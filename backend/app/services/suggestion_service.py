@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
 from app.services.openai_service import get_llm_client, _uses_max_completion_tokens
+from app.services.sub_agent_models import provider_safe_utility_model
 
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
@@ -71,9 +72,14 @@ def generate_suggestions(
     client = get_llm_client(user_settings)
 
     # Model resolution: user_settings override (UI/JSON) > env override > provider default
-    override_model = (
+    # Phase 175 XPROV-03 (D-03): the shared guard drops a stale cross-provider
+    # sub_agent_model (inferred provider != active) BEFORE the call, so a mismatched
+    # override falls through to the active provider's default instead of routing a
+    # wrong-provider utility call (twin of thread_title's guarded override).
+    override_model = provider_safe_utility_model(
+        user_settings,
         (user_settings.sub_agent_model if user_settings else "")
-        or settings.sub_agent_model
+        or settings.sub_agent_model,
     )
     if override_model:
         effective_model = override_model

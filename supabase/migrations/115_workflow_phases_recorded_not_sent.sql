@@ -1,0 +1,122 @@
+-- 115_workflow_phases_recorded_not_sent.sql
+-- Phase 189 (CONN-01 / D-08 / D-17) — extend the workflow_phases status CHECK with the
+-- ONE governed-external-action outcome literal: 'recorded_not_sent'.
+--
+-- WHY: Phase 189 ships a governed external-action node whose external step honestly
+-- records what it *would* do and sends nothing (SC#4 — no egress exists in this phase).
+-- That outcome is neither `completed` (the send did not happen) nor `failed` (nothing
+-- went wrong) nor `skipped` (the step DID run and a human DID approve it), so D-07 gives
+-- it its own worded status. Measured: `workflow_phases_status_check` caps `status` at
+-- exactly five values — `pending, active, completed, failed, skipped`
+-- (supabase/full-schema.sql:1932, re-verified 2026-08-07) — so a genuinely new PERSISTED
+-- status needs a migration. Without it the new terminal write dies with a Postgres 23514
+-- mid-run, leaving the phase row permanently `active` under a run marked `failed`.
+--
+-- ⚠ AMENDS THE ROADMAP'S "no migration" FLAG FOR 189. The precedent is near-exact and its
+-- reasoning transfers verbatim: Phase 185 amended its own zero-migration promise for
+-- migration 114 (the sibling file next to this one), because the zero-migration promise
+-- was a scoping convenience while the honest vocabulary is a correctness property — and
+-- the alternative knowingly ships the defect the phase existed to fix. The rejected
+-- alternative here was deriving the word at render while the column stays `completed`
+-- (real precedent — Phase 188's wire-only "State unknown") but the ROW would then read
+-- *completed* forever to anything querying the table directly.
+--
+-- ⚠ D-17 — THE STORED VALUE AND THE RENDERED WORD ARE DIFFERENT THINGS, AND THIS
+-- CONSTRAINT STORES THE SLUG. It gains `recorded_not_sent`: lowercase, snake_case, in the
+-- shape of the five literals that already exist. The rendered human sentence (D-16) is
+-- what the CLIENT's vocabulary layer produces for that slug — it lives one language away
+-- and never enters this file. Putting display prose inside a database constraint would
+-- make the wording un-editable without a second migration, would put an em-dash in a
+-- CHECK, and would break the shape of the column. backend/tests/test_migration_115.py's
+-- NEGATIVE control asserts that sentence is REJECTED here with SQLSTATE 23514 naming
+-- workflow_phases_status_check — i.e. D-17 is expressed as an executable test, not a
+-- comment.
+--
+-- ALTER (NOT CREATE — workflow_phases and its status CHECK both already exist). Adds
+-- exactly ONE literal (5 → 6) and changes nothing else: no table, no column, no index,
+-- no grant. Does NOT touch RLS on workflow_phases — no policy is created, dropped or
+-- altered, so the existing org/membership access rules are untouched. The
+-- closed-vocabulary property the CHECK exists for is PRESERVED: this widens it by one
+-- REVIEWED literal, and all five shipped literals are re-added verbatim below. A
+-- re-typed ARRAY[…] is precisely where a shipped literal gets silently dropped, which
+-- would orphan every existing row using it — test_migration_115.py re-asserts all five
+-- are still admitted (plus a nonsense value still refused) for that reason.
+--
+-- ⚠ TWO DELIBERATE DEPARTURES FROM THE 114 ANALOG:
+--
+--   1. `= ANY (ARRAY[…])` with ::text casts, NOT `IN (…)`. 114 used `IN`; the SHIPPED
+--      workflow_phases constraint uses `= ANY (ARRAY[…])`, which is the form pg_dump
+--      regenerates. Matching the live shape keeps the regenerated full-schema.sql diff to
+--      roughly one line instead of a whole-constraint reformat.
+--
+--   2. ⚠ THERE IS NO PYTHON LITERAL SET TO PIN — do not look for one, and note that 114's
+--      pin test is deliberately NOT named anywhere in this file, because that pin belongs
+--      to 114 and citing it here would be a false claim. 114 can cite one because
+--      harness_audit's event kinds ARE mirrored by a Python allow-list
+--      (backend/app/db/workflows.py:120-136) that must be widened in lockstep. `workflow_phases.status` has NO Python enum and
+--      NO allow-list: the statuses are bare string literals inside the four UPDATEs in
+--      backend/app/db/workflows.py (lines 965, 979, 1001, 1013 — 'active', 'completed',
+--      'failed', 'skipped'; 'pending' is the column DEFAULT set at INSERT). So this
+--      migration has exactly ONE code counterpart, not two: the new
+--      `record_phase_not_sent` write function landing in plan 189-11. Its live-DB gate is
+--      backend/tests/test_migration_115.py, which GREEN-SKIPS until this file is applied
+--      and MUST PASS afterwards.
+--
+-- ⚠ NOTE FOR REVIEWERS — `workflow_phases_status_check` appears in NO existing migration
+-- file (`grep -rln workflow_phases_status_check supabase/migrations/` → no output). It
+-- predates the numbered-migration era and exists only in the live DB and in the dump. So
+-- 115 is the FIRST migration ever to touch it and there is no earlier ALTER to copy
+-- verbatim. `DROP CONSTRAINT` is nonetheless correct: the constraint exists by that exact
+-- name in the live DB, which is what supabase/full-schema.sql:1932 reflects.
+--
+-- Apply by pasting into the Supabase SQL editor — NEVER `supabase db push` /
+-- `supabase db reset` (both wipe local dev data; CLAUDE.md forbids them outright); then
+-- `bash scripts/regenerate-full-schema.sh` (NO --reset), and commit the regenerated
+-- artifact. Never hand-edit supabase/full-schema.sql.
+-- Task 2 [BLOCKING] (operator, autonomous:false) applies it; Task 3 regenerates.
+-- This plan ONLY AUTHORS the file — it is NOT applied here.
+--
+-- NOTE (T-189-20): DROP+ADD CONSTRAINT takes a brief ACCESS EXCLUSIVE lock on
+-- workflow_phases. Immaterial on local dev; on cloud this belongs in the standing
+-- migration-parity window (migs 099 onward land together, in order), not mid-traffic.
+-- Do NOT apply this to the cloud database during Phase 189.
+--
+-- ⚠ REVIEW FINDING WR-01 (2026-08-07) — THE APPLY SHAPE IS NOW ATOMIC AND IDEMPOTENT.
+-- This file previously shipped the two ALTERs BARE: no transaction, no IF EXISTS. Pasted
+-- into the Supabase SQL editor each ran in its OWN implicit transaction, so if the session
+-- dropped, the editor timed out, or anything interrupted the pair between them, the table
+-- was left with NO workflow_phases_status_check AT ALL — the closed vocabulary this whole
+-- migration exists to PRESERVE, gone, fail-open, and SILENTLY (nothing reads pg_constraint
+-- at boot). Re-pasting after such a partial apply then errored on the bare DROP, because
+-- the constraint was already gone. The header above argues at length that the closed
+-- vocabulary is "the property the CHECK exists for" and then shipped the one apply shape
+-- that can drop it.
+--
+--   * BEGIN/COMMIT makes the window atomic — either the constraint is the OLD five-literal
+--     one or the NEW six-literal one, never absent. DDL is transactional in Postgres, so
+--     this genuinely rolls back. (House style: migrations 108–113, the six immediately
+--     preceding this one, all wrap in BEGIN/COMMIT.)
+--   * DROP CONSTRAINT **IF EXISTS** makes a re-paste safe. (House style: 048 and 063 are
+--     the shipped CHECK-widening precedents and both use it.)
+--
+-- ⚠ THIS CHANGES NO SCHEMA AND REQUIRES NO RE-APPLY. Running the block below produces
+-- exactly the constraint the bare pair produced. Migration 115 is ALREADY APPLIED to the
+-- live LOCAL database and the operator does NOT need to paste anything again;
+-- supabase/full-schema.sql is unaffected and no regeneration is owed. The change is pure
+-- FORWARD safety, and it is worth making because the CLOUD apply is still outstanding
+-- (this file's own note above defers it to the standing parity window) — the paste this
+-- protects is the one that has not happened yet.
+
+BEGIN;
+
+ALTER TABLE public.workflow_phases DROP CONSTRAINT IF EXISTS workflow_phases_status_check;
+ALTER TABLE public.workflow_phases ADD CONSTRAINT workflow_phases_status_check CHECK (
+    status = ANY (ARRAY[
+        'pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text,
+        -- 189 (CONN-01 / D-08, D-17) — the governed external action that was recorded
+        -- rather than transmitted. THE SLUG, never the rendered sentence:
+        'recorded_not_sent'::text
+    ])
+);
+
+COMMIT;

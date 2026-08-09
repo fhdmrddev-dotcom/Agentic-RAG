@@ -12,7 +12,7 @@ Scaffold (test_skill_proposals_router.py precedent): reuses ``_FilterSupabase`` 
 ``_override`` / ``_clear_overrides`` from ``test_evals_router`` so the in-memory fake-store
 semantics (``.eq()`` / ``.in_()`` chains, ``.insert()`` returning rows in ``.data``,
 ``.order(...).limit(1)``) stay identical to the sibling eval tests. ``_seed`` builds the exact
-store the gate reads: one owner-scoped ``skills`` row (with ``instructions`` + ``is_global``),
+store the gate reads: one owner-scoped ``skills`` row (with ``instructions`` + ``is_org_shared``),
 N ``skill_versions`` rows (each ``id`` + ``instructions`` — two rows with IDENTICAL text but
 DISTINCT ids model the D-04 near-dup case), zero-or-more ``eval_runs`` rows
 (``status``/``passed_count``/``measured_count``/``skill_version_id`` — non-completed runs carry
@@ -30,7 +30,7 @@ Test inventory (RESEARCH Requirements → Test Map — 11 rows):
     * test_toggle_global_blocked_when_no_passing_eval
     * test_toggle_global_allowed_after_passing_eval
     * test_force_publish_records_override
-    * test_create_skill_ignores_body_is_global
+    * test_create_skill_ignores_body_is_org_shared
     * test_import_and_save_skill_stay_private
     * test_unshare_never_gated_reshare_regated
 """
@@ -59,7 +59,7 @@ _H = {"Authorization": "Bearer test"}
 def _seed(
     *,
     instructions="CURRENT INSTRUCTIONS",
-    is_global=False,
+    is_org_shared=False,
     versions=None,
     runs=(),
     overrides=(),
@@ -68,7 +68,7 @@ def _seed(
 
     Args:
         instructions: the LIVE ``skills.instructions`` text (what D-04 binds against).
-        is_global:    the skill's current share state.
+        is_org_shared:    the skill's current share state.
         versions:     list of instruction texts, one ``skill_versions`` row each, in creation
                       order (index 0 = oldest). Defaults to ONE version matching ``instructions``.
                       Two entries with IDENTICAL text but distinct auto-generated ids model the
@@ -97,7 +97,7 @@ def _seed(
                 "description": "d",
                 "instructions": instructions,
                 "is_enabled": True,
-                "is_global": is_global,
+                "is_org_shared": is_org_shared,
                 "created_at": "2026-07-03T00:00:00Z",
                 "updated_at": "2026-07-03T00:00:00Z",
             }
@@ -291,7 +291,7 @@ async def test_interrupted_run_does_not_satisfy():
 class _CreateSupabase(_FilterSupabase):
     """``_FilterSupabase`` whose ``skills`` INSERT back-fills the DB-side defaults (id /
     is_enabled / timestamps) a real Postgres row carries, so ``create_skill``'s
-    ``SkillResponse`` serialization succeeds through the fake store. ``is_global`` is
+    ``SkillResponse`` serialization succeeds through the fake store. ``is_org_shared`` is
     deliberately NOT back-filled — the endpoint must hard-set it (D-08), so whatever value it
     inserts is exactly what the test reads back (a born-global bypass would surface as True)."""
 
@@ -316,10 +316,10 @@ class _CreateSupabase(_FilterSupabase):
 @pytest.mark.asyncio
 async def test_toggle_global_blocked_when_no_passing_eval():
     """Private→global toggle with no passing eval → 409 {'error': 'publish_gate_unmet',
-    'gate': {...}}; skills.is_global stays False (GATE-01 SC#1 / D-07)."""
+    'gate': {...}}; skills.is_org_shared stays False (GATE-01 SC#1 / D-07)."""
     from app.main import app
 
-    store, ids = _seed(is_global=False)  # no eval_runs → gate unmet (never_evaled)
+    store, ids = _seed(is_org_shared=False)  # no eval_runs → gate unmet (never_evaled)
     sb = _FilterSupabase(store)
 
     _override(app, user=OWNER, supabase=sb)
@@ -334,8 +334,8 @@ async def test_toggle_global_blocked_when_no_passing_eval():
     assert detail["error"] == "publish_gate_unmet"
     # The server-computed gate travels in the refusal payload (server→client only, T-136-03).
     assert "gate" in detail and detail["gate"]["met"] is False
-    # The is_global UPDATE never ran — the skill stays private.
-    assert sb.store["skills"][0]["is_global"] is False
+    # The is_org_shared UPDATE never ran — the skill stays private.
+    assert sb.store["skills"][0]["is_org_shared"] is False
     # A plain (non-override) refusal records nothing.
     assert sb.store["skill_publish_overrides"] == []
 
@@ -343,11 +343,11 @@ async def test_toggle_global_blocked_when_no_passing_eval():
 @pytest.mark.asyncio
 async def test_toggle_global_allowed_after_passing_eval():
     """After a completed passing run on the CURRENT version, the toggle succeeds (200) and
-    flips is_global true — the gate was MET, so NO override row is recorded (GATE-01 SC#2)."""
+    flips is_org_shared true — the gate was MET, so NO override row is recorded (GATE-01 SC#2)."""
     from app.main import app
 
     store, ids = _seed(
-        is_global=False,
+        is_org_shared=False,
         runs=[{"version": 0, "passed": 2, "measured": 2}],  # D-03 full pass on the current version
     )
     sb = _FilterSupabase(store)
@@ -360,8 +360,8 @@ async def test_toggle_global_allowed_after_passing_eval():
         _clear_overrides(app)
 
     assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
-    assert resp.json()["is_global"] is True
-    assert sb.store["skills"][0]["is_global"] is True
+    assert resp.json()["is_org_shared"] is True
+    assert sb.store["skills"][0]["is_org_shared"] is True
     # Met gate → a straight publish, no owner-visible override row.
     assert sb.store["skill_publish_overrides"] == []
 
@@ -375,7 +375,7 @@ async def test_force_publish_records_override():
 
     # Two versions, no runs → gate unmet (never_evaled); the latest version is index 1
     # (version_number 2 — resolved via order("version_number", desc).limit(1)).
-    store, ids = _seed(is_global=False, instructions="V2", versions=["V1", "V2"])
+    store, ids = _seed(is_org_shared=False, instructions="V2", versions=["V1", "V2"])
     sb = _FilterSupabase(store)
 
     _override(app, user=OWNER, supabase=sb)
@@ -388,8 +388,8 @@ async def test_force_publish_records_override():
         _clear_overrides(app)
 
     assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
-    assert resp.json()["is_global"] is True
-    assert sb.store["skills"][0]["is_global"] is True
+    assert resp.json()["is_org_shared"] is True
+    assert sb.store["skills"][0]["is_org_shared"] is True
 
     overrides = sb.store["skill_publish_overrides"]
     assert len(overrides) == 1, "force-publish records exactly one owner-visible override row"
@@ -403,8 +403,8 @@ async def test_force_publish_records_override():
 
 
 @pytest.mark.asyncio
-async def test_create_skill_ignores_body_is_global():
-    """POST /skills with body is_global=true → the created row is is_global=False; the
+async def test_create_skill_ignores_body_is_org_shared():
+    """POST /skills with body is_org_shared=true → the created row is is_org_shared=False; the
     born-global side door is hard-closed server-side (D-08 / T-118-02-01)."""
     from app.main import app
 
@@ -415,21 +415,21 @@ async def test_create_skill_ignores_body_is_global():
         async with httpx.AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             resp = await c.post(
                 "/skills",
-                json={"name": "Sneaky", "description": "d", "instructions": "i", "is_global": True},
+                json={"name": "Sneaky", "description": "d", "instructions": "i", "is_org_shared": True},
                 headers=_H,
             )
     finally:
         _clear_overrides(app)
 
     assert resp.status_code == 201, f"expected 201, got {resp.status_code}: {resp.text}"
-    assert resp.json()["is_global"] is False, "the server must ignore body.is_global (D-08)"
-    assert sb.store["skills"][0]["is_global"] is False
+    assert resp.json()["is_org_shared"] is False, "the server must ignore body.is_org_shared (D-08)"
+    assert sb.store["skills"][0]["is_org_shared"] is False
 
 
 @pytest.mark.asyncio
 async def test_import_and_save_skill_stay_private():
     """Skill import (ZIP → POST /skills/import) AND the agent save_skill tool both produce
-    is_global=False rows — the D-08 regression guard on the two non-create write paths."""
+    is_org_shared=False rows — the D-08 regression guard on the two non-create write paths."""
     from app.main import app
     from app.services.tool_dispatcher import _handle_save_skill
 
@@ -443,7 +443,7 @@ async def test_import_and_save_skill_stay_private():
     zip_bytes = buf.getvalue()
 
     # _CreateSupabase back-fills the inserted skills row's ``id`` (the import path threads
-    # ``skill_row["id"]`` into the companion-file upload) while leaving is_global untouched.
+    # ``skill_row["id"]`` into the companion-file upload) while leaving is_org_shared untouched.
     sb = _CreateSupabase({"skills": []})
     _override(app, user=OWNER, supabase=sb)
     try:
@@ -459,10 +459,10 @@ async def test_import_and_save_skill_stay_private():
     assert resp.status_code in (200, 201), f"import {resp.status_code}: {resp.text}"
     created = resp.json()["created"]
     assert len(created) == 1
-    assert created[0]["is_global"] is False, "import must land is_global=False (D-08)"
-    assert sb.store["skills"][0]["is_global"] is False
+    assert created[0]["is_org_shared"] is False, "import must land is_org_shared=False (D-08)"
+    assert sb.store["skills"][0]["is_org_shared"] is False
 
-    # ── save_skill tool path: the insert carries NO is_global key → the DB default (False)
+    # ── save_skill tool path: the insert carries NO is_org_shared key → the DB default (False)
     #    applies; a caller can never make a born-global skill through the agent tool. ──
     save_store = {"skills": []}
     save_sb = _FilterSupabase(save_store)
@@ -471,7 +471,7 @@ async def test_import_and_save_skill_stay_private():
         {"name": "Tool Skill", "description": "d", "instructions": "i"}, ctx
     )
     assert len(save_store["skills"]) == 1
-    assert save_store["skills"][0].get("is_global") is not True
+    assert save_store["skills"][0].get("is_org_shared") is not True
 
 
 @pytest.mark.asyncio
@@ -482,7 +482,7 @@ async def test_unshare_never_gated_reshare_regated():
     ungated unshare returning 200 proves it is not invoked on the global→private direction."""
     from app.main import app
 
-    store, ids = _seed(is_global=True)  # already global, but no passing eval
+    store, ids = _seed(is_org_shared=True)  # already global, but no passing eval
     sb = _FilterSupabase(store)
 
     _override(app, user=OWNER, supabase=sb)
@@ -495,9 +495,9 @@ async def test_unshare_never_gated_reshare_regated():
 
     # Unshare: an ungated straight UPDATE (no gate, no override).
     assert unshare.status_code == 200, f"unshare expected 200, got {unshare.status_code}: {unshare.text}"
-    assert unshare.json()["is_global"] is False
+    assert unshare.json()["is_org_shared"] is False
     assert sb.store["skill_publish_overrides"] == [], "unshare must NOT record an override"
     # Re-share: the gate runs fresh — unmet → 409 (no grandfathering).
     assert reshare.status_code == 409, f"reshare expected 409, got {reshare.status_code}: {reshare.text}"
     assert reshare.json()["detail"]["error"] == "publish_gate_unmet"
-    assert sb.store["skills"][0]["is_global"] is False, "the blocked re-share left the skill private"
+    assert sb.store["skills"][0]["is_org_shared"] is False, "the blocked re-share left the skill private"

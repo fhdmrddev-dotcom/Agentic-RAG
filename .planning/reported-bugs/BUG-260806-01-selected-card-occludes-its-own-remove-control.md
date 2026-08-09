@@ -1,0 +1,144 @@
+---
+id: BUG-260806-01
+title: A selected phase card occludes its own ✕ remove control on the editable canvas
+reported: 2026-08-06
+surface: Agentic-RAG
+severity: major
+status: closed
+affected_areas: [frontend/workflow-canvas, frontend/editing-affordances]
+folded_into: 188.2
+verified_closed_by: 188.2
+related_seeds: []
+re_open_trigger: null
+reproduces_on:
+  branch: develop
+  commit: 42b9cec9
+  date: 2026-08-06
+---
+
+# BUG-260806-01: A selected phase card occludes its own ✕ remove control
+
+## What we observed
+
+On the editable Workflow Builder canvas (draft `compliance-gap-report-1u9vcs`,
+viewport 1522 × 522, canvas zoom 1.69), hit-testing each editing affordance at
+its own centre with `document.elementFromPoint`:
+
+| Affordance | Reachable | What actually sits at that pixel |
+|---|---|---|
+| `＋ Add a step before step 1` | yes | the `＋` button |
+| `＋ Add a step before step 2` | yes | the `＋` button |
+| `＋ Add a step at the end` | yes | the `＋` button |
+| `✕ Remove step 1` | yes | the `✕` button |
+| `✕ Remove step 2` | **no** | `DIV.mx-auto block w-[248px] rounded-[22px] …` — the `PhaseNodeCard` |
+
+The distinguishing variable is **selection**, not position. Measured node state
+at the moment of the failing hit-test:
+
+```
+Work out how to do it        selected: false   z-index: 0
+Fill compliance-gap-report   selected: TRUE    z-index: 1000
+○ (end cap)                  selected: false   z-index: 0
+```
+
+Deselecting (all nodes return to `z-index: 0`) and re-running the identical
+hit-test returns the `✕` button. Reachable flips **false → true** with no other
+change.
+
+The `✕` itself is not at fault: computed `opacity: 1`, `pointer-events: auto`,
+correctly positioned, and it moves with its card under drag (measured: card
++76 y, `✕` +76 y). It is simply painted under the card.
+
+## Why it matters
+
+Clicking a card is *how* a card becomes selected. So the natural user flow —
+click the phase you want to delete, then click its `✕` — is not completable
+with a real pointer. The user sees an enabled, fully-revealed control that does
+not respond.
+
+Severity **major** rather than minor: the control is not merely awkward, it is
+unreachable in the state a user most likely reaches it from, and the failure is
+silent (no error, the click lands on the card and selects it again).
+
+This defect class is invisible to the entire automated suite:
+
+- `.click()` and `fireEvent.click()` dispatch directly to the element and bypass
+  hit-testing entirely, so every unit test passes.
+- jsdom applies no CSS and computes no stacking contexts.
+
+`WorkflowCanvas.tsx:390-410` records a prior incident of exactly this class (a
+`pointer-events` rule once shipped an unreachable `＋` while every unit test was
+green). This is the same class, a different mechanism.
+
+## Hypothesized cause
+
+Hypothesis, not yet confirmed by a fix:
+
+`@xyflow/react` elevates a selected node to `z-index: 1000`. The editing
+affordances render through the library's `<ViewportPortal>`, whose container
+`.react-flow__viewport-portal` carries `z-index: auto` — so the portal's
+children participate in the stacking context at effectively `auto` and lose to
+any node at 1000.
+
+Likely fix shapes (untested): give the portal container a stacking context above
+the selected-node elevation, or render the affordance layer above the node
+renderer rather than in the viewport portal. Either needs care — the portal is
+what makes the affordances pan and zoom with the plane, which is load-bearing.
+
+## Not introduced by Phase 188.1
+
+Phase 188.1 extracted `PlaneEditingLayer` and `EDIT_AFFORDANCE` out of
+`WorkflowCanvas.tsx`. Evidence this defect predates that move:
+
+- `git show 14917821^:frontend/src/components/workflows/WorkflowCanvas.tsx`
+  (the pre-extraction tree) and the shipped `PlaneEditingLayer.tsx` **both**
+  render through `<ViewportPortal>`, and **neither sets any `zIndex`**.
+- `188.1-02`'s `AFFORDANCE_SHAPE_BASELINE`, captured from the pre-move tree,
+  still deep-equals after the extraction — the rendered geometry is unchanged.
+
+Found *during* 188.1's operator UAT, caused by something older.
+
+## Surface classification
+
+`Agentic-RAG` — this app's own Workflow Builder canvas. A routing candidate at
+`/gsd:discuss-phase`, `/gsd:new-milestone`, and `/gsd:complete-milestone`.
+
+Natural home: the next phase touching `PlaneEditingLayer.tsx`, the viewport
+portal, or node z-index/selection. Note that `PhaseNodeCard.tsx`'s hot-file
+ledger row now reads **G-5 fires — extraction due**, so a refactor phase on that
+file is already owed; this bug is a candidate to fold into it.
+
+---
+
+## How it was fixed and how that was verified — CLOSED by Phase 188.2
+
+**Fix (plan `188.2-02`, commit `7f77af44`).** Applied one tier lower than this report's
+hypothesis guessed. Rather than give the portal *container* a stacking context, all three
+editing-affordance groups in `PlaneEditingLayer.tsx` — the `＋` buttons, the `✕` buttons
+**and** the insert picker wrapper — now carry `zIndex: AFFORDANCE_Z` (**1002**), above
+`@xyflow/system`'s `SELECTED_NODE_Z` (**1000**, traced to
+`@xyflow/system/dist/esm/index.js:1547` in the installed package rather than assumed). The
+portal container is left untouched, so the pan/zoom behaviour this report flagged as
+load-bearing is unchanged. `PhaseNodeCard.tsx` and `WorkflowCanvas.tsx` report **0 files
+changed**.
+
+**Verified by two instruments, deliberately of different kinds:**
+
+1. **The driven row (`188.2-UAT.md` → B1), 2026-08-07** — the only instrument that can see
+   this defect class. With step 2 selected (`z-index: 1000`, the failing state from the table
+   above) and the affordance revealed by a **physical** pointer (`opacity: 1`),
+   `document.elementFromPoint` at the `✕`'s centre returned **`canvas-remove-emit`** — the
+   control, not the card. B2 repeated the identical test deselected (`z-index: 0`): also
+   reachable. The node's elevation is the only variable that moved.
+2. **A falsification control on that same row** — because a hit test that returns the `✕`
+   proves nothing unless it can return something else. Dropping the control to `z-index: 999`
+   (the pre-fix world) with the node still selected made `elementFromPoint` return
+   **`canvas-node-emit`**, *reproducing this report's exact failure*; restoring `1002` returned
+   the `✕`. The instrument was observed swinging both ways in one session.
+3. **A unit guard (`188.2-02`, commit `fe3de624`)** pins the relation, the library's own
+   constant and the rendered wiring on every build — so a regression is caught without a
+   browser, even though a browser is what proved the fix.
+
+**Closed on the strength of the driven row plus its control and the unit guard — never on the
+stacking analysis alone**, which is what this report's "Hypothesized cause" section was, and
+which turned out to name the wrong tier.

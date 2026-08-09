@@ -4,7 +4,7 @@ import logging
 import os
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 # WR-01 fix: removed dead imports `AsyncGenerator` and `EventSourceResponse`
@@ -23,7 +23,22 @@ except ImportError:
     AnthropicAPIError = Exception  # fallback if SDK not installed
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase, get_redis
+# Phase 163 (TEN-02) — the Wave-4 request-seam swap:
+#   get_user_supabase_client : the FastAPI-injectable per-request user-JWT (anon+Bearer)
+#     client — RLS-ENFORCED — that the chat/streaming request handlers inject instead of
+#     the service-role get_supabase singleton (D-03).
+#   get_user_pg_connection   : the SET-LOCAL-ROLE-authenticated asyncpg CM the request-scoped
+#     connectionless pool reads convert to (D-02).
+#   get_supabase (kept)      : STILL injected on the send_message producer seam ONLY, as the
+#     service-role client handed to run_producer — the agent-loop async writer stays
+#     service-role (D-05/D-09); it must NEVER get the user-JWT client.
+from app.dependencies import (
+    get_current_user,
+    get_supabase,
+    get_redis,
+    get_user_pg_connection,
+    get_user_supabase_client,
+)
 import redis.asyncio as aioredis
 # Phase 075 D-075-04: RedisError for the /snapshot endpoint's xinfo_stream
 # probe → 503+Retry-After:10 fallback (mirrors runs.py:354-370 pattern).
@@ -44,18 +59,43 @@ from app.db.runs import finalize_run, insert_assistant_message
 # never drift (BUG-260709-01 / 145-REPRO Direction B). The SSE transport
 # (sentinel XADD / EXPIRE / get_snapshot / RUN_TASKS) stays in this file.
 from app.services.run_lifecycle import register_run_start, finalize_run_terminal
+# Phase 162.5 Plan 01 (D-A2 / D-A4) — the title subsystem extracted to a leaf module.
+# Re-imported at module scope so every existing patch("app.api.threads.generate_thread_title")
+# still intercepts, and send_message injects this module-global into maybe_autotitle_thread
+# (title_fn=generate_thread_title, emit=_emit) — behavior byte-identical.
+from app.services.thread_title import generate_thread_title, maybe_autotitle_thread
+# Phase 162.5 Plan 01 (D-A2 / D-A4) — the disabled-model fallback + provider-resolution
+# transform extracted to a leaf module. Re-imported at module scope so test_149's
+# `from app.api.threads import _resolve_enabled_model` + threads_mod._reresolve_fallback_provider
+# / _apply_fallback_to_request still resolve; send_message calls resolve_run_model. The moved
+# bodies resolve load_all_model_overrides / get_model_capability_async / override_provider LATE
+# off this module (kept imported below), so patch("app.api.threads.*") still intercepts.
+from app.services.run_model_resolution import (
+    _resolve_enabled_model,
+    _reresolve_fallback_provider,
+    _apply_fallback_to_request,
+    resolve_run_model,
+)
+# Phase 167 VIS-02 — module handle so the send-path per-user model-default overlay is a
+# SINGLE call line (the 149-shaped named-import block above is untouched; the guard is
+# module-qualified → the G-5 threads.py surface grows by exactly the one guard line).
+from app.services import run_model_resolution as _run_model_resolution
+# Phase 162.5 Plan 02 (D-A2 / D-A4) — the workflow-kickoff machinery extracted to a
+# service module. Re-imported at module scope so `from app.api.threads import
+# _ensure_skill_snapshots` (test_099) still resolves + send_message calls the seam.
+# The moved bodies late-import workflows_enabled / get_pg_pool FROM this module so
+# patch("app.api.threads.workflows_enabled") (test_147) + the app.api.threads.get_pg_pool
+# patch (test_dual_mode_wiring) still intercept (D-A4). Behavior byte-identical.
+from app.services.workflow_kickoff import (
+    _ensure_skill_snapshots,
+    preflight_workflow_kickoff,
+)
 # Phase 092 (MODE-01): the net-new run-creation + picker-feed helpers. db-layer
 # imports are cycle-safe (db/workflows.py imports only models). run_workflow +
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
 # the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
 from app.db.workflows import create_workflow_run, list_published_workflows
 from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
-from app.utils.folder_utils import fetch_visible_folders
-from app.services.harness.scope import resolve_project_subtree, assert_folder_scopes_subset, resolve_run_scope_root
-# 099 WFSKILL-01: imported as a MODULE (not bound names) so the kickoff helper calls
-# validate_skill_refs / materialize_skill_snapshots_if_needed through the module
-# object — keeps the seam patchable + the hot file free of inline gate/copy logic (G-5).
-from app.services.harness import skill_snapshot as _skill_snapshot
 from app.models.user_settings import (
     load_all_model_overrides,
     load_user_settings,
@@ -193,133 +233,14 @@ async def _emit_terminal(redis, run_id: _uuid_mod.UUID, type: str, **fields) -> 
     )
 
 
-async def _resolve_enabled_model(resolved_model: str, org_default: str) -> tuple[str, dict | None]:
-    """Phase 149 (D-149-10) enabled-enforcement at the ONE shared model-resolution seam.
-
-    If ``resolved_model`` was operator-DISABLED, fall back to the org default and return
-    ``(org_default, notice)`` where ``notice`` names BOTH models for an honest inline SSE
-    event; otherwise return ``(resolved_model, None)`` — byte-identical to before (the
-    shared Deep/workflow path is untouched for the common enabled case; no per-provider
-    fork, D-14 red line).
-
-    The disabled check reads the CACHED all-rows override set (``load_all_model_overrides``
-    — 30s TTL, no per-request DB read on a warm cache; the enabled-only hot cache is NOT
-    touched). A model is disabled ONLY when its override row carries ``enabled=false``; an
-    absent override defaults enabled. The org default is guaranteed ENABLED by the Plan-06
-    Task-1 guards (the disable guard refuses disabling it; the lock guard refuses locking a
-    disabled model), so the fallback target can never itself be disabled — no dead default.
-    A settings-read blip is swallowed (returns the model unchanged) so this never breaks
-    send_message.
-    """
-    try:
-        overrides = await load_all_model_overrides()
-    except Exception:  # noqa: BLE001 — an override-read blip must never sink send_message
-        return resolved_model, None
-    is_disabled = (overrides.get(resolved_model) or {}).get("enabled") is False
-    if is_disabled and org_default and org_default != resolved_model:
-        notice = {
-            "disabled_model": resolved_model,
-            "fallback_model": org_default,
-            "message": (
-                f"{resolved_model} was disabled by your administrator — "
-                f"this reply used {org_default}."
-            ),
-        }
-        # WR-03/WR-04 defense-in-depth: re-verify the fallback target (the org default) is
-        # itself ENABLED. The Plan-06 write-side guards keep the org default enabled, but a
-        # multi-worker 30s-cache-staleness window could leave a DEAD default. If the org
-        # default is ALSO disabled we KEEP the honest notice (never a silent route to a
-        # disabled model) and log the anomaly — we do not pretend the fallback is a clean route.
-        if (overrides.get(org_default) or {}).get("enabled") is False:
-            logger.warning(
-                "_resolve_enabled_model: org default %r is itself disabled — a dead default "
-                "(WR-03 multi-worker window); surfacing the honest fallback notice, not a "
-                "silent route to a disabled model.",
-                org_default,
-            )
-        return org_default, notice
-    return resolved_model, None
-
-
-async def _reresolve_fallback_provider(effective_model: str, current_provider: str) -> str:
-    """Phase 149 Plan 09 (D-149-10 bookkeeping honesty) — after a disabled-model fallback,
-    re-resolve the RECORDED provider from the EFFECTIVE (fallback) model's capability so
-    ``runs.provider`` matches the model that actually served the run.
-
-    The send_message provider-resolution block leaves ``_resolved_provider`` as the
-    PRE-fallback value on a fallback (the ``body.provider`` branch and the non-registry
-    ``else`` branch both keep the original ``active_provider``) — a MiniMax-served fallback
-    would otherwise record ``provider='anthropic'`` (the UAT Test-7 wart). This returns the
-    effective model's provider ONLY when the capability is a VERIFIED entry
-    (``capability_source`` in ``registry`` / ``db_override``), else the current provider
-    UNCHANGED. WR-01 (review round 2): post-075.3, ``get_model_capability_async`` never
-    returns ``provider="unknown"`` for a non-empty id — a registry/DB miss returns a
-    pattern-INFERRED provider (slashed ids → ``openrouter``, garbage → the ``ollama``
-    bucket) with ``capability_source="inferred"``, so a source check (the same D-075.3-08
-    semantics the pre-existing provider-resolution block enforces 20 lines below the call
-    site) is what actually delivers the "a garbage / absent capability never yanks the
-    recorded provider" promise. Without it, an org default absent from the registry/DB
-    (legacy env-CSV model, mis-cased id) would yank ``runs.provider`` AND live SDK routing
-    to an inference bucket — e.g. a slashed local-model default routed to OpenRouter (the
-    BUG-260616-01 data-egress class: a name cannot identify the endpoint).
-    ``db_override`` is accepted alongside ``registry`` because a discovery-confirmed
-    DB-only model is operator-verified. Reads through the same cached
-    ``get_model_capability_async`` the handler already calls (no new per-request DB read
-    on a warm cache); routing itself is unchanged.
-    """
-    capability = await get_model_capability_async(effective_model) or {}
-    provider = capability.get("provider")
-    source = capability.get("capability_source", "")
-    if provider and provider != "unknown" and source in ("registry", "db_override"):
-        return provider
-    return current_provider
-
-
-async def _apply_fallback_to_request(
-    body, resolved_model: str, resolved_provider: str, user_settings
-):
-    """Phase 149 review round-2 CR-01 — apply a fired disabled-model fallback to the
-    OUTBOUND request. Called ONLY when ``_model_fallback_notice`` is truthy (the enabled /
-    no-fallback path never enters — byte-identical, D-14).
-
-    Returns ``(body, resolved_provider, user_settings)``:
-
-    - ``body`` is rebuilt with ``body.model`` = the EFFECTIVE (fallback) model. This is
-      THE CR-01 fix: the model actually sent to the LLM is always ``body.model``
-      (``agent_loop.py:1937`` native path, ``:2005``/``:2032`` compat path → the gateway's
-      ``model=request.model``); ``ctx.resolved_model`` is a dead local there. Without the
-      rewrite every fallback-fired run still sent the DISABLED model on the wire — the
-      plan-09 provider flip then aimed that disabled model at the fallback model's
-      provider (cross-provider fallback → provider 400/404 hard-fail, the exact UAT
-      Test-7 shape), and a same-provider fallback silently served the disabled model
-      while the inline notice claimed the fallback model replied. Post-seam
-      ``body.model`` readers audited: the title-gen read (threads.py ~:1325), the
-      RunContext/agent_loop request sites, and the suggestion-gen reads all correctly
-      want the EFFECTIVE model.
-    - ``resolved_provider`` / ``user_settings`` carry the plan-09 provider re-resolve
-      (bookkeeping honesty — ``runs.provider`` names who actually serves the run) via
-      the same canonical ``override_provider`` mutation path the registry branch uses.
-      WR-02 (review round 2): the re-resolved provider is committed ONLY when the
-      credentials switch actually applied — ``override_provider`` returns the settings
-      UNCHANGED (same object) when the target provider has no configured API key, and
-      recording the fallback provider in that case would make ``runs.provider`` name a
-      provider that did not serve the run (the exact runs-row dishonesty plan 09 set out
-      to fix, in the opposite direction).
-    """
-    fallback_provider = await _reresolve_fallback_provider(resolved_model, resolved_provider)
-    if fallback_provider != resolved_provider:
-        # Align user_settings so any downstream reader (agent_runner SDK selection)
-        # stays consistent with the recorded provider — same canonical mutation path
-        # the registry branch uses. Identity check: override_provider returns
-        # `effective` unchanged on refusal (no key configured for the target).
-        switched = override_provider(user_settings, fallback_provider)
-        if switched is not user_settings:
-            user_settings = switched
-            resolved_provider = fallback_provider
-    # CR-01: the producer's closure-captured body must carry the EFFECTIVE model —
-    # this is the value the agent loop / provider gateway put on the wire.
-    body = body.model_copy(update={"model": resolved_model})
-    return body, resolved_provider, user_settings
+# Phase 162.5 Plan 01 (G-5 leaf extraction): the disabled-model fallback + provider-resolution
+# helpers — _resolve_enabled_model, _reresolve_fallback_provider, _apply_fallback_to_request —
+# MOVED VERBATIM to app.services.run_model_resolution and re-imported at the top of this module
+# (one canonical copy, no duplicate). They stay patchable/importable as app.api.threads.* via
+# that re-import; their moved bodies resolve load_all_model_overrides / get_model_capability_async
+# / override_provider LATE off this module (still imported above) so those patches still apply.
+# The inline model/provider resolution block (below, in send_message) moved with them into
+# run_model_resolution.resolve_run_model.
 
 
 # Phase 089 Plan 03 (G-5 verbatim move): _is_transient_provider_error,
@@ -343,7 +264,7 @@ async def _apply_fallback_to_request(
 @router.get("", response_model=list[ThreadResponse])
 async def list_threads(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # BUG-260702-01 / Phase 134.1 (mig 082): exclude eval-execution threads (is_eval=true).
     # They are pure agent-loop exhaust — the eval's user-visible outputs live in eval_results +
@@ -450,7 +371,7 @@ async def _enrich_messages_with_runs(
 async def list_active_runs(
     thread_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # Ownership check — mirror runs.py stream_run / cancel_run pattern. 404
     # (NOT 403) per D-062-12 so we don't leak thread existence to other users
@@ -504,7 +425,7 @@ async def list_active_runs(
 async def get_snapshot(
     thread_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """D-075-01: one-round-trip reconcile primitive.
@@ -639,7 +560,7 @@ async def create_thread(
     background_tasks: BackgroundTasks,
     body: ThreadCreate = ThreadCreate(),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     insert_data: dict = {"user_id": current_user["id"], "title": body.title}
     if body.folder_id:
@@ -663,7 +584,7 @@ async def rename_thread(
     thread_id: str,
     body: ThreadUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
     await aexec(
@@ -689,7 +610,7 @@ async def delete_thread(
     thread_id: str,
     background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # Close sandbox session if sandbox is enabled (SAND-10).
     # sandbox_manager is imported unconditionally at module scope (WR-03);
@@ -744,163 +665,19 @@ async def delete_thread(
     )
 
 
-# BUG-260527-01 (D-08): Single-model providers have one tier — no cheaper
-# sub-agent model exists, so title generation uses the user's main model.
-# Multi-model providers (openai, anthropic, google, openrouter) can route
-# to a cheaper model via _SUB_AGENT_MODEL_DEFAULTS.
-_SINGLE_MODEL_PROVIDERS = frozenset({"deepseek", "moonshot", "minimax", "zhipu", "ollama"})
-
-
-def _strip_think_blocks(text: str) -> str:
-    """Remove <think>...</think> reasoning blocks (closed) and any unclosed trailing
-    <think> from text. Reasoning providers (minimax inline, GLM-4.6+) emit <think>
-    in message.content rather than a separate reasoning_content field, which would
-    otherwise bury or replace a generated title."""
-    out = text or ""
-    lower = out.lower()
-    while "<think>" in lower and "</think>" in lower:
-        start = lower.find("<think>")
-        end = lower.find("</think>", start)
-        if end == -1:
-            break
-        out = out[:start] + out[end + len("</think>"):]
-        lower = out.lower()
-    idx = out.lower().find("<think>")  # unclosed trailing think (ran out of budget mid-reasoning)
-    if idx != -1:
-        out = out[:idx]
-    return out
-
-
-def _derive_title_from_message(msg: str) -> str:
-    """Deterministic fallback title from the first user message — used when the LLM
-    returned reasoning-only / empty / a refusal. Returns a clean short title (first
-    line, first ~8 words, <=50 chars) instead of the bare 'New Chat' sentinel."""
-    text = (msg or "").strip()
-    if not text:
-        return "New Chat"
-    first_line = text.splitlines()[0].strip()
-    title = " ".join(first_line.split()[:8])[:50].strip()
-    return title or "New Chat"
-
-
-def _clean_llm_title(raw: str, first_user_message: str) -> str:
-    """Extract a usable title from raw LLM output. Strips <think> blocks + markdown/
-    quotes; falls back to a title derived from the user message (NOT bare 'New Chat')
-    when the model returned reasoning-only / empty / a refusal. Closes the title-gen
-    'stuck on New Chat' bug on reasoning providers (deepseek/moonshot/google/minimax)
-    whose tiny token budget left content empty after hidden reasoning."""
-    cleaned = _strip_think_blocks(raw or "")
-    cleaned = cleaned.strip().strip('"').strip("'").strip("*").strip()
-    if (
-        not cleaned
-        or len(cleaned) > 60
-        or cleaned.startswith(("I ", "I'", "**", "Sorry", "As ", "<"))
-    ):
-        return _derive_title_from_message(first_user_message)
-    return cleaned
-
-
-def generate_thread_title(
-    first_user_message: str,
-    user_settings=None,
-    chat_model: str = "",
-) -> tuple[str, dict | None]:
-    """Call LLM to produce a short thread title from the first user message.
-
-    Returns (title, fallback_info). fallback_info is None unless a 404 retry occurred.
-    """
-    try:
-        client = get_llm_client(user_settings)
-        provider = user_settings.active_provider if user_settings else ""
-
-        if provider in _SINGLE_MODEL_PROVIDERS:
-            # Single-model providers: use the chat_model the frontend sent
-            # (always correct for the active provider), then provider default,
-            # then user_settings.llm_model as last resort.
-            model = (
-                chat_model
-                or _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
-                or (user_settings.llm_model if user_settings else settings.llm_model)
-            )
-        else:
-            # Multi-model providers: try sub-agent override, then provider default, then fallback.
-            override = (
-                (user_settings.sub_agent_model if user_settings else "")
-                or settings.sub_agent_model
-            )
-            if override:
-                model = override
-            else:
-                model = (
-                    _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
-                    or (user_settings.llm_model if user_settings else settings.llm_model)
-                )
-
-        # Google (Gemini) is verbose and truncates a title at 60 — give it room
-        # for a full 4-6 word title. Other providers keep 30: non-reasoning models
-        # emit a short title fine, and reasoning models (deepseek/moonshot/minimax/
-        # zhipu) would burn any larger budget on hidden reasoning while BLOCKING the
-        # producer spawn — so we keep their budget small (fast empty return) and let
-        # _clean_llm_title fall back to a derived title. No added first-message latency.
-        _title_max_tokens = 160 if provider == "google" else 30
-        token_param = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
-        title_messages = [
-            {
-                "role": "system",
-                "content": "You are a title generator. Output ONLY a 4-6 word title summarizing the user's message. No explanation, no refusal, no markdown, no quotes. Just the title words.",
-            },
-            {"role": "user", "content": f"Generate a title for this message: {first_user_message[:200]}"},
-        ]
-        response = client.chat.completions.create(
-            model=model,
-            messages=title_messages,
-            stream=False,
-            **{token_param: _title_max_tokens},
-        )
-        # _clean_llm_title strips <think> blocks, markdown/quotes, and refusals,
-        # falling back to a derived title (never bare 'New Chat') on empty content.
-        return _clean_llm_title(response.choices[0].message.content or "", first_user_message), None
-    except openai.NotFoundError:
-        provider = user_settings.active_provider if user_settings else ""
-        if provider in _SINGLE_MODEL_PROVIDERS:
-            # Single-model provider and the model 404'd -- no fallback available
-            return _derive_title_from_message(first_user_message), None
-        fallback = (
-            _SUB_AGENT_MODEL_DEFAULTS.get(provider, "")
-            or (user_settings.llm_model if user_settings else settings.llm_model)
-        )
-        if not fallback or fallback == model:
-            return _derive_title_from_message(first_user_message), None
-        fallback_info = {"original_model": model, "fallback_model": fallback}
-        _title_max_tokens_fb = 160 if provider == "google" else 30
-        token_param2 = "max_completion_tokens" if _uses_max_completion_tokens(fallback) else "max_tokens"
-        title_messages = [
-            {
-                "role": "system",
-                "content": "Generate a concise chat title (4-6 words max) for the following message. Respond with only the title, no punctuation, no quotes.",
-            },
-            {"role": "user", "content": first_user_message[:500]},
-        ]
-        response = client.chat.completions.create(
-            model=fallback,
-            messages=title_messages,
-            stream=False,
-            **{token_param2: _title_max_tokens_fb},
-        )
-        return _clean_llm_title(response.choices[0].message.content or "", first_user_message), fallback_info
-    except Exception as e:
-        logger.warning(
-            "title_generation_failed: %s", e,
-            exc_info=True,
-        )
-        return _derive_title_from_message(first_user_message), None
+# Phase 162.5 Plan 01 (G-5 leaf extraction): the title subsystem — _SINGLE_MODEL_PROVIDERS,
+# _strip_think_blocks, _derive_title_from_message, _clean_llm_title, generate_thread_title —
+# MOVED VERBATIM to app.services.thread_title and re-imported at the top of this module
+# (one canonical copy, no duplicate). generate_thread_title stays patchable as
+# app.api.threads.generate_thread_title via that re-import. The inline auto-title emit block
+# (below, in send_message) moved with them into thread_title.maybe_autotitle_thread.
 
 
 @router.get("/{thread_id}/messages", response_model=list[MessageResponse])
 async def get_messages(
     thread_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # BL-01 fix: wrap sync .execute() with aexec (D-v2.5-01).
     thread = await aexec(
@@ -953,74 +730,28 @@ async def get_messages(
 # test_tool_memory.py) keeps resolving. Definition removed here (one canonical copy).
 
 
-async def _ensure_skill_snapshots(
-    *, definition, run_id, supabase, user_id, definition_id=None, skill_snapshots=None
-):
-    """099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot) — the kickoff seam.
-
-    Delegates ALL gate/copy logic to ``skill_snapshot.py`` (G-5: the hot file gains
-    only this thin wrapper + the import — no inline skill-resolution query or Storage
-    call). 099-07: grafts the persisted snapshots (the ``skill_snapshots`` sibling
-    column, NOT the locked ``definition`` JSONB) onto the parsed definition FIRST, so a
-    2nd+ kickoff hands the materializer a fully-snapshotted definition → idempotent
-    early-return (no persist, no 23514); a ``None`` map is a no-op (first kickoff).
-    Then runs the D-10 publish gate (``ValueError → HTTPException 400``, the exact shape
-    the 098 ``assert_folder_scopes_subset`` call-site uses — never a silent run on a
-    disabled/missing/non-visible skill) and materializes the immutable snapshot at FIRST
-    kickoff (idempotent, keyed by ``definition_id`` for the persist-back). An UNEXPECTED
-    materializer failure (anything that is NOT the ValueError→400 gate) maps to a
-    structured ``HTTPException(500)`` — never a naked ASGI traceback (the reported blank-
-    thread symptom); the fail-closed ordering (before the user-message insert) is
-    unchanged. Returns the (possibly snapshot-augmented) definition so the caller
-    reassigns it for the downstream run. A no-skill workflow is byte-identical: graft +
-    validate are no-ops and materialize returns the definition unchanged.
-
-    The service functions are called THROUGH the module object (``_skill_snapshot.``)
-    so the seam stays patchable. Structured so the Phase-103 publish endpoint can call
-    the same materializer at true publish time.
-    """
-    # 099-07: graft persisted snapshots (sibling column) onto the parsed definition
-    # BEFORE validate/materialize. On a 2nd+ kickoff every phase is already
-    # snapshotted → materialize early-returns (no persist, no 23514). A None map is
-    # a no-op (first kickoff). Delegated to skill_snapshot.py (G-5: thin wrapper).
-    definition = _skill_snapshot.graft_skill_snapshots(definition, skill_snapshots)
-    try:
-        await _skill_snapshot.validate_skill_refs(
-            definition, supabase=supabase, user_id=user_id
-        )
-    except ValueError as _skill_err:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(_skill_err),
-        )
-    try:
-        return await _skill_snapshot.materialize_skill_snapshots_if_needed(
-            definition,
-            run_id=run_id,
-            supabase=supabase,
-            user_id=user_id,
-            definition_id=definition_id,
-        )
-    except HTTPException:
-        raise
-    except Exception as _mat_err:   # noqa: BLE001 — structured fail-closed (099-07)
-        # An unexpected materializer failure (e.g. a DB trigger edge) must return
-        # structured JSON, NOT a naked ASGI traceback. 500 (not 503): a true server
-        # fault, not a transient upstream — the operator wants a stable error body
-        # so the kickoff dies cleanly BEFORE the user-message insert (no blank
-        # thread). The fail-closed ordering is unchanged.
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"skill snapshot materialization failed: {_mat_err}",
-        )
+# Phase 162.5 Plan 02 (G-5 extraction): _ensure_skill_snapshots MOVED VERBATIM to
+# app.services.workflow_kickoff (re-imported at module scope above so
+# `from app.api.threads import _ensure_skill_snapshots` — test_099 — still resolves;
+# one canonical copy, no duplicate). The service functions are still called THROUGH
+# the _skill_snapshot module object there, so test_099's monkeypatch surface holds.
 
 
 @router.post("/{thread_id}/messages")
 async def send_message(
     thread_id: str,
     body: MessageCreate,
+    request: Request,  # Phase 163: threaded into preflight_workflow_kickoff for its RLS lock-check
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # Phase 163 (D-05/D-09): the service-role client handed to the PRODUCER only.
+    # send_message's own request-scoped reads/writes (the thread ownership SELECT,
+    # preflight_workflow_kickoff, the user-message INSERT, maybe_autotitle_thread)
+    # run on the RLS-enforced `supabase` above; the detached agent-loop producer task
+    # (run_producer, below) STAYS service-role — it has no auth.uid() and must never
+    # carry the request's user-JWT client (which would also expire mid-run). The
+    # org-aware widening of the producer's writes is db/runs.py (Task 2).
+    service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     thread_resp = await aexec(
@@ -1037,133 +768,24 @@ async def send_message(
     # This is the AUTHORITATIVE workflow lock (the grayed client toggle is courtesy
     # only — D-05). The anchor + its run's terminal-state decide whether a send is
     # allowed and whether it kicks off a workflow. Done BEFORE the user-message
-    # INSERT so a refused send writes nothing.
-    _existing_anchor = (thread_resp.data or {}).get("active_workflow_run_id")
-    _kickoff_definition = None          # parsed WorkflowDefinition when kicking off
-    _kickoff_definition_id = None       # workflow_definitions.id for the kickoff
-    if _existing_anchor is not None:
-        # A run currently holds the lock — is it still live (non-terminal)?
-        _pool = await get_pg_pool()
-        _anchor_status = await _pool.fetchval(
-            "SELECT status FROM workflow_runs WHERE id = $1",
-            UUID(_existing_anchor) if isinstance(_existing_anchor, str) else _existing_anchor,
-        )
-        _TERMINAL_WORKFLOW = ("completed", "failed", "cancelled")
-        if _anchor_status is not None and _anchor_status not in _TERMINAL_WORKFLOW:
-            # The lock holds. Refuse a Deep send AND a different-workflow send
-            # (SC#2 / MODE-02 — the binding 409, not just a grayed button). A
-            # send is only allowed if it targets THE SAME active run (continuation
-            # of the locked workflow). Since the kickoff field carries a
-            # *definition* id (not the run id), any kickoff against a locked thread
-            # is a different-workflow attempt → refuse. The lock is cleared by
-            # cancel / natural terminal (Plan 03), never by this handler.
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Thread is workflow-locked — cancel the active workflow to "
-                    "switch back to Deep mode."
-                ),
-            )
-        # else: anchor is set but its run is terminal/absent (a stale lock). We do
-        # NOT clear it here (the GET reconcile reports lock_is_stale; cancel/terminal
-        # owns the clear). A fresh kickoff below will re-point the anchor atomically.
-
-    if body.workflow_definition_id is not None:
-        # ── Phase 147 (FLAG-01 / D-05) — workflows kill-switch: block NEW launches ──
-        # Fires ONLY here (inside the NEW-launch branch) and BEFORE any definition
-        # resolve / user-message insert / create_workflow_run, so a refused launch
-        # leaves NO partial run row and NO blank message (the same fail-closed-before-
-        # insert discipline the kickoff already follows). Scope is deliberately narrow:
-        #   * in-flight workflow runs are UNTOUCHED (Kill is the tool for those — D-05);
-        #     a locked-thread kickoff already 409s above, so we never reach here for one.
-        #   * a plain Deep send (workflow_definition_id is None) never enters this branch
-        #     → Deep chat is byte-identical regardless of the flag.
-        # workflows_enabled() reads the plan-01 last-known-good TTL cache (default-ON on a
-        # blip — D-Q4), so a transient settings-read failure never blocks a legit launch.
-        if not workflows_enabled():
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Workflows are currently disabled by the administrator",
-            )
-        # Resolve+parse the published definition UNDER THE USER'S RLS (T-092-05 IDOR
-        # mitigation): only a published, owned-or-global definition may be kicked
-        # off. A non-owned / private / unpublished id is refused 404 (never leaks
-        # existence) — a user cannot start another user's private workflow.
-        _def_resp = await aexec(
-            supabase.table("workflow_definitions")
-            .select("id, definition, status, is_global, created_by, skill_snapshots")
-            .eq("id", str(body.workflow_definition_id))
-            .or_(f"is_global.eq.true,created_by.eq.{current_user['id']}")
-            .maybe_single()
-        )
-        _def_row = _def_resp.data if _def_resp is not None else None
-        if not _def_row:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Workflow not found",
-            )
-        if _def_row.get("status") != "published":
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Workflow is not published",
-            )
-        from app.models.harness import WorkflowDefinition
-        _raw_def = _def_row["definition"]
-        if isinstance(_raw_def, str):
-            _raw_def = json.loads(_raw_def)
-        _kickoff_definition = WorkflowDefinition.model_validate(_raw_def)
-        _kickoff_definition_id = _def_row["id"]
-        # 099-07: the materialized snapshots live in the skill_snapshots SIBLING column
-        # (not the locked definition JSONB) → load them so the kickoff seam can graft
-        # them back onto the parsed definition (idempotent 2nd-kickoff). May arrive as a
-        # JSON string via PostgREST — mirror the definition parse (json imported above).
-        _kickoff_skill_snapshots = _def_row.get("skill_snapshots")
-        if isinstance(_kickoff_skill_snapshots, str):
-            _kickoff_skill_snapshots = json.loads(_kickoff_skill_snapshots)
-        # 098 (D-07 DB half — GOV-01): a non-⊆ declared phase scope is a definition
-        # VALIDITY error that must fail LOUDLY at run-start (NOT a silent runtime
-        # clip — Pitfall 5). Resolve the project subtree and assert every per-phase
-        # folder_scope ⊆ it; surface the ValueError as a 400 (a bad definition, not
-        # a runtime degrade). Owner-scoped via current_user["id"].
-        try:
-            await assert_folder_scopes_subset(
-                _kickoff_definition, supabase=supabase, user_id=current_user["id"]
-            )
-        except ValueError as _scope_err:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(_scope_err),
-            )
-
-        # 099 WFSKILL-01 (D-10 gate + D-03a lazy snapshot): validate every phase
-        # skill_ref resolves to a visible, enabled skill (ValueError → 400, same as the
-        # 098 scope assert — never a silent run on a disabled/missing skill), then
-        # materialize the immutable snapshot at FIRST kickoff (idempotent: subsequent
-        # runs reuse the persisted snapshot, keyed by definition id). Drafts can't reach
-        # here (status='published' enforced above), so first-kickoff IS the first moment
-        # a snapshot is needed. The seam delegates ALL gate/copy logic to
-        # skill_snapshot.py (G-5: no inline query/Storage call in this hot file). The
-        # materialized definition rides the phase configs the downstream run reads.
-        _kickoff_definition = await _ensure_skill_snapshots(
-            definition=_kickoff_definition,
-            run_id=None,
-            supabase=supabase,
-            user_id=current_user["id"],
-            definition_id=str(_kickoff_definition_id),
-            skill_snapshots=_kickoff_skill_snapshots,
-        )
-
-        # 100 D-09 run-pin: extend each template_input file's expiry to cover this
-        # run's wall-clock cap so it can't die mid-flight from template expiry (D-09).
-        # Thin delegating call — ALL logic (the extend-only expiry write + the cap
-        # formula) lives in template_service (G-5: no inline query/Storage call in this
-        # hot file). D-11: a thread with no template_input row → the write no-ops.
-        from app.services import template_service as _template_service
-        await _template_service.pin_templates_for_run(
-            pool=await get_pg_pool(),
-            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-            run_wall_clock_cap=_template_service.run_cap_seconds(_kickoff_definition),
-        )
+    # INSERT so a refused send writes nothing. Phase 162.5 Plan 02 (G-5 extraction,
+    # D-A2/D-A4): the anchor 409-lock check + the workflow_definition_id preflight
+    # (workflows kill-switch 403 → RLS-scoped published-definition resolve → 098
+    # folder-scope ⊆ assert → 099 skill-snapshot materialize → 100 template pin) moved
+    # VERBATIM to workflow_kickoff.preflight_workflow_kickoff. Every HTTPException 4xx/5xx
+    # shape + the fail-closed-before-insert ordering is byte-identical; a plain Deep send
+    # (no anchor, workflow_definition_id is None) returns (None, None) — a byte-identical
+    # no-op that never consults the kill-switch. workflows_enabled / get_pg_pool resolve
+    # LATE off this module inside the seam so patch("app.api.threads.workflows_enabled")
+    # (test_147) + the app.api.threads.get_pg_pool patch still intercept (D-A4).
+    _kickoff_definition, _kickoff_definition_id = await preflight_workflow_kickoff(
+        request=request,  # Phase 163 (T-163-06c): RLS lock-check on the user-JWT connection
+        body=body,
+        thread_id=thread_id,
+        thread_row=thread_resp.data,
+        supabase=supabase,
+        current_user=current_user,
+    )
 
     # Insert user message (D-058-02: pre-stream INSERT in scope for 058).
     # Phase 063 (D-063-01): capture inserted user_message id for the new
@@ -1217,69 +839,25 @@ async def send_message(
     # the producer's closure-captured user_settings is independent (cheap
     # second call; load_user_settings is a settings-file read).
     _user_settings = load_user_settings(current_user["id"])
+    # Phase 167 VIS-02 (D-167-04) — the ONE-line two-layer per-user model-default overlay
+    # (SEED-116: operator allowed-set + lock; user picks within it). STRICT no-op when unset →
+    # the shared Deep/workflow send path stays byte-identical (D-14); the minimal G-5 in-place
+    # guard (no new endpoint here, no per-provider fork) mirroring the 147/149 in-place overrides.
+    _user_settings = await _run_model_resolution.apply_user_model_default(request, current_user, _user_settings)
     if body.provider and body.provider != _user_settings.active_provider:
         _user_settings = override_provider(_user_settings, body.provider)
 
     run_id = _uuid_mod.uuid4()
-    _resolved_model = body.model if getattr(body, "model", None) else _user_settings.llm_model
-    # Phase 149 (D-149-10) — enabled-enforcement at the ONE shared resolution seam: a user
-    # whose selected model was just operator-DISABLED runs on the org default instead, with
-    # an honest inline SSE notice naming BOTH models (emitted below, once the run stream
-    # exists). Single-seam additive guard; for an enabled / no-override model this is a
-    # no-op and the shared path stays byte-identical (no per-provider fork — D-14).
-    _resolved_model, _model_fallback_notice = await _resolve_enabled_model(
-        _resolved_model, _user_settings.llm_model
+    # Phase 149 (D-149-10) enabled-enforcement + D-067.3-N01 provider resolution + Plan-09/CR-01
+    # disabled-model fallback. Phase 162.5 Plan 01 (G-5 leaf extraction): the inline model/provider
+    # resolution transform moved VERBATIM to run_model_resolution.resolve_run_model. It returns the
+    # (possibly mutated) body + user_settings so the EFFECTIVE fallback model on the wire + the
+    # fallback-aligned provider credentials flow into register_run_start and the producer closure
+    # unchanged; get_model_capability_async / override_provider resolve LATE off this module so the
+    # provider-router patches still intercept. Behavior byte-identical (D-14).
+    _resolved_model, _resolved_provider, _model_fallback_notice, body, _user_settings = await resolve_run_model(
+        body=body, user_settings=_user_settings
     )
-    # D-067.3-N01-01: Resolution order — explicit body.provider (already
-    # applied to _user_settings.active_provider above via override_provider) >
-    # MODEL_CAPABILITIES[model]["provider"] > active_provider fallback.
-    # Repro: run 6eab949f-78da-4ea4-ac01-f04b16c9be7d (claude model + openai
-    # default active_provider → routed to OpenAI SDK → 404). Fix uses the
-    # existing get_model_capability helper which returns provider='unknown'
-    # for unknown models so the fallback chain is naturally safe (D-067.3-N01-02).
-    if body.provider:
-        # Explicit override already applied to _user_settings.active_provider above.
-        _resolved_provider = _user_settings.active_provider
-    else:
-        _capability = await get_model_capability_async(_resolved_model) or {}
-        _capability_provider = _capability.get("provider", "unknown")
-        # Phase 075.3 D-075.3-08: only override the active provider when the
-        # registry has a verified entry. After 075.3 get_model_capability no
-        # longer returns provider="unknown" for unknown model_ids — it returns
-        # a pattern-inferred provider (gpt-* → openai, gemini-* → google, etc.)
-        # with capability_source="inferred". Falling through to active-provider
-        # for inferred entries preserves D-067.3-N01-02 semantics: a totally
-        # garbage model_id (which falls into the ollama fallback bucket)
-        # shouldn't yank routing to Ollama when the user has an explicit
-        # active_provider set.
-        _capability_source = _capability.get("capability_source", "registry")
-        if _capability_provider != "unknown" and _capability_source == "registry":
-            _resolved_provider = _capability_provider
-            # Align _user_settings so downstream agent_runner reads see the
-            # resolved provider for SDK selection (D-067.3-N01-04). The
-            # inner-shadowed `user_settings = _user_settings` at the top of
-            # agent_runner picks this mutation up for free. Use override_provider
-            # to keep the canonical mutation path.
-            _user_settings = override_provider(_user_settings, _resolved_provider)
-        else:
-            _resolved_provider = _user_settings.active_provider
-
-    # Phase 149 Plan 09 (D-149-10 bookkeeping honesty) + review round-2 CR-01 — when a
-    # disabled-model fallback fired, _resolved_model is now the org-default fallback but
-    # BOTH the outbound request model (body.model — what the agent loop / gateway actually
-    # send) and _resolved_provider still hold PRE-fallback values. _apply_fallback_to_request
-    # re-resolves the recorded provider from the EFFECTIVE fallback model (a MiniMax-served
-    # fallback records "minimax", not the stale "anthropic") AND rewrites body.model to the
-    # effective model so the fallback model is what actually goes on the wire (CR-01: without
-    # the rewrite, a cross-provider fallback hard-failed and a same-provider fallback silently
-    # served the disabled model under a false notice). Minimal additive guard at the existing
-    # seam (threads.py is a G-5 hot file — no refactor, no per-provider fork); for the
-    # no-fallback case _model_fallback_notice is falsy → a no-op and the shared path stays
-    # byte-identical (D-14).
-    if _model_fallback_notice:
-        body, _resolved_provider, _user_settings = await _apply_fallback_to_request(
-            body, _resolved_model, _resolved_provider, _user_settings
-        )
 
     try:
         # Phase 145-03 (D-145-09) — the runs INSERT + both ZADD mirrors are now ONE
@@ -1290,6 +868,13 @@ async def send_message(
         # started-at score (the ordering 062's active-runs endpoint ZRANGEBYSCOREs).
         # _resolved_provider is guaranteed non-None at this line by the if/else chain
         # above (Pitfall 6 — provider column is NOT NULL).
+        #
+        # Phase 163 (D-05): register_run_start / finalize_run_terminal / create_workflow_run
+        # are the run-LIFECYCLE writers on the raw asyncpg pool (get_pg_pool → postgres role).
+        # They are the agent-loop-writer substrate (the runs / workflow_runs rows the producer
+        # then finalizes), NOT request-scoped user reads — so they STAY on the service-role pool
+        # and are NOT converted to get_user_pg_connection. mig-106's runs_autofill_org_id /
+        # workflow-run autofill triggers stamp org_id on INSERT; the widening lives in db/runs.py.
         await register_run_start(
             pool=await get_pg_pool(),
             redis=redis,
@@ -1357,657 +942,53 @@ async def send_message(
             user_id=UUID(current_user["id"]) if isinstance(current_user["id"], str) else current_user["id"],
         )
 
-    # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT (line ~903)
-    # but BEFORE the agent producer task starts (asyncio.create_task at the bottom
-    # of this handler). Title is derived from the user message alone — independent
-    # of run outcome — so the title persists regardless of success / failure /
-    # timeout / cancellation / exception (closes D-067.2-05a + D-067.2-05b).
-    #
-    # Option B placeholder check (PATTERNS.md § 6 recommendation): only auto-title
-    # when threads.title is the canonical "New Chat" default. Avoids re-titling an
-    # existing thread whose user added a follow-up message AND avoids the
-    # count-query race when the agent retries with the same thread_id.
-    try:
-        _title_check = await aexec(
-            supabase.table("threads").select("title").eq("id", thread_id).single()
-        )
-        _existing_title = (_title_check.data or {}).get("title") if _title_check is not None else None
-        if _existing_title == "New Chat":
-            # generate_thread_title is sync (def at line ~660) and makes a blocking
-            # provider SDK call (client.chat.completions.create) — wrap with
-            # run_in_threadpool per CLAUDE.md D-v2.5-01.
-            _title, _title_fallback = await run_in_threadpool(
-                generate_thread_title,
-                body.content,
-                _user_settings,
-                body.model or "",
-            )
-            # Ordering invariant (preserved from the original :2398-2408 block):
-            # fallback_model emit fires BEFORE title emit when title_fallback is
-            # non-empty.
-            if _title_fallback:
-                await _emit(redis, run_id, 'fallback_model', **_title_fallback)
-            try:
-                await aexec(
-                    supabase.table("threads").update({"title": _title}).eq("id", thread_id)
-                )
-                await _emit(redis, run_id, 'title', content=_title)
-            except Exception as e:
-                logger.warning(
-                    "D-067.2-05 title persist/emit failed at run start: %s", e,
-                    exc_info=True,
-                )
-    except Exception as e:
-        # Outer try guards the title-check query AND the run_in_threadpool call —
-        # never block the run on title-generation failure (matches the original
-        # :2398-2408 block's exception-swallow stance, with a logger.warning
-        # upgrade per CONTEXT.md D-067.2-05 fix shape).
-        logger.warning(
-            "D-067.2-05 title generation skipped due to setup error: %s", e,
-            exc_info=True,
-        )
-
-    async def agent_runner(run_id: _uuid_mod.UUID) -> None:
-        """Producer task — XADDs every SSE event to run:{run_id} Redis Stream.
-
-        Phase 061 (D-061-01, D-061-10, D-v2.5-08): replaces 059's
-        queue.put(...) producer. Lifetime decoupled from the SSE consumer
-        (D-061-03). Body wrapped in asyncio.timeout(120s) to bound
-        abandoned runs (D-061-01); on TimeoutError the outer except sets
-        _terminal_error='hard_timeout' and the finally writes the terminal
-        error sentinel + runs UPDATE + EXPIRE 60.
-        """
-        # State for the finally — set inside the body, read by the finally (Task 3).
-        _terminal_status: str = "completed"  # default — set on natural completion
-        _terminal_error: str | None = None
-        # Phase 066 D-066-07: capture per-iteration context for the timed_out
-        # error string. Updated each iteration BEFORE the LLM stream block
-        # (around line ~1149 / ~1213) so the outer except sees the iteration
-        # at which the timer fired. MUST be declared at function scope (same
-        # indent as _terminal_status / _terminal_error, BEFORE the try: below)
-        # — declaring inside try: would cause UnboundLocalError if a
-        # TimeoutError fires before the agent loop iterates.
-        _last_iteration: int = 0
-        _last_model_id: str = ""
-        _last_per_call_budget: int = 0
-
-        try:                          # OUTER try → finally runs shielded finalizer (Phase 061 Plan 03 Task 3)
-            # Phase 066 D-066-01: the outer 120s total-deadline asyncio.timeout
-            # wrapper (formerly fed by the legacy producer-hard-timeout setting)
-            # that lived here in Phase 061 has been DELETED. The agent loop now
-            # has no hard total cap (matches Claude/ChatGPT UX where complex
-            # tool-calling workflows can run as long as needed within
-            # max_iterations). Per-LLM-call deadlines live INSIDE the iteration
-            # loop at the SDK stream blocks (D-066-02); see the
-            # `async with asyncio.timeout(per_call_budget)` wraps at the
-            # Anthropic native path (around line ~1149) and the
-            # OpenAI/Google/OpenRouter path (around line ~1213). Tool execution
-            # (sandbox / web_search / sub-agent) is OUTSIDE the per-call
-            # timer — tools own their own timeout discipline.
-            #
-            # Worst-case wall-time = max_iterations × per_call_budget (15 × 300s
-            # ≈ 75min for unknown models; per-model overrides in
-            # MODEL_CAPABILITIES tune this). The replay-tail consumer's deadline
-            # at runs.py (settings.consumer_timeout_seconds) is independent
-            # from this scope — it bounds the CONSUMER, not the producer.
-
-            # Reuse the user_settings already resolved by the route handler
-            # (hoisted from inside this function in Plan 03 Task 1 so the
-            # runs INSERT could populate model/provider before producer spawn).
-            user_settings = _user_settings
-
-            # Phase 089 Plan 03 (G-5 THE verbatim move): the entire agent loop —
-            # the B1 setup block, the Category-D accumulators, the nested persist
-            # functions, the multi-iteration loop with the three provider
-            # chunk-handlers, the tool-dispatch round, the inner try/except, the
-            # post-loop emits, and the suggestion-gen + stream_end — MOVED verbatim
-            # into app.services.agent_loop.run_agent_loop. agent_runner now: build
-            # the frozen RunContext, call run_agent_loop, consume the AgentLoopResult.
-            # The _terminal_status classifier (except branches below) + the shielded
-            # finalizer STAY here (producer-shell concern). Behavior-preserving — file
-            # location changes only (D-089-03).
-            _agent_loop_result: AgentLoopResult | None = None
-            # 089-03: per-iteration timeout context surfaced by the loop so the
-            # `except asyncio.TimeoutError` classifier below can format the
-            # byte-identical `timed_out: …` error string (Phase 066 D-066-07). The
-            # loop writes last_iteration / last_model_id / last_per_call_budget into
-            # this dict before each provider stream block (was an agent_runner-scope
-            # local captured by closure pre-move).
-            _timeout_ctx: dict = {
-                "last_iteration": _last_iteration,
-                "last_model_id": _last_model_id,
-                "last_per_call_budget": _last_per_call_budget,
-            }
-            # 089-03: finalizer-needed outputs surfaced by the loop on EVERY exit
-            # path (incl. exception) so _shielded_finalize can persist the
-            # (possibly partial) assistant message + token totals + system
-            # warnings exactly as the pre-move closure-scoped finalizer did. The
-            # loop populates this in its outer `finally`; the by-reference dict is
-            # the cycle-free surface that survives a re-raise (the return value
-            # below is unavailable when the loop exits via an exception).
-            _result_sink: dict = {}
-
-            try:  # middle try/finally — guarantees persist even on GeneratorExit (client disconnect)
-                # ── Phase 092 MODE-01 — producer mode-branch (SC#1) ────────────
-                # The ONE additive branch: Harness iff the thread holds a live
-                # workflow anchor (set by create_workflow_run above), else Deep.
-                # MUST live here (above the loop, inside this try) — NEVER inside a
-                # provider streaming branch (075.x cascade rule). The Deep `else`
-                # is BYTE-IDENTICAL to the pre-092 call. The surrounding except +
-                # finally:_shielded_finalize stay mode-agnostic (untouched). The
-                # harness branch's `run_workflow` owns the workflow_runs terminal
-                # write internally; the producer-shell `runs` row still finalizes
-                # via _shielded_finalize for SSE-terminal consistency (the lock-clear
-                # is Plan 03's single-clear-site concern — this plan only SETS it).
-                if _active_workflow_run_id is not None:        # Harness
-                    # Engine ctx is NOT RunContext (Landmine 7) — build the loose
-                    # SimpleNamespace bag the engine threads through, mirroring
-                    # harness_engine._build_resume_context.
-                    from types import SimpleNamespace
-                    from app.services.harness_engine import (
-                        run_workflow,
-                        _load_run_definition,
-                        _emit as _harness_emit,
-                    )
-                    # D-04 (site 1): the shared resolve-never-mutate (D-05) wrapper —
-                    # resolve the effective ctx model from the run owner's active
-                    # provider (a stale cross-provider llm_model falls back to the
-                    # provider default rather than leaking to the wrong client). Lazy
-                    # import inside the harness branch (matches the pattern above);
-                    # threaded onto wf_ctx.model below. Phase-level precedence is
-                    # unchanged downstream: phase.config.model or ctx.model.
-                    from app.services.sub_agent_models import resolve_workflow_ctx_model
-                    _wf_pool = await get_pg_pool()
-                    _wf_definition = await _load_run_definition(
-                        _wf_pool, _active_workflow_run_id
-                    )
-                    # F5 (092-07) + 098 (GOV-01/PROJ-02 — site 1 kickoff): resolve the
-                    # run-start retrieval scope. For a BOUND workflow
-                    # (_kickoff_definition.project_folder_id set) the scope is the
-                    # PROJECT subtree, sourced from the binding the model cannot supply
-                    # (GOV-01) — NOT the thread folder. For an UNBOUND/legacy workflow
-                    # the scope stays the thread-folder subtree (unchanged — SC#1). Both
-                    # branches resolve through the shared scope.resolve_project_subtree
-                    # helper, so the inline recursive subtree walk is REMOVED
-                    # (G-5: threads.py must shrink, not grow). The scoped_folder_path is
-                    # the human-readable ls/tree/grep default-path hint (display only —
-                    # the real scope enforcement is folder_subtree_ids).
-                    _wf_folder_subtree_ids: list[str] | None = None
-                    _wf_scoped_folder_path: str | None = None
-                    try:
-                        _wf_thread_data = await aexec(
-                            supabase.table("threads").select("folder_id").eq("id", thread_id).single()
-                        )
-                        _wf_thread_folder = _wf_thread_data.data.get("folder_id") if _wf_thread_data.data else None
-                        # 152 WFIN-02: owned-override > author > thread precedence + D-05 gate in the helper (G-5).
-                        _wf_scope_root = await resolve_run_scope_root(
-                            _kickoff_definition,
-                            run_inputs={"folder_id": str(body.folder_id)} if body.folder_id else None,
-                            thread_folder_id=_wf_thread_folder,
-                            supabase=supabase, user_id=current_user["id"],
-                        )
-                        if _wf_scope_root:
-                            _wf_folder_subtree_ids = await resolve_project_subtree(
-                                _wf_scope_root, supabase=supabase, user_id=current_user["id"]
-                            )
-                            _wf_all_folders = await fetch_visible_folders(
-                                supabase, current_user["id"]
-                            )
-                            _wf_folder_map = {f["id"]: f for f in _wf_all_folders}
-                            _wf_path_parts: list[str] = []
-                            _wf_current_fid = _wf_scope_root
-                            while _wf_current_fid:
-                                _f = _wf_folder_map.get(_wf_current_fid)
-                                if not _f:
-                                    break
-                                _wf_path_parts.append(_f.get("name", ""))
-                                _wf_current_fid = _f.get("parent_id")
-                            _wf_scoped_folder_path = (
-                                "/" + "/".join(reversed(_wf_path_parts))
-                                if _wf_path_parts else None
-                            )
-                    except Exception:
-                        # WR-03 (098 secure-phase): a scope-resolution failure must not
-                        # silently widen a BOUND workflow to the whole KB. The Plan-05
-                        # clip + scope_violation emit are gated on
-                        # `folder_subtree_ids is not None`, so on a None fallback neither
-                        # narrows nor fires — the degradation would be INVISIBLE. Kickoff
-                        # is the one site where the run has NOT started yet, so for a
-                        # bound workflow we fail CLOSED (emit + raise → a clean `failed`
-                        # terminal via the producer's outer `except Exception` below)
-                        # rather than run unscoped. An UNBOUND/legacy workflow keeps the
-                        # historical fall-through to whole-KB (SC#1 — losing the
-                        # thread-folder default hint is not a governance violation).
-                        _wf_bound = _kickoff_definition.project_folder_id is not None
-                        logger.exception(
-                            "harness run-start scope resolution failed for thread %s "
-                            "(bound=%s)", thread_id, _wf_bound,
-                        )
-                        if _wf_bound:
-                            try:
-                                await _harness_emit(
-                                    redis,
-                                    _active_workflow_run_id,
-                                    "scope_resolution_failed",
-                                    site="kickoff",
-                                    bound=True,
-                                    detail=(
-                                        "project-scope resolution failed at run start; "
-                                        "failing closed to avoid whole-KB retrieval"
-                                    ),
-                                )
-                            except Exception:  # noqa: BLE001 — emit is best-effort
-                                logger.debug(
-                                    "kickoff: scope_resolution_failed emit failed for run %s",
-                                    _active_workflow_run_id,
-                                )
-                            raise RuntimeError(
-                                "bound workflow scope resolution failed at run start "
-                                "(failing closed to avoid whole-KB retrieval)"
-                            )
-                        # unbound → fall through to unscoped (None) search (unchanged)
-                    wf_ctx = SimpleNamespace(
-                        run_id=_active_workflow_run_id,
-                        # Facet A (092-07): the producer runs.run_id is the FK target
-                        # for sub-agent parent_run_id; ctx.run_id stays the workflow_run
-                        # id for audit/terminal/definition/resume-match.
-                        producer_run_id=run_id,
-                        thread_id=thread_id,
-                        current_user=current_user,
-                        user_settings=user_settings,
-                        # D-04 (site 1): the effective ctx model resolved from the run
-                        # owner's active provider (resolve-never-mutate, D-05). user_settings
-                        # is the live request's effective settings — resolve from it so a
-                        # stale cross-provider llm_model cannot leak to the wrong client.
-                        # Phase-level precedence stays phase.config.model or ctx.model
-                        # (phase_types._effective_model) — this only sets ctx.model.
-                        model=resolve_workflow_ctx_model(user_settings),
-                        # F8 (092-07): the consumption half of SEED-047. create_workflow_run
-                        # STORED the user's kickoff question in workflow_runs.inputs.kickoff_prompt
-                        # (:995 above) but the phase executors never read it — the FIRST phase
-                        # (research) ran with an empty user turn and asked "send me the topic…".
-                        # Mirror EXACTLY what was persisted so live ctx.inputs == the durable
-                        # inputs jsonb the resume builders read back (152: mirror the folder
-                        # override too). ctx.inputs["kickoff_prompt"] is the first phase's user
-                        # turn / sub-agent task; programmatic split_topic reads ctx.inputs at :178.
-                        inputs={"kickoff_prompt": body.content, **({"folder_id": str(body.folder_id)} if body.folder_id else {})},
-                        redis=redis,
-                        pool=_wf_pool,
-                        emit=_harness_emit,
-                        retry_feedback=None,
-                        # F5 (092-07): the tool-context fields every Supabase tool
-                        # reads via ctx.<field> (search_documents/hybrid/ls/tree/grep/
-                        # glob/fetch_document/skills/code-exec logging). Sourced from
-                        # the SAME in-scope values the Deep RunContext + run_agent_loop
-                        # use: supabase=supabase (threads.py:1190), spawn=_spawn
-                        # (threads.py:1198, the module-level _spawn). Without these
-                        # _build_phase_tool_context forwards None → ctx.supabase.rpc
-                        # raises AttributeError on the first search_documents (F5).
-                        supabase=supabase,
-                        folder_subtree_ids=_wf_folder_subtree_ids,
-                        scoped_folder_path=_wf_scoped_folder_path,
-                        spawn=_spawn,
-                        # Per-run task() concurrency gate — mirrors the Deep
-                        # run_agent_loop local (_per_run_task_semaphore,
-                        # agent_loop.py:1234). A fresh per-run semaphore is correct
-                        # (this is a fresh top-level workflow run).
-                        per_run_task_semaphore=asyncio.Semaphore(
-                            settings.task_per_run_concurrency
-                        ),
-                    )
-                    await run_workflow(
-                        _active_workflow_run_id,
-                        _wf_definition,
-                        wf_ctx,
-                        pool=_wf_pool,
-                        redis=redis,
-                        # Facet B (092-07): route engine SSE events to the producer
-                        # stream the frontend watches (run:{producer_run_id}).
-                        stream_run_id=run_id,
-                    )
-                    # ── 093-05 D-11: answer surfacing now lives in run_workflow ──────
-                    # The F6/F7 surfacing (delta + sources/citations/confidence emit +
-                    # the assistant-message persist) was moved INTO the shared helper
-                    # `harness_engine._surface_final_answer`, which run_workflow invokes
-                    # on its success terminal BEFORE the terminal `run_completed` (D-11,
-                    # Pitfall 5). That helper is THE single surfacing site + single
-                    # persist owner for ALL THREE entry paths (live kickoff here, resume
-                    # via _build_resume_context, Continue via _harness_continuation) —
-                    # so resumed/Continue'd workflows surface identically and there is
-                    # exactly ONE persisted assistant message per path (Landmine 5).
-                    # Therefore the live-kickoff branch surfaces NOTHING inline and
-                    # installs NO harness persist callable into `_result_sink`:
-                    # `_shielded_finalize` reads `_result_sink.get("persist")` and is a
-                    # no-op when it is absent (threads.py:1529) → no double-persist /
-                    # duplicate assistant message. The Deep `else` branch +
-                    # run_agent_loop + the Deep `_result_sink` flow stay byte-identical
-                    # (D-14).
-                else:                                          # Deep — byte-identical
-                    ctx = RunContext(
-                        run_id=run_id,
-                        thread_id=thread_id,
-                        current_user=current_user,
-                        user_settings=user_settings,
-                        body=body,
-                        redis=redis,
-                        supabase=supabase,
-                        resolved_model=_resolved_model,
-                        resolved_provider=_resolved_provider,
-                    )
-                    _agent_loop_result = await run_agent_loop(
-                        ctx,
-                        emit=_emit,
-                        emit_terminal=_emit_terminal,
-                        spawn=_spawn,
-                        timeout_ctx=_timeout_ctx,
-                        result_sink=_result_sink,
-                    )
-                # Mirror the loop-surfaced timeout context back onto the
-                # producer-shell locals the classifier reads (keeps the
-                # timed_out error string byte-identical — Phase 066 D-066-07).
-                _last_iteration = _timeout_ctx.get("last_iteration", _last_iteration)
-                _last_model_id = _timeout_ctx.get("last_model_id", _last_model_id)
-                _last_per_call_budget = _timeout_ctx.get("last_per_call_budget", _last_per_call_budget)
-
-            except asyncio.TimeoutError:
-                # Phase 066 D-066-05 + D-066-07: per-LLM-call asyncio.timeout
-                # fired inside the SDK iteration block. _last_iteration /
-                # _last_model_id / _last_per_call_budget were captured at the
-                # iteration start (closure variables initialized to defaults
-                # at top of agent_runner so an early TimeoutError before the
-                # loop iterates won't UnboundLocalError).
-                # 089-03: the loop now lives in run_agent_loop, so it surfaces
-                # the per-iteration context via the by-reference _timeout_ctx
-                # dict (mutated even when the TimeoutError propagates out of the
-                # loop, before the post-call mirror above runs). Read it here so
-                # the timed_out error string carries the real iteration/model —
-                # byte-identical to the pre-move closure-captured behavior.
-                _last_iteration = _timeout_ctx.get("last_iteration", _last_iteration)
-                _last_model_id = _timeout_ctx.get("last_model_id", _last_model_id)
-                _last_per_call_budget = _timeout_ctx.get("last_per_call_budget", _last_per_call_budget)
-                # Strict partition guard: timer fire = system = 'timed_out'.
-                # The user-Stop write at runs.py stays 'cancelled' (UNCHANGED).
-                # The format mirrors the contract documented in CONTEXT.md
-                # D-066-07 exactly so log/audit consumers can grep on the prefix.
-                _terminal_status = "timed_out"
-                _terminal_error = (
-                    f"timed_out: {_last_per_call_budget}s per-call deadline "
-                    f"exceeded at iteration {_last_iteration} "
-                    f"(model={_last_model_id})"
-                )
-                logger.warning(
-                    "Run %s timed out at iteration %d (model=%s, budget=%ds)",
-                    run_id, _last_iteration, _last_model_id, _last_per_call_budget,
-                )
-            except asyncio.CancelledError:
-                # D-066-05 UNCHANGED: cancellation comes from app lifespan shutdown
-                # OR DELETE /runs/{id} (cancel verb). The DELETE handler writes its
-                # own error string ('cancelled_by_user') in runs.py:423; this branch
-                # leaves _terminal_error = None and lets the finalizer write NULL,
-                # which is the legacy contract for in-process producer cancellation.
-                _terminal_status = "cancelled"
-                _terminal_error = None
-                raise   # MUST re-raise so timeout context + asyncio task state stay correct (Pitfall 3)
-            except Exception as e:
-                # D-066-07 extended format: 'failed: <ExceptionClass>: <truncated≤200chars>'
-                # supersedes today's bare type(e).__name__. The 200-char cap (T-066-02
-                # mitigation) prevents accidental traceback / API-key-fragment leakage
-                # via RLS-readable runs.error column.
-                _terminal_status = "failed"
-                _truncated_msg = (str(e) or "")[:200]
-                _terminal_error = f"failed: {type(e).__name__}: {_truncated_msg}"
-                logger.exception("Run %s failed", run_id)
-            finally:
-                # Phase 061 (D-061-04, Pitfall 2): shielded finalizer with
-                # strict ordering — sentinel BEFORE expire, registry pop LAST.
-                # Persists message, writes terminal sentinel, updates runs row,
-                # EXPIREs Redis key, ZREMs sorted sets, evicts from RUN_TASKS.
-                #
-                # asyncio.shield protects the whole block from app-shutdown
-                # cancellation (058/059 invariant preserved). socket_timeout=10
-                # on the Redis client (Plan 01, Pitfall 7) prevents this block
-                # from hanging on a dead Redis socket.
-                async def _shielded_finalize():
-                    # IN-03 (D-061.1-09): _persist_assistant_message owns the
-                    # cached id on its own function attribute. We capture the
-                    # return value here as a local — no nonlocal reaches into
-                    # send_message scope. Idempotency is preserved via the
-                    # _message_persisted guard inside _persist_assistant_message.
-                    #
-                    # 089-03: the persist callables + accumulators now live inside
-                    # run_agent_loop. They are surfaced to this finalizer via the
-                    # by-reference _result_sink (populated by the loop's outer
-                    # `finally` on EVERY exit path, incl. exception). The
-                    # persist→persist_system_warnings→finalize_run→sentinel→expire→
-                    # zrem step order is byte-identical to the pre-move finalizer
-                    # (I10 / Pitfall 5). When the loop never ran (defensive: sink
-                    # empty), the persist callables are absent — we skip the
-                    # persist + system-warning steps and still finalize the runs
-                    # row so the run reaches a terminal status.
-                    _persist = _result_sink.get("persist")
-                    _persist_sys = _result_sink.get("persist_system_warnings")
-                    _sink_system_warnings = _result_sink.get("persisted_system_warnings") or []
-                    _input_tokens_total = _result_sink.get("input_tokens_total")
-                    _output_tokens_total = _result_sink.get("output_tokens_total")
-                    # 1. SHIELDED PERSIST — preserves 058/059 contract.
-                    _msg_id_for_runs: str | None = None
-                    try:
-                        if _persist is not None:
-                            _msg_id_for_runs = await _persist()
-                    except BaseException:
-                        logger.exception("Shielded persist failed for run %s", run_id)
-
-                    # Plan 075.4-03 D-075.4-E1 — persist any system_warning
-                    # rows captured during the run. Best-effort (try/except)
-                    # because the messages_role_check constraint pre-migration
-                    # 048 rejects role='system' — INSERT fails-silent; SSE
-                    # event remains the user-visible signal regardless.
-                    try:
-                        if _persist_sys is not None and _sink_system_warnings:
-                            await _persist_sys(_sink_system_warnings)
-                    except BaseException:
-                        logger.exception("Shielded system-warning persist failed for run %s", run_id)
-
-                    # Phase 138 RUN-01b (SITE 1) — on a genuinely-clean run end, append
-                    # the honesty marker to any still-open todo so the Workspace TODOS
-                    # panel reads "… (run ended — not completed)" instead of looking
-                    # permanently stuck. Positioned AFTER step-1 persist and BEFORE
-                    # step-2 finalize_run so the todo_updated emit reaches the live SSE
-                    # consumer ahead of the terminal sentinel and isn't trimmed by EXPIRE
-                    # (S5 — no existing step is reordered). Best-effort: the reconciler
-                    # NEVER raises into the byte-locked finalizer.
-                    #
-                    # LOCK-2 / S6 two-clause gate: _shielded_finalize NEVER reads
-                    # cap_disposition, so a fresh Deep run that hit the iteration cap
-                    # arrives here as _terminal_status == "completed" with
-                    # _result_sink["cap_disposition"] == "cap_paused". Gating on status
-                    # alone would WRONGLY mark a cap-paused run (the D-05 trap) — the
-                    # cap_paused clause is load-bearing.
-                    if _terminal_status == "completed" and _result_sink.get("cap_disposition") != "cap_paused":
-                        try:
-                            from app.services.todos_service import reconcile_open_todos_on_run_end  # noqa: PLC0415
-                            await reconcile_open_todos_on_run_end(
-                                await get_pg_pool(),
-                                UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-                                emit=_emit,
-                                redis=redis,
-                                run_id=run_id,
-                            )
-                        except BaseException:
-                            logger.exception("RUN-01b reconciler failed for run %s", run_id)
-
-                    # Plan 075.4-03 T-075.4-04 — STEP-SWAP race fix.
-                    # Legacy order was (2) sentinel → (3) finalize_run, but
-                    # frontend consumes the SSE `done` (which is the
-                    # _emit_terminal payload's discriminator type) as the
-                    # signal that the run is finished — including any
-                    # subsequent GET /threads/{id}/snapshot expectations on
-                    # runs.status. Old order let the consumer see `done`
-                    # BEFORE the DB UPDATE landed.
-                    # New order (post-Plan-03):
-                    #   2. finalize_run UPDATE      (DB commit)
-                    #   3. _emit_terminal sentinel  (SSE consumer breaks)
-                    # Pitfall 2 (terminal-sentinel-before-EXPIRE) still holds
-                    # because EXPIRE (step 4) follows the sentinel (step 3).
-                    # The Phase 067.4 Rule 3 invariant (suggestion events
-                    # emit before terminal sentinel) is preserved because
-                    # suggestions live in the agent body that runs BEFORE
-                    # the finally: that triggers _shielded_finalize.
-
-                    # 2. UPDATE runs row — status/error/completed_at/message_id/tokens.
-                    # Phase 073 D-073-04 SITE #2 — flips to asyncpg finalize_run helper.
-                    # Phase 073 TOKEN-COL-01 (D-073-09): NULL + warn when SDK never
-                    # surfaced usage on any iteration (interrupted stream / provider
-                    # gap). Both slots stay None until the on-chunk callback fires.
-                    # Warning format string contains run/provider/model identifiers
-                    # only — NO token VALUES (T-073-04 mitigation; locked by Plan 03's
-                    # test_missing_usage_format_string_has_no_token_values negative gate).
-                    # WR-01 historical note: PostgREST required ISO-8601-string timestamps
-                    # due to JSON-over-the-wire encoding. asyncpg uses the Postgres binary
-                    # protocol — pass datetime objects directly.
-                    try:
-                        if _input_tokens_total is None and _output_tokens_total is None:
-                            logger.warning(
-                                "runs.usage missing for run=%s provider=%s model=%s",
-                                run_id, _resolved_provider, _resolved_model,
-                            )
-                        # Phase 145-03 (D-145-09) — the terminal runs.status write +
-                        # both ZREMs are now ONE atomic co-write via the owner (was:
-                        # finalize_run here + a separate ZREM ×2 at old step 5). The
-                        # 075.4-03 ordering holds: the owner writes status FIRST then
-                        # ZREMs; the terminal sentinel (step 3) + EXPIRE (step 4) below
-                        # still run AFTER this call. Deep _terminal_status is always a
-                        # TRUE terminal here (cap_disposition is tracked separately —
-                        # see the LOCK-2/S6 gate above), so this is unconditional.
-                        await finalize_run_terminal(
-                            pool=await get_pg_pool(),
-                            redis=redis,
-                            run_id=run_id,
-                            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-                            status=_terminal_status,
-                            error=_terminal_error,
-                            completed_at=datetime.now(timezone.utc),
-                            message_id=UUID(_msg_id_for_runs) if _msg_id_for_runs else None,
-                            input_tokens=_input_tokens_total,
-                            output_tokens=_output_tokens_total,
-                        )
-                    except BaseException:
-                        logger.exception("runs row finalize+ZREM failed for run %s", run_id)
-
-                    # 3. TERMINAL SENTINEL XADD — MUST come AFTER finalize_run
-                    # (Plan 075.4-03 race fix) AND BEFORE EXPIRE (Pitfall 2).
-                    # Use _emit_terminal (no MAXLEN — sentinel must not be trimmed, Pitfall 5).
-                    # Map runs.status enum → SSE TERMINAL_TYPES (D-061-09 vs D-061-12 namespaces).
-                    # CR-02 + WR-03: catch BaseException (incl. CancelledError) so a
-                    # lifespan-shutdown cancel mid-finalize doesn't leave runs row stuck
-                    # in 'streaming'. Also catches KeyError if an unmapped status sneaks
-                    # past the _RUN_STATUS_TO_TERMINAL_TYPE lookup, plus any future
-                    # ValueError from the _emit_terminal type guard.
-                    try:
-                        _terminal_type = _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status]
-                        await _emit_terminal(redis, run_id, _terminal_type, error=_terminal_error)
-                    except BaseException:
-                        logger.exception("Terminal sentinel XADD failed for run %s", run_id)
-
-                    # 4. EXPIRE Redis stream — 600s completed, 60s failed/cancelled (REDIS-SETUP.md TTL discipline)
-                    _ttl = 600 if _terminal_status == "completed" else 60
-                    try:
-                        await redis.expire(f"run:{run_id}", _ttl)
-                    except BaseException:
-                        logger.exception("EXPIRE failed for run %s", run_id)
-
-                    # 5. ZREM sorted-set indexes — MOVED into the finalize_run_terminal
-                    # owner above (Phase 145-03 / D-145-09): the terminal mirror removal
-                    # now co-writes atomically with the runs.status UPDATE, so status +
-                    # runs:active can no longer drift (BUG-260709-01, 145-REPRO Dir B).
-
-                    # 6. Phase 092-05 F2: a HARNESS run that escapes via
-                    # exception/timeout/cancel never reached run_workflow's own
-                    # finish_run, so workflow_runs would stay 'active' and the
-                    # thread is wedged locked (lock_is_stale=false, no UI recovery).
-                    # Terminalize the workflow_runs row + clear the anchor here on
-                    # any NON-completed terminal status. Idempotent: finish_run
-                    # no-ops the anchor-clear if run_workflow already cleared it on
-                    # its own internal failure path. A natural-success run
-                    # (_terminal_status=='completed') is SKIPPED — run_workflow
-                    # already wrote finish_run(..., 'completed'). Deep runs
-                    # (_active_workflow_run_id is None) skip this entirely
-                    # (byte-identical).
-                    #
-                    # 096-09 (UAT Test 2 restart-resumability fix): on a GRACEFUL
-                    # app shutdown, do NOT terminalize — leaving workflow_runs
-                    # 'active' + the thread anchor intact is PRECISELY what makes
-                    # the boot-time resume sweep re-claim and re-drive this run
-                    # (the active phase's output was never durable → re-running it
-                    # from the top is the correct, idempotent resume). Terminalizing
-                    # here (the pre-fix behavior) is what stranded the run. The gate
-                    # is the ONLY change: user-Stop / crash / timeout (flag False)
-                    # still terminalize exactly as before — byte-identical. Deep
-                    # runs are unaffected (_active_workflow_run_id is None).
-                    from app.services.harness_engine import is_app_shutting_down
-                    if (
-                        _active_workflow_run_id is not None
-                        and _terminal_status != "completed"
-                        and not is_app_shutting_down()
-                    ):
-                        try:
-                            from app.db.workflows import finish_run as _finish_wf
-                            await _finish_wf(
-                                await get_pg_pool(),
-                                _active_workflow_run_id,
-                                # v2.8-audit cancel-honesty fix: a user Stop sets
-                                # _terminal_status='cancelled' (:1379) and the
-                                # workflow_runs CHECK + every terminal-status
-                                # consumer (_TERMINAL_WORKFLOW_STATUSES here and
-                                # in panel.py, PhaseTimeline, RunCard) already
-                                # handle 'cancelled' — record the true intent.
-                                # Every OTHER non-completed escape (timed_out is
-                                # NOT in the workflow_runs CHECK, failed, crash)
-                                # keeps writing 'failed' verbatim.
-                                "cancelled"
-                                if _terminal_status == "cancelled"
-                                else "failed",
-                            )
-                        except BaseException:
-                            logger.exception(
-                                "F2 harness-failure terminalize failed for run %s",
-                                _active_workflow_run_id,
-                            )
-                    elif (
-                        _active_workflow_run_id is not None
-                        and _terminal_status != "completed"
-                    ):
-                        # Shutdown path — left resumable on purpose.
-                        logger.info(
-                            "F2 skipped for workflow run %s — app shutting down, "
-                            "left active for the boot-time resume sweep (096-09)",
-                            _active_workflow_run_id,
-                        )
-
-                try:
-                    await asyncio.shield(_shielded_finalize())
-                except asyncio.CancelledError:
-                    raise   # propagate; lifespan-cancel path
-                finally:
-                    # 6. Self-evict from registry (done-callback also handles this; defense-in-depth)
-                    RUN_TASKS.pop(run_id, None)
-
-    # CR-01 fix: classification of TimeoutError / CancelledError / Exception
-    # was moved INSIDE the inner try (just before its finally) so the finalizer
-    # at line 1942 reads the correct _terminal_status. The previous outer
-    # except branches at this level were redundant — they fired AFTER the
-    # finally had already committed status='completed' to Redis and Postgres.
-    # CancelledError still propagates out of agent_runner via the inner re-raise
-    # so the asyncio task transitions to CANCELLED state correctly (Pitfall 3).
-        finally:
-            pass  # outer try kept structurally; classification handled by inner except branches above.
+    # D-067.2-05: Auto-title fires AFTER the first-user-message INSERT but BEFORE the
+    # agent producer task starts, derived from the user message alone (so the title persists
+    # regardless of run success / failure / timeout / cancellation). Phase 162.5 Plan 01
+    # (G-5 leaf extraction): the "New Chat" guard + threadpool-wrapped title-gen + the
+    # fallback-model-before-title emit ordering + the nested try/except moved VERBATIM into
+    # thread_title.maybe_autotitle_thread. title_fn / emit are injected as THIS module's
+    # generate_thread_title / _emit so patch("app.api.threads.generate_thread_title") and
+    # app.api.threads._emit still intercept (D-A4). Behavior byte-identical.
+    await maybe_autotitle_thread(
+        supabase=supabase,
+        redis=redis,
+        thread_id=thread_id,
+        first_message=body.content,
+        user_settings=_user_settings,
+        chat_model=body.model or "",
+        run_id=run_id,
+        title_fn=generate_thread_title,
+        emit=_emit,
+    )
 
     # Spawn producer task — runs concurrently with the consumer below.
     # D-061-11: register the producer in RUN_TASKS BEFORE returning the
     # consumer. add_done_callback evicts on completion (defense-in-depth;
     # the producer's own finally ALSO pops). 062's DELETE /runs/{id}
     # looks up run_id here and calls task.cancel().
-    task = asyncio.create_task(agent_runner(run_id))
+    #
+    # Phase 162.5 Plan 03 (G-5 extraction): the producer shell moved VERBATIM to
+    # run_producer.run_producer; the create_task/RUN_TASKS registration + the
+    # _evict done-callback STAY here (send_message concern). The captured closure
+    # vars become explicit kwargs. Late import for maximal cycle safety (D-A4).
+    from app.services.run_producer import run_producer  # noqa: PLC0415
+    task = asyncio.create_task(run_producer(
+        run_id,
+        thread_id=thread_id,
+        current_user=current_user,
+        # Phase 163 (D-05/D-09): service-role — the agent-loop async writer path
+        # keeps BYPASSRLS (no auth.uid() off-request); NOT the user-JWT `supabase`.
+        supabase=service_supabase,
+        redis=redis,
+        user_settings=_user_settings,
+        body=body,
+        resolved_model=_resolved_model,
+        resolved_provider=_resolved_provider,
+        active_workflow_run_id=_active_workflow_run_id,
+        kickoff_definition=_kickoff_definition,
+        kickoff_definition_id=_kickoff_definition_id,
+    ))
     RUN_TASKS[run_id] = task
 
     def _evict(_t, _rid=run_id):
@@ -2055,8 +1036,9 @@ _MAX_CONTINUES_PER_RUN = 3  # D-06 (mirror of config.max_continues_per_run; Plan
 @router.get("/{thread_id}/workflow", response_model=ThreadWorkflowState)
 async def get_thread_workflow(
     thread_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ) -> ThreadWorkflowState:
     """PURE READ — reconcile a thread's Deep/Harness mode + lock + phase + Continue.
 
@@ -2081,7 +1063,21 @@ async def get_thread_workflow(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Thread not found")
 
     active_workflow_run_id = row.get("active_workflow_run_id")
-    pool = await get_pg_pool()
+
+    # Phase 163 (TEN-02 / D-02): the reconcile reads that used a connectionless
+    # get_pg_pool() BYPASSRLS pool now run under RLS on the per-request user-JWT
+    # connection (SET LOCAL ROLE authenticated + both GUC forms). Each read opens its
+    # own short SET-LOCAL txn — byte-for-byte the SAME independent-read semantics the
+    # old pool.fetchrow/pool.fetch had (asyncpg Pool.* acquires+releases per call), so
+    # workflow_runs / runs / workflow_phases / workflow_definitions are all gated by the
+    # caller's org membership. Deep byte-identical: this is a pure-read reconcile endpoint.
+    async def _rls_fetchrow(sql, *args):
+        async with get_user_pg_connection(request, current_user) as _conn:
+            return await _conn.fetchrow(sql, *args)
+
+    async def _rls_fetch(sql, *args):
+        async with get_user_pg_connection(request, current_user) as _conn:
+            return await _conn.fetch(sql, *args)
 
     # 2. Workflow-run state (joined: run -> definition -> current phase + total).
     run_status = None
@@ -2093,7 +1089,7 @@ async def get_thread_workflow(
     wf_continues_used = 0
     phases_list: list[WorkflowPhaseState] | None = None
     if active_workflow_run_id is not None:
-        wf_row = await pool.fetchrow(
+        wf_row = await _rls_fetchrow(
             """
             SELECT wr.status,
                    wr.continues_used,
@@ -2145,7 +1141,7 @@ async def get_thread_workflow(
     # new query, no write — the 092-05 pure-read F2 invariant holds).
     latest_producer_run_id = None
     if active_workflow_run_id is not None and not lock_is_stale:
-        prod_row = await pool.fetchrow(
+        prod_row = await _rls_fetchrow(
             "SELECT run_id, status FROM runs WHERE thread_id = $1 "
             "ORDER BY started_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
@@ -2166,7 +1162,7 @@ async def get_thread_workflow(
     continues_used = wf_continues_used
     if not cap_paused:
         # Look at the thread's latest cap_paused `runs` row (Deep-run Continue case).
-        deep_row = await pool.fetchrow(
+        deep_row = await _rls_fetchrow(
             """
             SELECT status, continues_used
             FROM runs
@@ -2191,7 +1187,7 @@ async def get_thread_workflow(
     # panel timeline; a pure-deep thread (no workflow_run ever) yields phases=None.
     phases_source_run_id = active_workflow_run_id
     if phases_source_run_id is None:
-        latest_wf = await pool.fetchrow(
+        latest_wf = await _rls_fetchrow(
             "SELECT id FROM workflow_runs WHERE thread_id = $1 "
             "ORDER BY created_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
@@ -2199,7 +1195,7 @@ async def get_thread_workflow(
         if latest_wf is not None:
             phases_source_run_id = latest_wf["id"]
     if phases_source_run_id is not None:
-        phase_rows = await pool.fetch(
+        phase_rows = await _rls_fetch(
             "SELECT slug, phase_index, status FROM workflow_phases "
             "WHERE workflow_run_id = $1 ORDER BY phase_index",
             UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
@@ -2209,7 +1205,7 @@ async def get_thread_workflow(
             # timeline can render the correct 3D icon for completed/historical runs
             # (the workflow_phases table doesn't store phase_type).
             slug_to_type: dict[str, str] = {}
-            def_row = await pool.fetchrow(
+            def_row = await _rls_fetchrow(
                 "SELECT wd.definition FROM workflow_runs wr "
                 "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
                 "WHERE wr.id = $1",
@@ -2262,183 +1258,16 @@ async def get_thread_workflow(
             if isinstance(latest_producer_run_id, str)
             else latest_producer_run_id
         ),
+        # Phase 188 CR-03 — the ALREADY-RESOLVED anchor-then-latest id, surfaced. This is
+        # literally the value that sourced `phases` above; nothing new is queried and nothing
+        # is written. It exists because `finish_run` NULLs the live anchor in the same
+        # transaction as the terminal status, so a consumer that reads only
+        # `active_workflow_run_id` can never reach a FINISHED run — and `finish_run`'s clear
+        # is Phase 092's SC#2 and is deliberately NOT undone.
+        last_workflow_run_id=(
+            UUID(phases_source_run_id)
+            if isinstance(phases_source_run_id, str)
+            else phases_source_run_id
+        ),
         phases=phases_list,
     )
-
-
-# ───────────────────────────────────────────────────────────────────────
-# Phase 092 (092-03 / CONT-01) — Deep-run continuation spawner.
-# POST /runs/{id}/continue (runs.py) calls this to re-drive the SAME run_id
-# within a FRESH bounded budget, CONSUMING the persisted dropped tool calls
-# (SC#4). NET-NEW (PATTERNS.md "No Analog Found"): the Deep-run continuation.
-# Mirrors agent_runner's _shielded_finalize ordering (persist → finalize_run →
-# sentinel → expire → zrem); the only twist is the cap_paused disposition —
-# if the continuation hits the cap AGAIN, it re-pauses (no terminal sentinel)
-# so the next Continue can resume, instead of finalizing terminal.
-# ───────────────────────────────────────────────────────────────────────
-async def spawn_continuation_run(
-    *,
-    run_id: _uuid_mod.UUID,
-    thread_id: str,
-    current_user: dict,
-    redis,
-    supabase,
-    dropped_tool_calls: list[dict],
-) -> None:
-    """Re-drive ``run_id`` consuming the persisted dropped tool calls (SC#4)."""
-
-    async def _continuation() -> None:
-        _terminal_status = "completed"
-        _terminal_error: str | None = None
-        _result_sink: dict = {}
-        try:
-            user_settings = load_user_settings(current_user["id"])
-            resolved_model = user_settings.llm_model
-            resolved_provider = user_settings.active_provider
-            # Minimal MessageCreate carrier — the loop reads body.model/.provider/
-            # .agent_mode/.content; a continuation carries no new user content.
-            body = MessageCreate(content="", model=resolved_model, provider=resolved_provider)
-            ctx = RunContext(
-                run_id=run_id,
-                thread_id=thread_id,
-                current_user=current_user,
-                user_settings=user_settings,
-                body=body,
-                redis=redis,
-                supabase=supabase,
-                resolved_model=resolved_model,
-                resolved_provider=resolved_provider,
-                resume_dropped_tool_calls=True,
-                dropped_tool_calls=tuple(dropped_tool_calls),
-            )
-            try:
-                await run_agent_loop(
-                    ctx,
-                    emit=_emit,
-                    emit_terminal=_emit_terminal,
-                    spawn=_spawn,
-                    result_sink=_result_sink,
-                )
-            except asyncio.CancelledError:
-                _terminal_status = "cancelled"
-                raise
-            except Exception as e:  # noqa: BLE001 — mirror agent_runner classifier
-                _terminal_status = "failed"
-                _terminal_error = f"failed: {type(e).__name__}: {(str(e) or '')[:200]}"
-                logger.exception("Continuation run %s failed", run_id)
-        finally:
-            # cap_disposition override — if the cap fired AGAIN, stay non-terminal.
-            _cap = _result_sink.get("cap_disposition")
-            if _cap == "cap_paused":
-                _terminal_status = "cap_paused"
-
-            async def _finalize() -> None:
-                _persist = _result_sink.get("persist")
-                _persist_sys = _result_sink.get("persist_system_warnings")
-                _sink_warnings = _result_sink.get("persisted_system_warnings") or []
-                _in_tok = _result_sink.get("input_tokens_total")
-                _out_tok = _result_sink.get("output_tokens_total")
-                _msg_id: str | None = None
-                try:
-                    if _persist is not None:
-                        _msg_id = await _persist()
-                except BaseException:
-                    logger.exception("Continuation persist failed for run %s", run_id)
-                try:
-                    if _persist_sys is not None and _sink_warnings:
-                        await _persist_sys(_sink_warnings)
-                except BaseException:
-                    logger.exception("Continuation sys-warning persist failed for run %s", run_id)
-
-                # Phase 138 RUN-01b (SITE 2 / LOCK-1) — a Continue-completed run ending
-                # with open todos is just as dishonest as a first-turn completion, so it
-                # must reconcile too. Positioned AFTER persist and BEFORE finalize_run so
-                # the todo_updated emit lands before the terminal sentinel (S5). PLAIN
-                # gate here (no cap_disposition clause): this finalizer's own `finally`
-                # (~2104-2107) already set _terminal_status = "cap_paused" when the cap
-                # fired, so a cap-paused continuation never reaches "completed".
-                # Best-effort — never raises into the finalizer.
-                if _terminal_status == "completed":
-                    try:
-                        from app.services.todos_service import reconcile_open_todos_on_run_end  # noqa: PLC0415
-                        await reconcile_open_todos_on_run_end(
-                            await get_pg_pool(),
-                            UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-                            emit=_emit,
-                            redis=redis,
-                            run_id=run_id,
-                        )
-                    except BaseException:
-                        logger.exception("RUN-01b reconciler failed for run %s", run_id)
-
-                # Phase 145-03 (D-145-09) — TRUE terminals route the runs.status write
-                # + both ZREMs through the atomic owner (was: finalize_run here + a
-                # separate gated ZREM ×2 below). cap_paused is NON-terminal +
-                # re-attachable: it MUST keep its runs:active membership, so it still
-                # writes its status via the shared finalize_run DIRECTLY (NOT the owner,
-                # which would ZREM) — mirroring the old != "cap_paused" skip gate exactly.
-                if _terminal_status != "cap_paused":
-                    try:
-                        await finalize_run_terminal(
-                            pool=await get_pg_pool(),
-                            redis=redis,
-                            run_id=run_id,
-                            thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,
-                            status=_terminal_status,
-                            error=_terminal_error,
-                            completed_at=datetime.now(timezone.utc),
-                            message_id=UUID(_msg_id) if _msg_id else None,
-                            input_tokens=_in_tok,
-                            output_tokens=_out_tok,
-                        )
-                    except BaseException:
-                        logger.exception("Continuation finalize+ZREM failed for run %s", run_id)
-                else:
-                    try:
-                        await finalize_run(
-                            await get_pg_pool(),
-                            run_id=run_id,
-                            status=_terminal_status,
-                            error=_terminal_error,
-                            completed_at=datetime.now(timezone.utc),
-                            message_id=UUID(_msg_id) if _msg_id else None,
-                            input_tokens=_in_tok,
-                            output_tokens=_out_tok,
-                        )
-                    except BaseException:
-                        logger.exception("Continuation cap_paused status write failed for run %s", run_id)
-                # cap_paused is NON-terminal — NO terminal sentinel (Landmine 6).
-                # The agent_loop already emitted the non-terminal cap_paused event.
-                if _terminal_status in _RUN_STATUS_TO_TERMINAL_TYPE:
-                    try:
-                        await _emit_terminal(
-                            redis, run_id,
-                            _RUN_STATUS_TO_TERMINAL_TYPE[_terminal_status],
-                            error=_terminal_error,
-                        )
-                    except BaseException:
-                        logger.exception("Continuation sentinel XADD failed for run %s", run_id)
-                _ttl = 600 if _terminal_status == "completed" else 60
-                try:
-                    await redis.expire(f"run:{run_id}", _ttl)
-                except BaseException:
-                    logger.exception("Continuation EXPIRE failed for run %s", run_id)
-                # cap_paused keeps the run in the active sorted sets (re-attachable);
-                # a true terminal status ZREMs them — that ZREM now lives INSIDE the
-                # finalize_run_terminal owner above (Phase 145-03 / D-145-09), so the
-                # standalone runs:active removal that used to live here is gone. The
-                # cap_paused branch above (plain finalize_run) deliberately skips it.
-
-            try:
-                await asyncio.shield(_finalize())
-            except asyncio.CancelledError:
-                raise
-            finally:
-                RUN_TASKS.pop(run_id, None)
-
-    task = asyncio.create_task(_continuation())
-    RUN_TASKS[run_id] = task
-
-    def _evict(_t, _rid=run_id):
-        RUN_TASKS.pop(_rid, None)
-    task.add_done_callback(_evict)

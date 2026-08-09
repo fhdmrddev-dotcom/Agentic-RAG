@@ -212,6 +212,20 @@ class ModelCapability(TypedDict, total=False):
     # deprecated model can stay enabled. Overlaid from model_capabilities_overrides.deprecated
     # by get_model_capability_async so a discovery-confirmed DB-only row carries it with no code edit.
     deprecated: bool  # Phase 149 D-149-04 — informational deprecated badge (default absent = not deprecated)
+    # Phase 175 XPROV-01 (D-01) — reasoning-first STRUCTURED gate marker. True => this
+    # model emits reasoning tokens BEFORE tool calls, so the Plan-03 routing gate must
+    # short-circuit it to STRUCTURED mode ABOVE the native-tools read (capability-keyed,
+    # NEVER a hardcoded id-list — D-122-04). ABSENT => today's derived routing (default-inert, D-14).
+    reasoning_first: bool  # Phase 175 XPROV-01 D-01 — reasoning-first STRUCTURED gate (default absent)
+    # Phase 175 XPROV-04 (D-05) — docs-confirmed reasoning-DISABLE mechanism. Marked
+    # per-MODEL across the WHOLE docs-confirmed-SAFE set (NOT per-provider-default —
+    # thread_title.py resolves the title model from the user's ACTIVE chat_model, so any
+    # SAFE model a user chats with must carry it). Values: "thinking_disabled" (the
+    # extra_body {"thinking":{"type":"disabled"}} family — deepseek-v4/kimi/glm/MiniMax-M3)
+    # or "effort_none" (Google reasoning_effort="none" — gemini-2.5-flash/-flash-lite).
+    # ABSENT => keep today's derived fallback (UNSAFE: accept-but-ignore / cannot-disable /
+    # pre-4.6 / non-reasoning rows stay unmarked — no regression, default-inert, D-14).
+    reasoning_off: Literal["thinking_disabled", "effort_none"]  # Phase 175 XPROV-04 D-05 — docs-confirmed reasoning-disable mechanism (default absent)
 
 
 # Capability registry: which models support native API tool calling.
@@ -262,9 +276,9 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # reasoning effort + ultra mode); Terra=balanced everyday; Luna=lightweight/fastest.
     # Same OpenAI TIER-FORCE + verified strict json_schema as the rest of the gpt-5 line.
     # Re-verify ids + caps against live /models (scripts/curate_models.py) once GA.
-    "gpt-5.6-sol":   {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # flagship + max reasoning/ultra — reasoning tier
-    "gpt-5.6-terra": {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # balanced everyday — flagship tier (mirrors gpt-5.5)
-    "gpt-5.6-luna":  {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # lightweight/fastest — standard tier
+    "gpt-5.6-sol":   {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # flagship + max reasoning/ultra — reasoning tier
+    "gpt-5.6-terra": {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 600, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # balanced everyday — flagship tier (mirrors gpt-5.5)
+    "gpt-5.6-luna":  {"native_tools": True, "reasoning_first": True,"provider": "openai", "llm_call_timeout_seconds": 300, "max_output_tokens": 128000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},  # lightweight/fastest — standard tier
     "o1":           {"native_tools": True, "provider": "openai", "llm_call_timeout_seconds": 900, "max_output_tokens": 100000, "capability_source": "registry", "uses_max_completion_tokens": True, "forced_emission": True, "strict_json_schema": True, "emit_tier": "force_strict"},
     # o3 / o4 removed 2026-06-07 — no longer served by live /models (096 D-05 curation)
     # Anthropic direct — native tool_use
@@ -300,8 +314,8 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # Phase 101.1 D-15: Google is TIER-FORCE — forced_emission True (tool_config
     # function_calling_config mode='ANY' + allowed_function_names forces a function call).
     "gemini-2.5-pro":         {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True, "emit_tier": "force"},
-    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True, "emit_tier": "force"},
-    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True, "emit_tier": "force"},
+    "gemini-2.5-flash":       {"native_tools": True, "provider": "google", "reasoning_off": "effort_none", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True, "emit_tier": "force"},
+    "gemini-2.5-flash-lite":  {"native_tools": True, "provider": "google", "reasoning_off": "effort_none", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "supports_parallel_tools": False, "max_tools": 16, "forced_emission": True, "emit_tier": "force"},
     # Gemini 3.x preview — no published vendor cap as of 2026-05-18; OMITTED max_output_tokens
     # per RESEARCH.md Open Question 1 recommendation (pass-through is more honest than guessed value).
     # Add a value here once Google publishes the GA spec for these IDs.
@@ -322,16 +336,16 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # thinking + non-thinking; the server validates the json schema). Per-MODEL, not
     # per-provider — the served ids are v4-flash/v4-pro (deepseek-reasoner, which does
     # NOT support tool_choice, is no longer served — RESEARCH §2 caveat).
-    "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True, "emit_tier": "force"},  # DEMOTED — strict inert (no /beta base_url, Pitfall 3 / D-122-04)
-    "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "strict_json_schema": True, "emit_tier": "force"},  # DEMOTED — strict inert (no /beta base_url, Pitfall 3 / D-122-04)
+    "deepseek-v4-flash":  {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "strict_json_schema": True, "emit_tier": "force"},  # DEMOTED — strict inert (no /beta base_url, Pitfall 3 / D-122-04)
+    "deepseek-v4-pro":    {"native_tools": True, "provider": "deepseek", "llm_call_timeout_seconds": 900, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "strict_json_schema": True, "emit_tier": "force"},  # DEMOTED — strict inert (no /beta base_url, Pitfall 3 / D-122-04)
     # Moonshot/Kimi direct — OpenAI-compatible API at api.moonshot.ai
     # verified against live /models 2026-06-07 (096 D-05 curation) — kimi-k2.5 added
     # Phase 101.1 D-15: TIER-COERCE — Kimi/Moonshot are genuinely UNFORCEABLE (no
     # required/named tool_choice; thinking further restricts to auto/none). LEAVE
     # forced_emission ABSENT (default SAFE → coerce: directive + hard-validate + retry,
     # never a code-emission fallback).
-    "kimi-k2.6":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "emit_tier": "coerce"},
-    "kimi-k2.5":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "emit_tier": "coerce"},  # live /models 2026-06-07 (096 D-05 curation)
+    "kimi-k2.6":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "emit_tier": "coerce"},
+    "kimi-k2.5":          {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 600, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "emit_tier": "coerce"},  # live /models 2026-06-07 (096 D-05 curation)
     "moonshot-v1-8k":     {"native_tools": True, "provider": "moonshot", "llm_call_timeout_seconds": 120, "max_output_tokens": 8192, "capability_source": "registry", "emit_tier": "coerce"},
     # MiniMax direct — OpenAI-compatible API at api.minimax.io (INTERNATIONAL; all 8 verified
     # against live /models 2026-06-07, 096 D-05 curation — MiniMax-M3 added, exact PascalCase)
@@ -346,7 +360,7 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     "MiniMax-M2.5-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # fast rep (eval/native-7 baseline)
     "MiniMax-M2.7":           {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # (PascalCase — API is case-sensitive)
     "MiniMax-M2.7-highspeed": {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 300, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # fast flagship
-    "MiniMax-M3":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation; exact PascalCase)
+    "MiniMax-M3":             {"native_tools": True, "provider": "minimax", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},  # newest flagship — live /models 2026-06-07 (096 D-05 curation; exact PascalCase)
     # GLM/Zhipu direct — OpenAI-compatible API at api.z.ai/api/paas/v4 (INTERNATIONAL; codes from live /models, specs per docs.z.ai/guides/llm/*; D-089 docs curation 2026-05-30)
     # Phase 101.1 D-15: GLM/Zhipu is TIER-FORCE via OpenAI-compatible tool_choice
     # (forced_emission True). strict_json_schema LEFT ABSENT — verify strict
@@ -354,12 +368,12 @@ MODEL_CAPABILITIES: dict[str, ModelCapability] = {
     # zhipu/minimax case-sensitivity tool-drop trap — a miss SAFELY coerces, Pitfall 7).
     "glm-4.5":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
     "glm-4.5-air":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # lightweight fast tier
-    "glm-4.6":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # 200K ctx (eval/native-7 baseline)
-    "glm-4.7":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},
-    "glm-5":              {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # GLM-5 family — 200K ctx / 128K out
-    "glm-5-turbo":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # fast GLM-5 tier
-    "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
-    "glm-5.2":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 900, "max_output_tokens": 131072, "capability_source": "registry", "forced_emission": True, "emit_tier": "force"},  # newest flagship — 1M ctx / 128K out / tools + thinking (2026-06-13)
+    "glm-4.6":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},  # 200K ctx (eval/native-7 baseline)
+    "glm-4.7":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 300, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},
+    "glm-5":              {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},  # GLM-5 family — 200K ctx / 128K out
+    "glm-5-turbo":        {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 180, "max_output_tokens": 65536, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},  # fast GLM-5 tier
+    "glm-5.1":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 600, "max_output_tokens": 131072, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},  # latest flagship — docs.z.ai: 200K ctx / 128K out / tools + thinking
+    "glm-5.2":            {"native_tools": True, "provider": "zhipu", "llm_call_timeout_seconds": 900, "max_output_tokens": 131072, "capability_source": "registry", "reasoning_off": "thinking_disabled", "forced_emission": True, "emit_tier": "force"},  # newest flagship — 1M ctx / 128K out / tools + thinking (2026-06-13)
     # OpenRouter — mixed; start safe with structured mode
     # max_output_tokens verified per upstream provider's model card 2026-05-18
     # verified against live /models 2026-06-07 (096 D-05 curation) — deepseek/deepseek-reasoner
@@ -755,6 +769,21 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_publishable_key: str = ""
     supabase_secret_key: str = ""
+
+    # Phase 168 (SSO — SAML 2.0 CORE, D-168-01 / D-160 4-tier no-code-fork contract) — the
+    # provider-CRUD transport adapter switch. Supabase Auth IS the SAML SP; sso_provider_service
+    # makes ONE authenticated call per operation, selecting Cloud-vs-self-hosted transport by env
+    # (identical request body, different base URL + auth headers). Both are CONFIG, not secrets:
+    #   * supabase_project_ref  — Cloud Management API path var (Dashboard → Project Settings →
+    #                             General → Reference ID). Empty on self-hosted / until SSO is used.
+    #   * supabase_self_hosted  — False (default) = Cloud path (api.supabase.com Management API +
+    #                             the sbp_ token in app_settings.supabase_management_token). True =
+    #                             self-hosted GoTrue Admin API ({supabase_url}/auth/v1/admin/…,
+    #                             authed by the service_role key already in config above).
+    # The Cloud sbp_ token itself is NOT here — it lives encrypted in app_settings (Phase-150
+    # cipher), per CLAUDE.md "env vars are for secrets and infra only" (D-168-01).
+    supabase_project_ref: str = ""
+    supabase_self_hosted: bool = False
 
     # Active provider — set this to switch between providers
     # Options: openai | anthropic | google | openrouter | ollama | deepseek | moonshot | minimax | zhipu
@@ -1177,6 +1206,16 @@ class Settings(BaseSettings):
     langsmith_tracing: str = "true"
 
     frontend_url: str = "http://localhost:5173"
+
+    # Phase 167 (INV-01, D-167-02) — env-switched invitation email delivery. The DEFAULT is
+    # ``none``: the app just LOGS the invite link (offline/self-hosted safe — no email service
+    # or API key required). Set ``EMAIL_PROVIDER=resend`` + ``RESEND_API_KEY`` +
+    # ``INVITE_FROM_EMAIL`` to send real email (the ``resend`` package is an opt-in lazy import,
+    # NOT a default requirement). The link base reuses ``frontend_url`` above — no new
+    # APP_BASE_URL env var. RESEND_API_KEY is a secret → env only (never app_settings).
+    email_provider: str = "none"  # none | resend
+    resend_api_key: str = ""
+    invite_from_email: str = ""
 
 
 settings = Settings()

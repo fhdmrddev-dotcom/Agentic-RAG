@@ -257,7 +257,7 @@ describe("listFolders", () => {
   })
 
   it("returns parsed Folder array", async () => {
-    const folders = [{ id: "f1", name: "Docs", parent_id: null, is_global: false }]
+    const folders = [{ id: "f1", name: "Docs", parent_id: null, is_org_shared: false }]
     vi.stubGlobal("fetch", mockFetch(folders))
     const result = await listFolders()
     expect(result).toEqual(folders)
@@ -274,8 +274,8 @@ describe("createFolder", () => {
     vi.unstubAllGlobals()
   })
 
-  it("makes POST /folders with name, parent_id, is_global", async () => {
-    const folder = { id: "f1", name: "Reports", parent_id: null, is_global: false }
+  it("makes POST /folders with name, parent_id, is_org_shared", async () => {
+    const folder = { id: "f1", name: "Reports", parent_id: null, is_org_shared: false }
     const fetchMock = mockFetch(folder, 201)
     vi.stubGlobal("fetch", fetchMock)
 
@@ -287,11 +287,11 @@ describe("createFolder", () => {
     const body = JSON.parse(options?.body as string) as Record<string, unknown>
     expect(body.name).toBe("Reports")
     expect(body.parent_id).toBeNull()
-    expect(body.is_global).toBe(false)
+    expect(body.is_org_shared).toBe(false)
   })
 
-  it("defaults is_global to false when not provided", async () => {
-    const folder = { id: "f2", name: "Notes", parent_id: null, is_global: false }
+  it("defaults is_org_shared to false when not provided", async () => {
+    const folder = { id: "f2", name: "Notes", parent_id: null, is_org_shared: false }
     const fetchMock = mockFetch(folder, 201)
     vi.stubGlobal("fetch", fetchMock)
 
@@ -299,11 +299,11 @@ describe("createFolder", () => {
 
     const [, options] = fetchMock.mock.calls[0] as [string, RequestInit]
     const body = JSON.parse(options?.body as string) as Record<string, unknown>
-    expect(body.is_global).toBe(false)
+    expect(body.is_org_shared).toBe(false)
   })
 
   it("returns the created folder", async () => {
-    const folder = { id: "f3", name: "Archive", parent_id: "p1", is_global: true }
+    const folder = { id: "f3", name: "Archive", parent_id: "p1", is_org_shared: true }
     vi.stubGlobal("fetch", mockFetch(folder, 201))
     const result = await createFolder("Archive", "p1", true)
     expect(result).toEqual(folder)

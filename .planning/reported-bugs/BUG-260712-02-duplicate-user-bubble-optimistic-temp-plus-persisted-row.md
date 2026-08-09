@@ -4,9 +4,9 @@ title: User message renders as two identical bubbles on send (optimistic temp + 
 reported: 2026-07-12
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, frontend/chat, frontend/workflow-run-surface]
-folded_into: null
+folded_into: "176"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

@@ -9,7 +9,7 @@ op-reject layer; Pitfall 5: no op-ladder, no eval). DO NOT redefine the AST here
 A classification rule is a metadata-driven *suggestion source* (CLASS-01/02): ``name`` +
 the validated ``match_expr`` AST (jsonb) + an optional ``suggest_folder_id`` (the folder the
 rule suggests for matching uploads; the FK is ``ON DELETE SET NULL`` — a rule survives its
-folder's deletion). ``is_global`` is HARD-SET False by the service on create (never trusted
+folder's deletion). ``is_system_global`` is HARD-SET False by the service on create (never trusted
 from the caller — globals are service-role/migration-seeded only); ``enabled`` toggles the
 rule on/off and rides the UPDATE path (no dedicated toggle endpoint).
 
@@ -47,5 +47,5 @@ class RuleResponse(BaseModel):
     name: str
     match_expr: dict  # the raw jsonb dict round-tripped to the client
     suggest_folder_id: UUID | None = None
-    is_global: bool = False
+    is_system_global: bool = False
     enabled: bool = True

@@ -5,6 +5,15 @@ one asyncpg transaction (DELETE all + INSERT new). Concurrent writers can't
 interleave thanks to Postgres MVCC — last writer wins by commit order.
 
 Validation runs BEFORE the DELETE so a malformed payload never wipes state.
+
+Phase 163 (D-05) — this whole module is the AGENT/finalizer path, NOT request-scoped,
+so it STAYS on the service-role pool and is deliberately NOT converted to
+``get_user_pg_connection``:
+  * ``replace_todos`` — the ``write_todos`` agent tool (``tool_dispatcher`` → ``ctx.pool``);
+    it also does ``pool.acquire()`` for its DELETE+INSERT txn, which REQUIRES a real Pool.
+  * ``reconcile_open_todos_on_run_end`` — the run finalizer (``run_producer``); off-request,
+    no auth.uid(). Both run inside the detached producer task; org-scoping rides the
+    mig-106 autofill trigger on the todos INSERT (org_id from the parent thread).
 """
 from __future__ import annotations
 

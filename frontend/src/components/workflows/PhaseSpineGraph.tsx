@@ -10,85 +10,67 @@
  *
  * G-5 RED LINE: this component MUST NOT import or modify the run-surface live
  * phase timeline / phase-card (those read live `usePhases`; this reads a DRAFT
- * definition JSON). It shares only the phase-type glyph vocabulary by value.
+ * definition JSON).
  *
  * The static drag-free invariant (REQ-4 acceptance c) is structural: every node
  * is a `<button>` (keyboard-selectable), there is NO `draggable` attribute, NO
  * drag handler (onDragStart / onPointerDown drag), NO connection handle, and NO
  * add-node control anywhere in the DOM. Selection NEVER reorders — clicking a
  * node only fires `onSelectNode(slug)`.
+ *
+ * Phase 183-04 (D-183-06 / D-183-08 / D-183-13) — THE HARD CUT. This file used to
+ * carry its OWN phase-glyph map (the flat text marks Phase 127 retired), its own
+ * type-label map, its own definition read shapes, its own on-fail parse and its own
+ * node-title resolver. All six are DELETED: they now live in exactly one home,
+ * `phaseVocabulary.ts` (vocabulary + parse + titles) and `soulData.ts` +
+ * `phaseGlyph()` (the icon vocabulary + its render-time resolver), so the vertical
+ * spine and the read-only canvas one toggle away cannot disagree about what a step
+ * is called, what it looks like, or where its on-fail branch goes. Nothing is
+ * re-exported from here — every consumer imports from the shared home directly.
+ *
+ * Two visible consequences, both intended:
+ *   - the spine now renders the 3D fluent-emoji marks (finishing the Phase 127
+ *     migration this file was left out of);
+ *   - the DEFAULT node face is the plain-language business sentence (D-183-06), and
+ *     the slug stays REVEALABLE — see the paragraph below for where, since 187-09.
+ *
+ * Phase 187-09 (SPEC Req 4 / D-187-16) — THIS COMPONENT IS NO LONGER A CONSUMER OF THE
+ * ⌥ TECHNICAL-NAMES STATE, and the removal is the point rather than an oversight. 183-04
+ * made the spine SWAP its title under the reveal, mirroring the canvas card. 187-04 gave
+ * `nodeTitle` a config-derived tier, which makes the plain title SPECIFIC — so the swap
+ * began destroying real meaning, and on the card it also truncated the slug it existed
+ * to show. The canvas therefore moved its reveal into the card's SUBTITLE slot; this
+ * surface has no subtitle slot, so it stops swapping instead, and the two views one
+ * toggle apart agree on the TITLE in both toggle states.
+ *
+ * Nothing was hidden by that. The technical vocabulary was never behind the reveal HERE:
+ * the mono chip beside each title prints the RAW `phase_type` unconditionally, the line
+ * beneath prints the RAW `phase_index`, and the `aria-label` carries the raw type — all
+ * three with the reveal OFF. With the title no longer swapping, no rendered value on this
+ * surface depends on the reveal at all, so the subscription that used to read it was dead
+ * code and is gone (`tsc -b` and ESLint both said so, which is how it was found rather
+ * than assumed). The app-wide `TechnicalNamesProvider` is untouched and remains the ONE
+ * technical-names state; the canvas is still its consumer, and the control still ships in
+ * Settings, the operator band and the canvas header — never here.
+ *
+ * `nameContext` (D-187-05) is the page-owned folder/skill id→name lookup the derived tier
+ * needs. It is OPTIONAL, it reaches `nodeTitle` and nowhere else, and an absent one makes
+ * every derived tier MISS — the generic type sentence renders, never a fabricated or
+ * id-shaped face — so a caller that omits it renders byte-identically to HEAD.
  */
-
-/** The phase-type glyph vocabulary (mirrors the run-surface glyphs by VALUE — not
- *  by import; the 6th `◆` llm_emit deliverable is net-new per sketch 019-D D9). */
-const PHASE_GLYPHS: Record<string, string> = {
-  programmatic: "⚙",
-  llm_single: "✎",
-  llm_agent: "🤖",
-  llm_batch_agents: "⛓",
-  llm_human_input: "☺",
-  llm_emit: "◆",
-}
-
-/** A human label for a phase type (the node-title fallback when `phase.name` is absent). */
-const PHASE_TYPE_LABELS: Record<string, string> = {
-  programmatic: "Server step",
-  llm_single: "AI write step",
-  llm_agent: "AI agent step",
-  llm_batch_agents: "Parallel agents",
-  llm_human_input: "Needs you",
-  llm_emit: "Deliverable",
-}
+import { PHASE_GLYPHS } from "@/components/workflows/soulData"
+import {
+  nodeTitle,
+  parseSkipTarget,
+  type NameContext,
+  type PhaseSpecJSON,
+} from "@/components/workflows/phaseVocabulary"
+import { phaseGlyph } from "@/lib/phaseGlyph"
 
 /** The verbatim read-only legend (locked contract — sketch 019-D / 103-PLAN). */
 export const READ_ONLY_LEGEND =
   "READ-ONLY GRAPH · ordered by phase_index · run order (i→i+1) · " +
   "on-fail branch (skip_to_phase) · no depends_on · no parallel lanes · inspect, don't drag"
-
-/** A validator entry as it appears in the draft definition JSON (loose shape — the
- *  Builder refines the real definition; we only read `on_failure` here). */
-export interface ValidatorJSON {
-  kind?: string
-  on_failure?: string
-  [k: string]: unknown
-}
-
-/** A phase config as it appears in the draft definition JSON. */
-export interface PhaseConfigJSON {
-  phase_type: string
-  [k: string]: unknown
-}
-
-/** A `PhaseSpec` as it appears in the draft definition JSON (the Builder's working
- *  shape — `WorkflowDefinitionJSON` is opaque at the api layer; this is the local
- *  read shape the graph + form panel agree on). */
-export interface PhaseSpecJSON {
-  slug: string
-  phase_index: number
-  name?: string | null
-  config: PhaseConfigJSON
-  validators?: ValidatorJSON[]
-}
-
-/**
- * Resolve the target slug of a `skip_to_phase:<slug>` on_failure value, mirroring
- * the backend `parse_skip_target` (reachability.py): split on the LAST ":" and
- * return the trailing slug. Returns null for any non-skip on_failure value.
- */
-export function parseSkipTarget(onFailure: string | undefined | null): string | null {
-  if (!onFailure || !onFailure.startsWith("skip_to_phase:")) return null
-  const idx = onFailure.lastIndexOf(":")
-  const slug = onFailure.slice(idx + 1).trim()
-  return slug.length > 0 ? slug : null
-}
-
-/** The node title: phase.name if present, else a non-empty fallback (type label · slug). */
-function nodeTitle(phase: PhaseSpecJSON): string {
-  const name = phase.name?.trim()
-  if (name) return name
-  const label = PHASE_TYPE_LABELS[phase.config.phase_type] ?? phase.config.phase_type
-  return `${label} · ${phase.slug}`
-}
 
 export interface PhaseSpineGraphProps {
   phases: PhaseSpecJSON[]
@@ -96,9 +78,18 @@ export interface PhaseSpineGraphProps {
   selectedSlug: string | null
   /** Selection only — NEVER reorders. Fires the clicked phase's slug. */
   onSelectNode: (slug: string) => void
+  /** The page-owned folder/skill id→name maps and the definition's template filename
+   *  (Phase 187 / D-187-05). Absent ⇒ every derived tier misses and the generic type
+   *  sentence renders — never a fabricated or id-shaped face. */
+  nameContext?: NameContext
 }
 
-export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpineGraphProps) {
+export function PhaseSpineGraph({
+  phases,
+  selectedSlug,
+  onSelectNode,
+  nameContext,
+}: PhaseSpineGraphProps) {
   // Sort by phase_index (strict run order). The input array order is irrelevant.
   const ordered = [...phases].sort((a, b) => a.phase_index - b.phase_index)
   const slugSet = new Set(ordered.map((p) => p.slug))
@@ -146,7 +137,41 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
         {ordered.map((phase, i) => {
           const isLast = i === ordered.length - 1
           const isSelected = selectedSlug === phase.slug
-          const glyph = PHASE_GLYPHS[phase.config.phase_type] ?? "●"
+          // The 3D mark first; the soulData slug string is NOT a glyph since Phase
+          // 127, so "•" is the real visual fallback for an unmapped type.
+          const Glyph = phaseGlyph(phase.config.phase_type)
+          const glyphFallback = PHASE_GLYPHS[phase.config.phase_type] ?? "•"
+          // Resolved ONCE and used in BOTH the visible title and the accessible
+          // name, so they can never drift apart (WCAG 2.5.3 label-in-name).
+          //
+          // THE SPINE NO LONGER SWAPS THIS (Phase 187 / SPEC Req 4 / D-187-16). Until
+          // 187-09 this line was a ternary on the ⌥ reveal, choosing the technical
+          // `<type label> · <slug>` form over the plain one and mirroring the canvas
+          // card's swap. (The retired expression is quoted verbatim exactly once, as the
+          // positive control of the source guard in `PhaseSpineGraph.test.tsx` — a
+          // control string is the one place it cannot be mistaken for live code, and it
+          // keeps this file's acceptance grep for the retired form honestly at zero.)
+          // The canvas moved its ⌥ reveal into the
+          // card's SUBTITLE slot, because 187-04's config-derived tier makes the plain
+          // title specific and the swap destroyed it (and truncated the slug it was
+          // meant to reveal). This surface has NO subtitle slot to move into, so the
+          // only way the two views one toggle apart can still agree is for the spine to
+          // stop swapping.
+          //
+          // THE ASYMMETRY IS RECORDED, NOT DESIGNED AWAY, and it costs nothing because
+          // this surface never hid the technical vocabulary in the first place: the mono
+          // chip below prints the RAW `phase_type` unconditionally, the line beneath it
+          // prints the RAW `phase_index`, and the `aria-label` carries the raw type too —
+          // all three with the reveal OFF. So Req 4's "both graph views agree in both
+          // toggle states" is satisfied on the TITLE, which is exactly what the SPEC's
+          // acceptance criterion says. Giving the spine a subtitle consumer, or stripping
+          // its raw chrome, would both grow scope into this component's layout for no
+          // Req-4 gain.
+          //
+          // `nameContext` (D-187-05) is the page-owned id→name lookup 187-04's derived
+          // tier needs; it reaches `nodeTitle` and nowhere else. Absent ⇒ every derived
+          // tier misses and the generic type sentence renders, byte-identically to HEAD.
+          const title = nodeTitle(phase, nameContext)
           const isEmit = phase.config.phase_type === "llm_emit"
           // The dashed on-fail edges originating at THIS node (rendered as a labeled
           // skip-branch row beneath the node; the target slug is declared for assertion).
@@ -173,7 +198,7 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
                   isSelected ? "ring-2 ring-primary" : "",
                 ].join(" ")}
               >
-                {glyph}
+                {Glyph ? <Glyph className="h-4 w-4" /> : glyphFallback}
               </span>
 
               {/* The node CARD — a <button> (keyboard-selectable; selection only,
@@ -185,7 +210,7 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
                 data-phase-type={phase.config.phase_type}
                 data-selected={isSelected ? "true" : "false"}
                 aria-pressed={isSelected}
-                aria-label={`Phase ${phase.phase_index + 1}: ${nodeTitle(phase)} (${phase.config.phase_type})`}
+                aria-label={`Phase ${phase.phase_index + 1}: ${title} (${phase.config.phase_type})`}
                 onClick={() => onSelectNode(phase.slug)}
                 className={[
                   "w-full rounded-md border px-3 py-2 text-left transition-colors",
@@ -196,13 +221,13 @@ export function PhaseSpineGraph({ phases, selectedSlug, onSelectNode }: PhaseSpi
               >
                 <span className="flex items-center gap-2">
                   <span aria-hidden="true" className="text-[13px] leading-none">
-                    {glyph}
+                    {Glyph ? <Glyph className="h-4 w-4" /> : glyphFallback}
                   </span>
                   <span
                     data-testid="node-title"
                     className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
                   >
-                    {nodeTitle(phase)}
+                    {title}
                   </span>
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {phase.config.phase_type}

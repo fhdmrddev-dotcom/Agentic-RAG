@@ -28,7 +28,7 @@ def _skill_row(
     description="Writes SQL",
     instructions="Write valid SQL for the user.",
     is_enabled=True,
-    is_global=False,
+    is_org_shared=False,
 ):
     return {
         "id": skill_id or SKILL_ID,
@@ -37,7 +37,7 @@ def _skill_row(
         "description": description,
         "instructions": instructions,
         "is_enabled": is_enabled,
-        "is_global": is_global,
+        "is_org_shared": is_org_shared,
         "created_at": NOW,
         "updated_at": NOW,
     }

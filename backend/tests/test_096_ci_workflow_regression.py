@@ -935,7 +935,7 @@ async def test_096_resume_two_phase_writes(
             {"run_id": run_id, "thread_id": thread_id,
              "current_phase_id": p_two,
              "inputs": {"kickoff_prompt": "CI resume kickoff."},
-             "user_id": user_id}
+             "user_id": user_id, "org_id": uuid.uuid4()}
         )
 
         resumed = await asyncio.wait_for(

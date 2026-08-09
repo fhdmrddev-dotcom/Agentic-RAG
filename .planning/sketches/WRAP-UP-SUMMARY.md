@@ -1,5 +1,117 @@
 # Sketch Wrap-Up Summary
 
+## Wrap-up 2026-07-28 — Phase 185 Graded Governance (sketches 142–146)
+
+**Date:** 2026-07-28
+**Sketches processed:** 5 (5 included, 0 excluded — the operator directed all five in)
+**Design areas (2 new reference files):** graded-governance · approval-and-review
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode)
+
+### Included Sketches
+
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 142 | grounding-dial-and-lock | **B** — a switch that visibly refuses | Graded Governance |
+| 143 | proven-on-the-canvas | **A** — sealed edge + corner seal | Graded Governance |
+| 144 | the-approval-stop-sign | *no winner locked* — superseded by 145/146; its armed-on-by-default finding stands | Approval & Review |
+| 145 | the-review-moment | **A** — the document is the surface | Approval & Review |
+| 146 | the-round-trip | **A** — one place; the canvas you built on is the canvas you watch | Approval & Review |
+
+### Design direction — one addition this batch forced
+
+Unchanged overall (*calm instrument with selective signal-density at the live moment*), plus:
+**honesty has a visual cost and must be paid.** A locked control shows its lock and prints its reason; an
+unread document is marked unread and recorded as such; an assessment is labelled as an assessment inside
+the deliverable; "running" and "waiting for you" never share a word.
+
+Two budget rules held throughout: governance spends **no colour** (banked for Phase 188's run status) and
+**no third badge** (both slots committed). Every governance signal is made of **shape**.
+
+### Key decisions
+
+- **The model** — grounding is DETECTED and ONE-WAY, no exceptions. The precise rule is
+  **you can only undo a lock you created**. Detection is a named tool list, never a judgement call.
+- **The canvas mark** — a sealed edge with a corner seal, where **the seal is load-bearing** (run status
+  overwrites the border) and may never be conditional on run state. **Top-right of the card is claimed.**
+- **Vocabulary (binding)** — *must prove it* on the canvas, never *proven*; *free to think*; *nothing to
+  prove here*; *traceable* only at the review moment, where the check really ran.
+- **The approval gate** — a gate ON the risky step, never an extra step, **armed-on by default**.
+- **The review moment** — the document IS the surface, approve bar docked to it, backing marks inside the
+  document, and approve-blind visibly different + recorded as such.
+- **The round trip** — one place: build, watch, review and return all on the canvas.
+
+### Findings that leave Phase 185
+
+| Finding | Owner |
+|---|---|
+| `_exec_llm_human_input` times out at 300s and **advances the run** — the action-risk gate must fail closed | **185** (engine change, in scope) |
+| `.docx`/`.pptx`/`.pdf` are download-only while `render_template` produces `.docx` — the flagship deliverable cannot be previewed | **185 spec decision, DEFERRED with a trigger** — decide at `/gsd:spec-phase 185`, re-open unconditionally at **190** |
+| A second approver on an org-shared run must be told who decided | **186** (run-time twin of the co-editing guard) |
+| Workflows launch by redirecting into Chat; a run belongs on a dedicated surface | **188** (start from the 145/146 proposal) |
+| An external-action node arrives armed-on | **189** (already its SC#2) |
+| Run status needs a shape of its own — it does not survive a colour-blind read | **188** |
+
+### Cross-sketch alignment audit (operator-requested, same day)
+
+Three real misalignments found and fixed before packaging: the running example had drifted into **three
+different workflows** (now one canonical 5-step flow everywhere); 143 called a step **"Proven"** on a
+canvas that had never run; and 146's executing step and waiting-for-a-person step shared one chip.
+
+### Also recorded
+
+Every `workflow_definitions` row is throwaway test data (operator), so **no grandfathering or backfill
+affordance may be designed for them** — detection simply applies. Corpus counts stay useful as evidence
+about the engine (84 of 170 steps read the KB, 48 cite), never as user data to protect.
+
+---
+
+## Wrap-up 2026-07-22 — v3.3/v3.4 catch-up + first v3.5 sketch (Phases 149/152/153/156/166 + 174)
+
+**Date:** 2026-07-22
+**Sketches processed:** 13 (13 included, 0 excluded) — 11 previously-unwrapped from v3.3/v3.4 + 2 new from v3.5
+**Design areas (6 new reference files):** model-registry-and-discovery · workflow-run-inputs-and-delete · inline-citations · chat-history-and-nav · org-admin-and-identity · run-state-honesty
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode — now covers 070–080 + 129–130; the Processed list had stalled at 069)
+
+### Why this batch existed
+
+The `--wrap-up` was never run after Phases 149/152/153/156/166 — the skill's Processed list stopped at sketch **069** (Phase 148), leaving 11 operator-approved sketches recorded only in MANIFEST + their READMEs, not in the loadable skill. This caught all 11 up plus the 2 new Phase-174 run-state sketches, so the skill is complete + current through v3.5's first phase.
+
+### Included Sketches
+
+| # | Name | Winner | Design Area | Phase |
+|---|------|--------|-------------|-------|
+| 070 | model-capability-editor | A | Model Registry & Discovery | 149 |
+| 071 | model-discovery-propose-confirm | A | Model Registry & Discovery | 149 |
+| 072 | run-inputs-modal | A | Workflow Run Inputs & Safe Delete | 152 |
+| 073 | workflow-delete-cascade | A | Workflow Run Inputs & Safe Delete | 152 |
+| 074 | inline-citation-marker | A | Inline Citations | 153 |
+| 075 | citation-clickthrough | A | Inline Citations | 153 |
+| 076 | collapsed-nav-rail | B | Chat History & Nav Rail | 156 |
+| 077 | thread-list-organization | _(reframed by 078 — no winner)_ | Chat History & Nav Rail | 156 |
+| 078 | chat-history-home | D | Chat History & Nav Rail | 156 |
+| 079 | identity-anchor-and-org-switcher | C | Org-Admin Shell & Identity | 166 |
+| 080 | org-admin-shell | A | Org-Admin Shell & Identity | 166 |
+| 129 | terminal-run-states | C | Run-State & Lifecycle Honesty | 174 |
+| 130 | live-preparing-honesty | C | Run-State & Lifecycle Honesty | 174 |
+
+### Key Decisions (headline per area)
+
+1. **Model Registry & Discovery:** instrument-table capability editor over the real mig-053 columns + the `enabled`→picker two-layer coupling chip + lock; discovery is **propose-only** — a new/un-returned capability is NEVER auto-enabled (SC#3), vanished ≠ deleted, verbatim provider errors excluded-not-failed.
+2. **Workflow Run Inputs & Safe Delete:** the Run modal inline-grows (chip→`<select>` + quiet upload) with a **bounded, server-enforced per-run scope override** (SEED-112); delete = the 064/068 **victim-naming sheet** where threads become normal chats (WFIN-03 no-orphans).
+3. **Inline Citations:** per-claim superscript marker, **attach-on-settle**, absence-as-signal via an ⓘ; hover-peek → click-to-pin + a numbered `[n]` References footer keyed 1:1; the binding is **set-membership-safe** (`n` = `citations[n]`, no re-ask).
+4. **Chat History & Nav Rail:** the collapsed rail keeps New Chat + Search; the **pivot** — nav → a permanent 58px icon rail (growth decoupled), history → a full-height column + ⌘K, so a growing nav can never starve history.
+5. **Org-Admin Shell & Identity:** merged identity/org-switcher menu (switcher only at 2+ orgs) + org-admin as a rail **Shield-mirror**; the 7-tab shell reuses 061-B band+tabs in **org-indigo** (amber stays operator), 3 live + 4 honest locked, audit degrades **RLS-honest**.
+6. **Run-State & Lifecycle Honesty:** the tiered **dim → amber → red** terminal vocabulary keyed off persisted `runs.status` (survives reload — STATE-01/02); the run-card header carries a **live pre-answer sub-state** + a timer **anchored to `started_at`** + a single avatar (STATE-03/04). The sharpest statement of the through-line: honesty derived from durable state, rendered in the calmest surface that can carry it, loudness earned by severity.
+
+### Cross-cutting patterns now reusable in the skill
+
+- The **victim-naming confirm sheet** (064/068) generalizes to any destructive action with downstream victims (073).
+- **Propose-only** (071) generalizes to any surface applying external values — never auto-apply what the source didn't return.
+- **RLS-honest degrade** (080) — a permission-gated view shows "you see only your own", never a silent-empty list.
+- The run-state primitives (129/130) are the foundation the rest of v3.5's chat surface renders on (176 render correctness, 178 chat polish).
+
+---
+
 ## Wrap-up 2026-07-11 — Operator Control Room (Phases 146–148)
 
 **Date:** 2026-07-11
@@ -505,3 +617,95 @@ A density + visual-energy re-skin of two ALREADY-SHIPPED workflow surfaces (the 
 
 ### Downstream
 `/gsd:plan-phase 127` — G-2 (sketch-before-plan) satisfied by 051 + 052; the plan adopts the icon convention (Running Design Decision 43) and re-runs the harness replay tests for the G-5 `PhaseCard`/`PhaseTimeline` re-skin. Then `/gsd:execute-phase 127` → verify → `/gsd:complete-milestone` (tag v3.1 — 127 is the last piece). The skill auto-loads during build for the publish gauntlet, the live phase spine, provider/model logos, and the icon convention.
+
+---
+
+# Sketch Wrap-Up Session — v3.6 Visual Canvas + Phase 187 Vocabulary
+
+**Date:** 2026-08-01
+**Sketches processed:** 13 (134-141, 147-151)
+**Design areas:** Canvas Frame & Node Anatomy - Canvas Editing & Authoring - Node Vocabulary & the Reveal - AI Seed & Templates (+ appends into Graded Governance and Icon Convention)
+**Skill output:** `./.claude/skills/sketch-findings-agentic-rag/` (append mode - now 99 processed sketches)
+
+### Included Sketches
+| # | Name | Winner | Design Area |
+|---|------|--------|-------------|
+| 134 | canvas-frame-and-read-only | none locked - look superseded by 137 | Canvas Frame & Node Anatomy |
+| 135 | phase-node-anatomy | none locked - look superseded by 137 | Canvas Frame & Node Anatomy |
+| 136 | flow-shape-and-branches | B - horizontal left-to-right | Canvas Frame & Node Anatomy |
+| 137 | agentic-canvas-look | B - Glass Depth (operator changed D->B) | Canvas Frame & Node Anatomy |
+| 138 | growing-the-flow | C-local - spine + browser-persisted nudge | Canvas Editing & Authoring |
+| 139 | validation-while-building | A - node mark + problems tray | Canvas Editing & Authoring |
+| 140 | step-inspector-and-rails | A - extend the shipped PhaseFormPanel | Canvas Editing & Authoring |
+| 141 | the-authoring-session | B - canvas toolbar + page header | Canvas Editing & Authoring |
+| 147 | the-armed-mark | B - the detour edge | -> appended into Graded Governance |
+| 148 | the-step-that-says-what-it-does | C - the layered node-face ladder | Node Vocabulary & the Reveal |
+| 149 | what-the-reveal-costs | C - swap the subtitle, not the title | Node Vocabulary & the Reveal |
+| 150 | the-seeded-canvas-arrives | B - all at once + the seed receipt | AI Seed & Templates |
+| 151 | a-door-beside-the-describe-box | C - the template seeds the describe box | AI Seed & Templates |
+
+### Excluded Sketches
+| # | Name | Reason |
+|---|------|--------|
+| 017 | cross-thread-run-stop | Orphan - no README, no locked winner |
+| 098 | tool-card-live-essence | Orphan - no README, no locked winner |
+| 094 / 103 / 128 | *-grounding | **Not sketches** - grounding / brief folders (BRIEF.md, DATA-CONTRACT.md); no variants, no winner |
+| 131-133 | org-state-matrix, org-entry-failure-honesty, org-management-surfaces | Deferred - v3.4 org surfaces, shipped and unrelated to the canvas. Wrap when org work next moves. |
+
+### Design Direction
+
+The v3.6 visual canvas, from frame to vocabulary. **137-B "Glass Depth"** is the settled visual
+language: a 3D mark floating above a narrower centre-aligned frosted panel, **no per-step-type
+colour anywhere** (banked for Phase 188's run status), plain language on the face, motion keyed to
+run state. The canvas is a **projection of a LINEAR spine, never a free DAG** - order cannot be
+rewired, because the harness engine runs a sequence and a canvas must not promise what the runtime
+cannot honour.
+
+Phase 187's contribution is **specificity and honesty at the seam where the AI hands you a draft**.
+
+### Key Decisions
+
+- **The card is 137-B, and `themes/canvas-184.css` is NOT it.** That stylesheet encodes the older
+  137-D language; 185-01 rebuilt the shipped card. Reasoning from the sketch-era CSS draws a card
+  that no longer exists. Always read `PhaseNodeCard.tsx`.
+- **Order is the spine; the nudge is a browser preference with zero migration.** Cosmetic movement
+  never writes the definition.
+- **INCOMPLETE is not ERROR**, and any verdict surface must **fail closed** - an unrecognised state
+  is not a pass.
+- **The panel is where you SET; the canvas is where you SEE.** No focusable control inside the card;
+  one tab stop per node.
+- **A permanent mark keeps a verified corner; a transient one moves.** The governance seal holds
+  top-right permanently; the verdict mark relocated to the left edge to free it.
+- **Most of VOCAB-01 already shipped.** The plain-language sentences (183) and the Technical-names
+  reveal (154, already wired to the canvas and both graph views). What was missing is specificity:
+  only 10 of 119 phases carry a name and the generator writes none, so every AI-seeded workflow
+  renders the same six type sentences.
+- **The node face is a layered ladder** (author name -> config-derived -> type sentence), computed
+  and never stored. AI-authored names are a *seeding* behaviour that fills its top tier - not a
+  rival strategy.
+- **The reveal swaps the subtitle, not the title** - and the shipped title swap *truncates*, clipping
+  the slug it exists to show.
+- **Generation is single-shot**, so a staged reveal is pacing, not progress - and the seed receipt is
+  the only thing that makes "safe-by-construction" visible.
+- **Path count, not clutter**, decided the template door: a template that opens a canvas creates a
+  second way workflows come into existence.
+
+### Process findings recorded this session
+
+1. **Variants that differ semantically in the same position need a co-present side-by-side view, not
+   tabs.** Sketch 148's first review reported "no difference" - the variants were correct; the sketch
+   put the deciding card off-screen and made the comparison a memory test.
+2. **The findings skill must be LOADED, not paraphrased from MANIFEST.** Four icon drifts were
+   introduced by not loading it - and the correct mark was written down in
+   `references/graded-governance.md` the whole time. `references/icon-convention.md` now carries a
+   section 4 with the full canvas glyph vocabulary and its source lines.
+3. **There is no category-icon vocabulary** - a workflow is identified by its phase spine (#36),
+   never by one borrowed phase-type glyph.
+
+### Downstream
+
+`/gsd:spec-phase 187` - G-2 satisfied by 148-151. Two things no sketch covers: **SC#6 / SEED-137**
+(the armed-gate precedence bypass - backend, three non-equivalent fix shapes, a discuss-phase
+decision, and the reason 187 carries a threat model), and the **G-5 hot-file audit** for
+`WorkflowBuilderPage.tsx` (151-C touches the describe screen) and `PhaseNode.tsx` (148-C + 149-C
+both touch the face). `WorkflowCanvas.tsx` already has an extraction due in Phase 188.

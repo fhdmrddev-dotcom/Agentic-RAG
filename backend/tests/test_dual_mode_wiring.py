@@ -234,7 +234,7 @@ async def test_write_audit_rejects_unknown_event_type_before_insert(mock_asyncpg
 async def test_list_published_workflows_scopes_to_published_owned_or_global(
     mock_asyncpg_pool
 ):
-    """The picker feed: only status='published' rows, scoped to (is_global OR
+    """The picker feed: only status='published' rows, scoped to (is_system_global OR
     created_by=user). The WHERE clause enforces the RLS-mirroring predicate
     (T-092-07) and the result carries id/slug/name.
     """
@@ -253,7 +253,7 @@ async def test_list_published_workflows_scopes_to_published_owned_or_global(
     ]
     sql, args = mock_asyncpg_pool.calls[-1]
     assert "status = 'published'" in sql
-    assert "is_global = true OR created_by = $1" in sql
+    assert "is_system_global = true OR created_by = $1" in sql
     assert args == (user_id,)
 
 
@@ -368,7 +368,7 @@ async def test_producer_branches_harness_when_anchor_set(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -454,7 +454,7 @@ async def test_harness_failure_terminalizes_and_clears_anchor(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -544,7 +544,7 @@ async def test_user_cancel_terminalizes_workflow_as_cancelled(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -695,7 +695,13 @@ async def test_locked_thread_deep_send_refused_409(fake_redis, mock_asyncpg_pool
     app.dependency_overrides[get_supabase] = lambda: sb
     app.dependency_overrides[get_redis] = lambda: fake_redis
     try:
+        # Phase 163 (T-163-06c): the anchor lock-check now reads workflow_runs.status on
+        # the RLS user-JWT connection (get_user_pg_connection → app.dependencies.get_pg_pool),
+        # so patch THAT seam too — the mock pool's fetchval ("active", set above) drives the
+        # non-terminal 409. The app.api.threads.get_pg_pool patch stays for the other sites.
         with patch("app.api.threads.get_pg_pool",
+                   AsyncMock(return_value=mock_asyncpg_pool)), \
+             patch("app.dependencies.get_pg_pool",
                    AsyncMock(return_value=mock_asyncpg_pool)):
             async with httpx.AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
@@ -834,19 +840,25 @@ def _llm_agent_phase():
 # ── Task 1 / Facet A: producer_run_id on wf_ctx + fail-closed parent sourcing ──
 
 def test_producer_run_id_distinct_from_run_id_on_wf_ctx():
-    """The harness producer branch (threads.py) builds wf_ctx with BOTH run_id (the
-    workflow_run id) AND producer_run_id (the producer runs id). The edit is a
-    source-level addition; assert the SimpleNamespace shape contract here and the
-    threads.py source carries `producer_run_id=run_id`.
+    """The harness producer branch builds wf_ctx with BOTH run_id (the workflow_run id)
+    AND producer_run_id (the producer runs id). Phase 162.5 Plan 02 (G-5) moved the
+    wf_ctx build VERBATIM out of threads.py into workflow_kickoff.build_harness_run_context
+    (byte-identical); assert the SimpleNamespace shape contract here and that the
+    run-context seam source carries the two DISTINCT id fields.
     """
     import inspect
-    from app.api import threads as threads_mod
+    from app.services import workflow_kickoff as wk_mod
 
-    # The agent_runner harness branch must add producer_run_id=run_id to wf_ctx.
-    src = inspect.getsource(threads_mod)
-    assert "producer_run_id=run_id" in src, (
-        "wf_ctx must carry producer_run_id=run_id (the producer runs.run_id is the "
-        "FK target for sub-agent parent_run_id; ctx.run_id stays the workflow_run id)"
+    # The build_harness_run_context seam must set producer_run_id (the producer runs.run_id,
+    # the FK target for sub-agent parent_run_id) DISTINCT from run_id (the workflow_run id).
+    src = inspect.getsource(wk_mod)
+    assert "producer_run_id=producer_run_id" in src, (
+        "wf_ctx must carry producer_run_id (the producer runs.run_id is the FK target "
+        "for sub-agent parent_run_id; ctx.run_id stays the workflow_run id)"
+    )
+    assert "run_id=active_workflow_run_id" in src, (
+        "wf_ctx.run_id must be the workflow_run id (active_workflow_run_id), distinct "
+        "from producer_run_id"
     )
     # Contract: the two ids are distinct values on the bag.
     ctx = _harness_ctx()
@@ -1520,9 +1532,20 @@ def test_get_thread_workflow_latest_producer_none_when_terminal(
 
 
 def patch_get_pg_pool(pool):
+    from contextlib import contextmanager
     from unittest.mock import AsyncMock, patch
 
-    return patch("app.api.threads.get_pg_pool", AsyncMock(return_value=pool))
+    @contextmanager
+    def _both():
+        # Phase 163: get_thread_workflow's reconcile reads moved to get_user_pg_connection
+        # (app.dependencies.get_pg_pool) under RLS, so patch THAT seam too. The
+        # app.api.threads.get_pg_pool patch stays for any co-resident callers. get_current_user
+        # is dependency-overridden in these tests, so _is_banned never consumes the fetchrow queue.
+        with patch("app.api.threads.get_pg_pool", AsyncMock(return_value=pool)), \
+             patch("app.dependencies.get_pg_pool", AsyncMock(return_value=pool)):
+            yield
+
+    return _both()
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1548,22 +1571,23 @@ _F5_TOOL_CTX_FIELDS = (
 
 
 def test_live_wf_ctx_sets_tool_context_substrate_in_source():
-    """F5 (live): the threads.py harness wf_ctx build must set the 5 tool-context
-    fields — supabase=supabase (same value Deep's RunContext uses), the folder-scope
-    pair, spawn=_spawn, and a per_run_task_semaphore. Source-level assertion: these
-    fields appear on the wf_ctx SimpleNamespace in the agent_runner harness branch.
+    """F5 (live): the harness wf_ctx build must set the 5 tool-context fields — supabase
+    (same value Deep's RunContext uses), the folder-scope pair, spawn, and a
+    per_run_task_semaphore. Phase 162.5 Plan 02 (G-5) moved the wf_ctx build VERBATIM
+    into workflow_kickoff.build_harness_run_context; source-level assertion: these fields
+    appear on the wf_ctx SimpleNamespace in the run-context seam.
     """
     import inspect
-    from app.api import threads as threads_mod
+    from app.services import workflow_kickoff as wk_mod
 
-    src = inspect.getsource(threads_mod)
+    src = inspect.getsource(wk_mod)
     # supabase wired from the request param (the SAME local Deep's RunContext uses).
     assert "supabase=supabase" in src, (
         "harness wf_ctx must set supabase=supabase (without it ctx.supabase is None "
         "→ search_documents hits None.rpc — the F5 crash)"
     )
-    # spawn wired from the module-level _spawn (the SAME ref Deep passes).
-    assert "spawn=_spawn" in src
+    # spawn wired from the threaded-in spawn param (threads.py passes the module-level _spawn).
+    assert "spawn=spawn" in src
     # the folder-scope pair + per-run semaphore appear on the bag.
     assert "folder_subtree_ids=" in src
     assert "scoped_folder_path=" in src
@@ -1761,7 +1785,7 @@ async def test_harness_final_output_persisted_as_assistant_message(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -1867,7 +1891,7 @@ async def test_harness_final_output_emits_delta_for_live_render(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -1939,22 +1963,27 @@ async def test_harness_final_output_emits_delta_for_live_render(
 def test_deep_path_does_not_install_harness_persist_in_source():
     """F6/F7 single-persist-owner guard (D-11 / Pitfall 5): the surfacing + persist
     now live in ONE shared helper on the run_workflow terminal — NOT inline in the
-    threads.py harness branch. Assert:
+    producer's harness branch. Assert:
       * the shared helper exists in harness_engine and reads ctx.final_output;
-      * the threads.py harness branch NO LONGER persists inline (the inline
+      * the producer harness branch NO LONGER persists inline (the inline
         _persist_harness_message closure + its _result_sink install are GONE), so
         there is no double-persist / duplicate assistant message;
       * Deep stays byte-identical — run_agent_loop is still the sole Deep persist
         source via _result_sink.
+
+    Phase 162.5 Plan 03 (G-5 extraction): the producer shell (the harness branch +
+    the Deep run_agent_loop call) moved VERBATIM from threads.py::agent_runner into
+    run_producer.run_producer — so the harness-branch + Deep-persist assertions now
+    introspect run_producer.py (the runtime invariant is unchanged; only the home moved).
     """
     import inspect
-    from app.api import threads as threads_mod
+    from app.services import run_producer as producer_mod
     from app.services import harness_engine as engine_mod
 
-    threads_src = inspect.getsource(threads_mod)
+    producer_src = inspect.getsource(producer_mod)
     engine_src = inspect.getsource(engine_mod)
 
-    # The shared helper is THE surfacing/persist site, in the engine (not threads.py).
+    # The shared helper is THE surfacing/persist site, in the engine (not the producer).
     assert "_surface_final_answer" in engine_src, (
         "the shared surfacing helper must live in harness_engine"
     )
@@ -1964,15 +1993,15 @@ def test_deep_path_does_not_install_harness_persist_in_source():
     # run_workflow invokes the helper on its terminal (definition + call ≥ 2).
     assert engine_src.count("_surface_final_answer") >= 2
 
-    # The threads.py harness branch no longer persists inline — the inline closure +
+    # The producer harness branch no longer persists inline — the inline closure +
     # the harness _result_sink persist install are REMOVED (single persist owner).
-    assert "_persist_harness_message" not in threads_src, (
-        "the inline harness persist closure must be removed from threads.py"
+    assert "_persist_harness_message" not in producer_src, (
+        "the inline harness persist closure must be removed from run_producer.py"
     )
-    assert '_result_sink["persist"] = _persist_harness_message' not in threads_src
+    assert '_result_sink["persist"] = _persist_harness_message' not in producer_src
 
     # Deep stays byte-identical: run_agent_loop is still the sole Deep persist source.
-    assert "result_sink=_result_sink" in threads_src
+    assert "result_sink=_result_sink" in producer_src
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -2040,7 +2069,7 @@ async def test_harness_final_grounding_persisted_with_deep_param_shape(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -2145,7 +2174,7 @@ async def test_harness_final_grounding_emits_sources_citations_confidence_live(
     def_row = {
         "id": str(def_id),
         "status": "published",
-        "is_global": True,
+        "is_system_global": True,
         "created_by": str(uuid.uuid4()),
         "definition": {
             "slug": "wf", "version": 1, "name": "WF", "status": "published",
@@ -2414,14 +2443,21 @@ def test_live_wf_ctx_sets_inputs_kickoff_prompt_in_source():
     guards the kickoff_prompt key substring rather than the exact `inputs={...}`
     literal — kickoff_prompt stays the first key at BOTH the create_workflow_run and
     wf_ctx sites (the mirror invariant is preserved; the folder_id is additive).
+
+    Phase 162.5 Plan 02 (G-5): the wf_ctx build moved to
+    workflow_kickoff.build_harness_run_context, so the two mirror sites now live in TWO
+    modules — create_workflow_run stays in threads.py, the wf_ctx build moved to
+    workflow_kickoff.py. The count is taken across BOTH sources.
     """
     import inspect
     from app.api import threads as threads_mod
+    from app.services import workflow_kickoff as wk_mod
 
-    src = inspect.getsource(threads_mod)
-    # create_workflow_run stored it; the wf_ctx must mirror it so the first phase reads it.
-    # Both sites carry `"kickoff_prompt": body.content` as the first key (folder_id, when
-    # present, is merged AFTER via **{...}) — assert that F8 substring survives.
+    # create_workflow_run (threads.py) stored it; the wf_ctx build (workflow_kickoff.py)
+    # must mirror it so the first phase reads it. Both sites carry
+    # `"kickoff_prompt": body.content` as the first key (folder_id, when present, is
+    # merged AFTER via **{...}) — assert that F8 substring survives across both modules.
+    src = inspect.getsource(threads_mod) + inspect.getsource(wk_mod)
     assert src.count('"kickoff_prompt": body.content') >= 2, (
         "harness wf_ctx AND create_workflow_run must both set "
         "inputs['kickoff_prompt'] = body.content (the consumption half of SEED-047 — "

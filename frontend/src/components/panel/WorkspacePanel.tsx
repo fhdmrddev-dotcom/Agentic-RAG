@@ -144,6 +144,109 @@ function RunSoul({ threadId }: { threadId: string | null }) {
   )
 }
 
+/**
+ * Phase 188 Plan 10 (RUNVIZ-03 / D-188-13) — the run receipt, and the OTHER HALF of a
+ * bidirectional seam.
+ *
+ * The run surface already carries a line back into this thread. This is its counterpart:
+ * one line, from the thread that anchors a workflow run back to that run's own surface.
+ *
+ * WHY IT IS NOT A CONVENIENCE. `GET /runs` and the cross-workflow runs home are deferred
+ * by the SPEC, and the app has no router — so there are no links and no list. Chat history
+ * IS the index of runs, because a launch mints one thread per run. Without this line a run
+ * becomes unreachable the moment the user navigates away from it, and "a finished run
+ * re-opens" would be true of the endpoint and false of the product.
+ *
+ * THE ID IS RESOLVED FROM THE THREAD FRAME, and deliberately NOT from the panel's workflow
+ * lock. The lock's id field is documented as the anchor but is overwritten with a PRODUCER
+ * run id at kickoff and again on a Continue re-subscribe (StreamsProvider), and the lock is
+ * cleared outright once a run goes terminal — which is exactly the case this line exists to
+ * serve. Both ids are bare uuids, so a swap typechecks and then resolves nothing.
+ *
+ * ⚠ CORRECTED (CR-03). This block previously asserted that *"the thread frame's anchor
+ * survives termination ... and is the only honest source"*, and read `active_workflow_run_id`
+ * alone on the strength of it. The claim was FALSE and the falseness is in the DB:
+ * `finish_run` runs `UPDATE threads SET active_workflow_run_id = NULL WHERE
+ * active_workflow_run_id = $1` in the SAME transaction as the terminal status — described in
+ * its own docblock as "the SINGLE authoritative clear site", and correctly stated by
+ * `reconcilePhases`' comment ("a COMPLETED workflow run CLEARS the thread anchor"). So this
+ * receipt rendered ONLY while a run was live, i.e. never for the finished run it was built
+ * for, and with `GET /runs` deferred and no router that run then had zero entry points.
+ *
+ * That clear is Phase 092's SC#2 (no dangling lock survives a terminal run) and is NOT
+ * undone. Instead the frame now also carries `last_workflow_run_id` — the anchor-then-latest
+ * resolution the SAME endpoint already performed to source its phase spine, surfaced rather
+ * than recomputed (no migration, no new query). The live anchor is still preferred, so a
+ * mid-run receipt is byte-unchanged; the fallback is reached only once the anchor is gone.
+ *
+ * ADDITIVE SIBLING, and the same G-5 red line the run-soul section observes: it does not
+ * read PhaseCard / PhaseTimeline internals and adds a prop to neither. It also renders
+ * nothing at all when the callback is absent, so every existing caller and every existing
+ * panel test is byte-unchanged; and it sits inside the SAME harness gate as its
+ * neighbours, so a Deep / no-run thread sees nothing new (the D-08 discipline).
+ *
+ * ⚠ The visible words are written ONCE, in the constant below. The acceptance fence counts
+ * that literal in this file, so no comment here spells it — a comment that did would turn
+ * a measurement of the rendered line into a measurement of the prose (the 187-24 lesson).
+ */
+const RUN_RECEIPT_LABEL = "Open the run"
+
+function RunSeam({
+  threadId,
+  onOpenRun,
+}: {
+  threadId: string | null
+  onOpenRun?: (runId: string) => void
+}) {
+  const [runId, setRunId] = useState<string | null>(null)
+  // The callback is read at CLICK time, never captured here, so the effect keys on its
+  // PRESENCE rather than its identity. An inline arrow from the caller would otherwise
+  // change identity every render and re-fire this read on every render it caused.
+  const enabled = onOpenRun != null
+
+  useEffect(() => {
+    if (!threadId || !enabled) {
+      setRunId(null)
+      return
+    }
+    let cancelled = false
+    const ctrl = new AbortController()
+    void (async () => {
+      try {
+        const frame = await getThreadWorkflow(threadId, ctrl.signal)
+        // Live anchor first (unchanged mid-run), then the anchor that survives termination.
+        if (!cancelled) {
+          setRunId(frame.active_workflow_run_id ?? frame.last_workflow_run_id ?? null)
+        }
+      } catch {
+        // A frame read that fails degrades to no line — an unreachable receipt is better
+        // than one that opens a surface it cannot resolve, and this must never throw
+        // into the panel.
+        if (!cancelled) setRunId(null)
+      }
+    })()
+    return () => {
+      cancelled = true
+      ctrl.abort()
+    }
+  }, [threadId, enabled])
+
+  if (!onOpenRun || !runId) return null
+
+  return (
+    <div className="border-b border-border/40 px-3 py-2">
+      <button
+        type="button"
+        onClick={() => onOpenRun(runId)}
+        data-testid="panel-run-receipt"
+        className="text-[13px] font-medium text-primary transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
+        {RUN_RECEIPT_LABEL}
+      </button>
+    </div>
+  )
+}
+
 export interface WorkspacePanelProps {
   selectedThread: Thread | null
   /** Controlled panel state — owned by ChatLayout (Plan 06 hoist). */
@@ -153,6 +256,9 @@ export interface WorkspacePanelProps {
   onToggle: () => void
   /** Rail Expand control / seam pointer: → open (force-open). */
   onExpand: () => void
+  /** OPTIONAL — open the run this thread anchors (D-188-13's second half). Omitted by
+   *  any caller that has nowhere to send the user; the receipt then does not render. */
+  onOpenRun?: (runId: string) => void
 }
 
 export function WorkspacePanel({
@@ -160,6 +266,7 @@ export function WorkspacePanel({
   state,
   onToggle,
   onExpand,
+  onOpenRun,
 }: WorkspacePanelProps) {
   const threadId = useViewingThread()
   const { data: todos } = useTodos(threadId)
@@ -266,6 +373,13 @@ export function WorkspacePanel({
               <RunSoul threadId={threadId} />
             </PanelSection>
           )}
+
+          {/* Phase 188 Plan 10 (RUNVIZ-03 / D-188-13): the run receipt — an ADDITIVE
+              SIBLING line, above the live timeline section, under the SAME harness gate
+              as the run soul above it, so Deep / no-run threads stay byte-identical.
+              See the component's docblock for why the id comes from the thread anchor
+              and never from the panel's lock. */}
+          {showTimeline && <RunSeam threadId={threadId} onOpenRun={onOpenRun} />}
 
           {/* Phase 094 (PANEL-08): the harness phase-timeline — the 5th section,
               mounted only for a harness run (server-truth lock) OR when phases

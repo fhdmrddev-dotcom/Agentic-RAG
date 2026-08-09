@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 140 — Step inspector + governance rails (Phase 184)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  /* ── B: the inspector docks to the node ───────────────────────────────── */
+  .dock {
+    position: absolute; z-index: 50; width: 344px; max-height: 74%;
+    display: flex; flex-direction: column; overflow: hidden;
+    background: hsl(220 30% 8% / .97); backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid hsl(239 100% 82% / .3); border-radius: 18px;
+    box-shadow: var(--shadow-lg), 0 0 48px -14px hsl(239 100% 82% / .35);
+    animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .dock header { flex-shrink: 0; padding: 11px 14px; border-bottom: 1px solid var(--color-border);
+                 display: flex; align-items: center; gap: 9px; }
+  .dock .scroll { flex: 1; min-height: 0; overflow: auto; padding: 13px 14px 18px; }
+  .dock::before {
+    content: ''; position: absolute; left: -7px; top: 34px; width: 12px; height: 12px;
+    background: inherit; border-left: 1px solid hsl(239 100% 82% / .3);
+    border-bottom: 1px solid hsl(239 100% 82% / .3); transform: rotate(45deg);
+  }
+
+  /* ── C: inline editing on the card face ───────────────────────────────── */
+  .ttl[contenteditable="true"] {
+    outline: none; border-bottom: 1px dashed hsl(239 100% 82% / .5); cursor: text;
+    padding-bottom: 1px;
+  }
+  .ttl[contenteditable="true"]:focus { border-bottom-color: var(--color-primary); background: hsl(239 100% 82% / .07); }
+  .inlinehint { font-size: 10px; color: var(--color-text-dim); margin-top: 7px; font-style: italic; }
+  .quickfld { margin-top: 10px; }
+  .quickfld textarea {
+    width: 100%; background: hsl(220 30% 4% / .6); color: var(--color-text);
+    border: 1px solid var(--color-border); border-radius: 9px; padding: 7px 9px;
+    font-family: inherit; font-size: 11.5px; line-height: 1.55; resize: vertical; min-height: 66px;
+  }
+  .quickfld textarea:focus { outline: none; border-color: var(--color-primary); }
+  .quickfld .lb { font-size: 10px; color: var(--color-text-dim); margin-bottom: 4px;
+                  font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; }
+
+  /* ── the rails ────────────────────────────────────────────────────────── */
+  .rail {
+    margin: 0 0 15px; padding: 11px 12px; border-radius: 12px;
+    border: 1px solid var(--color-border); background: var(--color-surface);
+  }
+  .rail.locked { border-color: hsl(142 71% 45% / .38); background: hsl(142 71% 45% / .07); }
+  .rail .rh {
+    display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 600;
+    color: var(--color-text); margin-bottom: 5px;
+  }
+  .rail .rw { font-size: 11px; color: var(--color-text-muted); line-height: 1.6; }
+  .rail .rw code { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim); }
+  .lockmark { color: hsl(142 71% 62%); }
+
+  .toolgrid { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .tool {
+    display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+    padding: 3px 9px; font-size: 11px; cursor: pointer; font-family: var(--font-mono);
+    background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-dim);
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .tool:hover { border-color: var(--color-text-dim); color: var(--color-text); }
+  .tool.on { background: var(--color-primary-dim); border-color: hsl(239 100% 82% / .45); color: var(--color-primary); }
+  .tool.rejected {
+    background: hsl(0 72% 51% / .12); border: 1px dashed hsl(0 72% 51% / .5);
+    color: hsl(0 85% 76%); cursor: not-allowed; text-decoration: line-through;
+  }
+  .src {
+    margin-top: 9px; font-size: 10px; color: var(--color-text-dim); line-height: 1.6;
+    padding-top: 8px; border-top: 1px dashed var(--color-border);
+  }
+  .src b { color: var(--color-text-muted); }
+
+  .gate {
+    display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 9px;
+    background: hsl(142 71% 45% / .1); border: 1px solid hsl(142 71% 45% / .3);
+    font-size: 11.5px; margin-bottom: 6px; color: hsl(142 71% 74%);
+  }
+  .gate .x { margin-left: auto; color: var(--color-text-dim); font-size: 10px; }
+  .gate.optional { background: var(--color-muted); border-color: var(--color-border); color: var(--color-text-muted); }
+  .gate.optional .x { cursor: pointer; color: var(--color-text-dim); }
+  .gate.optional .x:hover { color: hsl(0 85% 74%); }
+
+  .typechip {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px;
+    font-size: 11px; background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-muted);
+  }
+  .xbtn { margin-left: auto; background: transparent; border: 0; color: var(--color-text-dim);
+          cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 6px; }
+  .xbtn:hover { color: var(--color-text); background: var(--color-accent); }
+
+  .hint { position: relative; display: inline-grid; place-items: center; width: 14px; height: 14px;
+          border-radius: 50%; border: 1px solid var(--color-border); font-size: 8px;
+          color: var(--color-text-dim); cursor: help; margin-left: 4px; }
+
+  .rest { margin: auto; text-align: center; color: var(--color-text-dim); font-size: var(--text-sm);
+          padding: var(--space-8); line-height: 1.7; }
+  /* Only B replaces the panel. C keeps it — C is on-card AND panel, two tiers. */
+  body.vb .side { display: none !important; }
+</style>
+</head>
+<body class="alive card-b va">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 140</span>
+  <button class="variant-tab active" data-v="a" type="button">A: Extend the shipped 400px panel <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" type="button">B: Inspector docked to the node</button>
+  <button class="variant-tab" data-v="c" type="button">C: Two-tier — on-card + panel</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Selected step</span>
+  <div class="seg" id="stepseg"></div>
+  <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
+  <span class="lbl">Rails</span>
+  <div class="seg" id="railseg">
+    <button type="button" data-rail="on" class="on">Show governance</button>
+    <button type="button" data-rail="off">Fields only</button>
+  </div>
+  <div class="seg" id="techseg">
+    <button type="button" data-tech="off" class="on">Plain language</button>
+    <button type="button" data-tech="on">⌥ Technical names</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+    <div id="dockhost"></div>
+  </div>
+
+  <aside class="side" id="side">
+    <header id="sidehdr"></header>
+    <div class="scroll" id="sidebody"></div>
+  </aside>
+</div>
+
+<div class="foot" id="foot"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sketch-toolbar">
+  <span>140</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 140 — Configuring a step, and where governance becomes visible.
+   CANVAS-03 (side-panel config over the PhaseConfig union) + CANVAS-04 (rails).
+
+   Two things are deliberately REAL here rather than illustrative:
+
+   1. The field set per step type is the shipped `PhaseFormPanel` conditioning
+      (programmatic / llm_human_input carry no model, no tools, no folder scope;
+      `citation_policy` exists ONLY on llm_emit; `integrity_policy` is declared
+      but read-only). Pydantic is authoritative — the panel is a view of a
+      discriminated union, not its own schema.
+
+   2. The tool names are the actual registry (`get_tools` in openai_service.py),
+      served by `GET /workflows/grounding-bundle`. That endpoint exists BECAUSE
+      of Pitfall 1: KB content can never whitelist itself, so the valid set is
+      computed server-side and is NEVER a frontend constant. `web_scrape` is in
+      the list to show what the rail does with something the registry does not
+      have — the same `unregistered_tool` verdict 139 renders.
+
+   THE RAIL RULE (CANVAS-04): governance is RENDERED, never removed. Locked
+   order, a whitelist you can only choose from, and a gate you cannot detach.
+   Phase 185 grades these — strict on grounded steps, relaxed on open ones —
+   so this sketch shows the container, with the graded variant flagged.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var REGISTRY = ['search_documents', 'query_documents', 'query_documents_by_view', 'get_related_documents',
+  'read_document', 'analyze_document', 'grep', 'glob', 'ls', 'tree', 'web_search',
+  'execute_code', 'query_tables', 'load_skill', 'remember', 'recall'];
+
+var TYPE_META = {
+  llm_agent:        { icon: 'llm_agent_compass',    label: 'AI agent step',   plain: 'Search the knowledge base',   sub: 'Finds every risk it can support with a source' },
+  llm_single:       { icon: 'llm_single',           label: 'AI write step',   plain: 'Write it up',                 sub: 'Writes one piece in one pass' },
+  llm_human_input:  { icon: 'llm_human_input',      label: 'Needs you',       plain: 'Check with you',              sub: 'Pauses here until you answer' },
+  llm_emit:         { icon: 'llm_emit',             label: 'Deliverable',     plain: 'Produce the risk register',   sub: 'Fills your Word template, one row per risk' },
+  programmatic:     { icon: 'programmatic',         label: 'Server step',     plain: 'Prepare the inputs',          sub: 'A fixed step the server runs' },
+  llm_batch_agents: { icon: 'llm_batch_agents_alt', label: 'Parallel agents', plain: 'Work on the parts together',  sub: 'Several assistants work in parallel' }
+};
+
+var STEPS = [
+  { slug: 'retrieve', t: 'llm_agent', name: 'Search the knowledge base',
+    prompt: 'Find every compliance risk in the bound folder. Support each one with a citation from the source document.',
+    tools: ['search_documents', 'read_document', 'web_scrape'],
+    folder: 'Compliance 2026', model: 'claude-opus-4-8',
+    badges: [['cited', '⛨ Must cite its sources']],
+    gates: [{ kind: 'citations_required', locked: true, why: 'This step is grounded — its answer has to come from your knowledge base.' }] },
+  { slug: 'confirm', t: 'llm_human_input', name: 'Check with you',
+    prompt: 'Here are the risks I found. Confirm the ones to include in the register.',
+    badges: [['you', '✋ Waits for you']], gates: [] },
+  { slug: 'emit', t: 'llm_emit', name: 'Produce the risk register',
+    prompt: 'Fill the risk-register template — one row per confirmed risk.',
+    policy: 'strict', integrity: 'strict', template: 'risk-register.docx',
+    badges: [['cited', '⛨ Every cell cited'], ['file', '▤ risk-register.docx']],
+    gates: [
+      { kind: 'citations_required', locked: true, why: 'The sourcing dial on this deliverable is set to “every claim cited”, so the gate comes with it.' },
+      { kind: 'output_file_valid', locked: true, why: 'The produced file is re-opened and checked — an unfilled placeholder fails it.' },
+      { kind: 'llm_judge_rubric', locked: false, why: 'Optional here — you can take it off, and the tier drops with it.' }
+    ] }
+];
+
+var LEAD = {
+  a: '<b>A — Extend the panel that already ships.</b> The 400px right-side <code>PhaseFormPanel</code> from the Builder, ' +
+     'unchanged in shape: plain-language labels, an always-visible helper line under each, the technical term behind ⓘ, ' +
+     'and the field set conditioned on the step type. The canvas becomes a third way to <i>reach</i> the same form. ' +
+     'Least net-new by a wide margin — and the panel pushes the canvas rather than covering it, so the flow stays visible.',
+  b: '<b>B — The inspector comes to the node.</b> Selecting a step opens a floating card beside it, so your eye never ' +
+     'leaves the flow and the connection between “this card” and “these settings” is spatial rather than remembered. ' +
+     'The cost is real: it covers the canvas it is anchored to, it has to reposition on pan/zoom/scroll, and it is a ' +
+     'second form surface to keep in step with the Builder\'s.',
+  c: '<b>C — Two tiers: the obvious thing on the card, the depth in the panel.</b> Rename a step by clicking its title; ' +
+     'the one field that matters most for that type (the instruction) edits right there. Everything else — tools, scope, ' +
+     'gates, model — stays in the panel. Fastest for the common edit; the risk is a card that grows into a form and stops ' +
+     'being scannable, which is exactly what 137-D was chosen to avoid.'
+};
+
+var variant = 'a', selIdx = 0, toastT = null;
+var state = JSON.parse(JSON.stringify(STEPS));
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function toast(m) {
+  var el = document.getElementById('toast'); el.innerHTML = m; el.classList.add('show');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { el.classList.remove('show'); }, 4200);
+}
+
+function nodeHTML(s, i) {
+  var m = TYPE_META[s.t];
+  var badges = (s.badges || []).map(function (b) {
+    return '<span class="badge ' + b[0] + '">' + esc(b[1]) + '</span>';
+  }).join('');
+  var lockedGates = (s.gates || []).filter(function (g) { return g.locked; });
+  if (lockedGates.length) {
+    badges += '<span class="badge lock" title="' + esc(lockedGates.map(function (g) { return g.kind; }).join(' · ')) + '">🔒 ' +
+      lockedGates.length + ' check' + (lockedGates.length === 1 ? '' : 's') + ' that cannot be removed</span>';
+  }
+  var inline = '';
+  if (variant === 'c' && selIdx === i) {
+    inline =
+      '<div class="quickfld">' +
+        '<div class="lb">What it should do</div>' +
+        '<textarea data-quick="' + i + '">' + esc(s.prompt || '') + '</textarea>' +
+      '</div>' +
+      '<div class="inlinehint">Tools, folder, checks and model are in the panel →</div>';
+  }
+  return '<div class="node' + (selIdx === i ? ' sel' : '') + '" data-i="' + i + '" data-type="' + s.t + '"' +
+      ' tabindex="0" role="button" aria-label="Step ' + (i + 1) + ': ' + esc(s.name) + ' (' + s.t + ')">' +
+    '<span class="stepn">' + (i + 1) + '</span>' +
+    '<div class="icowrap">' + icon3d(m.icon, 52) + '</div>' +
+    '<div class="body">' +
+      '<div class="ttl"' + (variant === 'c' && selIdx === i ? ' contenteditable="true" data-name="' + i + '"' : '') + '>' +
+        esc(s.name) + '</div>' +
+      '<div class="sub">' + esc(m.sub) + '</div>' +
+      (badges ? '<div class="badges">' + badges + '</div>' : '') +
+      inline +
+      '<div class="techline">' + esc(m.label) + ' · ' + esc(s.slug) + ' · phase_index ' + i + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderFlow() {
+  var html = '<div class="conn"><div class="ins" role="button" tabindex="0" aria-label="Insert a step">＋</div></div>';
+  state.forEach(function (s, i) {
+    html += nodeHTML(s, i);
+    html += '<div class="conn"><div class="line"></div><div class="tip"></div>' +
+            '<div class="ins" role="button" tabindex="0" aria-label="Insert a step">＋</div></div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  document.getElementById('flow').innerHTML = html;
+}
+
+/* ── the form body — ONE builder, three homes ────────────────────────────── */
+function fld(label, help, tech, inner) {
+  return '<div class="fld"><label>' + esc(label) +
+    (tech ? '<span class="hint" role="button" tabindex="0" aria-label="' + esc(tech) + '" title="' + esc(tech) + '">ⓘ</span>' : '') +
+    '</label>' + (help ? '<div class="help">' + esc(help) + '</div>' : '') + inner + '</div>';
+}
+
+function formBody(s, i) {
+  var m = TYPE_META[s.t];
+  var showRails = !document.body.classList.contains('norails');
+  var html = '';
+
+  if (variant !== 'c') {
+    html += fld('Name this step', 'What a business reader will see on the card and in the run.', 'phase.name',
+      '<input value="' + esc(s.name) + '" data-f="name">');
+  }
+
+  /* ── RAIL 1: the order is locked ─────────────────────────────────────── */
+  if (showRails) {
+    html += '<div class="rail locked">' +
+      '<div class="rh"><span class="lockmark">🔒</span> Runs as step ' + (i + 1) + ' of ' + state.length + '</div>' +
+      '<div class="rw">Steps run in order, one after another. You can move this step earlier or later on the canvas — ' +
+      'you cannot make it run beside another one or branch off to two places at once. ' +
+      '<code>phase_index</code> is the order and there is no <code>depends_on</code>.</div></div>';
+  }
+
+  if (s.t !== 'programmatic') {
+    html += fld(s.t === 'llm_human_input' ? 'What to ask you' : 'What it should do',
+      s.t === 'llm_human_input' ? 'The question you will be shown when the run pauses here.'
+                                : 'Plain instructions. The AI reads this as its brief for this step.',
+      'prompt',
+      '<textarea data-f="prompt">' + esc(s.prompt || '') + '</textarea>');
+  }
+
+  /* ── RAIL 2: the tool whitelist ──────────────────────────────────────── */
+  if (s.t === 'llm_agent' || s.t === 'llm_batch_agents') {
+    var chips = REGISTRY.map(function (t) {
+      var on = (s.tools || []).indexOf(t) >= 0;
+      return '<button type="button" class="tool' + (on ? ' on' : '') + '" data-tool="' + t + '">' +
+        (on ? '✓ ' : '') + t + '</button>';
+    }).join('');
+    var stray = (s.tools || []).filter(function (t) { return REGISTRY.indexOf(t) < 0; });
+    var strayChips = stray.map(function (t) {
+      return '<button type="button" class="tool rejected" data-strip="' + t + '" ' +
+        'title="Not in the registry — the server will reject this">' + t + '</button>';
+    }).join('');
+    html += '<div class="rail' + (showRails ? ' locked' : '') + '">' +
+      '<div class="rh">' + (showRails ? '<span class="lockmark">🔒</span> ' : '') +
+        'What this step is allowed to use</div>' +
+      (showRails ? '<div class="rw">You choose from what exists. There is no free-text box here, so a step can never ' +
+        'be given a capability the platform does not have.</div>' : '') +
+      '<div class="toolgrid">' + chips + strayChips + '</div>' +
+      (stray.length
+        ? '<div class="src" style="color:hsl(0 85% 76%)"><b>' + esc(stray.join(', ')) + '</b> is not in the registry. ' +
+          'The server already says so — <code>unregistered_tool</code> — and it will keep saying so until you take it off.</div>'
+        : '') +
+      '<div class="src">Sourced live from <b>GET /workflows/grounding-bundle</b>, never a list held in the front end. ' +
+      'If that read fails the response says <b>degraded</b> and the picker says “we could not load these” — an empty ' +
+      'list would be a lie.</div>' +
+      '</div>';
+  }
+
+  if (s.t === 'llm_agent' || s.t === 'llm_emit' || s.t === 'llm_single' || s.t === 'llm_batch_agents') {
+    html += fld('Which documents it may read', 'Narrows this step to one folder of your knowledge base. Leave it as the workflow default to use everything the workflow is bound to.',
+      'folder_scope', '<select data-f="folder"><option>Workflow default — Compliance 2026</option>' +
+      '<option' + (s.folder === 'Compliance 2026' ? ' selected' : '') + '>Compliance 2026</option>' +
+      '<option>Policies</option><option>Contracts / 2026</option></select>');
+    html += fld('Which AI runs it', 'Leave on the workflow default unless this step needs something specific.', 'model',
+      '<select data-f="model"><option>Workflow default — claude-opus-4-8</option><option>gpt-5</option>' +
+      '<option>gemini-3-pro</option><option>deepseek-v4</option></select>');
+  }
+
+  if (s.t === 'llm_emit') {
+    html += fld('How strictly it must cite', 'Applies to the deliverable this step produces.', 'citation_policy',
+      '<select data-f="policy">' +
+      ['strict', 'flag', 'partial', 'draft'].map(function (p) {
+        return '<option' + (s.policy === p ? ' selected' : '') + '>' + p + '</option>';
+      }).join('') + '</select>' +
+      '<div class="help" style="margin-top:6px">Every claim must be cited — the deliverable fails if anything is uncited.</div>');
+    html += fld('File integrity', 'Declared in the schema; the wiring lands in a later phase, so it is shown but not editable.',
+      'integrity_policy', '<select data-f="integrity" disabled><option>strict</option></select>');
+  }
+
+  /* ── RAIL 3: gates you cannot wire around ────────────────────────────── */
+  if (showRails && (s.gates || []).length) {
+    html += '<div class="rail locked">' +
+      '<div class="rh"><span class="lockmark">🔒</span> Checks that run before this step is accepted</div>' +
+      (s.gates || []).map(function (g) {
+        return '<div class="gate' + (g.locked ? '' : ' optional') + '" title="' + esc(g.why) + '">' +
+          '<span>' + (g.locked ? '🔒' : '○') + '</span>' +
+          '<span>' + esc(gateWords(g.kind)) + '<span class="techline" style="display:' +
+            (document.body.classList.contains('tech') ? 'block' : 'none') + '">' + esc(g.kind) + '</span></span>' +
+          '<span class="x">' + (g.locked ? 'cannot be removed' : '✕ remove') + '</span></div>';
+      }).join('') +
+      '<div class="rw" style="margin-top:7px">' +
+        (s.gates.some(function (g) { return g.locked; })
+          ? 'The locked ones came with the choices above — they are not a separate setting you can quietly switch off. ' +
+            'Take away what made them apply and they go with it.'
+          : 'Nothing is locked on this step.') +
+      '</div>' +
+      '<div class="src" style="color:hsl(258 90% 80%)">Phase 185 grades this: a <b>grounded</b> step keeps the locked ' +
+      'citation gate, an <b>open</b> exploratory step does not get one. Same rail, two settings.</div>' +
+      '</div>';
+  }
+
+  if (s.t === 'llm_human_input' && showRails) {
+    html += '<div class="rail"><div class="rh">A person has to answer here</div>' +
+      '<div class="rw">Which means this workflow cannot run unattended. That is not an error — the validator reports it ' +
+      'as <code>interactive_phase</code>, one of the “not finished yet” kind.</div></div>';
+  }
+
+  return html;
+}
+
+function gateWords(kind) {
+  return {
+    citations_required: 'Everything it says has to come from your documents',
+    output_file_valid: 'The file it produces is opened and checked',
+    llm_judge_rubric: 'A second AI grades the result against your rubric',
+    freshness: 'The sources have to be recent enough'
+  }[kind] || kind;
+}
+
+function renderSide() {
+  var s = state[selIdx];
+  var m = TYPE_META[s.t];
+  document.getElementById('sidehdr').innerHTML =
+    icon3d(m.icon, 26) +
+    '<span style="flex:1;min-width:0"><b style="font-family:var(--font-headline);display:block;font-size:13px">' +
+      esc(s.name) + '</b>' +
+      '<span class="techline" style="margin:0">' + esc(m.label) + ' · ' + esc(s.slug) + '</span></span>' +
+    '<button class="xbtn" id="closeside" type="button" aria-label="Close">✕</button>';
+  document.getElementById('sidebody').innerHTML = formBody(s, selIdx);
+}
+
+function renderDock() {
+  var host = document.getElementById('dockhost');
+  host.innerHTML = '';
+  if (variant !== 'b') return;
+  var n = document.querySelector('.node[data-i="' + selIdx + '"]');
+  if (!n) return;
+  var s = state[selIdx], m = TYPE_META[s.t];
+  var d = document.createElement('div');
+  d.className = 'dock';
+  d.innerHTML =
+    '<header>' + icon3d(m.icon, 24) +
+      '<span style="flex:1;min-width:0"><b style="font-family:var(--font-headline);display:block;font-size:12.5px">' +
+        esc(s.name) + '</b><span class="techline" style="margin:0">' + esc(m.label) + ' · ' + esc(s.slug) + '</span></span>' +
+      '<button class="xbtn" id="closedock" type="button" aria-label="Close">✕</button></header>' +
+    '<div class="scroll">' + formBody(s, selIdx) + '</div>';
+  host.appendChild(d);
+  var plane = document.getElementById('plane');
+  var pr = plane.getBoundingClientRect();
+  var nr = n.getBoundingClientRect();
+  var left = (nr.right - pr.left) + plane.scrollLeft + 22;
+  if (left + 344 > pr.width + plane.scrollLeft) {
+    left = (nr.left - pr.left) + plane.scrollLeft - 366;
+  }
+  /* Clamp INSIDE the plane. A panel anchored to a node has to survive the node
+     being near an edge — which is precisely the extra work B costs over A. */
+  var h = d.offsetHeight;
+  var top = (nr.top - pr.top) + plane.scrollTop - 16;
+  top = Math.min(top, plane.scrollTop + pr.height - h - 12);
+  top = Math.max(plane.scrollTop + 12, top);
+  d.style.left = Math.max(8, left) + 'px';
+  d.style.top = top + 'px';
+}
+
+function renderFoot() {
+  var bits = [];
+  bits.push('<span class="pill">' + state.length + ' steps</span>');
+  if (variant === 'a') {
+    bits.push('<span class="pill good">✓ Reuses the shipped PhaseFormPanel — one form, three ways in</span>');
+    bits.push('<span class="pill">Panel pushes the canvas, never covers it</span>');
+  } else if (variant === 'b') {
+    bits.push('<span class="pill net">＋ A second form surface to keep in step with the Builder\'s</span>');
+    bits.push('<span class="pill warn">Covers the canvas · must follow pan / zoom / scroll</span>');
+  } else {
+    bits.push('<span class="pill net">＋ Inline editing on the card face</span>');
+    bits.push('<span class="pill warn">Watch the card stop being scannable</span>');
+  }
+  bits.push('<span class="pill">Pydantic stays authoritative — this is a view of the PhaseConfig union</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb', 'vc');
+  document.body.classList.add('v' + variant);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  document.getElementById('side').style.display = (variant === 'b') ? 'none' : '';
+  renderFlow();
+  if (variant !== 'b') renderSide();
+  renderDock();
+  renderFoot();
+  document.getElementById('stepseg').innerHTML = state.map(function (s, i) {
+    return '<button type="button" data-step="' + i + '"' + (i === selIdx ? ' class="on"' : '') + '>' +
+      (i + 1) + '. ' + esc(s.name) + '</button>';
+  }).join('');
+}
+
+/* ── events ──────────────────────────────────────────────────────────────── */
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-step')) selIdx = parseInt(b.getAttribute('data-step'), 10);
+  if (b.hasAttribute('data-rail')) document.body.classList.toggle('norails', b.getAttribute('data-rail') === 'off');
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
+  if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
+  render();
+});
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  if (e.target.id === 'closeside' || e.target.id === 'closedock') {
+    toast('In the build this collapses to the resting rail — the shipped panel is dismissed from its own header and ' +
+          'that <code>onClose</code> is a required prop, so an unclosable panel is not a representable state.');
+    return;
+  }
+  var tl = e.target.closest('.tool[data-tool]');
+  if (tl) {
+    var t = tl.getAttribute('data-tool');
+    var s = state[selIdx];
+    s.tools = s.tools || [];
+    var k = s.tools.indexOf(t);
+    if (k >= 0) s.tools.splice(k, 1); else s.tools.push(t);
+    render();
+    return;
+  }
+  var strip = e.target.closest('.tool[data-strip]');
+  if (strip) {
+    toast('You cannot turn this one <i>on</i> — it is already on, and that is the problem. Click it in the list above ' +
+          'to take it off, or the server will keep refusing the workflow.');
+    return;
+  }
+  var gx = e.target.closest('.gate.optional .x');
+  if (gx) {
+    var st = state[selIdx];
+    st.gates = (st.gates || []).filter(function (g) { return g.locked; });
+    render();
+    toast('Removed. Note which ones you could not touch — those are the rails.');
+    return;
+  }
+  var n = e.target.closest('.node');
+  if (n && !e.target.closest('textarea') && !e.target.closest('[contenteditable]')) {
+    selIdx = parseInt(n.getAttribute('data-i'), 10); render();
+  }
+});
+
+document.getElementById('stage').addEventListener('keydown', function (e) {
+  if (e.repeat) return;
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.target.closest('textarea') || e.target.closest('[contenteditable]')) return;
+  var n = e.target.closest('.node');
+  if (n) { e.preventDefault(); selIdx = parseInt(n.getAttribute('data-i'), 10); render(); }
+});
+
+document.getElementById('stage').addEventListener('input', function (e) {
+  var q = e.target.closest('[data-quick]');
+  if (q) { state[parseInt(q.getAttribute('data-quick'), 10)].prompt = q.value; return; }
+  var f = e.target.closest('[data-f]');
+  if (f) {
+    var key = f.getAttribute('data-f');
+    state[selIdx][key] = f.value;
+    if (key === 'name') {
+      var node = document.querySelector('.node[data-i="' + selIdx + '"] .ttl');
+      if (node) node.textContent = f.value;
+      document.getElementById('stepseg').querySelector('button[data-step="' + selIdx + '"]').textContent =
+        (selIdx + 1) + '. ' + f.value;
+    }
+  }
+});
+
+document.getElementById('stage').addEventListener('blur', function (e) {
+  var ce = e.target.closest('[data-name]');
+  if (ce) {
+    state[parseInt(ce.getAttribute('data-name'), 10)].name = ce.textContent.trim() || 'Untitled step';
+    render();
+    toast('Saved into the draft. The shipped form saves on blur — <code>onChange</code> patches, <code>onPersist</code> PATCHes.');
+  }
+}, true);
+
+window.addEventListener('resize', function () { renderDock(); });
+document.getElementById('plane').addEventListener('scroll', function () { renderDock(); });
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

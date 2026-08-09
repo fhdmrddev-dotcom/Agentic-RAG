@@ -1,14 +1,23 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Lock } from "lucide-react"
 import "./index.css"
 import { useAuth } from "./hooks/useAuth"
 import { AuthPage } from "./pages/AuthPage"
+import { AcceptInvitePage } from "./pages/AcceptInvitePage"
 import { ChatLayout } from "./components/layout/ChatLayout"
 import type { StudioTab } from "./pages/SkillStudioPage"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+// Phase 166 (D-166-07): the org-context spine mounts OUTSIDE StreamsProvider so an
+// org switch can reach the streams teardown from above. Exposes active org +
+// memberships + role + can_manage/can_audit_view + switchOrg via useOrg/useOrgOptional.
+import { OrgProvider } from "@/providers/OrgProvider"
 import { CitationNavProvider } from "@/lib/citationNav"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
+// Phase 183 (CANVAS-01 / OP-2): broadcasts the ONE effective-features map below the
+// nav so a page can gate on a governed feature without a second GET /features.
+// Value-passing only — App still owns the single useEffectiveFeatures call.
+import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import { getMaintenanceStatus, getSetupStatus, FEATURE_FORBIDDEN_EVENT, VISIBILITY_REFUSAL, type SetupStatus } from "@/lib/api"
 import { hydrateSupabaseFromRuntime } from "@/lib/supabase"
 import { SetupWizard } from "./pages/SetupWizard"
@@ -79,7 +88,18 @@ import { useOperatorProbe } from "@/hooks/useOperatorProbe"
 import { useEffectiveFeatures } from "@/hooks/useEffectiveFeatures"
 import { visibleNavItems } from "@/lib/nav-items"
 
-export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room"
+// Phase 188 Plan 09 (RUNVIZ-03 / D-188-10): the TWELFTH member below is the run's own
+// home (SPEC Req 6). ⚠ Its literal is deliberately NOT spelled again in this comment —
+// the acceptance fence counts occurrences in this file, and prose that repeats the
+// member would make a code measurement satisfiable by a comment (the 187-24 lesson,
+// met again by 188-03 / 188-07 / 188-08). NO ROUTER: the three-homes contract holds and this
+// is wired exactly like the other eleven (a `useState<ActiveView>` switch + a matching
+// render branch in ChatLayout + a launch that navigates to it). ⚠ The member alone is
+// NOT reachability: ChatLayout's trailing `<KnowledgeHealthPage />` is a POSITIONAL
+// FALLBACK, not a `default:` that throws, so a union member with no branch silently
+// renders Knowledge Health (the Phase-118 built-but-unreachable lesson). The matching
+// branch ships in the same commit as this member.
+export type ActiveView = "chat" | "documents" | "skills" | "settings" | "library-health" | "workflows" | "classification-rules" | "governance" | "skill-studio" | "control-room" | "org-admin" | "workflow-run"
 
 function App() {
   const { user, loading, signIn, signUp, signOut } = useAuth()
@@ -141,8 +161,17 @@ function App() {
   // use simply does NOT render (the sketch 069-A vanish). Fails CLOSED to {} on error
   // / pre-resolve — a blip never flashes an operators-only feature to an end user
   // (T-148-FAILCLOSED). An operator's map is all-true → every nav item shows.
-  const { features: effectiveFeatures, refetch: refetchFeatures } = useEffectiveFeatures(user?.id ?? null)
+  const { features: effectiveFeatures, loading: featuresLoading, refetch: refetchFeatures } = useEffectiveFeatures(user?.id ?? null)
   const navItems = visibleNavItems(effectiveFeatures)
+  // Phase 183 (CANVAS-01 / OP-2): the SAME object the nav filter reads, memoized so
+  // descendants re-render only when the map / loading / refetch actually change
+  // (the TechnicalNamesProvider memo idiom). This is broadcast — never re-fetched:
+  // one hook call site in the whole tree keeps the budget at one GET /features per
+  // session, and the nav and any page consumer can never disagree.
+  const effectiveFeaturesValue = useMemo(
+    () => ({ features: effectiveFeatures, loading: featuresLoading, refetch: refetchFeatures }),
+    [effectiveFeatures, featuresLoading, refetchFeatures],
+  )
 
   // Phase 148 (VIS-01 / D-04): the graceful mid-session-flip bounce. If a governed
   // feature's audience is tightened while a non-operator is on its page, that page's
@@ -201,13 +230,28 @@ function App() {
     return <FinalizedLockout onGoToApp={() => window.location.assign("/")} />
   }
 
+  // Phase 167 (INV-01 / INV-02 / D-167-01): the pre-auth /invite accept-invite branch,
+  // mirroring the /setup precedent above — a guarded window.location.pathname check (no url
+  // router). Placed BEFORE the !user AuthPage return so an unauthenticated invitee gets the
+  // invite-branded auth (sign in → additive 2nd org, or sign up → fresh join) and an already-
+  // authenticated visitor on /invite still lands on the accept flow (NOT straight into
+  // ChatLayout). AcceptInvitePage reads the raw token from the URL and, on the first authed
+  // session, idempotently calls acceptInvitation(token); on success it redirects to "/" so
+  // OrgProvider re-probes and the 166 switcher shows both orgs. A non-/invite visit is
+  // byte-identical to today — this branch only fires on the literal /invite path.
+  const atInvitePath = window.location.pathname === "/invite"
+  if (atInvitePath) {
+    return <AcceptInvitePage user={user} onSignIn={signIn} onSignUp={signUp} />
+  }
+
   if (!user) {
     return <AuthPage onSignIn={signIn} onSignUp={signUp} />
   }
 
   return (
-    <StreamsProvider>
-      <TooltipProvider>
+    <OrgProvider userId={user?.id ?? null}>
+      <StreamsProvider>
+        <TooltipProvider>
         {/* Phase 147 (D-06): app-wide end-user maintenance banner — sits above
             ChatLayout, outside the /admin surface, reading the public /health flag. */}
         <MaintenanceBanner />
@@ -230,6 +274,15 @@ function App() {
             switch — so the Settings toggle and the admin Control Room toggle move
             ONE shared value and can never disagree. Default plain; localStorage. */}
         <TechnicalNamesProvider>
+          {/* Phase 183 (CANVAS-01 / OP-2): the app-wide effective-features broadcast.
+              It sits beside TechnicalNamesProvider — both are app-wide UI contexts and
+              both must cover ChatLayout's view switch, so the workflows view (and any
+              other page) can read the map. Pure plumbing: the value is the object the
+              ONE useEffectiveFeatures call above already produced, so there is no
+              second GET /features and the Phase-148 fail-closed policy is unchanged.
+              A descendant that reads a NULL context (no provider) must treat it as
+              fail-closed — every governed feature hidden. */}
+          <EffectiveFeaturesProvider value={effectiveFeaturesValue}>
           {/* Phase 153 (CITE-01 / SC#2): the citation cross-view nav provider wraps
               BOTH the chat subtree (where the citation markers/"Open document"
               affordance live) and the documents view (IngestionPage, which reads the
@@ -254,9 +307,11 @@ function App() {
               onTuneSkill={handleTuneSkill}
             />
           </CitationNavProvider>
+          </EffectiveFeaturesProvider>
         </TechnicalNamesProvider>
-      </TooltipProvider>
-    </StreamsProvider>
+        </TooltipProvider>
+      </StreamsProvider>
+    </OrgProvider>
   )
 }
 

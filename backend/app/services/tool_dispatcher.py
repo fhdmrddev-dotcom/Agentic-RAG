@@ -18,6 +18,7 @@ import io
 import json
 import logging
 import os
+import shlex
 import time as time_mod
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Awaitable
@@ -30,7 +31,12 @@ from app.api.kb import ls_path, tree_path, grep_path, glob_path, read_path
 # Phase 151 (FILE-02) — owner→global doc-scope fallback (mirrors read_path). Module-level
 # (patch-where-used friendly) and cycle-safe: folder_utils imports only dependencies/db,
 # never tool_dispatcher.
-from app.utils.folder_utils import get_globally_visible_folder_ids
+# SEED-125 (CR-01) — the same fail-closed caller-org resolver the SEED-124 folder fix uses,
+# reused here to org-gate service-role skill resolution (see _resolve_skill_visibility_or).
+from app.utils.folder_utils import get_globally_visible_folder_ids, _resolve_caller_org_ids
+# SEED-125 (CR-01) / Phase 182 (CR-01) — the ONE org-gated skill-visibility predicate, hoisted
+# to a shared import-light home so the grounding/canvas seam reuses it instead of copying it.
+from app.utils.skill_visibility import build_skill_visibility_or
 from app.services.retrieval_service import search_documents, resolve_document_id, fetch_full_document
 from app.services.web_search_service import web_search
 from app.services.sub_agent_service import run_sub_agent
@@ -553,7 +559,7 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     untouched, no ``provider ==`` fork. self_improve-gated (D-11) in ``get_tools()`` AND
     refused in-flight via ``_CAPABILITY_FLAG_TOOLS``. Owner-only WRITE gate (D-06/T-04):
     the target skill is resolved by name under ``.eq("user_id")`` — NEVER the
-    ``.or_(is_global.eq.true)`` READ filter — and ``is_system`` skills are also rejected;
+    ``.or_(is_org_shared.eq.true)`` READ filter — and ``is_system`` skills are also rejected;
     service-role has no RLS backstop so this app gate is load-bearing. A colliding filename
     overwrites in place via a race-immune upsert (D-07, Plan 02 unique index). Reuses the
     existing ``skill_files`` table + ``skill-files`` bucket (D-08) — no new table/bucket.
@@ -579,9 +585,9 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
     filename = _re_local.sub(r"\.{2,}", ".", filename).strip() or "attachment"
 
     # ── D-06 / T-04 / SC#4 — resolve the target skill OWNER-ONLY. Empty .data (not owned
-    #    / not found) OR is_system → refuse. NEVER the .or_(is_global.eq.true) READ filter.
-    #    WR-04: the gate intentionally does NOT reject is_global — a global skill the caller
-    #    OWNS is writable BY DESIGN (T-03: attach-to-owned-skill then owner later toggles it
+    #    / not found) OR is_system → refuse. NEVER the .or_(is_org_shared.eq.true) READ filter.
+    #    WR-04: the gate intentionally does NOT reject is_org_shared — an org-shared skill the
+    #    caller OWNS is writable BY DESIGN (T-03: attach-to-owned-skill then owner later toggles it
     #    global is a documented, owner-driven data-movement path, not blocked). The refusal
     #    copy below is therefore scoped to built-in (is_system) skills only, so it never
     #    overstates the enforcement (auditors: owner-scope on user_id is the load-bearing gate). ──
@@ -1136,20 +1142,58 @@ def _skill_runtime_note(file_names: list[str]) -> str | None:
     return _SKILL_RUNTIME_NOTE.format(names=", ".join(offending))
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SEED-125 (CR-01) — org-gated skill resolution on the service-role client.
+#
+# The agent's skill tools (load_skill / read_skill_file / save_skill sibling-lint /
+# execute_code skill-file injection) resolve skills on the BYPASSRLS service-role
+# producer client (``ctx.supabase``), so the membership org gate that RLS + the mig-110
+# DEFINER fns enforce on EVERY request path never applies here. Without an org predicate
+# the legacy ``.or_(user_id.eq.<caller>,is_org_shared.eq.true)`` filter matched ANY org's
+# ``is_org_shared`` skill → a disjoint-org caller's agent could load another org's skill
+# instructions + pull its bundled file bytes. This is the SKILLS analog of the SEED-124
+# folder leak Phase 165 closed on the same service-role seam.
+#
+# Phase 182 (CR-01) HOISTED the predicate itself to ``app.utils.skill_visibility`` — the
+# grounding/canvas seam needs the SAME rule but cannot import this module (a real
+# harness.scope → task_service → tool_dispatcher cycle), and a second copy is exactly the
+# drift the one-source red line forbids. The rule, the RLS shape it mirrors and the
+# fail-closed reasoning all live in that module's docstring. This module keeps only the
+# ToolContext-shaped resolver below.
+# ─────────────────────────────────────────────────────────────────────────────
+
+async def _resolve_skill_visibility_or(ctx: ToolContext) -> str:
+    """Resolve the caller's org set + build the org-gated skill-visibility ``.or_()``.
+
+    The service-role client bypasses RLS so ``auth.uid()`` / ``current_user_org_ids()``
+    never resolve here — the org set MUST be resolved from the threaded ``user_id`` via
+    ``org_members`` (fail-closed on an empty membership), exactly as ``folder_utils`` does
+    for the folder analog (SEED-124). One await per handler; handlers with two resolution
+    sites (read_skill_file / execute_code) resolve ONCE and reuse the returned string so
+    the injection loop never fires N membership round-trips.
+    """
+    org_ids = await _resolve_caller_org_ids(ctx.supabase, ctx.current_user["id"])
+    return build_skill_visibility_or(ctx.current_user["id"], org_ids)
+
+
 async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     skill_name = args.get("skill_name", "")
     # Emit skill_activated SSE event immediately (SKIL-12)
     await ctx.emit(ctx.redis, ctx.run_id, 'skill_activated', skill_name=skill_name)
     # Resolve skill -- on a name collision the most-authoritative row wins:
     # system > global > owned (SEED-102). is_system DESC pins a protected built-in
-    # above any same-named owned row; is_global DESC is the secondary tie-break.
+    # above any same-named owned row; is_org_shared DESC is the secondary tie-break.
+    # SEED-125 (CR-01): the visibility filter is org-gated (is_system universal escape
+    # OR org_id ∈ caller_org_ids AND (owner OR is_org_shared)) — a disjoint-org caller no
+    # longer resolves another org's is_org_shared skill on the BYPASSRLS service client.
+    _skill_filter = await _resolve_skill_visibility_or(ctx)
     _skill_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, name, description, instructions, user_id")
-        .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+        .or_(_skill_filter)
         .eq("name", skill_name)
         .eq("is_enabled", True)
-        .order("is_system", desc=True).order("is_global", desc=True)
+        .order("is_system", desc=True).order("is_org_shared", desc=True)
     )
     skill_row = _skill_resp.data
     if not skill_row:
@@ -1230,10 +1274,13 @@ async def _handle_save_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # can mention them. A read failure degrades to an empty sibling list.
     lint_warnings: list[dict] = []
     try:
+        # SEED-125 (CR-01): org-gate the sibling set so the lint never reads (or echoes
+        # the description of) another org's is_org_shared skill on the service client.
+        _sibling_filter = await _resolve_skill_visibility_or(ctx)
         siblings_resp = await aexec(
             ctx.supabase.table("skills")
             .select("id, description")
-            .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+            .or_(_sibling_filter)
         )
         siblings = [
             r.get("description", "")
@@ -1355,13 +1402,16 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
             tool_result = json.dumps({"error": f"File '{filename}' not found in snapshot: {e}"})
         return ToolResult(result=tool_result)
 
-    # ── live-skill resolution below — UNCHANGED (the SC#3 red line; Pitfall 4) ──
+    # ── live-skill resolution below — SC#3 red line preserved (Pitfall 4); only the
+    #    visibility filter is org-gated per SEED-125 (CR-01). Resolve the caller's org
+    #    set ONCE and reuse it for the normalized-name retry (no double round-trip). ──
     skill_name = args.get("skill_name", "")
+    _skill_filter = await _resolve_skill_visibility_or(ctx)
     # Resolve skill to get owner's user_id for storage path
     _sr_resp = await aexec(
         ctx.supabase.table("skills")
         .select("id, user_id")
-        .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+        .or_(_skill_filter)
         .eq("name", skill_name)
         .maybe_single()
     )
@@ -1373,7 +1423,7 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
             _sr_resp2 = await aexec(
                 ctx.supabase.table("skills")
                 .select("id, user_id")
-                .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+                .or_(_skill_filter)
                 .eq("name", _sr_norm)
                 .maybe_single()
             )
@@ -1390,6 +1440,143 @@ async def _handle_read_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
         tool_result = json.dumps({"error": f"File '{filename}' not found: {e}"})
 
     return ToolResult(result=tool_result)
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03 / D-01..D-04) — reliable declared-library install +
+# bounded ModuleNotFound auto-heal, ENTIRELY inside the tool dispatcher (below the
+# provider adapter boundary → provider-uniform, Deep byte-identical). See
+# `_handle_execute_code` for the wiring; the run-scoped heal-bound helpers live at
+# `_heal_bound_seen` / `_heal_bound_record` alongside `_NO_MODULE_RE`.
+# ---------------------------------------------------------------------------
+def _pip_install(session, libs: "list[str]"):
+    """Install `libs` into the SANDBOX SYSTEM interpreter via `python -m pip`.
+
+    Deliberately NOT `session.install(...)`: (A) `session.install` swallows pip
+    failures (returns None on a non-zero exit — our try/except was dead code) and
+    (B) it targets the venv pip, whose site-packages are invisible to the code run
+    (`python -u <file>` = the SYSTEM interpreter). Running `python -m pip` here
+    matches the run interpreter AND — with NO on_stdout/on_stderr callbacks — makes
+    `session.execute_command` NON-streaming, so `ConsoleOutput.exit_code` and
+    `.stderr` are RELIABLE. SYNCHRONOUS/blocking → call via `run_in_threadpool`.
+    """
+    joined = " ".join(shlex.quote(lib) for lib in libs)
+    return session.execute_command(
+        f"python -m pip install --disable-pip-version-check {joined}"
+    )
+
+
+class _SandboxCommandTimeout(Exception):
+    """A bounded blocking sandbox call exceeded its wall-clock ceiling and the
+    container was killed to free the wedged (uncancellable) thread (096/SEED-063).
+    Carries the ceiling so the caller can build an honest aborted message."""
+
+    def __init__(self, timeout_s):
+        self.timeout_s = timeout_s
+        super().__init__(f"sandbox command exceeded {timeout_s}s wall-clock limit")
+
+
+async def _run_bounded_sandbox(func, *args, thread_id, timeout_s):
+    """Run a BLOCKING sandbox call ``func(*args)`` off the event loop, bounded by a
+    wall-clock ``timeout_s`` (``None``/``<=0`` disables the cap — operator escape hatch,
+    mirrors the primary run at ``:1784``).
+
+    A Python thread blocked in ``session.execute_command`` cannot be cancelled, so on
+    overrun this KILLS the sandbox container (the only way to free the thread — 096 /
+    SEED-063), abandons the orphaned future (retrieving its eventual exception in a
+    done-callback so asyncio doesn't log "exception never retrieved"), and raises
+    ``_SandboxCommandTimeout``. Uses ``asyncio.wait`` (which never cancels the future
+    itself) rather than ``asyncio.wait_for`` so the abandoned thread keeps running
+    harmlessly until the kill lands, exactly like the primary drain loop. Returns the
+    call's result when it completes within the ceiling.
+    """
+    loop = asyncio.get_running_loop()
+    fut = loop.run_in_executor(None, func, *args)
+    if not timeout_s or timeout_s <= 0:
+        return await fut
+    done, _pending = await asyncio.wait({fut}, timeout=timeout_s)
+    if not done:
+        logger.warning(
+            "bounded sandbox command wall-clock timeout (%ss) thread=%s — "
+            "killing sandbox container", timeout_s, thread_id,
+        )
+        try:
+            await run_in_threadpool(sandbox_manager.kill_session, thread_id)
+        except Exception:  # noqa: BLE001 — abort path never raises
+            logger.exception(
+                "kill_session failed after bounded-command timeout thread=%s", thread_id,
+            )
+        fut.add_done_callback(lambda f: f.cancelled() or f.exception())
+        raise _SandboxCommandTimeout(timeout_s)
+    return fut.result()
+
+
+async def _install_declared_libraries(
+    session, libraries: "list[str]", *, thread_id=None, timeout_s=None,
+) -> str:
+    """Install declared `libraries` deterministically; retry ONCE on a non-zero exit.
+
+    Returns the pip stderr IFF the install STILL failed after the retry (else "") so
+    the caller can carry the honest reason into the tool result — NEVER silently
+    swallowed (D-01/D-02.1). A thread-side raise is surfaced as the reason too.
+
+    CR-01 (176): each blocking `pip install` is routed through `_run_bounded_sandbox`
+    so a hung install (network stall) can't wedge the run forever — a wall-clock
+    overrun kills the container and surfaces an honest aborted reason, mirroring the
+    primary run's wall-clock abort. `thread_id`/`timeout_s` default to no-bound so
+    unit callers stay unchanged.
+    """
+    try:
+        res = await _run_bounded_sandbox(
+            _pip_install, session, libraries, thread_id=thread_id, timeout_s=timeout_s)
+        if getattr(res, "exit_code", 0):
+            res = await _run_bounded_sandbox(  # retry once
+                _pip_install, session, libraries, thread_id=thread_id, timeout_s=timeout_s)
+        if getattr(res, "exit_code", 0):
+            return (getattr(res, "stderr", "") or "") or "pip install exited non-zero"
+        return ""
+    except _SandboxCommandTimeout as _t:  # CR-01 — hung install killed + surfaced honestly
+        logger.warning("declared pip install exceeded wall-clock limit: %s", _t)
+        return (
+            f"pip install exceeded the {_t.timeout_s}s wall-clock limit and was "
+            "aborted (the sandbox container was killed to free it)."
+        )
+    except Exception as _e:  # noqa: BLE001 — surface, never swallow (D-01)
+        logger.warning("declared pip install raised thread-side: %s", _e)
+        return f"{type(_e).__name__}: {_e}"
+
+
+# Error markers that force a stdout-only "success" to be reclassified as a failure
+# (the streamed exit code from a bare `python -u` run is always 0 — Defect C). Hoisted
+# to module scope so both the initial derivation and the post-heal re-derivation share
+# one definition.
+_EXEC_ERROR_MARKERS = (
+    "Traceback (most recent call last)",
+    "Error:",
+    "Exception:",
+    "ModuleNotFoundError",
+    "ImportError",
+    "SyntaxError",
+    "NameError",
+    "TypeError",
+    "ValueError",
+    "RuntimeError",
+    "AttributeError",
+    "KeyError",
+    "IndexError",
+)
+
+
+def _derive_actual_exit_code(exec_result) -> int:
+    """Derive the effective exit code: a bare `python -u` run streams exit_code 0
+    even on a Python traceback (Defect C), so an exit-0 run whose stdout carries a
+    Python error marker is bumped to 1."""
+    code = getattr(exec_result, "exit_code", None) or 0
+    if code == 0:
+        stdout_text = getattr(exec_result, "stdout", "") or ""
+        if any(m in stdout_text for m in _EXEC_ERROR_MARKERS):
+            return 1
+    return code
 
 
 async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
@@ -1508,6 +1695,10 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         # Inject skill files into sandbox
         skill_files_req = args.get("skill_files") or []
         file_preamble = ""
+        # SEED-125 (CR-01): resolve the caller's org-gated skill-visibility filter ONCE
+        # before the injection loop (not per file) so a disjoint-org caller cannot pull
+        # another org's is_org_shared skill files into the sandbox on the service client.
+        _sf_filter = await _resolve_skill_visibility_or(ctx) if skill_files_req else None
         for sf in skill_files_req:
             sf_skill_name = sf.get("skill_name", "")
             sf_filename = sf.get("filename", "")
@@ -1516,7 +1707,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _sf_resp = await aexec(
                 ctx.supabase.table("skills")
                 .select("id, user_id")
-                .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+                .or_(_sf_filter)
                 .eq("name", sf_skill_name)
                 .maybe_single()
             )
@@ -1528,7 +1719,7 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                     _sf_resp2 = await aexec(
                         ctx.supabase.table("skills")
                         .select("id, user_id")
-                        .or_(f"user_id.eq.{ctx.current_user['id']},is_global.eq.true")
+                        .or_(_sf_filter)
                         .eq("name", _sf_norm)
                         .maybe_single()
                     )
@@ -1569,6 +1760,14 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             except OSError:
                 pass
 
+        # EXEC-01 (D-01/D-02.1): declared-install hardening + per-run heal bookkeeping.
+        # `_declared_install_stderr` carries a persistent declared-install failure
+        # forward to the honest tool result (never swallowed); `_healed_modules_fallback`
+        # is the call-local heal bound used only when Redis is unavailable (graceful
+        # degrade — a Redis hiccup must never break execute_code).
+        _declared_install_stderr = ""
+        _healed_modules_fallback: set[str] = set()
+
         # Install libraries
         if libraries:
             # SAND (silence fix): honest 'installing libraries' phase for the pip
@@ -1578,13 +1777,15 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
                            tool_index=ctx.tool_index,
                            elapsed_seconds=round(time_mod.time() - _setup_started, 1),
                            phase='installing_libraries')
-            try:
-                await run_in_threadpool(session.install, libraries=libraries)
-            except Exception as _install_err:
-                logger.warning(
-                    "sandbox library install failed thread=%s err=%s",
-                    ctx.thread_id, type(_install_err).__name__,
-                )
+            # EXEC-01: `python -m pip install` (system interpreter → visible to the
+            # `python -u` code run; non-stream → reliable exit_code), retry once. A
+            # persistent failure surfaces via the honest tool result below — NEVER
+            # silently swallowed as it was with the venv-targeted `session.install`.
+            _declared_install_stderr = await _install_declared_libraries(
+                session, libraries,
+                thread_id=ctx.thread_id,
+                timeout_s=settings.sandbox_exec_timeout_seconds,
+            )
 
         start_time = time_mod.time()
 
@@ -1724,27 +1925,41 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
         end_time = time_mod.time()
         duration_ms = int((end_time - start_time) * 1000)
 
-        # Derive actual exit code
-        actual_exit_code = getattr(exec_result, "exit_code", None) or 0
-        if actual_exit_code == 0:
-            stdout_text = exec_result.stdout or ""
-            _error_markers = (
-                "Traceback (most recent call last)",
-                "Error:",
-                "Exception:",
-                "ModuleNotFoundError",
-                "ImportError",
-                "SyntaxError",
-                "NameError",
-                "TypeError",
-                "ValueError",
-                "RuntimeError",
-                "AttributeError",
-                "KeyError",
-                "IndexError",
+        # Derive actual exit code (Defect C: a bare `python -u` streams exit 0 even on a
+        # traceback → bump to 1 on a stdout error marker).
+        actual_exit_code = _derive_actual_exit_code(exec_result)
+
+        # EXEC-01 (D-02.2 / D-03) — bounded, RUN-SCOPED ModuleNotFound auto-heal. On a
+        # FAILED run, install the missing module (system interpreter) + re-run the code
+        # ONCE, bounded 1-per-module-per-RUN via a per-run Redis key on ctx.run_id (with
+        # a graceful call-local fallback). A successful heal adopts the re-run result and
+        # flows through the normal DB-log / harvest / completion path below; a persistent
+        # failure attaches an honest `install_failed` note to the MODEL-facing llm_content
+        # (never a raw traceback under a 'completed' status). Provider-uniform, no
+        # `provider ==` fork; a clean run never enters here (Deep byte-identical — D-04).
+        _install_failed_note: "dict | None" = None
+        # WR-02 (176): True once a heal RE-RUN produced a new result. The re-run runs
+        # WITHOUT on_stdout/on_stderr, so its output never streamed as code_stdout/
+        # code_stderr deltas — the live card still holds the FIRST run's pre-heal error
+        # text. This flag drives the corrective stdout/stderr carried on the completion
+        # event below so the live card reflects the run of record, not a stale error
+        # under a success badge.
+        _healed_rerun = False
+        if actual_exit_code != 0:
+            _heal = await _autoheal_missing_module(
+                session=session, ctx=ctx, code_file=code_file,
+                stdout=exec_result.stdout or "", stderr=exec_result.stderr or "",
+                declared_install_stderr=_declared_install_stderr,
+                healed_fallback=_healed_modules_fallback,
             )
-            if any(m in stdout_text for m in _error_markers):
-                actual_exit_code = 1
+            if _heal is not None:
+                if _heal.get("exec_result") is not None:
+                    exec_result = _heal["exec_result"]
+                    duration_ms = int((time_mod.time() - start_time) * 1000)
+                    actual_exit_code = _derive_actual_exit_code(exec_result)
+                    _healed_rerun = True
+                if _heal.get("install_failed") is not None:
+                    _install_failed_note = _heal["install_failed"]
 
         # Log execution to DB (SAND-09)
         exec_row = await aexec(
@@ -1781,9 +1996,20 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             output_file_list = delta_files
 
         # Emit completion event (SAND-06)
-        await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete',
-                       exit_code=actual_exit_code, duration_ms=duration_ms,
-                       execution_id=execution_id, output_files=output_file_list)
+        _complete_kwargs: dict = dict(
+            exit_code=actual_exit_code, duration_ms=duration_ms,
+            execution_id=execution_id, output_files=output_file_list,
+        )
+        # WR-02 (176): on a heal re-run, carry the HEALED run's authoritative
+        # stdout/stderr + a `healed` marker so the client REPLACES the stale pre-heal
+        # delta text (which never got superseded — the re-run had no stream callbacks)
+        # with the real output of record. Guarded on `_healed_rerun` → the normal
+        # (non-heal) completion is byte-identical (D-14); a clean run never sets it.
+        if _healed_rerun:
+            _complete_kwargs["healed"] = True
+            _complete_kwargs["stdout"] = exec_result.stdout or ""
+            _complete_kwargs["stderr"] = exec_result.stderr or ""
+        await ctx.emit(ctx.redis, ctx.run_id, 'code_execution_complete', **_complete_kwargs)
 
         exec_status = "completed" if actual_exit_code == 0 else "error"
         tool_result = json.dumps({
@@ -1827,6 +2053,13 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             _llm_payload["runtime_gap"] = _gap
             if ctx.dead_gap_tokens_in_run is not None:
                 ctx.dead_gap_tokens_in_run.add(_gap["token"])
+        # EXEC-01 (D-03) — honest install-failure note on the MODEL-facing llm_content
+        # only (the persisted/UI `tool_result` stays a normal error). Mirrors the
+        # runtime_gap injection above; only set on a FAILED run, so `status` is already
+        # "error". Mutually exclusive with runtime_gap (KNOWN_MISSING modules are never
+        # healed, unknown modules are never classified as a permanent gap).
+        if _install_failed_note is not None:
+            _llm_payload["install_failed"] = _install_failed_note
         llm_content = json.dumps(_llm_payload)
         ctx.spawn(write_audit_entry(
             user_id=ctx.current_user["id"],
@@ -2741,6 +2974,161 @@ def _code_references_dead_token(code: str, token: str) -> bool:
             rf"\b{_re_filename.escape(token)}\b", code, _re_filename.IGNORECASE
         ) is not None
     return token.lower() in code.lower()
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03 / D-02.2 / D-03) — run-scoped ModuleNotFound auto-heal.
+# Reuses `_NO_MODULE_RE` for extraction and `_pip_install` (system interpreter) for
+# the install; the 1-per-module-per-RUN bound lives in a per-run Redis SET keyed on
+# `ctx.run_id` (`heal_attempted:{run_id}`, SADD/SISMEMBER + EXPIRE 600 — same run-buffer
+# TTL discipline as `run:{run_id}` / eval_runner_service / skill_tuner) with a graceful
+# call-local fallback when Redis is unavailable. Entirely below the provider boundary
+# → provider-uniform, and a literal no-op for any run where the code succeeds (a clean
+# run never enters the heal), so Deep behavior stays byte-identical (D-04/D-14).
+# ---------------------------------------------------------------------------
+_PREINSTALLED_HINT_LIBS = (
+    "reportlab, pandas, matplotlib, python-docx, python-pptx, openpyxl, "
+    "docxtpl, numpy, scipy, seaborn, plotly, pypdf"
+)
+_HEAL_BOUND_TTL_S = 600  # run-buffer TTL (eval_runner_service:79 / skill_tuner:114)
+
+
+def _extract_missing_module(stdout: str, stderr: str) -> "str | None":
+    """Extract the missing module from a ModuleNotFoundError via the shared
+    `_NO_MODULE_RE`, scanning stdout+stderr lowercased (mirrors `_classify_runtime_gap`
+    `out_l`). None when there is no `No module named 'X'` signal."""
+    out_l = f"{stdout or ''}\n{stderr or ''}".lower()
+    m = _NO_MODULE_RE.search(out_l)
+    return m.group(1) if m else None
+
+
+def _install_failed_detail(module: str, reason: str) -> dict:
+    """Model-facing honest payload for a persistent install/heal failure. The reason
+    (pip stderr) is truncated ~300 chars; the hint points at the preinstalled set so
+    the model can pivot instead of blindly retrying (D-03)."""
+    return {
+        "module": module,
+        "reason": (reason or "").strip()[:300],
+        "hint": (
+            f"Could not install {module}. Use a preinstalled library "
+            f"({_PREINSTALLED_HINT_LIBS}) or tell the user this package is "
+            "unavailable. Do not retry the same install."
+        ),
+    }
+
+
+async def _heal_bound_seen(ctx, healed_fallback: set, module: str) -> bool:
+    """True if `module` was already heal-attempted anywhere in THIS run. Consults the
+    per-run Redis set (`heal_attempted:{ctx.run_id}`); on ANY Redis error/unavailability
+    falls back to the call-local set. `ctx.redis` is a redis.asyncio client so sismember
+    is awaited directly (NO run_in_threadpool — that wraps only the blocking sandbox
+    session.* calls; D-v2.5-01)."""
+    redis = getattr(ctx, "redis", None)
+    run_id = getattr(ctx, "run_id", None)
+    if redis is not None and run_id is not None:
+        try:
+            return bool(await redis.sismember(f"heal_attempted:{run_id}", module))
+        except Exception as _e:  # noqa: BLE001 — a Redis hiccup must never break execute_code
+            logger.warning("heal-bound sismember failed (call-local fallback): %s", _e)
+    return module in healed_fallback
+
+
+async def _heal_bound_record(ctx, healed_fallback: set, module: str) -> None:
+    """Record `module` as heal-attempted for THIS run in the per-run Redis set (SADD +
+    EXPIRE so it self-expires with the run buffer); falls back to the call-local set on
+    any Redis error/unavailability."""
+    redis = getattr(ctx, "redis", None)
+    run_id = getattr(ctx, "run_id", None)
+    if redis is not None and run_id is not None:
+        try:
+            key = f"heal_attempted:{run_id}"
+            await redis.sadd(key, module)
+            await redis.expire(key, _HEAL_BOUND_TTL_S)
+            return
+        except Exception as _e:  # noqa: BLE001 — degrade gracefully
+            logger.warning("heal-bound sadd failed (call-local fallback): %s", _e)
+    healed_fallback.add(module)
+
+
+async def _autoheal_missing_module(
+    *, session, ctx, code_file: str, stdout: str, stderr: str,
+    declared_install_stderr: str, healed_fallback: set,
+) -> "dict | None":
+    """Bounded ModuleNotFound auto-heal for a FAILED execute_code run (D-02.2 / D-03).
+
+    Returns one of:
+      * ``None`` — nothing to heal (no ModuleNotFound + no declared failure, or a
+        KNOWN_MISSING permanent gap → left to ``_classify_runtime_gap``).
+      * ``{"install_failed": {...}}`` — honest note for ``llm_content`` (no re-run).
+      * ``{"exec_result": <ConsoleOutput>}`` — the code was re-run clean; adopt it.
+      * ``{"exec_result": <ConsoleOutput>, "install_failed": {...}}`` — re-ran but still
+        missing → adopt the new result AND attach the honest note.
+    """
+    module = _extract_missing_module(stdout, stderr)
+    if module is None:
+        # No ModuleNotFound signal — but a persistent DECLARED install failure must
+        # still surface honestly rather than be swallowed (D-01).
+        if declared_install_stderr:
+            return {"install_failed": _install_failed_detail(
+                "the declared libraries", declared_install_stderr)}
+        return None
+
+    # KNOWN_MISSING permanent gaps (e.g. markitdown) are reshaped by _classify_runtime_gap
+    # — never install/heal them here.
+    if module in KNOWN_MISSING_MODULES:
+        return None
+
+    # Run-scoped 1-per-module bound: a module already heal-attempted anywhere in this
+    # run (INCLUDING a prior execute_code call — the actual BUG-260708-02 behavior, which
+    # a call-local set cannot bound) goes straight to the honest result, no re-install.
+    if await _heal_bound_seen(ctx, healed_fallback, module):
+        return {"install_failed": _install_failed_detail(
+            module, declared_install_stderr or "Already attempted to install this module "
+            "earlier in this run; it did not resolve.")}
+
+    await _heal_bound_record(ctx, healed_fallback, module)
+
+    # CR-01 (176): both the heal install and the re-run are bounded by the SAME
+    # wall-clock ceiling the primary run uses (096/SEED-063) so a healed-then-runaway
+    # script — or a hung `pip install` — can never wedge the run into a 40-minute
+    # zombie. `thread_id` is what `_run_bounded_sandbox`/`kill_session` need to free
+    # the container on overrun; absent (unit ctx) → no bound.
+    _thread_id = getattr(ctx, "thread_id", None)
+    _exec_timeout_s = settings.sandbox_exec_timeout_seconds
+
+    # Install the missing module into the SYSTEM interpreter (python -m pip, retry once).
+    _install_stderr = await _install_declared_libraries(
+        session, [module], thread_id=_thread_id, timeout_s=_exec_timeout_s)
+    if _install_stderr:
+        return {"install_failed": _install_failed_detail(module, _install_stderr)}
+
+    # Install OK — re-run the code ONCE, bounded by the wall-clock ceiling (a blocking
+    # session.execute_command in a threadpool thread cannot be cancelled — D-v2.5-01),
+    # reusing the container-resident code_file. Do NOT re-enter the async drain
+    # (Pitfall 1). On overrun `_run_bounded_sandbox` has already killed the container;
+    # surface an honest aborted note (never a silent zombie), mirroring the primary
+    # run's `[execution aborted]` / 124 completion.
+    try:
+        new_result = await _run_bounded_sandbox(
+            session.execute_command, f"python -u {code_file}",
+            thread_id=_thread_id, timeout_s=_exec_timeout_s)
+    except _SandboxCommandTimeout as _t:
+        logger.warning(
+            "auto-heal re-run wall-clock timeout (%ss) thread=%s module=%s — "
+            "container killed", _t.timeout_s, _thread_id, module,
+        )
+        return {"install_failed": _install_failed_detail(
+            module,
+            f"installed, but the re-run exceeded the {_t.timeout_s}s wall-clock "
+            "execution limit and was aborted.",
+        )}
+    still_missing = _extract_missing_module(
+        getattr(new_result, "stdout", "") or "", getattr(new_result, "stderr", "") or ""
+    )
+    if still_missing is not None:
+        return {"exec_result": new_result,
+                "install_failed": _install_failed_detail(still_missing, "")}
+    return {"exec_result": new_result}
 
 
 _REPEAT_BLOCKED_NOTE = (

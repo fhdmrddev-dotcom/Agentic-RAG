@@ -5,7 +5,7 @@ import {
   updateSkill as apiUpdateSkill,
   deleteSkill as apiDeleteSkill,
   toggleSkillEnabled as apiToggleSkillEnabled,
-  toggleSkillGlobal as apiToggleSkillGlobal,
+  toggleSkillOrgShared as apiToggleSkillOrgShared,
 } from "@/lib/api"
 import type { Skill, SkillCreate, SkillUpdate } from "@/types"
 
@@ -17,7 +17,7 @@ interface UseSkills {
   updateSkill: (id: string, body: SkillUpdate) => Promise<Skill>
   deleteSkill: (id: string) => Promise<void>
   toggleEnabled: (id: string) => Promise<void>
-  toggleGlobal: (id: string, override?: boolean) => Promise<void>
+  toggleOrgShared: (id: string, override?: boolean) => Promise<void>
 }
 
 export function useSkills(): UseSkills {
@@ -60,13 +60,15 @@ export function useSkills(): UseSkills {
     setSkills((prev) => prev.map((s) => (s.id === id ? { ...s, is_enabled: updated.is_enabled } : s)))
   }, [])
 
-  const toggleGlobal = useCallback(async (id: string, override?: boolean): Promise<void> => {
-    // `override` rides through to the publish-gate on the private→global direction
+  const toggleOrgShared = useCallback(async (id: string, override?: boolean): Promise<void> => {
+    // `override` rides through to the publish-gate on the private→org-shared direction
     // (Phase 136 / D-07); the unshare direction passes nothing. A gate refusal
     // (PublishGateError) or auth error propagates to the caller (the dialog).
-    const updated = await apiToggleSkillGlobal(id, override)
-    setSkills((prev) => prev.map((s) => (s.id === id ? { ...s, is_global: updated.is_global } : s)))
+    const updated = await apiToggleSkillOrgShared(id, override)
+    setSkills((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, is_org_shared: updated.is_org_shared } : s)),
+    )
   }, [])
 
-  return { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal }
+  return { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleOrgShared }
 }

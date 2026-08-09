@@ -21,6 +21,20 @@ import { ReembedConfirmModal } from "@/components/settings/ReembedConfirmModal"
 import { ReembedStatusCard } from "@/components/settings/ReembedStatusCard"
 import { EngineHealthCard } from "@/components/settings/EngineHealthCard"
 import { JudgeModelPicker } from "@/components/settings/JudgeModelPicker"
+// Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default-model picker. Lives
+// in the personal-preferences home (this Settings surface, NOT the operator Control Room):
+// the user picks a default WITHIN the operator/org-allowed set; the always-on 🔒 footer
+// surfaces the operator lock. Self-fetching (getModelDefault), so it needs no page state.
+import { ModelDefaultPreference } from "@/components/settings/ModelDefaultPreference"
+// Phase 190-16 (CONN-02 / D-25 / sketch 155-C) — Settings → Connections, the sixth tab.
+// D-25 puts connections HERE and not in the Control Room: the operator sets the allowed-set
+// and the platform lock; the user (an org admin) sets the preference. Self-fetching, so it
+// needs no page state and contributes nothing to the tab-level Save.
+import { ConnectionsTab } from "@/components/settings/ConnectionsTab"
+import {
+  CONNECTIONS_SECTION_DESCRIPTION,
+  CONNECTIONS_SECTION_TITLE,
+} from "@/components/settings/connectionsCopy"
 // Phase 154 (LANG-01) — the app-wide plain-language reveal spine (Wave 1). The
 // Settings page HOSTS the "Show technical names" toggle (D-01/SC#3) wired to the
 // shared context, and routes bounded user-facing labels through the term-map (D-04).
@@ -874,6 +888,16 @@ export function SettingsPage() {
                 ROUTING key — is unchanged (D-02a / no contract break). */}
             <TabsTrigger value="1">{retrievalTabLabel}</TabsTrigger>
             <TabsTrigger value="2">Integrations</TabsTrigger>
+            {/* Phase 190-16 (CONN-02 / D-25 / UI-SPEC §2a, U-01) — Connections.
+                ROUTING KEY "5" is the next FREE key, deliberately: appending renumbers
+                nothing, so every user's persisted `settings_active_tab` keeps pointing at
+                the tab they left. It is rendered VISUALLY FOURTH because Connections is
+                what Integrations is *about*, while Memory and Audit Log are unrelated —
+                and visual order is independent of the routing key, so this costs nothing.
+                ⚠ THE REVERSIBLE HALF (U-01): if the operator later prefers this tab LAST,
+                move ONLY this line. The routing key stays "5" either way — do NOT
+                renumber, exactly as the retrieval relabel above records for value="1". */}
+            <TabsTrigger value="5">Connections</TabsTrigger>
             <TabsTrigger value="3">Memory</TabsTrigger>
             <TabsTrigger value="4">Audit Log</TabsTrigger>
           </TabsList>
@@ -895,6 +919,14 @@ export function SettingsPage() {
                 </div>
                 <TechnicalNamesToggle enabled={showTechnical} onToggle={toggleTechnical} />
               </div>
+
+              {/* Phase 167 (VIS-02 / D-167-04 / SEED-116) — the per-user default chat
+                  model. A PERSONAL preference (this Settings home, not the operator
+                  Control Room): the user picks WITHIN the operator/org-allowed set, and
+                  the always-on 🔒 footer surfaces the operator lock. Self-contained
+                  (self-fetches + self-persists via /me/preferences), outside the AI Model
+                  save cycle — mirrors the EngineHealthCard/JudgeModelPicker infra cards. */}
+              <ModelDefaultPreference />
 
               {/* LLM Providers SectionCard */}
               <SectionCard
@@ -1365,6 +1397,26 @@ export function SettingsPage() {
             <div className="bg-card/50 ghost-border rounded-xl p-6">
               <AuditLogSection />
             </div>
+          </TabsContent>
+
+          {/* Tab 5 (rendered fourth): Connections — Phase 190-16 (CONN-02 / D-25).
+              UNLIKE the five tabs above, this one is NOT a single-value form saved en
+              masse behind the page Save: a connection is a ROW with its own transaction
+              and a write-only secret, which is precisely why sketch 155-C made it a sixth
+              TAB rather than a card inside Integrations (nesting it means either the
+              tab-level Save silently skips rows, or a row edit is lost on navigate-away).
+              It therefore reads and writes on its own and contributes nothing to `s`.
+              NO DEEP LINK: the three-homes IA contract forbids a router here, so there is
+              no query-param and no route — the "route" IS this numeric key, persisted to
+              localStorage. Do not add a router, a search-param reader or a navigate call
+              to this page to reach this tab. */}
+          <TabsContent value="5">
+            <SectionCard
+              title={CONNECTIONS_SECTION_TITLE}
+              description={CONNECTIONS_SECTION_DESCRIPTION}
+            >
+              <ConnectionsTab />
+            </SectionCard>
           </TabsContent>
         </Tabs>
 

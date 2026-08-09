@@ -4,9 +4,9 @@ title: Chat send intermittently does nothing (silent drop) on the general chat p
 reported: 2026-06-03
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/chat, frontend/composer]
-folded_into: null
+folded_into: "176"
 verified_closed_by: null
 related_seeds: [SEED-055]
 re_open_trigger: "Reviewed at Phase 096 plan-phase (2026-06-07, D-096-07): no overlap with 096 surfaces; stays open; SEED-055 holds the residual. PRIOR: Reviewed at Phase 096 discuss-phase (2026-06-06, D-096-07): considered for 096 (parallel-thread axis adjacent) but routed OUT — composer/send-path surface, no overlap with 096's eval/restart-UAT/stream-cap domain; mechanism #1 already fixed via parallel chats (SEED-055 holds residual). Stays OPEN; re-route to a dedicated composer/send-reliability fix when scoped. PRIOR: Reviewed at Phase 095.1 discuss-phase (2026-06-06): considered for the 095.1 cross-check but routed OUT — composer/send-path surface (frontend/chat, frontend/composer), unrelated to 095.1's run-honesty + provider-error + workspace-panel scope. Stays OPEN; re-route to a dedicated composer/send-reliability fix when scoped."

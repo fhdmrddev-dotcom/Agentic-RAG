@@ -1,4 +1,16 @@
-"""Knowledge Health Dashboard — Backend (Phase 49, HLTH-01–HLTH-04)."""
+"""Knowledge Health Dashboard — Backend (Phase 49, HLTH-01–HLTH-04).
+
+Phase 163 (TEN-02) — SERVICE-ROLE, classified exception (NOT swapped to the user-JWT client).
+This retrieval-analytics surface reads ``audit_log`` (the ``search.query`` events behind
+most-retrieved / never-retrieved / retrieval-trend / coverage) — a table whose RLS is INSERT-only
+for ``authenticated`` (mig 108 adds NO SELECT policy), so a user-JWT client would silently read
+back an EMPTY audit set and the analytics would break. Like ``governance_service.py``, this is the
+plan's "aggregate/analytics call that legitimately needs service-role" carve-out: every query stays
+owner-scoped in app code via ``.eq("user_id", user_id)`` (D-14 belt-and-suspenders — the sole gate),
+parameterized, and read-only. The messages/documents/message_feedback reads here WOULD work under
+RLS, but the module is kept uniformly service-role so the surface has ONE auditable rationale rather
+than a per-handler split.
+"""
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
@@ -544,7 +556,7 @@ def _pagination_params(
 async def knowledge_health_overview(
     stale_days: int = Query(90, ge=1, le=3650),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return aggregate KPIs + health score (0-100)."""
     user_id = current_user["id"]
@@ -561,7 +573,7 @@ async def knowledge_health_overview(
 async def knowledge_health_most_retrieved(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return paginated most-retrieved documents."""
     user_id = current_user["id"]
@@ -579,7 +591,7 @@ async def knowledge_health_most_retrieved(
 async def knowledge_health_never_retrieved(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return paginated never-retrieved documents (SQL-level filter)."""
     user_id = current_user["id"]
@@ -598,7 +610,7 @@ async def knowledge_health_stale(
     stale_days: int = Query(90, ge=1, le=3650),
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return paginated stale documents."""
     user_id = current_user["id"]
@@ -616,7 +628,7 @@ async def knowledge_health_stale(
 async def knowledge_health_low_confidence_documents(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return paginated document-level low confidence (backward compatible behaviour)."""
     user_id = current_user["id"]
@@ -634,7 +646,7 @@ async def knowledge_health_low_confidence_documents(
 async def knowledge_health_low_confidence_queries(
     offset_limit: tuple[int, int] = Depends(_pagination_params),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return paginated query-level low-confidence analysis."""
     user_id = current_user["id"]
@@ -652,7 +664,7 @@ async def knowledge_health_low_confidence_queries(
 async def knowledge_health_retrieval_trend(
     days: int = Query(30, ge=1, le=365),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return daily retrieval counts for line chart."""
     user_id = current_user["id"]
@@ -669,7 +681,7 @@ async def knowledge_health_retrieval_trend(
 async def knowledge_health_summary(
     stale_days: int = Query(90, ge=1, le=3650),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # SERVICE-ROLE (classified): reads audit_log (no authenticated SELECT policy) — see module docstring
 ):
     """Return four library health metric arrays (DEPRECATED — use paginated endpoints)."""
     user_id = current_user["id"]

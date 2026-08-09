@@ -76,8 +76,8 @@ import type { Folder } from "@/types"
 /** The bound author default (folder-aaa) + a distinct override target (folder-bbb)
  *  so the KB-scope <select> renders with a real override option. */
 const folders: Folder[] = [
-  { id: "folder-aaa", user_id: "u1", name: "DBA Chapters", parent_id: null, is_global: false, created_at: "", updated_at: "" },
-  { id: "folder-bbb", user_id: "u1", name: "Contracts", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-aaa", user_id: "u1", name: "DBA Chapters", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
+  { id: "folder-bbb", user_id: "u1", name: "Contracts", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
 const boundPublished = {

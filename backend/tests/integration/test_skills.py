@@ -29,7 +29,7 @@ def _skill_row(
     description="Writes SQL",
     instructions="Write valid SQL",
     is_enabled=True,
-    is_global=False,
+    is_org_shared=False,
     is_system=False,
 ):
     return {
@@ -39,7 +39,7 @@ def _skill_row(
         "description": description,
         "instructions": instructions,
         "is_enabled": is_enabled,
-        "is_global": is_global,
+        "is_org_shared": is_org_shared,
         "is_system": is_system,
         "created_at": NOW,
         "updated_at": NOW,
@@ -79,7 +79,7 @@ class TestCreateSkill:
         assert response.status_code == 201
         data = response.json()
         for key in ("id", "user_id", "name", "description", "instructions",
-                    "is_enabled", "is_global", "created_at", "updated_at"):
+                    "is_enabled", "is_org_shared", "created_at", "updated_at"):
             assert key in data, f"Missing field: {key}"
         assert data["name"] == "SQL Writer"
         assert data["user_id"] == USER_ID
@@ -108,7 +108,7 @@ class TestListSkills:
         """GET /skills returns own + global skills (dedup). (SKIL-01)"""
         mock_execute_result.data = [
             _skill_row(),
-            _skill_row(skill_id=str(uuid4()), is_global=True),
+            _skill_row(skill_id=str(uuid4()), is_org_shared=True),
         ]
         response = client.get("/skills", headers=auth_headers)
         assert response.status_code == 200
@@ -188,7 +188,7 @@ class TestToggleEnabled:
 
 class TestToggleGlobal:
     def test_toggle_global_flips_value(self, client, auth_headers, mock_builder):
-        """PATCH /skills/{id}/toggle-global flips is_global True when the publish gate is MET.
+        """PATCH /skills/{id}/toggle-global flips is_org_shared True when the publish gate is MET.
         GATE-01 (Phase 136): private→global now recomputes the gate from eval_runs FIRST — a
         completed passing run on the CURRENT version satisfies it, so the flip succeeds.
         (SKIL-05, SKIL-06)"""
@@ -197,17 +197,17 @@ class TestToggleGlobal:
         run_id = str(uuid4())
         # Execute-call order for a GATED private→global toggle:
         #   1 owner-verify fetch → 2-5 compute_publish_gate reads
-        #   (skill / completed-runs / pinned-versions / last-override) → 6 the is_global UPDATE.
+        #   (skill / completed-runs / pinned-versions / last-override) → 6 the is_org_shared UPDATE.
         mock_builder.execute.side_effect = [
-            _make_result([_skill_row(is_global=False, instructions=instr)]),               # 1 fetch
-            _make_result([{"id": SKILL_ID, "instructions": instr, "is_global": False}]),    # 2 gate skill
+            _make_result([_skill_row(is_org_shared=False, instructions=instr)]),               # 1 fetch
+            _make_result([{"id": SKILL_ID, "instructions": instr, "is_org_shared": False}]),    # 2 gate skill
             _make_result([{                                                                 # 3 gate runs
                 "id": run_id, "status": "completed", "passed_count": 1,
                 "measured_count": 1, "skill_version_id": ver_id, "created_at": NOW,
             }]),
             _make_result([{"id": ver_id, "instructions": instr}]),                          # 4 gate versions
             _make_result([]),                                                               # 5 gate override
-            _make_result([_skill_row(is_global=True)]),                                     # 6 update
+            _make_result([_skill_row(is_org_shared=True)]),                                     # 6 update
         ]
 
         response = client.patch(
@@ -216,7 +216,7 @@ class TestToggleGlobal:
         )
         assert response.status_code == 200
         data = response.json()
-        assert data["is_global"] is True
+        assert data["is_org_shared"] is True
 
 
 # ── POST /skills/{id}/files ────────────────────────────────────────────────────

@@ -140,6 +140,24 @@ function DraftBlock({ draft }: { draft: string }) {
   )
 }
 
+/**
+ * Phase 185 (GOVERN-03 / SPEC Req 9) — the ONLY sentence this surface is allowed
+ * to say about an open-ended wait, exported so a test can assert it
+ * character-identically.
+ *
+ * It renders ONLY when `timeout_seconds` is null — the armed action-risk
+ * checkpoint, where the engine really does wait forever (`subscribe_for_response`
+ * with no timeout). It must NEVER appear on a card that has a deadline: on those
+ * the run does NOT wait, it expires, and claiming otherwise is the exact dishonesty
+ * Req 9's third acceptance bullet forbids ("Claiming the run waits unless the
+ * fail-closed change has actually shipped").
+ *
+ * It deliberately says nothing about WHO may answer — "someone else approved it"
+ * is Phase 186's surface, and promising it here would be a second lie.
+ */
+export const NO_DEADLINE_WAITING_LINE =
+  "No deadline — the run is waiting for your answer and will not continue on its own"
+
 /** mm:ss from a non-negative seconds count. */
 function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
@@ -181,12 +199,27 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
   // expired on mount, never a misleading fresh 5:00. SSE-path prompts lack
   // created_at (genuinely fresh — emission ≈ mount) and honestly seed at
   // timeout_seconds. Ticks once a second while pending.
-  const initialRemaining = ask.created_at
-    ? Math.max(0, timeout_seconds - Math.floor((Date.now() - Date.parse(ask.created_at)) / 1000))
-    : timeout_seconds
+  //
+  // Phase 185 (GOVERN-03 / L-15): ONE reading of "does this prompt have a
+  // deadline at all". The armed action-risk checkpoint sends `null` — the run
+  // waits for a person indefinitely — and the countdown is TOTAL over that case
+  // rather than arithmetic on it. Doing the arithmetic would seed `remaining` at
+  // NaN/0 and flip straight to "No response within 0:00 — agent stopped", i.e.
+  // render every armed prompt as dead the instant it appeared.
+  const hasDeadline = typeof timeout_seconds === "number"
+  const initialRemaining =
+    typeof timeout_seconds === "number"
+      ? ask.created_at
+        ? Math.max(0, timeout_seconds - Math.floor((Date.now() - Date.parse(ask.created_at)) / 1000))
+        : timeout_seconds
+      : 0
   const [remaining, setRemaining] = useState<number>(initialRemaining)
 
   useEffect(() => {
+    // No deadline → no tick, and the `remaining <= 0 → expired` transition below
+    // is UNREACHABLE. Such a card can still reach `expired` through the 404 path
+    // (expiredMessage), which is correct — there the run really is terminal.
+    if (!hasDeadline) return
     if (state !== "pending") return
     if (remaining <= 0) {
       setState("expired")
@@ -194,7 +227,7 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
     }
     const t = setTimeout(() => setRemaining((r) => r - 1), 1000)
     return () => clearTimeout(t)
-  }, [remaining, state])
+  }, [remaining, state, hasDeadline])
 
   // A2 / Pitfall 1: a pure-SSE prompt lacks run_id. Trigger ONE reconcile on
   // mount-if-missing so the GET-reconciled prompt (carrying run_id) replaces it
@@ -276,7 +309,13 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
             096-04: a 404-driven expiry renders its own constant honesty message;
             countdown-driven expiry keeps the timeout copy. */}
         <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]">
-          {expiredMessage ?? `No response within ${formatClock(timeout_seconds)} — agent stopped`}
+          {/* Phase 185: never call formatClock on a null deadline. A no-deadline
+              card only reaches here via the 404 path, which always supplies its
+              own message; the fallback stays honest rather than saying "0:00". */}
+          {expiredMessage ??
+            (typeof timeout_seconds === "number"
+              ? `No response within ${formatClock(timeout_seconds)} — agent stopped`
+              : "This prompt is no longer active")}
         </p>
       </div>
     )
@@ -314,8 +353,18 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
           aria-hidden="true"
         />
         <span aria-live="assertive">Needs you</span>
-        <span className="ml-auto text-[hsl(var(--muted-foreground-dim))]">{formatClock(remaining)}</span>
+        {hasDeadline && (
+          <span className="ml-auto text-[hsl(var(--muted-foreground-dim))]">{formatClock(remaining)}</span>
+        )}
       </div>
+
+      {/* Phase 185 (GOVERN-03): in place of the countdown, an honest line — but
+          ONLY when there is genuinely no deadline. See NO_DEADLINE_WAITING_LINE. */}
+      {!hasDeadline && (
+        <p className="text-[12px] leading-relaxed text-[hsl(var(--muted-foreground-dim))]">
+          {NO_DEADLINE_WAITING_LINE}
+        </p>
+      )}
 
       {/* Phase 094 (D-06): the draft renders ABOVE the question — labelled
           "not yet saved" so it is never read as the final answer. DRAFT-MISSING

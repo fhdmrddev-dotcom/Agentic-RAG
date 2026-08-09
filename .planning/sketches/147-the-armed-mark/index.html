@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 147 — Who owns the card? (Phase 185 occupancy audit)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  .flow { padding: 120px 40px 210px; zoom: .9; align-items: flex-start; }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     EVERY NUMBER IN THIS SKETCH COMES FROM SHIPPED CODE.
+     The card is drawn from the same zone table the collision checker reads, so
+     the picture cannot drift from the maths. See the ZONES const in the script.
+     ══════════════════════════════════════════════════════════════════════════ */
+  .nodebox { position: relative; flex-shrink: 0; }
+  .nodebox .frost {
+    position: absolute; border-radius: 18px;
+    background: linear-gradient(160deg, hsl(220 30% 100% / .075), hsl(220 30% 100% / .022));
+    backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid hsl(220 30% 100% / .11);
+    box-shadow: 0 1px 0 hsl(220 30% 100% / .13) inset, 0 24px 48px -22px rgba(0,0,0,.95);
+    transition: border-color var(--dur-slow) var(--ease-out), box-shadow var(--dur-slow) var(--ease-out);
+  }
+  /* 143-A's sealed edge — reinforcement only, overwritten by run status */
+  .nodebox.proven .frost { border-color: hsl(220 30% 100% / .34); }
+
+  .nodebox .txt { position: absolute; pointer-events: none; }
+  .nodebox .ttl { font-family: var(--font-headline); font-weight: 600; letter-spacing: -.01em;
+                  color: var(--color-text); font-size: 13.5px; line-height: 1.25; }
+  .nodebox .sub { color: var(--color-text-muted); font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
+  .nodebox.tb .txt { text-align: center; }
+
+  /* ── the zones, all drawn from the table ─────────────────────────────────── */
+  .z { position: absolute; box-sizing: border-box; }
+  .z.icon { display: grid; place-items: center; border-radius: 50%; }
+  .z.icon .halo { position: absolute; inset: -4px; border-radius: 50%;
+                  background: radial-gradient(circle, hsl(220 30% 100% / .18), transparent 68%); }
+  .z.icon .sh { position: absolute; bottom: -2px; left: 50%; transform: translateX(-50%);
+                width: 62%; height: 8px; border-radius: 50%; background: rgba(0,0,0,.6); filter: blur(5px); }
+  .z.icon .ico3d { position: relative; z-index: 2; }
+
+  .z.verdict, .z.seal, .z.stepn {
+    border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; line-height: 1;
+  }
+  .z.verdict { color: var(--color-text-muted); background: var(--color-muted);
+               border: 1px dashed var(--color-border); }
+  .z.seal    { color: var(--color-text); background: hsl(220 30% 100% / .1);
+               border: 1px solid hsl(220 30% 100% / .34); }
+  .z.stepn   { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim);
+               background: var(--color-bg-elev1); border: 1px solid var(--color-border); }
+
+  .z.badges { display: flex; gap: 4px; align-items: center; }
+  .badge2 { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px;
+            padding: 1.5px 7px; font-size: 9.5px; font-weight: 500; white-space: nowrap;
+            color: hsl(142 71% 62%); background: hsl(142 71% 45% / .14); border: 1px solid hsl(142 71% 45% / .3); }
+  .badge2.you { color: hsl(38 92% 68%); background: hsl(38 92% 60% / .14); border-color: hsl(38 92% 60% / .32); }
+
+  /* ── THE ARMED MARK — three meaning-first concepts ───────────────────────── */
+  /* 1 · DETOUR — the run leaves the machine and comes back. Arcs BELOW the
+        connector, so the ＋ (26px at y=28) keeps its place. */
+  .detour { position: absolute; pointer-events: none; }
+  .detour svg { display: block; overflow: visible; }
+  .detour .who {
+    position: absolute; left: 50%; transform: translateX(-50%);
+    font-size: 9.5px; color: var(--color-text-muted); white-space: nowrap; text-align: center;
+  }
+  /* 2 · COUNTERSIGNATURE — a ruled sign-off line at the foot of the card */
+  .sign { position: absolute; }
+  .sign .rule { height: 1px; background: hsl(220 30% 100% / .42); }
+  .sign .lbl { font-size: 9px; color: var(--color-text-muted); margin-top: 3px;
+               letter-spacing: .02em; white-space: nowrap; }
+  .sign.none .rule { background: none; border-top: 1px dashed hsl(220 30% 100% / .14); }
+  .sign.none .lbl { color: var(--color-text-dim); }
+  /* 3 · WAITING CARD — a second card edge peeking out from behind */
+  .waiting {
+    position: absolute; border-radius: 18px;
+    background: hsl(220 30% 11% / .9); border: 1px solid hsl(220 30% 100% / .2);
+    box-shadow: 0 18px 36px -22px rgba(0,0,0,.95);
+  }
+  .waiting .wl {
+    position: absolute; right: 10px; bottom: 5px; font-size: 9px; color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  /* ── the connector, drawn at real geometry ───────────────────────────────── */
+  .gapbox { position: relative; flex-shrink: 0; }
+  .gapbox .ln { position: absolute; height: 2px; background: var(--color-border); border-radius: 2px; }
+  .gapbox .plus {
+    position: absolute; border-radius: 50%; display: grid; place-items: center;
+    background: var(--color-surface-hi); border: 1px dashed var(--color-border);
+    color: var(--color-text-dim); font-size: 14px; line-height: 1; z-index: 6;
+  }
+
+  /* ── the collision overlay ───────────────────────────────────────────────── */
+  body.xray .z, body.xray .waiting, body.xray .sign, body.xray .detour svg {
+    outline: 1px dashed hsl(200 85% 62% / .55); outline-offset: 0;
+  }
+  .hit { position: absolute; z-index: 30; pointer-events: none;
+         background: hsl(0 72% 51% / .42); border: 1px solid hsl(0 85% 66%); border-radius: 2px; }
+
+  /* ── the anatomy rail ────────────────────────────────────────────────────── */
+  .side { width: 430px; }
+  .anat { position: relative; margin: 6px auto 20px; }
+  .anat .cap { position: absolute; font-size: 9px; font-family: var(--font-mono);
+               color: hsl(200 85% 74%); white-space: nowrap; }
+  .row { display: flex; align-items: flex-start; gap: 8px; padding: 6px 0;
+         border-bottom: 1px dashed var(--color-border); font-size: 11px; line-height: 1.5; }
+  .row:last-child { border-bottom: 0; }
+  .row .who2 { flex: 1; min-width: 0; color: var(--color-text); }
+  .row .src { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); }
+  .tag { flex-shrink: 0; border-radius: 999px; padding: 1px 8px; font-size: 9.5px; white-space: nowrap;
+         border: 1px solid var(--color-border); color: var(--color-text-muted); background: var(--color-muted); }
+  .tag.ship { color: hsl(142 71% 64%); border-color: hsl(142 71% 45% / .4); background: hsl(142 71% 45% / .12); }
+  .tag.p185 { color: hsl(258 90% 80%); border-color: hsl(258 90% 66% / .45); background: hsl(258 90% 66% / .12); }
+  .tag.p188 { color: hsl(239 100% 84%); border-color: hsl(239 84% 67% / .45); background: hsl(239 84% 67% / .12); }
+  .tag.slot { color: var(--color-text-dim); border-style: dashed; background: transparent; }
+
+  .crash { border: 1px solid hsl(0 72% 51% / .5); background: hsl(0 72% 51% / .1);
+           border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+  .crash h5 { margin: 0 0 6px; font-size: 11.5px; color: hsl(0 85% 80%); font-family: var(--font-headline); }
+  .crash div { font-size: 10.5px; color: hsl(0 85% 88%); line-height: 1.6; font-family: var(--font-mono); }
+  .clear { border: 1px solid hsl(142 71% 45% / .4); background: hsl(142 71% 45% / .1);
+           border-radius: 10px; padding: 9px 12px; margin-bottom: 12px;
+           font-size: 11px; color: hsl(142 71% 74%); }
+
+  /* ── the panel governance section (142-B's dial + the action-risk switch) ──
+     Drawn so the pair reads as ONE story: the panel is where you SET, the canvas
+     is where you SEE. A control on the card is not representable — one tab stop
+     per node (PhaseNodeCard.tsx:37-48) is what puts the ✕ and ＋ on the lane. */
+  .govpanel { border: 1px solid var(--color-border); border-radius: 12px;
+              padding: 12px 13px; background: var(--color-surface); }
+  .sechd { font-size: 9.5px; font-family: var(--font-mono); letter-spacing: .09em;
+           text-transform: uppercase; color: var(--color-text-dim); margin-bottom: 7px; }
+  .dial { display: inline-flex; background: var(--color-muted); border: 1px solid var(--color-border);
+          border-radius: 999px; padding: 3px; }
+  .dial button { border: 0; background: transparent; color: var(--color-text-dim);
+                 font-family: var(--font-sans); font-size: 11px; padding: 4px 11px;
+                 border-radius: 999px; cursor: pointer; }
+  .dial button.on { background: hsl(142 71% 45% / .22); color: hsl(142 71% 74%);
+                    box-shadow: 0 0 0 1px hsl(142 71% 45% / .4); }
+  .dial button.locked { opacity: .42; cursor: not-allowed; text-decoration: line-through; }
+  .gw { font-size: 10.5px; color: var(--color-text-muted); margin-top: 7px; line-height: 1.55; }
+
+  .armrow { display: flex; gap: 9px; align-items: flex-start; cursor: pointer; }
+  .armrow input { margin-top: 2px; accent-color: hsl(38 92% 60%); width: 15px; height: 15px; }
+  .armrow b { display: block; font-size: 12px; color: var(--color-text); font-weight: 600; }
+  .armrow em { display: block; font-style: normal; font-size: 10.5px; color: var(--color-text-muted);
+               line-height: 1.55; margin-top: 3px; }
+  .onep { margin-top: 12px; padding-top: 9px; border-top: 1px dashed var(--color-border);
+          font-size: 10px; line-height: 1.6; color: var(--color-text-dim); }
+  .onep b { color: var(--color-text-muted); }
+  .onep code { font-family: var(--font-mono); font-size: 9.5px; }
+
+  .trythis {
+    position: absolute; left: 22px; bottom: 20px; z-index: 20; max-width: 340px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .28); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow-lg);
+  }
+  .trythis h5 { margin: 0 0 8px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.75; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 5px; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 8px; right: 9px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+</style>
+</head>
+<body class="alive vb load-185 mk-detour run-off">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 147</span>
+  <button class="variant-tab" data-v="a" type="button">A: 137-D &mdash; what SHIPPED today (icon left)</button>
+  <button class="variant-tab active" data-v="b" type="button">B: 137-B &mdash; the card <span class="star">&#9733;</span></button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Load</span>
+  <div class="seg" id="loadseg">
+    <button type="button" data-load="184">Today (184)</button>
+    <button type="button" data-load="185" class="on">+ 185 governance</button>
+    <button type="button" data-load="188">+ 188 run state</button>
+    <button type="button" data-load="189">Everything</button>
+  </div>
+  <span class="lbl" style="margin-left:10px">Armed mark</span>
+  <div class="seg" id="mkseg">
+    <button type="button" data-mk="detour" class="on">Detour &#9733;</button>
+    <button type="button" data-mk="sign">Countersign</button>
+    <button type="button" data-mk="waiting">Waiting card</button>
+    <button type="button" data-mk="none">None</button>
+  </div>
+  <div class="spacer"></div>
+  <div class="seg" id="xrayseg">
+    <button type="button" data-xray="off" class="on">Normal</button>
+    <button type="button" data-xray="on">Show zones</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+  </div>
+
+  <aside class="side">
+    <header>
+      <strong style="font-size:12.5px;font-family:var(--font-headline)">Who owns the card</strong>
+      <span class="spacer"></span>
+      <span class="lbl" id="dims"></span>
+    </header>
+    <div class="scroll">
+      <div id="crashbox"></div>
+      <h4>Anatomy &mdash; drawn from the same numbers</h4>
+      <div class="anat" id="anat"></div>
+      <h4>Every claimant</h4>
+      <div id="rows"></div>
+
+      <h4 style="margin-top:20px">Where you actually arm it</h4>
+      <div class="govpanel">
+        <div class="sechd">How strictly this step is held</div>
+        <div class="dial" role="group" aria-label="How strictly this step is held">
+          <button type="button" class="locked" aria-disabled="true">&#9675; Free to think</button>
+          <button type="button" class="on">&#9960; Must prove it</button>
+        </div>
+        <div class="gw">Because this step reads your documents.</div>
+
+        <div class="sechd" style="margin-top:16px">Before this step runs</div>
+        <label class="armrow">
+          <input type="checkbox" id="armbox" checked>
+          <span>
+            <b>Stop and ask me first</b>
+            <em>This step sends the report outside the company. Nothing leaves until you say yes &mdash;
+            however long that takes.</em>
+          </span>
+        </label>
+        <div class="onep">Both governance dials live here. The canvas <b>shows</b> the state; it never
+          sets it &mdash; a control on the card would be a second tab stop per node
+          (<code>PhaseNodeCard.tsx:37-48</code>).</div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="trythis" id="trythis">
+    <button class="close" type="button" id="closetry" aria-label="Hide">&#10005;</button>
+    <h5>Three things to try</h5>
+    <ol>
+      <li>Step <b>Load</b> from <b>Today</b> to <b>Everything</b>. Watch the collision box appear &mdash; that is the pile-up, not a guess.</li>
+      <li>Switch to <b>B: 137-B</b>. Does moving the icon to the top actually free the room 185/188/189 need?</li>
+      <li>Try each <b>Armed mark</b>. Which one still has somewhere to live on <i>both</i> cards?</li>
+    </ol>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="sketch-toolbar">
+  <span>147</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════════
+   Sketch 147 (round 3) — WHO OWNS THE CARD?
+
+   Rounds 1 and 2 drew shapes. Both were rejected, and the operator then named the
+   real fault: the sketches were not aligned with what is already built or with what
+   later phases will add. That was literally true — rounds 1/2 were drawn against
+   `themes/canvas-184.css` `body.card-b`, a SKETCH-ERA card shape, while the shipped
+   `PhaseNodeCard.tsx` renders a different one.
+
+   So round 3 is not a shape hunt. It is an OCCUPANCY AUDIT, and every number below is
+   read out of shipped code:
+
+     CANVAS_LAYOUT (canvasModel.ts:62-74)   NODE_WIDTH 260 · NODE_MIN_HEIGHT 96
+                                            PITCH_X 320 · EDGE_ANCHOR_Y 28
+     EDIT_AFFORDANCE (WorkflowCanvas:314)   INSERT_SIZE 26 · REMOVE_SIZE 24
+                                            GAP = PITCH_X − NODE_WIDTH = 60
+                                            INSERT_Y = LANE_Y + EDGE_ANCHOR_Y = 28
+     PhaseNodeCard.tsx:311-313              icon `absolute left-0 top-1/2` 56×56
+     PhaseNodeCard.tsx:293-306              verdict `-right-2 top-1.5` 22×22
+     PhaseNodeCard.tsx:117-118              BadgeSlot2Tuple — a 3rd badge is a
+                                            TYPECHECK ERROR, not a review comment
+     PhaseNodeCard.tsx:37-48                NO focusable control may live in the card
+                                            (one tab stop per node) — which is why the
+                                            ✕ and ＋ sit on the LANE, not on the card
+
+   ⚠ THE DIVERGENCE THIS SKETCH EXISTS TO SURFACE.
+   `canvas-184.css:170-171` records: "The operator moved the locked card from 137-D to
+   137-B on 2026-07-26." But nothing in `frontend/src` applies a `card-b` class, and
+   `PhaseNodeCard.tsx:50` says "THE LOOK IS SKETCH 137-D". The DECISION is 137-B (icon
+   on top); the SHIPPED CODE is 137-D (icon on the left). Stray 137-B reasoning is
+   already embedded in shipped docblocks — `PhaseNodeCard.tsx:287` and
+   `WorkflowCanvas.tsx:502-504` both justify a placement with "Under 137-B the TOP edge
+   belongs to the floating 3D icon", on a component that renders the icon at LEFT.
+
+   Variant A draws what shipped. Variant B draws what was locked. Same claimants on
+   both. The question is which card actually has room for 185 + 188 + 189.
+
+   ⚠ AND A COLLISION THAT IS ALREADY IN THE SPEC.
+   Sketch 143-A placed the governance seal at the card's top-right and `185-SPEC.md`
+   Requirement 6 locked that corner as CLAIMED — but the shipped VALID-03 verdict mark
+   is ALREADY at `-right-2 top-1.5`. They overlap by 3×17px, on BOTH card shapes. The
+   checker below computes it live rather than asserting it.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+var STEPS = [
+  { icon: 'llm_agent_compass', title: 'Find the risks in our supplier files',
+    sub: 'Reads your contracts and incident reports', proven: true,  risky: false },
+  { icon: 'llm_single',        title: 'Work out which suppliers look shaky',
+    sub: 'Judgement — no documents involved',        proven: false, risky: false },
+  { icon: 'llm_emit',          title: 'Write the risk report',
+    sub: 'Every claim has to trace to a document',   proven: true,  risky: false },
+  { icon: 'connector_email',   title: 'Email it to procurement',
+    sub: 'Sends the report outside the company',     proven: false, risky: true, armed: true },
+  { icon: 'connector_link',    title: 'File it in the shared drive',
+    sub: 'Writes the report to your team folder',    proven: false, risky: true, armed: false }
+];
+
+/* the real constants, named so a reader can go and check them */
+var C = { NODE_W: 260, NODE_H: 96, PITCH_X: 320, EDGE_ANCHOR_Y: 28,
+          INSERT_SIZE: 26, REMOVE_SIZE: 24 };
+C.GAP = C.PITCH_X - C.NODE_W;          /* 60 */
+C.INSERT_Y = C.EDGE_ANCHOR_Y;          /* 28 */
+
+/* ── 137-B's OWN numbers, and the two corrections the operator made 2026-07-29 ──
+   The locked `canvas-184.css:182-188` gives 137-B `padding: 34px 20px 20px` with a
+   62px icon wrap at `top:-26`. The wrap therefore ends at y=36 and the text starts
+   at y=34 — and the VISIBLE 52px mark inside that wrap ends at y=31, clearing the
+   title by **3px**. Three pixels survives no font change and no longer title, so:
+
+     CORRECTION 1 — padding-top 34 → 42, giving the mark 11px of clearance.
+     CORRECTION 2 — min-height 96 → 104, so an unbadged card still fits its two
+                    lines inside the taller padding (title 17 + gap 3 + sub 15 = 35;
+                    35 + 42 + 20 = 97 > 96, which is why the floor had to move).
+
+   `CANVAS_LAYOUT.NODE_MIN_HEIGHT` is a FLOOR the card grows down from
+   (`canvasModel.ts:65-66`), so raising it is additive — nothing gets clipped. */
+C.NODE_W_B = 248;
+C.NODE_H_B = 104;      /* was 96 */
+C.PAD_TOP_B = 42;      /* was 34 */
+C.ICON_WRAP_B = 62;
+C.ICON_MARK_B = 52;    /* the visible mark inside the 62px wrap */
+
+var LOAD_ORDER = ['184', '185', '188', '189'];
+function loadAtLeast(lv) { return LOAD_ORDER.indexOf(load) >= LOAD_ORDER.indexOf(lv); }
+
+/* ── THE ZONE TABLE ───────────────────────────────────────────────────────────
+   Node-local coordinates. The card is RENDERED from this table and the collision
+   checker READS the same table, so the picture cannot disagree with the maths. */
+function zonesFor(card, step) {
+  var W = card === 'a' ? C.NODE_W : C.NODE_W_B;
+  var H = card === 'a' ? C.NODE_H : C.NODE_H_B;
+  var z = [];
+
+  if (card === 'a') {
+    /* 137-D SHIPPED — PhaseNodeCard.tsx:311-313, `absolute left-0 top-1/2`, h-14 w-14 */
+    z.push({ k: 'icon', label: 'the 3D phase mark', src: 'PhaseNodeCard:311  left-0 top-1/2 h-14',
+             tag: 'ship', x: 0, y: (H - 56) / 2, w: 56, h: 56 });
+    z.push({ k: 'body', label: 'title · supporting line', src: 'PhaseNodeCard:249  ml-6 pl-10 pr-3',
+             tag: 'ship', x: 24, y: 0, w: W - 24, h: H, soft: true });
+  } else {
+    /* 137-B LOCKED — canvas-184.css:186-188, icon floats above a 248px centred card */
+    z.push({ k: 'icon', label: 'the 3D phase mark', src: 'canvas-184.css:186  top:-26, 62px wrap / 52px mark',
+             tag: 'ship', x: (W - C.ICON_WRAP_B) / 2, y: -26, w: C.ICON_WRAP_B, h: C.ICON_WRAP_B });
+    z.push({ k: 'body', label: 'title · supporting line', src: 'padding-top 42 (was 34) — 11px clearance',
+             tag: 'ship', x: 0, y: 0, w: W, h: H, soft: true });
+  }
+
+  /* The VALID-03 verdict mark.
+     ⚠ ON 137-B IT MOVES TO THE LEFT (operator, 2026-07-29). Shipped it is
+     `-right-2 top-1.5`, but 143-A's governance seal owns top-right and the two
+     overlapped 3×17px. The PERMANENT mark keeps the corner 143-A verified at all
+     four run states; the TRANSIENT one — a verdict only exists when the server has
+     returned a problem — moves. Mirrored as `-left-2`, so it hangs OUTSIDE the left
+     edge and barely grazes the (empty) stepNumber slot. */
+  z.push({ k: 'verdict', label: 'VALID-03 verdict mark',
+           src: card === 'a' ? 'PhaseNodeCard:298  -right-2 top-1.5'
+                             : 'MOVED to -left-2 top-1.5 (was -right-2)',
+           tag: 'ship', x: card === 'a' ? W - 22 + 8 : -8, y: 6, w: 22, h: 22, glyph: '○' });
+
+  /* the step number — a DECLARED slot that renders nothing today */
+  z.push({ k: 'stepn', label: 'stepNumber slot', src: 'PhaseNodeCard:181  declared, renders nothing',
+           tag: 'slot', x: card === 'a' ? 24 : 12, y: card === 'a' ? 6 : 12, w: 22, h: 22,
+           glyph: String(step.i + 1), ghost: true });
+
+  /* the badge row — max 2, enforced by BadgeSlot2Tuple */
+  if (step.proven || step.risky) {
+    z.push({ k: 'badges', label: 'badge row (max 2 — type-enforced)',
+             src: 'PhaseNodeCard:117  BadgeSlot2Tuple', tag: 'ship',
+             x: card === 'a' ? 64 : 20, y: H - 26, w: W - (card === 'a' ? 76 : 40), h: 18, soft: true });
+  }
+
+  /* ── PHASE 185 ── the 143-A governance seal */
+  if (loadAtLeast('185') && step.proven) {
+    z.push({ k: 'seal', label: '143-A governance seal', src: 'sketch 143-A  top:11 right:11',
+             tag: 'p185', x: W - 11 - 21, y: 11, w: 21, h: 21, glyph: '⛨' });
+  }
+
+  /* ── PHASE 188 ── the run-state slot. Declared, unrendered, home undecided. */
+  if (loadAtLeast('188')) {
+    z.push({ k: 'run', label: 'status slot — Phase 188 run state',
+             src: 'PhaseNodeCard:141-149  declared, unrendered', tag: 'p188',
+             x: (W - 92) / 2, y: H - 11, w: 92, h: 22, ghost: true, glyph: 'run state' });
+  }
+  return z;
+}
+
+var variant = 'a', load = '185', mk = 'detour';
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+function overlap(a, b) {
+  var ox = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+  var oy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+  return (ox > 0 && oy > 0) ? { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y), w: ox, h: oy } : null;
+}
+
+/* soft zones are text areas — they are allowed to sit under a floating mark.
+   The check is about HARD marks fighting each other. */
+function collisions(zs) {
+  var out = [];
+  for (var i = 0; i < zs.length; i++) {
+    for (var j = i + 1; j < zs.length; j++) {
+      if (zs[i].soft || zs[j].soft) continue;
+      var o = overlap(zs[i], zs[j]);
+      if (o) out.push({ a: zs[i], b: zs[j], o: o });
+    }
+  }
+  return out;
+}
+
+function zoneHtml(z) {
+  var st = 'left:' + z.x + 'px;top:' + z.y + 'px;width:' + z.w + 'px;height:' + z.h + 'px;';
+  if (z.soft) return '';
+  if (z.k === 'icon') {
+    /* the VISIBLE mark is smaller than its wrap — that gap is exactly what buys the
+       title its clearance, so it is drawn honestly rather than filling the box. */
+    return '<span class="z icon" style="' + st + '"><span class="halo"></span><span class="sh"></span>' +
+           icon3d(z.iconKey, z.markSize || (z.w - 10)) + '</span>';
+  }
+  if (z.k === 'badges') return '';
+  if (z.ghost) {
+    return '<span class="z" style="' + st + 'border:1px dashed hsl(220 30% 100% / .22);border-radius:' +
+      (z.k === 'run' ? '999px' : '50%') + ';display:grid;place-items:center;font-size:9px;' +
+      'color:var(--color-text-dim);font-family:var(--font-mono)">' + esc(z.glyph || '') + '</span>';
+  }
+  return '<span class="z ' + z.k + '" style="' + st + '">' + esc(z.glyph || '') + '</span>';
+}
+
+/* the armed mark, per concept. Returns { onCard, inGap } html. */
+function armedMark(card, step, W, H) {
+  if (mk === 'none' || !step.risky) return { onCard: '', inGap: '' };
+  var on = !!step.armed;
+
+  if (mk === 'detour') {
+    /* ══ THE WINNER (operator, 2026-07-29) ══════════════════════════════════════
+       The run leaves the machine and comes back through a person. It arcs BELOW
+       the line, which is what keeps it off the ＋ (26px at y=28, x 17..43): the
+       tightest point of the curve inside that x-range sits 8.2px UNDER the ＋'s
+       bottom edge and the curve never enters its box.
+
+       It also dodges a collision the other two concepts did not. The ✕ remove is
+       card-centred straddling the card's BOTTOM edge (`WorkflowCanvas.tsx:618-627`,
+       y = H−12 … H+12) — exactly where `countersign` put its rule, and within ~5px
+       of where `waiting card` put its lower edge. The detour lives in the GAP, so
+       it is clear of the ✕ entirely.
+
+       ARMED     the solid arc IS the path. The flow physically goes through you.
+       NOT ARMED the arc stays, drawn as a faint dashed ghost, and a solid line runs
+                 straight past it. The checkpoint is visibly PRESENT AND OPEN —
+                 never absent. Drawing nothing here would break the rule that an
+                 unarmed risky step must be marked: a step that emails a report with
+                 nobody watching would look identical to one that reads a file. */
+    var ARC = 'M0,' + C.INSERT_Y + ' C14,' + C.INSERT_Y + ' 16,' + (C.INSERT_Y + 34) +
+              ' 30,' + (C.INSERT_Y + 34) + ' C44,' + (C.INSERT_Y + 34) + ' 46,' + C.INSERT_Y +
+              ' 60,' + C.INSERT_Y;
+    var LINE = 'M0,' + C.INSERT_Y + ' L' + C.GAP + ',' + C.INSERT_Y;
+    var svg = on
+      ? '<path d="' + ARC + '" fill="none" stroke="hsl(220 30% 100% / .62)" stroke-width="2"/>' +
+        '<circle cx="30" cy="' + (C.INSERT_Y + 34) + '" r="4.5" fill="none" ' +
+          'stroke="hsl(220 30% 100% / .85)" stroke-width="1.6"/>'
+      : '<path d="' + ARC + '" fill="none" stroke="hsl(220 30% 100% / .17)" stroke-width="1.5" ' +
+          'stroke-dasharray="3 3"/>' +
+        '<circle cx="30" cy="' + (C.INSERT_Y + 34) + '" r="4.5" fill="none" ' +
+          'stroke="hsl(220 30% 100% / .2)" stroke-width="1.4" stroke-dasharray="2 2"/>' +
+        '<path d="' + LINE + '" fill="none" stroke="var(--color-border)" stroke-width="2"/>';
+    return { onCard: '', inGap:
+      '<span class="detour" style="left:0;top:0;width:' + C.GAP + 'px;height:' + (C.INSERT_Y + 60) + 'px">' +
+        '<svg width="' + C.GAP + '" height="' + (C.INSERT_Y + 60) + '">' + svg + '</svg>' +
+        '<span class="who" style="top:' + (C.INSERT_Y + 44) + 'px">' +
+          (on ? 'you say yes' : 'nobody asked') + '</span>' +
+      '</span>' };
+  }
+
+  if (mk === 'sign') {
+    var left = card === 'a' ? 64 : 20;
+    var w = W - (card === 'a' ? 78 : 40);
+    return { inGap: '', onCard:
+      '<span class="sign' + (on ? '' : ' none') + '" style="left:' + left + 'px;top:' + (H + 4) + 'px;width:' + w + 'px">' +
+        '<span class="rule" style="display:block"></span>' +
+        '<span class="lbl" style="display:block">' + (on ? 'waits for your ok' : 'runs unsigned') + '</span>' +
+      '</span>' };
+  }
+
+  /* waiting card — a second card edge peeking out from behind */
+  return { inGap: '', onCard: on
+    ? '<span class="waiting" style="left:14px;top:-13px;width:' + (W - 6) + 'px;height:' + (H + 6) + 'px;z-index:-1">' +
+        '<span class="wl">it will ask you first</span></span>'
+    : '' };
+}
+
+function renderFlow() {
+  var html = '';
+  STEPS.forEach(function (s, i) {
+    s.i = i;
+    var card = variant;
+    var W = card === 'a' ? C.NODE_W : C.NODE_W_B;
+    var H = card === 'a' ? C.NODE_H : C.NODE_H_B;
+    var zs = zonesFor(card, s);
+    zs.forEach(function (z) {
+      if (z.k === 'icon') { z.iconKey = s.icon; z.markSize = card === 'a' ? 48 : C.ICON_MARK_B; }
+    });
+    var am = armedMark(card, s, W, H);
+
+    /* the connector — real geometry, the ＋ centred in the 60px gap at y=28 */
+    if (i) {
+      /* When the detour is on a risky connector it OWNS the line — armed, the arc IS
+         the path and no straight line may run past it, or the flow would appear to
+         bypass the person. Unarmed, the detour draws its own straight line through
+         the open ghost. Either way the default `.ln` would double up, so it is
+         suppressed rather than layered. */
+      var detourOwnsLine = (mk === 'detour' && s.risky);
+      html += '<div class="gapbox" style="width:' + C.GAP + 'px;height:' + (H + 70) + 'px">' +
+        (detourOwnsLine ? ''
+          : '<span class="ln" style="left:0;top:' + C.INSERT_Y + 'px;width:' + C.GAP + 'px"></span>') +
+        am.inGap +
+        '<span class="plus" style="left:' + ((C.GAP - C.INSERT_SIZE) / 2) + 'px;top:' +
+          (C.INSERT_Y - C.INSERT_SIZE / 2) + 'px;width:' + C.INSERT_SIZE + 'px;height:' + C.INSERT_SIZE + 'px">＋</span>' +
+      '</div>';
+    }
+
+    var frostL = card === 'a' ? 24 : 0;
+    var frostW = card === 'a' ? W - 24 : W;
+    var txtL   = card === 'a' ? 64 : 16;
+    var txtW   = card === 'a' ? W - 78 : W - 32;
+    var hits = collisions(zs);
+
+    html += '<div class="nodebox' + (s.proven && loadAtLeast('185') ? ' proven' : '') +
+              (card === 'b' ? ' tb' : '') + '" style="width:' + W + 'px;height:' + (H + 70) + 'px">' +
+      '<span class="frost" style="left:' + frostL + 'px;top:0;width:' + frostW + 'px;height:' + H + 'px"></span>' +
+      am.onCard +
+      '<span class="txt" style="left:' + txtL + 'px;top:' + (card === 'a' ? 20 : C.PAD_TOP_B) + 'px;width:' + txtW + 'px">' +
+        '<span class="ttl" style="display:block">' + esc(s.title) + '</span>' +
+        '<span class="sub" style="display:block">' + esc(s.sub) + '</span>' +
+      '</span>' +
+      (s.proven && loadAtLeast('185')
+        ? '' : '') +
+      /* the badge row, at most two */
+      '<span class="z badges" style="left:' + (card === 'a' ? 64 : 20) + 'px;top:' + (H - 26) + 'px">' +
+        (s.risky ? '<span class="badge2 you">✋ Waits for you</span>' : '') +
+      '</span>' +
+      zs.map(zoneHtml).join('') +
+      hits.map(function (h) {
+        return '<span class="hit" style="left:' + h.o.x + 'px;top:' + h.o.y + 'px;width:' +
+               h.o.w + 'px;height:' + h.o.h + 'px"></span>';
+      }).join('') +
+    '</div>';
+  });
+  document.getElementById('flow').innerHTML = html;
+}
+
+function renderRail() {
+  var W = variant === 'a' ? C.NODE_W : C.NODE_W_B;
+  var H = variant === 'a' ? C.NODE_H : C.NODE_H_B;
+  document.getElementById('dims').textContent = W + ' × ' + H + '  ·  gap ' + C.GAP;
+
+  var probe = { i: 0, proven: true, risky: false, icon: 'llm_agent_compass' };
+  var zs = zonesFor(variant, probe);
+  zs.forEach(function (z) {
+    if (z.k === 'icon') { z.iconKey = probe.icon; z.markSize = variant === 'a' ? 48 : C.ICON_MARK_B; }
+  });
+  var hits = collisions(zs);
+
+  /* A collision against a DECLARED-BUT-EMPTY slot is not the same defect as two
+     rendered marks fighting. `stepNumber` draws nothing today (D-183-07 keeps
+     phase_index off the face), so it is reported separately and honestly rather
+     than inflating the red count — or being hidden, which would be worse. */
+  var hard = hits.filter(function (h) { return !h.a.ghost && !h.b.ghost; });
+  var soft = hits.filter(function (h) { return h.a.ghost || h.b.ghost; });
+  var html = '';
+  if (hard.length) {
+    html += '<div class="crash"><h5>' + hard.length + ' collision' + (hard.length > 1 ? 's' : '') +
+      ' between RENDERED marks — computed, not asserted</h5>' +
+      hard.map(function (h) {
+        return '<div>' + esc(h.a.label) + '  ×  ' + esc(h.b.label) +
+               '<br>&nbsp;&nbsp;overlap ' + h.o.w + '×' + h.o.h + 'px at (' + h.o.x + ',' + h.o.y + ')</div>';
+      }).join('') + '</div>';
+  } else {
+    html += '<div class="clear">✓ No two rendered marks overlap on this card at this load.</div>';
+  }
+  if (soft.length) {
+    html += '<div style="border:1px solid hsl(38 92% 60% / .4);background:hsl(38 92% 60% / .1);' +
+      'border-radius:10px;padding:9px 12px;margin-bottom:12px;font-size:10.5px;line-height:1.6;' +
+      'color:hsl(38 92% 82%)">' +
+      soft.map(function (h) {
+        var ghost = h.a.ghost ? h.a : h.b, real = h.a.ghost ? h.b : h.a;
+        return '<b>Touches a reserved slot</b><br>' + esc(real.label) + ' × ' + esc(ghost.label) +
+               ' — ' + h.o.w + '×' + h.o.h + 'px. That slot renders NOTHING today (D-183-07). ' +
+               'If it is ever brought to the face, move it to <code>left:16</code> and this clears.';
+      }).join('<br>') + '</div>';
+  }
+  document.getElementById('crashbox').innerHTML = html;
+
+  /* the anatomy diagram — the same zone table at 1.35× */
+  var S = 1.35;
+  var box = '<div style="position:relative;width:' + (W * S + 40) + 'px;height:' + (H * S + 70) + 'px">' +
+    '<div style="position:absolute;left:20px;top:44px;width:' + (W * S) + 'px;height:' + (H * S) +
+      'px;border:1px solid var(--color-border);border-radius:14px;background:hsl(220 30% 100% / .03)"></div>';
+  zs.forEach(function (z) {
+    if (z.soft) return;
+    box += '<div style="position:absolute;left:' + (20 + z.x * S) + 'px;top:' + (44 + z.y * S) +
+      'px;width:' + (z.w * S) + 'px;height:' + (z.h * S) + 'px;border:1px solid hsl(200 85% 62% / .6);' +
+      'border-radius:' + (z.k === 'run' ? '999px' : '6px') + ';background:hsl(200 85% 62% / .08)"></div>';
+  });
+  hits.forEach(function (h) {
+    box += '<div style="position:absolute;left:' + (20 + h.o.x * S) + 'px;top:' + (44 + h.o.y * S) +
+      'px;width:' + (h.o.w * S) + 'px;height:' + (h.o.h * S) + 'px;background:hsl(0 72% 51% / .5);' +
+      'border:1px solid hsl(0 85% 66%);border-radius:2px"></div>';
+  });
+  box += '</div>';
+  document.getElementById('anat').innerHTML = box;
+
+  document.getElementById('rows').innerHTML = zs.filter(function (z) { return !z.soft; }).map(function (z) {
+    return '<div class="row"><span class="who2">' + esc(z.label) +
+           '<br><span class="src">' + esc(z.src) + '</span></span>' +
+           '<span class="tag ' + z.tag + '">' +
+           (z.tag === 'ship' ? 'shipped' : z.tag === 'slot' ? 'slot, empty' :
+            z.tag === 'p185' ? '185' : '188') + '</span></div>';
+  }).join('') +
+  '<div class="row"><span class="who2">the ＋ insert<br><span class="src">WorkflowCanvas:575  gap centre, y=' +
+    C.INSERT_Y + ', ' + C.INSERT_SIZE + 'px</span></span><span class="tag ship">shipped</span></div>' +
+  '<div class="row"><span class="who2">the ✕ remove<br><span class="src">EDIT_AFFORDANCE.REMOVE_SIZE ' +
+    C.REMOVE_SIZE + ' — on the LANE, never in the card</span></span><span class="tag ship">shipped</span></div>' +
+  '<div class="row"><span class="who2">the armed action-risk mark<br><span class="src">' +
+    'this sketch — no home yet</span></span><span class="tag p185">185</span></div>';
+}
+
+var LEAD = {
+  a: '<b>A — 137-D, what is in the app TODAY.</b> <code>PhaseNodeCard.tsx:311</code> puts the 3D mark at ' +
+     '<code>left-0 top-1/2</code>, 56px, card inset <code>ml-6</code> padded <code>pl-10</code>. 260 × 96. ' +
+     'Kept here as the reference the code has to move away from — it carries <b>two</b> collisions, and the ' +
+     'extra one (stepNumber × icon, 22×8) is very likely why that slot renders nothing.',
+  b: '<b>B — 137-B, THE CARD ★ (operator, 2026-07-29).</b> The mark floats above a 248px centred card, no ' +
+     'per-type colour. Two corrections applied: the <b>verdict mark moves to the LEFT</b> so 143-A’s ' +
+     'governance seal keeps the top-right corner it was verified on — the permanent mark keeps the corner, ' +
+     'the occasional one moves — and <b>padding-top goes 34 → 42</b> (min-height 96 → 104) so the icon ' +
+     'clears the title by <b>11px</b> instead of 3. <b>Zero collisions.</b> ' +
+     '<code>frontend/src</code> still renders 137-D, so the code owes this change. ' +
+     'The armed mark is <b>the detour ★</b>: the run leaves the machine and comes back through you. ' +
+     'Arming happens in the <b>panel</b> on the right — the canvas only shows it.'
+};
+
+function renderFoot() {
+  var bits = [];
+  bits.push('<span class="pill">' + (variant === 'a'
+    ? '137-D · in the app today, not the target'
+    : '137-B ★ · the card — code owes this change') + '</span>');
+  if (variant === 'b') {
+    bits.push('<span class="pill good">verdict moved LEFT · seal keeps top-right</span>');
+    bits.push('<span class="pill good">icon clears the title by 11px (was 3)</span>');
+  }
+  if (mk === 'detour') {
+    bits.push('<span class="pill good">★ detour · clears the ＋ by 8.2px, never enters it</span>');
+    bits.push('<span class="pill good">in the GAP — clear of the ✕ (card-centred, y H−12…H+12)</span>');
+  } else if (mk === 'sign') {
+    bits.push('<span class="pill bad">countersign lands ON the ✕ — card-centred bottom edge</span>');
+  } else if (mk === 'waiting') {
+    bits.push('<span class="pill warn">waiting card grazes the ✕ by ~5px</span>');
+  }
+  bits.push('<span class="pill">load: ' + (load === '184' ? 'today' : '+' + load) + '</span>');
+  bits.push('<span class="pill bad">3rd badge = typecheck error (BadgeSlot2Tuple)</span>');
+  bits.push('<span class="pill bad">no focusable control may live in the card — one tab stop per node</span>');
+  bits.push('<span class="pill warn">the ＋ owns the gap centre at y=' + C.INSERT_Y + '</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb');
+  document.body.classList.add('v' + variant);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  renderFlow(); renderRail(); renderFoot();
+}
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-load')) load = b.getAttribute('data-load');
+  if (b.hasAttribute('data-mk'))   mk   = b.getAttribute('data-mk');
+  if (b.hasAttribute('data-xray')) document.body.classList.toggle('xray', b.getAttribute('data-xray') === 'on');
+  render();
+});
+
+/* The panel is the ONLY control. Ticking it changes the canvas mark — which is the
+   whole point of the split: you set it here, you read it out there. The canvas marks
+   themselves carry no role, no tabIndex and no handler, so a node keeps exactly one
+   tab stop (PhaseNodeCard.tsx:37-48). */
+document.getElementById('armbox').addEventListener('change', function () {
+  STEPS[3].armed = this.checked;
+  render();
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

@@ -31,8 +31,22 @@ vi.mock("@/components/skills/studio/VersionsTab", () => ({
   ),
 }))
 vi.mock("@/components/skills/studio/TriggeringTab", () => ({
-  TriggeringTab: ({ skillId }: { skillId: string }) => (
-    <div data-testid="triggering-stub">triggering · {skillId}</div>
+  TriggeringTab: ({
+    skillId,
+    onVersionPromoted,
+  }: {
+    skillId: string
+    onVersionPromoted?: () => void
+  }) => (
+    <div data-testid="triggering-stub">
+      triggering · {skillId}
+      {/* 176-02 (RENDER-04): the shell threads onVersionPromoted into this tab; this
+          button simulates the embedded tuner approving a description proposal so the
+          shell's refreshVersions refetch can be exercised without mounting the tuner. */}
+      <button data-testid="mock-promote" onClick={() => onVersionPromoted?.()}>
+        promote
+      </button>
+    </div>
   ),
 }))
 
@@ -48,7 +62,7 @@ vi.mock("@/lib/api", () => ({
   updateSkill: vi.fn(),
   deleteSkill: vi.fn(),
   toggleSkillEnabled: vi.fn(),
-  toggleSkillGlobal: vi.fn(),
+  toggleSkillOrgShared: vi.fn(),
   getPublishGate: (...a: unknown[]) => getPublishGate(...(a as [string])),
   listSkillVersions: (...a: unknown[]) => listSkillVersions(...(a as [string])),
   listTestCases: (...a: unknown[]) => listTestCases(...(a as [string])),
@@ -65,7 +79,7 @@ function mkSkill(overrides: Partial<Skill> = {}): Skill {
     description: "desc",
     instructions: "INSTR-A",
     is_enabled: true,
-    is_global: false,
+    is_org_shared: false,
     is_system: false,
     created_at: "2026-07-01T00:00:00Z",
     updated_at: "2026-07-01T00:00:00Z",
@@ -121,6 +135,15 @@ const VERSIONS: SkillVersion[] = [
   mkVersion({ id: "v3", version_number: 3, instructions: "INSTR-A", source: "self_improve" }),
   mkVersion({ id: "v2", version_number: 2, instructions: "INSTR-OLD-2" }),
   mkVersion({ id: "v1", version_number: 1, instructions: "INSTR-OLD-1", source: "backfill" }),
+]
+
+// After a description proposal is approved, the 079 trigger snapshots a NEW version
+// (same live instructions, new description) — so the refetched list gains a v4 whose
+// instructions still equal the live skill (INSTR-A). newest-first, deriveLiveVersion
+// finds v4 first → the header re-derives to v4 (RENDER-04 / BUG-260706-01).
+const VERSIONS_AFTER: SkillVersion[] = [
+  mkVersion({ id: "v4", version_number: 4, instructions: "INSTR-A", source: "self_improve" }),
+  ...VERSIONS,
 ]
 
 const onTabChange = vi.fn()
@@ -223,5 +246,32 @@ describe("SkillStudioPage — shell, header, gate strip, tabs (137-06 Task 1)", 
     await screen.findByText("Doc Summarizer")
     fireEvent.click(screen.getByRole("button", { name: /^skills$/i }))
     await waitFor(() => expect(onBack).toHaveBeenCalled())
+  })
+
+  // 176-02 (RENDER-04 / BUG-260706-01): approving a description proposal in the embedded
+  // tuner threads onVersionPromoted → the shell's refreshVersions re-runs
+  // listSkillVersions(skillId) + setVersions → deriveLiveVersion re-derives → the header vN
+  // updates with NO reload. Before this fix the shell's versions list was fetched once per
+  // skillId and went stale, so the header kept showing the pre-approve vN.
+  it("onVersionPromoted refetches listSkillVersions and re-derives the header vN with no reload", async () => {
+    // First fetch → v3 live; the post-promote refetch → a new v4 is the live version.
+    listSkillVersions
+      .mockReset()
+      .mockResolvedValueOnce(VERSIONS)
+      .mockResolvedValue(VERSIONS_AFTER)
+
+    render(<Harness initialTab="triggering" />)
+
+    // The header derives v3 from the initial versions list (fetched exactly once).
+    expect(await screen.findByText("v3")).toBeInTheDocument()
+    expect(listSkillVersions).toHaveBeenCalledTimes(1)
+
+    // The embedded tuner approves a description proposal → onVersionPromoted fires.
+    fireEvent.click(screen.getByTestId("mock-promote"))
+
+    // refreshVersions re-invokes the SAME owner-scoped GET and the header re-derives to v4.
+    expect(await screen.findByText("v4")).toBeInTheDocument()
+    expect(listSkillVersions).toHaveBeenCalledTimes(2)
+    expect(listSkillVersions).toHaveBeenLastCalledWith("skill-1")
   })
 })

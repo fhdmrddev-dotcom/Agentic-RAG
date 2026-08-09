@@ -16,22 +16,52 @@
  */
 import { deriveTier, type CitationPolicy, type ValidatorKind } from "@/components/workflows/deriveTier"
 
-// ── Phase-type glyph vocabulary (the ONE shared copy — previously duplicated by
-//    value in WorkflowsPage.tsx:44-51 and PhaseSpineGraph.tsx:24-31; the 6th ◆
-//    llm_emit "deliverable"). All soul surfaces import THIS map. ──
+// ── Phase-type glyph vocabulary (the ONE shared copy; the 6th llm_emit
+//    "deliverable" entry). All soul surfaces import THIS map. ──
+// Extraction history, stated literally — this header once claimed the
+// PhaseSpineGraph.tsx duplicate had been replaced when it had NOT, which is how
+// that drift survived two phases. The facts: Phase 124-01 removed the
+// WorkflowsPage.tsx:44-51 copy; **Phase 183-04 removed the PhaseSpineGraph.tsx
+// copy**, which now imports this map and renders it through phaseGlyph(). As of
+// that plan there is no other declaration of this vocabulary in frontend/src, and
+// `?raw` source guards in PhaseSpine.test.tsx / PhaseSpineGraph.test.tsx /
+// WorkflowSoul.test.tsx make a reappearance a test failure rather than a comment.
 // Phase 127-01 (WUX-03): upgraded flat unicode → verified fluent-emoji slug strings.
 // phaseGlyph() (src/lib/phaseGlyph.tsx) is the render-time resolver — it returns
 // a bundled 3D SVG component for each slug. This map is the single source of truth
 // for the phase-type → icon vocabulary; PhaseSpine.tsx reads it for the unicode
 // fallback ("•" for unknown types). Slugs verified API-present 2026-06-27.
 // NEVER use: "direct-hit" (missing from the set), "no-entry-sign" (missing).
+// Phase 184-01 Task 2 (D-184-07): the two cross-cutting swaps — `llm_agent` to
+// "compass" and `llm_batch_agents` to "handshake" (its previous silhouettes mark
+// measured luminance 34.5 on Deep Midnight, ~4x dimmer than the other five, and
+// disappeared). Sketch 137-B makes the 3D mark the SOLE carrier of step type, so
+// this is a correctness fix, not a taste call. Both slugs re-verified present in
+// the installed @iconify-json/fluent-emoji@1.2.7 set 2026-07-27; the swap landed
+// in ONE commit together with phaseGlyph.PHASE_GLYPH_MARKS, because changing this
+// map alone would leave phaseGlyph() returning the old 3D component.
+// Phase 189-13 Task 1 (CONN-01 / UI-SPEC §5a): the 7th type, `external_action`, gets
+// "outbox-tray" 📤 — "leaves here / goes outside", which is the TYPE's nature. The mark
+// is keyed by phase_type, so it is ONE mark for the type and NOT one per capability: an
+// envelope would say *email* on a step whose capability might be a ticket. Two things
+// were MEASURED against the installed @iconify-json/fluent-emoji@1.2.7 set (3174 icons)
+// rather than inherited — (a) `outbox-tray` is PRESENT while the bare `outbox` is ABSENT
+// (the empty-icon trap; never try it, it fails the build), and (b) presence is NECESSARY,
+// NOT SUFFICIENT, per the 184 swap above: the slug's palette measures mean luminance
+// 168.4, inside the shipped band (package 148.2 … handshake 189.0) and far above the 34.5
+// that made the old batch-agents mark disappear. That is an unweighted palette estimate,
+// not a rendered measurement — the rendered check is UAT row U1 (plan 189-16), because
+// jsdom applies no CSS and paints nothing. Landed in ONE commit with
+// phaseGlyph.PHASE_GLYPH_MARKS, and the two maps' key sets are now asserted IDENTICAL as
+// a property (soulData.test.ts), so a ninth type inherits the split-brain guard.
 export const PHASE_GLYPHS: Record<string, string> = {
   programmatic: "gear",
   llm_single: "memo",
-  llm_agent: "robot",
-  llm_batch_agents: "busts-in-silhouette",
+  llm_agent: "compass",
+  llm_batch_agents: "handshake",
   llm_human_input: "raised-hand",
   llm_emit: "package",
+  external_action: "outbox-tray",
 }
 
 /** A loose read-shape over the definition JSONB (we only read what the soul needs). */

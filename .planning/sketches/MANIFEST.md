@@ -508,3 +508,825 @@ G-2 sketch, BEFORE discuss-phase (POLISH-01 is visual — nav-collapse behavior,
 | 078 | chat-history-home | **Pivot (operator):** organizing inside the cramped sidebar can't fix a growing nav starving history — WHERE should chat history live? (two-tier rail / history page / ⌘K palette) | **D — Synthesis: A's permanent icon rail + C's ⌘K global finder** ★ | phase-156, polish-01, seed-045, ia, two-tier-rail, command-palette, history-page, space-competition, chat-history |
 
 **Pivot note (2026-07-16):** 076 (collapsed-rail) landed clean (winner B). 077 (organize-the-list) drew an operator course-correction: **the thread list and a *growing* nav compete for one vertical column, and grouping adds chrome to an already-starved region — you'd still see 2–3 chats, and it worsens as we ship surfaces.** 078 reframed the question from "how to organize" to "where should history live so nav growth can't starve it," explored three structural directions (two-tier rail / dedicated Chats page / ⌘K palette), and the operator chose the **A + C synthesis**: nav → permanent 58px icon rail (growth decoupled from history), history → full-height column with inline filter (077's mechanics), **+ ⌘K** global finder for instant jump. B's full "Chats page" is retained as a future deep-history destination. Feeds `/gsd:discuss-phase 156`. **Design decision: chat history gets a dedicated home (icon-rail two-tier + ⌘K); the nav rail must stay icon+tooltip and never re-absorb the history list.**
+
+### Phase 166 session — Org-Admin Shell + Org Switcher + Profile-Menu Anchor (2026-07-21)
+
+G-2 sketch, BEFORE plan-phase (D-166-05 leaves the visual composition to the sketch as the acceptance bar). Ships the human-facing surface of the now-real tenancy model (163 crux + 164 isolation + 165 `is_global` retirement all shipped). Grounded in the LIVE shell: `NavPanel.tsx` is a left vertical rail (58px collapsed / ~210px expanded) whose footer today holds only theme-toggle · the probe-gated **amber operator shield** (`OperatorBand`/`useOperatorProbe` precedent) · a bare "Sign out" — there is **no rich profile anchor yet** and **no top bar**, so SEED-113's "top-right anchor" lands as a rail-footer element. Reuses the Operator Control-Room shell (061-B band+tabs, `LockedTab`, plain-first + ⌥ Technical-names) as composition, the 068-A instrument-table roster for Members, and a lighter cut of the 067-A audit browser for Audit. Two sketches. Sessions: 079–080.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 079 | identity-anchor-and-org-switcher | How does the profile identity anchor compose with the org switcher (only at 2+ orgs) + the org-scoped role badge in the rail footer — merged / separate / hybrid — and where does the org-admin entry point live? | **C — Hybrid: merged identity+switcher menu + org-admin as a rail Shield-mirror parallel to the operator shield** ★ | phase-166, admin-02, admin-03, org-switcher, profile-menu, role-badge, identity-anchor, nav-rail, seed-113, tenancy, g2-sketch-gate |
+| 080 | org-admin-shell | How does the 7-tab org-admin shell compose from the Control-Room band+tabs — band warmth (org-indigo / operator-amber / lighter header) + how the 3 live (Members · Audit · Settings) + 4 locked tabs read? | **A — Org-indigo band+tabs (amber reserved for operator); 3 live + 4 honest "coming soon" locked tabs; audit RLS-honest** ★ | phase-166, admin-01, admin-04, admin-05, org-admin-shell, control-room-reuse, band-tabs, locked-tab, members-roster, org-audit, settings-ia, g2-sketch-gate |
+
+**Session decision (2026-07-21):** Both sketches ship the tenancy human-surface on **Control-Room reuse** terms. **079-C** puts identity + org-scoped role badge (`◆ Org-admin` / `Member`) + the org switcher (renders only at 2+ orgs; solo = quiet name button, D-166-02) in ONE merged rail-footer profile menu, and pulls the **org-admin entry out to a rail Shield-mirror sitting parallel to the operator amber shield** — the SEED-113 "user-side mirror" made spatial, in **indigo** (distinct from operator amber). **080-A** carries that indigo into the shell band (amber stays operator-only), reuses the 061-B band+tabs + 068-A roster + a lighter 067-A audit cut, ships **3 live + 4 honest locked** tabs (no roadmap numbers in copy), and makes the `org:audit_view` degrade **RLS-honest** (explicit "you see only your own", never a silent empty). The org-switch teardown (079) preserves subscription-teardown → thread-bucket-clear → refetch (D-166-08). Feeds `/gsd:plan-phase 166`. Sessions: 079–080.
+
+### Phase 174 session — Run-State & Lifecycle Honesty (STATE-01..04) (2026-07-22)
+
+G-2 sketch, BEFORE spec/discuss-phase. First sketch of **v3.5 UX Consolidation & Chat Polish**. Phase 174 makes every run's lifecycle honest in chat — no empty/orphaned bubbles on cancel/kill (STATE-01), a stop indicator that survives nav-away-and-back AND reload (STATE-02, read from authoritative `runs.status` — FND-01/145, no new persistence), a "Setting up agent…" state that shows live model activity instead of hiding it (STATE-03), and workflow-run timers/avatars that stay accurate on nav — anchored elapsed, single avatar (STATE-04). Folds 5 parked `surface: Agentic-RAG` reports: `cancelled-run-empty-bubble-early-cancel`, `killed-workflow-empty-chat-card`, `cancelled-run-stop-indicator-lost-on-navigation`, `setting-up-agent-hides-model-activity`, `BUG-260610-01`. Grounded in the shipped run-honesty language (live-run-container run-card + `run-honesty.md` fail-taxonomy + Sketch-015 never-vanishes status strip) — the sketches refine WITHIN the Deep-Midnight house style, not reinvent it. G-5 hot files: `MessageItem.tsx` / `StreamsProvider.tsx` / `useMessages.ts` / `threads.py` (run-lifecycle). Red line D-14: Deep byte-identical; the honest states are a render layer over persisted `runs.status` + wire events the backend already emits. Sessions: 129–130.
+
+**Intake decisions (operator, 2026-07-22):** (1) **two focused sketches** — 129 terminal/interrupted message states (STATE-01/02), 130 live pre-answer honesty (STATE-03/04) — each answers one question in isolation. (2) **Feel = quiet & calm, red for real failure** — honesty as a muted inline signal matching the calm-instrument language; loud (amber/red) only for administrative blocks + genuine failures. The variants refine within that direction.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 129 | terminal-run-states | How does a stopped / cancelled-no-output / blocked / failed run read as an honest, PERSISTENT chat state that survives reload — without noising the calm transcript? | **C — Tiered: dim (user-stopped) → amber (admin-blocked) → red framed (genuine failure); every marker derived from persisted `runs.status`** ★ | phase-174, state-01, state-02, terminal-states, run-honesty, stopped, cancelled, blocked, failed, persistent-badge, runs-status, messageitem, g2-sketch-gate |
+| 130 | live-preparing-honesty | Before the first token, and on nav-back into a long run, what shows the model is actually working — with a timer anchored to `started_at` + a single avatar? | **C — Run-header carries the live sub-state (activity pill + anchored timer + one avatar); fixes STATE-03 (activity) AND STATE-04 (timer/avatar) in the shipped run-card header** ★ | phase-174, state-03, state-04, preparing-state, reasoning-activity, setting-up-agent, anchored-timer, single-avatar, run-honesty, streamsprovider, g2-sketch-gate |
+
+**Session decision (2026-07-22):** Both winners are **C**, a consistent house rule for run-state honesty: **honesty is derived from durable state (persisted `runs.status` / the run's `started_at`), rendered in the calmest surface that can carry it, with loudness earned by severity.** 129-C = the terminal vocabulary (dim user-stop → amber admin-block → red genuine-failure), each marker keyed off `runs.status` so it survives reload (STATE-01/02). 130-C = the pre-answer vocabulary (honest live sub-state Reasoning/Writing/Sandbox in the run-card header, timer anchored to `started_at`, single avatar — STATE-03/04). Together they cover the whole lifecycle: **preparing → streaming → stopped/cancelled/blocked/failed**, all honest at rest and on reload. Feeds `/gsd:spec-phase 174` / `/gsd:discuss-phase 174` (acceptance bar = these mockups). G-5 hot files confirmed at the render layer (`MessageItem.tsx` / `StreamsProvider.tsx` / `useMessages.ts`); Deep byte-identical (D-14). Sessions: 129–130.
+
+### Phase 177 session — v3.4 Org-Surface Polish (ORGUX-01 / ORGUX-02) (2026-07-23)
+
+G-2 sketch, BEFORE spec/discuss-phase. Second sketch batch of **v3.5 UX Consolidation & Chat Polish**. Phase 177 is a **polish pass over surfaces that already shipped and work** (Phases 166/167/168) — not greenfield. ORGUX-01 = the org-admin shell + org switcher + profile-menu identity anchor, *polished and honest across states* (member vs org-admin, 1-org vs multi-org) — already sketched as **079-C** (hybrid identity/switcher menu + rail Shield-mirror) + **080-A** (org-indigo 7-tab shell), now refined for state completeness. ORGUX-02 = the invitations + SSO surfaces (invite dialog, invitations tab, `/invite` landing, SSO tab, identifier-first sign-in), *polished and error-honest* — these 5 surfaces shipped in 167/168 **without any sketch**, so this is fresh territory. Grounded in the LIVE shipped components (`InviteMemberDialog.tsx`, `InvitationsTab.tsx`, `SsoTab.tsx`, `AcceptInvitePage.tsx`, `SignInForm.tsx`) — real copy, real role/status vocab, real error messages. G-5 light: `StreamsProvider` (`<OrgContext>` OUTSIDE the stream path, 067.5 Branch-D3 guard). No SC#10 (not streamed state); no threat model (polish over already-secured 166–168). Sessions: 131–133.
+
+**Intake decisions (operator, 2026-07-23):** (1) **all three sketches** — 131 ORGUX-01 state matrix, 132 ORGUX-02 pre-auth entry/failure, 133 ORGUX-02 in-app management. (2) **Primary lens = family cohesion** — the 5 surfaces each invented their own spacing/type rhythm + duplicated chip vocab (`SsoTab` even documents *intentional* off-grid deviation); make them read as one built-together system. Failure/edge honesty carried as the secondary edge-state bar.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 131 | org-state-matrix | Do the identity anchor + org switcher + org-admin shell entry read honestly + polished across all 4 cells (member/org-admin × solo/multi-org) as one set? | **C — Unified org-identity primitive + per-org role honesty** ★ | phase-177, orgux-01, org-admin-shell, org-switcher, identity-anchor, role-badge, state-matrix, honest-absent, family-cohesion, g2-sketch-gate |
+| 132 | org-entry-failure-honesty | Identifier-first sign-in (fail-open) + the `/invite` landing's 6 outcome states — does "coming into an org" feel calm + every failure honest? | **B — Unified card + one honest-notice vocabulary** ★ | phase-177, orgux-02, sign-in, identifier-first, sso-fail-open, accept-invite, invite-landing, failure-honesty, family-cohesion, g2-sketch-gate |
+| 133 | org-management-surfaces | Invite dialog + invitations tab + SSO tab as ONE polished family — shared chip vocab, spacing rhythm, honest-absent, link-first, victim-naming remove? | **B — One management language (shared chip · row · 4px grid)** ★ | phase-177, orgux-02, invite-dialog, invitations-tab, sso-tab, status-chips, honest-absent, victim-naming, family-cohesion, g2-sketch-gate |
+
+**Session decision (2026-07-23, operator-delegated autonomous pick):** Operator set the primary lens to **family cohesion** then delegated the winner calls. The through-line across all three: **one org-identity primitive + one status-chip component + one honest-absent rule, reused everywhere; org-indigo for the tenancy zone, amber reserved for operator.** **131-C** = the unified identity block (avatar · org name · org-scoped role badge, identical in anchor/menu/band/rows) PLUS per-org role honesty (role follows the active org; the indigo shield appears/vanishes on switch) — the only variant that satisfies ORGUX-01's "honest across states" literally; B is the calm floor if per-org switching is heavier than polish scope warrants. **132-B** = sign-in + `/invite` share ONE card and every outcome routes through one severity-keyed notice vocabulary (calm-muted for recoverable dead-ends, weight only for genuine errors); C's fail-open depth folds in as the sign-in behavior (a route outage degrades to password, never a lockout). **133-B** = the invite dialog + invitations tab + SSO tab collapse to one row anatomy + one chip set + one 4px grid, retiring SsoTab's off-grid UPPERCASE fork; honest-absent + link-first + victim-naming all preserved; C's admin-vs-member split is B's read-only behavior demonstrated. Feeds `/gsd:discuss-phase 177` (acceptance bar = these mockups). No SC#10 (not streamed state); no threat model (polish over already-secured 166–168); no migration. Sessions: 131–133.
+
+### Phase 183 session — v3.6 Read-Only Canvas (CANVAS-01) (2026-07-25)
+
+G-2 sketch, BEFORE spec/discuss-phase. First sketch batch of **v3.6 Visual / No-Code Workflow Studio**. Phase 183 is the first surface where a real graph library (`@xyflow/react` v12, MIT, React-19) enters the app, and it sets the node/edge visual language that Phases **184** (editable canvas), **185** (graded governance dials), **187** (business vocabulary) and **188** (run-viz) all inherit. Scope is a **pure read-only projection** of an existing `WorkflowDefinition` — `canvasModel.toCanvas`, layout computed deterministically at render and **never persisted into the definition JSONB** (research Pitfall 3), `node.id === phase.slug`, nodes not draggable. Red line D-14 (projection, never a runtime); no SC#10; no threat model; no migration. G-5 ledger: `WorkflowCanvas.tsx` / `canvasModel.ts` / `PhaseNode.tsx` mirror `PhaseSpineGraph.tsx`'s glyph/parse logic — 1st touch, extract a shared module proactively before the 3rd consumer. The shipped `PhaseSpineGraph` is **kept** as the keyboard/screen-reader fallback, never deleted. Sessions: 134–136.
+
+**Intake decisions (operator, 2026-07-25):** (1) Operator declined the pre-set canvas-feel options and asked for a **recommendation** instead — recorded recommendation was the **quiet-until-touched hybrid**, because "simplicity to the user" and "full customization" are the two halves that option pairs (a permanently-on grid/minimap/handles charges every user for power they may not use; a fully bare plane hides it). (2) Operator set the **spectrum constraint**: the node vocabulary must be able to carry KB-retrieval that *must not invent information*, agent steps *flexible enough for every business case*, **templates**, **connectors / multiple integrations**, and **document / final-output generation** — so 183 builds the container once and 185 / 187 / 189 plug into it rather than forcing a re-skin. (3) All three proposed sketches approved as scoped.
+
+**Live-DB grounding (read 2026-07-25 — 95 `workflow_definitions`, 119 phases).** These facts shaped every variant:
+
+| Finding | Design consequence |
+|---|---|
+| `skip_to_phase` used **0 times**; `on_failure` is only `fail_run` (×45) + `ask_user` (×2) | SC#1's branch edge has **never rendered against real data** — Phase 183 needs a fixture (sketch 136 proposes one, marked SYNTHETIC) |
+| `phase.name` on only **10 of 119** phases (8%) | The *fallback* node title is the dominant case — design for it, not the happy path |
+| **40 of 95** definitions have **zero** phases | The empty projection is the most common canvas state — it needs an honest empty state, not a blank plane |
+| Phase count max **5**, modal **2** | Graphs are tiny — no virtualization, no minimap need; but a 2-node graph must not look lost on a big plane |
+| `available_tools` runs **1 → 10** | The node must survive both a 1-tool chip and a 10-tool overflow |
+| Gate vocab: `citations_required` ×19, `output_file_valid` ×18, `llm_judge_rubric` ×8, `freshness` ×2 | Real gate chips, not invented |
+| `llm_emit` already carries `citation_policy: strict\|flag` + `integrity_policy` + `emitter` | The **grounding slot is readable from today's data** — the 185 dial is a graded layer over a distinction that already exists |
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 134 | canvas-frame-and-read-only | What does the canvas plane feel like at rest vs. under touch, where does it enter the app, and how does "view only" read as deliberate rather than broken? | *pending* | phase-183, canvas-01, xyflow, read-only, canvas-frame, entry-door, chrome-reveal, empty-state, g2-sketch-gate |
+| 135 | phase-node-anatomy | What IS a canvas node — simple at a glance, yet carrying grounding state, tools, gates and templates, with room for connectors later? | *pending* | phase-183, canvas-01, phasenode, node-anatomy, grounding-slot, technical-names, forward-slots, g5-hot-file, g2-sketch-gate |
+| 136 | flow-shape-and-branches | How does the whole graph read — layout direction, `skip_to_phase` branches, gates, terminal ends, batch fan-out — with no dropped phase and no phantom edge? | **B — horizontal left→right** ★ (operator, 2026-07-25) | phase-183, canvas-01, canvasmodel, layout, skip-to-phase, branch-edge, fan-out, terminal, sc4-faithfulness, g2-sketch-gate |
+
+**Operator review of 134–136 (2026-07-25) — course correction.** Operator verdict: variants **A and C read as near-identical** in 134 and 135 (the differences were opacity/motion nuances, not different worlds — a failed first-round variant set, which is meant to be dramatically different); **136-B (horizontal left→right) is the chosen flow shape** ("similar to any [other builder]"); and the whole batch was **too technical, too messy, and visually basic — "no 3D effects or innovative design… does not look very agentic."** Root cause on the visual half: **the sketches violated the project's own ICON CONVENTION** — they drew the flat unicode glyphs `⚙ ✎ 🤖 ⛓ ☺ ◆` that Phase 127 explicitly *retired*, instead of the shared 3D `PHASE_GLYPHS` marks bundled by `frontend/src/lib/phaseGlyph.tsx`. Operator direction going forward: **calm, user-friendly, less technical, less messy — but modern, 3D-iconed, visually attractive and agentic-feeling**, and the connectors (Phases 189–190) must use those same icons. Sketch **137** is the redo: horizontal flow locked from 136-B, three genuinely different visual worlds, real 3D icons, plain language by default. 134/135 remain on file as the structural reference (frame options, node-content inventory, the SC#4 faithfulness harness) — their *findings* stand, their *look* is superseded by 137.
+
+**New reusable asset:** `themes/phase-icons-3d.js` — the 6 shared phase-type marks plus connector candidates, extracted **verbatim** from the installed `@iconify-json/fluent-emoji` package (the same source `phaseGlyph.tsx` bundles), with per-instance id namespacing so repeated marks don't break each other's gradients. Every slug verified present (icon-convention §3 — the Phase 127 empty-icon trap). **All future sketches touching phase types must use this instead of text glyphs.**
+
+**Measured icon finding (2026-07-25).** Average luminance of each shared mark on the Deep Midnight background: `gear` 173.7 · `memo` 166.3 · `robot` 134.9 · `raised-hand` 184.9 · `package` 147.3 · **`busts-in-silhouette` 34.5**. The `llm_batch_agents` mark is ~4× dimmer than the rest and visually disappears. Two fixes, deliberately kept separate: **(a) in scope for 183** — lighten the icon well (canvas-local, touches nothing shipped; applied in all 137 variants); **(b) cross-cutting** — swap the shared slug to `handshake` (luminance 182.6), which is one clean additive `PHASE_GLYPHS` map swap **but changes five already-shipped surfaces** (workflows-page card, run + publish soul headers, gauntlet stages, live step cards), so it is its own decision. Both are toggleable live in sketch 137.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 137 | agentic-canvas-look | What should the canvas actually LOOK like — modern, 3D, alive and agentic, while staying calm and non-technical? | **B — Glass Depth** ★ (operator changed D → B, 2026-07-26; D remains on file as the documented alternative) | phase-183, canvas-01, visual-direction, 3d-icons, icon-convention, energy-language, plain-language, connectors-preview, g2-sketch-gate |
+
+**⚠ 137's winner CHANGED D → B (operator, 2026-07-26).** The locked card is now **137-B — Glass Depth**:
+the 3D mark floats ABOVE a narrower centre-aligned frosted panel with its own contact shadow, and there
+is **no per-step-type colour anywhere** (verified — variant B has no `data-type` rule at all). This is
+not a reversal of D's reasoning but the complete form of it: D was chosen to protect the colour budget
+for Phase 188 run status, and B protects **all** of it rather than most. Three consequences carried
+forward:
+
+1. **Step type is now carried by the 3D mark ALONE**, which promotes the two pending cross-cutting icon
+   swaps from optional to **required before Phase 184 builds**: `llm_batch_agents`
+   `busts-in-silhouette` (luminance 34.5, ~4× dimmer than the other five — it disappears on Deep
+   Midnight) → `handshake` (182.6), and `llm_agent` `robot` → `compass` (157.4). Still one additive
+   `PHASE_GLYPHS` map swap across five shipped surfaces — a small dedicated task, never a side effect.
+2. **The card's top edge belongs to the floating icon**, so the Phase-184 editing chrome had to be
+   re-homed: per-node actions to the bottom edge, the verdict mark to the right edge, the step number
+   inside the card. Done in `themes/canvas-184.css` (`body.card-b`) and verified.
+3. **B is tighter than D** — 248px cards + 66px connectors vs 300 + 96, so the 5-step flow is ~250px
+   narrower. That headroom matters once the 400px inspector shares the width.
+
+Sketches 138–141 carry a live **Card** toggle so B and D remain comparable.
+
+**Session decision (2026-07-25) — the v3.6 canvas visual language is LOCKED.**
+
+**136-B + 137-D.** The canvas is a **horizontal left→right flow** of **frosted-glass step cards** with a **3D
+`fluent-emoji` mark floating at the left edge**, casting its own contact shadow. Titles are **plain business
+language** ("Search the knowledge base"), one supporting line, at most two word-badges ("Must cite its sources",
+"Waits for you"); the real `phase_type` / slug lives behind the **⌥ Technical names** reveal (the shipped v3.3
+two-audience pattern). Motion is **Alive by default** — the backdrop drifts, the running step breathes, and light
+travels the edge into it — with a **Calm** setting that holds everything completely still.
+
+**The load-bearing rule this locks: the colour budget.** Per-step-type colour is a *tint behind the icon only*,
+never a whole coloured tile — because **Phase 188 needs the strong colours for run status** (running / done /
+waiting-for-you / failed). Variant C was rejected on exactly this: it spends its colour on step type, so an
+`llm_human_input` tile is amber whether or not it is actually waiting for you. **Any later phase that wants to
+colour a node by *type* must justify it against this rule.**
+
+**Two build rules that came out of the review:**
+1. **Motion keys off RUN STATE, never off selection.** The first build attached motion to the selected node, so the
+   Calm/Alive toggle silently did nothing whenever nothing was selected (operator-reported). A running step must
+   look running whether or not anyone clicked it — which is also the honest behaviour (research Pitfall 4).
+2. **Phase icons come from `themes/phase-icons-3d.js`, never text glyphs.** The 134–136 batch drew the flat unicode
+   set Phase 127 retired, and that single miss is most of why the operator read the work as "very basic … does not
+   look very agentic."
+
+**Competitor evidence backing the constrained-spine bet** (`.planning/research/deep-dive/`, crawled at milestone
+kickoff; surfaced to the operator 2026-07-25 in answer to "how do Beam / Glean do this?"): **Glean** — the strongest
+enterprise competitor — scopes drag-and-drop to **reordering steps**, not free wiring ("closer to a reorderable,
+branchable spine than an open graph"). **Beam** redesigned its builder in **July 2026** *toward* sidebar config +
+per-field completeness status, and its own docs rate the blank-canvas path "intermediate-to-advanced." **n8n**’s free
+DAG has a documented complexity cliff — 20–30 nodes before non-technical teammates lose the thread, 200 nodes
+"impossible to maintain, debug, or explain to anyone." All three ship describe→draft→refine AI authoring, so the
+AI-seed is table stakes; our differentiator is that the generator’s response schema **is** the `extra="forbid"`
+discriminated union, so it structurally cannot emit an invalid draft — plus graded grounding governance, which
+**none of the three has**.
+
+**Feeds `/gsd:spec-phase 183` / `/gsd:discuss-phase 183`** — acceptance bar = 137-D. Sketches 134–135 remain the
+structural reference (frame options, node-content inventory, live-data findings); 136 is the topology + SC#4
+faithfulness harness. Sessions: 134–137.
+
+**Icon decisions (2026-07-25).** `llm_agent` → **🧭 `compass`** (luminance 157.4), replacing `robot` — operator: the robot
+"seems like it used everywhere in any other application". Compass is semantically exact (an agent works out *how* to
+get there rather than following a fixed script — the thing that separates `llm_agent` from `llm_single`) and it is an
+object, consistent with gear / memo / package. `sparkles` was deliberately excluded as the industry's most overused AI
+icon; `bullseye` is already taken by the Phase 127 gauntlet Goal stage. `llm_batch_agents` → the too-dark
+`busts-in-silhouette` (luminance 34.5) gets the **in-scope fix** (lighter icon well) in 183; the **cross-cutting**
+swap to `handshake` (182.6) stays open.
+
+⚠ **Both icon swaps are cross-cutting, NOT Phase 183's to ship quietly.** `PHASE_GLYPHS` is deliberately shared —
+the same mark also renders on the workflows-page card, the run + publish soul headers, the gauntlet stages and the
+live step cards. One clean additive map swap, five shipped surfaces. **Carry as a small dedicated task, not a
+side effect of the canvas phase.**
+
+**Two live-data findings that MUST reach the Phase 183 plan** (both from the 2026-07-25 Supabase read):
+1. **`skip_to_phase` is used ZERO times** across all 95 definitions / 119 phases — so SC#1's branch edge cannot be
+   demonstrated from the existing corpus. **The phase needs a fixture** (sketch 136 proposes the shape).
+2. **40 of 95 definitions have zero phases** — the empty projection is the single most common canvas state and needs
+   an honest empty state, not a blank plane.
+
+### Phase 184 session — v3.6 Editable Canvas + Live Structural Validation (2026-07-26)
+
+G-2 sketch, BEFORE spec/discuss-phase. Phase 184 is the milestone's **CORE deliverable** — CANVAS-02
+(add / move / connect / delete, lossless round-trip through the EXISTING draft CRUD, layout OUT of the
+immutable definition JSONB), CANVAS-03 (side-panel config over the `PhaseConfig` discriminated union,
+Pydantic authoritative), CANVAS-04 (governance as visible rails), VALID-02 (author-time STRUCTURAL
+validation — "you cannot draw an invalid workflow") and VALID-03 (per-node status from the SERVER
+verdict, never a client guess). Red line D-14; no SC#10 (authoring, no run stream); **migration
+SKETCH-CONDITIONAL** — slot 114 reserved ONLY IF `workflow_layouts` is confirmed here (OPEN-05), else
+ZERO. Sessions: 138–141.
+
+**Intake decisions (operator, 2026-07-26):** (1) **Core action = "grow a flow step-by-step"** — so the
+*add* affordance is the hero and the empty canvas (40 of 95 real definitions) is a first-class screen,
+not an edge case. (2) **Explore BOTH spine and free-wire** — the constrained spine must *win an
+argument* rather than be assumed, which is what makes migration 114 a real decision instead of a
+foregone one.
+
+**Inherited and NOT re-opened:** the 137-D visual language is locked (horizontal left→right frosted step
+cards, floating 3D `fluent-emoji` mark, plain title + one line + ≤2 word-badges, ⌥ Technical names,
+motion keys off RUN STATE not selection, and the **colour budget** — per-type colour is a tint behind
+the icon only, because Phase 188 needs the strong colours for run status). Extracted into a new shared
+asset so the four sketches cannot drift from it or from each other.
+
+**New reusable asset:** `themes/canvas-184.css` — the 137-D node atoms plus the net-new Phase-184
+editing chrome (insert affordance, per-node actions, verdict marks, the mono round-trip readout, the
+400px inspector rail). It exists for the same reason `PhaseNode.tsx` does: **there is one node.** A
+sketch that needs a different card is making a design argument, not a copy-paste.
+
+**Live grounding read for this batch (schema, 2026-07-26).** `workflow_definitions` carries no layout
+column (`id · slug · version · name · description · status · definition · created_by · is_system_global ·
+org_id · created_at · updated_at · skill_snapshots`) and `WorkflowDefinition` is `extra="forbid"` at the
+Pydantic layer — so node positions genuinely cannot ride along in the JSONB, and any free-placement
+variant is honestly costed at a **new table**, not a free field. Every verdict rendered in 139 is a real
+code from its owning module (`reachability.LINT_CODES` · `grounding.GROUNDING_VERDICT_CODES` · the two
+`/validate` mints itself · `grounding_unavailable`) with the VERBATIM server message behind ⌥. Every
+tool chip in 140 is the real registry (`get_tools`, `openai_service.py`) as served by
+`GET /workflows/grounding-bundle`.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 138 | growing-the-flow | How do you add, move and delete a step — and how much wiring freedom is right for a canvas the linear harness engine has to run? | **C — Hybrid spine + free nudge, in its "C-local" form** ★ | phase-184, canvas-02, editing-model, insert-between, reorder, free-wire, workflow-layouts, migration-114, open-05, d-14, g2-sketch-gate |
+| 139 | validation-while-building | How do server verdicts read on the canvas while the flow is half-built — so "you cannot draw an invalid workflow" holds without punishing someone for not being finished? | **A — Mark + problems tray** ★ | phase-184, valid-02, valid-03, severity-split, incomplete-vs-error, problems-tray, prevent-at-source, grounding-unavailable, g2-sketch-gate |
+| 140 | step-inspector-and-rails | How do you configure a selected step, and where does governance become visible as rails you can see but cannot wire around? | **A — Extend the shipped 400px panel** ★ | phase-184, canvas-03, canvas-04, phaseformpanel, node-config, governance-rails, tool-whitelist, grounding-bundle, locked-gates, phase-185-graded, g2-sketch-gate |
+| 141 | the-authoring-session | Do 138 + 139 + 140 compose into a session a person can sit inside — empty draft → first step → a mistake → undo → autosave → publish? | **B — Canvas toolbar + page header** ★ | phase-184, composition, consistency, undo-redo, zundo, autosave-honesty, saved-not-published, publish-handoff, empty-state, viewport, g2-sketch-gate |
+
+**The load-bearing rule the batch is built around (all four sketches make it visible).** The shipped
+projection draws a sequential edge to the phase whose `phase_index` is **exactly +1, found by LOOKUP**
+(`canvasModel.ts:258`, mirroring `reachability.py:164` line for line). Two consequences: a gap draws NO
+bridging edge and the phase after it is honestly orphaned; and therefore **"insert a step" is never
+cosmetic** — on a spine it renumbers, which is precisely why a hole cannot be hand-authored there.
+
+**Three decisions these sketches are staged to settle at discuss-phase:**
+
+1. **OPEN-05 / migration 114** — 138-A stores nothing (positions recomputed from `phase_index`, the
+   shipped `toCanvas` behaviour) → ZERO migration. 138-B and 138-C both require `workflow_layouts`. The
+   sketch's own tell: **"Auto-arrange" in B** — if a machine can always lay the graph out, the stored
+   positions were never load-bearing.
+2. **Whether "you cannot draw an invalid workflow" means prevented or reported.** 139-C shows prevention
+   at its strongest and then admits its ceiling in-surface: prevention can decide anything about the
+   *shape* of the flow, but an unavailable tool, an out-of-scope folder or a missing description can only
+   be **reported**. So C is not a third alternative — it is **A or B plus a gate**, and the question is
+   whether the gate earns its cost.
+3. **The `incomplete` ≠ `error` split is a product decision, not a colour choice.** Both severities set
+   `ok: false` and both block publish, but `incomplete` is the state a canvas spends most of its life in.
+   Any variant that reads as alarming on the "Mid-build" scenario is wrong.
+
+**Two seams deliberately left to their owning phases.** The gate rail in 140 is where **Phase 185's
+graded governance** plugs in (today's lock is *derived* from `citation_policy` + a `citations_required`
+validator via the shipped `groundingFor()`; 185 replaces the derivation with an authored per-node
+grounding mode — Grounded keeps the lock, Open does not get one). 184 must **not** invent that field.
+And 141's autosave vocabulary ("Saved · still a draft" — never mints a version, never re-arms the
+gauntlet) is chosen here but **mechanised by Phase 186 / CONCUR-01**; the two-editor case is explicitly
+out of scope and said so in-surface.
+
+**Feeds `/gsd:spec-phase 184` / `/gsd:discuss-phase 184`.**
+
+**Session decision (2026-07-26) — the Phase 184 authoring surface is LOCKED.**
+
+**137-B card · 138-C-local · 139-A · 140-A · 141-B.** Operator selections, with one advisory refinement
+accepted (138) and one build correction recorded (141).
+
+| # | Winner | The reason that decided it |
+|---|---|---|
+| 138 | **C-local** — spine + free nudge, browser-persisted | **OPEN-05 resolves to ZERO migration; slot 114 stays RESERVED, not spent.** Order is the spine and cannot be rewired; the nudge is a **per-user view preference**, never sent to the server. A's data model + C's interaction + no migration. |
+| 139 | **A** — mark on the node + problems tray | The **only** variant with a home for a workflow-wide verdict (`business_requirement` belongs to no node — B loses it from the canvas entirely), and its two-word count ("1 problem · 2 things to finish") is what stops `incomplete` reading as failure. |
+| 140 | **A** — extend the shipped `PhaseFormPanel` | Lowest net-new, and the only option that does not create a second form surface to keep in step with the Builder's. The canvas becomes a third way IN to one form. |
+| 141 | **B** — canvas toolbar + page header | Editing controls where editing happens, the way out where leaving happens. **Correction:** the sketch drew publish as a bottom bar; the intent is the **page header**, and the Builder already has one (the `← Workflows` breadcrumb) — reuse it rather than add a band. |
+
+**The 138 refinement, recorded because the reasoning generalises.** C was picked for forward flexibility.
+The advisory finding: at the live scale (**2 steps modal, 5 max, across all 95 definitions**) a vertical
+nudge disambiguates nothing, while a `workflow_layouts` row costs a migration, a second store that can go
+stale against the definition, an unanswered "does my colleague see my nudge?" on org-shared workflows,
+and — the decisive one — it **manufactures the exact case Phase 186 / CONCUR-01 must defend against**
+("a cosmetic drag never mints a version or re-arms the gauntlet"). Under a computed layout that
+requirement is true by construction; under a persisted one it becomes a live code path. **C-local keeps
+the interaction and moves the storage.** The door stays provably open via a written promotion trigger:
+promote `dy` into `workflow_layouts` (nullable, cosmetic-only, keyed by `phase_slug`, slot 114) when
+*either* a nudge must survive across devices *or* a layout is deliberately shared. Neither is true today.
+
+**139-C is folded in, not discarded.** Its finding is a build rule: prevention covers anything decidable
+from the *shape* of the flow (do not offer a step that would strand the deliverable; refuse a delete that
+would orphan its successor); an unavailable tool, an out-of-scope folder or a missing description can
+only be **reported**. So the build is **A plus C's gate where the gate is cheap** — and the gate must
+never become the thing that stops someone building.
+
+**Three composition risks the five picks create together** (no single sketch shows these):
+
+1. **Two bottom bands** — 139-A's tray and 141-B's bar. Fold the tray's summary line into the bar and
+   expand the tray upward from it: one region, two rows max.
+2. **Width budget** — a 400px panel beside 248px cards leaves ~2 steps visible at 900px. The shipped
+   panel already collapses to a 44px rail and to a bottom sheet under 768px; **keep both, do not rebuild**.
+3. **Four chrome regions** (header/publish · floating canvas bar · right panel · bottom tray). Fine at
+   1440, crowded below — name the composition in the spec so it cannot drift during build.
+
+**Four extensibility seams to write into the spec now** (the operator's explicit "do not stop here" ask):
+
+1. **A node-slots contract.** `PhaseNode` takes data-driven slots (icon · title · subtitle · badges ≤2 ·
+   status · verdict) so Phase 185 (grounding mode + action-risk), 188 (run state) and 189 (connectors)
+   add **data, not layout**. The neutral 137-B card has the room a coloured one would not.
+2. **The badge budget will be contested — settle it now.** 137 allows ≤2 word-badges on the face; 185
+   wants two more and 188 wants status. Rule: **the face keeps 2, everything else moves to selection or
+   the panel**, or 185 spends its first week fighting the card.
+3. **Connector nodes cost nothing extra under 137-B** — no new colour slot is needed, and the `e-mail` /
+   `ticket` / `electric-plug` / `link` marks are already extracted and luminance-verified in
+   `themes/phase-icons-3d.js`. The 189/190 door is genuinely open.
+4. **The validate seam is the extension point, not the canvas.** New governance ships as new verdict
+   codes in the owning module; the canvas renders whatever comes back, keyed by `verdict.phase`. That is
+   why VALID-03's "never a client guess" is a **flexibility** rule as much as a correctness one — future
+   rules need no canvas change at all.
+
+**Carried into the plan as a pre-req:** the two cross-cutting `PHASE_GLYPHS` swaps (`handshake`,
+`compass`) are now REQUIRED before 184 builds, because 137-B makes the icon the sole carrier of step type.
+
+**Feeds `/gsd:spec-phase 184` / `/gsd:discuss-phase 184`** — acceptance bar = these four winners as marked.
+
+---
+
+## Phase 185 — Graded Governance (`/gsd:sketch 185`, 2026-07-28)
+
+Four sketches for the milestone's **headline differentiator**: per-node grounding mode + the orthogonal
+action-risk dial (GOVERN-01/02/03). They inherit the whole 184 language unchanged — **137-B** Glass Depth
+cards, **139-A** mark + problems tray, **140-A** the shipped 400px `PhaseFormPanel`, **141-B** canvas
+toolbar + page header — and add data to it, never layout.
+
+**Three model decisions taken by the operator at intake (2026-07-28), BEFORE any variant was drawn:**
+
+1. **Grounding is DETECTED and ONE-WAY.** A step that reads the knowledge base switches itself to
+   Grounded and locks; an open step can be escalated by hand; a grounded step can never be loosened.
+   This is the literal reading of "structurally enforced and NOT author-loosenable-away", and the only
+   option that closes the 36-step gap without waiting for a human to notice it.
+2. **Governance gets a dedicated NON-COLOUR, NON-BADGE channel on the canvas.** The face's two-badge
+   budget is fully spent (grounding + "Waits for you") and 137-B banked 100% of the colour budget for
+   Phase 188's run status. Governance may spend neither.
+3. **The action-risk checkpoint is a gate ON the risky step**, not an extra step in the flow. Step count
+   and step numbering stay true; whether it materialises as an `llm_human_input` phase underneath is an
+   engine detail the canvas hides.
+
+**The corpus is NOT a constraint (operator, 2026-07-28).** Every workflow row in the database is
+engineering test data, so there is no migration or grandfathering problem to design around — detection
+simply applies. This also reverses the usual "nothing invented" rule for THIS phase's sketches: the
+shipped rows are fixtures named `eval_coverage` / `split` / `fanout`, and grounding a business-wording
+question in them made the sketches LESS readable, not more. **Phase-185 sketches draw realistic business
+workflows and say so**, while keeping the engine facts real (phase types, the `get_tools` registry, the
+`{kind: "citations_required", config: {mode: "deterministic"}}` gate shape).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 142 | grounding-dial-and-lock | A step that reads your documents is held to citing them, and that cannot be switched off. How does that read as a safety rail rather than as a broken setting? | **B — a switch that refuses** ★ | phase-185, govern-01, grounding-mode, detected-lock, one-way, escalate-only, phaseformpanel, plain-language, g2-sketch-gate |
+| 143 | proven-on-the-canvas | How do you mark a proven step on the canvas when colour and badges are both already spent? | **A — a sealed edge** ★ | phase-185, govern-02, canvas-mark, non-colour-channel, badge-budget, colour-budget, phase-188-collision, greyscale-proof, g2-sketch-gate |
+| 144 | the-approval-stop-sign | Where does "this step waits for your OK" live, so you can see it before a run and feel it during one — without adding a step to the flow? | *pending* | phase-185, govern-03, action-risk, approval-checkpoint, connectors, phase-189, phase-190, armed-default, g2-sketch-gate |
+| 145 | the-review-moment | The run has stopped and is asking you to approve sending a document. What do you actually see before you say yes — and where are you standing when you see it? | *pending* | phase-185, govern-03, review-moment, artefact-preview, check-coverage, run-surface, workflow-vs-chat, phase-188-input, approve-blind-honesty, g2-sketch-gate |
+| 146 | the-round-trip | How do you get from the canvas into a human review and back out again — for every kind of output, and when things go wrong? | **A — one place** ★ | phase-185, govern-03, round-trip, canvas-to-review, output-types, docx-not-previewable, ask-user-timeout, failure-modes, phase-188-input, g2-sketch-gate |
+
+**Two findings 142 produces that outlive whichever variant wins:**
+
+1. **"Not author-loosenable-away" resolves to one precise rule — _you can only undo a lock you created._**
+   A detected lock (a KB tool is on) and a policy lock (`citation_policy: strict`) are owned by their
+   cause and have no switch at all; an author-escalated lock is undoable because it was a choice. If
+   detection later applies to an escalated step, detection wins and the undo disappears.
+2. **The requirement's "confidence gate" has no field behind it.** `grep -rn confidence` over
+   `backend/app/services/harness/` and `backend/app/models/harness.py` returns nothing; the shipped
+   `citations_required` validator is deterministic coverage, not a threshold. Phase 185 either adds a
+   real confidence number (new field, new scope) or the word leaves the requirement. **Decide at spec
+   time, not build time.**
+
+**Decision carried into 143 and beyond (operator, 2026-07-28):** grounding takes **no exceptions** — a
+step that reads your documents must prove it, full stop. The exploratory-reading case ("skim the board
+decks and suggest themes") is handled by *splitting the step in two* — a proven retrieval step feeding a
+free-to-think judgement step — not by a third state. Rejected alternative: an "reads, but exploring"
+mode, which would put a named escape hatch inside the one rail that is the milestone's differentiator.
+
+**A finding 143 hands forward to Phase 188.** Both governance channels survive a colour-blind read
+because neither is made of colour. Run status, as currently imagined, does **not** — switch colour off
+mid-run and it vanishes entirely. **188 needs a shape of its own, not just four colours.**
+
+**The build rule 143-A creates.** The corner seal is the **load-bearing** mark and the edge is
+reinforcement: run status overwrites the border, so mid-run the seal is the only carrier left. Verified
+live at all four run states — the seal stays legible on every one. Therefore (1) the seal may never be
+conditional on run state, and (2) top-right of the 137-B card is now **claimed** — Phases 188/189 may not
+take it. B (a rail outside the border) is the documented fallback if the seal proves too quiet in use.
+
+**Connectors are designed for now, not bolted on later (operator, 2026-07-28).** Sketch 144 draws an
+email-out and a file-to-shared-drive step as a labelled preview of Phases **189** (governed
+external-action node, no live egress) and **190** (2-3 live connectors + SSRF / credential /
+cross-tenant security). Reason: only **9 of 170** steps in the corpus do anything outbound today, which
+makes the action-risk gate look optional — and 189 SC#2 already commits that the external-action node
+"carries the Phase-185 action-risk approval checkpoint **by default**." The connector marks used are the
+already-verified `connector_email` / `connector_link` entries in `themes/phase-icons-3d.js`.
+
+**The finding 144 produces regardless of which variant wins:** an outbound step with no checkpoint is
+harmless today and is *the whole risk* the moment 190 ships. **The default must be armed-on** — a new
+external-action step arrives with its checkpoint set, and turning it off is the deliberate act.
+
+**Sketch 145 carries a proposal that belongs to PHASE 188, not 185.** Two operator questions on
+2026-07-28 turned out to be one: *"how does the user view the artefact before approving?"* and
+*"workflows run and appear in the chat — we need to isolate them."* Verified in code: `WorkflowsPage.tsx`
+launches a workflow by creating a thread and **redirecting into Chat**. You cannot draw "what do I see
+before I approve" without deciding where you are standing, so **both 145 variants are drawn on a
+dedicated workflow run surface — own header, own compact spine, no message list, no composer.** Phase 188
+("a business view distinct from the developer timeline, painted from the same run stream") should start
+from that rather than re-derive it.
+
+**Two honesty cases 145 settles for any approval surface, whichever variant wins:**
+
+1. **Approving blind must look different from reviewing.** When the artefact cannot be previewed, the
+   surface says so in as many words, offers the download first, and records the approval as *without a
+   preview*. An approve-blind that renders identically to a real review is the failure mode.
+2. **A long deliverable gets a reviewer's summary, not 40 unread pages** — total coverage, which sections
+   are the AI's own assessment rather than quotation, and what changed since the last approved version.
+   And *Not yet* HOLDS: the run waits for a person, it never quietly times out and sends.
+
+## ⚠ Two engine truths sketch 146 found — both are PHASE-185 SCOPE, both falsify sketch 145
+
+Found by reading shipped code while drawing 146, not assumed. 145's README carries corrections in place.
+
+**1. The approval gate expires into "yes".** `_exec_llm_human_input` (`phase_types.py`) blocks on
+`subscribe_for_response(..., timeout_seconds)` — default **300s**, cap 1800
+(`settings.ask_user_max_timeout_seconds`). On timeout it returns `None`, `answer` becomes `""`, and the
+phase **returns normally**, so the workflow ADVANCES — and in the drawn flow the next step is the email.
+GOVERN-03 may reuse the `llm_human_input` SUBSTRATE (durable prompt row, `tool_call_id`, resume sweep)
+but **must not inherit its timeout disposition**. An action-risk gate has to **fail closed**. Engine
+change; belongs in the phase scope.
+
+**2. The flagship deliverable cannot be previewed.** `FilePreview.tsx` renders markdown, plain text,
+code, CSV and images; **DOCX / PPTX / XLSX / PDF fall through to download-only**. And `llm_emit` +
+`render_template` (docxtpl) produces **`.docx`**. So the most important artefact a workflow makes is the
+one a reviewer cannot see. Either the review moment gains a docx→viewable conversion, or every template
+deliverable is approved blind — which guts GOVERN-03. **Spec must take this fork deliberately.**
+
+**Three more failure modes 146 names, with owners:** the durable prompt survives a closed tab but the
+clock does not stop; a second approver on an org-shared run must be told *who* decided (the run-time twin
+of Phase 186's co-editing guard — name it there); and a failure AFTER approval must never make the
+approval look undone, nor let a retry re-send.
+
+## Cross-sketch alignment audit (2026-07-28, operator-requested)
+
+Ran across 142-146 before the wrap-up. **Three real misalignments found and fixed**, not waved through:
+
+1. **The running example had drifted into three different workflows.** 142 drew 4 steps, 143 drew a
+   different 5, and 144/145/146 drew a third. Now **one canonical flow everywhere**, and it is the flow
+   the skill teaches:
+
+   | # | Step | Governance | Why it is in the example |
+   |---|---|---|---|
+   | 1 | Find the risks in our supplier files | **must prove it** (detected — reads the KB) | the auto-locked case |
+   | 2 | Work out which suppliers look shaky | free to think | judgement — the case that earns "free" |
+   | 3 | Write the risk report | **must prove it** (authored policy) | the deliverable + the citation gate |
+   | 4 | Email it to procurement | nothing to prove · **approval armed** | connector (189/190) + the action-risk gate |
+   | 5 | File it in the shared drive | nothing to prove · **not armed** | the contrast that argues armed-on by default |
+
+2. **A vocabulary overclaim.** 143 called a step **"Proven"** on a canvas that has never run. Nothing is
+   proven until a run's citation gate passes. **Settled rule: the seal reads "must prove it" everywhere
+   on the canvas; the word "traceable" appears only at the review moment (145), where the check has
+   actually run.** Calling an unrun step "proven" is the exact overclaim this milestone exists to prevent.
+
+3. **A state conflation in 146.** The executing step and the waiting-for-a-person step shared one chip
+   ("Waiting for you"). Split — "Running now" vs "Waiting for you". Pitfall 4 in miniature.
+
+**Deferred with a trigger:** inline rendering of `.docx` / `.pptx` / `.pdf` is **not decided** (operator,
+2026-07-28 — *"we will decide later"*). The finding stands. **Re-open at `/gsd:spec-phase 185`, and
+unconditionally at Phase 190**, when live connectors make an unread-but-approved document something that
+really leaves the company. The *behaviour* is not deferred: until it is decided the surface says so out
+loud and records **approved without a preview**.
+
+**Resolved at `/gsd:spec-phase 185` (2026-07-28, commit `4d7ea818`):** the `.docx` preview gets **its own
+insert phase immediately after 185** — not Phase 190, and not folded into 185. Its consumer
+(`FilesSection` → `FilePreview`, `frontend/src/components/panel/`) already ships and is independent of
+governance; it maps to no GOVERN requirement and needs a net-new frontend dependency. The 190 re-open
+trigger is satisfied early rather than dropped.
+
+### Phase 185 session (cont.) — the one shape 142–146 left open (2026-07-28)
+
+`185-SPEC.md` locked 9 requirements and recorded exactly one unsettled design question: **the at-rest
+canvas mark for an armed action-risk checkpoint.** Sketch 144 drew two shapes and locked no winner —
+145/146 overtook it — and neither survived as drawn once the shipped CSS was read: 144-A's collar wants
+the same bottom edge as `.runchip` (`bottom: -13px`) and `.acts` (`bottom: -12px`), and 144-B's connector
+badge was 30px of mark in a **66px** gap where the eye skips. Requirement 8 locks *that* an armed step
+must be marked and locks the budget (no colour, no word-badge, top-right seal untouched, still 5 steps);
+147 picks the shape. **Intake decisions:** the mark **interrupts the flow** rather than sitting quietly on
+a card, and an **unarmed risky step is marked too** — same shape, unlatched — because otherwise a step
+that emails a report with nobody watching looks identical to a step that reads a file, and 144's surviving
+finding (*the default must be ARMED-ON*) has nothing to argue against on screen.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 147 | the-armed-mark | Who owns the canvas card — which shape is real (137-D shipped vs 137-B locked), where do the governance seal and the armed action-risk mark fit, and what collides once 185/188/189 have all landed? | **B — 137-B · verdict left · the detour** ★ | phase-185, govern-03, action-risk, armed-checkpoint, armed-default, unguarded-risk, canvas-mark, shape-only, phase-188, phase-189, g2-sketch-gate |
+
+**The build cost, established while drawing:** `WorkflowCanvas.tsx:279` already registers an `edgeTypes`
+entry named `flow` and `canvasModel.ts:88` gives every edge a `data.kind` — so a connector-based mark
+(A / C) rides a shipped seam rather than needing net-new infrastructure. B is still cheapest by a
+distance (one pseudo-element on `PhaseNodeCard`, no edge work, scales with the card at fit-zoom), but it
+puts a **second lock-shaped mark** on a card that already carries the governance seal, and the two dials
+are orthogonal — reading them as one channel is the specific risk to judge.
+
+**Round 1 rejected (`f7fad019`), and the reason is reusable.** The first pass drew three different
+PICTURES — a level-crossing boom, a padlock latch, a hazard-hatched band. Operator verdict: *the ideas
+hold, the treatment does not.* Two faults, the second worth remembering: they were **pictograms in a
+system made of structure** (edges, seals, rails, borders), and the padlock **collided with the seal** —
+the 143-A governance mark is a shield, so two ORTHOGONAL dials ended up wearing two security pictures,
+and *must prove it* vs *stops and asks you* blurred into one "governed" impression. **Nothing on this
+card may look like the seal, not just nothing may occupy its corner.**
+
+**Round 2 — one mark, three placements.** The mark is a **gate bar**, identical in every variant:
+*armed* = the bar is whole and the flow visibly cannot pass; *not armed* = the SAME bar splits in the
+middle and stands open. Because the mark no longer varies, the only thing under test is **where it
+belongs** — in the gap (truthful: the run really does pause BETWEEN steps), on the card's leading edge
+(cheapest, scales with the card), or across the whole canvas (unmissable, claims full height).
+
+**Round 2 rejected, and round 3 changed what the sketch IS.** Round 2 drew one gate bar in three
+placements — structural rather than pictogram, but still a **barrier**, which says *blocked* and has no
+person in it. The operator then named the real fault: *"you are not being comprehensive and not aligning
+on what we already built and what we will build collectively."* True — **rounds 1 and 2 were both drawn
+against `canvas-184.css` `body.card-b`, a sketch-era card, while the shipped `PhaseNodeCard.tsx` renders
+a different one.** Round 3 is therefore an **occupancy audit**, not a shape hunt.
+
+### ⚠ TWO STRUCTURAL FINDINGS — both affect phases beyond 185
+
+**1 · The card decision and the card code disagree.** `canvas-184.css:170-171` records *"the operator
+moved the locked card from 137-D to 137-B on 2026-07-26"* (icon floats on TOP, 248px, centred). But
+`PhaseNodeCard.tsx:311-313` renders the mark at `absolute left-0 top-1/2`, 56px, card inset `ml-6` /
+padded `pl-10`, 260×96 — **137-D, icon on the LEFT** — and nothing in `frontend/src` applies a `card-b`
+class. Stray 137-B reasoning is already embedded in shipped docblocks (`PhaseNodeCard.tsx:287`,
+`WorkflowCanvas.tsx:502-504`) justifying real placements on a premise the file does not render.
+
+**2 · `185-SPEC.md` Requirement 6 rests on an occupied corner.** Sketch 143-A put the governance seal at
+top-right and the SPEC locked that corner as CLAIMED — but the shipped **VALID-03 verdict mark is
+already there** (`PhaseNodeCard.tsx:298`, `-right-2 top-1.5`). They overlap **3×17px on BOTH card
+shapes**; sketch 147 computes it live rather than asserting it. A third collision (`stepNumber` × icon,
+22×8px) appears only on 137-D and is very likely why that slot renders nothing today.
+
+### Constraints that now bind every later canvas phase
+
+| Constraint | Source |
+|---|---|
+| A **third badge is a typecheck error** (`BadgeSlot2Tuple`) | `PhaseNodeCard.tsx:117-118` |
+| **No focusable control may live in the card** — one tab stop per node, asserted in `WorkflowCanvas.test.tsx:231-238`; this is *why* ✕ and ＋ sit on the LANE | `PhaseNodeCard.tsx:37-48` |
+| The **＋ owns the gap centre** — 26px at `INSERT_Y = 28`, in a `GAP = PITCH_X − NODE_WIDTH = 60`px span | `WorkflowCanvas.tsx:314-327, 575` |
+| `status` (188), `stepNumber`, `technicalLine` are **declared, unrendered slots** — future claimants | `PhaseNodeCard.tsx:141-149, 164-167, 181-184` |
+
+**Consequence for GOVERN-03:** if the armed mark is clickable it **cannot live on the card at all** —
+it is either a non-interactive mark (with arming done in the side panel, where 142-B already puts the
+grounding dial) or it lives on the lane like ✕ and ＋.
+
+### ★ RESOLVED 2026-07-29 — sketch 147
+
+**Winner B: 137-B is the card.** Three decisions, all now binding on 185 / 188 / 189:
+
+1. **137-B is the target shape** (icon floats above a 248px centred card). `frontend/src` still renders
+   137-D, so the code owes a card-geometry change that moves the icon, the verdict mark and the step
+   number together — **its own task**, recorded out-of-scope in `185-SPEC.md`. The two shipped docblocks
+   that reason from 137-B on a 137-D component (`PhaseNodeCard.tsx:287`, `WorkflowCanvas.tsx:502-504`)
+   are corrected in the same task.
+2. **The verdict mark moves to `-left-2 top-1.5`; the 143-A governance seal keeps top-right.** The rule
+   this establishes is reusable: **a PERMANENT mark keeps a verified corner; a TRANSIENT one moves.** The
+   seal is a property of the step and was verified at all four run states; a verdict exists only when the
+   server returned a problem. `185-SPEC.md` Requirement 6 amended accordingly.
+3. **Icon clearance widened** — `padding-top` 34 → **42**, `NODE_MIN_HEIGHT` 96 → **104**, so the visible
+   52px mark clears the title by **11px** instead of 3. `NODE_MIN_HEIGHT` is a floor the card grows down
+   from, so raising it is additive.
+
+Result: **zero collisions between rendered marks on 137-B.** The one residual is the moved verdict
+grazing the `stepNumber` slot by 2×16px — a slot that renders nothing (D-183-07). If it is ever brought
+to the face, move it to `left:16` and it clears; the sketch reports that separately from real collisions
+rather than inflating the red count.
+
+4. **Arming happens in the SIDE PANEL; the canvas mark is READ-ONLY.** Forced as much as chosen —
+   `PhaseNodeCard.tsx:37-48` forbids any focusable control inside the card (one tab stop per node), which
+   is why the ✕ and ＋ live on the lane. The operator chose the panel over a third lane affordance so
+   **both governance dials sit together**, beside 142-B's grounding dial. **The panel is where you SET,
+   the canvas is where you SEE.** `185-SPEC.md` Requirement 8 refined with a machine-checkable acceptance
+   criterion (no `role`, no `tabIndex`, no handler on the mark; exactly one tab stop per node).
+
+5. **THE ARMED MARK IS THE DETOUR** — the connector *into* the risky step leaves the flow and comes
+   back through a point representing the person. The only finalist that says what the engine DOES (stop,
+   hand out to a human, resume) rather than *blocked*, which is what both rejected rounds of barrier
+   shapes said. **Armed:** the solid arc IS the path, with no straight line running past it. **Not
+   armed:** the arc stays as a faint dashed ghost with a line through it — present and open, never
+   absent, which is what keeps the armed-on-by-default rule legible.
+
+   *Verified, computed not asserted:* the arc clears the ＋ by **8.2px** and never enters its box; and
+   because it lives in the GAP it is clear of the ✕, which is card-centred straddling the card's bottom
+   edge (`WorkflowCanvas.tsx:618-627`, y = H−12 … H+12) — **exactly where the rejected `countersign`
+   would have landed**, and within ~5px of the rejected `waiting card`. *Build note:* a CUSTOM EDGE, not
+   a node change — rides the `edgeTypes.flow` entry `WorkflowCanvas.tsx:279` already registers.
+
+**Sketch 147 is CLOSED.** Nothing structural remains — card, corners, control home and mark are all
+settled. `/gsd:discuss-phase 185` picks it up from here.
+
+| 60 | **Node face = the LAYERED ladder — author name → config-derived → type sentence (148-C), with AI-authored names folded in as a SEEDING behaviour rather than a display strategy.** Phase 187 VOCAB-01's plain-language vocabulary ALREADY SHIPPED in 183 (`phaseVocabulary.ts:127` `PHASE_TYPE_SENTENCES` + the 3-tier `nodeTitle`); what had not shipped is *specificity*. Measured, not assumed: only **10 of 119** live phases carry a real `phase.name`, and the NL generator authors a **definition-level** name only (`workflow_authoring.py:88`), never a per-step one — so **every AI-seeded workflow renders the same six type sentences**, and in the sketch's procurement scenario steps 2 and 3 are letter-for-letter identical. That is SC#5's "toy demo" failure landing on VOCAB-02's own headline feature; the seed problem and the vocabulary problem are ONE problem. Three criteria decided it, each computed from a visible cell, never asserted: ① every step reads distinctly ② the face survives a config edit ③ a hand-written name is kept. **A (AI-authored, stored)** fails ② — re-binding step 3's skill leaves the stored name promising a pricing-policy check while the step runs `contract-risk-flags`; **B (config-derived only)** fails ③ — it discards the author's "Board-ready renewal pack" for the template filename, i.e. config-only *removes* the one tier already shipped; **C passes all three** and is additive (ONE tier inserted into the shipped ladder — a pure function, no schema change, no migration). **A and C are not rivals and must not be planned as an either/or:** A governs what the generator WRITES, C governs what the card SHOWS when nothing was written, so A fills C's top tier and the derived tier is the safety net underneath. Bounded residual for discuss-phase: **a stored name that predates a config edit — stays on the face, or gets marked?** Build constraint surfaced: the title `truncate`s at 14px in the 248px 137-B card, and derived titles built from a folder or filename already wrap ("Fill Renewal Summary.pptx"). **Method lesson (recorded because it generalises):** the first review reported "no difference between the variants" — the variants were correct, the SKETCH was wrong twice: the deciding card (step 5, the only place B and C disagree) sat off-screen behind a horizontal scroll, and tab-switching outsourced the comparison to memory. **Variants that differ SEMANTICALLY IN THE SAME POSITION need a co-present side-by-side view, not tabs.** | Sketch 148 winner C + operator 2026-08-01 |
+| 61 | **Technical-names on the canvas = SWAP THE SUBTITLE, never the title (149-C).** Audit first, because it shrinks the phase: the reveal is **already fully shipped on the canvas** - the app-wide `TechnicalNamesProvider` (Phase 154 / LANG-01, ONE boolean so two toggles can never disagree), the toolbar toggle (`WorkflowCanvas.tsx:1285`), the `technical` merge onto node data (`:945`), the title swap (`PhaseNode.tsx:144`) and the SAME swap on the vertical spine (`PhaseSpineGraph.tsx:125`). Both graph views already agree - **VOCAB-01 owes no wiring.** What is open is that the shipped reveal is a *swap* that DESTROYS the plain title - cheap when that title was the generic "Work out how to do it", expensive the moment **60/148-C** makes it specific ("Search Supplier Contracts"). Three treatments compared co-present at both toggle states: **A (swap the title, shipped)** loses the business meaning AND - measured, not predicted - **truncates**, rendering `AI agent step / find-renewal-t...` because the title is `truncate` at 14px in the 248px card, so *the slug clips*: the one genuinely technical token, and the entire reason to turn the reveal on. **B (add a third line)** gives the best comprehension but SPENDS `technicalLine`, a slot rendered by the card (`PhaseNodeCard.tsx:325`) yet deliberately never passed - `PhaseNode.tsx:183` reserves it for **Phase 188** alongside `status` and `stepNumber`, so picking B is a 188 scope decision, not a 187 one. **C wins:** the plain title stays as the title and the technical detail replaces the SUBTITLE, which 148-C already made near-redundant - meaning kept, detail gained, **no slot spent, card height unchanged**. Open: confirm the subtitle is near-redundant across all six phase types, not just `llm_agent`. | Sketch 149 winner C + operator 2026-08-01 |
+| 62 | **AI-seeded canvas arrival = ALL AT ONCE + A SEED RECEIPT that names what was locked and why (150-B).** The honesty constraint that killed the obvious answer: generation is **SINGLE-SHOT, not streamed** - `generate_workflow_definition` (`workflow_authoring.py:217`) makes exactly one provider call on a valid first emit (two only on a first-pass `ValidationError`, never three) and returns the whole definition or an honest error, never a partial; the builder is `empty -> composing -> drafted`. So **a node-by-node reveal is PACING, NOT PROGRESS** - the work is finished before the first node lands - and variant A carries that admission printed on its own canvas rather than implying an event it never received. The three variants answer **DIFFERENT** questions and none answers all three (*where do I start reading / why is that step locked / what have I reviewed*): A answers 1, B and C each answer 2, but not the same 2. **B wins because it is the ONLY variant that discharges SC#3.** Safe-by-construction is invisible by construction - two steps arrive carrying a seal the user never asked for, and today nothing anywhere explains it; the receipt ("Here is what I built - 5 steps. Two of them read your documents, so I set them to **must prove it**. You cannot turn that off - but you can see exactly where it applies") is that explanation, per-step, with its cause. Same discipline as #16's publish gauntlet: render the real reason, never re-derive it. **C (AI-drafted-until-touched) is NOT rejected, it is deferred as a separate question** - it tracks review state, which B does not, but as drawn its mark occupies the verdict slot's coordinates (`-left-2 top-1.5`) and its glyphs are **net-new**, not existing vocabulary; it also owes an answer on whether an unreviewed node blocks publish. | Sketch 150 winner B + operator 2026-08-01 |
+| 63 | **Start-from-a-template = the template SEEDS THE DESCRIBE BOX; the gallery stays on the Workflows page (151-C).** Measured: there are exactly **THREE** curated starters (`list_starter_workflows`, `db/workflows.py:291`, reading `definition->>'category'='starter'`; mig 094 seeds Risk Register / Weekly Status Report / Compliance Gap Report), so a gallery is over-built - and "fork a starter" is ALREADY one of the four routes into the Builder (`WorkflowBuilderPage.tsx:459`); what was missing is only a door on the FIRST screen. The axis that decided it is not clutter but **path count**: A (quiet link) and B (inline chips) both create a **SECOND forward path** - template to canvas, skipping generation entirely - a second way a workflow comes into existence, with its own code and failure modes, bypassing the describe-to-draft flow everything else is built around. **C collapses it back to one path:** picking a template fills the describe box with its plain-language sentence, which you can still edit before anything is generated. Preserves #11's describe-box-only screen and #12's 3-second read (one extra line, same as A). **C's cost is real and recorded:** it discards the starter's *curated definition* - a workflow a human shaped - and re-derives one from a sentence, which may come back different; that is why **#19's three-homes contract keeps the direct curated fork on the Workflows page**, where a library belongs, giving both behaviours a home without either crowding the calm screen. | Sketch 151 winner C + operator 2026-08-01 |
+| 64 | **ICON CONVENTION reaffirmed + the canvas glyph vocabulary written down (operator directive, 2026-08-01).** Enforcing #43 during the 148-151 review caught FOUR drifts *the assistant had introduced*, every one an invention where a shipped value existed - recorded because the failure mode generalises: **a sketch that invents a glyph teaches the wrong vocabulary to whoever builds from it.** The shipped canvas vocabulary, read from source: **U+26E8** governance / "Must prove it" seal (`PhaseNodeCard.tsx:440` - the SAME shield as the Control Room's operator-only mark; one authority mark, two surfaces) - **lock glyph** locked / one-way (`GovernanceSection.tsx:280`, `WorkflowDoorSwitch.tsx:159`) - **U+2933** the on-fail branch (`PhaseNode.tsx:238`, `PhaseSpineGraph.tsx:201`) - **fullwidth + / x** add / remove, on the lane never the card (`WorkflowCanvas.tsx:637/680`) - **undo/redo arrows** - **diamond** a gauntlet stage - and phase-type marks from the ONE shared 3D map via `icon3d()` / `PHASE_GLYPHS`. The drifts: a **diamond-with-dot** drawn for the seal (should be the shield), a **raised-hand emoji + amber tone** on the "Waits for you" badge (the shipped `waitsForYou` BadgeSlot has **NO glyph** and tone `primary` - the card's own docblock says *the WORD carries the meaning*), a 20x20 seal (21x21), and - worst - **ONE phase-type glyph used as a category icon** for each starter in 151, which misuses the shared map (`icon3d('llm_agent')` means "this STEP is an agent step", not "this WORKFLOW is about risk"). **There is no category-icon vocabulary in this system and none may be invented**: #36 already settled that a whole workflow is identified by its **glyph-dot PHASE SPINE**, so starters now carry their spine at both sizes (honest side effect - the chips wrap to two lines, which *strengthens* B's density cost rather than hiding it). Post-fix audit: the shield is the only glyph literal across all four sketches; 150-C's drafted/reviewed marks are retained but flagged in-README as **net-new proposals**, never passed off as existing vocabulary. | Operator directive + sketches 148-151 2026-08-01 |
+
+---
+
+## Session 2026-08-04 — Phase 188: Non-Technical Run Observability (sketches 152-154)
+
+**G-2 sketch gate for Phase 188.** The ROADMAP guardrail block lists 188 for G-2 ("live run 'feels
+like'"), and no 188-owned sketch existed: the two sketches tagged `phase-188-input` (145, 146) were
+authored *for Phase 185*, and **145's winner is still `*pending*`**. Sketch 143 additionally handed
+188 an explicitly unanswered question. These three close that gate.
+
+**The running example across all three** is one realistic business workflow — *Supplier renewal risk
+pack*, 5 steps — drawn with REAL phase types (`PHASE_GLYPHS`), the REAL plain-language sentences
+(`PHASE_TYPE_SENTENCES`) and the shipped grounding rule (a KB-reading step is detected-and-locked, so
+it carries the `⛨` seal). Engine facts stay real; the scenario is business-readable.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 152 | the-runs-own-room | You click Run. Where do you stand — and tomorrow, how do you find that run again and get the file it made? | **B — the run has its own room** ★ | phase-188, runviz-03, run-surface, workflow-vs-chat, launch-redirect, run-history, deliverable-reach, three-homes, d-14, g2-sketch-gate |
+| 153 | run-state-without-colour | What carries a step's run state on the canvas, when colour alone is not allowed to carry it? | **A — the well becomes the dial** ★ | phase-188, runviz-01, canvas-mark, run-status, colour-budget, badge-budget, greyscale-proof, shape-not-colour, waits-for-you-collision, step-number-slot, g2-sketch-gate |
+| 154 | the-run-that-tells-the-truth | How does the canvas read when it cannot just say done — failed, reloaded, cancelled, capped, or in a state it does not recognise? | **A — every node states its own truth** ★ | phase-188, runviz-02, run-honesty, total-function, reconcile-on-fetch, fail-open, closed-taxonomy, cap-paused, retrying-not-durable, tier-ladder, g2-sketch-gate |
+
+### Six measured facts these sketches establish before any variant is chosen
+
+Every one was read from the tree on 2026-08-04 rather than inherited — the standing rule after four of
+four executors in Phase 186 found an inherited claim false.
+
+1. **`Phase["status"]` has no `waiting-for-you` value.** The union is
+   `pending｜running｜done｜failed｜retrying｜skipped` (`types/index.ts:1013`). SC#1's sixth state can
+   only derive from `pendingAsk != null`, which is already on `Phase`. **Two sources, one vocabulary.**
+2. **`retrying` cannot survive a reload.** It exists in the client union and NOT in
+   `workflow_phases_status_check` (`pending｜active｜completed｜failed｜skipped`,
+   `full-schema.sql:1932`), so reconcile can only restore it as *running*. **SC#4 lands directly on
+   this** — it is a real loss of information at every reconnect, not a rendering detail.
+3. **The fail-open is one line and it is chosen wrong.** `DB_PHASE_STATUS[r.status] ?? "done"`
+   (`StreamsProvider.tsx:3337`) maps an unrecognised status to **success** — precisely the reading SC#3
+   forbids. Unreachable today (all five DB values are mapped), and the same shape as the
+   `findIndex → -1` fail-open that painted an unknown `blocked_stage` as 8/8 green.
+   **The fix is one word: fall back to an explicit unknown.**
+4. **There is no run read endpoint.** `runs.py` exposes `/{run_id}/stream`, `/ask_user_response`,
+   `/continue` and a `DELETE` — **no `GET /runs`, no `GET /runs/{id}`**. Any list-of-runs surface is
+   net-new wire. A finished run's spine *is* already re-readable, but only thread-scoped
+   (`threads.py:1189-1197`), and since `doRun` mints a new thread per run, **run history today IS chat
+   history**.
+5. **`workflow_runs` has no `started_at` / `completed_at`** — only `created_at`, `updated_at`,
+   `claimed_at` (`full-schema.sql:1947-1962`). Sketch 130-C's "anchor the timer to `started_at`, never
+   to mount" is **right in spirit and wrong in field** here; every clock in 152/154 is labelled with
+   its real anchor, because an unlabelled clock silently meaning "since queued" is a lie the moment a
+   run waits in a queue.
+6. **`cap_paused` is a shipped state with no vocabulary.** `workflow_runs.status` =
+   `active｜paused｜cap_paused｜completed｜failed｜cancelled` (`:1962`) and `POST /runs/{id}/continue`
+   is a real route, but nothing in the product tells a user what a capped run is. *Adjacent:*
+   `PhaseTimeline`'s `TERMINAL_RUN_STATUSES` contains `timed_out`, which is **not** a valid status and
+   can never occur — dead code.
+
+### The collision sketch 153 surfaces (not previously written down anywhere)
+
+**`Waits for you` already ships, and it means something else.** Badge slot 2 (`PhaseNode.tsx:174-180`,
+word-only, no glyph, `llm_human_input` only) is a **design-time** fact — this step *will* pause, true
+whether or not anything has ever run. SC#1 asks for a **run-time** state — this step is paused *right
+now* and nothing moves until you act. Sketch 146's alignment pass already ruled that *"running" and
+"waiting for you" may never share a word*; this is the same defect one turn inward, and every 153
+variant draws the waiting step with **both marks visible at once** so the operator can judge whether
+they read as two facts or as one thing said twice.
+
+### The card occupancy position going in (audited, not assumed)
+
+`⛨` seal top-right — **CLAIMED**, never conditional on run state (pinned twice: a `?raw` props fence
+and a four-run-state render assertion) · verdict mark on the left edge — transient · badge slot 2 —
+`Waits for you` · **FREE:** badge slot 1 (a third badge is a *typecheck error*), `stepNumber`,
+`technicalLine`, and the 62×62 icon well · **ANTICIPATED:** the card **border**, which the card's own
+docblock already gives to 188. Two invariants no variant may break: no third badge, and **no focusable
+control inside the card** (one tab stop per node).
+
+### The seventh fact, found on the SECOND audit pass (2026-08-05)
+
+**The status vocabulary already exists, and it is not on the canvas.** `PhaseCard.tsx:67-79` ships
+`STATUS_META` — every one of the six phase statuses already carries a **glyph + real text + an
+AA-contrast colour token**, built explicitly as non-colour-alone for WCAG 1.4.1. That is the
+*developer* timeline: the exact view 188's canvas is meant to be the business twin of, painted from
+the same stream.
+
+This was found **after** sketch 153's first draft had already invented a parallel set of lane glyphs —
+i.e. the precise failure §4 exists to catch (*"a sketch that invents a glyph teaches the wrong
+vocabulary to whoever builds from it"*). Recorded rather than quietly fixed, because it is the second
+time in five days the same failure mode has been caught by the same rule.
+
+| Status | Shipped | Word | Canvas can inherit? |
+|---|---|---|---|
+| `running` | `●` | Running | yes, verbatim |
+| `done` | `✓` | Complete | yes, verbatim |
+| `failed` | `✕` | Failed | yes — agrees with `VERDICT_MARK.error`; same mark, same news |
+| `retrying` | `↻` | Attempt *N* | the mark yes; **the state cannot survive a reload** (fact 2) |
+| `pending` | `○` | **Locked** | the mark yes, **the word no** — "Locked" is a harness word for "the engine has not unlocked this step"; beside a governance rail that also says *locked*, it reads as a permission |
+| `skipped` | `⤳` | Skipped | **NO** — `⤳` is already the on-fail `skip_to_phase` **branch edge** on the canvas (`PhaseNode.tsx:257`, `PhaseSpineGraph.tsx:250`). One surface, one glyph, two meanings |
+| *waiting for you* | — | — | nothing to inherit — no such status exists |
+
+**And the same split in words.** `PhaseCard` labels an `llm_human_input` step **"Needs you"** (`:48`);
+the canvas badge says **"Waits for you"** (`PhaseNode.tsx:177`). Two views of one run, two words for
+one concept — neither wrong, each decided independently, and **Phase 188 is the first phase obliged to
+make them agree**, because it is the first to show both views of the same run. Together with the
+design-time/run-time collision above, *"waits for you"* is now carrying **three** distinct jobs.
+
+*Noted while auditing, not 188's to fix:* `PhaseCard`'s `PHASE_TYPE_LABEL` still carries the flat
+`⚙ ✎ 🤖 ⛓ ☺` glyphs Phase 127 retired in favour of the shared 3D map, and lists only five types — so
+`llm_emit` falls through to `•` "Step".
+
+### Glyph audit (icon-convention §4)
+
+**The first pass of this audit was itself wrong, and the correction is the point.** Three drifts were
+caught on the 2026-08-05 re-check and fixed:
+
+| Drift | Why it was wrong | Fix |
+|---|---|---|
+| 153-C invented eight lane-notch glyphs | `STATUS_META` already ships six of them | inherits `● ✓ ✕ ↻ ○` verbatim; the two it cannot inherit render with a **visible violet `net-new` tag on the page**, so a proposal can never be mistaken for shipped vocabulary |
+| 153-B put `✕` on the card for "failed" | §4 reserves `＋`/`✕` for add/remove **on the lane, never the card** | B now always shows the step **number** — truer to B's own proposition and drift-free |
+| 153 + 154 drew `!` and `▲` for a problem | `VERDICT_MARK.error` and `STATUS_META.failed` both ship `✕` | `✕` |
+
+**Inherited:** `⛨` (`PhaseNodeCard.tsx:440`) · `● ✓ ✕ ↻ ○` (`STATUS_META`) · `?`
+(`VERDICT_MARK.unknown`) · `⊘` (sketch 129-C's stopped/cancelled marker).
+**Net-new, flagged in-README and on-page:** `‖` waiting-for-you / `cap_paused`, and `⋯` skipped-on-canvas
+— exactly the two readings with nothing to inherit.
+**153-A uses no glyph at all**, which is an argument in its favour under the same rule that gives the
+shipped `Waits for you` badge none: *the word carries the meaning; tone is decoration.*
+No phase-type glyph is used as a category icon.
+
+
+### Winners (operator, 2026-08-05) — and the one bill they add up to
+
+| # | Winner | Why it won |
+|---|---|---|
+| 152 | **B — the run has its own room** | A run becomes a thing with an address: own header, own spine, **no message list, no composer**, plus a `Runs` home across every workflow. The shape 145 and 146 were both already drawn on. A's `Runs` tab could only answer *"how has this workflow behaved?"*, never *"what ran last night?"* — the question an operator actually asks; C is free but leaves tomorrow's run in chat history. |
+| 153 | **A — the well becomes the dial** | The only variant that **spends nothing** — badge slot 1, `stepNumber` and `technicalLine` all stay free for Phase 189 — and the only one that **uses no glyph at all**, so it cannot drift under a convention that has caught two glyph drifts in five days. B collides with the verdict mark by a measured 2×16px and clearing it reopens a coordinate 185 chose deliberately; C puts state in the gap between cards, where 144-B found *the eye skips*. |
+| 154 | **A — every node states its own truth** | The reason lives on the step it belongs to. A run-level banner is one sentence about a five-step spine — it says *something* failed and makes you hunt for *which*. Same principle 145-A settled for the review moment: **decision and evidence are one object.** |
+
+**The bill, stated once so planning cannot be surprised by it.** 152-B is the largest ask in this phase:
+
+1. **Two net-new reads** — `GET /runs` and `GET /runs/{id}`. Neither exists.
+2. **A fourth home in a three-homes contract** (#23-A), which is wired with **no router** — the
+   `ActiveView` union extends; a router must not be smuggled in behind it.
+3. **The launch redirect goes** — `doRun`'s closing `selectThread(); onNavigate("chat")`
+   (`ChatLayout.tsx:264-266`) is exactly what SC#5 deletes.
+4. **Durations stay approximations** until `workflow_runs` gains a column — every elapsed figure is
+   `updated_at − claimed_at`, so either the column lands or **the UI must not present the number as a
+   runtime.**
+
+**The interaction between 153-A and 154-A, recorded now rather than discovered in build.** They compose
+well — *the ring says which state, the card says why* — but 154-A is **the first thing to actually spend
+the card's free vertical space**, and that column now holds the subtitle (which Phase 187 gave to the ⌥
+technical reveal), the reason block, and a still-notionally-free `technicalLine`. **Plan the card body as
+one budget, not three independent slots.**
+
+**Picking 153-A does NOT settle the vocabulary.** Three questions go to discuss-phase intact:
+`pending`'s shipped word is **"Locked"**; `skipped` **cannot** inherit `⤳` on the canvas because it is
+already the branch edge; and **"waits for you" is now carrying three jobs** — the design-time badge, the
+run-time state, and the developer view's "Needs you".
+
+### A build note that outlived its variant
+
+**Place an arc's gap with `stroke-dashoffset`, never with a rotation.** Setting the SVG `transform`
+attribute *and* CSS `transform-box`/`transform-origin` composes them and pivots about a doubled offset.
+That bug shipped in two consecutive drafts of 153-A and was only caught by an operator screenshot — the
+amber gap sat in the lower-left while the pause chip sat at the top, detached from the gap it was
+supposed to occupy. The offsets are now computed from `offset = (D + G/2) − p` and verified numerically
+in-source. **A sketch's geometry is as reviewable as its code, and a screenshot is the review.**
+
+---
+
+## Session 2026-08-08 — Phase 190: Live Connector Slice (sketches 155-156)
+
+**G-2 sketch gate for Phase 190.** `190-CONTEXT.md` D-27 records the guardrail firing and being
+honoured rather than skipped, and scopes the sketch to **the Settings → Connections page only**,
+capped at ~3 on-screen actions. The author-side picker is deliberately NOT sketched — it reuses
+`ExternalActionSection`'s shipped shape — but sketch 155 draws a small seam strip proving the row's
+identity line is what that picker renders, so no second vocabulary is invented at the seam.
+
+**Two measured facts shaped the decomposition before any variant was drawn:**
+
+1. **The shipped Settings tab shape fights this surface.** `SettingsPage.tsx:875-884` ships five
+   tabs and every one is a *single-value form saved en masse* — Integrations ends in one
+   **Save Integrations** button (`:1354-1365`). `connector_connections` is per-org, **per-row**,
+   with a write-only secret. Row CRUD inside a whole-tab-Save contract puts two save models on one
+   screen. Sketch 155-B exists to make that visible; it is a foil, built to be rejected.
+2. **The surface must survive connection #4 through #40.** SEED-013's broad catalog and the MCP
+   client both land on this exact page. So 155 ships a **scale control (empty · 3 · 24)** — the
+   045 real-scale rule, and the BUG-260624-01 lesson where a fixed grid crammed illegibly at the
+   real roster.
+
+**Two operator decisions taken at intake, recorded here so they are not re-litigated:**
+
+- **The connection form gets a credential check that DELIVERS NOTHING**, run **after save** on the
+  stored connection — Slack `auth.test` / Jira `/myself` / SMTP connect-auth-quit. Rationale: a
+  pre-save check would put a plaintext token on the wire for a non-storage purpose, in the one
+  phase whose whole gate is `threats_open: 0`; a post-save check instead exercises the same
+  org-scoped resolver **D-14** protects. It is not the D-16 shape, because the line that matters is
+  *"did an external side effect occur"*, not *"did a packet leave"* — nobody's inbox, board or
+  channel changes. **Flexibility argument:** it grows `ConnectorAdapter` to `{describe, check, send}`,
+  which is the *more* MCP-shaped protocol — a real MCP server has a handshake, and `check()` is
+  where that lands when SEED-013 arrives. A test-*send* has no MCP analog and would be deleted later.
+- **Kill-switch honesty follows a rule, not a placement preference:** the **banner owns
+  platform-wide truth** (`live_connectors` off — not a fact about any one connection), the **row
+  owns only what is true of that row** (disabled, credential failed). Every future per-connection
+  state has a home; every future platform state has a different one. 155 ships a
+  `banner ⇄ rows ⇄ both` toggle so the rule can be felt before it is committed — at 24 rows,
+  "both" is 24 identical amber lines.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 155 | connections-at-rest | Where does a per-row, per-org CRUD surface live in a whole-tab-Save Settings — and what is a connection's 3-second identity, at 3 connections and at 24? | **C — own tab, instrument table** ★ | phase-190, conn-02, settings, placement, scale, instrument-table, kill-switch, seam-proof, g2-sketch-gate |
+| 156 | adding-a-connection | How does the create form make "where this sends" and "what we hold" honest — and how do the two refusals land? | **A — push/split panel** ★ | phase-190, conn-03, secrets, write-only, egress-refusal, fail-closed, d-11, d-07, d-26, credential-check, g2-sketch-gate |
+
+### The finding sketch 156 produced before a winner was picked
+
+**A refusal you CAN fix leaves the door open; a refusal you CANNOT fix closes it.** Driven in-page
+across all ten moments:
+
+| | moment 8 · egress refused | moment 9 · no encryption key |
+|---|---|---|
+| Cause | the host typed resolves to `10.4.2.19` | no `SECRETS_ENCRYPTION_KEY` configured |
+| Fixable by the person here? | **yes** — correct the host | **no** — nothing they type helps |
+| So Save | stays **enabled** + *"Correct the host and try again"* | goes **disabled** + `aria-describedby` at the reason |
+
+Both follow the 142-B rule: name the cause, name what the refusal **costs**, put the reason in real
+DOM text and never in a `title`. Moment 9 is where **D-11's deliberate fail-CLOSED inversion** of
+`get_cipher()`'s shipped fail-open polarity (D-150-01) becomes visible to a person — it is a
+decision, so it has to read as one.
+
+**156's three containers are content-identical by construction** (verified in-page:
+`aEqualsB: true, aEqualsC: true`), so the container comparison cannot be won by one variant
+happening to tell more truth than another.
+
+### Claims these sketches make that the backend does not yet honour
+
+Recorded now so plan-phase either builds them or deletes the sentence — never ships the copy
+against absent behaviour:
+
+- *"no step will be allowed to use it until this passes"* (156 moment 6) — needs a real gate at
+  bind or publish time, or the sentence goes.
+- **`Used by N steps`** (155's table column) — needs a count over `workflow_definitions.definition`
+  JSONB across published versions. Net-new, and it is what names the victims in a 073-A delete confirm.
+- **A persisted check verdict + timestamp** on `connector_connections` — 155's `Credential` column
+  reads `checked 2 days ago`, which is a column decision for **migration 116**.
+- **Capability glyphs `✉ ▣ ＃` are placeholders**, not shipped art. They are not canvas
+  `PHASE_GLYPHS` and must not become a fourth icon vocabulary — settle the source before build.
+
+### Winners (operator, 2026-08-08)
+
+| # | Winner | Why it won |
+|---|---|---|
+| 155 | **C — own tab, instrument table** | The only variant that survives its own future. A's three capability shelves are a projection of *today's* closed set of three (D-04); a fourth capability or SEED-013's catalog needs a fourth shelf, where C needs one more chip in a filter bar it already has. The 24-row drive made it concrete — A becomes three unfilterable lists (Messages alone is 13), C reads `13 of 24` on one scan line. **B did its job by being rejected:** two save models on one screen is not taste, it is one `app_settings` form behind one Save button (`SettingsPage.tsx:1354-1365`) sharing a screen with rows that each own a transaction and a write-only secret. **So Connections is a SIXTH TAB**, and that placement is now a decision with a reason. C is also a re-use, not a new pattern — the 068-A roster shape already carries users and the model registry. |
+| 156 | **A — push/split panel** | Path of least resistance and already shipped three times (`PhaseFormPanel` 140-A, the 037-A rules builder, the 027-A detail shell). Decisive beat: **it is the only container that does not trap you at moment 6** — when a check fails the honest next action is to look at the list (which connection is unusable, is anything else), and B's dialog scrims the list away. Same *scan → fix → next* argument that decided 027-A. C loses on growth, the same axis as 155: the notice blocks are the tallest thing in the form, so at moments 8/9 the inline row grows past ~400px and stops being a row — and inside 155-C's table it would push every row below it. |
+
+**Obligations the winners inherit** — carry these into `/gsd:plan-phase 190` rather than rediscovering them:
+
+- **155-C:** the filter bar + live count are load-bearing at scale, not decoration. The `Credential`
+  column commits **migration 116** to a persisted check verdict + timestamp. `Used by` commits a
+  net-new count over `workflow_definitions.definition` JSONB.
+- **156-A:** must survive **375px** (mobile → bottom sheet, per the shipped shell rule). Unlike the
+  rejected B, the panel gets **no free focus trap or focus restore** from `Dialog` — both are net-new,
+  and the a11y 035-A got for free here has to be built. Name it in the plan, not in review.

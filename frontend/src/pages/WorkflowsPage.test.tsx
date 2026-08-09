@@ -65,7 +65,7 @@ const folders: Folder[] = [
     user_id: "u1",
     name: "DBA Chapters",
     parent_id: null,
-    is_global: false,
+    is_org_shared: false,
     created_at: "",
     updated_at: "",
   },
@@ -126,7 +126,7 @@ const draftRow = {
 }
 
 /**
- * Phase 143 (WF-01) — a curated starter (is_global published, category='starter').
+ * Phase 143 (WF-01) — a curated starter (is_system_global published, category='starter').
  * A two-phase KB→document def: retrieve (llm_agent) → emit (llm_emit strict). The
  * fresh-copy fork (D-143-1) mints a NEW suffixed slug + v1 off this seeded slug.
  */

@@ -4,7 +4,7 @@ The `metadata_field_definitions.field_type` DB column is `text NOT NULL DEFAULT
 'string'` with NO CHECK (migration 071:94), so the closed `field_type` vocabulary
 + `field_key` hardening (regex, built-in collision, reserved prefix) is validated
 HERE on the Create model (D-111-5). The CRUD router additionally hard-sets
-`user_id=caller` + `is_global=false` server-side (T-111-03-01) — never from the body.
+`user_id=caller` + `is_system_global=false` server-side (T-111-03-01) — never from the body.
 """
 
 import re
@@ -64,5 +64,5 @@ class MetadataFieldResponse(BaseModel):
     field_type: str
     description: str | None = None
     options: list[str] | None = None
-    is_global: bool = False
+    is_system_global: bool = False
     enabled: bool = True

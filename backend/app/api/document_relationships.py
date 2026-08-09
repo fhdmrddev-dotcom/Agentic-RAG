@@ -53,7 +53,7 @@ here — the gate lives at the UI surface (Phase 117). ``threads.py`` is NOT tou
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.document_relationship import RelationshipCreate, RelationshipResponse
 from app.services import document_relationship_service
 from app.services.audit_service import write_audit_entry
@@ -70,7 +70,7 @@ _INVALID_LINK_DETAIL = "Both documents must be readable and distinct"
 async def get_relationships(
     document_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Read a document's outgoing + incoming typed links (REL-02 / D-117-7).
 
@@ -127,7 +127,7 @@ async def get_relationships(
 async def create_relationship(
     body: RelationshipCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create a typed link between two caller-readable documents (REL-01).
 
@@ -232,7 +232,7 @@ async def create_relationship(
 async def delete_relationship(
     relationship_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Remove an owned relationship (REL-03); a cross-user/absent id is a uniform 404.
 

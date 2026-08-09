@@ -267,7 +267,7 @@ def _resolve_folder_name(folder_id, supabase, user_id) -> str | None:
             supabase.table("folders")
             .select("id,name")
             .eq("id", str(folder_id))
-            .or_(f"user_id.eq.{coerce_uid(user_id)},is_global.eq.true")  # AR-118-01: coerced
+            .or_(f"user_id.eq.{coerce_uid(user_id)},is_org_shared.eq.true")  # AR-118-01: coerced
             .maybe_single()
             .execute()
         )

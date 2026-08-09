@@ -1,288 +1,343 @@
-# Architecture Research — v3.3 Operator UX Integration
+# Architecture Research
 
-**Domain:** Subsequent-milestone integration into an existing ~160K LOC Agentic RAG platform (React/Vite + FastAPI + Supabase + Redis Streams)
-**Researched:** 2026-07-10
-**Confidence:** HIGH (every substrate claim below verified against live code with file:line; the stale `PRDs/v3.2-operator-ux.md` §5/§6 tables were treated as hypotheses and are corrected in the dedicated section)
-**Migration head:** `094_starter_workflows.sql` — **next new migration = `095`** (the stale PRD's reserved range `065–074` is 100% consumed by harness/DM/skill migrations)
+**Domain:** Visual / no-code workflow authoring + non-technical run-observability layer ON TOP of an existing governed harness workflow engine (v3.6 / SEED-123)
+**Researched:** 2026-07-24
+**Confidence:** HIGH (integration points read directly from the live codebase; competitor/library recommendations are MEDIUM)
 
-> This is an **integration** architecture doc, not an ecosystem survey. The stack is fixed. The question is: for each of the four v3.3 tracks, which existing seams are the integration points, what is net-new vs modified, what data-flow changes occur, and what build order the dependencies suggest. Verified substrate is cited `file:line`; the roadmap should trust these over the 2026-05-10 brief.
-
----
-
-## Brief corrections (stale `PRDs/v3.2-operator-ux.md` claims that are WRONG against live code)
-
-The brief was authored 2026-05-10, **predates the entire v2.7–v3.2 workflow/skill/DM surface**, and uses a since-abandoned version/migration sequence. Its business decisions (D-PRD-01..15) hold; its internals do not. Corrections, most load-bearing first:
-
-| # | Brief claim (§5/§6) | Live reality | Impact on roadmap |
-|---|---|---|---|
-| C-1 | Migration range `065–074` reserved for this milestone; `model_capabilities_overrides` ships as new migration `066` | Head is **`094`**; `model_capabilities_overrides` **already exists since `053`** (`053_settings_unification.sql:35-50`). Slots 065–094 are consumed. | Next migration = `095`. No table CREATE for model overrides — at most an `ALTER` to add admin-only columns. |
-| C-2 | `model_capabilities_overrides` PK = `model_key`; fields include `default_temperature`, `deprecated`, `notes`, `updated_by`, `updated_at` | Actual PK = **`model_id`**; columns are `provider, llm_call_timeout_seconds, context_window_tokens, max_output_tokens, native_tools, enabled, created_at, updated_at` (`053:35-45`). **No** `default_temperature`/`deprecated`/`notes`/`updated_by`. | The write UI targets the existing shape. If audit fields (`updated_by`, `deprecated`, `notes`) are wanted, they are a small additive `ALTER` — not a new table. |
-| C-3 | The max-tokens clamp read lives in `anthropic_service.py:150-200 _clamp_max_tokens` and must be pointed at the overrides table | The overrides read is **already live and provider-agnostic**: `config.get_model_capability_async` (`config.py:669-701`) + `get_per_call_timeout_async` (`config.py:625-666`), both reading `model_capabilities_overrides` via TTL-cached `_load_model_overrides` (`user_settings.py:302`). Hot-path callers: `agent_loop.py:2023`, `threads.py:1086`, `task_service.py:279`. | **The read path is DONE.** Only the write UI + an RLS write policy are missing. Pointing this at `anthropic_service` would *fork the shared path* (red-line violation) — do not. |
-| C-4 | "Close `CONCERNS.md:81-83`: API keys persisted to `settings_override.json` as plain text" | `settings_override.json` was **eliminated in Phase 081.1** (`user_settings.py:4` — "file-based settings_override.json eliminated"; mig `053` moved ~15 settings into `app_settings`). | The goal shifts from *"get secrets off the JSON file"* (done) to *"encrypt secrets at rest in the DB"* (`app_settings`/`user_settings` still store them as plaintext columns). Track 3's secrets work is now an at-rest-encryption story. |
-| C-5 | `/admin/backpressure` is a "v2.6 endpoint"; auth flips from `BACKPRESSURE_ADMIN_USER_IDS` to RBAC | It **does exist** (`admin.py:52`, Phase 078 WORKER-LIFT-04) and is env-var-gated (`admin.py:24 _check_backpressure_auth`), reading `runs:active` ZCARD (`admin.py:72`). The `/admin` router prefix already exists (`admin.py:21`). | The dashboard can wrap the live endpoint; the auth-gate swap to `operator_users` RBAC is real and small. `admin.py` is currently a single small file — extend it, do not re-grow `threads.py`. |
-| C-6 | OBS-PRIM: add `org_id` to `audit_log, runs, documents, threads, messages` (all net-new) | Forward-compat `org_id uuid` (NO FK) **already exists** on the v3.0 DM tables: `document_views, document_relationships, classification_rules, metadata_field_definitions` (`071_dm_foundations.sql:49-113`). The five core tables the brief lists do **not** have it yet. | The org_id stub pattern is established (nullable, no FK, RLS stays user-scoped). Extend it to the core tables — cheap, and v3.4-RLS-safe. |
-| C-7 | Brief is silent on Track 1 (workflow file inputs) entirely | Track 1 is the v3.2 carry-forward cluster (FILE-01/SEED-104, SEED-108/110/112). The brief predates the harness — it has **no** coverage of the Run modal, folder-scope binding, template upload, or the tool registry. | Track 1's integration points are established v2.9/v3.0 substrate (below), not brief hypotheses. Trust the code. |
+> Scope note: this is a **subsequent-milestone integration architecture**, not a greenfield domain survey. Every "existing" component below was read from the real source tree and is named verbatim so the roadmap/sketch/plan steps can wire to it. The heart of v3.6 is a **UX+product problem** (easy visual authoring ↔ governed/safe/observable), NOT an engine rebuild — the engine's governance is *expressed visually*, never removed (SEED-123).
 
 ---
 
-## Standard Architecture — the existing seams v3.3 plugs into
+## Standard Architecture
 
-### System overview (integration seams marked with a star)
+### System Overview — where the new layer attaches
 
 ```
-┌──────────────────────────────────────────────────────────────────────────┐
-│  FRONTEND  (React/Vite, Deep Midnight design system)                     │
-│  ┌────────────┐ ┌────────────┐ ┌──────────────┐ ┌────────────────────┐   │
-│  │ ChatLayout │ │SettingsPage│ │WorkflowsPage │ │  (NET-NEW) /admin  │   │
-│  │  doRun *   │ │  5 tabs    │ │  RunModal *  │ │   route tree       │   │
-│  │            │ │            │ │  (kickoff-   │ │  (Track 2)         │   │
-│  │ MessageItem│ │            │ │   only today)│ │                    │   │
-│  │ CitationList*│ │           │ │              │ │                    │   │
-│  └─────┬──────┘ └─────┬──────┘ └──────┬───────┘ └─────────┬──────────┘   │
-├────────┼──────────────┼───────────────┼───────────────────┼──────────────┤
-│  BACKEND (FastAPI)    │               │                   │              │
-│  ┌─────▼──────────────▼───────────────▼───┐  ┌────────────▼───────────┐  │
-│  │ api/threads.py (JUST extracted v3.2) — │  │ api/admin.py *         │  │
-│  │  the agent-loop entry; DO NOT re-grow  │  │  /backpressure (live)  │  │
-│  └─────┬──────────────────────────────────┘  │  + NET-NEW /admin/*    │  │
-│  ┌─────▼───────────────┐ ┌──────────────────┐ └────────────────────────┘  │
-│  │ services/agent_loop │ │ tool_dispatcher  │  ┌────────────────────────┐  │
-│  │  (shared path) *    │ │  _TOOL_REGISTRY *│  │ config.py              │  │
-│  │  citations accrue   │ │  (dict — add a   │  │  get_model_capability_ │  │
-│  └─────┬───────────────┘ │   handler + key) │  │  async * (reads DB     │  │
-│  ┌─────▼───────────────┐ └───────┬──────────┘  │  overrides — LIVE)     │  │
-│  │ provider_gateway/   │ ┌───────▼──────────┐  └────────────────────────┘  │
-│  │  adapters (per-     │ │ harness/         │  ┌────────────────────────┐  │
-│  │  provider boundary) │ │  scope.py *      │  │ services/sandbox_svc *  │  │
-│  │  RED LINE: no fork  │ │  phase_types.py *│  │  base64-preamble file  │  │
-│  └─────────────────────┘ │  emitters.py *   │  │  injection into /sandbox│ │
-│                          └──────────────────┘  └────────────────────────┘  │
-├──────────────────────────────────────────────────────────────────────────┤
-│  DATA                                                                     │
-│  ┌────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐   │
-│  │ Postgres (RLS) │  │ Storage buckets  │  │ Redis Streams            │   │
-│  │  model_caps_   │  │  documents *     │  │  run:{id}, runs:active * │   │
-│  │  overrides *   │  │  skill-files *   │  │  runs_by_thread:{tid}    │   │
-│  │  workspace_    │  │  sandbox-outputs │  │  (best-effort hint)      │   │
-│  │  files *       │  │                  │  │                          │   │
-│  │  audit_log     │  └──────────────────┘  └──────────────────────────┘   │
-│  └────────────────┘                                                       │
-└──────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  NEW visual layer  (v3.6 — 100% additive, gated by `visual_workflow_canvas`)   │
+│  ┌───────────────┐  ┌──────────────────┐  ┌───────────────┐  ┌──────────────┐  │
+│  │ Canvas editor │  │ Canvas model ↔   │  │ Live validate │  │ CanvasRunView│  │
+│  │ (React Flow)  │  │ WorkflowDefinition│ │ (as-you-build)│  │ (biz run-viz)│  │
+│  │ nodes+edges   │  │  serializer       │  │  client seam  │  │              │  │
+│  └───────┬───────┘  └────────┬─────────┘  └───────┬───────┘  └──────┬───────┘  │
+├──────────┼───────────────────┼────────────────────┼─────────────────┼──────────┤
+│  EXISTING authoring surface (untouched; flip flag OFF = land here exactly)      │
+│  ┌────────────────────┐  ┌──────────────────────┐  ┌────────────────────────┐   │
+│  │ WorkflowBuilderPage │ │ PhaseSpineGraph      │  │ WorkflowDoorSwitch      │   │
+│  │ (describe-first)    │ │ (READ-ONLY spine)    │  │ Describe&run/Author&gov │   │
+│  └─────────┬───────────┘ └──────────────────────┘  └────────────────────────┘   │
+├────────────┼────────────────────────────────────────────────────────────────────┤
+│  EXISTING server contract (the ONE authoring API — reused verbatim)             │
+│  api/workflows.py:  POST "" · PATCH /{id} · POST /{id}/publish · POST /generate  │
+│  gate: Depends(require_visible("workflow_authoring"))    [+ NEW: /validate]      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  EXISTING governed engine (D-14 red line — byte-identical, NO new runtime)      │
+│  ┌─────────────────┐  ┌───────────────────┐  ┌──────────────┐  ┌────────────┐   │
+│  │ WorkflowDefinition│ │ publish_service   │  │ reachability │  │ harness_    │  │
+│  │ (Pydantic strict) │ │ (8-stage gauntlet │  │ .lint_workflow│ │ engine.     │  │
+│  │ + immutable JSONB │ │  + judge HARD wall│  │  (PURE)      │  │ run_workflow│  │
+│  └─────────────────┘  └───────────────────┘  └──────────────┘  └─────┬──────┘   │
+│  PHASE_TYPE_REGISTRY (6 executors) · validators (closed) · tool_dispatcher      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  EXISTING run substrate (reused as-is for run-viz)                              │
+│  Redis: run:{run_id} · runs_by_thread:{tid} · runs:active   → StreamsProvider   │
+│  phasesByThread demux (onPhaseStarted/Completed/Failed/Substep) → usePhases()    │
+└──────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Component responsibilities (the seams, verified)
+### Component Responsibilities
 
-| Seam | Responsibility | Live location | v3.3 role |
-|------|----------------|---------------|-----------|
-| `_TOOL_REGISTRY` | Flat `dict[str, handler]`; add a tool = write `_handle_X(args, ctx)` + one dict entry, `threads.py` untouched | `tool_dispatcher.py:3189` | Track 1: `attach_skill_file` + `fetch_document_file` are two new entries |
-| `get_model_capability_async` | 4-tier resolve: DB overrides → env CSV → static `MODEL_CAPABILITIES` → default | `config.py:669-701` | Track 3: write UI feeds the DB tier it already reads |
-| `harness/scope.py` | `resolve_project_subtree` (parent_id walk → list) + `assert_folder_scopes_subset` (D-07 subset gate) | `scope.py:51,92` | Track 1 (SEED-112): resolve a run-input folder scope through here |
-| `phase_types.py` ToolContext build | Single seam that narrows `folder_subtree_ids` = project subtree ∩ phase `folder_scope` → feeds `search_documents` | `phase_types.py:316-338` | Track 1 (SEED-112): the intersection point a run-scope binds into |
-| `harness/emitters.py` | Re-dispatches the hardened `_handle_render_template` as the deterministic fill driver; whitelist-gated | `emitters.py:116-166` | Track 1 (SEED-110): resolves the uploaded template into the fill |
-| sandbox file injection | Downloads `skill-files` bytes → base64 preamble → writes `/sandbox/{name}` before user code | `tool_dispatcher.py:1076-1123` | Track 1 (SEED-108): same pattern, source = `documents` bucket |
-| `api/admin.py` | `/admin` router; live `/backpressure` reading `runs:active` ZCARD; env-var auth gate | `admin.py:21,52,72` | Track 2: extend with `/admin/*` routes + swap gate to RBAC |
-| `api/runs.py cancel_run` | Cancel + zombie-heal (D-062-11); updates Postgres then Redis | `runs.py:1097` | Track 2: admin "kill run" delegates here |
-| `agent_loop.py` citation accrual | Accumulates `retrieved_citations` + `source_refs`, dedups, persists `row["source_refs"]` | `agent_loop.py:1421-1495, 2471-2474` | Track 4 (SEED-033): inline markers ride this existing channel |
-
----
-
-## Per-track integration
-
-### Track 1 — Workflow & file inputs (v3.2 carry-forwards)
-
-The strongest-substrate track. Every piece plugs into established v2.9/v3.0 seams; there is **no new runtime** — only new tools (registry entries) and new run-input plumbing.
-
-#### 1a. `attach_skill_file` agent tool (FILE-01 / SEED-104 — the one undelivered v3.2 requirement)
-
-- **Integration point:** `_TOOL_REGISTRY` (`tool_dispatcher.py:3189`) — one new `_handle_attach_skill_file`. The write endpoint substrate already exists: `_upload_skill_files` (`skills.py:113-158`) uploads to the **`skill-files`** bucket and inserts a `skill_files` row (`skill_id, user_id, filename, file_path, file_size, mime_type`). SEED-104 explicitly mandates reusing `skill_files` + `skill-files` (no new bucket).
-- **Net-new:** the tool handler; a service-layer `attach_skill_file(skill_id, filename, bytes, user_id)` shared by the tool and (optionally) the existing HTTP endpoint; a threat model for a **WRITE-capable agent tool** (owner-scope assert, size/MIME allowlist, path-traversal guard — `skills.py:52 _sanitize_zip_name` is the reuse pattern).
-- **Modified:** nothing in `threads.py`. The sandbox already materializes generated files (`/sandbox/output/` → `sandbox-outputs`, `sandbox_service.py:297`); the tool copies the agent's produced bytes from workspace/sandbox into `skill-files`.
-- **Data flow:** agent writes file (workspace/sandbox) → `attach_skill_file(skill, name)` → download-or-read bytes → upload `skill-files` + insert `skill_files` row → `read_skill_file`/`load_skill` (`tool_dispatcher.py:707,904`) resolve it next run.
-- **Cross-provider:** needs SC#10 proof (a new write tool all providers can drive) — this is exactly why v3.2 deferred it (avoid a 3rd decimal insert; give it its own threat-modeled phase).
-
-#### 1b. Run-time template upload as a workflow run input (SEED-110)
-
-- **Integration point:** the **Run modal** (`WorkflowsPage.tsx:719-847`) is today a read-only folder chip + **one** kickoff textarea + input-keys hint; launch is `onLaunch(target, text)` → `doRun` (`ChatLayout.tsx:314`) → `createThread + sendMessage(workflow_definition_id)` (the **shared chat pathway**, never a bespoke `/run`). The fill substrate is complete: `workspace_files.kind='template_input'` + `expires_at` TTL (`068_workspace_template_ephemeral.sql`), upload endpoint `upload_template` (`workspace.py:160-210`), a `TemplateUpload.tsx` component **already exists in the workspace panel**, and `_handle_render_template` is re-dispatched by the whitelist-gated emitter (`emitters.py:116-166`). Kickoff run-pin already extends template expiry (`threads.py:1006`).
-- **Net-new:** a file-upload control **on the Run modal** (today template upload only exists mid-run in the workspace panel — SEED-110 wants it as a **pre-run input**); a run-input channel threading the uploaded artifact reference through `onLaunch → doRun → sendMessage → create_workflow_run` (which already persists `inputs`, SEED-047); binding the uploaded file to the new run's thread/workspace **before** the fill phase executes.
-- **Modified:** `RunModal` (add upload + carry the ref), `doRun`/`onLaunch` signature (carry more than `text`), `create_workflow_run` inputs persistence (already exists — add the template ref key).
-- **Data-flow change:** `RunModal upload → workspace_files(kind=template_input, run-pinned) → create_workflow_run.inputs → harness fill phase → _handle_render_template resolves the template_input row → deterministic cited render`. No change to the fill engine.
-
-#### 1c. Per-workflow / per-run KB folder-scope (SEED-112)
-
-- **Integration point:** the Phase 098 folder-scope binding is fully live. `search_documents` (`_handle_search_documents`, `tool_dispatcher.py:248-276`) already filters by `ctx.folder_subtree_ids` (RPC `p_folder_ids` primary + post-query scope clip at `:262`, emitting `scope_violation`). The workflow already resolves a **project subtree** at run-start and narrows per-phase at the single seam `phase_types.py:316-338` (`_effective = _proj ∩ _phase_scope`). `scope.py` provides `resolve_project_subtree` + `assert_folder_scopes_subset`.
-- **Net-new:** an **optional** retrieval-scope field on the workflow definition **or** a run-input scope selector; making the Run modal's read-only folder chip **editable** (D-103-1 explicitly made it "never a picker" — this reverses that for user-owned workflows); resolving the chosen folder → `folder_subtree_ids` at run-start (reuse `resolve_project_subtree`).
-- **Modified:** `RunModal` chip → picker; the run-start scope resolution (bind the selected folder into the same `folder_subtree_ids` the harness already threads); definition schema gains an optional `folder_scope`/`retrieval_scope` field.
-- **Data flow:** identical to Phase 098 once resolved — the selected folder enters `folder_subtree_ids`, `assert_folder_scopes_subset` guards it, `search_documents` constrains. Absent scope = current whole-KB default (keeps starters unscoped, D-143-4b intact).
-- **Constraint:** SEED-112 carries an **operator directive — research Glean/Beam workflow-scope + run-input UX FIRST** before locking this control (and it informs the whole workflow-UX cluster: 110 + 112 + SEED-051 authoring + SEED-111 lifecycle).
-
-#### 1d. RAG↔sandbox original-file bridge — `fetch_document_file`/`load_kb_file` (SEED-108)
-
-- **Integration point:** `_TOOL_REGISTRY` — one new read-direction tool. KB originals live in the **`documents`** bucket at `documents.file_path = {user_id}/{document_id}/{filename}` (`documents.py:473`, download at `:712`/`:1074`). The inverse of `harvest_output_files`' `copy_from_runtime`. The injection mechanism already exists: the skill-file base64-preamble path (`tool_dispatcher.py:1076-1123`) writes bytes into `/sandbox/`.
-- **Net-new:** the handler; a `/sandbox/input/<filename>` materialization (mirror the base64-preamble but pull from `documents` bucket, RLS-scoped like `read_document`); a **size cap + stream-to-disk** (never into model context).
-- **Modified:** nothing in the shared path; reuses `get_or_create` session + `copy_to_runtime`.
-- **Data flow (net-new):** `fetch_document_file(doc)` → RLS-scoped resolve `documents.file_path` → download bytes → write `/sandbox/input/<name>` → `execute_code` operates on real bytes (python-docx/pypdf/openpyxl on the actual file, not a text reconstruction).
-- **Honesty tie-in:** until faithful binary conversion is possible (SEED-106 binaries: soffice/pandoc), the agent must say "reconstructed from text" not "converted your file" (cross-links Phase 142 SRH-01).
+| Component | Responsibility | Status |
+|-----------|----------------|--------|
+| `backend/app/models/harness.py::WorkflowDefinition` | The immutable, strict-parsed (`extra="forbid"`) JSON spec: slug/version/name/status/phases + project/asset/business_requirement fields | **EXISTING — do not touch** |
+| `backend/app/db/workflows.py` | Draft CRUD + `publish_definition` flip + immutability trigger + Tweak-fork. `UNIQUE(slug, version)` | **EXISTING — reuse verbatim** |
+| `backend/app/api/workflows.py` | The only authoring HTTP surface; every write gated `require_visible("workflow_authoring")` | **EXISTING — reuse; ADD one `/validate` route** |
+| `backend/app/services/harness/publish_service.py::publish` | 8-stage gauntlet (business_req → lint → golden run → judge HARD wall → flip) | **EXISTING — reuse; the canvas is just another client** |
+| `backend/app/services/harness/reachability.py::lint_workflow` | PURE structural lint (orphan/skip/terminal/index/input) | **EXISTING — the shared validation seam** |
+| `backend/app/services/harness_engine.py::run_workflow` + `PHASE_TYPE_REGISTRY` | The locked transition loop + 6 thin executors | **EXISTING — untouched (D-14)** |
+| `frontend/.../workflows/PhaseSpineGraph.tsx` | READ-ONLY vertical spine (plain HTML/CSS, no graph lib) | **EXISTING — fallback / evolves into the canvas** |
+| `frontend/.../panel/PhaseTimeline.tsx` + `StreamsProvider` `phasesByThread` | The developer live run surface over Redis events | **EXISTING — the run-viz reads the SAME slice** |
+| **Canvas editor** | Drag nodes=phases, connect=flow, side-panel config | **NEW** |
+| **Canvas↔Definition serializer** | Bidirectional map: nodes/edges ⇄ `WorkflowDefinition` phases + `on_failure` skip edges | **NEW** |
+| **`POST /workflows/validate`** | Server-authoritative as-you-build lint (reuses `lint_workflow` + `model_validate` + grounding fidelity) | **NEW** |
+| **CanvasRunView** | Business-friendly run-viz painting node states from `usePhases()` | **NEW** |
+| **`workflow_layouts`** (optional) | Nullable side table for free-placement node positions | **NEW — dead-until-flagged** |
 
 ---
 
-### Track 2 — Admin shell + operator role
+## Recommended Project Structure (net-new files only)
 
-Mostly net-new, but it lands on **real** primitives (`admin.py`, `runs:active`, `cancel_run`, `audit_log`, `/health`), not the brief's imagined ones.
-
-- **Integration points (live):** `admin.py:21` (`/admin` router), `admin.py:52` (`/backpressure` reading `runs:active` ZCARD), `runs.py:1097` (`cancel_run` + zombie-heal), `main.py:458` (`/health`), `audit_log` (v2.2 F-06), the `org_id`-stub pattern (`071:49-113`).
-- **Net-new:**
-  - `operator_users` table (system-level `super_admin`/`operator`, distinct from v3.4 org RBAC) — **does not exist** (verified). RLS on every admin table cross-references it; a `get_current_operator` dependency parallels `get_current_user`.
-  - `/admin` **frontend** route tree (NOT a Settings tab — `SettingsPage.tsx` stays user-level and untouched); guarded by an `operator_role` auth-context field.
-  - `/admin/*` backend routes (users, audit browser, active-runs, health-detail, kill-run, feature-flags/kill-switch). Extend `admin.py` — **do not** route through `threads.py` (JUST extracted in v3.2 FND-01; G-5 hot file).
-  - `operator_audit_log` (net-new; INSERT-only RLS mirroring `audit_log`).
-  - `org_id` stubs on the five core tables (`audit_log, runs, documents, threads, messages`) — extend the established pattern.
-- **Modified:** `admin.py` auth gate swaps `BACKPRESSURE_ADMIN_USER_IDS` → `operator_users` RBAC (one-time env-var read as migration assist); `App.tsx`/auth context adds `operator_role`.
-- **Data-flow change:** admin mutating routes → `record_operator_action(...)` → `operator_audit_log`; admin reads use a service-role client **only after** an `operator_users` membership check (failures → 404, non-discoverable). Kill-run delegates to `cancel_run` (no new cancellation path).
-- **Multi-worker note:** any admin background job (e.g. audit pruner) must be cross-worker-safe (`WORKER_COUNT=2`) — single-execution via a Redis lock, never an in-process singleton (D-PRD-12).
-
----
-
-### Track 3 — Model & settings management
-
-The critical correction track: **the read substrate is done; only the write UI + secrets-at-rest are missing.**
-
-- **Integration points (live):** `model_capabilities_overrides` table (`053:35-45`, PK `model_id`), read via `get_model_capability_async` (`config.py:669`) + `get_per_call_timeout_async` (`config.py:625`), TTL-cached `_load_model_overrides` (`user_settings.py:302`), consumed on the hot path at `agent_loop.py:2023` / `threads.py:1086` / `task_service.py:279`. Settings already unified into `app_settings` (mig 053; `settings_override.json` eliminated in Phase 081.1).
-- **Net-new:**
-  - A **write UI + write route** for `model_capabilities_overrides`. Current RLS is `model_overrides_read_all` (SELECT for authenticated) with **no write policy** (`053:49`) → only service-role writes today. Add a `super_admin`-gated write route (service-role after an `operator_users` check) **or** a new RLS write policy referencing `operator_users`.
-  - Live `/models` discovery service (per-provider probe → populate/curate the registry; note Phase 096 already did a one-off `/models` curation manually — this makes it a UI action).
-  - A `SecretsBackend` abstraction with **encryption at rest** (secrets are in `app_settings`/`user_settings` plaintext columns today; the goal is DB-side encryption, e.g. pgsodium — **not** the already-done JSON-file removal).
-- **Modified:** optionally `ALTER model_capabilities_overrides` to add `updated_by`/`deprecated`/`notes` (admin audit fields the current table lacks). The read tiers need **no** change — they already merge DB rows over static defaults (`config.py:682-693`).
-- **Data-flow change:** admin edits a capability row → 30s TTL cache expiry → next `get_model_capability_async` returns the merged override (`capability_source="db_override"`). No restart, no provider fork.
-- **Red line:** all capability resolution stays in `config.py` (provider-agnostic). Do **not** implement per-provider clamp reads (the brief's `anthropic_service` suggestion) — that forks the shared path.
-
----
-
-### Track 4 — User-friendliness (Glean/Beam-informed)
-
-- **Inline citations (SEED-033):** the citation **data** already flows end-to-end — handlers build `citations` + `source_refs` (`tool_dispatcher.py:290,462,588`), `agent_loop.py` accrues + dedups + persists `row["source_refs"]` (`:1421-1495, 2471-2474`), and `MessageItem` already renders a `<CitationList>` at end-of-message (`MessageItem.tsx:442`). **Net-new = inline attribution:** footnote-style markers threaded into the streamed assistant text (mapped to the existing citation objects) + inline rendering in the markdown, on top of (not replacing) the CitationList. This is a rendering/attribution layer over existing data — it does **not** need new retrieval plumbing, but it **does** touch the SSE stream + `MessageItem` (both G-5 hot files — sketch-first per G-2).
-- **Plain-language two-audience layer (SEED-085), WCAG AA (SEED-092):** cross-cutting UI concerns; WCAG applies to all net-new `/admin` + Run-modal surfaces (keyboard nav, `aria-label`, 4.5:1 contrast, color+icon+text status). The Run modal already models a minimal focus trap (`WorkflowsPage.tsx:738-777`) — reuse that pattern for new dialogs.
-
----
-
-## Data flow — the three net-new flows
-
-**Flow A — KB file into the sandbox (SEED-108):**
 ```
-agent: fetch_document_file(doc)
-  → RLS resolve documents.file_path ({user_id}/{doc_id}/{name})
-  → Storage.download("documents", path)          [size-capped, stream to disk]
-  → base64 preamble → write /sandbox/input/<name> [reuse tool_dispatcher.py:1076-1123 pattern]
-  → execute_code operates on REAL bytes
+frontend/src/
+├── components/workflows/
+│   ├── canvas/                       # NEW — the visual layer (gated)
+│   │   ├── WorkflowCanvas.tsx        # React Flow host; nodes=phases, edges=flow
+│   │   ├── canvasModel.ts            # serializer: WorkflowDefinition ⇄ {nodes,edges}
+│   │   ├── nodeVocabulary.ts         # phase_type/tool/gate → business verbs (SEED-085)
+│   │   ├── PhaseNode.tsx             # a canvas node (reuses PHASE_GLYPHS by value)
+│   │   ├── useCanvasValidation.ts    # debounced POST /workflows/validate
+│   │   └── CanvasRunView.tsx         # run-viz over usePhases(threadId)
+│   └── (existing PhaseSpineGraph / PhaseFormPanel / WorkflowDoorSwitch …)
+└── pages/
+    └── WorkflowCanvasPage.tsx        # NEW third door host (gated nav entry)
+
+backend/app/
+├── api/workflows.py                  # MODIFY (additive): + POST /workflows/validate
+├── services/harness/
+│   └── canvas_validate.py            # NEW: thin reuse of lint_workflow + fidelity
+└── (engine / models / db / publish_service … UNTOUCHED)
+
+supabase/migrations/
+└── 114_workflow_layouts.sql          # NEW (optional): nullable side table, engine never reads
 ```
 
-**Flow B — template as a run input (SEED-110):**
-```
-RunModal upload
-  → Storage + workspace_files(kind=template_input, expires_at=+TTL)   [reuse workspace.py:160]
-  → create_workflow_run.inputs = {..., template_ref}                  [SEED-047 persists inputs]
-  → run-pin extends expiry (threads.py:1006)
-  → harness fill phase → emitters._render_template_post
-  → _handle_render_template resolves the template_input row → cited deterministic render
+### Structure Rationale
+
+- **`components/workflows/canvas/` as a sibling, not a replacement:** the existing `PhaseSpineGraph`/`PhaseFormPanel`/`WorkflowBuilderPage` stay byte-intact so the flag-off state is exactly today. The canvas is a new folder the flag mounts.
+- **`canvasModel.ts` is the single serializer seam** — one file owns the nodes/edges ⇄ `WorkflowDefinition` mapping so it can't drift across the editor, run-viz, and AI-seed paths.
+- **Server validation in `harness/`, not a new package** — it must live next to (and import) `reachability.lint_workflow` so there is provably one lint implementation.
+
+---
+
+## Architectural Patterns
+
+### Pattern 1: Canvas is a PROJECTION of `WorkflowDefinition`; layout lives OUTSIDE it (Q1)
+
+**What:** The canvas graph model (`{nodes[], edges[]}`) is a **pure derived projection** of the authoritative `WorkflowDefinition`, not a parallel source of truth. `canvasModel.ts` provides two pure functions:
+
+- `toCanvas(def): {nodes, edges}` — one node per `PhaseSpec` (node **id === `phase.slug`**, node type === `config.phase_type`); solid edges from the implicit `phase_index` `i→i+1` order; dashed edges from each validator's `on_failure: "skip_to_phase:<slug>"` (mirrors `reachability.parse_skip_target` and the existing `PhaseSpineGraph.parseSkipTarget`).
+- `fromCanvas(nodes, edges): WorkflowDefinition` — re-derive `phases[]` with contiguous `phase_index` from the edge order, fold skip-edges back into `validators[].on_failure`.
+
+**Where the mapping lives:** entirely client-side in `canvasModel.ts`. The server never sees "nodes/edges" — it only ever receives a `WorkflowDefinition` on the EXISTING `POST ""` / `PATCH /{id}` routes (which already `model_validate` the body as `WorkflowDefinition`, `extra="forbid"`). This keeps the wire contract unchanged.
+
+**Positions — do NOT persist them inside `definition` JSONB.** `WorkflowDefinition` is `extra="forbid"`; adding `x/y` to a `PhaseSpec` would (a) force a model change, (b) serialize layout into the immutable definition, and (c) change the bytes the golden-run/publish path hashes and the judge grades. Two clean, additive options:
+
+| Option | Where positions live | Trade-off | Recommendation |
+|--------|----------------------|-----------|----------------|
+| **A. Deterministic auto-layout (MVP)** | Nowhere — computed from `phase_index` at render (exactly like `PhaseSpineGraph` today) | Zero persistence, zero migration; no free 2D placement | **Default for the first cut** |
+| **B. `workflow_layouts` side table** | New nullable table `(definition_id FK, layout jsonb, updated_at)`; engine never reads it | Enables free placement; still additive/dead-until-flagged; a **side table (not a column on `workflow_definitions`)** dodges the published-row immutability trigger | **Add only when free placement is a confirmed requirement** |
+
+Avoid a nullable `layout` column ON `workflow_definitions`: the `workflow_definitions_block_published_update` trigger (Postgres `23514`, BEFORE UPDATE) would forbid re-laying-out a published workflow's view. The side table sidesteps this.
+
+**Per-version immutability is preserved for free** because the canvas edits go through the EXISTING draft CRUD:
+- Edit a draft → `PATCH /workflows/{id}` (`update_workflow_definition` is `status='draft'`-gated).
+- Publish → `POST /{id}/publish` flips draft→published (the ONLY flip site).
+- Edit a PUBLISHED workflow → the existing **Tweak fork**: a new `create_workflow_definition` INSERT with `version = published_N + 1`, same slug; the frozen published row is never UPDATEd (`UNIQUE(slug, version)` keeps them distinct). The canvas inherits this by simply loading the forked draft — no new immutability logic.
+
+**Example:**
+```ts
+// canvasModel.ts — the ONE serializer seam (pure, no I/O)
+export function toCanvas(def: WorkflowDefinition): { nodes: Node[]; edges: Edge[] } {
+  const ordered = [...def.phases].sort((a, b) => a.phase_index - b.phase_index)
+  const nodes = ordered.map((p, i) => ({
+    id: p.slug, type: p.config.phase_type,
+    position: autoLayout(i),            // Option A: derived, not stored
+    data: { phase: p },
+  }))
+  const edges = ordered.flatMap((p, i) => [
+    ...(i < ordered.length - 1 ? [seqEdge(p.slug, ordered[i + 1].slug)] : []),
+    ...skipEdges(p),                    // on_failure: "skip_to_phase:<slug>"
+  ])
+  return { nodes, edges }
+}
 ```
 
-**Flow C — run-scoped retrieval (SEED-112):**
+**Trade-offs:** projection keeps one source of truth (no divergence bugs) but constrains the canvas to what the definition can express (the existing spine is strictly linear + skip branches — no `depends_on`, no parallel lanes; see `READ_ONLY_LEGEND`). That constraint is a *feature*: the canvas can only draw runnable, governed shapes.
+
+### Pattern 2: Live validation reuses the publish gauntlet's PURE stages via a server seam (Q2)
+
+**What:** As-you-build validation must enforce the SAME rules the publish gauntlet enforces, without a client re-implementation that drifts. The publish gauntlet (`publish_service.publish`) runs, in order: `model_validate` → `lint_workflow` (pure) → interactive-phase check → **golden run** → **judge**. Only the first three are cheap+deterministic; the golden run + judge are expensive/interactive and stay at publish.
+
+**Where the shared seam is:** add **`POST /workflows/validate`** (new route in `api/workflows.py`, gated by the same `require_visible`) delegating to a thin `harness/canvas_validate.py` that runs EXACTLY the gauntlet's pre-run stages against the posted working definition:
+1. `WorkflowDefinition.model_validate(body)` → shape errors (`extra="forbid"`, discriminator, the two structural model-validators `_folder_scope_requires_project` / `_skill_snapshot_requires_ref`).
+2. `reachability.lint_workflow(def)` → `LintError[]` (orphan / unsatisfiable_skip / no_terminal / bad_index / input_unsatisfied) — **the same function `publish_service` stage 2 calls**.
+3. Grounding/whitelist fidelity: `workflow_authoring._check_grounding_fidelity` + `harness.scope.assert_folder_scopes_subset` (tool names ∈ registry, `skill_ref` ∈ owner/global skills, `folder_scope` ⊆ project subtree) — the same server-authoritative checks the NL author already runs.
+
+The canvas calls `/workflows/validate` **debounced** on every edit and paints per-node error badges from the returned `LintError[]` (keyed by `phase_slug`). The client keeps ONLY trivial, non-authoritative edge-drawing parses (e.g. `parseSkipTarget` for rendering the dashed edge) — never the pass/fail decision.
+
+**Why not validate purely client-side:** the whitelist/grounding checks require server state (the tool registry, the owner's skill set, the folder subtree) that KB content must not be able to whitelist itself with (the T-103-02-03 injection guard). Server-authoritative validation is the anti-drift guarantee.
+
+**Trade-off:** a network round-trip per edit (debounced ~300ms). Acceptable — the lint is pure/fast and the fidelity reads are cached owner-scoped reads. The judge/golden-run stays at publish (surfaced by the EXISTING `PublishGauntlet.tsx`), so the canvas honestly shows "structurally valid" ≠ "publishable" — the same two-tier honesty the read-only Builder already conveys.
+
+### Pattern 3: Non-technical run-viz is a second VIEW over one `phasesByThread` slice — never a data fork (Q3)
+
+**What:** The business run-viz reuses the entire existing run substrate — no new Redis events, no new store, no new demux. The engine already emits `phase_started` / `phase_completed` / `phase_transition` / `phase_substep` / `run_completed` / `run_failed` / `ask_user_prompt` on `run:{run_id}`; `StreamsProvider` already demuxes them into the `phasesByThread` map (mutators `appendPhaseForThread`, `setPhaseStatusForThread`, `setPhaseEmitSubstepForThread`, `finalizeEarlierPhasesForThread`, `finalizeAllPhasesForThread`) and exposes them via `usePhases(threadId)`.
+
+**The mapping onto canvas nodes:** `CanvasRunView` calls the SAME `usePhases(threadId)` hook `PhaseTimeline` uses, and paints each canvas node by matching **`phase.slug` === node id** (the identity `toCanvas` already establishes), coloring `running`/`done`/`failed`/`skipped`/`retrying` onto the node. Sub-step honesty (`phase_substep`: forcing/emitting/validating/rendering, or a terminal `failure`) rides the same `usePhases` fields. A mid-run reconnect gets the forward-only skeleton from `getThreadWorkflow(threadId)` (`total_phases` reconcile floor) exactly as `PhaseTimeline` does.
+
+So the **developer timeline** (`PhaseTimeline`, list-shaped) and the **business run-viz** (`CanvasRunView`, graph-shaped) are two presentational views over ONE data slice — the fork is purely visual, never in the store or the wire. This satisfies SEED-123's "distinct from the developer timeline" without forking the run surface (G-5).
+
+**Example:**
+```tsx
+function CanvasRunView({ threadId }: { threadId: string | null }) {
+  const { data: phases } = usePhases(threadId)      // SAME hook PhaseTimeline uses
+  const byslug = new Map(phases.map(p => [p.slug, p.status]))
+  // paint node border/glyph from byslug.get(node.id) — active/passed/failed
+}
 ```
-RunModal folder picker (was: read-only chip)
-  → create_workflow_run.inputs = {..., folder_scope}
-  → run-start: resolve_project_subtree / assert_folder_scopes_subset (scope.py)
-  → phase_types.py:316 narrows folder_subtree_ids = subtree ∩ scope
-  → search_documents(folder_ids=ctx.folder_subtree_ids)  [tool_dispatcher.py:254 — unchanged]
+
+**Trade-off:** the canvas node id must stay stable === `phase.slug` across author-time and run-time. This is already how both `PhaseSpineGraph` and the `phasesByThread` demux key phases, so it's a preserved invariant, not a new constraint.
+
+### Pattern 4: One new governed feature key gates the whole visual layer (Q4)
+
+**What:** The revert seam (operator HARD requirement #1) uses the SHIPPED feature-visibility machinery (v3.3 VIS-01), NOT a bespoke flag. Add ONE key — recommend **`visual_workflow_canvas`** — to `_GOVERNED_FEATURES` in `models/user_settings.py`, defaulting to **`"operators"`** (dark until an operator flips it; revert = flip it back). Then:
+
+- **Backend:** every NEW route (`/workflows/validate`, any canvas-specific route, the optional layout read/write) carries `Depends(require_visible("visual_workflow_canvas"))`. Off → 403 for non-operators (the deliberate "governed product feature" 403, not the /admin 404). The existing `workflow_authoring`-gated routes are UNCHANGED.
+- **Frontend:** add a nav entry `{ view: "workflow-canvas", feature: "visual_workflow_canvas" }` to `NAV_ITEMS`; `visibleNavItems(features)` hides it when the key is false; `useEffectiveFeatures` fail-closes to `{}` pre-resolve so it never flashes. Off → the third door simply does not render; the two existing doors (`WorkflowDoorSwitch`) are untouched.
+
+**Additive / dead-until-flagged checklist (the tested acceptance gate):**
+
+| New surface | Dead-when-off guarantee |
+|-------------|-------------------------|
+| `visual_workflow_canvas` feature key | Defaults `operators`; a fresh env with no seed row cold-reads to `operators` (same polarity as `skill_studio`) |
+| Canvas routes (`/workflows/validate`, canvas/*) | `require_visible` → 403 for non-operators; body still `model_validate`s as `WorkflowDefinition` |
+| `workflow_layouts` table (if built) | Nullable, engine/`run_workflow`/`WorkflowDefinition` NEVER read it; a NULL layout auto-lays-out |
+| Canvas writes | Go through the EXISTING `POST ""` / `PATCH /{id}` — the definition read/execute path is byte-unchanged |
+| `WorkflowDefinition` model | UNCHANGED (positions live outside it); so `run_workflow` / `PHASE_TYPE_REGISTRY` / `tool_dispatcher` / the golden-run hash are byte-identical |
+
+**Falsifiable revert test:** with `visual_workflow_canvas=false`, the nav entry is absent, canvas routes 403, and a full describe→draft→publish→run cycle on the existing Builder + engine is byte-identical to pre-v3.6 (extends D-14). This is exactly the shape v3.3 already proved for `skill_studio` / `model_management`, so it's a known-good pattern.
+
+**Why a NEW key, not the existing `workflow_authoring`:** `workflow_authoring` defaults `"everyone"` (the two existing doors must stay available to end users). The visual canvas needs an INDEPENDENT switch that starts OFF so "flip it off → land on today" is a clean, isolated operation that never disables the existing doors.
+
+---
+
+## Data Flow
+
+### Authoring flow (canvas → engine)
+
+```
+User drags/connects nodes on WorkflowCanvas
+      ↓ (canvasModel.fromCanvas)
+Working WorkflowDefinition (in-memory, client)
+      ↓ debounced POST /workflows/validate      → LintError[] painted per-node  (Pattern 2)
+      ↓ Save  → POST "" (create) / PATCH /{id}   (EXISTING draft CRUD, create-once-then-PATCH)
+      ↓ Publish → POST /{id}/publish             (EXISTING 8-stage gauntlet + judge HARD wall)
+workflow_definitions row flips draft→published (immutable)
+```
+
+### AI-seed flow (NL → canvas → edit)
+
+```
+User describes task  → POST /generate  (EXISTING workflow_authoring.generate_workflow_definition)
+      ↓ {ok:true, definition}          (grounded, model_validate-clean, NOT persisted)
+canvasModel.toCanvas(definition)       → nodes/edges rendered whole in one batch
+      ↓ user edits on canvas → (back into the Authoring flow above)
+```
+This realizes SEED-051 "AI seeds a canvas the user then edits" by reusing `/generate` verbatim — the canvas is just a new consumer of the existing NL draft.
+
+### Run-viz flow (engine → business view)
+
+```
+run_workflow emits phase_started/completed/failed/substep on run:{run_id}
+      ↓ StreamsProvider demux (onPhase* → phasesByThread, panel-only)
+usePhases(threadId)  ──┬──→ PhaseTimeline   (developer list view — EXISTING)
+                       └──→ CanvasRunView    (business graph view — NEW, same slice)
 ```
 
 ---
 
-## Suggested build order (dependency-driven)
+## Scaling Considerations
 
-The tracks are largely independent, but within/across them these dependencies dictate order:
+| Scale | Adjustments |
+|-------|-------------|
+| 0–1k users | No change. Canvas is client-rendered; `/workflows/validate` is a cheap pure lint + cached owner reads. Auto-layout (Option A) has zero storage cost. |
+| 1k–100k | Debounce `/workflows/validate` (≥300ms) and cache the folder/tool/skill grounding sets per session so as-you-build validation doesn't hammer the DB. If free placement (`workflow_layouts`) ships, it's a tiny keyed JSONB read/write — negligible. |
+| 100k+ | The run-viz already scales with the shipped Redis run-buffer (replay-and-tail per `run_id`); no new hot path. The only new server cost is `/workflows/validate` — keep it pure/stateless and it scales with the existing API tier. |
 
-1. **Foundation first — `operator_users` + `/admin` shell skeleton + RBAC dependency (Track 2 core).**
-   Rationale: the model-registry write UI (Track 3) and every admin mutation need the `get_current_operator` gate and `operator_audit_log`. Ship the role table, the RLS-referenced membership check, the `/admin` route tree, and the auth-gate swap on the existing `/backpressure` endpoint. Cheap, unblocks Track 3's write path. (org_id core-table stubs ride along — cheap, v3.4-safe.)
-
-2. **Model registry write UI (Track 3) — depends on (1).**
-   Rationale: the read path is already live; this is the highest-value/lowest-risk closure (a `super_admin`-gated write route + UI over the existing `model_capabilities_overrides` table). Live `/models` discovery is a natural companion. Secrets-at-rest encryption is a separable sub-phase (bigger; can defer/STRETCH).
-
-3. **Workflow file-input cluster (Track 1) — after Glean/Beam research (operator directive, SEED-112).**
-   Order within the cluster by shared substrate:
-   - **SEED-108 `fetch_document_file` first** — pure new read tool, no UI, unblocks "work on my KB file" and pairs with the sandbox injection already proven. Lowest coupling.
-   - **FILE-01 `attach_skill_file`** — new WRITE tool; its threat model + upload/storage pattern is the reference SEED-110 reuses. Do it before the run-input surfaces so the shared upload/threat pattern exists.
-   - **SEED-110 template upload + SEED-112 folder scope together** — both are Run-modal run-input surfaces sharing one "run inputs" channel (`onLaunch → doRun → create_workflow_run.inputs`); build the channel once, add both controls. Gated on the Glean/Beam UX research.
-
-4. **UX track (Track 4) — inline citations, plain-language, WCAG — last / parallel.**
-   Rationale: inline citations touch G-5 hot files (SSE stream, `MessageItem`) → sketch-first (G-2). WCAG applies to all net-new surfaces from (1)-(3), so it audits best once those surfaces exist. Plain-language layer is cross-cutting polish.
-
-**Ordering invariant:** Track 2 (1) precedes Track 3 (2) precedes any admin-gated write. Track 1's shared upload/threat pattern (FILE-01) precedes the run-input surfaces (110/112). Everything after the Glean/Beam research gate for the workflow-UX cluster.
+**First bottleneck:** as-you-build validation chattiness — mitigated by debounce + grounding-set caching. **Second:** React Flow render cost on very large graphs — mitigated by the fact that governed workflows are small (linear + skip branches, typically < 15 nodes); virtualize only if a real workflow exceeds ~50 nodes.
 
 ---
 
-## Anti-patterns (the hard constraints, as concrete "do not")
+## Anti-Patterns
 
-| Anti-pattern | Why it breaks | Do instead |
-|---|---|---|
-| Re-growing `backend/app/api/threads.py` | JUST extracted in v3.2 FND-01; G-5 hot file (9+ phases) | New tools → `_TOOL_REGISTRY` in `tool_dispatcher.py`; admin routes → `admin.py` |
-| Per-provider model-capability reads (e.g. `anthropic_service._clamp_max_tokens`) | Forks the shared provider path (D-14 red line) | Keep resolution in `config.get_model_capability_async` (provider-agnostic) |
-| An in-process singleton for admin jobs / secrets cache | `WORKER_COUNT=2` — two workers, double-execution (D-PRD-12) | Cross-worker Redis lock (mirror the harness `claim_run` CAS pattern) |
-| A bespoke `/workflows/{id}/run` endpoint for run inputs | Diverges from the shared chat pathway (`doRun → sendMessage`) | Thread inputs through `create_workflow_run.inputs` (SEED-047) |
-| Blocking I/O in async admin/tool handlers | Freezes the event loop (D-v2.5-01) | `run_in_threadpool` (every supabase-py call — see the tool handlers' pattern) |
-| An `operator`/`org_admin` role model that conflicts with v3.4 org RBAC | v3.4 is a one-way RLS-rewrite door | System-level `operator_users` only; org_id stubs nullable/no-FK; never a role shape that fights the rewrite |
-| A new storage bucket for skill/template/KB files | Fragments the file surface | Reuse `skill-files` (skill), `workspace_files`/panel (template), `documents` (KB), `sandbox-outputs` (output) |
-| Making Deep Mode non-byte-identical when a v3.3 feature is off | Breaks the D-14 invariant every phase preserves | Gated no-ops (the `folder_subtree_ids is None` / `skill_snapshot is None` pattern, e.g. `tool_dispatcher.py:262,910`) |
+### Anti-Pattern 1: Re-implementing lint/whitelist rules in the client
 
----
+**What people do:** Port `lint_workflow` + the tool/skill/folder fidelity checks into TypeScript for "instant" canvas feedback.
+**Why it's wrong:** The client copy WILL drift from the server gauntlet, producing "green in the canvas, blocked at publish" (or worse, the inverse). The whitelist/grounding checks also need server state the client cannot safely hold (KB content could whitelist its own citation/tool — the T-103-02-03 guard).
+**Do this instead:** `POST /workflows/validate` reusing `reachability.lint_workflow` + `_check_grounding_fidelity` (Pattern 2). The client only does trivial, non-authoritative edge-drawing parses.
 
-## Integration points summary
+### Anti-Pattern 2: Persisting node positions inside `definition` JSONB
 
-### Storage buckets (all reused — no new bucket)
+**What people do:** Add `x`/`y` to `PhaseSpec` so the layout round-trips with the definition.
+**Why it's wrong:** `WorkflowDefinition` is `extra="forbid"`; it changes the model, serializes layout into the immutable row, and alters the bytes the golden-run/judge/publish path depends on. It also collides with the published-row immutability trigger.
+**Do this instead:** deterministic auto-layout (MVP) or a nullable `workflow_layouts` side table (Pattern 1, Option B).
 
-| Bucket | Path convention | Used by | v3.3 track |
-|--------|-----------------|---------|------------|
-| `documents` | `{user_id}/{doc_id}/{filename}` | `documents.file_path` | Track 1 (SEED-108 source) |
-| `skill-files` | `{user_id}/{skill_id}/{filename}` | `skill_files.file_path` | Track 1 (FILE-01 target) |
-| `sandbox-outputs` | `{user_id}/{exec_id}/{filename}` | `harvest_output_files` | Track 1 (attach source) |
-| workspace (via `workspace_files`) | `kind='template_input'` + TTL | `upload_template` | Track 1 (SEED-110) |
+### Anti-Pattern 3: Forking the run surface for the business view
 
-### Internal boundaries
+**What people do:** New Redis events, a new store slice, or a new demux for the "friendly" run-viz.
+**Why it's wrong:** Duplicates the hard-won reconcile/forward-only/panel-only-re-render invariants (`phasesByThread`, PANEL-09) and violates G-5 on the hot files (`PhaseTimeline`/`PhaseCard`/`StreamsProvider`).
+**Do this instead:** `CanvasRunView` reads the SAME `usePhases(threadId)` slice; the fork is presentational only (Pattern 3).
 
-| Boundary | Communication | v3.3 note |
-|----------|---------------|-----------|
-| `tool_dispatcher._TOOL_REGISTRY` ↔ agent loop | dict dispatch via `ToolContext` | Add tools here; `threads.py` untouched |
-| `config.py` ↔ providers | `get_model_capability_async` (shared) | Never fork per-provider |
-| harness `phase_types` ↔ `search_documents` | `ctx.folder_subtree_ids` | SEED-112 binds here |
-| Run modal ↔ run creation | `onLaunch → doRun → sendMessage → create_workflow_run` | Run-input channel for 110/112 |
-| `admin.py` ↔ `operator_users` | RLS + `get_current_operator` dep | Net-new gate |
-| SSE stream ↔ `MessageItem` | `citations`/`source_refs` on message | Inline-citation layer (SEED-033) |
+### Anti-Pattern 4: A second authoring API for the canvas
+
+**What people do:** New `/canvas` create/update endpoints that speak nodes/edges.
+**Why it's wrong:** Splits the write path, duplicates owner-scoping/immutability/publish, and grows the surface the gauntlet must re-cover.
+**Do this instead:** the canvas serializes to `WorkflowDefinition` and reuses `POST ""` / `PATCH /{id}` / `POST /{id}/publish` verbatim. The ONLY new route is the read-only `/workflows/validate`.
 
 ---
 
-## Scaling & open questions
+## Connector Integration Point (Q5 — framed, with a recommended default)
 
-| Concern | Note |
-|---|---|
-| `model_capabilities_overrides` write contention | Low-cardinality admin table; 30s TTL cache absorbs reads. Trivial. |
-| Admin active-runs view | `runs:active` ZSET cardinality ≈ active runs (bounded); ZRANGE O(log N). Paginate at 100. |
-| SEED-108 large-file materialization | Must cap size + stream to disk (never model context); the one real perf risk in Track 1. |
-| Inline citations at long context | Reuses existing dedup (`_deduplicate_citations` `agent_loop.py:812`); marker-mapping is O(citations). |
-| org RBAC (v3.4) collision | org_id stubs are nullable/no-FK; RLS stays user-scoped until v3.4. Verify no v3.3 policy assumes org_id. |
+**Terminology correction (verified):** the prompt cites SEED-013/031 as the connector track, but **SEED-031 is "Direct Provider SDK Integrations" (DeepSeek/Kimi/MiniMax/GLM — LLM providers), already `status: folded → 076.1`** — it is NOT an external-connector framework. The real connector track is **SEED-013 (Open Platform: versioned REST API + MCP server + webhooks + service accounts)** and its sibling **SEED-014 (Automations & Routines)**. SEED-013's own n8n triage example is *inbound* (n8n calls us); v3.6 canvas "email/JIRA" nodes are *outbound* (we call them) — a capability neither seed has built yet.
 
-**Open questions for requirements/roadmap:**
-1. Does the model-registry write use a **new RLS write policy** (referencing `operator_users`) or a **service-role route** behind the operator gate? (053 has read-only RLS today.)
-2. SEED-112 folder scope: **definition-time field** vs **run-input selector** vs both? (Blocked on Glean/Beam research — operator directive.)
-3. Secrets-at-rest: pgsodium in-DB encryption vs an external `SecretsBackend` — and is it CORE or STRETCH? (The JSON-file removal the brief scoped is already done.)
-4. Is the install wizard / deployment-preset half of the brief (Themes H/I) **in scope for v3.3** or deferred? (Biggest lift; natural STRETCH per PROJECT.md — the cloud deploy already shipped `superrag.cloud`.)
+**The architectural seam either option plugs into:** the engine already has exactly one place an external action belongs — a **whitelisted tool dispatched through `tool_dispatcher`** inside an `llm_agent`/`programmatic` phase, or a **new phase-type executor** registered in `PHASE_TYPE_REGISTRY`. The per-phase tool whitelist + validation gates already govern it. So "a connector" = "a governed tool/executor," which is the natural, already-safe seam.
+
+| Option | Where it plugs in | Pros | Cons |
+|--------|-------------------|------|------|
+| **A. v3.6 ships its own thin connector** | New `programmatic`/tool entries (`send_email`, `create_jira_issue`) in `tool_dispatcher` + `PHASE_TYPE_REGISTRY`; secrets via the shipped app-layer Fernet (SEC-01) | Fast; self-contained; a real email/JIRA demo in v3.6; rides existing whitelist+gate governance | Re-invents auth/secrets/rate-limit/retry/webhooks that SEED-013 scopes; risks a throwaway second connector framework; outbound-network safety review needed |
+| **B. Sequence-with / depend-on Open Platform (SEED-013)** | Canvas "external action" nodes resolve to registered service-account connectors + outbound webhooks | One durable connector platform; per-consumer auth/quota/observability done once; aligns with the B2B platform thesis | SEED-013 is an unstarted 6–10 phase milestone; depending on it BLOCKS v3.6; over-scopes the UX-first milestone |
+
+**Recommended default (NOT a unilateral decision — operator confirms at requirements):**
+
+> **v3.6 CORE ships the visual authoring + run-viz WITHOUT its own general connector framework.** Represent connectors as a **first-class but explicitly-stubbed node vocabulary** (e.g. an "external action" node that lint-blocks at publish with an honest "connectors arrive with the Open Platform" message) so the canvas is *connector-ready* and the UX is designed for it. **Defer the real outbound connector execution to the Open Platform track (SEED-013), sequenced AFTER v3.6.** IF the operator wants a live email/JIRA demo inside v3.6, do the **thin Option-A slice for exactly those one-or-two actions** as whitelisted `tool_dispatcher` tools (secrets via the shipped Fernet), explicitly scoped as pre-Open-Platform and NOT a general framework.
+
+**Rationale:** SEED-123 states the heart of the milestone is the authoring↔governance UX, not connectors; the connector-scope question is flagged "decide via research, not blind." Building a general connector framework inside a UX milestone is the classic scope-creep trap and would duplicate SEED-013. The governance rails already treat any external action as a governed tool, so nothing is lost by deferring the *framework* while shipping the *node vocabulary* now. This keeps v3.6 focused and preserves the Open Platform as the one durable home for connectors.
+
+---
+
+## Suggested Build Order (Q6 — dependency-ordered)
+
+1. **Sketch first (G-2 fires — mandatory).** The canvas node vocabulary (business verbs, SEED-085), the node/edge model, the side-panel config, and the `CanvasRunView` run-viz. Operator-approved mockup is the acceptance bar. *No dependency; blocks everything visual.*
+2. **Feature-flag scaffold FIRST (the revert seam).** Add `visual_workflow_canvas` to `_GOVERNED_FEATURES`, a gated nav entry, and an empty gated route. Land the OFF-lands-on-today gate before any feature so all subsequent work is provably additive-behind-flag. *Depends on: nothing.*
+3. **Server validation seam.** `POST /workflows/validate` + `harness/canvas_validate.py` reusing `lint_workflow` + `_check_grounding_fidelity`. *Depends on: nothing (pure reuse); needed by 5 & 7.*
+4. **Read-only canvas.** `canvasModel.toCanvas` + `WorkflowCanvas` rendering an existing `WorkflowDefinition` on React Flow, deterministic auto-layout, read-only. Proves projection + node vocabulary without persistence. *Depends on: 2.*
+5. **Editable canvas.** Add/move/connect → `canvasModel.fromCanvas` → live-validate (3) → save via EXISTING draft CRUD (create-once-then-PATCH, mirroring `WorkflowBuilderPage.onPersist`). Optional `workflow_layouts` side table only if free placement is confirmed. *Depends on: 3, 4.*
+6. **AI-seed the canvas.** Wire the existing `POST /generate` NL draft into `toCanvas` (SEED-051). *Depends on: 4.*
+7. **Business run-viz.** `CanvasRunView` over `usePhases(threadId)` (no backend). *Depends on: 4 (node ids) + the existing run substrate.*
+8. **Connector decision executed** per Q5 (stubbed node vocabulary in CORE; real execution sequenced to Open Platform / optional thin email+JIRA slice). *Depends on: 5; sequenced last.*
+
+**Critical path:** 2 → 3 → 4 → 5, with 6/7 parallelizable after 4. The flag (2) and the validation seam (3) are the load-bearing early wins: 2 guarantees revertibility, 3 guarantees the canvas can't drift from the gauntlet.
+
+---
+
+## Integration Points
+
+### Internal Boundaries (verified real names)
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| Canvas ⇄ server | `POST ""` / `PATCH /{id}` / `POST /{id}/publish` / `POST /generate` / **`POST /validate`** (new) | All speak `WorkflowDefinition`, never nodes/edges. Gated `require_visible` |
+| Canvas ⇄ engine | none (indirect) | The canvas never calls `run_workflow`; it produces definitions the existing kickoff path runs |
+| Canvas validate ⇄ gauntlet | shared function `reachability.lint_workflow` + `_check_grounding_fidelity` | The anti-drift seam — one lint impl |
+| Run-viz ⇄ run substrate | `usePhases(threadId)` over `phasesByThread` | Same slice as `PhaseTimeline`; presentational fork only |
+| Layout ⇄ definition | decoupled (`workflow_layouts` side table or none) | Engine never reads layout; immutability untouched |
+| Feature gate | `require_visible("visual_workflow_canvas")` + `useEffectiveFeatures` | Reuses shipped VIS-01 machinery |
+
+### External Services (connector track — deferred)
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| Email / JIRA / etc. | Whitelisted `tool_dispatcher` tool OR `PHASE_TYPE_REGISTRY` executor | Governed by per-phase whitelist + gates; real execution deferred to SEED-013 (Open Platform) per Q5 |
 
 ---
 
 ## Sources
 
-- Live code (HIGH — grep/read, this session): `053_settings_unification.sql`, `068_workspace_template_ephemeral.sql`, `071_dm_foundations.sql`, `config.py:498-701`, `tool_dispatcher.py:248-276,707-960,1076-1123,3189`, `sandbox_service.py`, `skills.py:113-158`, `documents.py:473-1074`, `harness/scope.py`, `harness/phase_types.py:300-359`, `harness/emitters.py`, `admin.py:21-72`, `runs.py:1097`, `main.py:458`, `WorkflowsPage.tsx:515-847`, `ChatLayout.tsx:314`, `MessageItem.tsx:442`, `user_settings.py:302`
-- SEED files (HIGH — authoritative scope): `SEED-104`, `SEED-108`, `SEED-110`, `SEED-112`, `SEED-033`
-- `.planning/PROJECT.md` (current milestone v3.3 section) + `MEMORY.md` (v3.2 close-out state)
-- `.planning/PRDs/v3.2-operator-ux.md` §5/§6 — treated as **stale hypotheses**, corrected above (LOW confidence on its internals; business decisions D-PRD-* retained)
+- Live codebase (HIGH): `backend/app/models/harness.py`, `backend/app/db/workflows.py`, `backend/app/api/workflows.py`, `backend/app/services/harness/{publish_service,reachability,validators,phase_types}.py`, `backend/app/services/workflow_authoring.py`, `backend/app/dependencies.py` (`require_visible`), `backend/app/models/user_settings.py` (`_GOVERNED_FEATURES` / `feature_audience`).
+- Live frontend (HIGH): `frontend/src/components/workflows/PhaseSpineGraph.tsx`, `frontend/src/pages/WorkflowBuilderPage.tsx`, `frontend/src/components/panel/PhaseTimeline.tsx`, `frontend/src/providers/StreamsProvider.tsx` (phase demux + `phasesByThread` mutators), `frontend/src/hooks/useEffectiveFeatures.ts`, `frontend/src/lib/nav-items.ts`.
+- Planning (HIGH): `.planning/PROJECT.md` (v3.6 milestone + D-14), `.planning/seeds/SEED-123`, `.planning/seeds/SEED-013`, `.planning/seeds/SEED-031` (verified: LLM-provider seed, NOT connectors).
+- Frontend deps scan (HIGH): no graph/canvas/dnd library present (`zustand` + `@tanstack/react-query` only) — a canvas library (React Flow / `@xyflow/react`) is net-new; see STACK.md.
 
 ---
-*Integration architecture research for: v3.3 Operator UX (subsequent milestone)*
-*Researched: 2026-07-10*
+*Architecture research for: v3.6 Visual / No-Code Workflow Studio — authoring+observability layer over the governed harness engine*
+*Researched: 2026-07-24*

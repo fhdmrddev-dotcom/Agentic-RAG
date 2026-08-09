@@ -16,18 +16,26 @@ the body issues RLS-aware reads via supabase-py / asyncpg.
 
 Sync supabase-py calls are wrapped via ``aexec`` (Phase 058 D-058-03 — runs
 ``execute()`` in a threadpool). The jsonb @> / parent_run_id subquery paths
-route through the asyncpg pool from ``get_pg_pool`` because supabase-py
-cannot natively express those filters.
+route through the per-request ``get_user_pg_connection`` (Phase 163 D-02 — SET
+LOCAL ROLE authenticated, RLS-enforced) because supabase-py cannot natively
+express those filters.
 """
 from __future__ import annotations
 
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_pg_pool, get_supabase
+# Phase 163 (D-02/D-03): all three panel reads are request-scoped → the RLS-enforced
+# per-request user-JWT client (supabase) + get_user_pg_connection for the jsonb/subquery
+# reads that supabase-py can't express (SET LOCAL ROLE authenticated). No producer path.
+from app.dependencies import (
+    get_current_user,
+    get_user_pg_connection,
+    get_user_supabase_client,
+)
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -68,7 +76,7 @@ async def _verify_thread_ownership(
 async def get_thread_todos(
     thread_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 085 D-085-23 — current canonical todo list for the thread.
 
@@ -156,8 +164,9 @@ async def _prompt_run_is_live(pool, run_id_text: str | None) -> bool:
 @router.get("/ask_user/pending")
 async def get_pending_ask_user(
     thread_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 085 D-085-23 — ask_user_prompt rows without a matching ask_user_response.
 
@@ -171,56 +180,63 @@ async def get_pending_ask_user(
     thread_id filter closes the cross-user disclosure threat (T-085-T19).
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)
-    pool = await get_pg_pool()
-    rows = await pool.fetch(
-        """
-        SELECT m.id, m.tool_calls, m.created_at
-        FROM messages m
-        WHERE m.thread_id = $1
-          AND m.role = 'system'
-          AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
-          AND NOT EXISTS (
-            SELECT 1 FROM messages r
-            WHERE r.thread_id = m.thread_id
-              AND r.role = 'system'
-              AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
-              AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
-          )
-        ORDER BY m.created_at ASC
-        """,
-        UUID(thread_id),
-    )
-    result = []
-    for r in rows:
-        tcs = r["tool_calls"] or []
-        payload = tcs[0] if tcs else {}
-        # D-06 (BUG-260605-01): liveness filter — never return a prompt whose
-        # owning run is dead (BOTH ID namespaces; legacy prompts fail open).
-        # Closes every historical orphan the terminal-site cleanup (new runs,
-        # harness_engine.py) can never touch. Pending prompts per thread are
-        # ~0-2, so the per-prompt status lookups are negligible.
-        if not await _prompt_run_is_live(pool, payload.get("run_id")):
-            continue
-        result.append({
-            "message_id": str(r["id"]),
-            "tool_call_id": payload.get("tool_call_id"),
-            "prompt": payload.get("prompt"),
-            "options": payload.get("options"),
-            "timeout_seconds": payload.get("timeout_seconds"),
-            "run_id": payload.get("run_id"),
-            # D-12: the prior-phase draft the user is confirming (defensive .get —
-            # older prompt rows predate the draft field → None, harmless).
-            "draft": payload.get("draft"),
-            "created_at": r["created_at"].isoformat() if r["created_at"] else None,
-        })
-    return result
+    # Phase 163 (D-02): the jsonb @> / NOT-EXISTS scan + the per-prompt liveness
+    # reads (_prompt_run_is_live) run under RLS on the per-request user-JWT connection
+    # (SET LOCAL ROLE authenticated) — no more connectionless BYPASSRLS pool. The
+    # ownership gate above already 404'd a non-owner; the thread_id filter + RLS combine
+    # to keep this owner-scoped. `conn` is passed where `pool` was (asyncpg Connection
+    # exposes the same fetch/fetchrow — _prompt_run_is_live is duck-typed over both).
+    async with get_user_pg_connection(request, current_user) as conn:
+        rows = await conn.fetch(
+            """
+            SELECT m.id, m.tool_calls, m.created_at
+            FROM messages m
+            WHERE m.thread_id = $1
+              AND m.role = 'system'
+              AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+              AND NOT EXISTS (
+                SELECT 1 FROM messages r
+                WHERE r.thread_id = m.thread_id
+                  AND r.role = 'system'
+                  AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+                  AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+              )
+            ORDER BY m.created_at ASC
+            """,
+            UUID(thread_id),
+        )
+        result = []
+        for r in rows:
+            tcs = r["tool_calls"] or []
+            payload = tcs[0] if tcs else {}
+            # D-06 (BUG-260605-01): liveness filter — never return a prompt whose
+            # owning run is dead (BOTH ID namespaces; legacy prompts fail open).
+            # Closes every historical orphan the terminal-site cleanup (new runs,
+            # harness_engine.py) can never touch. Pending prompts per thread are
+            # ~0-2, so the per-prompt status lookups are negligible.
+            if not await _prompt_run_is_live(conn, payload.get("run_id")):
+                continue
+            result.append({
+                "message_id": str(r["id"]),
+                "tool_call_id": payload.get("tool_call_id"),
+                "prompt": payload.get("prompt"),
+                "options": payload.get("options"),
+                "timeout_seconds": payload.get("timeout_seconds"),
+                "run_id": payload.get("run_id"),
+                # D-12: the prior-phase draft the user is confirming (defensive .get —
+                # older prompt rows predate the draft field → None, harmless).
+                "draft": payload.get("draft"),
+                "created_at": r["created_at"].isoformat() if r["created_at"] else None,
+            })
+        return result
 
 
 @router.get("/tasks")
 async def get_thread_tasks(
     thread_id: str,
+    request: Request,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Phase 085 D-085-23 — sub-agent run index for Phase 087 drill-down.
 
@@ -235,29 +251,32 @@ async def get_thread_tasks(
     FC#9).
     """
     await _verify_thread_ownership(thread_id, current_user, supabase)
-    pool = await get_pg_pool()
-    rows = await pool.fetch(
-        """
-        SELECT r.run_id AS sub_run_id, r.started_at, r.completed_at,
-               r.status, r.model, r.provider, r.parent_run_id
-        FROM runs r
-        WHERE r.parent_run_id IN (
-          SELECT run_id FROM runs
-          WHERE thread_id = $1 AND user_id = $2
+    # Phase 163 (D-02): the sub-agent index read runs under RLS on the per-request
+    # user-JWT connection (SET LOCAL ROLE authenticated). The subquery's explicit
+    # thread_id + user_id gate stays as belt-and-suspenders (D-14) alongside RLS.
+    async with get_user_pg_connection(request, current_user) as conn:
+        rows = await conn.fetch(
+            """
+            SELECT r.run_id AS sub_run_id, r.started_at, r.completed_at,
+                   r.status, r.model, r.provider, r.parent_run_id
+            FROM runs r
+            WHERE r.parent_run_id IN (
+              SELECT run_id FROM runs
+              WHERE thread_id = $1 AND user_id = $2
+            )
+            ORDER BY r.started_at DESC
+            """,
+            UUID(thread_id), UUID(current_user["id"]),
         )
-        ORDER BY r.started_at DESC
-        """,
-        UUID(thread_id), UUID(current_user["id"]),
-    )
-    return [
-        {
-            "sub_run_id": str(r["sub_run_id"]),
-            "parent_run_id": str(r["parent_run_id"]) if r["parent_run_id"] else None,
-            "status": r["status"],
-            "model": r["model"],
-            "provider": r["provider"],
-            "started_at": r["started_at"].isoformat() if r["started_at"] else None,
-            "completed_at": r["completed_at"].isoformat() if r["completed_at"] else None,
-        }
-        for r in rows
-    ]
+        return [
+            {
+                "sub_run_id": str(r["sub_run_id"]),
+                "parent_run_id": str(r["parent_run_id"]) if r["parent_run_id"] else None,
+                "status": r["status"],
+                "model": r["model"],
+                "provider": r["provider"],
+                "started_at": r["started_at"].isoformat() if r["started_at"] else None,
+                "completed_at": r["completed_at"].isoformat() if r["completed_at"] else None,
+            }
+            for r in rows
+        ]

@@ -73,7 +73,7 @@ async def compute_publish_gate(supabase, skill_id: str, user_id: str) -> Publish
     def _read_skill():
         return (
             supabase.table("skills")
-            .select("id, instructions, is_global")
+            .select("id, instructions, is_org_shared")
             .eq("id", skill_id)
             .eq("user_id", user_id)
             .limit(1)

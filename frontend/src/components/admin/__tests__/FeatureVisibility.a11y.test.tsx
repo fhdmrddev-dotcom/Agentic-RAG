@@ -26,6 +26,8 @@ const ALL_EVERYONE: Record<GovernedFeature, FeatureAudience> = {
   model_management: "everyone",
   workflow_authoring: "everyone",
   governance_health: "everyone",
+  // Phase 181 — the 5th governed key (its own Off|On control; "everyone" = On here).
+  visual_workflow_canvas: "everyone",
 }
 
 const MIXED: Record<GovernedFeature, FeatureAudience> = {

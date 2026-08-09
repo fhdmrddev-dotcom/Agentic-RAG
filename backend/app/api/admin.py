@@ -99,8 +99,27 @@ _VISIBILITY_FEATURES = {
     "model_management",
     "workflow_authoring",
     "governance_health",
+    # Phase 181 (REVERT-01 / T-181-03): the v3.6 canvas flag is operator-writable through
+    # the SAME allowlisted PUT /admin/visibility path (Off = "off", On = "everyone").
+    "visual_workflow_canvas",
+    # Phase 190 (CONN-03 / D-26): the live-connector kill-switch rides the SAME allowlisted
+    # PUT /admin/visibility path (Off = "off", On = "everyone"), for the SAME reason Phase
+    # 181 chose it — ZERO migrations. CONTEXT D-26 names the /admin/flags allowlist above
+    # while citing this very precedent; measured, `visual_workflow_canvas` has always lived
+    # HERE, and the flags path writes an app_settings BOOLEAN COLUMN (= a migration 118 this
+    # phase does not owe). Cold default "off" lives in user_settings._GOVERNED_FEATURES;
+    # test_190_connectors_api.py asserts membership here AND absence from _FLAG_HUMAN_NAMES,
+    # so a later move that silently owes a column fails loudly instead of reading False.
+    "live_connectors",
 }
-_VISIBILITY_AUDIENCES = {"everyone", "operators"}
+# Phase 167 (VIS-01 / D-167-06): the audience enum extends to "role" (zero migration — the
+# mig-098 JSONB shape). A "role" write also carries a roles[] greenlist validated against the
+# 4-tier set (mig 104 CHECK) BEFORE the write — a free-text role must NEVER reach the JSONB
+# codec (SQLi-safe, mirrors the feature allowlist above).
+# Phase 181 (T-181-03): "off" joins the write-allowlist so an operator can flip the canvas
+# hidden; a crafted off-allowlist audience still 400s BEFORE any JSONB write (SQLi-safe).
+_VISIBILITY_AUDIENCES = {"everyone", "operators", "role", "off"}
+_VISIBILITY_ROLES = {"super-admin", "org-admin", "dept-admin", "member"}
 
 # Phase 149 (MODEL-01 / T-149-11): the ONLY columns a capability PATCH may write — the
 # seven editable columns of model_capabilities_overrides. A client-supplied field name
@@ -941,13 +960,40 @@ async def revoke_operator_access(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.get("/visibility")
+async def get_visibility():
+    """Read the persisted per-feature audience + greenlist map (WR-05 — server truth).
+
+    The Control Room previously seeded its visibility/greenlist UI from client defaults, so an
+    operator saw the DEFAULT audience (not the persisted one) after any reload — display
+    dishonesty on a security-governance surface. This returns the CURRENT audience (cold-default
+    aware, via ``feature_audience``) + greenlisted ``roles`` for every governed feature, so the
+    shell seeds from the DB on mount. Floor-EXEMPT (a config read seeded on every Control Room
+    mount — logging it would spam the ledger; the write PUT /admin/visibility is what's recorded).
+    Inherits the router-level ``require_operator`` gate (404 to non-operators).
+    """
+    from app.models.user_settings import (
+        _GOVERNED_FEATURES,
+        _feature_record,
+        feature_audience,
+    )
+    features = {}
+    for f in _GOVERNED_FEATURES:
+        rec = _feature_record(f)
+        roles = [r for r in (rec.get("roles") or []) if isinstance(r, str) and r in _VISIBILITY_ROLES]
+        features[f] = {"audience": feature_audience(f), "roles": roles}
+    return {"features": features}
+
+
 class VisibilityUpdate(BaseModel):
-    """Body for PUT /admin/visibility. ``feature`` + ``audience`` are validated against
-    code allowlists in the handler (T-148-03) — never free text. ``audience`` is an enum
-    VALUE, never a boolean (SEED-115 forward-compat)."""
+    """Body for PUT /admin/visibility. ``feature`` + ``audience`` + ``roles`` are validated
+    against code allowlists in the handler (T-148-03 / T-167-12) — never free text.
+    ``audience`` is an enum VALUE, never a boolean (SEED-115 forward-compat). ``roles`` is the
+    greenlist for the ``role`` audience (D-167-06) — empty for everyone/operators."""
 
     feature: str
     audience: str
+    roles: list[str] = []
 
 
 @router.put("/visibility", status_code=status.HTTP_204_NO_CONTENT)
@@ -974,10 +1020,23 @@ async def set_visibility(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unknown audience: {body.audience}",
         )
+    # T-167-12: every greenlist role must be in the 4-tier set BEFORE the JSONB write —
+    # a free-text role must never reach set_feature_visibility's codec (SQLi-safe).
+    bad = [r for r in body.roles if r not in _VISIBILITY_ROLES]
+    if bad:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown role(s): {', '.join(bad)}",
+        )
 
-    await set_feature_visibility(body.feature, body.audience)
+    await set_feature_visibility(body.feature, body.audience, roles=body.roles)
 
-    request.state.audit_label = f"Made {body.feature} visible to {body.audience}"
+    if body.audience == "role":
+        request.state.audit_label = (
+            f"Made {body.feature} visible to role(s): {', '.join(body.roles) or 'none'}"
+        )
+    else:
+        request.state.audit_label = f"Made {body.feature} visible to {body.audience}"
     request.state.audit_action = "visibility.set"
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -1613,3 +1672,47 @@ async def run_model_discovery(
         for d in discovered
     ]
     return {**diff, "providers": providers_summary}
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 168 (SSO-01 / D-168-05 Control 2) — operator approval of a pending SSO connection
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# The second anti-hijack control: an org-admin CREATES a connection (it lands
+# status='pending_approval' — org.py create_sso_provider), but an OPERATOR — not the creating
+# org-admin — flips it live. Until then the pending config routes nobody (org.py /sso/route +
+# /sso/provision both filter status='active'). This is a minimal operator affordance on the
+# service-role pool behind the router-level require_operator gate (byte-identical 404 to
+# non-operators; no RLS backstop). Floor-attached: an approval is a deliberate, recorded action.
+
+
+@router.post("/sso/configs/{config_id}/approve", status_code=status.HTTP_204_NO_CONTENT)
+async def approve_sso_config(
+    config_id: UUID,
+    request: Request,
+    _floor: None = Depends(operator_audit_floor),
+):
+    """Flip a pending_approval SSO connection to active (D-168-05 Control 2; operator-only).
+
+    Guarded ``WHERE id=$1 AND status='pending_approval'`` on the singleton pool: an already-
+    active / unknown id matches no row → the byte-identical /admin 404 (non-discoverable).
+    Records ``approved_by`` (the acting operator) + ``approved_at`` for the D-168-05 audit
+    trail, and a plain-language ``sso.approve`` ledger row.
+    """
+    operator_id = request.state.operator["id"]  # set by require_operator (router gate)
+    pool = await deps.get_pg_pool()
+    row = await pool.fetchrow(
+        "UPDATE public.sso_configs "
+        "SET status = 'active', approved_by = $2, approved_at = now() "
+        "WHERE id = $1 AND status = 'pending_approval' "
+        "RETURNING id, email_domain",
+        config_id, deps._to_uuid(operator_id),
+    )
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="SSO configuration not found"
+        )
+
+    request.state.audit_label = f"Approved SSO for {row['email_domain'] or 'a domain'}"
+    request.state.audit_action = "sso.approve"
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -4,9 +4,9 @@ title: execute_code `libraries` param does not reliably install before the code 
 reported: 2026-07-08
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [sandbox, backend/tool-dispatcher, backend/sandbox-service]
-folded_into: null
+folded_into: "176"
 verified_closed_by: null
 related_seeds: [SEED-043]
 re_open_trigger: null

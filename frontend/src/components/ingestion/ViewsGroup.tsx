@@ -167,7 +167,8 @@ export function ViewsGroup({
                 name={view.name}
                 count={counts[view.id]}
                 isSelected={selectedViewId === view.id}
-                isGlobal={view.is_global}
+                isShared={view.is_system_global}
+                sharedLabel="Built-in — shared with everyone"
                 onSelect={() => handleSelect(view)}
                 isEditing={isEditing}
                 onCommitRename={(newName) => handleCommitRename(view.id, newName)}

@@ -66,6 +66,10 @@ from app.services.citation_markers import (
     normalize_citation_markers,
 )
 from app.services.tool_dispatcher import ToolContext, ToolResult, dispatch_tool
+# Phase 164 (D-164-02): reuse the shared retrieval user-context seam for the match_skills
+# DEFINER RPC (retrieval_service is already in the import graph via tool_dispatcher above —
+# no new cycle; it never imports agent_loop).
+from app.services.retrieval_service import _call_as_user, _vector_literal
 # Phase 095.1-04 (D-095.1-03 / PROVIDER-ERR): the per-provider gateway-boundary
 # error classifier — replaces the billing-first keyword if-ladder in the outer
 # APIError catch so a 429 (incl. Google RESOURCE_EXHAUSTED) reads as rate_limit,
@@ -106,6 +110,17 @@ if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
 logger = logging.getLogger(__name__)
+
+
+# XPROV-02b (Phase 175 / D-02b): fixed honest-incomplete copy for a detected DeepSeek
+# DSML leak (the model wrote a tool call as visible text, so it never ran). Emitted via
+# the EXISTING 'error' SSE event from the post-drain hook. Deliberately a FIXED string —
+# it MUST NOT interpolate the model's raw (attacker-controllable) leaked markup, so it
+# cannot break the SSE contract or echo injected content (T-175-02-02).
+DSML_LEAK_ERROR_MESSAGE = (
+    "The model tried to call a tool but wrote it as text, so it didn't run. "
+    "Please retry."
+)
 
 
 # ---------------------------------------------------------------------------
@@ -1266,7 +1281,7 @@ async def run_agent_loop(
             _skills_resp = await aexec(
                 supabase.table("skills")
                 .select("id, name, description")
-                .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+                .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
                 .eq("is_enabled", True)
                 .order("name")
             )
@@ -1303,21 +1318,24 @@ async def run_agent_loop(
                         # WHERE clause is the byte-exact clone of today's catalog scope
                         # (V4 — no cross-user leak) and filters the CURRENT embedding model
                         # (D-10 stale guard); a vector-less skill returns similarity NULL.
-                        _ranked = await aexec(
-                            supabase.rpc(
-                                "match_skills",
-                                {
-                                    "query_embedding": q_vec,
-                                    "match_user_id": current_user["id"],
-                                    "p_embedding_model": getattr(
-                                        user_settings, "embedding_model", ""
-                                    )
-                                    or "text-embedding-3-small",
-                                },
-                            )
+                        # Phase 164 (D-164-02): match_skills is DEFINER — its in-body org gate
+                        # (is_system UNIVERSAL escape OUTSIDE the gate, owner/is_org_shared INSIDE —
+                        # mig 109 FIX-A) resolves the caller only when auth.uid() is set, so run
+                        # it over the asyncpg user-context, NOT the service-role producer supabase.
+                        # Same vector-literal wrinkle (Pitfall 3); id cast ::text so keys match the
+                        # str skill ids from the catalog SELECT. No request JWT captured (163 red
+                        # line); uid comes from the already-carried current_user (no new ctx field).
+                        _ranked_rows = await _call_as_user(
+                            current_user["id"],
+                            "SELECT id::text AS id, name, description, similarity "
+                            "FROM public.match_skills($1::public.vector, $2, $3)",
+                            _vector_literal(q_vec),
+                            current_user["id"],
+                            getattr(user_settings, "embedding_model", "")
+                            or "text-embedding-3-small",
                         )
                         sim_by_id = {
-                            r["id"]: r["similarity"] for r in (_ranked.data or [])
+                            r["id"]: r["similarity"] for r in _ranked_rows
                         }
                         # Blocker-1 self-heal: any in-scope skill the RPC returned with a
                         # missing/NULL similarity has a stale/absent vector — fire the
@@ -2147,6 +2165,33 @@ async def run_agent_loop(
                             _on_chunk,
                             close_fn=stream.close,
                         )
+
+                        # XPROV-02b (Phase 175, Option B — post-drain, deepseek-leak-only).
+                        # If the sanitizer detected a DSML leak (DeepSeek wrote a tool call
+                        # as visible text, so the tool never ran), end the turn HONESTLY via
+                        # the EXISTING 'error' SSE event — no new event type, no per-chunk
+                        # edit. The getattr default keeps every non-deepseek / non-leak
+                        # stream byte-identical (anthropic/google streams lack the attr).
+                        if getattr(stream, "dsml_leaked", False):
+                            # XPROV-02b fix (Phase 175 code-review CR-01): a DSML leak is
+                            # NOT a provider crash — the stream completed; DeepSeek merely
+                            # wrote a tool call as visible text (the tool never ran). Surface
+                            # the honest notice the SAME way the provider-error path does
+                            # (~L2800 below): append it to `full_content` so it PERSISTS in the
+                            # finalized assistant message, and emit it as a `delta` so the live
+                            # view shows it inline. Do NOT emit the terminal `error` SSE event:
+                            # api.ts (frontend/src/lib/api.ts:838) treats `error` as terminal
+                            # (onTerminal + return) while THIS path keeps streaming and
+                            # finalizes the run as `completed` — that mismatch showed a phantom
+                            # terminal error over a silently-empty persisted turn, the exact
+                            # "silently incomplete" outcome XPROV-02b set out to fix.
+                            _leak_notice = (
+                                f"\n\n{DSML_LEAK_ERROR_MESSAGE}"
+                                if full_content
+                                else DSML_LEAK_ERROR_MESSAGE
+                            )
+                            full_content += _leak_notice
+                            await _emit(redis, run_id, 'delta', content=_leak_notice)
 
                         # Parse tool calls based on calling mode
                         if calling_mode == CallingMode.STRUCTURED:

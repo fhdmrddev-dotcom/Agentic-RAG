@@ -50,13 +50,13 @@ const rules: ClassificationRule[] = [
     name: "Acme Invoices",
     match_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "invoice" }] },
     suggest_folder_id: "folder-fin",
-    is_global: false,
+    is_system_global: false,
     enabled: true,
   },
 ]
 
 const folders: Folder[] = [
-  { id: "folder-fin", user_id: "user-1", name: "Finance", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+  { id: "folder-fin", user_id: "user-1", name: "Finance", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
 ]
 
 function renderPage() {

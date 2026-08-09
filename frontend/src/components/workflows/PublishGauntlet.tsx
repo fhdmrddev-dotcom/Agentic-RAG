@@ -38,7 +38,7 @@
  * The run link gates strictly on `golden_run_id != null` (stage 3+ reached);
  * otherwise an explicit no-run note. Lint codes render the LOWERCASE literals.
  */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import type { ComponentType, SVGProps } from "react"
 import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib/api"
 // Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the publish-summary soul
@@ -47,16 +47,24 @@ import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib
 // is WUX-03 / Phase 127). The definition is threaded from the Builder's renderPublish.
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import type { DefShape } from "@/components/workflows/soulData"
+// Phase 186-05 (CONCUR-02, D-186-11) — the worded refusal. The map + its total resolver
+// live in the pure verdict module, next to the other sentences a surface says about a
+// check; see that module's docblock for why a component file cannot own them.
+import { blockedSentence } from "@/components/workflows/verdictModel"
 // Phase 127-02 Task 1 (WUX-03, sketch 051-A) — the engized gauntlet re-skin.
 // The engine chip mirrors RunCard's providerLogo()→Bot fallback (icon-convention
-// §1); the 8 stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3).
+// §1); the stage glyphs are the bundled 3D fluent-emoji set (icon-convention §3) —
+// one per STAGES row, so the count follows the table rather than a numeral here.
 import { Bot } from "lucide-react"
 import { providerLogo } from "@/lib/providerLogo"
-// The 8 gauntlet-stage 3D glyphs, bundled at build time by unplugin-icons. Only
-// API-verified-present fluent-emoji slugs are used (icon-convention §3 / RESEARCH
-// §Pitfall 2; aligned 1:1 with the STAGES order below). The empty-render traps
-// (`direct-hit` / `no-entry-sign`) are NEVER referenced.
+// The gauntlet-node 3D glyphs, bundled at build time by unplugin-icons — one per row of
+// the STAGES table below, in the same order and the same count. Only API-verified-present
+// fluent-emoji slugs are used (icon-convention §3 / RESEARCH §Pitfall 2). The empty-render
+// traps (`direct-hit` / `no-entry-sign`) are NEVER referenced — and because an unverified
+// slug renders as an EMPTY svg rather than failing to build, the newest addition here is
+// pinned by a render assertion in the suite, not by this comment.
 import Shield from "~icons/fluent-emoji/shield"
+import Books from "~icons/fluent-emoji/books"
 import CheckMarkButton from "~icons/fluent-emoji/check-mark-button"
 import Bullseye from "~icons/fluent-emoji/bullseye"
 import MagnifyingGlassTiltedLeft from "~icons/fluent-emoji/magnifying-glass-tilted-left"
@@ -64,6 +72,7 @@ import RaisedHand from "~icons/fluent-emoji/raised-hand"
 import Rocket from "~icons/fluent-emoji/rocket"
 import Locked from "~icons/fluent-emoji/locked"
 import BalanceScale from "~icons/fluent-emoji/balance-scale"
+import ChequeredFlag from "~icons/fluent-emoji/chequered-flag"
 
 /** An unplugin-icons bundled 3D SVG component (accepts standard SVG attrs + size). */
 type StageIcon = ComponentType<SVGProps<SVGSVGElement> & { size?: number | string }>
@@ -78,14 +87,84 @@ export interface PublishGauntletProps {
   definition?: DefShape | null
   /** Fired on a PASS so the parent (Plan 06) can auto-return to the Workflows page. */
   onPublished?: (version: number) => void
+  /**
+   * Phase 186-07 (D-186-12) — a BOOLEAN report of whether the gauntlet is running.
+   *
+   * The Builder holds its autosave writes while a publish is in flight: a stray keystroke
+   * mid-gauntlet costs minutes of golden run and real provider spend, and the stage-5
+   * token guard would then honestly refuse the publish. Edits accumulate as dirty and
+   * flush when this goes false.
+   *
+   * OPTIONAL AND ADDITIVE, in the `blockedReason` shape: absent ⇒ today's behaviour, byte
+   * for byte. This component already owns the `loading` flag (it blocks the close
+   * affordances with it); this prop only lets a parent observe the flag it already keeps,
+   * and adds no state, no request and no rendered element.
+   */
+  onRunningChange?: (running: boolean) => void
+  /**
+   * Phase 184-11 (R12, sketch 141-B) — WHY publish cannot be attempted yet, in the
+   * author's own words, or absent/null when it can.
+   *
+   * ABSENT ⇒ TODAY'S BEHAVIOUR, BYTE-FOR-BYTE. This component is rendered by every
+   * publish call site in the app, and only the flagged canvas Builder has a live
+   * structural verdict to hand it — so a missing prop must leave the trigger exactly as
+   * it shipped, enabled and unadorned. The 24 shipped assertions in
+   * `PublishGauntlet.test.tsx` render without it and are the guard on that.
+   *
+   * A NON-EMPTY STRING DISABLES THE TRIGGER **AND NAMES THE REASON**. Greying alone is
+   * not enough: a disabled control with no stated reason is the exit hidden, and R12 is
+   * explicit that the author must be told what to fix. The sentence is rendered visibly
+   * beside the control and tied to it with `aria-describedby`, so it reaches a screen
+   * reader too — a disabled button is skipped by some reading modes, and the reason is
+   * the part that matters.
+   *
+   * THE WORDING IS THE CALLER'S. This component neither derives it nor rewrites it: the
+   * page passes the server's own first message verbatim (or the plain invitation on an
+   * empty draft). There is no severity, code or lint table anywhere in this file.
+   *
+   * ── PHASE 186-16 (WR-10): IT NOW GATES THE INNER PUBLISH TOO, NOT ONLY THE TRIGGER ──
+   * The modal can sit open for as long as the author takes to write a golden input, so
+   * the click that actually spends money is the INNER one — and it used to be checked
+   * against nothing but the input and `loading`. The finding that made that expensive:
+   * the Builder's hold stops NEW writes once a publish is running (D-186-12) but cannot
+   * recall one already outstanding, so an autosave PATCH committing after
+   * `publish_service.py` reads `stage0_token` makes that token dead on arrival — the
+   * stage-5 flip answers `draft_changed` only AFTER a real golden run has burned minutes
+   * and provider spend on a publish that could never have succeeded.
+   */
+  blockedReason?: string | null
 }
 
 /**
- * The 8 server-fixed stages (sketch 020-B D2 / publish_service.py `STAGES`). The
- * client DISPLAYS them in order — it does not invent or reorder them. The
- * `code` is the verbatim `blocked_stage` a block at that stage emits; the spine
- * highlight (passed-up-to / blocked-at) is a VISUAL derivation only — the PASS/BLOCK
- * truth comes from the server verdict, never re-computed here.
+ * The server-fixed gauntlet, row by row (sketch 020-B D2 / publish_service.py `STAGES`).
+ * The client DISPLAYS them in order — it does not invent or reorder them. The `codes`
+ * are the verbatim `blocked_stage` values a block at that row emits; the spine highlight
+ * (passed-up-to / blocked-at) is a VISUAL derivation only — the PASS/BLOCK truth comes
+ * from the server verdict, never re-computed here.
+ *
+ * Every row but the last is a CHECK. The last row is the publish COMMIT — the flip
+ * itself, which sketch 020-B D2 has always carried as its own row and which the spine
+ * had no node for until Phase 186-05. It sits last on purpose: a refusal there happened
+ * AFTER the grader passed, so folding its code into the Judge row would tell an author
+ * the grader stopped them, which is false.
+ *
+ * ── PHASE 186-10 (WR-02): THE MIRROR CLAIM IS NOW CHECKED, NOT ASSERTED ──
+ * The paragraph above used to argue that the table was safe to extend only by APPENDING,
+ * because the running highlight below pointed at the golden-run row by a literal index.
+ * That is no longer the reason it is safe, and leaving it written would send the next
+ * reader to the wrong invariant: the highlight now LOCATES its row by the stage it
+ * belongs to (see `RUNNING_STAGE_INDEX`), so a row may be inserted at its true pipeline
+ * position without moving the pulse. `Grounding` is the first row that needed that — it
+ * runs BEFORE the golden run in `publish_service.py`, so appending it would have drawn
+ * the pipeline in the wrong order to spare the code.
+ *
+ * And the first sentence of this docblock — that the table mirrors the server's stage
+ * list — was prose for three phases and was FALSE for two of them: `grounding_fidelity`
+ * has been emitted since Phase 182 with no row here, so the most likely real refusal on a
+ * KB-bound workflow painted a spine that could place nothing. It is now pinned by F18 in
+ * the co-located suite, which reads the `stage="…"` literals out of `publish_service.py`
+ * itself and drives one render per stage. A stage added to the service and forgotten here
+ * fails that test; it can no longer be a comment that quietly stops being true.
  */
 const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[] = [
   { label: "Owner", what: "Owner check — RLS-resolve + you own it", codes: ["not_found"], Icon: Shield },
@@ -93,10 +172,29 @@ const STAGES: { label: string; what: string; codes: string[]; Icon: StageIcon }[
   { label: "Goal", what: "business_requirement — exactly one must be declared", codes: ["business_requirement"], Icon: Bullseye },
   { label: "Structure", what: "Structural lint — reachable · terminal · inputs satisfied · no orphans", codes: ["lint"], Icon: MagnifyingGlassTiltedLeft },
   { label: "Pause", what: "Interactive-phase check — human-pause phases can't validate synchronously", codes: ["interactive_phase"], Icon: RaisedHand },
+  { label: "Grounding", what: "Grounding check — the folders, tools and skills this workflow points at must all resolve", codes: ["grounding_fidelity"], Icon: Books },
   { label: "Golden run", what: "Golden run — a REAL harness run against the project KB", codes: ["golden_run_timeout", "golden_run_error"], Icon: Rocket },
   { label: "Citations", what: "Structural gate — citations / integrity checked during the run", codes: ["structural_gate"], Icon: Locked },
   { label: "Judge", what: "Independent judge — an independent model grades the deliverable", codes: ["judge"], Icon: BalanceScale },
+  { label: "Commit", what: "Publish commit — the draft must not have changed while we were checking it", codes: ["draft_changed"], Icon: ChequeredFlag },
 ]
+
+/**
+ * Which row pulses while a publish is in flight — LOCATED BY THE STAGE IT BELONGS TO, never
+ * by a literal index (Phase 186-10 / WR-02).
+ *
+ * The golden run is the only stage the author actually waits on: everything before it is a
+ * cheap static check that resolves in milliseconds, and everything after it grades a run that
+ * has already finished. So the amber aura and the energy comet both belong to this row.
+ *
+ * It used to be a bare index literal, compared against the loop counter in two separate
+ * places (the node tone and the energy comet). That number was a fact about the table's
+ * SHAPE, not about the golden run, so inserting `Grounding` at its true pipeline position
+ * would have moved the pulse silently onto the wrong node — the surface claiming a different
+ * stage is running than the one that is. Derived here, a row may be inserted anywhere and the
+ * pulse follows the run.
+ */
+const RUNNING_STAGE_INDEX = STAGES.findIndex((s) => s.codes.includes("golden_run_timeout"))
 
 /** The HTTP status surfaced for each discriminated outcome kind (for the badge). */
 function httpStatusForKind(kind: PublishOutcome["kind"]): number {
@@ -293,31 +391,57 @@ function HardWall({ onFix }: { onFix: () => void }) {
 }
 
 /**
- * The 8-stage energy-spine. `blockedStage` (server-truth) drives the highlight.
+ * The gauntlet energy-spine. `blockedStage` (server-truth) drives the highlight.
  *
- * Phase 127-02 Task 1 (WUX-03, sketch 051-A): the eight wrapping boxes become a
- * compact horizontal spine of 3D icon nodes joined by energy connectors — passed
- * nodes glow green with a ✓ badge, the running golden-run node (i===5) pulses an
- * amber aura with an energy comet flowing into it, a blocked node turns red. The
- * pass/block TRUTH is unchanged: `blockedIndex` / `isPassed` / `running && i===5`
- * are byte-identical to the shipped derivation — this is markup + tone only, never
- * a recompute of pass/block. All motion is gated behind prefers-reduced-motion
- * (colour + glyph + ✓ badge carry the state without any animation).
+ * Phase 127-02 Task 1 (WUX-03, sketch 051-A): the wrapping boxes become a compact
+ * horizontal spine of 3D icon nodes joined by energy connectors — passed nodes glow
+ * green with a ✓ badge, the running golden-run node (`RUNNING_STAGE_INDEX`, located by its
+ * stage rather than by a literal index since Phase 186-10) pulses an amber aura with
+ * an energy comet flowing into it, a blocked node turns red. All motion is gated behind
+ * prefers-reduced-motion (colour + glyph + ✓ badge carry the state without any
+ * animation).
+ *
+ * ── PHASE 186-05: THE SPINE FAILS CLOSED ON A STAGE IT CANNOT PLACE (F7) ──
+ * `findIndex` answers -1 for a stage this client has never seen, which is the SAME value
+ * it answers when nothing was blocked at all. Both per-node reads below used to branch
+ * straight off that single -1, so the two cases collapsed and a refusal painted every
+ * node passed: a full green spine with ✓ badges underneath a "Blocked" headline. A green
+ * indicator scoped to the wrong thing is the T-185-04-01 pattern, and it became reachable
+ * in production the moment the publish commit began refusing a draft that moved.
+ *
+ * The repair is a PROPERTY, not a special case for the code that exposed it: the -1
+ * sentinel is now interpreted exactly once, into two named states with opposite meanings,
+ * and every future `blocked_stage` the backend adds inherits the closed behaviour with no
+ * edit here. There is deliberately NO client-side list of acceptable stages — the server
+ * owns the verdict vocabulary (D-182-06 / VALID-03, stated on `Verdict.code` in the API
+ * client), so the client renders what arrives and fails closed on what it has not seen.
  */
 function GauntletSpine({ blockedStage, running }: { blockedStage: string | null; running: boolean }) {
   // Find the FIRST stage whose codes contain the server's blocked_stage (visual only).
   const blockedIndex = blockedStage
     ? STAGES.findIndex((s) => s.codes.includes(blockedStage))
     : -1
+  // A block HAPPENED — `blockedStage != null` is the server saying so — but we could not
+  // place it on the spine. The missing index carries BOTH meanings, and this is the line
+  // that separates them: everything after it may read the remaining -1 as "no block".
+  // Derived ONCE, above the map, so the two per-node reads cannot drift apart again.
+  const unknownBlock = blockedStage != null && blockedIndex === -1
   return (
     <div data-testid="gauntlet-spine" className="flex items-start overflow-x-auto py-4">
       {STAGES.map((stage, i) => {
         const isBlocked = blockedIndex === i
-        const isPassed = blockedIndex === -1 ? !running : i < blockedIndex
-        const isRunning = running && i === 5
+        // Unplaceable block first, placed block second, no block last. Only in that order
+        // is the fail-closed case unreachable by falling through anything — and the tail
+        // is honest precisely BECAUSE the guard ran first: a missing index that is not an
+        // unknown block can only be "nothing blocked", which still waits for the run.
+        const isPassed = unknownBlock ? false : blockedIndex >= 0 ? i < blockedIndex : !running
+        const isRunning = running && i === RUNNING_STAGE_INDEX
         const Icon = stage.Icon
         // The connector LEADING INTO this node is "reached" up to (and incl.) the block.
-        const connReached = blockedIndex === -1 ? !running : i <= blockedIndex
+        // The SAME guard in the SAME order, because this is a SECOND, independent read of
+        // the same index: repairing only the line above left the connectors lighting green
+        // under a refusal, which is exactly the half-fix the suite pins separately.
+        const connReached = unknownBlock ? false : blockedIndex >= 0 ? i <= blockedIndex : !running
         const nodeTone = isBlocked
           ? "border-destructive/60 bg-destructive/10"
           : isPassed
@@ -337,7 +461,7 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
             {i > 0 && (
               <div className={`relative mt-[20px] h-[3px] w-4 shrink-0 rounded-full sm:w-6 ${connReached ? "bg-success/50" : "bg-border"}`}>
                 {/* The energy comet flows along the connector INTO the running golden-run node. */}
-                {running && i === 5 && <span className="gauntlet-comet" aria-hidden />}
+                {running && i === RUNNING_STAGE_INDEX && <span className="gauntlet-comet" aria-hidden />}
               </div>
             )}
             <div className="flex w-[64px] shrink-0 flex-col items-center gap-1">
@@ -437,6 +561,8 @@ function GauntletContent({
   loading,
   setLoading,
   goldenInputRef,
+  blocked,
+  blockedReason,
 }: {
   definitionId: string
   definition?: DefShape | null
@@ -444,13 +570,26 @@ function GauntletContent({
   loading: boolean
   setLoading: (v: boolean) => void
   goldenInputRef: React.RefObject<HTMLTextAreaElement | null>
+  /** Phase 186-16 (WR-10) — the wrapper's DERIVED emptiness test, handed down rather
+   *  than recomputed. One home for "is this string a reason", so the trigger and the
+   *  inner Publish can never disagree about whether one was supplied. */
+  blocked: boolean
+  blockedReason?: string | null
 }) {
   const [goldenInput, setGoldenInput] = useState("")
   const [outcome, setOutcome] = useState<PublishOutcome | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [elapsedSec, setElapsedSec] = useState(0)
+  // Its OWN id, in the shape the trigger's already uses. A second element is needed
+  // rather than a reference to the trigger's because the trigger's reason sits behind
+  // the modal backdrop and cannot be read from inside the dialog — and a disabled button
+  // whose explanation is unreachable IS the greyed-in-silence failure R12 names.
+  const innerBlockedReasonId = useId()
 
-  const canPublish = goldenInput.trim().length > 0 && !loading
+  // Phase 186-16 (WR-10): `!blocked` is the third term. `runGauntlet` already returns
+  // immediately when `!canPublish`, so the request cannot leave while a reason stands and
+  // no early return had to be added anywhere else.
+  const canPublish = goldenInput.trim().length > 0 && !loading && !blocked
 
   // Elapsed-seconds ticker — runs only while the golden run is in flight, so the
   // user can SEE the synchronous publish is alive (no live per-phase progress).
@@ -495,12 +634,17 @@ function GauntletContent({
   // it NEVER re-derives pass/block (T-127-03). Lead-with-words: a business user reads a
   // pass/block in ~3 seconds; the verbatim 5-field grid is demoted behind the <details>
   // below (one click away, never removed).
+  //
+  // Phase 186-05: the refusal arm no longer interpolates the server's stage token into
+  // the sentence a business user reads. `blockedSentence` is total — it answers a
+  // SENTENCE for a stage it has never seen — so no machine code can reach this line,
+  // while the verbatim token keeps rendering inside the raw-verdict disclosure below.
+  // The wording lives in the pure module because a component file may not export shared
+  // constants (`react-refresh/only-export-components`).
   const wordedHeadline = verdict
     ? isSuccess
       ? `Published — v${verdict.version ?? "—"} is live`
-      : verdict.blocked_stage === "judge"
-        ? "Blocked by the grader — the run finished, but the independent grader would not pass the result"
-        : `Blocked early — ${verdict.blocked_stage ?? "unknown"}`
+      : blockedSentence(verdict.blocked_stage)
     : ""
 
   return (
@@ -525,7 +669,7 @@ function GauntletContent({
         <div className="mt-2 rounded-lg border border-border bg-card p-4">
           <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
           <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
-            Publishing runs the full <b>8-stage gauntlet</b> — including a <b>real golden run</b> of this workflow against
+            Publishing runs the <b>full gauntlet above</b> — including a <b>real golden run</b> of this workflow against
             your project KB and an <b>independent judge</b> of the result. It can honestly block.
           </p>
           <label
@@ -543,9 +687,23 @@ function GauntletContent({
             className="min-h-[88px] w-full resize-y rounded border border-border bg-background px-3 py-2 text-[13px] leading-relaxed text-foreground focus:border-primary focus:outline-none"
           />
           <div className="mt-3 flex items-center justify-end">
+            {/* R12, applied to the one control that did not have it: greying alone is
+                never enough. `mr-auto` puts the sentence at the row's left WITHOUT
+                changing the row's own classes, so with no reason supplied the rendered
+                markup is the one that shipped, character for character. */}
+            {blocked && (
+              <span
+                id={innerBlockedReasonId}
+                data-testid="publish-inner-blocked-reason"
+                className="mr-auto text-[12px] leading-snug text-muted-foreground"
+              >
+                {blockedReason}
+              </span>
+            )}
             <button
               type="button"
               disabled={!canPublish}
+              aria-describedby={blocked ? innerBlockedReasonId : undefined}
               onClick={runGauntlet}
               className="rounded bg-primary px-4 py-1.5 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
             >
@@ -672,8 +830,20 @@ function GauntletContent({
  * modal is `position:fixed`, it escapes the header's overflow/shrink-0 context
  * and never clips or crams into the layout.
  */
-export function PublishGauntlet({ definitionId, definition, onPublished }: PublishGauntletProps) {
+export function PublishGauntlet({
+  definitionId,
+  definition,
+  onPublished,
+  blockedReason,
+  onRunningChange,
+}: PublishGauntletProps) {
   const [open, setOpen] = useState(false)
+  // Phase 184-11 (R12): the reason's id, so `aria-describedby` can point at it. `useId`
+  // keeps two gauntlets on one page from colliding.
+  const blockedReasonId = useId()
+  // An empty string is NOT a reason, so it does not block — a caller that has nothing to
+  // say must not be able to disable the control by accident.
+  const blocked = typeof blockedReason === "string" && blockedReason.trim().length > 0
   // `loading` lives on the wrapper so close affordances (✕ / backdrop / Escape)
   // can be BLOCKED while a publish is in flight (the gauntlet runs synchronously).
   const [loading, setLoading] = useState(false)
@@ -692,6 +862,18 @@ export function PublishGauntlet({ definitionId, definition, onPublished }: Publi
   useEffect(() => {
     if (open) goldenInputRef.current?.focus()
   }, [open])
+
+  /**
+   * Phase 186-07 (D-186-12) — report the in-flight flag this component already keeps, and
+   * report `false` on unmount so a Builder cannot be left holding its writes forever
+   * because the gauntlet was closed while a request was outstanding. No-ops entirely when
+   * no parent asked, which is every call site outside the Builder.
+   */
+  useEffect(() => {
+    if (!onRunningChange) return
+    onRunningChange(loading)
+    return () => onRunningChange(false)
+  }, [loading, onRunningChange])
 
   // Escape-to-close + simple Tab focus containment — mirrors RunModal's contract.
   useEffect(() => {
@@ -727,15 +909,35 @@ export function PublishGauntlet({ definitionId, definition, onPublished }: Publi
 
   return (
     <>
-      {/* The resting trigger — compact, fits the Builder header's shrink-0 slot. */}
+      {/* The resting trigger — compact, fits the Builder header's shrink-0 slot.
+          Phase 184-11 (R12): while a reason is supplied it is DISABLED and the reason is
+          named right beside it — never greyed in silence. With no reason supplied both
+          the `disabled` and the `aria-describedby` attributes are absent, so the rendered
+          control is the one that shipped. */}
       <button
         type="button"
         data-testid="publish-trigger"
         onClick={() => setOpen(true)}
-        className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90"
+        disabled={blocked}
+        aria-describedby={blocked ? blockedReasonId : undefined}
+        // The blocked styling is APPENDED rather than expressed as `disabled:` variants,
+        // so the unblocked class string is the shipped one character for character.
+        className={
+          "rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90" +
+          (blocked ? " cursor-not-allowed opacity-50" : "")
+        }
       >
         ◆ Publish…
       </button>
+      {blocked && (
+        <span
+          id={blockedReasonId}
+          data-testid="publish-blocked-reason"
+          className="ml-2 text-[12px] leading-snug text-muted-foreground"
+        >
+          {blockedReason}
+        </span>
+      )}
 
       {open && (
         <div
@@ -786,6 +988,8 @@ export function PublishGauntlet({ definitionId, definition, onPublished }: Publi
                 loading={loading}
                 setLoading={setLoading}
                 goldenInputRef={goldenInputRef}
+                blocked={blocked}
+                blockedReason={blockedReason}
               />
             </div>
           </div>

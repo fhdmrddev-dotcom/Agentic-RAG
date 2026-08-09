@@ -17,7 +17,7 @@
  * fresh (MEMORY project_frontend_vitest_rot) — not leaning on a rotted sibling.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, cleanup, fireEvent } from "@testing-library/react"
+import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
 import type { SkillVersion, EvalRun, SkillProposal, PromotionGate } from "@/types"
 
 const listSkillVersions = vi.fn()
@@ -188,5 +188,44 @@ describe("VersionsTab — 056-B table + compare + provenance joins (137-02)", ()
     expect(screen.queryByText(/restore/i)).toBeNull()
     expect(screen.queryByText(/revert/i)).toBeNull()
     expect(screen.queryByRole("button", { name: /restore|revert/i })).toBeNull()
+  })
+
+  // 176-02 (RENDER-04 / BUG-260706-01): the Studio shell bumps refreshNonce after a
+  // version is promoted; VersionsTab must include it in its fetch-effect deps so its OWN
+  // versions/runs/proposals self-fetch re-runs and the newly-promoted version appears —
+  // with no reload. A skillId change must still refetch (existing behavior preserved).
+  it("(7) a refreshNonce bump re-invokes listSkillVersions and updates the rows; a skillId change still refetches", async () => {
+    const VERSIONS_BUMPED: SkillVersion[] = [
+      mkVersion({
+        id: "ver-6",
+        version_number: 6,
+        source: "self_improve",
+        instructions: "shared top\nsix body\nshared bottom",
+      }),
+      ...VERSIONS,
+    ]
+    listSkillVersions
+      .mockReset()
+      .mockResolvedValueOnce(VERSIONS) // initial mount → 5 rows
+      .mockResolvedValue(VERSIONS_BUMPED) // after the nonce bump → 6 rows
+
+    const { rerender } = render(
+      <VersionsTab skillId="skill-1" liveVersionNumber={5} refreshNonce={0} />,
+    )
+
+    // Initial mount → 5 rows, exactly one listSkillVersions call.
+    expect(await screen.findByText("proposal-promoted")).toBeInTheDocument()
+    expect(document.querySelectorAll("tbody tr").length).toBe(5)
+    expect(listSkillVersions).toHaveBeenCalledTimes(1)
+
+    // Bump ONLY the nonce (same skillId) → the self-fetch effect must re-run.
+    rerender(<VersionsTab skillId="skill-1" liveVersionNumber={5} refreshNonce={1} />)
+    await waitFor(() => expect(listSkillVersions).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(document.querySelectorAll("tbody tr").length).toBe(6))
+
+    // A skillId change still refetches (deps also include skillId — existing behavior).
+    rerender(<VersionsTab skillId="skill-2" liveVersionNumber={5} refreshNonce={1} />)
+    await waitFor(() => expect(listSkillVersions).toHaveBeenCalledTimes(3))
+    expect(listSkillVersions).toHaveBeenLastCalledWith("skill-2")
   })
 })

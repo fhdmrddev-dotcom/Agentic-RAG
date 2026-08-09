@@ -1,11 +1,28 @@
 """Integration tests for /kb endpoints."""
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from tests.conftest import _supabase
+
+
+def _patch_grep_rpc(rows):
+    """Patch kb.get_user_pg_connection so grep_path's query_user_documents returns ``rows``.
+
+    Phase 164 (D-164-04): grep_path deletes the _inject_user_id_for_grep regex and runs the
+    INVOKER query_user_documents RPC over the asyncpg user-context (RLS scopes it), NOT over
+    the mocked service-role supabase client. This stubs that user-context connection so the
+    endpoint returns canned rows without hitting the live DB. Cross-org isolation itself is
+    proven live in tests/integration/test_v3_4_org_isolation.py (text_to_sql/grep legs)."""
+    @asynccontextmanager
+    async def _cm(request, current_user):
+        conn = MagicMock()
+        conn.fetchval = AsyncMock(return_value=rows)
+        yield conn
+    return patch("app.api.kb.get_user_pg_connection", _cm)
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -23,13 +40,13 @@ DOC_ROOT = str(uuid4())        # doc at root (folder_id=None)
 DOC_IN_REPORTS = str(uuid4())  # doc in reports folder
 
 
-def _folder_row(folder_id, name, parent_id=None, is_global=False, user_id=USER_ID):
+def _folder_row(folder_id, name, parent_id=None, is_org_shared=False, user_id=USER_ID):
     return {
         "id": folder_id,
         "user_id": user_id,
         "name": name,
         "parent_id": parent_id,
-        "is_global": is_global,
+        "is_org_shared": is_org_shared,
         "created_at": NOW,
         "updated_at": NOW,
     }
@@ -58,6 +75,39 @@ def _standard_folders():
         _folder_row(FOLDER_ROOT_B, "notes"),
         _folder_row(FOLDER_CHILD, "q1", parent_id=FOLDER_ROOT_A),
     ]
+
+
+# ── Phase 165 (MIG-02) org-membership mock routing ────────────────────────────
+# Plan 165-02 added `_resolve_caller_org_ids` -> a leading
+# `supabase.table("org_members").select("org_id").eq("user_id", ...)` query at the FRONT of
+# fetch_visible_folders / get_globally_visible_folder_ids (folder_utils.py). Route THAT one
+# query to a canned caller-org result (table-name-keyed dispatch) so it never consumes an
+# entry from the ordered `execute.side_effect` lists below — the existing positional folder /
+# document sequences stay aligned, and future leading-query insertions won't re-break them.
+CALLER_ORG_ID = "00000000-0000-0000-0000-0000000000a1"
+
+
+@pytest.fixture(autouse=True)
+def _route_org_members(mock_builder):
+    """Dispatch `table("org_members")` to a canned org-membership result; everything else
+    keeps returning the shared side_effect-driven builder (so positional lists stay intact)."""
+    from tests.conftest import _supabase  # noqa: PLC0415
+
+    org_result = MagicMock()
+    org_result.data = [{"org_id": CALLER_ORG_ID}]
+    org_builder = MagicMock()
+    org_builder.select.return_value = org_builder
+    org_builder.eq.return_value = org_builder
+    org_builder.execute.return_value = org_result
+
+    def _dispatch(name, *args, **kwargs):
+        return org_builder if name == "org_members" else mock_builder
+
+    _supabase.table.side_effect = _dispatch
+    try:
+        yield
+    finally:
+        _supabase.table.side_effect = None
 
 
 # ── TestLs ───────────────────────────────────────────────────────────────────
@@ -201,8 +251,12 @@ class TestTree:
 
     def test_tree_not_found(self, client, auth_headers, mock_builder):
         """GET /kb/tree?path=/nonexistent returns 404."""
+        # tree_path resolves get_globally_visible_folder_ids (WR-01 owner-nulling set, Plan
+        # 165-02) BEFORE path resolution, so BOTH _fetch_visible_folders and
+        # get_globally_visible_folder_ids fetch folders before the 404 — two folder fetches.
         mock_builder.execute.side_effect = [
-            _make_result(_standard_folders()),
+            _make_result(_standard_folders()),  # _fetch_visible_folders
+            _make_result(_standard_folders()),  # get_globally_visible_folder_ids (WR-01)
         ]
         response = client.get("/kb/tree?path=/nonexistent", headers=auth_headers)
         assert response.status_code == 404
@@ -234,12 +288,11 @@ class TestTree:
 class TestGrep:
     def test_grep_no_path(self, client, auth_headers, mock_builder):
         """GET /kb/grep?pattern=budget returns 200 with matching documents."""
-        mock_builder.execute.side_effect = [
-            _make_result([
-                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
-            ]),
-        ]
-        response = client.get("/kb/grep?pattern=budget", headers=auth_headers)
+        # Phase 164: the query_user_documents RPC runs over the user-context, not mock_builder.
+        with _patch_grep_rpc([
+            {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+        ]):
+            response = client.get("/kb/grep?pattern=budget", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["pattern"] == "budget"
@@ -249,13 +302,14 @@ class TestGrep:
 
     def test_grep_with_path(self, client, auth_headers, mock_builder):
         """GET /kb/grep?pattern=revenue&path=/reports scopes to reports subtree."""
+        # Folder resolution still uses the mocked supabase; the RPC uses the user-context (164).
         mock_builder.execute.side_effect = [
             _make_result(_standard_folders()),  # _fetch_visible_folders
-            _make_result([
-                {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
-            ]),  # RPC result
         ]
-        response = client.get("/kb/grep?pattern=revenue&path=/reports", headers=auth_headers)
+        with _patch_grep_rpc([
+            {"id": DOC_IN_REPORTS, "filename": "report.pdf", "folder_id": FOLDER_ROOT_A},
+        ]):
+            response = client.get("/kb/grep?pattern=revenue&path=/reports", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["pattern"] == "revenue"
@@ -282,19 +336,21 @@ class TestGrep:
         assert data["matches"] == []
 
     def test_grep_rls(self, client, auth_headers, mock_builder):
-        """grep results are scoped to the user via query_user_documents RPC user_id injection."""
-        # The RPC call includes user_id in the SQL WHERE clause
-        # Mock returns only the user's documents (RLS simulation)
-        mock_builder.execute.side_effect = [
-            _make_result([
-                {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
-            ]),
-        ]
-        response = client.get("/kb/grep?pattern=hello", headers=auth_headers)
+        """grep results are scoped to the caller via RLS on the user-context connection.
+
+        Phase 164 (D-164-04): the _inject_user_id_for_grep regex is DELETED — cross-user/
+        cross-org scoping is now enforced by RLS when the INVOKER query_user_documents RPC
+        runs over the asyncpg user-context (the actual isolation is proven live in
+        test_v3_4_org_isolation.py::test_text_to_sql_grep_path_isolation). Here the
+        user-context returns only the caller's document, and the endpoint surfaces it."""
+        with _patch_grep_rpc([
+            {"id": DOC_ROOT, "filename": "readme.pdf", "folder_id": None},
+        ]):
+            response = client.get("/kb/grep?pattern=hello", headers=auth_headers)
         assert response.status_code == 200
         data = response.json()
         assert data["total"] == 1
-        # Verify only the user's document was returned
+        # Only the caller's document is returned (RLS-scoped via the user-context).
         assert data["matches"][0]["document_id"] == DOC_ROOT
 
 

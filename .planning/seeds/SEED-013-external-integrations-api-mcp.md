@@ -177,3 +177,26 @@ This seed (SEED-013) owns only the **API/MCP surface** — exposing `answer + co
 The confidence-GATED, closed-loop behavior — "when confidence is low, route to a human queue / open an escalation / file a ticket" — is **reactive automation logic** and lives in **SEED-014 (Automations & Routines, targeted for v3.4)**. SEED-014 already lists `confidence.low` as a triggered-run event. If we ever want to drive that escalation *inside our own app* (rather than letting n8n branch on the JSON), that's SEED-014 work, not API-layer work. See SEED-014's matching `## Update 2026-05-31` section for the human-in-the-loop (HITL) escalation pattern.
 
 Plain-language split: **SEED-013 hands back the number; SEED-014 decides what to do when the number is low.**
+
+## Update 2026-08-08 — Operator direction: there is a FOURTH consumer mode, and it is the one this seed never wrote down
+
+Recorded at the Phase 190 context lock. The three consumer modes above are all about **others calling
+us** — REST API inbound, us as MCP **server**, webhooks. The operator's direction adds the mirror:
+
+> "it should be a two way communication… we need the ability to read write to pull something from
+> Jira from email from Slack from anything. And also to send."
+
+**Mode 4 — us as MCP CLIENT.** The app calls out and reads back: a workflow step pulls a Jira ticket's
+description, the last messages in a Slack channel, an email — and a connected drive (OneDrive /
+SharePoint / Google Drive) auto-ingests documents into the knowledge base without a human upload.
+
+This is **binding on this milestone's scope**, not a follow-on to it. When Open Platform gets a phase
+number, mode 4 is scoped alongside modes 1–3 — they share auth, quotas, credentials and observability,
+which is the same reason this seed planted the first three together.
+
+Full analysis, the two halves (workflow reads vs drive auto-ingest), why neither belongs in Phase 190,
+and what Phase 190 must NOT change because of it: **`SEED-142-two-way-connectors-read-pull-auto-ingest.md`**.
+
+⚠ Note for whoever scopes this: auto-ingest contradicts the standing `CLAUDE.md` rule *"Ingestion is
+manual file upload only — no connectors or automated pipelines."* That rule is dated, not permanent —
+change it in the same commit as the first sync connector, never leave it standing against shipped code.

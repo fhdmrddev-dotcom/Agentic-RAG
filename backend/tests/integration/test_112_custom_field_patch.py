@@ -153,7 +153,7 @@ async def user_doc_and_field(pg_pool):
             pytest.skip("migration 071 not applied (metadata_field_definitions absent)")
         await pg_pool.execute(
             "INSERT INTO metadata_field_definitions "
-            "(user_id, field_key, field_type, is_global, enabled) "
+            "(user_id, field_key, field_type, is_system_global, enabled) "
             "VALUES ($1, $2, $3, $4, $5)",
             user_id, field_key, "string", False, True,
         )

@@ -113,7 +113,7 @@ async def test_load_skill_by_name_bypasses_catalog():
         "instructions": "LEGACY REPORT FORMATTER BODY",
         "user_id": TEST_USER_ID,
         "is_system": False,
-        "is_global": False,
+        "is_org_shared": False,
         "is_enabled": True,
     }
     sb = _FakeSupabase(skills_rows=[enabled_skill], files_rows=[])

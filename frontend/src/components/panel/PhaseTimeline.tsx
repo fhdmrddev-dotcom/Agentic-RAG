@@ -29,7 +29,13 @@ import { useEffect, useRef, useState } from "react"
 import { usePhases, useTasks } from "@/providers/StreamsProvider"
 import { getThreadWorkflow, type ThreadWorkflowState } from "@/lib/api"
 import type { Phase } from "@/types"
+// Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the terminal-run set MOVED to the shared
+// derivation module so the canvas run view reads the same one. `timed_out` is carried
+// forward unchanged (D-188-21) — the measurement is recorded in that module's docblock.
+import { TERMINAL_RUN_STATUSES } from "@/lib/phaseState"
 import { PhaseCard } from "./PhaseCard"
+// WR-05 — the panel's status vocabulary, read from its ONE home rather than re-derived.
+import { statusWord } from "./phaseStatusMeta"
 
 /** The run-level reconcile frame this timeline needs (subset of ThreadWorkflowState). */
 type RunFrame = Pick<
@@ -37,7 +43,6 @@ type RunFrame = Pick<
   "mode" | "definition_name" | "run_status" | "current_phase_index" | "total_phases"
 >
 
-const TERMINAL_RUN_STATUSES = new Set(["completed", "failed", "cancelled", "timed_out"])
 
 /** Find the active (running/retrying) phase index, else the last done, else 0. */
 function activePhaseIndex(phases: Phase[]): number {
@@ -50,7 +55,19 @@ function activePhaseIndex(phases: Phase[]): number {
   return 0
 }
 
-/** Plain-language milestone for the announcer (one sentence per transition edge). */
+/**
+ * Plain-language milestone for the announcer (one sentence per transition edge).
+ *
+ * ⚠ THIS SWITCH IS SILENT TO A WIDENED `Phase["status"]`. It carries a `default:` arm, so
+ * a new member does NOT become a typecheck error here the way it does in `PhaseCard`'s
+ * `STATUS_META` — it simply announces nothing, and a screen-reader user is told a step
+ * reached a terminal by hearing nothing at all. That is why 189's arm below was added from
+ * a written list of consumers rather than from a compiler run: only the list finds it.
+ * Recorded so the next widening does not have to rediscover it.
+ *
+ * The `default:` arm STAYS. Silence is the correct announcement for a state this component
+ * has no sentence for; inventing one would be the announcer's version of a fail-open.
+ */
 function milestoneFor(phase: Phase | undefined, total: number): string {
   if (!phase) return ""
   const ordinal = `Phase ${phase.phaseIndex + 1} of ${total}`
@@ -65,6 +82,12 @@ function milestoneFor(phase: Phase | undefined, total: number): string {
       return `${ordinal}, ${phase.slug}, retrying`
     case "skipped":
       return `${ordinal}, ${phase.slug}, skipped`
+    // Phase 189 Plan 08 (CONN-01 / D-07) — the governed external action's terminal, in the
+    // shipped pattern: ordinal, slug, then the state. It ends in the panel's own harness
+    // words and must not be spoken as `complete`; announcing a step that deliberately sent
+    // nothing as finished is the same fail-open one language layer up.
+    case "recorded-not-sent":
+      return `${ordinal}, ${phase.slug}, not sent`
     default:
       return ""
   }
@@ -161,7 +184,15 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
   let doingNow = "Setting up…"
   if (runTerminal && frame?.run_status === "completed") doingNow = "Workflow complete"
   else if (activePhase?.status === "failed") doingNow = `Run failed during ${activePhase.slug}.`
-  else if (activePhase) doingNow = `${activePhase.slug} — ${activePhase.status}`
+  // WR-05: the STATUS goes through the vocabulary table, never straight out of the union.
+  // This line used to interpolate `activePhase.status` — the internal `Phase["status"]`
+  // member — into copy a user reads. For the six pre-189 members that read tolerably
+  // (*notify — running*); the member 189 added rendered as **`notify — recorded-not-sent`**,
+  // a kebab-case identifier on the one surface whose whole discipline (D-17) is that the
+  // stored slug, the panel word and the canvas sentence are three DIFFERENT spellings.
+  // `statusWord` is `STATUS_META`'s own `text` (the table two files' worth of comments call
+  // the panel's vocabulary), reached through the same own-property guard the card uses.
+  else if (activePhase) doingNow = `${activePhase.slug} — ${statusWord(activePhase.status)}`
 
   const headerName = frame?.definition_name?.trim() || "Workflow"
 

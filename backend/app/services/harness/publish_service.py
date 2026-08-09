@@ -3,12 +3,32 @@
 ``publish()`` is the orchestration the ``POST /workflows/{id}/publish`` route delegates
 to (Plan 05 Task 3). A draft becomes published ONLY through here, enforcing IN ORDER:
 
-    0. load + owner-check the draft (V4 — a non-owner gets ``not_found`` -> 404)
-    1. business_requirement present?  (D-13 publish-time invariant -> 400 on absence)
-    2. structural lint               (reachability.lint_workflow — pure, no I/O)
-    3. a REAL golden run             (is_golden_run=True on the project KB — D-05, no mocks)
-    4. the judge verdict             (the llm_judge_rubric forced emission over the run's output)
-    5. flip                          (publish_definition — draft->published)
+    0.  load + owner-check the draft (V4 — a non-owner gets ``not_found`` -> 404)
+    1.  business_requirement present? (D-13 publish-time invariant -> 400 on absence)
+    2.  structural lint              (reachability.lint_workflow — pure, no I/O)
+    2.5 interactive-phase pre-run    (WR-04 — llm_human_input / ask_user cannot be validated)
+    2.6 grounding fidelity           (Phase 182 gap closure — the SHARED
+                                      ``grounding.grounding_verdicts``: folder_scope ⊆ the
+                                      project subtree, available tools ∈ the registry, a
+                                      phase skill reference ∈ the caller's enabled set)
+    3.  a REAL golden run            (is_golden_run=True on the project KB — D-05, no mocks)
+    4.  the judge verdict            (the llm_judge_rubric forced emission over the run's output)
+    5.  flip                         (publish_definition — draft->published)
+
+STAGE 2.6 IS THE ANTI-DRIFT HALF (Phase 182 / VALID-01 / D-182-02 / D-182-06). It calls the
+SAME collector ``POST /workflows/validate`` previews, so there is exactly ONE copy of every
+grounding rule and the canvas can never drift from the publish gauntlet it must ultimately
+pass. Before this stage existed, a definition naming a hallucinated tool or an inaccessible
+skill reference painted RED in ``/validate`` and published GREEN
+(``182-VERIFICATION.md`` Truth 5 / WR-01). No grounding rule is implemented here — this
+module only calls the shared one.
+
+DELIBERATELY NOT GATED — ``create_draft`` (``POST /workflows``) and ``update_draft``
+(``PATCH /workflows/{id}``) do NOT enforce grounding fidelity. This is a DECISION, not an
+oversight: a work-in-progress draft must remain storable while incomplete, or the Phase 184
+canvas editing loop becomes hostile (every keystroke that outruns its node config would be
+rejected). ``POST /workflows/validate`` is the live ADVISORY surface; PUBLISH is the
+ENFORCING gate. Anything that mints a version passes stage 2.6.
 
 A lint-clean workflow whose JUDGE fails CANNOT publish — that is the QUAL-01 hard
 blocker. Every block returns the D-08 structured verdict
@@ -26,8 +46,8 @@ pipeline ORDER and the hard-blocker contract; the REAL acceptance is the LIVE go
 against the project KB on the VALIDATION.md SC#10 4-axis scoreboard — not the mocked test.
 
 RECEIPT KEYING (the documented choice, plan Task 2 note): ``publish_attempted`` is written
-AFTER the golden run row exists (stage 3) so it carries a real ``run_id``; a stage-0/1/2
-block (before any golden run) writes ``publish_blocked`` keyed to a NULL ``run_id``
+AFTER the golden run row exists (stage 3) so it carries a real ``run_id``; EVERY pre-run
+block — stages 0, 1, 2, 2.5 and 2.6 — writes ``publish_blocked`` keyed to a NULL ``run_id``
 (``harness_audit.run_id`` is nullable — full-schema.sql:452) with the definition id in
 metadata. The governance trail is honest about whether a real run was created.
 """
@@ -63,6 +83,10 @@ async def publish_workflow(
     # helpers (which re-import them locally) — publish_workflow itself needs only these.
     from app.db.workflows import get_definition, publish_definition
     from app.models.harness import WorkflowDefinition
+    # Phase 182 (D-182-02 / Pitfall 4): the D-13 stage-1 predicate is now a SHARED
+    # one-liner in the grounding module so publish and the canvas /validate seam call
+    # ONE copy — a copy-pasted rule drifts, even a trivial one.
+    from app.services.harness.grounding import business_requirement_missing
     from app.services.harness.reachability import lint_workflow
 
     user_id_raw = user.get("id")
@@ -87,6 +111,15 @@ async def publish_workflow(
             "named_failures": ["workflow not found"],
             "golden_run_id": None,
         }
+
+    # Phase 186 (D-186-10) — the draft AS IT WAS WHEN WE STARTED CHECKING IT. Captured
+    # here, spent at stage 5, minutes of golden run later. ``row.get`` and NEVER a
+    # SUBSCRIPT: at least five shipped test files patch ``get_definition`` with
+    # hand-built dicts that carry no ``token`` key, and a subscript would turn every one
+    # of them into a KeyError. A missing token degrades to ``None``, which
+    # ``publish_definition`` defines as today's unguarded flip — the same graceful shape
+    # as the route's optional ``If-Match``.
+    stage0_token = row.get("token")
 
     if row.get("status") != "draft":
         return await _block(
@@ -121,7 +154,9 @@ async def publish_workflow(
         )
 
     # ── stage 1: business_requirement present? (D-13 publish-time invariant) ─────
-    if not (definition.business_requirement or "").strip():
+    # The predicate is the SHARED grounding.business_requirement_missing (Phase 182) —
+    # behavior identical, now one source with the canvas /validate seam.
+    if business_requirement_missing(definition):
         return await _block(
             pool,
             run_id=None,
@@ -167,6 +202,42 @@ async def publish_workflow(
             definition_id=definition_id,
             stage="interactive_phase",
             named_failures=interactive_failures,
+            golden_run_id=None,
+        )
+
+    # ── stage 2.6: grounding fidelity (Phase 182 gap closure — the SHARED rules) ──
+    # ORDERING RATIONALE. This is the LAST of the cheap static gates and it runs BEFORE
+    # the golden run because:
+    #   * it needs exactly what ``/validate`` needs — the definition, the owner, and the
+    #     server-side registries — and nothing whatsoever from a run;
+    #   * it is a pre-run static check (one folder read + one skill read + the in-process
+    #     tool registry), so a hallucinated tool or an inaccessible skill reference can
+    #     never burn a REAL provider run (the same posture as the lint short-circuit);
+    #   * it is placed AFTER the existing gates rather than before them, so no currently
+    #     blocking definition changes WHICH stage it blocks at — nothing is reordered.
+    #
+    # SEEN AND DEFERRED — IN-05 (round-2 review). ``supabase`` stays ``None`` between this
+    # stage and the golden run below, so ``_resolve_publish_supabase`` runs TWICE per publish
+    # and each self-constructed client opens an httpx client that is never closed. Resolving
+    # once and threading the pair through both would fix it, but restructuring this
+    # orchestration is outside the operator-selected scope of this round. Recorded here so the
+    # next reader meets a deferral rather than re-discovering it — and so it is not mistaken
+    # for something the WR-05 tuple change introduced (it predates it; the tuple adds no read).
+    grounding_failures = await _grounding_fidelity_failures(
+        definition,
+        definition_id=definition_id,
+        user_id=user_id,
+        pool=pool,
+        supabase=supabase,
+    )
+    if grounding_failures:
+        return await _block(
+            pool,
+            run_id=None,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="grounding_fidelity",
+            named_failures=grounding_failures,
             golden_run_id=None,
         )
 
@@ -294,7 +365,11 @@ async def publish_workflow(
         )
 
     # ── stage 5: flip (all passed) ───────────────────────────────────────────────
-    version = await publish_definition(pool, definition_id)
+    # Phase 186 (D-186-10): the flip is guarded on the STAGE-0 token, so what we publish
+    # is what we spent the golden run checking. NOT wrapped in a transaction with any
+    # other UPDATE — ``now()`` is transaction time and a sibling write would render an
+    # identical token, silently disabling the guard (CONCURRENCY_TOKEN_SQL, Pitfall 9).
+    version = await publish_definition(pool, definition_id, token=stage0_token)
     # WR-03 (T-102-09-02): publish_definition returns -1 when its ``status='draft'``
     # WHERE guard matched 0 rows — a concurrent double-publish (the race loser) or a
     # row no longer a draft. Without this check the caller returned a FALSE
@@ -309,6 +384,29 @@ async def publish_workflow(
             definition_id=definition_id,
             stage="already_published",
             named_failures=["the draft was published concurrently or is no longer a draft"],
+            golden_run_id=golden_run_id,
+        )
+    # D-186-10: publish_definition returns -2 when the row is STILL an owned draft but
+    # its token no longer matches the one captured at stage 0 — the draft was edited
+    # while the gauntlet was running (autosave makes this routine, not exotic). The
+    # sentinel is kept SEPARATE from -1 for the same reason -1 exists at all: a receipt
+    # must describe what happened. A -2 routed to ``already_published`` would tell the
+    # author that someone else published their workflow — false, and worse than useless,
+    # because the true cause (their own newer edit) is the one thing that tells them what
+    # to do next. The golden run and every harness_audit row it wrote are PRESERVED: this
+    # is a ``_block``, which only ADDS a publish_blocked receipt, and ``golden_run_id`` is
+    # carried through so the refusal stays attributable to the run that really happened.
+    if version == -2:
+        return await _block(
+            pool,
+            run_id=golden_run_id,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="draft_changed",
+            named_failures=[
+                "the draft changed while it was being checked — "
+                "re-publish to check the new version"
+            ],
             golden_run_id=golden_run_id,
         )
     await _safe_audit(
@@ -442,6 +540,164 @@ def _interactive_phase_failures(definition) -> list:
     return failures
 
 
+async def _resolve_publish_supabase(supabase, *, definition_id: UUID, pool) -> tuple:
+    """The ONE service-role client resolution on the publish path (stage 2.6 + golden run),
+    AND the ONE place the publish path learns which TENANT it is acting for.
+
+    Returns ``(client, org_id)``.
+
+    Phase 163 (D-05 / T-163-05b): NO bare, org-less service-role fallback survives on the
+    publish / golden-run path. When the caller supplies no client, the org of the workflow
+    definition being published (``workflow_definitions.org_id``, backfilled post-162) is
+    read first and the client is built through the org-requiring factory in
+    ``app.dependencies`` — which REFUSES to construct without an explicit org scope, by
+    design. A falsy org therefore raises here rather than silently producing an
+    unscoped BYPASSRLS client.
+
+    THE SECOND RESPONSIBILITY (round-2 gap closure — WR-05). The definition's ``org_id`` was
+    already being read here, used to scope the CLIENT, and then thrown away. It is now
+    RETURNED, because BOTH consumers of that value read it from this one place: the client
+    scope (Phase 163 / D-05) and the grounding-gate scope (WR-05). Reading it once is what
+    makes it impossible for the two to disagree about which tenant a publish is acting for —
+    a second read is how they would drift apart.
+
+    THE ORG IS READ ON BOTH BRANCHES, deliberately. A caller-supplied client does not mean
+    "no tenant": returning ``(supabase, None)`` would silently disable the gate's restriction
+    in exactly the suites written to prove it, and would hand the gate a ``None`` scope on any
+    future caller that passes its own client. A FALSY org is refused on both branches too —
+    without a client the org-requiring factory refuses; with one, this function refuses
+    itself, since there is no factory to do it. **A falsy org must never resolve to an
+    unrestricted gate.** The refusal is a raise, which stage 2.6's fail-closed wrapper turns
+    into a ``grounding_unavailable`` block — the correct direction.
+
+    Shared by ``_grounding_fidelity_failures`` and ``_drive_golden_run`` so exactly ONE
+    construction path exists (a second copy is how an org-less fallback creeps back in).
+    Also the single patchable seam the unit suites swap — ``pool`` is an ``AsyncMock``
+    there, so an un-patched resolution would hand a truthy mock to the factory.
+    """
+    from app import dependencies as _deps  # function-local (mirrors this module's posture)
+
+    _org_id = await pool.fetchval(
+        "SELECT org_id FROM workflow_definitions WHERE id = $1", definition_id
+    )
+    if supabase is not None:
+        if not _org_id:
+            raise ValueError(
+                "publish cannot resolve the definition's org_id — refusing to run the "
+                "grounding gate against the publisher's full org-membership union (WR-05)"
+            )
+        return supabase, _org_id
+    return _deps.get_service_role_supabase(_org_id), _org_id
+
+
+async def _grounding_fidelity_failures(
+    definition,
+    *,
+    definition_id: UUID,
+    user_id,
+    pool,
+    supabase,
+) -> list:
+    """Stage 2.6 — the grounding-fidelity named failures, from the ONE shared collector.
+
+    Calls ``grounding.assemble_grounding_bundle`` + ``grounding.grounding_verdicts`` — the
+    SAME copy ``POST /workflows/validate`` calls — so there is exactly ONE implementation of
+    the three grounding rules (folder scope ⊆ the bound project subtree, every declared tool
+    ∈ the real registry, every phase skill reference ∈ the caller's enabled set). D-182-02
+    reuse-verbatim / D-182-06 red line: NOTHING is re-implemented, re-shaped, re-filtered or
+    re-classified here — the collector's list is returned unchanged.
+
+    PRE-RUN STATIC CHECK: one folder read + one skill read + the in-process tool registry —
+    no provider call — so it short-circuits BEFORE the expensive golden run.
+
+    The returned dicts are the collector's ``{code, phase, message}`` — the SAME shape the
+    ``lint`` stage renders its named failures with (no new response vocabulary), per-node
+    keyed on the phase ``slug``.
+
+    FAILS CLOSED, TWO WAYS. On any raise — and on a bundle that reports itself DEGRADED —
+    this returns a single ``grounding_unavailable`` named failure, which BLOCKS the publish.
+    A publish that cannot verify grounding must not mint a version. Returning ``[]`` would
+    silently publish an unverified definition, which is the exact defect this stage exists to
+    close; raising would violate ``publish_workflow``'s sealed-orchestration contract (never
+    raise into the route).
+
+    WHY THE DEGRADED BRANCH EXISTS (round-2 gap closure — WR-01). This docstring used to claim
+    that the posture here matched ``grounding._skill_registry``'s own fail-closed read
+    (CR-01). That was false in the way that mattered: that read's swallow was INVISIBLE to
+    this wrapper. A transient registry failure produced an EMPTY registry and a
+    bundle that returned SUCCESSFULLY, so the ``try`` below never fired, the collector ran
+    against nothing, and every membership test came back vacuously false — this stage then
+    blocked publish naming the author's own valid phase references as unregistered. A factual
+    accusation against a correct definition, sourced from an outage. The degradation now
+    travels on ``bundle.degraded`` and this stage reports "we could not CHECK" instead, from
+    the SAME builder ``POST /workflows/validate`` uses, so the two sides share one message and
+    one code string as well as one rule set.
+
+    SCOPED TO THE DEFINITION'S OWN ORG (round-2 gap closure — WR-05). This gate must answer
+    "is this definition grounded in ITS OWN org?", not "can this publisher see everything it
+    names". For a MULTI-ORG author those are different questions, and the second one is the
+    wrong one: ``_resolve_publish_supabase`` had already read this definition's ``org_id`` to
+    scope the BYPASSRLS client, and then the gate discarded it and let
+    ``assemble_grounding_bundle`` resolve visibility from the publisher's ENTIRE org
+    membership. A definition in org A naming an org-B skill or an org-B folder therefore
+    passed.
+
+    The RUN-TIME picture is the one that matters, and it flips: ``tool_dispatcher``'s skill
+    resolution and ``fetch_visible_folders`` gate on the RUNNER's org set, so an org-A
+    colleague running that published workflow gets an unresolvable reference or an empty
+    folder intersection — a workflow that cleared the hard gate and silently under-performs
+    for everyone but its author, with no way to tell whether the definition or the environment
+    is at fault. Nothing crosses a tenant boundary on the wire; this is the SEED-124 /
+    SEED-125 family (org-blind service-role reads) one layer up — the read IS org-gated, the
+    SCOPE of the gate was wrong, and plan 182-06 is what made this gate authoritative.
+
+    The fix is ONE optional keyword built from the org this path already reads, passed to BOTH
+    grounding calls so the palette and the ⊆ walk agree. No visibility rule is duplicated: the
+    shared skill predicate and the folder ancestor walk are untouched and simply receive a
+    narrower org set.
+    """
+    from app.services.harness.grounding import (  # function-local (Pitfall 4)
+        assemble_grounding_bundle,
+        grounding_unavailable_finding,
+        grounding_verdicts,
+    )
+
+    try:
+        resolved, org_id = await _resolve_publish_supabase(
+            supabase, definition_id=definition_id, pool=pool
+        )
+        # WR-05 — the gate's scope IS the definition's org, read once above alongside the
+        # client scope so the two can never disagree. A raise on the way here (an unreadable
+        # or falsy org) lands in the fail-closed ``except`` below as ``grounding_unavailable``,
+        # which BLOCKS — the correct direction for a publish that cannot establish its tenant.
+        bundle = await assemble_grounding_bundle(
+            supabase=resolved, user_id=str(user_id), restrict_org_ids={str(org_id)}
+        )
+        if bundle.degraded:
+            logger.warning(
+                "publish: grounding registries %s could not be resolved for definition %s — "
+                "blocking (fail-closed) without running the fidelity rules",
+                sorted(bundle.degraded),
+                definition_id,
+            )
+            return [grounding_unavailable_finding(bundle.degraded)]
+        return await grounding_verdicts(
+            definition,
+            supabase=resolved,
+            user_id=str(user_id),
+            tool_names=bundle.tool_names,
+            skill_ids=bundle.skill_ids,
+            restrict_org_ids={str(org_id)},
+        )
+    except Exception:  # noqa: BLE001 — fail CLOSED, never raise into the sealed orchestration
+        logger.exception(
+            "publish: grounding registry could not be resolved for definition %s — "
+            "blocking (fail-closed)",
+            definition_id,
+        )
+        return [grounding_unavailable_finding()]
+
+
 def _judge_named_failures(verdict: dict) -> list:
     """The D-08 named failures for a judge block — per-criterion critique + summary."""
     if verdict.get("failure"):
@@ -496,10 +752,18 @@ async def _drive_golden_run(
     from app.db.workflows import create_workflow_run, load_run_phases
     from app.services.harness_engine import _emit, run_workflow
 
-    if supabase is None:
-        from app.dependencies import get_supabase
-
-        supabase = get_supabase()
+    # The org-scoped service-role client — resolved through the ONE shared helper (Phase 182
+    # plan 06 moved the Phase-163 / T-163-05b explanation onto ``_resolve_publish_supabase``
+    # so the "no org-less fallback on the publish path" rule lives in a single place, shared
+    # with the stage-2.6 grounding read). The ephemeral validation thread INSERT below still
+    # relies on the mig-106 autofill for its own org_id.
+    # The org is IGNORED here (bound to a throwaway name) on purpose: the golden run is scoped
+    # by the CLIENT alone — every read it performs rides that already-org-scoped client, and
+    # the ephemeral validation thread INSERT relies on the mig-106 autofill. Only stage 2.6's
+    # grounding gate needs the org as a VALUE (WR-05).
+    supabase, _golden_run_org_id = await _resolve_publish_supabase(
+        supabase, definition_id=definition_id, pool=pool
+    )
 
     # ── 1. ephemeral validation thread (the golden run's anchor) ─────────────────
     from fastapi.concurrency import run_in_threadpool  # D-v2.5-01: wrap blocking supabase-py
@@ -573,6 +837,15 @@ async def _drive_golden_run(
     )
 
     # ── 4. build the minimal validation ctx (mirrors _build_resume_context) ──────
+    # ⚠ Phase 190 UAT fix (D-14/D-16): `org_id` is DELIBERATELY ABSENT here, and its absence is
+    # a FENCE, not the oversight that was just repaired in the live-kickoff and resume builders.
+    # A golden run is a publish VALIDATION — D-16 already forbids it performing the external
+    # action, and `_exec_external_action` reads `getattr(ctx, "org_id", None)` and fails CLOSED
+    # without it. Withholding the org therefore makes a publish-time send impossible for a
+    # SECOND, independent reason: if the `is_golden_run` gate is ever removed or bypassed, the
+    # credential still cannot be scoped and the step records instead of sending. Do NOT "fix"
+    # this to match the sibling builders — the asymmetry is the point. Any future need for an
+    # org here must add it TOGETHER with an explicit publish-time send prohibition.
     ctx = SimpleNamespace(
         run_id=run_id,
         producer_run_id=_producer_id,  # real `runs` shell (sub-agent FK), NOT the workflow_run id
@@ -590,6 +863,17 @@ async def _drive_golden_run(
         scoped_folder_path=None,
         spawn=lambda coro: asyncio.create_task(coro),
         per_run_task_semaphore=asyncio.Semaphore(settings.task_per_run_concurrency),
+        # ── D-19 (189, CONFLICT 1) — the ONE ctx in the tree that IS a golden run ──
+        # READ BY ``harness_engine._run_phase_with_gates``' armed action-risk checkpoint
+        # via ``getattr(ctx, "is_golden_run", False)``: a golden run SKIPS THE PAUSE
+        # (no ask-channel subscribe) and still runs the step. The flag already existed
+        # as the ``workflow_runs`` COLUMN (step 3 above) but was never on the ctx bag,
+        # which is why the engine could not tell a publish from a live run and burned
+        # ``harness_publish_max_seconds`` waiting for a person nobody had asked.
+        # EVERY OTHER ctx BUILDER STAYS UNTOUCHED (threads.py, _build_resume_context,
+        # unit stubs): the reader's ``getattr`` default IS the live-run answer, mirroring
+        # ``create_workflow_run``'s own rule for this flag — default OFF = byte-identical.
+        is_golden_run=True,
     )
 
     # ── 5+6. drive the real run end-to-end + harvest, ALWAYS terminalizing the

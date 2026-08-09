@@ -49,12 +49,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Phase 185 (L-8) — how often the poll loop re-arms the ``ask_user:channels:{run_id}``
+# discovery-index TTL. Must be comfortably shorter than the 3600s TTL itself so a
+# handful of consecutive failed refreshes cannot let the advertisement lapse.
+_CHANNELS_TTL_REFRESH_SECONDS = 300
+
 
 async def _subscribe_and_block(
     redis: "aioredis.Redis",
     run_id: UUID,
     tool_call_id: str,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
     *,
     on_subscribed=None,
 ) -> "dict | None":
@@ -67,6 +72,13 @@ async def _subscribe_and_block(
     SUBSCRIBE happens FIRST, then SADD, then ``on_subscribed`` (the caller's
     user-visible signal — e.g. the resume re-emit) runs INSIDE the subscribed
     window so a fast answer can't be published into a no-subscriber gap and lost.
+
+    ``timeout_seconds=None`` means **wait indefinitely** — the Phase 185 armed
+    action-risk-checkpoint disposition (GOVERN-03 / SPEC Req 9). This is a
+    TYPE-ONLY widening on the default path: ``asyncio.wait_for(coro,
+    timeout=None)`` already waits forever, no shipped caller passes ``None``, and
+    both live call sites (``harness_engine.py`` and ``harness/phase_types.py``)
+    hard-cast with ``float()``, so no existing behaviour can reach this mode.
 
     Pitfall mitigations are unchanged from the original handler: get_message
     timeout=1.0 (never 0 — Pitfall 1); aclose under a 2s wait_for (Pitfall 3);
@@ -86,11 +98,37 @@ async def _subscribe_and_block(
             await on_subscribed()
 
         async def _wait():
+            # Phase 185 (L-8) — keep the channel FINDABLE for the whole wait.
+            # The SADD above advertises this channel in ``ask_user:channels:{run_id}``
+            # under a 3600s safety TTL. The WAIT itself is independent of that SET (the
+            # SUBSCRIBE survives its expiry); the SET is only the DISCOVERY INDEX that
+            # ``publish_cancel_sentinel`` (a user pressing Stop) and
+            # ``broadcast_shutdown_sentinel_to_all`` (a graceful restart) sweep to find
+            # a still-waiting subscriber. Once it expires, a >1h wait becomes
+            # un-Stoppable and un-drainable — and an INDEFINITE wait (timeout_seconds
+            # is None) routinely exceeds an hour. So re-arm the same TTL from inside the
+            # poll loop, which already ticks at most once a second. Best-effort: a
+            # failed refresh logs and the wait continues (never break the rendezvous
+            # over a housekeeping write).
+            _last_ttl_refresh = asyncio.get_running_loop().time()
             while True:
                 msg = await pubsub.get_message(
                     ignore_subscribe_messages=True,
                     timeout=1.0,                         # Pitfall 1 — never 0
                 )
+                _now = asyncio.get_running_loop().time()
+                if _now - _last_ttl_refresh >= _CHANNELS_TTL_REFRESH_SECONDS:
+                    _last_ttl_refresh = _now
+                    try:
+                        # The SAME 3600s safety TTL the SADD above set — re-armed, not
+                        # extended, so a leaked entry still auto-clears an hour after
+                        # the waiter is gone.
+                        await redis.expire(channels_set_key, 3600)
+                    except Exception:  # noqa: BLE001
+                        logger.warning(
+                            "ask_user: channels-SET TTL refresh failed for %s "
+                            "(wait continues)", channels_set_key,
+                        )
                 if msg is not None and msg.get("type") == "message":
                     try:
                         return json.loads(msg["data"])
@@ -123,13 +161,30 @@ async def subscribe_for_response(
     redis: "aioredis.Redis",
     run_id: UUID,
     tool_call_id: str,
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> "dict | None":
     """Block until a PUBLISH arrives on ``ask_user:{run_id}:{tool_call_id}`` or
     ``timeout_seconds`` elapses.
 
+    ``timeout_seconds=None`` means **wait indefinitely** — the Phase 185 armed
+    action-risk-checkpoint disposition (GOVERN-03 / SPEC Req 9): with the
+    checkpoint set, no answer must mean the run never proceeds, so there is no
+    expiry that could quietly read as "yes". This is a TYPE-ONLY change on the
+    default path: ``asyncio.wait_for(coro, timeout=None)`` already waits forever,
+    no pre-185 caller passes ``None``, and both live call sites
+    (``harness_engine._resolve_failure_with_ask_user`` and
+    ``harness/phase_types._exec_llm_human_input``) hard-cast with ``float()``.
+
+    COST OF AN INDEFINITE WAIT, measured (RESEARCH §"Event-loop safety"): one
+    suspended coroutine and one Redis pub/sub connection. The wait is a pure
+    asyncio poll — ``await pubsub.get_message(..., timeout=1.0)`` inside a
+    ``while True`` — so it occupies neither the event loop nor a threadpool
+    worker, and D-v2.5-01 (no blocking I/O in an async handler) is satisfied.
+
     Registers the channel in ``ask_user:channels:{run_id}`` SET on entry and
-    removes it on exit (so the cancel + shutdown sweep paths can find it).
+    removes it on exit (so the cancel + shutdown sweep paths can find it); the
+    SET's TTL is re-armed from inside the poll loop so an indefinite wait stays
+    Stoppable and drainable past the 3600s mark (L-8).
 
     Returns:
         Parsed JSON payload dict on PUBLISH (e.g. ``{"kind": "response",
@@ -139,7 +194,7 @@ async def subscribe_for_response(
     Delegates to the single-sourced ``_subscribe_and_block`` primitive (no
     ``on_subscribed`` hook — this path's user-visible signal is owned by the
     dispatcher handler that calls it). Externally-observable behavior is
-    UNCHANGED from the pre-refactor inline body.
+    UNCHANGED from the pre-refactor inline body for every non-``None`` timeout.
     """
     return await _subscribe_and_block(
         redis, run_id, tool_call_id, timeout_seconds
@@ -152,12 +207,16 @@ async def _emit_ask_user_prompt(
     tool_call_id: str,
     prompt: str,
     options: "list | None",
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> None:
     """XADD an ``ask_user_prompt`` event to ``run:{run_id}`` (mirrors the engine _emit).
 
     One canonical event so the reconnected frontend re-renders the question on
     resume. Same stream/shape the live ``_exec_llm_human_input`` path emits.
+
+    Phase 185 (L-7/L-15): ``None`` serializes to JSON ``null`` — "no deadline", which
+    ``PendingAskCard`` renders as an open-ended wait. Type-only widening; every shipped
+    caller still passes a number.
     """
     await redis.xadd(
         f"run:{run_id}",
@@ -183,7 +242,7 @@ async def resume_pending_prompt(
     tool_call_id: str,
     prompt: str,
     options: "list | None",
-    timeout_seconds: float,
+    timeout_seconds: float | None,
 ) -> "dict | None":
     """Resume a still-PENDING ask_user prompt after a restart (HARNESS-03 / Plan 04).
 
@@ -205,14 +264,24 @@ async def resume_pending_prompt(
     its ``on_subscribed`` window (guaranteeing subscribe-before-emit). Returns the
     parsed wake payload (response / cancel / shutdown) or ``None`` on timeout —
     identical to ``subscribe_for_response``.
+
+    ``timeout_seconds=None`` means **wait indefinitely** — the Phase 185 armed
+    action-risk-checkpoint disposition (GOVERN-03 / SPEC Req 9). A restart must not
+    quietly convert an indefinite wait into a bounded one: the run was parked on a
+    person before the restart and is still parked on them after it.
     """
     async def _reemit():
         await _emit_ask_user_prompt(
             redis, run_id, tool_call_id, prompt, options, timeout_seconds
         )
 
+    # Phase 185 (L-7): ``None`` passes through UNCHANGED (a ``float()`` cast would
+    # TypeError on it); a real number is still coerced exactly as it shipped, so every
+    # pre-185 caller reaches ``_subscribe_and_block`` with the identical float.
     return await _subscribe_and_block(
-        redis, run_id, tool_call_id, float(timeout_seconds), on_subscribed=_reemit
+        redis, run_id, tool_call_id,
+        None if timeout_seconds is None else float(timeout_seconds),
+        on_subscribed=_reemit,
     )
 
 

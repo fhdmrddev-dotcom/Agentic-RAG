@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 079 — Identity Anchor + Org Switcher</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .variant-nav { position: static; flex-shrink: 0; }
+
+  /* ── Control strip (state cyclers) ── */
+  .ctl {
+    flex-shrink: 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    padding: 7px 20px;
+    background: hsl(220 30% 7% / 0.94);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-border);
+    font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted);
+  }
+  .ctl .grp { display: inline-flex; align-items: center; gap: 6px; }
+  .ctl .grp > span.k { color: var(--color-text-dim); text-transform: uppercase; letter-spacing: .08em; }
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button {
+    background: transparent; color: var(--color-text-muted); border: 0;
+    padding: 3px 9px; font-family: inherit; font-size: 11px; cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .seg button + button { border-left: 1px solid var(--color-border); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .ctl .hint { color: var(--color-text-dim); margin-left: auto; font-style: italic; }
+
+  /* ── App shell ── */
+  .app { display: flex; flex: 1; min-height: 0; overflow: hidden; }
+
+  .rail {
+    position: relative; flex-shrink: 0;
+    display: flex; flex-direction: column;
+    background: var(--color-bg-elev1);
+    border-right: 1px solid var(--color-border-soft);
+    padding: 12px 8px;
+    transition: width var(--dur-slow) var(--ease-out);
+  }
+  .rail.expanded { width: 216px; align-items: stretch; }
+  .rail.collapsed { width: 58px; align-items: center; }
+
+  .rail-top { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .rail.collapsed .rail-top { flex-direction: column; }
+  .logo { width: 32px; height: 32px; border-radius: var(--radius-md); display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    box-shadow: 0 0 14px hsl(239 100% 82% / 0.25); flex-shrink: 0; }
+  .rail.expanded .rail-top .spacer { flex: 1; }
+
+  .rail-mid { display: flex; flex-direction: column; gap: 3px; margin-top: 18px; flex: 1; min-height: 0; }
+  .rail-foot { display: flex; flex-direction: column; gap: 3px; margin-top: auto; }
+
+  .ri {
+    display: flex; align-items: center; gap: 11px;
+    padding: 8px 10px; border-radius: var(--radius-md);
+    color: var(--color-text-muted); cursor: pointer; position: relative;
+    font-size: var(--text-sm); white-space: nowrap;
+    transition: all var(--dur-fast) var(--ease-out); border: 1px solid transparent;
+  }
+  .rail.collapsed .ri { justify-content: center; padding: 8px; }
+  .rail.collapsed .ri .lbl, .rail.collapsed .ri .caret, .rail.collapsed .ri .sub2 { display: none; }
+  .ri:hover { background: var(--color-accent); color: var(--color-text); }
+  .ri.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .ri svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .ri .lbl { flex: 1; }
+  .ri.new { color: var(--color-primary); background: var(--color-primary-dim); }
+
+  .divider { height: 1px; background: var(--color-border-soft); margin: 8px 4px; }
+
+  /* operator shield (context) */
+  .ri.op { color: hsl(38 92% 60% / 0.85); }
+  .ri.op:hover { color: var(--color-warning); background: var(--color-warning-dim); }
+  .ri.op svg { color: var(--color-warning); }
+
+  /* org-admin entry (indigo — distinct from operator amber) */
+  .ri.org { color: hsl(239 100% 82% / 0.9); }
+  .ri.org:hover { background: var(--color-primary-dim); color: var(--color-primary); }
+  .ri.org svg { color: var(--color-primary); }
+
+  /* ── Identity anchor button ── */
+  .anchor {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 9px; border-radius: var(--radius-md);
+    cursor: pointer; border: 1px solid transparent; position: relative;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .anchor:hover { background: var(--color-accent); }
+  .anchor.opened { background: var(--color-accent); border-color: var(--color-border); }
+  .rail.collapsed .anchor { justify-content: center; padding: 6px; }
+  .rail.collapsed .anchor .who, .rail.collapsed .anchor .caret { display: none; }
+  .avatar {
+    width: 30px; height: 30px; border-radius: var(--radius-full); flex-shrink: 0;
+    display: grid; place-items: center; font-family: var(--font-mono); font-weight: 600;
+    font-size: 12px; color: var(--color-text);
+    background: linear-gradient(135deg, hsl(239 60% 40%), hsl(258 60% 42%));
+    box-shadow: inset 0 1px 0 hsl(220 20% 40% / .4);
+  }
+  .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; flex: 1; }
+  .who .nm { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; }
+  .who .em { font-size: var(--text-xs); color: var(--color-text-dim); overflow: hidden; text-overflow: ellipsis; }
+  .caret { color: var(--color-text-dim); flex-shrink: 0; }
+
+  /* org switcher pill (variant B) */
+  .orgpill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: var(--radius-md);
+    border: 1px solid var(--color-border); background: var(--color-surface);
+    cursor: pointer; font-size: var(--text-sm); color: var(--color-text);
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .orgpill:hover { border-color: var(--color-primary-glow); background: var(--color-surface-hi); }
+  .orgpill .oglyph { width: 18px; height: 18px; border-radius: var(--radius-sm); display:grid; place-items:center;
+    background: var(--color-primary-dim); color: var(--color-primary); flex-shrink: 0; font-size: 11px; }
+  .orgpill .onm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rail.collapsed .orgpill .onm, .rail.collapsed .orgpill .caret { display: none; }
+
+  /* ── Popover menu ── */
+  .pop {
+    position: absolute; z-index: 200; width: 258px;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    padding: 6px; overflow: hidden;
+    animation: fadeSlideUp var(--dur-base) var(--ease-out);
+  }
+  .pop.hidden { display: none; }
+  .pop-head { display: flex; align-items: center; gap: 10px; padding: 10px 8px 8px; }
+  .pop-head .who .nm { font-size: var(--text-base); }
+  .pop-sec-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--color-text-dim); padding: 8px 10px 4px; }
+  .mi {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-md);
+    cursor: pointer; color: var(--color-text-muted); font-size: var(--text-sm);
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .mi:hover { background: var(--color-accent); color: var(--color-text); }
+  .mi svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .mi .lbl { flex: 1; }
+  .mi.org svg { color: var(--color-primary); }
+  .mi.org { color: hsl(239 100% 82% / 0.92); }
+  .mi.danger:hover { background: var(--color-danger-dim); color: hsl(0 72% 66%); }
+  .mi .arrow { color: var(--color-text-dim); font-size: 13px; }
+
+  /* org row in switcher */
+  .orow { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: var(--radius-md);
+    cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .orow:hover { background: var(--color-accent); }
+  .orow .oglyph { width: 26px; height: 26px; border-radius: var(--radius-sm); display: grid; place-items: center;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600; flex-shrink: 0;
+    background: var(--color-muted); color: var(--color-text-muted); }
+  .orow.cur .oglyph { background: var(--color-primary-dim); color: var(--color-primary); }
+  .orow .obody { flex: 1; min-width: 0; line-height: 1.25; }
+  .orow .obody .n { font-size: var(--text-sm); color: var(--color-text); }
+  .orow .obody .s { font-size: 10px; color: var(--color-text-dim); font-family: var(--font-mono); }
+  .orow .chk { color: var(--color-success); font-size: 14px; }
+
+  /* role badge */
+  .role {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 1px 7px; border-radius: var(--radius-full);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .04em;
+    margin-top: 3px; width: fit-content;
+  }
+  .role.admin { background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); }
+  .role.member { background: var(--color-muted); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+
+  .div-m { height: 1px; background: var(--color-border-soft); margin: 5px 6px; }
+
+  /* ── Main area ── */
+  .main { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column;
+    background: radial-gradient(120% 80% at 50% -10%, hsl(220 30% 8% / .6), var(--color-bg)); }
+  .main-head { display: flex; align-items: center; gap: 12px; padding: 14px 24px; border-bottom: 1px solid var(--color-border-soft); }
+  .main-head .ctx { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); }
+  .main-head .ctx b { color: var(--color-text-muted); font-weight: 600; }
+  .main-body { flex: 1; display: grid; place-items: center; opacity: .5; }
+  .main-body .stub { text-align: center; color: var(--color-text-dim); font-size: var(--text-sm); max-width: 320px; }
+  .main-body .stub .big { font-family: var(--font-headline); font-size: var(--text-lg); color: var(--color-text-muted); margin-bottom: 6px; }
+
+  /* switch overlay */
+  .switching { position: absolute; inset: 0; z-index: 50; display: none; place-items: center;
+    background: hsl(216 45% 4% / .78); backdrop-filter: blur(3px); }
+  .switching.on { display: grid; }
+  .switching .card { text-align: center; }
+  .switching .ring { width: 42px; height: 42px; border-radius: 50%; margin: 0 auto 14px;
+    border: 3px solid var(--color-primary-dim); border-top-color: var(--color-primary);
+    animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .switching .t1 { font-family: var(--font-headline); color: var(--color-text); font-size: var(--text-md); }
+  .switching .t2 { font-family: var(--font-mono); color: var(--color-text-dim); font-size: var(--text-xs); margin-top: 6px; }
+  .switching .steps { margin-top: 14px; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); text-align: left; display: inline-block; }
+  .switching .steps div { opacity: .4; transition: opacity .2s; }
+  .switching .steps div.done { opacity: 1; color: var(--color-success); }
+
+  /* variant descriptions */
+  .vdesc { flex-shrink: 0; padding: 8px 20px; font-size: var(--text-xs); color: var(--color-text-muted);
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border-soft);
+    font-family: var(--font-sans); }
+  .vdesc b { color: var(--color-text); }
+  .vdesc .q { color: var(--color-primary); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-right: 8px; }
+
+  .footer-variant { display: none; }
+  .footer-variant.on { display: flex; flex-direction: column; gap: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ── Variant nav ── -->
+<div class="variant-nav">
+  <span class="label">Sketch 079 · Identity anchor + org switcher</span>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: Merged anchor</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: Separate elements</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Hybrid (menu + rail shield) <span class="star">★</span></button>
+</div>
+
+<!-- ── Control strip ── -->
+<div class="ctl">
+  <span class="grp"><span class="k">Orgs</span>
+    <span class="seg" id="seg-org">
+      <button class="on" onclick="setOrg(false)">Solo (1)</button>
+      <button onclick="setOrg(true)">Multi (2+)</button>
+    </span>
+  </span>
+  <span class="grp"><span class="k">Your role</span>
+    <span class="seg" id="seg-role">
+      <button class="on" onclick="setRole('admin')">Org-admin</button>
+      <button onclick="setRole('member')">Member</button>
+    </span>
+  </span>
+  <span class="grp"><span class="k">Also operator</span>
+    <span class="seg" id="seg-op">
+      <button onclick="setOp(false)" class="on">No</button>
+      <button onclick="setOp(true)">Yes</button>
+    </span>
+  </span>
+  <span class="grp"><span class="k">Rail</span>
+    <span class="seg" id="seg-rail">
+      <button class="on" onclick="setRail(true)">Expanded</button>
+      <button onclick="setRail(false)">Collapsed</button>
+    </span>
+  </span>
+  <span class="hint">Toggles auto-open the menu so you can see the effect · in Multi mode, pick another org to feel the switch teardown</span>
+</div>
+
+<!-- ── Variant description ── -->
+<div class="vdesc" id="vdesc"></div>
+
+<!-- ── App shell ── -->
+<div class="app">
+  <nav class="rail expanded" id="rail">
+    <div class="rail-top">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" width="17" height="17"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4L12 2z" fill="white" opacity=".95"/></svg>
+      </div>
+      <span class="spacer"></span>
+      <div class="ri" style="padding:8px;flex:0" title="Collapse"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg></div>
+    </div>
+
+    <div class="rail-mid">
+      <div class="ri new"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span class="lbl">New chat</span></div>
+      <div class="ri active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span class="lbl">Chat</span></div>
+      <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h10M4 18h13"/></svg><span class="lbl">Workflows</span></div>
+      <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg><span class="lbl">Documents</span></div>
+      <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11z"/></svg><span class="lbl">Skills</span></div>
+      <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg><span class="lbl">Governance</span></div>
+    </div>
+
+    <div class="rail-foot" id="railfoot">
+      <div class="ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg><span class="lbl">Light mode</span></div>
+
+      <!-- operator shield (context — only when "also operator") -->
+      <div class="ri op" id="op-shield" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg><span class="lbl">Control Room</span></div>
+
+      <!-- === VARIANT A: merged anchor === -->
+      <div class="footer-variant on" data-fv="a">
+        <div class="divider"></div>
+        <div class="anchor" id="anchorA" onclick="toggleMenu('profileA', this)">
+          <div class="avatar">JR</div>
+          <div class="who"><span class="nm">Jordan Rivera</span><span class="em">jordan@acme.io</span></div>
+          <span class="caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+      </div>
+
+      <!-- === VARIANT B: separate elements === -->
+      <div class="footer-variant" data-fv="b">
+        <div class="ri org" id="orgentryB" onclick="alert('→ opens the Organization admin shell (sketch 080)')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/></svg><span class="lbl">Organization</span></div>
+        <div class="divider"></div>
+        <div class="orgpill" id="orgpillB" onclick="toggleMenu('switcherB', this)">
+          <span class="oglyph">A</span><span class="onm">Acme Corp</span>
+          <span class="caret"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+        <div class="anchor" id="anchorB" onclick="toggleMenu('profileB', this)">
+          <div class="avatar">JR</div>
+          <div class="who"><span class="nm">Jordan Rivera</span><span class="em">jordan@acme.io</span></div>
+          <span class="caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+      </div>
+
+      <!-- === VARIANT C: hybrid === -->
+      <div class="footer-variant" data-fv="c">
+        <div class="ri org" id="orgentryC" onclick="alert('→ opens the Organization admin shell (sketch 080)')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/></svg><span class="lbl">Organization</span></div>
+        <div class="divider"></div>
+        <div class="anchor" id="anchorC" onclick="toggleMenu('profileC', this)">
+          <div class="avatar">JR</div>
+          <div class="who"><span class="nm">Jordan Rivera</span><span class="em">jordan@acme.io</span></div>
+          <span class="caret"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- popovers live at rail level so they anchor to the footer -->
+    <div class="pop hidden" id="pop-profileA"></div>
+    <div class="pop hidden" id="pop-profileB"></div>
+    <div class="pop hidden" id="pop-switcherB"></div>
+    <div class="pop hidden" id="pop-profileC"></div>
+  </nav>
+
+  <div class="main">
+    <div class="main-head">
+      <span class="ctx">Context · org <b id="ctx-org">Acme Corp</b> · you are <b id="ctx-role">Org-admin</b></span>
+    </div>
+    <div class="main-body">
+      <div class="stub">
+        <div class="big">The app surface</div>
+        Dimmed on purpose — this sketch is about the rail-footer identity surface, shown in real context.
+      </div>
+    </div>
+    <div class="switching" id="switchOverlay">
+      <div class="card">
+        <div class="ring"></div>
+        <div class="t1">Switching to <span id="sw-name">Globex Industries</span></div>
+        <div class="t2">org context · X-Org-Id revalidated server-side</div>
+        <div class="steps" id="sw-steps">
+          <div id="st1">↻ tearing down live subscriptions</div>
+          <div id="st2">↻ clearing thread buckets</div>
+          <div id="st3">↻ refetching from the new org</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>079</span>
+  <button onclick="setRail(!state.railExpanded)">Rail</button>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const state = { variant: 'a', multiOrg: false, role: 'admin', operator: false, railExpanded: true, currentOrg: 'acme' };
+
+const ORGS = {
+  personal: { name: "Jordan’s Workspace", sub: "Personal", glyph: "J", role: 'admin' },
+  acme:     { name: "Acme Corp",          sub: "Member",   glyph: "A", role: 'member' },
+  globex:   { name: "Globex Industries",  sub: "Org-admin",glyph: "G", role: 'admin' },
+};
+
+const VDESC = {
+  a: '<span class="q">Q1·Q3</span><b>One merged anchor.</b> A single rail-footer identity button opens a popover holding everything: identity + role badge, the org-switcher section (only at 2+ orgs), the <b>Organization admin</b> entry, theme, and sign out. Fewest chrome elements; the admin entry is one click deep.',
+  b: '<span class="q">Q1·Q3</span><b>Three separate elements.</b> A distinct <b>org-switcher pill</b> (only at 2+ orgs) + the <b>identity avatar menu</b> (email · role · sign out) + the <b>Organization</b> entry as its own rail item. Most discoverable, most chrome — the switcher is always visible when relevant.',
+  c: '<span class="q">Q1·Q3</span><b>Hybrid.</b> A’s merged identity menu (identity + role + org-switcher section + sign out), <b>but the Organization entry is pulled out to a rail item</b> that sits directly parallel to the amber operator shield — the “who am I / my controls” mirror made spatial. Toggle “Also operator: Yes” to see them coexist.',
+};
+
+/* ── role → the org-scoped role in the CURRENT org ── */
+function roleBadgeHtml() {
+  return state.role === 'admin'
+    ? '<span class="role admin">◆ Org-admin</span>'
+    : '<span class="role member">Member</span>';
+}
+
+/* ── build the profile popover (A / C share the merged shape; B is identity-only) ── */
+function buildProfilePop(includeSwitcher, includeAdminEntry) {
+  let h = '';
+  h += '<div class="pop-head"><div class="avatar">JR</div><div class="who"><span class="nm">Jordan Rivera</span><span class="em">jordan@acme.io</span>' + roleBadgeHtml() + '</div></div>';
+
+  if (includeSwitcher && state.multiOrg) {
+    h += '<div class="div-m"></div><div class="pop-sec-label">Organization</div>';
+    h += orgRowsHtml();
+  } else if (includeSwitcher && !state.multiOrg) {
+    // solo: no switcher chrome — just a quiet current-org line (D-166-02)
+    h += '<div class="div-m"></div><div class="pop-sec-label">Organization</div>';
+    h += '<div class="orow cur" style="cursor:default"><span class="oglyph">'+ORGS[state.currentOrg].glyph+'</span><div class="obody"><div class="n">'+ORGS[state.currentOrg].name+'</div><div class="s">only org · no switcher shown</div></div></div>';
+  }
+
+  if (includeAdminEntry && state.role === 'admin') {
+    h += '<div class="div-m"></div><div class="mi org" onclick="alert(\'→ opens the Organization admin shell (sketch 080)\')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01"/></svg><span class="lbl">Organization admin</span><span class="arrow">→</span></div>';
+  } else if (includeAdminEntry && state.role === 'member') {
+    // members don't hold org:manage → no admin entry (honest omission)
+  }
+
+  h += '<div class="div-m"></div>';
+  h += '<div class="mi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2"/></svg><span class="lbl">Theme</span></div>';
+  h += '<div class="mi danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="lbl">Sign out</span></div>';
+  return h;
+}
+
+function orgRowsHtml() {
+  return Object.entries(ORGS).map(([id, o]) => {
+    const cur = id === state.currentOrg;
+    return '<div class="orow '+(cur?'cur':'')+'" onclick="switchOrg(\''+id+'\')">'
+      + '<span class="oglyph">'+o.glyph+'</span>'
+      + '<div class="obody"><div class="n">'+o.name+'</div><div class="s">'+o.sub+'</div></div>'
+      + (cur ? '<span class="chk">✓</span>' : '') + '</div>';
+  }).join('');
+}
+
+function buildSwitcherPop() {
+  let h = '<div class="pop-sec-label">Switch organization</div>';
+  h += orgRowsHtml();
+  return h;
+}
+
+/* ── menu open/close ── */
+let openMenu = null, openAnchorEl = null;
+function closeMenus() {
+  document.querySelectorAll('.pop').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('.anchor,.orgpill').forEach(a => a.classList.remove('opened'));
+  openMenu = null; openAnchorEl = null;
+}
+function buildMenu(id) {
+  const pop = document.getElementById('pop-' + id);
+  if (id.startsWith('profile')) {
+    const variant = id.slice(-1).toLowerCase();
+    pop.innerHTML = buildProfilePop(/*switcher*/ variant==='a'||variant==='c', /*admin*/ variant==='a');
+  } else if (id === 'switcherB') {
+    pop.innerHTML = buildSwitcherPop();
+  }
+  return pop;
+}
+function positionMenu(pop, anchorEl) {
+  const railRect = document.getElementById('rail').getBoundingClientRect();
+  const aRect = anchorEl.getBoundingClientRect();
+  pop.style.left = (state.railExpanded ? 8 : 66) + 'px';
+  pop.classList.remove('hidden');
+  const popH = pop.offsetHeight;
+  let top = aRect.top - railRect.top - popH - 6;
+  if (top < 8) top = 8;
+  pop.style.top = top + 'px';
+}
+function toggleMenu(id, anchorEl) {
+  if (openMenu === id) { closeMenus(); return; }
+  closeMenus();
+  const pop = buildMenu(id);
+  positionMenu(pop, anchorEl);
+  anchorEl.classList.add('opened');
+  openMenu = id; openAnchorEl = anchorEl;
+}
+// Re-render whatever menu is open so a control-strip toggle is visible live.
+function refreshOpenMenu() {
+  if (!openMenu || !openAnchorEl) return;
+  const pop = buildMenu(openMenu);
+  positionMenu(pop, openAnchorEl);
+}
+// After a toggle: if a menu is open, refresh it; else (A/C hide the effect
+// inside the menu) auto-open the profile menu so the change is visible.
+function afterToggle() {
+  if (openMenu) { refreshOpenMenu(); return; }
+  if (state.variant === 'a') toggleMenu('profileA', document.getElementById('anchorA'));
+  else if (state.variant === 'c') toggleMenu('profileC', document.getElementById('anchorC'));
+}
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.ctl')) return; // control-strip clicks manage menus themselves
+  if (!e.target.closest('.anchor') && !e.target.closest('.orgpill') && !e.target.closest('.pop')) closeMenus();
+});
+
+/* ── org switch (teardown feedback, D-166-08) ── */
+function switchOrg(id) {
+  if (id === state.currentOrg) { closeMenus(); return; }
+  closeMenus();
+  const o = ORGS[id];
+  document.getElementById('sw-name').textContent = o.name;
+  const ov = document.getElementById('switchOverlay');
+  ['st1','st2','st3'].forEach(s => document.getElementById(s).classList.remove('done'));
+  ov.classList.add('on');
+  setTimeout(()=>document.getElementById('st1').classList.add('done'), 250);
+  setTimeout(()=>document.getElementById('st2').classList.add('done'), 600);
+  setTimeout(()=>document.getElementById('st3').classList.add('done'), 950);
+  setTimeout(() => {
+    state.currentOrg = id;
+    state.role = o.role;
+    document.getElementById('seg-role').children[0].classList.toggle('on', o.role==='admin');
+    document.getElementById('seg-role').children[1].classList.toggle('on', o.role==='member');
+    ov.classList.remove('on');
+    render();
+  }, 1300);
+}
+
+/* ── state setters ── */
+function setOrg(multi) { state.multiOrg = multi; segOn('seg-org', multi?1:0); if (!multi) { state.currentOrg='acme'; } render(); afterToggle(); }
+function setRole(r) { state.role = r; segOn('seg-role', r==='admin'?0:1); render(); afterToggle(); }
+function setOp(v) { state.operator = v; segOn('seg-op', v?1:0); render(); refreshOpenMenu(); }
+function setRail(v) { state.railExpanded = v; segOn('seg-rail', v?0:1); render(); refreshOpenMenu(); }
+function segOn(segId, idx) { const s=document.getElementById(segId); [...s.children].forEach((b,i)=>b.classList.toggle('on', i===idx)); }
+
+function showVariant(v) {
+  state.variant = v;
+  closeMenus();
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.toggle('active', t.dataset.v===v));
+  document.querySelectorAll('.footer-variant').forEach(f => f.classList.toggle('on', f.dataset.fv===v));
+  render();
+  // A & C keep their payload inside the menu — auto-open it so you can see what
+  // the variant actually contains. B shows its pieces on the rail, so leave it closed.
+  if (v === 'a') toggleMenu('profileA', document.getElementById('anchorA'));
+  else if (v === 'c') toggleMenu('profileC', document.getElementById('anchorC'));
+}
+
+/* ── render derived UI ── */
+function render() {
+  const rail = document.getElementById('rail');
+  rail.classList.toggle('expanded', state.railExpanded);
+  rail.classList.toggle('collapsed', !state.railExpanded);
+
+  document.getElementById('op-shield').style.display = state.operator ? '' : 'none';
+  document.getElementById('vdesc').innerHTML = VDESC[state.variant];
+
+  // variant B: switcher pill only at 2+ orgs; org entry only if admin
+  const pillB = document.getElementById('orgpillB');
+  pillB.style.display = state.multiOrg ? '' : 'none';
+  const cur = ORGS[state.currentOrg];
+  pillB.querySelector('.oglyph').textContent = cur.glyph;
+  pillB.querySelector('.onm').textContent = cur.name;
+  document.getElementById('orgentryB').style.display = state.role==='admin' ? '' : 'none';
+  document.getElementById('orgentryC').style.display = state.role==='admin' ? '' : 'none';
+
+  // main-area context
+  document.getElementById('ctx-org').textContent = cur.name;
+  document.getElementById('ctx-role').textContent = state.role==='admin' ? 'Org-admin' : 'Member';
+}
+render();
+showVariant('a');
+</script>
+</body>
+</html>

@@ -60,6 +60,7 @@ from app.db.workflows import (
     get_pending_ask_user,
     load_run_phases,
     mark_phase_active,
+    record_phase_not_sent,
     skip_phase,
     write_audit,
 )
@@ -176,7 +177,7 @@ def _persist_output(output: dict) -> dict:
     return output
 
 
-async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
+async def _expire_pending_ask_user(pool, thread_id, run_id, *, org_id=None) -> None:
     """D-06 (BUG-260605-01): resolve any outstanding ask_user prompt when a run
     reaches terminal status. INSERT-only (HARNESS-06 audit posture): writes a
     system message shaped as the matching ask_user_response with expired=true,
@@ -192,29 +193,59 @@ async def _expire_pending_ask_user(pool, thread_id, run_id) -> None:
     Never UPDATEs any existing row. No-op when nothing is pending. Callers wrap
     each call in try/except — cleanup must never convert a successful
     terminalization into a crash.
+
+    Phase 163 (D-05 / D-14): this runs on the raw service-role (BYPASSRLS) pool with
+    no auth.uid(). When the caller has org context (``org_id`` — the resume finalizer
+    threads it from the run's org), an ``AND m.org_id = $3`` predicate is added to the
+    SELECT as belt-and-suspenders org-scoping. ``org_id=None`` keeps the read
+    byte-identical (thread_id + the prompt's run_id already uniquely scope the row).
+    The INSERT omits org_id → the mig-106 autofill-from-parent-thread trigger stamps it.
     """
     if thread_id is None:
         return
     _tid = thread_id if isinstance(thread_id, UUID) else UUID(str(thread_id))
-    rows = await pool.fetch(
-        """
-        SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
-        FROM messages m
-        WHERE m.thread_id = $1
-          AND m.role = 'system'
-          AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
-          AND m.tool_calls->0->>'run_id' = $2
-          AND NOT EXISTS (
-            SELECT 1 FROM messages r
-            WHERE r.thread_id = m.thread_id
-              AND r.role = 'system'
-              AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
-              AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
-          )
-        """,
-        _tid,
-        str(run_id),
-    )
+    if org_id is not None:
+        rows = await pool.fetch(
+            """
+            SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
+            FROM messages m
+            WHERE m.thread_id = $1
+              AND m.org_id = $3
+              AND m.role = 'system'
+              AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+              AND m.tool_calls->0->>'run_id' = $2
+              AND NOT EXISTS (
+                SELECT 1 FROM messages r
+                WHERE r.thread_id = m.thread_id
+                  AND r.role = 'system'
+                  AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+                  AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+              )
+            """,
+            _tid,
+            str(run_id),
+            org_id if isinstance(org_id, UUID) else UUID(str(org_id)),
+        )
+    else:
+        rows = await pool.fetch(
+            """
+            SELECT m.tool_calls->0->>'tool_call_id' AS tool_call_id, m.user_id
+            FROM messages m
+            WHERE m.thread_id = $1
+              AND m.role = 'system'
+              AND m.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+              AND m.tool_calls->0->>'run_id' = $2
+              AND NOT EXISTS (
+                SELECT 1 FROM messages r
+                WHERE r.thread_id = m.thread_id
+                  AND r.role = 'system'
+                  AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+                  AND r.tool_calls->0->>'tool_call_id' = m.tool_calls->0->>'tool_call_id'
+              )
+            """,
+            _tid,
+            str(run_id),
+        )
     for r in rows:
         tcid = r["tool_call_id"]
         if not tcid:
@@ -615,6 +646,7 @@ async def _run_phase_with_gates(
     wall_clock: int,
     _audit_user_id: UUID | None,
     stream_run_id: UUID | None = None,
+    total_phases: int | None = None,
 ) -> PhaseOutcome:
     """Execute a phase under a bounded-retry gate loop (HARNESS-04 — the SC#3 bar).
 
@@ -629,6 +661,13 @@ async def _run_phase_with_gates(
     ``gate_failed`` SSE event (D-08 visible retries). On exhaustion the failing
     validator's ``on_failure`` routes: ``fail_run`` (D-07 baseline) or
     ``skip_to_phase:<slug>`` (D-09); an unknown value fails safe to ``fail_run``.
+
+    ARMED ACTION-RISK CHECKPOINT (D-187-01). An ``action_risk_armed`` phase gets an
+    explicit pre-body checkpoint below — see the block between the pre-gate pass and the
+    retry loop. ``total_phases`` exists solely to compose its sentence
+    (``grounding._approval_sentence`` needs ``len(definition.phases)``); it is optional
+    so the many direct unit callers stay valid, and the ONE production call site in
+    ``run_workflow`` always passes the real total.
 
     Returns a :class:`PhaseOutcome`; the caller (``run_workflow``) commits the
     durable side-effects (complete/skip/fail) so the 2-phase write stays in the
@@ -664,6 +703,10 @@ async def _run_phase_with_gates(
     # GateResult immediately → byte-identical (the existing default-post path).
     pre = await run_gates(phase, {"_phase_inputs": accumulated_outputs}, ctx, timing="pre")
     if not pre.passed:
+        # Every gate reachable here is an AUTHOR's gate. After D-187-01's hoist the
+        # armed action-risk checkpoint is not a member of ``phase.validators`` at all,
+        # so there is no armed finding to special-case and this is the plain
+        # ``gate_failed`` announce for every pre gate.
         await write_audit(
             pool, run_id, user_id=_audit_user_id, event_type="gate_failed",
             metadata={"phase": phase.slug, "attempt": 0, "error": pre.error_message,
@@ -681,6 +724,174 @@ async def _run_phase_with_gates(
         if outcome is not None:
             return outcome  # fail_run / skip_to_phase / aborted ask_user
         # outcome is None → ask_user Proceed: fall through and run the body.
+
+    # ── D-187-01 — THE ARMED ACTION-RISK CHECKPOINT (SC#6 / SEED-137) ────────────
+    # "Armed ⇒ the person is asked before the body runs" is a PROPERTY OF THE PHASE,
+    # not a position in a list. Phase 185 shipped the guarantee as a synthesized
+    # ``timing="pre"`` ValidatorSpec appended to ``phase.validators``; because
+    # ``run_gates`` is first-failure-wins (``validators.py:248``) and the append put the
+    # armed spec LAST, any author-declared failing pre gate returned first and an
+    # ``ask_user`` Proceed fell straight through to the body with nobody asked. No
+    # ordering rule fixes that — the gate simply must not live in the author's list.
+    #
+    # PLACEMENT, both halves deliberate:
+    #   D-187-02 — AFTER the pre-gate pass, so a step an author's gate ``fail_run``s or
+    #     ``skip_to_phase``s away is never approved. An approval receipt for a step with
+    #     no body would violate the ledger's consequence ≠ receipt rule. Accepted cost:
+    #     an author ``ask_user`` Proceed followed by this checkpoint is two prompts in a
+    #     row. That is honest, not a defect.
+    #   D-187-17 — BEFORE the ``while True:`` retry loop, so one phase execution asks a
+    #     person exactly ONCE. Inside the loop, a 3-retry phase would ask three times for
+    #     one step.
+    #
+    # THERE ARE EXACTLY TWO PHASE-LEVEL ARMED READINGS, and they are deliberately
+    # INDEPENDENT: this one (run time, decides whether to pause) and
+    # ``_is_armed_action_risk`` (:2148 — boot-time resume sweep, decides whether a
+    # mid-flight row is re-driven or re-subscribed), which
+    # ``test_the_two_resume_predicates_are_independent`` pins. What D-187-03 actually
+    # deletes is the THIRD reading — the string-prefix sniff over a failing gate's error
+    # message. The engine no longer infers arming from a finding it parsed; it reads the
+    # boolean the author set.
+    #
+    # ── D-19 (Phase 189, CONFLICT 1) — THE GOLDEN-RUN BRANCH ─────────────────────
+    # THE MEASURED CHAIN THIS FIXES. ``publish_service._interactive_phase_failures``
+    # blocks a publish PRE-RUN for exactly two shapes — an ``llm_human_input`` phase and
+    # a validator whose ``on_failure == "ask_user"``. The armed checkpoint is NEITHER,
+    # because D-187-01 hoisted it OUT of ``phase.validators`` and the boolean is read
+    # right here instead. So an armed phase sails past stage 2.5 into the stage-3 REAL
+    # golden run, reaches this checkpoint, and subscribes to the ask channel with
+    # ``timeout_seconds = None`` — which ``ask_user_service.subscribe_for_response``'s
+    # own docstring calls "wait indefinitely". Nobody watches a synchronous publish's
+    # ask channel, so the request burned the whole ``harness_publish_max_seconds``
+    # budget (7200 s) and died at ``blocked_stage="golden_run_timeout"``. That made D-06
+    # ("a workflow containing the external-action node PUBLISHES and RUNS") FALSE, and
+    # it is a PRE-EXISTING defect: it reproduces on ANY armed phase of a SHIPPED type.
+    #
+    # THE RESOLUTION — AUTO-RECORD-AND-CONTINUE. On a golden run the PAUSE is skipped;
+    # the RECORD is not. Nothing below runs: no approval sentence is composed, no
+    # ``action_risk_pending`` row or event is written, no ask-channel subscribe is
+    # awaited. Execution falls straight through to the retry loop so THE STEP STILL
+    # RUNS and records what it would have done. "Skip the pause" must never become
+    # "skip the step" — a silently-skipped governed step is the fail-open shape Phase
+    # 188 spent two plans closing, and it would make the arming decorative.
+    #
+    # A LIVE RUN IS BYTE-IDENTICAL. ``ctx.is_golden_run`` is set at exactly one site
+    # (``publish_service._drive_golden_run``'s ctx literal); every other ctx builder is
+    # untouched and the ``getattr`` default below IS the live-run answer. The indefinite
+    # wait, the shutdown-sentinel ``CancelledError`` and the unparseable-payload refusal
+    # all stay exactly as shipped — the armed path is already fail-closed on a live run
+    # and that is precisely what must be preserved.
+    #
+    # TWO SHAPES WERE REJECTED, each for a recorded reason, and neither is used here:
+    #   (B) naming armed phases in ``publish_service._interactive_phase_failures`` so the
+    #       gauntlet blocks pre-run — that makes an ``external_action`` workflow
+    #       UNPUBLISHABLE and contradicts D-06 outright. ``_interactive_phase_failures``
+    #       is untouched by 189 and ``test_the_armed_checkpoint_is_not_a_validator``
+    #       fences it.
+    #   (C) publishing a synthetic approval onto the ask channel — it writes a
+    #       ``validator_ask_user_approved`` receipt claiming a human approved when none
+    #       did, violating the Control-Room ``consequence ≠ receipt`` rule. Which is why
+    #       this branch writes NO approval receipt AND no ``action_risk_pending`` row:
+    #       nothing paused, so the ledger must not say something did.
+    #
+    # ARMING ITSELF IS NOT TOUCHED. ``phase.action_risk_armed`` is neither cleared in
+    # memory nor in storage — only the pause is skipped. D-04 ("structurally armed, not
+    # disarmable") stands, and so does the boot-time resume predicate
+    # ``_is_armed_action_risk`` (:2240), which stays deliberately INDEPENDENT of this
+    # run-time reader — ``test_the_two_resume_predicates_are_independent`` pins that.
+    # ⚠⚠ REVIEW FINDING WR-06 — READ THIS BEFORE PHASE 190 MAKES A CAPABILITY REAL. ⚠⚠
+    #
+    # "The pause is skipped, the step still runs" is stated above as a virtue, and for the
+    # five LLM types it is one. For ``external_action`` it is the sentence that turns into a
+    # defect the moment egress exists, and the difference is that the arming on that type is
+    # NOT an author preference: ``PhaseSpec._external_action_is_always_armed`` pins it
+    # structurally, and it is the single guarantee D-04 exists to make. The branch below
+    # bypasses it UNCONDITIONALLY, with no phase-type carve-out — so once Phase 190 wires a
+    # real send, PUBLISHING a workflow would PERFORM THE EXTERNAL ACTION, with nobody asked,
+    # once per publish attempt. The publish gauntlet validates STRUCTURE; it must not
+    # acquire side effects in the world.
+    #
+    # WHY 189 DOES NOT SKIP THE BODY HERE, which is what the review proposed. The step
+    # currently sends nothing, so the risk is INERT — and the proposed carve-out (return a
+    # synthesized ``PhaseOutcome`` instead of executing) would have to FABRICATE the
+    # recorded body to keep ``test_publish_service.py``'s shipped assertions true (that the
+    # golden run's phase reaches ``recorded_not_sent`` with the real ``recorded_intent`` and
+    # a body reading "NOT SENT"). That means a SECOND composer for the one sentence
+    # ``_external_action_body`` owns — two vocabularies for one state, on the surface whose
+    # entire discipline is that there is one. Trading an inert risk for a live duplication
+    # is the wrong trade, and it would make the golden run stop exercising the real executor,
+    # which is the thing D-06 is supposed to prove works.
+    #
+    # WHAT 189 DOES INSTEAD, so this is a GUARDED decision and not a remembered one:
+    # ``test_harness_engine.py::test_a_golden_run_of_an_external_action_performs_no_egress``
+    # drives a REAL golden run with the widened no-egress transport sentinel armed (httpx +
+    # smtplib + urllib + raw sockets — WR-03). It passes today BECAUSE the step is inert.
+    # THE DAY A REAL SEND IS ADDED IT GOES RED, on the publish path specifically, naming this
+    # comment. That is the re-open trigger, expressed as a check rather than as prose.
+    #
+    # PHASE 190 OWNS THE FIX and it is one of two shapes: gate the SEND on
+    # ``ctx.is_golden_run`` inside the executor (the send is skipped, the record is not — so
+    # one composer still owns the body), or give this branch the phase-type carve-out once
+    # there is a real consequence to carve out. Recorded in ``189-DEFERRED.md`` too.
+    _armed = getattr(phase, "action_risk_armed", False)
+    if _armed and getattr(ctx, "is_golden_run", False):
+        # The golden run's ONLY trace of the checkpoint. Deliberately a log line and
+        # not an audit row: ``harness_audit`` is the ledger of things that HAPPENED to
+        # a person, and on a golden run nobody was asked.
+        logger.info(
+            "publish golden run: armed action-risk checkpoint auto-continued for phase "
+            "%s (D-19 — the pause is skipped, the step still runs; no approval receipt "
+            "is written because no human approved)",
+            getattr(phase, "slug", None),
+        )
+    elif _armed:
+        # The sentence is NEVER re-authored here. ``grounding._approval_sentence`` is the
+        # one composer, its honesty rules (POSITION / IDENTITY / CONSEQUENCE, never
+        # "approved" / "safe" / "proven") are asserted character-identically by a shipped
+        # test, and it is the only thing needing ``len(definition.phases)``.
+        from app.services.harness.grounding import _approval_sentence
+
+        # ``total_phases`` is None only on a direct unit call that omitted the keyword;
+        # the single production call site in ``run_workflow`` always passes the real
+        # ``len(definition.phases)``. The fallback keeps the sentence well-formed rather
+        # than crashing — it degrades "Step 2 of 5" to "Step 2 of 2", never to a lie
+        # about what the step is or what happens next.
+        _total = total_phases if total_phases is not None else phase.phase_index + 1
+        sentence = _approval_sentence(phase, _total)
+
+        # WAITING IS NOT FAILING (Phase 185 / RESEARCH L-5). The ledger records the
+        # CONSEQUENCE (the run paused for a person); the RECEIPT is the separate
+        # ``validator_ask_user_approved`` row the approval itself writes. Announcing
+        # ``gate_failed`` would tell the ledger and the frontend something went wrong
+        # when nothing did. Both event types are already in the ``harness_audit`` CHECK
+        # constraint — this checkpoint introduces NO new one (Pitfall 6 /
+        # ``BUG-260731-02``, where an unlisted kind killed the run).
+        await write_audit(
+            pool, run_id, user_id=_audit_user_id,
+            event_type="action_risk_pending",
+            metadata={"phase": phase.slug, "timing": "pre"},
+        )
+        # ``phase`` only: the raw sentence is deliberately NOT carried here — it IS the
+        # user-facing prompt and already reaches the browser on the durable
+        # ``ask_user_prompt`` row + emit inside the helper (T-185-05-04). THE CONSUMER
+        # IS PHASE 188's run surface; an unhandled event is inert.
+        await _emit(redis, stream_run_id, "action_risk_pending", phase=phase.slug)
+
+        # ``_ACTION_RISK_FINDING_PREFIX`` is retained because DELTA 1 inside the helper
+        # splits the prompt back out of the finding on ``"|"``. ``failed_idx=None``: the
+        # checkpoint has no index into ``phase.validators`` — which is the whole point,
+        # and why ``is_action_risk=True`` short-circuits the disposition resolution
+        # (Pitfall 4) and writes ``validator: null`` on the receipt (D-187-18).
+        outcome = await _resolve_failure_with_ask_user(
+            phase, _ACTION_RISK_FINDING_PREFIX + sentence, 0, None,
+            run_id=run_id, pool=pool, redis=redis, ctx=ctx,
+            _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
+            is_pre=True, is_action_risk=True,
+        )
+        if outcome is not None:
+            # Refusal / abort / an answer we could not read as consent → the body NEVER
+            # runs. Only an approval returns None and falls through.
+            return outcome
 
     attempt = 0
     last_output = None
@@ -764,6 +975,8 @@ async def _run_phase_with_gates(
             run_id=run_id, pool=pool, redis=redis, ctx=ctx,
             _audit_user_id=_audit_user_id, stream_run_id=stream_run_id,
             produced_output=output, is_pre=False,
+            # Never armed: the checkpoint is hoisted out of ``phase.validators``, so no
+            # POST gate can be it (D-187-01).
         )
 
 
@@ -796,9 +1009,17 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
     ``error_message`` prefix:
       - ``freshness:staleness|...``         → ["Proceed anyway", "Abort"]
       - ``freshness:version_ambiguity|...`` → ["Proceed despite version ambiguity", "Abort"]
+      - ``action_risk:approval|...``        → ["Approve this step", "Do not run it"]
     Any other finding falls back to the generic Proceed/Abort pair. The choices are
     presented to the user; the engine maps the chosen text back to a continue/fail
     routing (an Abort-like choice → fail_run; anything else → Proceed).
+
+    Phase 185 (GOVERN-03 / D-185-14): the ``action_risk:approval|`` pair is the ARMED
+    action-risk checkpoint's. Its wording is deliberately about THE STEP rather than
+    about a finding — nothing was flagged, the author simply said a person decides
+    before this one runs — which is why it does not reuse "Proceed anyway" / "Abort".
+    EVERY string returned from here MUST be classified by ``_is_abort_choice``; see
+    that function's docstring for why an unclassified decline phrase is a fail-open.
 
     WR-08: the version-ambiguity branch presents the HONEST pair matching the
     staleness pair — NOT "Use newest version" / "Use as-is", which implied
@@ -811,12 +1032,81 @@ def _ask_user_choices_from_finding(error_message: str) -> list[str]:
         return ["Proceed despite version ambiguity", "Abort"]
     if msg.startswith("freshness:staleness|"):
         return ["Proceed anyway", "Abort"]
+    if msg.startswith("action_risk:approval|"):
+        return [_ACTION_RISK_APPROVE_CHOICE, "Do not run it"]
     return ["Proceed anyway", "Abort"]
 
 
+# T-185-04-01 (quick-260731-3y4) — THE ONE HOME for the armed checkpoint's approve
+# label. It is BOTH what the armed pair above presents AND the only string the armed
+# disposition accepts as consent (the allow-list in ``_resolve_failure_with_ask_user``),
+# so a change here changes what counts as approval for an irreversible action. Written
+# once for the same reason ``_ABORT_LIKE_CHOICES`` below writes the decline phrase as
+# the literal the function returns: a rename must not be able to separate the label
+# from the gate that reads it.
+#
+# ⚠ WORDING — corrected at /gsd:verify-work 189 (2026-08-08), operator-decided.
+# This read "Approve and run this step" until Phase 189's live UAT observed it on an
+# ``external_action`` step, whose whole contract is that it RECORDS AN INTENTION AND
+# SENDS NOTHING. "and run" implied an outward effect the governed node exists not to
+# have — it was the one sentence on that surface arguing against SC#4, while the
+# step's own recorded output says "No email was sent. Nothing left this workflow."
+#
+# Deliberately ONE literal for every armed type rather than a phase-type-conditional
+# label: the gate at ``_resolve_failure_with_ask_user`` is an EXACT-MATCH fail-closed
+# compare, and making the label conditional would force that allow-list to accept two
+# strings — widening the consent set on an irreversible action, which is precisely the
+# surface Phase 190 makes dangerous. "Approve this step" is true of every armed type
+# (185's ``llm_human_input`` included) without splitting the label from its gate.
+#
+# ⚠ Changing this literal changes what counts as consent. A run already PAUSED at an
+# armed checkpoint under the old label fails CLOSED on resume (line ~1365 returns
+# fail_run when the answer does not match) — safe, but it does end that run. Verified
+# at edit time that no live paused run existed; the three ``active`` rows were stale
+# zombies from June/July.
+_ACTION_RISK_APPROVE_CHOICE = "Approve this step"
+
+
+# Phase 185 (GOVERN-03 / RESEARCH L-4) — the set of chosen texts that mean "do NOT
+# proceed". Lower-cased comparison values; the armed decline phrase is written as the
+# SAME literal ``_ask_user_choices_from_finding`` returns, lowered here, so the two
+# cannot drift apart under a rename.
+_ABORT_LIKE_CHOICES = ("abort", "cancel", "stop", "", "Do not run it".lower())
+
+
 def _is_abort_choice(choice: str) -> bool:
-    """A chosen option that means 'do NOT proceed' → honest fail_run (D-11)."""
-    return (choice or "").strip().lower() in ("abort", "cancel", "stop", "")
+    """A chosen option that means 'do NOT proceed' → honest fail_run (D-11).
+
+    **THE INVARIANT (Phase 185 / L-4): every string a branch of
+    ``_ask_user_choices_from_finding`` can return must be classified by this
+    function** — exactly one of each presented pair is abort-like and the other is not.
+
+    THE FAIL-OPEN SHAPE THIS CLOSES. The routing is not symmetric: an abort-like
+    choice fails the run, and *everything else* — including a decline phrase this
+    function does not recognise — falls through to the Proceed branch, which writes a
+    ``validator_ask_user_approved`` receipt and RUNS the step. Before Phase 185 the set
+    was ``("abort", "cancel", "stop", "")``, so the armed checkpoint's ``"Do not run
+    it"`` would have been read as approval: a person clicking *don't* would have sent
+    the email and been recorded as having authorised it. Any FUTURE choice pair must
+    therefore extend this set in the SAME commit that adds it; the invariant guard in
+    ``tests/unit/test_ask_user_disposition.py`` drives every known finding prefix plus
+    the generic fallback and fails if a pair is ever left unclassified.
+
+    The three shipped freshness/generic choices are literally ``"Proceed anyway"``,
+    ``"Proceed despite version ambiguity"`` and ``"Abort"`` — none of which the Phase
+    185 addition touches, so those routings are byte-identical.
+    """
+    return (choice or "").strip().lower() in _ABORT_LIKE_CHOICES
+
+
+# Phase 185 (GOVERN-03 / RESEARCH L-5) — the structured finding prefix that carries the
+# armed approval sentence into ``_resolve_failure_with_ask_user``, whose DELTA 1 splits
+# the prompt back out on ``"|"``. Phase 187 (D-187-01) made the hoisted checkpoint its
+# ONLY producer, and the string-prefix SNIFF that used to read it back is DELETED —
+# the engine no longer infers "this phase is armed" from a message it parsed; the
+# checkpoint reads ``phase.action_risk_armed`` and tells the helper so with
+# ``is_action_risk=True``. The prefix is now a wire format, not a predicate.
+_ACTION_RISK_FINDING_PREFIX = "action_risk:approval|"
 
 
 async def _resolve_failure_with_ask_user(
@@ -833,6 +1123,7 @@ async def _resolve_failure_with_ask_user(
     stream_run_id: UUID | None = None,
     produced_output: dict | None = None,
     is_pre: bool = False,
+    is_action_risk: bool = False,
 ) -> PhaseOutcome | None:
     """Resolve a failing validator's disposition, pausing for a human choice when
     the disposition is ``ask_user`` (D-11).
@@ -853,11 +1144,32 @@ async def _resolve_failure_with_ask_user(
 
     The redis/pool ordering, the channel keying, and the expiry-honest-fail are the
     SAME shipped 085 substrate ``_exec_llm_human_input`` uses — never re-invented.
+
+    ``is_action_risk`` (D-187-01 / RESEARCH Pitfall 3) — TRUE only when the CALLER is
+    the armed action-risk checkpoint. It is a per-CALL parameter and never a
+    ``phase.action_risk_armed`` read inside this function, because this function serves
+    BOTH the armed checkpoint AND the author's own ``ask_user`` gates on the SAME phase.
+    An armed phase can carry authored gates too, and only the armed one gets the armed
+    treatment (the indefinite wait, the shutdown-``CancelledError`` escape, the armed
+    choice pair, and the exact-match approval allow-list). Reading the phase here would
+    hand an unrelated freshness gate all four. Every non-armed caller leaves it at its
+    ``False`` default and every branch below evaluates to exactly the expression that
+    shipped.
     """
-    disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
-    if disp.kind != "ask_user":
-        # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
-        return _route_on_failure(phase, error_message, attempt, failed_idx)
+    # ── D-187-01 / RESEARCH Pitfall 4 — THE DISPOSITION SHORT-CIRCUIT ────────────
+    # An armed checkpoint has NO index into ``phase.validators`` (after the hoist it is
+    # not in the list at all), so ``failed_idx`` is None and ``_failing_on_failure``
+    # would fall back to the PHASE's own heuristic — an author's ``fail_run`` could
+    # route the checkpoint to ``_route_on_failure`` and THE PERSON WOULD NEVER BE ASKED.
+    # That is a fail-open of exactly the class the Phase-185 BLOCKER T-185-04-01
+    # belonged to. When ``is_action_risk`` the disposition is ``ask_user`` BY
+    # CONSTRUCTION, so ``_failing_on_failure`` is skipped ENTIRELY rather than computed
+    # and overridden — there is no path a future edit can re-introduce the read on.
+    if not is_action_risk:
+        disp = _parse_on_failure(_failing_on_failure(phase, failed_idx))
+        if disp.kind != "ask_user":
+            # fail_run / skip_to_phase — the sync mapper handles it byte-identical.
+            return _route_on_failure(phase, error_message, attempt, failed_idx)
 
     # ── ask_user pause (copy _exec_llm_human_input ordering VERBATIM) ──
     # The pause needs a live redis transport + a run_id channel; without them the
@@ -868,13 +1180,41 @@ async def _resolve_failure_with_ask_user(
 
     from uuid import uuid4
 
+    # ── Phase 185 (GOVERN-03 / SPEC Req 9) — THE ARMED-GATE READING ──────────────
+    # ONE flag; every Phase-185 delta below branches on it. Phase 187 (D-187-01) moved
+    # the reading from a string-prefix sniff on the error message to the ``is_action_risk``
+    # PARAMETER declared above: the CALLER knows which gate it is, and only the armed
+    # caller passes True. The substance is unchanged — an armed phase can also carry
+    # authored gates, and only the armed one gets this disposition. An unarmed
+    # ``llm_human_input`` step and every freshness gate keep byte-identical behaviour:
+    # for them ``is_action_risk`` is False and each branch below evaluates to exactly the
+    # expression that shipped.
+
     tool_call_id = uuid4().hex
     choices = _ask_user_choices_from_finding(error_message)
-    prompt = (
-        f"A validation check on phase '{phase.slug}' flagged: {error_message}. "
-        "How should the run proceed?"
-    )
-    timeout_seconds = min(
+    if is_action_risk:
+        # DELTA 1 — the prompt. "A validation check on phase 'X' flagged: …" is wrong
+        # for an armed step: nothing was flagged, the author simply said a person
+        # decides before this one runs. Use the engine-generated sentence carried AFTER
+        # the prefix, VERBATIM (D-185-14) — composed by ``grounding._approval_sentence``,
+        # already honest about POSITION, IDENTITY and CONSEQUENCE, and deliberately not
+        # wrapped in the generic validation-flagged sentence.
+        prompt = error_message.split("|", 1)[1]
+    else:
+        prompt = (
+            f"A validation check on phase '{phase.slug}' flagged: {error_message}. "
+            "How should the run proceed?"
+        )
+    # DELTA 2 — the timeout. An armed checkpoint waits INDEFINITELY: with the checkpoint
+    # set, no answer must mean the run NEVER proceeds (SPEC Req 9), so there can be no
+    # expiry that quietly reads as "yes". ``None``, never ``0``: the shipped
+    # ``PendingAskCard`` seeds its countdown from this value and counts a null/zero
+    # deadline down to EXPIRED ("No response within 0:00 — agent stopped"), so emitting
+    # ``0`` would render every armed prompt as dead the instant it appeared. Plan 185-05
+    # teaches the card to render ``None`` as "no deadline"; this path's job is to SEND
+    # ``None`` — it rides into the durable prompt row and the ``ask_user_prompt`` emit
+    # below unchanged, both of which simply carry ``timeout_seconds``.
+    timeout_seconds = None if is_action_risk else min(
         getattr(phase.config, "timeout_seconds", settings.ask_user_max_timeout_seconds)
         if getattr(phase, "config", None) is not None
         else settings.ask_user_max_timeout_seconds,
@@ -940,8 +1280,38 @@ async def _resolve_failure_with_ask_user(
     from app.services.ask_user_service import subscribe_for_response
 
     payload = await subscribe_for_response(
-        redis, run_id, tool_call_id, float(timeout_seconds)
+        redis, run_id, tool_call_id,
+        # DELTA 2 (cont.) — armed: pass ``None`` straight through for the indefinite
+        # wait (the ``float()`` cast would TypeError on it). The non-armed expression is
+        # byte-identical to what shipped.
+        timeout_seconds if is_action_risk else float(timeout_seconds),
     )
+
+    # DELTA 3 (RESEARCH L-6) — a graceful restart must not DESTROY an armed run.
+    # A ``{"kind": "shutdown"}`` payload comes ONLY from main.py's
+    # ``broadcast_shutdown_sentinel_to_all``. It is not a decision, and today it is read
+    # as one: the payload is not ``kind: "response"``, so ``choice`` stays ``""``,
+    # ``_is_abort_choice("")`` is True, and the run is FAILED by a routine deploy. Copy
+    # the shipped 096-09 precedent (``harness/phase_types._exec_llm_human_input``):
+    # raise ``asyncio.CancelledError`` so the phase stays ``active`` and the durable
+    # prompt row survives, and let the boot-time resume sweep re-ask. ``run_workflow``'s
+    # escape handler already skips ``_expire_pending_ask_user`` when
+    # ``is_app_shutting_down()``, so the prompt is not expired out from under it.
+    #
+    # SCOPED TO ARMED CHECKPOINTS ONLY, DELIBERATELY. The freshness gate reaching this
+    # same line has the identical destructive-on-deploy behaviour, but SPEC Req 9 scopes
+    # the fail-closed change to armed checkpoints ("a plain llm_human_input step keeps
+    # its CURRENT timeout disposition unchanged"; §Out-of-scope: "Only armed checkpoints
+    # change") and no D-185-NN decision authorises widening it. So the asymmetry inside
+    # this one function is intentional: an armed gate escapes via CancelledError, every
+    # other disposition keeps today's choice="" → _is_abort_choice("") → fail_run path
+    # byte-for-byte. The freshness twin is recorded as a deferred item in
+    # ``185-CONTEXT.md`` with a re-open trigger; it is not fixed here.
+    if is_action_risk and payload and payload.get("kind") == "shutdown":
+        raise asyncio.CancelledError(
+            "action-risk checkpoint interrupted by server shutdown — phase left active "
+            "for the boot-time resume sweep (096-09 precedent)"
+        )
 
     reason_base = (
         f"Phase {phase.phase_index + 1} ({phase.slug}) validation flagged: {error_message}"
@@ -949,6 +1319,12 @@ async def _resolve_failure_with_ask_user(
 
     if payload is None:
         # Unanswered (the 085 expiry) → honest fail, never hung.
+        #
+        # DELTA 4 — KEPT ON PURPOSE for armed gates. With ``timeout_seconds=None`` this
+        # branch is unreachable for an armed checkpoint except on an UNPARSEABLE payload
+        # (``_subscribe_and_block`` also returns ``None`` for malformed JSON). Keeping
+        # it is the fail-closed posture: a payload we could not read is not consent, and
+        # the only safe reading of "we don't know what they said" is "do not run it".
         return PhaseOutcome(
             "fail_run", None, None, f"{reason_base} — unanswered, run failed"
         )
@@ -972,7 +1348,57 @@ async def _resolve_failure_with_ask_user(
             "fail_run", None, None, f"{reason_base} — aborted by user"
         )
 
+    # ── T-185-04-01 — THE ARMED PROCEED SIDE IS AN ALLOW-LIST ────────────────────
+    # ``_is_abort_choice`` is a DENY-list, and a deny-list cannot be made fail-closed
+    # by extension: there is no finite set of ways to say no. Phase 185 extended it and
+    # added an invariant guard over the PRESENTED BUTTON LABELS, but the shipped
+    # ``PendingAskCard`` does not restrict the person to those labels — its free-text
+    # ``<textarea>`` is unconditional (the choice buttons are gated on
+    # ``options.length > 0``; the textarea is gated on nothing), and ``api/runs.py``
+    # accepts ``response_text`` without validating it against the prompt's options. So a
+    # typed "no", "nope", "stop it" or "Do not run it." (trailing period) fell straight
+    # through this deny-list into the receipt write below, RAN the risky step and
+    # recorded the person who refused as having authorised it.
+    #
+    # The engine's own words, four branches up at the ``payload is None`` case: "a
+    # payload we could not read is not consent, and the only safe reading of 'we don't
+    # know what they said' is 'do not run it'." An answer we cannot read AS THE APPROVAL
+    # OPTION is the identical epistemic situation, so it gets the identical reading.
+    #
+    # Exact equality against the presented label, on the value already ``.strip()``ed
+    # above — not casefold, not prefix, not substring. Case-insensitive matching would be
+    # strictly MORE permissive for zero benefit: the click path resolves ``choices[0]`` to
+    # this exact literal, so every string a looser rule newly accepts is one only the
+    # typed path can produce. And the two errors are not symmetric — refusing an
+    # oddly-cased approval fails a run the person re-triggers with a click; accepting one
+    # sends the email.
+    #
+    # ORDERING IS LOAD-BEARING. ``_is_abort_choice`` stays FIRST so "Do not run it" and
+    # "Abort" keep the byte-identical "— aborted by user" reason on every path including
+    # this one. And the branch is gated on ``is_action_risk`` (the caller-supplied
+    # parameter, D-187-01 — one flag read in one place), so
+    # on the three non-armed choice pairs it is dead code and their routing — free-text
+    # fall-through included — is unmoved. The distinct reason below is deliberate: the
+    # ledger must not claim the person "aborted" when the truth is that the engine could
+    # not read their answer as consent. The raw answer is NOT interpolated — it reaches
+    # the durable prompt row, not the run's failure reason.
+    if is_action_risk and choice != _ACTION_RISK_APPROVE_CHOICE:
+        return PhaseOutcome(
+            "fail_run", None, None,
+            f"{reason_base} — not approved: the answer did not match the approval option",
+        )
+
     # Proceed — write the governance receipt, then continue.
+    #
+    # D-187-18 — ``validator`` is written as ``None`` for a HOISTED armed checkpoint
+    # (``is_action_risk`` with ``failed_idx is None``). After D-187-01's hoist the
+    # checkpoint is not a member of ``phase.validators``, so there IS no validator index
+    # and saying so is honest. This is a DELIBERATE governance-ledger shape change, not
+    # an oversight: the key stays PRESENT so there is exactly one row shape per
+    # ``event_type`` — two shapes for one event type is worse than an honest null — and
+    # every pre-187 row keeps its int. No new ``event_type`` is introduced; the
+    # ``harness_audit`` CHECK is a closed list of 23 values and this phase ships zero
+    # migrations (``BUG-260731-02`` is the precedent where an unlisted kind killed a run).
     receipt_metadata = {
         "phase": phase.slug,
         "validator": failed_idx,
@@ -1085,7 +1511,33 @@ async def run_workflow(
 
     # Map the parsed definition's PhaseSpec by slug so we dispatch on the typed
     # config while iterating the durable rows in phase_index order.
-    spec_by_slug = {p.slug: p for p in definition.phases}
+    #
+    # ── Phase 185 (GOVERN-01 Req 4) — THE ONE ENFORCEMENT SEAM ──────────────────
+    # The synthesis below is what makes the citation gate fire "whether or not the
+    # definition JSONB declares it, including on already-published definitions" —
+    # its rule, its rationale and its NEVER-persisted contract live in one place,
+    # `app.services.harness.grounding` (read that docstring before changing this).
+    # This dict is the single chokepoint: DOWNSTREAM of every
+    # `WorkflowDefinition.model_validate()` (fresh kickoff, boot-time resume, AND the
+    # publish golden run, which drives `run_workflow` from
+    # `publish_service._drive_golden_run`) and UPSTREAM of `_run_phase_with_gates`,
+    # which owns the pre-gate pass, the post-gate pass, the WR-03 retry rebinding and
+    # `_route_on_failure` — all of which read `phase.validators` off the object handed
+    # over here. Because the synthesis happens inside `run_workflow` it never touches
+    # the save path (`db/workflows.py` persists `model_dump(mode="json")`), so no
+    # synthesized `ValidatorSpec` can ever be persisted; and the `workflow_phases`
+    # rows, minted from the original definition, are left untouched. An ungoverned
+    # phase comes back BY REFERENCE — the same object, not a copy.
+    #
+    # PUBLISH CONSEQUENCE, stated here rather than discovered in UAT: the publish
+    # gauntlet gains NO new stage (D-185-11's letter holds), but publish BEHAVIOUR
+    # changes for detected steps — a detected step whose golden run retrieves nothing
+    # now fails the existing golden-run stage and blocks publish. Every
+    # `workflow_definitions` row today is throwaway test data, so this is acceptable.
+    from app.services.harness.grounding import effective_phase
+
+    _total = len(definition.phases)
+    spec_by_slug = {p.slug: effective_phase(p, total_phases=_total) for p in definition.phases}
     ordered = sorted(rows, key=lambda r: r["phase_index"])
     index_by_slug = {row["slug"]: i for i, row in enumerate(ordered)}
 
@@ -1153,6 +1605,10 @@ async def run_workflow(
                 wall_clock=wall_clock,
                 _audit_user_id=_audit_user_id,
                 stream_run_id=stream_run_id,
+                # D-187-01 — the armed checkpoint's sentence needs the run's phase count
+                # (``_approval_sentence`` says "Step N of TOTAL"). This is the SAME
+                # ``len(definition.phases)`` ``effective_phase`` already receives above.
+                total_phases=_total,
             )
         except BaseException:
             # ── cancel/escape path (D-06 / BUG-260605-01) ─────────────────────
@@ -1176,7 +1632,8 @@ async def run_workflow(
                 try:
                     await asyncio.shield(
                         _expire_pending_ask_user(
-                            pool, getattr(ctx, "thread_id", None), run_id
+                            pool, getattr(ctx, "thread_id", None), run_id,
+                            org_id=getattr(ctx, "org_id", None),
                         )
                     )
                 except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
@@ -1204,7 +1661,8 @@ async def run_workflow(
             # outstanding ask_user prompt so /pending never serves a dead one.
             try:
                 await _expire_pending_ask_user(
-                    pool, getattr(ctx, "thread_id", None), run_id
+                    pool, getattr(ctx, "thread_id", None), run_id,
+                    org_id=getattr(ctx, "org_id", None),
                 )
             except Exception:  # noqa: BLE001 — cleanup never crashes a terminal
                 logger.exception(
@@ -1244,7 +1702,8 @@ async def run_workflow(
                 # D-06 (BUG-260605-01): second terminal site — same prompt expiry.
                 try:
                     await _expire_pending_ask_user(
-                        pool, getattr(ctx, "thread_id", None), run_id
+                        pool, getattr(ctx, "thread_id", None), run_id,
+                        org_id=getattr(ctx, "org_id", None),
                     )
                 except Exception:  # noqa: BLE001
                     logger.exception(
@@ -1267,11 +1726,51 @@ async def run_workflow(
         # deliverable was never produced. Additive + harness-only: a Deep success output
         # has no ``failure`` key, so this is a literal no-op on the shared path.
         _emit_failure = output.get("failure") if isinstance(output, dict) else None
+        # Phase 189 (CONN-01 / D-05) — THE THIRD BRANCH, same mechanism, one over.
+        # An ``external_action`` phase that a human APPROVED returns a normal output
+        # dict carrying ``phase_types.RECORDED_INTENT_KEY``: it RECORDED the action it
+        # would have taken and SENT NOTHING (SC#4 — nothing leaves this app in 189).
+        #
+        # WHY THE BRANCH EXISTS. Without it the row reads ``completed``, and
+        # ``completed`` means the send happened. That is precisely the lie D-08 declined
+        # to ship when it rejected deriving the honest word at render while the COLUMN
+        # stayed ``completed`` — anything querying ``workflow_phases`` directly (the
+        # status-repair scripts, the operator ledger, a future 190 reconciliation) would
+        # read a successful send forever. The status is its own persisted word,
+        # ``recorded_not_sent`` (migration 115 / D-17: the column stores the SLUG; the
+        # sentence a person reads is rendered by the client's vocabulary layer).
+        #
+        # THE KEY IS IMPORTED, NEVER RE-TYPED. ``RECORDED_INTENT_KEY`` is exported by
+        # the producer (``harness/phase_types.py``) exactly so the two ends of this seam
+        # cannot drift on a bare string literal.
+        #
+        # A LITERAL NO-OP ON THE SHARED PATH. A Deep success output has no sentinel key,
+        # so this branch cannot see it — the same additive + harness-only property the
+        # emit-failure branch above states, and the red line (D-14) this phase inherits.
+        #
+        # PLACEMENT IS WHAT MAKES "THE RUN CONTINUES" TRUE (D-05). This branch sits
+        # INSIDE the same if/else, after the ``outcome.kind`` checks have passed, and
+        # that block falls through to the unconditional ``advance_current_phase`` just
+        # below — the ``fail_run`` and ``skip_to`` branches return/continue out of the
+        # loop long before here. A branch that returned instead would be "skip the
+        # step", the fail-open shape Phase 188 spent two plans closing, and it would make
+        # the arming decorative. The ORDER matters too: the failure sentinel keeps
+        # precedence, because a recorded intent that ALSO carries a failure is a failure.
+        # Lazy import (breaks the harness-package import cycle — the same rule the
+        # ``run_gates`` import above follows; ``phase_types`` pulls the provider
+        # services in, and nothing here may reach them at module import time).
+        from app.services.harness.phase_types import RECORDED_INTENT_KEY
+
+        _recorded_intent = (
+            output.get(RECORDED_INTENT_KEY) if isinstance(output, dict) else None
+        )
         if _emit_failure:
             # 101.1 review WR-02: persist the FULL failure output (incl. the cited
             # field_map states b/c/d carry) on the phase row — fail_phase merges it
             # under _failure_reason, so the extracted data survives durably (D-08).
             await fail_phase(pool, phase_id, str(_emit_failure), output=durable_output)
+        elif _recorded_intent:
+            await record_phase_not_sent(pool, phase_id, durable_output)
         else:
             await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
@@ -1315,6 +1814,69 @@ async def run_workflow(
                 phase=phase.slug,
                 phase_index=phase.phase_index,
                 failure=str(_emit_failure),
+            )
+        elif _recorded_intent:
+            # 189 (T-189-31) — THE RECEIPT QUESTION, ANSWERED: a phase that RECORDED
+            # rather than completed gets NO ``phase_completed`` receipt. This is a
+            # DECISION, not an omission. Phase 107 / GOV-02 reads harness_audit rows as
+            # receipts, and a completion receipt here would tell the ledger the step
+            # completed — the ``consequence is not receipt`` rule the Control Room binds
+            # this codebase to, and the same reasoning D-09 used when it declined to add
+            # a new event type at all (a NEW kind needs a CHECK migration PLUS the
+            # Python literal set in ``db/workflows.py``; the shipped
+            # ``action_risk_pending`` row already records that a human was asked and
+            # approved, and the receipt for the recorded INTENT is Phase 190's, when it
+            # would describe a real consequence).
+            #
+            # The row that IS written rides the EXISTING ``phase_transition`` kind —
+            # the same choice the emit-failure branch above made for the same reason —
+            # so the ledger records the phase's TRUE terminal without inventing
+            # vocabulary. ``via`` names the status, never a rendered sentence (D-17).
+            await write_audit(
+                pool,
+                run_id,
+                user_id=_audit_user_id,
+                event_type="phase_transition",
+                metadata={
+                    "phase": phase.slug,
+                    "phase_index": phase.phase_index,
+                    "via": "recorded_not_sent",
+                },
+            )
+            # ⚠ REVIEW FINDING CR-02 — THE "NO SSE" DECISION IS REVERSED HERE, and the
+            # paragraph that stood in its place is kept below because being wrong for a
+            # stated reason is worth reading. It said: emitting ``phase_completed`` would
+            # paint the exact lie this branch prevents (TRUE, and still true — that event
+            # is NOT what is emitted); a new event would need a client handler and no plan
+            # in this phase built one (TRUE at the time); the client's honest reading comes
+            # from ``phaseStatusFromDb`` on reconcile (TRUE — but only on RECONNECT).
+            #
+            # WHAT IT MISSED: emitting NOTHING does not leave the card unresolved, it
+            # leaves it ``running`` — and TWO store sweeps then upgrade ``running`` to
+            # ``done`` all on their own. ``finalizeEarlierPhasesForThread`` fires from
+            # ``onPhaseStarted`` when the NEXT phase goes live, so any external-action step
+            # that is not the last phase is repainted "✓ Complete" MID-RUN, within
+            # milliseconds; ``finalizeAllPhasesForThread`` fires from ``onRunCompleted``
+            # and catches the last-phase case. The live surface then announces
+            # "Phase N of M, notify, complete" to a screen reader and prints ✓ Complete on
+            # the card, while a RELOAD of the same run shows "Not sent" — the live view and
+            # the reload disagreeing about whether work happened is exactly the failure
+            # shape SPEC Req 4 forbids, on the one step in the product whose entire reason
+            # for existing is that it did not complete.
+            #
+            # The sweeps must not be able to INVENT a terminal they were never told, so the
+            # producer tells them. ``phase_recorded_not_sent`` is ADDITIVE and inert for any
+            # older client (``api.ts`` dispatches on an else-if chain; an unmatched type
+            # falls through and only advances the cursor). It is NOT a new audit kind — the
+            # receipt argument above is untouched and no CHECK migration is implied; this is
+            # wire-only, and the client maps it onto ``"recorded-not-sent"``, a
+            # ``Phase["status"]`` member that ALREADY has its ``STATUS_META`` row, its
+            # ``canvasReading`` arm and its ``milestoneFor`` sentence. Every consumer was
+            # already built; only the event was missing.
+            await _emit(redis, stream_run_id,
+                "phase_recorded_not_sent",
+                phase=phase.slug,
+                phase_index=phase.phase_index,
             )
         else:
             await write_audit(
@@ -1469,16 +2031,34 @@ async def _build_resume_context(run, redis, pool):
     )
 
     # F5 (092-07): the startup sweep has NO request, so there is no request-scoped
-    # supabase to thread. Source the SERVICE-ROLE client from the existing
-    # dependencies factory (get_supabase — a module-level singleton building
-    # create_client(SUPABASE_URL, SERVICE_ROLE_KEY); dependencies.py:16-20). Without
+    # supabase to thread. Source the SERVICE-ROLE client for the resumed run. Without
     # ctx.supabase a resumed phase's search_documents hits ctx.supabase.rpc → None
     # AttributeError (the exact F5 crash). THREAT: the service-role client bypasses
     # RLS, so retrieval MUST stay owner-scoped — search_documents filters by
     # current_user["id"], which we set below from run["user_id"] (the durable
     # run-owner), so a resumed search can never read another user's documents.
-    from app.dependencies import get_supabase
-    _service_supabase = get_supabase()
+    #
+    # Phase 163 (D-05 / T-163-05b): the client is built via get_service_role_supabase(org_id)
+    # — the org-requiring wrapper that REFUSES to construct a BYPASSRLS client without an
+    # explicit org — instead of a bare, org-less service-role singleton, so no org-less
+    # service-role client survives on this async-writer path. The org is the resumed run's OWN org
+    # (workflow_runs.org_id, backfilled post-162): carried on the run dict when
+    # find_resumable_runs selected it, else read here by run id. The BYPASSRLS + owner-scope
+    # posture is otherwise unchanged.
+    from app.dependencies import get_service_role_supabase
+    _org_id = run.get("org_id")
+    if _org_id is None:
+        try:
+            _org_id = await pool.fetchval(
+                "SELECT org_id FROM workflow_runs WHERE id = $1",
+                run["run_id"] if isinstance(run["run_id"], UUID) else UUID(str(run["run_id"])),
+            )
+        except Exception:  # noqa: BLE001 — org resolution is best-effort
+            logger.debug(
+                "resume: org_id read failed for run %s", run.get("run_id"), exc_info=True
+            )
+            _org_id = None
+    _service_supabase = get_service_role_supabase(_org_id)
 
     # F8 (092-07) + 152 WFIN-02 (Pitfall 5): parse the durable workflow_runs.inputs jsonb
     # ONCE up front so both the folder-override scope resolution below AND the F8
@@ -1656,6 +2236,9 @@ async def _build_resume_context(run, redis, pool):
         # spawner so a resumed sub-agent's task() can fan out; per_run_task_semaphore =
         # a fresh per-run gate for this resumed run.
         supabase=_service_supabase,
+        # Phase 163 (D-05): the resumed run's org, so the terminal ask_user-expiry
+        # cleanup (and any org-aware helper reading off ctx) widens to org-scope.
+        org_id=_org_id,
         folder_subtree_ids=_resume_folder_subtree_ids,
         scoped_folder_path=None,
         spawn=_resume_spawn,
@@ -1702,6 +2285,12 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
            - PENDING (False): ``resume_pending_prompt`` re-SUBSCRIBES + re-SADDs +
              re-EMITs the SAME prompt (subscribe-before-emit, Pitfall 2) and blocks
              on the answer BEFORE handing back to the loop.
+      2b. Phase 185 (L-7): an ARMED action-risk step parked on its pre-gate is NOT
+         an ``llm_human_input`` phase (its stored config type is ``llm_agent`` and it
+         has no stored output), so step 2 never sees it. It gets its own branch,
+         keyed on the loaded definition, which re-subscribes the SAME
+         ``tool_call_id`` with NO timeout — the person keeps the card they were
+         already looking at, and the wait stays indefinite across the restart.
       3. Re-drive via ``_resume_run`` → ``run_workflow``, riding the same engine
          machinery a fresh run uses (single producer per run).
 
@@ -1753,6 +2342,44 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
                 "(re-claimable after lease expiry)", run_id,
             )
             continue
+
+        # 2b. Phase 185 (GOVERN-03 / RESEARCH L-7) — the ARMED action-risk branch.
+        #     Runs AFTER the definition load because the arming is only legible on the
+        #     parsed definition (see ``_is_armed_action_risk``); step 2's branch above
+        #     and the load above it are untouched.
+        #
+        #     FIX (a), CHOSEN DELIBERATELY: re-subscribe the SAME ``tool_call_id``
+        #     rather than expire-then-re-ask. G-4 scenario 3's stated failure is "the
+        #     prompt survived but is UNREACHABLE" — and re-asking with a new id IS that
+        #     failure from the person's chair: the card they are looking at (and that
+        #     ``/pending`` serves) stops being the one the run is listening to, while a
+        #     graceful shutdown leaves the old row un-expired (``run_workflow``'s escape
+        #     handler skips ``_expire_pending_ask_user`` when ``is_app_shutting_down()``
+        #     — the 096-09 fix). Preserving the id means exactly ONE live prompt per
+        #     armed pause, and the answer lands on the channel the person can see.
+        #
+        #     ``timeout_seconds=None``: the wait was indefinite before the restart and
+        #     must still be after it, or a restart would quietly re-introduce the expiry
+        #     that reads as "yes" (SPEC Req 9).
+        if active is not None and not _is_llm_human_input(active) \
+                and _is_armed_action_risk(active, definition):
+            pending = await get_pending_ask_user(pool, run_id)
+            _tcid = (pending or {}).get("tool_call_id")
+            if _tcid:
+                if not await ask_user_response_exists(pool, run_id, _tcid):
+                    await resume_pending_prompt(
+                        redis,
+                        run_id,
+                        _tcid,
+                        (pending.get("prompt") or ""),
+                        (pending.get("options") or []),
+                        None,   # indefinite — never a restart-introduced deadline
+                    )
+                # answered → fall through; the re-drive re-runs the phase.
+            # No durable prompt row (a crash BEFORE the insert) → fall through to the
+            # ordinary re-drive unchanged: the pre-gate re-attaches and re-asks. Either
+            # way the run does not advance without an answer.
+
         ctx = await _build_resume_context(run, redis, pool)
         # Facet C (092-07): MANDATORY resume finalizer — terminalize the
         # producer-shell minted in _build_resume_context on EVERY exit path
@@ -1796,7 +2423,8 @@ async def resume_stranded_workflows(*, pool, redis) -> int:
             # the stale one keeps /pending honest in the interim.
             try:
                 await _expire_pending_ask_user(
-                    pool, run.get("thread_id"), run_id
+                    pool, run.get("thread_id"), run_id,
+                    org_id=getattr(ctx, "org_id", None),
                 )
             except Exception:  # noqa: BLE001
                 logger.exception(
@@ -1822,6 +2450,31 @@ def _is_llm_human_input(active_phase: dict) -> bool:
     output = active_phase.get("output")
     if isinstance(output, dict) and "tool_call_id" in output:
         return True
+    return False
+
+
+def _is_armed_action_risk(active_phase: dict, definition) -> bool:
+    """True if the active phase row is an ARMED action-risk step (Phase 185 / L-7).
+
+    WHY THE STORED CONFIG CANNOT ANSWER THIS. ``_is_llm_human_input`` reads the
+    ``workflow_phases`` row, which is the right source for the question IT asks. It
+    cannot answer this one: an armed step's stored ``config.phase_type`` is
+    ``llm_agent`` (arming is a VALIDATOR the engine synthesizes at the run seam, never
+    a step — D-185-12/18), and its ``output`` is ``None`` because the phase never
+    completed. So the row looks exactly like any other mid-flight agent step, and the
+    only place the arming is legible is the parsed ``WorkflowDefinition``.
+
+    The two predicates are INDEPENDENT and deliberately kept so: this one is a second
+    named reading beside ``_is_llm_human_input``, not a widening of it. Returns False
+    for anything without a matching ``PhaseSpec`` — a definition that no longer carries
+    the slug falls through to the ordinary re-drive, which is fail-closed either way.
+    """
+    slug = active_phase.get("slug")
+    if not slug or definition is None:
+        return False
+    for spec in getattr(definition, "phases", None) or []:
+        if getattr(spec, "slug", None) == slug:
+            return bool(getattr(spec, "action_risk_armed", False))
     return False
 
 

@@ -127,7 +127,7 @@ async def test_iso_updated_at_casts_and_roundtrips_as_literal(pg_pool):
                 uid, f"phase-123-1-wr07-{uid}@test.local",
             )
             await conn.execute(
-                "INSERT INTO public.skills (id, user_id, name, description, is_global) "
+                "INSERT INTO public.skills (id, user_id, name, description, is_org_shared) "
                 "VALUES ($1, $2, $3, $4, false)",
                 sid, uid, "WR-07 probe skill", "probe",
             )

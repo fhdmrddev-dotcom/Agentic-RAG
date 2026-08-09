@@ -13,7 +13,7 @@ class DocumentEntry(BaseModel):
 class FolderEntry(BaseModel):
     id: UUID
     name: str
-    is_global: bool
+    is_org_shared: bool
 
 
 class LsResponse(BaseModel):
@@ -26,7 +26,7 @@ class TreeNode(BaseModel):
     id: UUID
     name: str
     type: str  # "folder"
-    is_global: bool
+    is_org_shared: bool
     truncated: bool
     children: list["TreeNode"]
     documents: list[DocumentEntry]

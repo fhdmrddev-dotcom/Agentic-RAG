@@ -1,0 +1,539 @@
+/**
+ * Phase 184-09 Task 3 — the D-14 and R11 proofs for the governance rails.
+ *
+ * A NET-NEW suite. It does NOT absorb, replace or re-implement `PhaseFormPanel.test.tsx`:
+ * those 19 assertions are the regression net for the panel as it ships, they all render
+ * WITHOUT `rails`, and Phase 177's coverage-loss lesson (a "net-new" file that quietly
+ * replaced an existing one) is why `scripts/vitest-count-gate.cjs` pins that file at 19.
+ *
+ * WHY THE D-14 GUARD LIVES HERE AND NOT IN `revertByteIdentical.test.tsx`. That suite is
+ * the flag-off byte-identity net for the Builder, and it never renders `PhaseFormPanel` at
+ * all — an assertion added there would guard nothing. This panel is a SINGLE instance
+ * serving BOTH the shipped Spine view and the flagged Canvas view, so the only thing
+ * standing between a rails feature and a changed flag-off surface is that `rails` is
+ * optional and its absence renders today. That property is observable exactly here.
+ * (184-VALIDATION.md records this reasoning; the file split is deliberate.)
+ *
+ * The R11 whitelist guard is worded as an OPTION-SET EQUALITY over two different mocked
+ * responses, never as a source grep for tool-name literals. A blanket grep would fire on
+ * `friendlyToolName` — a display-LABEL map that must survive — and force its docblock to
+ * omit the identifiers it exists to translate, which is the D-ITEM-183-02 trap this phase
+ * has now hit repeatedly.
+ */
+import { describe, it, expect, vi } from "vitest"
+import { fireEvent, render, screen, within } from "@testing-library/react"
+
+import phaseFormPanelSource from "./PhaseFormPanel?raw"
+import { PhaseFormPanel, type PhaseFormRails, type PhaseGateRow } from "./PhaseFormPanel"
+import { GOVERNANCE_GATE_ROW_LABEL, minimalPhaseFor, PHASE_TYPE_ORDER } from "./definitionOps"
+import { EXTERNAL_CAPABILITY_SENTENCES, type PhaseSpecJSON } from "./phaseVocabulary"
+
+function phaseOf(config: Record<string, unknown>): PhaseSpecJSON {
+  return {
+    slug: "p",
+    phase_index: 0,
+    name: "A phase",
+    config: config as PhaseSpecJSON["config"],
+  }
+}
+
+const noop = () => {}
+
+function railsOf(over: Partial<PhaseFormRails> = {}): PhaseFormRails {
+  return {
+    order: { index: 1, total: 3 },
+    toolOptions: [],
+    gates: [],
+    ...over,
+  }
+}
+
+/** The shipped `llm_agent` shape — the type that actually carries `available_tools`. */
+const AGENT = { phase_type: "llm_agent", prompt: "search", available_tools: ["search_documents"] }
+
+function renderPanel(config: Record<string, unknown>, rails?: PhaseFormRails) {
+  return render(
+    <PhaseFormPanel
+      phase={phaseOf(config)}
+      open
+      onChange={noop}
+      onPersist={noop}
+      onClose={noop}
+      rails={rails}
+    />,
+  )
+}
+
+/**
+ * Every marker the rails introduce. The D-14 test asserts NONE of them appears in a
+ * rails-absent render, and a positive control asserts EVERY one of them appears in a
+ * rails-present render — so the guard cannot pass by naming strings that never render.
+ */
+const RAIL_MARKERS = [
+  "data-rail",
+  "rail-order",
+  "rail-gates",
+  "tool-option",
+  "Order is locked",
+  "Runs as step",
+  "Checks that run on this step",
+  // Phase 185-07 — the governance section rides the SAME `rails` gate, so its markers
+  // belong in the same list. A new branch that forgot the gate would show up here first.
+  "rail-governance",
+  "How strictly this step is held",
+  "governance-arm",
+]
+
+// ── 1. THE D-14 ASSERTION ─────────────────────────────────────────────────────────────
+
+describe("PhaseFormPanel — WITHOUT rails, the panel is today's panel (D-14 / D-181-01)", () => {
+  it("renders the shipped free-text available_tools input and NO chip picker", () => {
+    renderPanel(AGENT)
+
+    // The shipped comma field, reachable by its friendly accessible name and carrying the
+    // RAW ids — exactly what the 19 shipped assertions describe.
+    const field = screen.getByLabelText(/what this step can do/i) as HTMLInputElement
+    expect(field.tagName).toBe("INPUT")
+    expect(field.getAttribute("type")).toBe("text")
+    expect(field.value).toContain("search_documents")
+    // The read-friendly chip PREVIEW is the shipped one, not the picker.
+    expect(screen.getByTestId("tools-chips")).toBeInTheDocument()
+    expect(screen.queryByTestId("tools-rail")).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId("tool-option")).toHaveLength(0)
+  })
+
+  it("renders no rail element and none of the strings the rails introduce", () => {
+    const { container } = renderPanel(AGENT)
+
+    expect(container.querySelectorAll("[data-rail]")).toHaveLength(0)
+    for (const marker of RAIL_MARKERS) {
+      expect(container.innerHTML).not.toContain(marker)
+    }
+  })
+
+  it("POSITIVE CONTROL — every one of those markers really does render WITH rails", () => {
+    // Without this, the assertion above could pass on a typo in every marker string.
+    const { container } = renderPanel(
+      AGENT,
+      railsOf({ toolOptions: ["search_documents"], gates: [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }] }),
+    )
+    for (const marker of RAIL_MARKERS) {
+      expect(container.innerHTML).toContain(marker)
+    }
+  })
+
+  it("the rails-absent and rails-present renders are NOT the same DOM (the prop is load-bearing)", () => {
+    const without = renderPanel(AGENT).container.innerHTML
+    const withRails = renderPanel(AGENT, railsOf({ toolOptions: ["search_documents"] })).container.innerHTML
+    expect(without).not.toBe(withRails)
+  })
+})
+
+// ── 1b. THE PHASE-185 MOUNT POINT (G-5 honoured by construction) ──────────────────────
+
+/**
+ * The panel gained a MOUNT POINT, not a feature. These three cases pin the only three
+ * things the panel itself owes the governance section: the `rails` gate, its position in
+ * the reading order, and tolerance of an unwired caller. Everything the section RENDERS is
+ * asserted in `GovernanceSection.test.tsx` — testing it twice, through two different prop
+ * paths, is how a 1078-line file grows a second home for the same rule.
+ */
+describe("PhaseFormPanel — the governance section is a mount point (Phase 185-07)", () => {
+  it("reads 'how strictly this step is held' BEFORE 'the checks that run on it'", () => {
+    const { container } = renderPanel(AGENT, railsOf())
+
+    const governance = screen.getByTestId("rail-governance")
+    const gates = screen.getByTestId("rail-gates")
+    expect(governance).toBeInTheDocument()
+    // `compareDocumentPosition` is the honest reading of "before" — a class or an index
+    // into `querySelectorAll` would both survive a reorder this assertion exists to catch.
+    expect(governance.compareDocumentPosition(gates) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(container.querySelectorAll('[data-rail="governance"]')).toHaveLength(1)
+  })
+
+  it("renders read-only with `onGovernanceChange` omitted — visible, never silent", () => {
+    // 185-08 wires the page handler. Until then an unwired panel must still SHOW the
+    // section (a disappearing surface is how a dropped wiring goes unnoticed) and must
+    // not throw when a control is pressed.
+    renderPanel(AGENT, railsOf())
+    const arm = screen.getByTestId("governance-arm")
+    expect(() => fireEvent.click(arm)).not.toThrow()
+    expect(screen.getByTestId("rail-governance")).toBeInTheDocument()
+  })
+
+  it("the KB list comes from the rails, and an absent one marks NOTHING", () => {
+    // Absent: the palette could not be read. The step is still an `llm_agent` naming
+    // `search_documents`, and it is NOT marked — the safe direction (D-185-09).
+    const absent = renderPanel(AGENT, railsOf())
+    expect(screen.getByTestId("rail-governance").getAttribute("data-cause")).toBe("none")
+    absent.unmount()
+
+    const supplied = renderPanel(AGENT, railsOf({ kbTools: ["search_documents"] }))
+    expect(
+      within(supplied.container).getByTestId("rail-governance").getAttribute("data-cause"),
+    ).toBe("detected")
+  })
+})
+
+// ── 2-5. THE TOOL RAIL (R11) ──────────────────────────────────────────────────────────
+
+describe("PhaseFormPanel rails — the tool whitelist comes from the bundle (R11)", () => {
+  it("the rendered option SET equals the supplied array exactly", () => {
+    renderPanel(AGENT, railsOf({ toolOptions: ["search_documents", "execute_code"] }))
+
+    const rendered = screen.getAllByTestId("tool-option").map((el) => el.getAttribute("data-tool"))
+    expect(rendered).toEqual(["search_documents", "execute_code"])
+  })
+
+  it("CHANGE THE MOCKED BUNDLE, CHANGE THE OPTIONS — nothing else moved", () => {
+    const first = renderPanel(AGENT, railsOf({ toolOptions: ["search_documents", "execute_code"] }))
+    const before = within(first.container)
+      .getAllByTestId("tool-option")
+      .map((el) => el.getAttribute("data-tool"))
+    first.unmount()
+
+    const second = renderPanel(AGENT, railsOf({ toolOptions: ["search_documents", "list_folders", "fetch_url"] }))
+    const after = within(second.container)
+      .getAllByTestId("tool-option")
+      .map((el) => el.getAttribute("data-tool"))
+
+    expect(before).toEqual(["search_documents", "execute_code"])
+    expect(after).toEqual(["search_documents", "list_folders", "fetch_url"])
+    expect(after).not.toEqual(before)
+  })
+
+  it("there is NO free-text box bound to available_tools in the rails variant", () => {
+    renderPanel(AGENT, railsOf({ toolOptions: ["search_documents", "execute_code"] }))
+
+    const rail = screen.getByTestId("tools-rail")
+    expect(rail.querySelectorAll("input, textarea")).toHaveLength(0)
+    // No control anywhere in the panel carries the tool list as an editable value.
+    const inputs = Array.from(document.querySelectorAll("input")) as HTMLInputElement[]
+    expect(inputs.some((i) => i.value.includes("search_documents"))).toBe(false)
+    // The accessible name survives (the rail is a labelled `role="group"`), but it no longer
+    // resolves to anything a user can TYPE into — which is the whole of "no free-text box".
+    const named = screen.getByLabelText(/what this step can do/i)
+    expect(named).toBe(rail)
+    expect(["INPUT", "TEXTAREA"]).not.toContain(named.tagName)
+  })
+
+  it("a chip toggles through the SAME comma seam the free-text field used", () => {
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    render(
+      <PhaseFormPanel
+        phase={phaseOf(AGENT)}
+        open
+        onChange={onChange}
+        onPersist={onPersist}
+        onClose={noop}
+        rails={railsOf({ toolOptions: ["search_documents", "execute_code"] })}
+      />,
+    )
+
+    fireEvent.click(screen.getByTitle("execute_code"))
+    expect(onChange).toHaveBeenCalledWith({ available_tools: ["search_documents", "execute_code"] })
+    expect(onPersist).toHaveBeenCalledTimes(1)
+  })
+
+  it("a named tool the registry LACKS renders struck through — present, never hidden", () => {
+    renderPanel(
+      { ...AGENT, available_tools: ["search_documents", "web_scrape"] },
+      railsOf({ toolOptions: ["search_documents", "execute_code"] }),
+    )
+
+    const stray = screen.getByTestId("tools-rail").querySelector('[data-tool="web_scrape"]')
+    expect(stray).toBeTruthy()
+    expect(stray?.className).toContain("line-through")
+    expect(stray?.getAttribute("data-unregistered")).toBe("true")
+    // A registered one is NOT struck through — the control that keeps the check meaningful.
+    const known = screen.getByTestId("tools-rail").querySelector('[data-tool="search_documents"]')
+    expect(known?.className).not.toContain("line-through")
+  })
+
+  it("a degraded bundle SAYS SO and renders ZERO options — never an empty-but-normal picker", () => {
+    renderPanel(AGENT, railsOf({ toolOptions: "degraded" }))
+
+    const sentence = screen.getByTestId("tools-degraded")
+    expect(sentence.textContent ?? "").toMatch(/could ?n[o’']t load/i)
+    expect(screen.queryAllByTestId("tool-option")).toHaveLength(0)
+    expect(screen.queryByTestId("tools-rail")).not.toBeInTheDocument()
+  })
+
+  it("a degraded read still prints what the step already names (a failed read is not a wipe)", () => {
+    renderPanel(AGENT, railsOf({ toolOptions: "degraded" }))
+    expect(screen.getByTestId("tools-degraded-current").textContent).toContain("Search documents")
+  })
+
+  it("an EMPTY registry with a successful read is a different, honest state", () => {
+    // We asked and the answer was "none" — distinct from "we could not ask".
+    renderPanel({ phase_type: "llm_agent", prompt: "x", available_tools: [] }, railsOf({ toolOptions: [] }))
+    expect(screen.getByTestId("tools-empty")).toBeInTheDocument()
+    expect(screen.queryByTestId("tools-degraded")).not.toBeInTheDocument()
+  })
+})
+
+// ── 6-7. THE GATES AND ORDER RAILS ────────────────────────────────────────────────────
+
+describe("PhaseFormPanel rails — gates cannot be wired around", () => {
+  const gates: PhaseGateRow[] = [
+    { label: GOVERNANCE_GATE_ROW_LABEL, locked: true },
+    { label: "Output file is valid", locked: false, onRemove: () => {} },
+  ]
+
+  it("a LOCKED gate row has zero controls in its DOM subtree", () => {
+    renderPanel(AGENT, railsOf({ gates }))
+
+    const rows = screen.getAllByTestId("gate-row")
+    const locked = rows.find((r) => r.getAttribute("data-locked") === "true")
+    expect(locked).toBeTruthy()
+    expect(locked!.querySelectorAll('button, [role="button"], input')).toHaveLength(0)
+    expect(locked!.textContent).toContain("Cannot be removed")
+  })
+
+  it("an UNLOCKED gate row has exactly one, and it fires the caller's handler", () => {
+    const onRemove = vi.fn()
+    renderPanel(
+      AGENT,
+      railsOf({
+        gates: [
+          { label: GOVERNANCE_GATE_ROW_LABEL, locked: true },
+          { label: "Output file is valid", locked: false, onRemove },
+        ],
+      }),
+    )
+
+    const rows = screen.getAllByTestId("gate-row")
+    const unlocked = rows.find((r) => r.getAttribute("data-locked") === "false")
+    expect(unlocked).toBeTruthy()
+    const controls = unlocked!.querySelectorAll('button, [role="button"], input')
+    expect(controls).toHaveLength(1)
+
+    fireEvent.click(controls[0] as HTMLElement)
+    expect(onRemove).toHaveBeenCalledTimes(1)
+  })
+
+  it("the order rail reads the locked sentence with the caller's numbers", () => {
+    renderPanel(AGENT, railsOf({ order: { index: 1, total: 3 } }))
+    expect(screen.getByTestId("rail-order").textContent).toContain(
+      "Runs as step 1 of 3 — steps run in order, one after another.",
+    )
+  })
+
+  it("the order rail carries NO control — moving is a canvas gesture, not a form field", () => {
+    renderPanel(AGENT, railsOf({ order: { index: 2, total: 4 } }))
+    const rail = screen.getByTestId("rail-order")
+    expect(rail.querySelectorAll('button, [role="button"], input, select, a')).toHaveLength(0)
+  })
+})
+
+// ── 8-9. THE SCOPE FENCES ─────────────────────────────────────────────────────────────
+
+describe("PhaseFormPanel rails — Phase 184 invents no authored grounding field", () => {
+  const GROUNDING_MODE = /grounding_mode/
+
+  it("the panel source never names Phase 185's field", () => {
+    expect(phaseFormPanelSource).not.toMatch(GROUNDING_MODE)
+  })
+
+  it("POSITIVE CONTROL — the pattern really does find that token", () => {
+    expect(GROUNDING_MODE.test('const mode = phase.config.grounding_mode')).toBe(true)
+  })
+})
+
+describe("PhaseFormPanel rails — the per-type conditioning is unchanged WITH rails present", () => {
+  it("programmatic still shows no model, no tools and no folder scope", () => {
+    renderPanel({ phase_type: "programmatic", fn: "split_topic", input_keys: ["topic"] }, railsOf())
+
+    expect(screen.getByLabelText(/^function/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^ai model/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("tools-rail")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("folder-scope-display")).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
+  })
+
+  it("llm_human_input still shows no model, no tools and no folder scope", () => {
+    renderPanel({ phase_type: "llm_human_input", prompt: "confirm?", options: ["yes"] }, railsOf())
+
+    expect(screen.getByLabelText(/choices to offer the person/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^ai model/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("tools-rail")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("folder-scope-display")).not.toBeInTheDocument()
+  })
+
+  it("citation_policy still appears ONLY on the deliverable", () => {
+    // DERIVED (Phase 189) — same decision as the sibling case in `PhaseFormPanel.test.tsx`:
+    // "ONLY on the deliverable" is a claim about every other type, so the 7th belongs in
+    // the subset, and `minimalPhaseFor` keeps each config valid without an `if` ladder.
+    // ⚠ `toolOptions` is passed UNCHANGED and is NOT widened: the three capability names
+    // must never reach an author-facing tool rail (D-20/D-22). `D-189-DEF-02` is CLOSED by
+    // the dedicated describe below, not by this loop.
+    const nonEmit = PHASE_TYPE_ORDER.filter((type) => type !== "llm_emit")
+    expect(nonEmit).toHaveLength(PHASE_TYPE_ORDER.length - 1)
+    for (const pt of nonEmit) {
+      const config = minimalPhaseFor(pt, "some-slug", 0).config
+      const { unmount } = renderPanel(config, railsOf({ toolOptions: ["search_documents"] }))
+      expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
+      unmount()
+    }
+
+    renderPanel(
+      { phase_type: "llm_emit", prompt: "render", emitter: "render_template", citation_policy: "strict" },
+      railsOf(),
+    )
+    expect(screen.getByLabelText(/sourcing strictness/i)).toBeInTheDocument()
+  })
+
+  it("the rails do not disturb the panel's dismissal or its resting rail", () => {
+    const onClose = vi.fn()
+    render(
+      <PhaseFormPanel
+        phase={phaseOf(AGENT)}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={onClose}
+        rails={railsOf({ toolOptions: ["search_documents"] })}
+      />,
+    )
+    fireEvent.click(screen.getByTestId("phase-form-close"))
+    expect(onClose).toHaveBeenCalledTimes(1)
+
+    // The 44px collapsed rail is reached by the SAME early return, before any rail renders.
+    const { container } = render(
+      <PhaseFormPanel
+        phase={null}
+        open={false}
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        rails={railsOf({ toolOptions: ["search_documents"], gates: [{ label: "g", locked: true }] })}
+      />,
+    )
+    expect(within(container).getByTestId("phase-form-rail")).toBeInTheDocument()
+    expect(container.querySelectorAll("[data-rail]")).toHaveLength(0)
+  })
+})
+
+// ── 9b. D-189-DEF-02 — the generic tool rail is SCOPED AWAY from external_action ──────
+//
+// THE DEFERRED ITEM, IN ITS OWN WORDS: *"the author-facing tool rail will render a
+// capability STRUCK THROUGH."* `ToolOptionSet` shows a name the registry lacks struck
+// through and STILL PRESSABLE — the fixable form, and the right behaviour for a tool the
+// author chose by mistake. D-20 deliberately keeps the three capabilities OUT of
+// `GroundingBundle.tools`, which is `toolOptions`' only source, so an `external_action`
+// step whose `available_tools` the SERVER derives from its capability (D-03) would have a
+// STRUCTURALLY REQUIRED value painted as an author-fixable error — and one click would
+// delete a value the author may not author in the first place.
+//
+// ⚠ THE FIX IS SCOPE, NEVER WIDTH. Widening `toolOptions` to admit the capabilities would
+// make the strike-through disappear and re-open the exact governance hole 189-04 closed:
+// PLANT 2 in that plan proved the whole fidelity suite stays GREEN while the leak is open,
+// and `test_182_grounding_bundle.py`'s V22 is the only guard that can see it.
+//
+// MEASURED, then GUARDED. The rail is already unreachable for this type BY CONSTRUCTION —
+// `PhaseFormPanel.tsx` renders `ToolsField` inside two mutually exclusive `pt === …`
+// branches (`llm_agent`, `llm_batch_agents`) and has no default arm — so this plan changes
+// no render code. What it adds is the thing that was missing: a MECHANICAL guard, because
+// "true today by construction" is exactly the claim a later branch silently falsifies.
+
+describe("PhaseFormPanel — D-189-DEF-02: no capability reaches the author-facing rail", () => {
+  it("external_action renders NO tool rail at all — not even the degraded one", () => {
+    const { container, unmount } = renderPanel(
+      minimalPhaseFor("external_action", "notify-owner", 0).config,
+      railsOf({ toolOptions: ["search_documents", "execute_code"] }),
+    )
+    expect(screen.queryByTestId("tools-rail")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("tools-degraded")).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId("tool-option")).toHaveLength(0)
+    // NON-VACUITY: the panel DID render — the absence above is a scope decision, not an
+    // empty component. The rails' other surfaces are present on this very step.
+    expect(screen.getByTestId("phase-form-close")).toBeInTheDocument()
+    expect(container.querySelectorAll("[data-rail]").length).toBeGreaterThan(0)
+    unmount()
+  })
+
+  it("POSITIVE CONTROL — the identical rails DO render the rail on llm_agent", () => {
+    const { unmount } = renderPanel(
+      AGENT,
+      railsOf({ toolOptions: ["search_documents", "execute_code"] }),
+    )
+    expect(screen.getByTestId("tools-rail")).toBeInTheDocument()
+    expect(screen.getAllByTestId("tool-option").length).toBeGreaterThan(0)
+    unmount()
+  })
+
+  it("no capability NAME appears anywhere in the external_action panel", () => {
+    // The strike-through hazard restated as its observable: a capability rendered as a
+    // pressable chip. Asserted over the whole panel HTML, and over the DEGRADED read too,
+    // because the degraded branch PRINTS what the step already names.
+    for (const options of [["search_documents"], [] as string[], "degraded" as const]) {
+      const { container, unmount } = renderPanel(
+        minimalPhaseFor("external_action", "notify-owner", 0).config,
+        railsOf({ toolOptions: options }),
+      )
+      for (const capability of Object.keys(EXTERNAL_CAPABILITY_SENTENCES)) {
+        expect(container.innerHTML).not.toContain(capability)
+      }
+      expect(container.innerHTML).not.toContain("line-through")
+      unmount()
+    }
+  })
+
+  it("`toolOptions` was NOT widened — the three capabilities are absent from the source", () => {
+    // The other half of the boundary, and the one a render test cannot see: the client
+    // must not carry a capability name into any tool-option list. V22
+    // (`backend/tests/test_182_grounding_bundle.py`) guards the SERVER half; this guards
+    // the client's.
+    for (const capability of Object.keys(EXTERNAL_CAPABILITY_SENTENCES)) {
+      expect(phaseFormPanelSource).not.toContain(capability)
+    }
+    // POSITIVE CONTROL — the haystack is the real source and does name tool ids.
+    expect(phaseFormPanelSource.length).toBeGreaterThan(1000)
+    expect(phaseFormPanelSource).toContain("search_documents")
+  })
+
+  it("the rail is reachable ONLY from the two tool-carrying branches, asserted on source", () => {
+    // A source fence, because the render cases above can only prove the types they render.
+    // `ToolsField` must appear exactly twice, and `external_action` must never gate it.
+    const mounts = phaseFormPanelSource.match(/<ToolsField/g) ?? []
+    expect(mounts).toHaveLength(2)
+    expect(phaseFormPanelSource).not.toMatch(/pt === "external_action"[\s\S]{0,600}<ToolsField/)
+    // POSITIVE CONTROL — the gate-then-rail regex really does match that shape.
+    expect('{pt === "external_action" && (<><ToolsField /></>)}').toMatch(
+      /pt === "external_action"[\s\S]{0,600}<ToolsField/,
+    )
+  })
+})
+
+// ── 10. EXACTLY ONE FORM COMPONENT ────────────────────────────────────────────────────
+
+/**
+ * 140-A won because it does not create a second form surface to keep in step with the
+ * Builder's. This is that claim, machine-checked: no module in this directory other than
+ * `PhaseFormPanel.tsx` may export a component whose name reads as a phase-config form.
+ */
+const WORKFLOW_MODULES = import.meta.glob("./*.{ts,tsx}", {
+  query: "?raw",
+  eager: true,
+  import: "default",
+}) as Record<string, string>
+
+const FORM_COMPONENT_EXPORT = /export\s+(?:default\s+)?(?:function|const)\s+(?:PhaseForm|PhaseConfigForm|StepForm)\w*/
+
+describe("the canvas is a third way IN to ONE form (CANVAS-03 / R5)", () => {
+  it("no module other than PhaseFormPanel.tsx exports a phase-config form component", () => {
+    const offenders = Object.entries(WORKFLOW_MODULES)
+      .filter(([path]) => !path.endsWith("/PhaseFormPanel.tsx") && !path.includes(".test."))
+      .filter(([, source]) => FORM_COMPONENT_EXPORT.test(source))
+      .map(([path]) => path)
+
+    expect(offenders).toEqual([])
+  })
+
+  it("POSITIVE CONTROL — the scan really does see PhaseFormPanel.tsx, and the glob is not empty", () => {
+    expect(Object.keys(WORKFLOW_MODULES).length).toBeGreaterThan(5)
+    expect(FORM_COMPONENT_EXPORT.test(WORKFLOW_MODULES["./PhaseFormPanel.tsx"])).toBe(true)
+  })
+})

@@ -13,12 +13,14 @@ owner-scoped router mounted under ``/skills/{skill_id}/tuner/...``:
      scoreboard (per-provider cells carrying BOTH fires/no_false sub-scores) + the candidate
      descriptions once the run is complete.
 
-OWNER-SCOPING IS THE SOLE GATE (V4 / T-123-04-01): ``get_supabase()`` is the SERVICE-ROLE
-client (RLS bypassed), so the app-code ``.eq("user_id", ...)`` / ``.or_(...own,global)`` on
-EVERY route is the only thing standing between user A and user B's skill. A user can NEVER
-start, stream, or read a tuning run for another user's non-global skill — a miss returns 404
-(never 403 — don't leak existence). The cross-user-404 integration test is the load-bearing
-proof.
+OWNER-SCOPING IS BELT-AND-SUSPENDERS BEHIND RLS (V4 / T-123-04-01): Phase 163 swapped the
+request-scoped route handlers to the per-request user-JWT client, so RLS (skills SELECT
+own+global; tuner_runs SELECT own+global-skill) is now the PRIMARY gate; the app-code
+``.eq("user_id", ...)`` / ``.or_(...own,global)`` on EVERY route stays as the D-14 second layer.
+A user can NEVER start, stream, or read a tuning run for another user's non-global skill — a miss
+returns 404 (never 403 — don't leak existence). The DETACHED background job keeps the hardened
+service-role client (D-05 — ``tuner_runs`` has no authenticated INSERT/UPDATE policy + the job
+outlives the request token). The cross-user-404 integration test is the load-bearing proof.
 
 BOUNDED RUN (DoS — T-123-04-02): the background job is capped on every axis — at most
 ``MAX_CASES`` benchmark cases, at most ``MAX_TARGETS`` provider columns, at most
@@ -56,7 +58,21 @@ from supabase import Client
 
 from app.api.runs import replay_tail_consumer
 from app.config import get_model_capability, get_per_call_timeout, settings
-from app.dependencies import get_current_user, get_redis, get_supabase, require_visible
+# Phase 163 (TEN-02 / D-03 / D-05): the tuner's request-scoped route handlers run on the
+# per-request user-JWT client (RLS-ENFORCED) — the owner-verify skill reads + the tuner_runs
+# SELECT reads all work under RLS (skills SELECT own+global; tuner_runs SELECT own+global-skill).
+# The DETACHED background job ``_run_tuner_job`` (spawned via asyncio.create_task, runs up to
+# ~30 min — can outlive the request's Bearer token) UPSERTs ``tuner_runs``, which has NO
+# authenticated INSERT/UPDATE policy — so it keeps the hardened service-role client via a second
+# ``service_supabase=Depends(get_supabase)`` param on start_tuner_run (the D-05 async-writer
+# carve-out, mirroring plan 06's producer split). KEEP .eq/.or_ scoping (D-14) + run_in_threadpool.
+from app.dependencies import (
+    get_current_user,
+    get_redis,
+    get_supabase,
+    get_user_supabase_client,
+    require_visible,
+)
 from app.services import skill_tuner_service
 
 logger = logging.getLogger(__name__)
@@ -185,7 +201,7 @@ class StartTunerRunBody(BaseModel):
 async def _fetch_owned_or_global_skill(supabase: Client, skill_id: str, user_id: str) -> dict:
     """Return the skill row IFF the caller owns it OR it is global; else raise 404.
 
-    ``get_supabase()`` is SERVICE-ROLE — this ``.or_(user_id.eq, is_global.eq.true)`` scoping
+    ``get_supabase()`` is SERVICE-ROLE — this ``.or_(user_id.eq, is_org_shared.eq.true)`` scoping
     (mirrors skills.py owner-scoping) is the only thing preventing a cross-user leak. 404 (never
     403) on a miss so resource existence is not leaked to other users. Wrapped in
     ``run_in_threadpool`` because supabase-py is blocking (D-v2.5-01).
@@ -194,9 +210,9 @@ async def _fetch_owned_or_global_skill(supabase: Client, skill_id: str, user_id:
     def _read():
         return (
             supabase.table("skills")
-            .select("id, name, description, user_id, is_global")
+            .select("id, name, description, user_id, is_org_shared")
             .eq("id", skill_id)
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
             .limit(1)
             .execute()
         )
@@ -660,7 +676,12 @@ async def start_tuner_run(
     skill_id: str,
     body: StartTunerRunBody,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # Phase 163 (D-05): the DETACHED _run_tuner_job (asyncio.create_task, ~30 min, can outlive
+    # this request's Bearer token) UPSERTs tuner_runs — a table with NO authenticated INSERT/UPDATE
+    # policy. It keeps the hardened service-role client; the request-scoped owner-verify + case-seed
+    # reads above use the RLS-enforced user-JWT ``supabase``.
+    service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Kick off a BOUNDED background tuning run; return the run id IMMEDIATELY (D-06).
@@ -759,7 +780,9 @@ async def start_tuner_run(
                 targets=targets,
                 n=n,
                 user_id=current_user["id"],
-                supabase=supabase,  # D-07 durable upsert into tuner_runs
+                # D-07 durable upsert into tuner_runs — service-role (D-05 detached-writer
+                # carve-out; tuner_runs has no authenticated INSERT/UPDATE policy).
+                supabase=service_supabase,
             )
         )
     except Exception:
@@ -786,7 +809,7 @@ async def stream_tuner_run(
     run_id: UUID,
     since: str = "0",
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Stream live tuner_* progress over SSE (reusing the shared replay_tail_consumer).
@@ -826,7 +849,7 @@ async def stream_tuner_run(
 async def get_latest_tuner_run(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return the DURABLE latest tuner result for a skill (D-07 rehydration-on-open).
 
@@ -886,7 +909,7 @@ async def get_tuner_results(
     skill_id: str,
     run_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Return the held-out scoreboard (per-provider cells with BOTH fires/no_false sub-scores)
@@ -952,12 +975,12 @@ async def get_tuner_results(
 async def get_seeded_cases(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return the already-computed seeded benchmark cases WITH provenance (D-05).
 
     Owner-verify first (404 on cross-user — T-123.1-02). Then fetch the owner-scoped siblings
-    (the SOLE false-fire-rail leak gate — ``.or_(user_id.eq, is_global.eq.true)`` inside
+    (the SOLE false-fire-rail leak gate — ``.or_(user_id.eq, is_org_shared.eq.true)`` inside
     ``fetch_owner_scoped_siblings``) and return the provenance-carrying seed so the editor can
     SHOW + edit the cases before a run (fixes WR-05 / HIGH #2 — the editor previously showed
     "0 cases"). Another user's private skill never reaches the seed.
@@ -992,7 +1015,7 @@ async def cancel_tuner_run(
     skill_id: str,
     run_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """REALLY cancel an in-flight tuning run (TT-08).

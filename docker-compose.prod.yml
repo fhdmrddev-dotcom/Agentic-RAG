@@ -50,6 +50,18 @@ services:
       # read ONCE at container create; a wizard-configured box persists its infra tier in the
       # store and the config overlay reads it at boot (D-01/D-02).
       SETUP_STORE_PATH: /data/setup.json
+      # Phase 167 (INV-01, D-167-02) — invitation email delivery. Default `none` LOGS the
+      # invite link (offline/self-hosted safe; no creds). Set EMAIL_PROVIDER=resend +
+      # RESEND_API_KEY + INVITE_FROM_EMAIL in ./.env to send real email. All three are also
+      # read from env_file above; listed here (with none-safe defaults) to self-document the knob.
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-none}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      INVITE_FROM_EMAIL: ${INVITE_FROM_EMAIL:-}
+      # Phase 168 (SSO-01) — SAML provider-CRUD transport adapter (config, NOT secrets). Also read
+      # from env_file above; listed here (with Cloud-path defaults) to self-document the knob. The
+      # Cloud sbp_ management token is NOT here — it lives encrypted in app_settings (D-168-01).
+      SUPABASE_PROJECT_REF: ${SUPABASE_PROJECT_REF:-}
+      SUPABASE_SELF_HOSTED: ${SUPABASE_SELF_HOSTED:-false}
     depends_on:
       redis:
         condition: service_healthy

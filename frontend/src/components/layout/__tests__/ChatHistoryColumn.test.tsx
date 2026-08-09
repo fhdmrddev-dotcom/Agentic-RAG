@@ -40,8 +40,8 @@ const HOUR = 3_600_000
 const DAY = 86_400_000
 
 const folders: Folder[] = [
-  { id: "f-fin", user_id: "u", name: "Finance", parent_id: null, is_global: false, created_at: iso(90 * DAY), updated_at: iso(90 * DAY) },
-  { id: "f-eng", user_id: "u", name: "Engineering", parent_id: null, is_global: false, created_at: iso(90 * DAY), updated_at: iso(90 * DAY) },
+  { id: "f-fin", user_id: "u", name: "Finance", parent_id: null, is_org_shared: false, created_at: iso(90 * DAY), updated_at: iso(90 * DAY) },
+  { id: "f-eng", user_id: "u", name: "Engineering", parent_id: null, is_org_shared: false, created_at: iso(90 * DAY), updated_at: iso(90 * DAY) },
 ]
 
 function mkThread(id: string, title: string, folderId: string | null, msAgo: number): Thread {

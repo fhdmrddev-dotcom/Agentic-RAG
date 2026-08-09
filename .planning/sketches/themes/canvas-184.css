@@ -1,0 +1,338 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   canvas-184.css — the LOCKED 137-D canvas node language, extracted so the
+   Phase-184 sketches (138–141) all speak it identically.
+
+   This file exists for the same reason `PhaseNode.tsx` exists: there is ONE
+   node. If a sketch needs a different card, that is a design decision to
+   argue, not a copy-paste to make.
+
+   What is locked here (sketch 137-D + operator, 2026-07-25):
+     · horizontal left→right flow of frosted step cards
+     · the 3D fluent-emoji mark FLOATS at the left edge with a contact shadow
+     · per-step-type colour is a TINT BEHIND THE ICON ONLY — never a tile wash,
+       because Phase 188 needs the strong colours for run status
+     · plain-language title + one supporting line + at most two word-badges
+     · the raw phase_type / slug lives behind the ⌥ Technical-names reveal
+     · motion keys off RUN STATE, never off selection
+
+   Everything below the `EDITING CHROME` rule is net-new for Phase 184 and is
+   deliberately kept visually quieter than the node itself.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── page frame shared by all four sketches ─────────────────────────────── */
+html, body { height: 100%; }
+body { display: flex; flex-direction: column; overflow: hidden; }
+.variant-nav, .lead, .bar { flex-shrink: 0; }
+
+.lead {
+  padding: var(--space-3) var(--space-6); font-size: var(--text-sm);
+  color: var(--color-text-muted); line-height: 1.6;
+  border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1);
+}
+.lead b { color: var(--color-text); }
+.lead code { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); }
+
+.bar {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-3) var(--space-6); border-bottom: 1px solid var(--color-border);
+}
+.bar .lbl {
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim);
+  text-transform: uppercase; letter-spacing: .09em;
+}
+.seg {
+  display: inline-flex; background: var(--color-muted);
+  border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px;
+}
+.seg button {
+  border: 0; background: transparent; color: var(--color-text-dim); font-family: var(--font-sans);
+  font-size: var(--text-xs); padding: 5px 13px; border-radius: 999px; cursor: pointer;
+  transition: all var(--dur-base) var(--ease-out);
+}
+.seg button:hover { color: var(--color-text); }
+.seg button.on { background: var(--color-surface-hi); color: var(--color-text); box-shadow: var(--shadow-sm); }
+.seg.energy button.on {
+  background: linear-gradient(135deg, hsl(239 84% 67% / .9), hsl(258 90% 66% / .9));
+  color: #fff; box-shadow: 0 0 16px hsl(239 100% 82% / .35);
+}
+.spacer { flex: 1; }
+
+/* ── the stage ──────────────────────────────────────────────────────────── */
+.stage { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; }
+.plane { position: relative; flex: 1; min-width: 0; overflow: auto; }
+.plane.scrollbar-thin { scrollbar-width: thin; }
+.flow {
+  position: relative; display: flex; align-items: center;
+  padding: 92px 60px 92px 76px; min-height: 100%; min-width: max-content;
+}
+
+/* ambient backdrop — the 137-D depth cue */
+.amb { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.amb::before, .amb::after { content: ''; position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; }
+.amb::before { width: 520px; height: 520px; left: 8%; top: -12%; background: hsl(239 84% 45% / .22); }
+.amb::after  { width: 460px; height: 460px; right: 6%; bottom: -16%; background: hsl(258 90% 50% / .16); }
+body.alive .amb::before { animation: drift1 19s ease-in-out infinite; }
+body.alive .amb::after  { animation: drift2 23s ease-in-out infinite; }
+@keyframes drift1 { 0%,100% { transform: translate(0,0) scale(1); opacity: .5 }
+                    50%     { transform: translate(70px,44px) scale(1.14); opacity: .78 } }
+@keyframes drift2 { 0%,100% { transform: translate(0,0) scale(1); opacity: .42 }
+                    50%     { transform: translate(-58px,-38px) scale(1.11); opacity: .68 } }
+
+/* ── THE NODE (137-D, locked) ───────────────────────────────────────────── */
+.node {
+  position: relative; flex-shrink: 0; cursor: pointer;
+  transition: transform var(--dur-slow) var(--ease-out),
+              border-color var(--dur-slow) var(--ease-out),
+              box-shadow var(--dur-slow) var(--ease-out),
+              opacity var(--dur-slow) var(--ease-out);
+  display: flex; align-items: center; gap: 16px; width: 300px;
+  padding: 17px 18px 17px 46px; margin-left: 30px; border-radius: 20px;
+  background: linear-gradient(160deg, hsl(220 30% 100% / .075), hsl(220 30% 100% / .022));
+  backdrop-filter: blur(18px) saturate(150%); -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid hsl(220 30% 100% / .11);
+  box-shadow: 0 1px 0 hsl(220 30% 100% / .13) inset, 0 24px 48px -22px rgba(0,0,0,.95);
+}
+.node:hover {
+  transform: translateY(-4px); border-color: hsl(220 30% 100% / .19);
+  box-shadow: 0 1px 0 hsl(220 30% 100% / .2) inset, 0 34px 60px -22px rgba(0,0,0,1);
+}
+.node.sel {
+  border-color: hsl(239 100% 82% / .55);
+  box-shadow: 0 1px 0 hsl(220 30% 100% / .2) inset, 0 34px 60px -22px rgba(0,0,0,1),
+              0 0 44px -8px hsl(239 100% 82% / .4);
+}
+.node:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+.node .icowrap {
+  position: absolute; left: -30px; top: 50%; transform: translateY(-50%);
+  width: 62px; height: 62px; display: grid; place-items: center; flex-shrink: 0;
+}
+.ico3d { display: block; position: relative; z-index: 2; filter: drop-shadow(0 9px 13px rgba(0,0,0,.8)); }
+.node .icowrap::after {
+  content: ''; position: absolute; bottom: -3px; left: 50%; transform: translateX(-50%);
+  width: 40px; height: 8px; border-radius: 50%; background: rgba(0,0,0,.6); filter: blur(5px); z-index: 0;
+}
+/* THE COLOUR BUDGET: type colour is a tint behind the icon, nothing more. */
+.node .icowrap::before {
+  content: ''; position: absolute; inset: -5px; border-radius: 50%; z-index: 0;
+  background: radial-gradient(circle, var(--tint, hsl(220 30% 100% / .18)), transparent 68%);
+}
+.node[data-type="llm_agent"]        { --tint: hsl(239 90% 70% / .40); }
+.node[data-type="llm_emit"]         { --tint: hsl(258 90% 70% / .40); }
+.node[data-type="programmatic"]     { --tint: hsl(200 85% 62% / .36); }
+.node[data-type="llm_batch_agents"] { --tint: hsl(170 80% 55% / .34); }
+.node[data-type="llm_human_input"]  { --tint: hsl(38 92% 62% / .38); }
+.node[data-type="llm_single"]       { --tint: hsl(220 30% 100% / .22); }
+
+.node .body { min-width: 0; flex: 1; }
+.ttl { font-family: var(--font-headline); font-weight: 600; letter-spacing: -0.01em;
+       color: var(--color-text); font-size: 15px; line-height: 1.3; }
+.sub { color: var(--color-text-muted); font-size: 11.5px; margin-top: 4px; line-height: 1.5; }
+.badges { display: flex; gap: 5px; margin-top: 9px; flex-wrap: wrap; }
+.techline { display: none; font-family: var(--font-mono); font-size: 10px;
+            color: var(--color-text-dim); margin-top: 5px; }
+body.tech .techline { display: block; }
+
+.stepn {
+  position: absolute; top: 10px; right: 10px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--font-mono); font-size: 10px;
+  background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+  color: var(--color-text-dim); z-index: 3;
+}
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  padding: 2px 9px; font-size: 10.5px; font-weight: 500; white-space: nowrap;
+}
+.badge.cited { color: hsl(142 71% 62%); background: hsl(142 71% 45% / .14); border: 1px solid hsl(142 71% 45% / .3); }
+.badge.file  { color: hsl(258 90% 78%); background: hsl(258 90% 66% / .14); border: 1px solid hsl(258 90% 66% / .32); }
+.badge.you   { color: hsl(38 92% 68%);  background: hsl(38 92% 60% / .14);  border: 1px solid hsl(38 92% 60% / .32); }
+.badge.flag  { color: hsl(200 85% 74%); background: hsl(200 85% 62% / .13); border: 1px solid hsl(200 85% 62% / .3); }
+.badge.soon  { color: var(--color-text-dim); background: transparent; border: 1px dashed var(--color-border); }
+.badge.lock  { color: hsl(142 71% 62%); background: hsl(142 71% 45% / .12); border: 1px solid hsl(142 71% 45% / .3); }
+
+/* ── the connector between steps ────────────────────────────────────────── */
+.conn { position: relative; flex-shrink: 0; display: grid; place-items: center; width: 96px; }
+.conn .line { position: relative; height: 2px; width: 62px; border-radius: 2px;
+              overflow: hidden; background: var(--color-border); }
+.conn .tip {
+  position: absolute; right: 16px; width: 0; height: 0;
+  border-left: 6px solid var(--color-border); border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+}
+
+/* the ○ end cap — every flow ends explicitly, never in a dangling stub */
+.endpin {
+  display: flex; align-items: center; gap: 7px; margin-left: 14px; flex-shrink: 0;
+  font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono);
+}
+.endpin .dot { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--color-text-dim); }
+
+/* ════════════════════════ CARD SHAPE — 137-D vs 137-B ═══════════════════
+   The operator moved the locked card from 137-D to 137-B on 2026-07-26. B was
+   only ever drawn READ-ONLY, so this block re-homes the Phase-184 editing
+   chrome onto B's shape rather than assuming it transfers. Toggle live in every
+   184 sketch via the `Card` control.
+
+   What B changes: the icon floats ABOVE a narrower, centre-aligned card, and
+   there is NO per-step-type colour anywhere — the colour budget Phase 188 needs
+   is preserved in full, which is a stronger version of the rule D was chosen for.
+   What that costs: step type is now carried by the 3D mark ALONE, and the top
+   edge of the card is occupied, so per-node actions cannot live there.
+   ───────────────────────────────────────────────────────────────────────── */
+body.card-b .node {
+  display: block; text-align: center; width: 248px;
+  padding: 34px 20px 20px; margin-left: 0; margin-top: 30px; border-radius: 22px;
+}
+body.card-b .node .icowrap {
+  left: 50%; top: -26px; transform: translateX(-50%); width: 62px; height: 62px;
+}
+body.card-b .node:hover .icowrap,
+body.card-b .node.sel .icowrap { transform: translateX(-50%); }
+/* B's neutral halo — deliberately the SAME for every step type. */
+body.card-b .node .icowrap::before {
+  inset: -4px; background: radial-gradient(circle, hsl(220 30% 100% / .16), transparent 66%);
+}
+body.card-b .node .icowrap::after { bottom: -6px; width: 42px; height: 9px; background: rgba(0,0,0,.55); }
+body.card-b .node .body { flex: none; }
+body.card-b .badges { justify-content: center; }
+body.card-b .sub { margin-top: 6px; }
+/* the step number moves inside — the top edge belongs to the floating icon now */
+body.card-b .stepn { top: 12px; left: 12px; right: auto; }
+/* per-node actions move to the BOTTOM edge; the top is taken. */
+body.card-b .acts { top: auto; bottom: -12px; left: 50%; transform: translateX(-50%); }
+/* the verdict mark moves off the icon's corner so the two never overlap */
+body.card-b .vmark { left: auto; right: -8px; top: 6px; }
+body.card-b .conn { width: 66px; }
+body.card-b .conn .line { width: 54px; }
+body.card-b .conn .tip { right: 6px; }
+body.card-b .endpin { margin-left: 10px; }
+
+/* ════════════════════════ EDITING CHROME (net-new, Phase 184) ═══════════ */
+
+/* the insert affordance that lives on a connector */
+.conn .ins {
+  position: absolute; width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--color-surface-hi); border: 1px dashed var(--color-border);
+  color: var(--color-text-dim); font-size: 15px; line-height: 1;
+  opacity: 0; transform: scale(.7); transition: all var(--dur-base) var(--ease-out); z-index: 6;
+}
+.conn:hover .ins, .conn .ins:focus-visible { opacity: 1; transform: scale(1); }
+.conn .ins:hover {
+  border-style: solid; border-color: var(--color-primary);
+  color: var(--color-primary); background: var(--color-primary-dim);
+  box-shadow: 0 0 18px -4px var(--color-primary-glow);
+}
+
+/* the small row of per-node actions */
+.acts {
+  position: absolute; top: -13px; left: 46px; display: flex; gap: 4px;
+  opacity: 0; transition: opacity var(--dur-base) var(--ease-out); z-index: 7;
+}
+.node:hover .acts, .node.sel .acts, .acts:focus-within { opacity: 1; }
+.acts button {
+  width: 24px; height: 24px; border-radius: 7px; cursor: pointer;
+  background: var(--color-surface-hi); border: 1px solid var(--color-border);
+  color: var(--color-text-muted); font-size: 11px; line-height: 1; display: grid; place-items: center;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+.acts button:hover { color: var(--color-text); border-color: var(--color-text-dim); background: var(--color-accent); }
+.acts button.danger:hover { color: hsl(0 85% 74%); border-color: hsl(0 72% 51% / .6); background: hsl(0 72% 51% / .14); }
+
+/* verdict marks — grey `incomplete` is NOT a failure, and must never look like one */
+.vmark {
+  position: absolute; left: -8px; top: -8px; width: 22px; height: 22px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 11px; z-index: 8; font-weight: 700;
+}
+.vmark.error { color: hsl(0 85% 76%); background: hsl(0 60% 16%); border: 1px solid hsl(0 72% 51% / .7); }
+.vmark.incomplete { color: var(--color-text-muted); background: var(--color-muted); border: 1px dashed var(--color-border); }
+.node.v-error { border-color: hsl(0 72% 55% / .55) !important; }
+.node.v-incomplete { border-style: dashed; }
+
+/* the mono readout every sketch uses to make the round-trip felt */
+.readout {
+  font-family: var(--font-mono); font-size: 10.5px; line-height: 1.65;
+  color: var(--color-text-muted); white-space: pre-wrap; word-break: break-word; margin: 0;
+}
+.readout .k { color: hsl(258 90% 78%); }
+.readout .s { color: hsl(142 71% 62%); }
+.readout .n { color: hsl(38 92% 68%); }
+
+/* the honest footer strip */
+.foot {
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  /* right padding clears the fixed sketch toolbar so no content hides behind it */
+  padding: 8px 200px 8px var(--space-5); font-size: var(--text-xs); color: var(--color-text-muted);
+  background: hsl(220 40% 5% / .9); border-top: 1px solid var(--color-border);
+}
+.scroll, .plane, .list { scrollbar-width: thin; scrollbar-color: hsl(220 16% 45% / .35) transparent; }
+.scroll::-webkit-scrollbar, .plane::-webkit-scrollbar, .list::-webkit-scrollbar { width: 7px; height: 7px; }
+.scroll::-webkit-scrollbar-track, .plane::-webkit-scrollbar-track, .list::-webkit-scrollbar-track { background: transparent; }
+.scroll::-webkit-scrollbar-thumb, .plane::-webkit-scrollbar-thumb, .list::-webkit-scrollbar-thumb {
+  background: hsl(220 16% 45% / .3); border-radius: 4px;
+}
+.pill {
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px;
+  font-size: 11px; border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text-muted);
+}
+.pill.warn { color: hsl(38 92% 70%); border-color: hsl(38 92% 60% / .4); background: hsl(38 92% 60% / .12); }
+.pill.bad  { color: hsl(0 85% 74%);  border-color: hsl(0 72% 51% / .45); background: hsl(0 72% 51% / .12); }
+.pill.good { color: hsl(142 71% 64%); border-color: hsl(142 71% 45% / .4); background: hsl(142 71% 45% / .12); }
+.pill.net  { color: hsl(258 90% 80%); border-color: hsl(258 90% 66% / .45); background: hsl(258 90% 66% / .12); }
+
+/* a small toast for "what just happened" */
+.toast {
+  position: fixed; left: 50%; bottom: 70px; transform: translateX(-50%) translateY(10px);
+  background: var(--color-surface-hi); border: 1px solid var(--color-border); color: var(--color-text);
+  padding: 9px 15px; border-radius: 12px; font-size: var(--text-sm); box-shadow: var(--shadow-lg);
+  opacity: 0; pointer-events: none; transition: all var(--dur-base) var(--ease-out); z-index: 9998; max-width: 74ch;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* the right-hand inspector rail shared by 140/141 */
+.side {
+  flex-shrink: 0; width: 400px; border-left: 1px solid var(--color-border);
+  background: var(--color-bg-elev1); display: flex; flex-direction: column; overflow: hidden;
+}
+.side header {
+  flex-shrink: 0; padding: 13px 16px; border-bottom: 1px solid var(--color-border);
+  display: flex; align-items: center; gap: 10px;
+}
+.side .scroll { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px 24px; }
+.side h4 {
+  margin: 0 0 8px; font-size: 10px; font-family: var(--font-mono); letter-spacing: .09em;
+  text-transform: uppercase; color: var(--color-text-dim); font-weight: 500;
+}
+
+.fld { margin-bottom: 15px; }
+.fld label { display: block; font-size: var(--text-sm); color: var(--color-text); margin-bottom: 3px; font-weight: 500; }
+.fld .help { font-size: 11px; color: var(--color-text-dim); margin-bottom: 6px; line-height: 1.5; }
+.fld input, .fld textarea, .fld select {
+  width: 100%; background: var(--color-surface); color: var(--color-text);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  padding: 7px 9px; font-family: inherit; font-size: var(--text-sm);
+}
+.fld input:focus, .fld textarea:focus, .fld select:focus {
+  outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-dim);
+}
+.fld textarea { resize: vertical; min-height: 66px; line-height: 1.55; }
+
+.empty {
+  margin: auto; text-align: center; max-width: 42ch; color: var(--color-text-muted);
+  padding: var(--space-8); position: relative; z-index: 2;
+}
+.empty h3 { font-family: var(--font-headline); color: var(--color-text); margin: 0 0 8px; font-size: var(--text-xl); }
+.empty p { margin: 0 0 18px; font-size: var(--text-sm); line-height: 1.65; }
+
+.btn {
+  border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text);
+  border-radius: var(--radius-sm); padding: 7px 14px; font-family: inherit; font-size: var(--text-sm);
+  cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+}
+.btn:hover { background: var(--color-accent); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary {
+  background: linear-gradient(135deg, hsl(239 84% 67%), hsl(258 90% 66%));
+  border-color: transparent; color: #fff;
+}
+.btn.primary:hover { box-shadow: 0 0 22px -4px var(--color-primary-glow); }

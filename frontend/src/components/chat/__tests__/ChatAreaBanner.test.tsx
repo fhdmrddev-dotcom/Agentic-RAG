@@ -177,6 +177,40 @@ describe("099-08 refusal banner", () => {
       expect(useStreamsStore.getState().failedSendDrafts.has("thread-A")).toBe(false),
     )
   })
+
+  it("e — a non-dispatch send-drop routes through the SAME seam: banner shows the honest retry hint + the draft is restored", async () => {
+    // Phase 176-04 RENDER-03 (D-10.2 / D-11): when sendMessage takes the
+    // duplicate-guard non-dispatch early-return it stashes the dropped draft +
+    // a quiet reconcileErrors hint (carried as an ApiError so the existing 099-08
+    // banner renders the custom message — a plain Error would show the misleading
+    // "Couldn't load latest messages" copy). No new toast/error channel: the same
+    // reconcileErrors + failedSendDrafts Maps the ApiError rollback already uses.
+    const HINT = "Couldn't send — tap to retry"
+    useStreamsStore.setState((s) => ({
+      reconcileErrors: new Map(s.reconcileErrors).set("thread-A", new ApiError(HINT, 400)),
+      failedSendDrafts: new Map(s.failedSendDrafts).set("thread-A", "message that never dispatched"),
+    }))
+
+    renderChatArea()
+
+    // The banner surfaces the honest hint — never the misleading reconcile copy.
+    await waitFor(() => expect(screen.getByText(HINT)).toBeInTheDocument())
+    expect(
+      screen.queryByText("Couldn't load latest messages. Showing cached version."),
+    ).not.toBeInTheDocument()
+    // 400 is non-retryable → no misleading reload-Retry; the composer prefill is the
+    // real recovery affordance (tap Send again with the restored text).
+    expect(screen.getByTestId("reconcile-error-banner")).toBeInTheDocument()
+    expect(
+      screen.queryByRole("button", { name: "Retry loading messages" }),
+    ).not.toBeInTheDocument()
+
+    // The dropped draft is restored to the composer via the existing prefill seam.
+    const textarea = await screen.findByPlaceholderText("Ask anything…")
+    await waitFor(() =>
+      expect((textarea as HTMLTextAreaElement).value).toBe("message that never dispatched"),
+    )
+  })
 })
 
 /**

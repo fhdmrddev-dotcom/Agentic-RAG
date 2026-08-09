@@ -46,9 +46,73 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from app.models.user_settings import UserEffectiveSettings
 
-from app.config import settings, _SUB_AGENT_MODEL_DEFAULTS
+from app.config import (
+    settings,
+    _SUB_AGENT_MODEL_DEFAULTS,
+    _infer_provider_for,
+    _INFERENCE_FALLBACK_PROVIDER,
+)
 
 logger = logging.getLogger(__name__)
+
+# Providers whose endpoints route by arbitrary model id (openrouter) or serve
+# locally-pulled models (ollama) — a cross-provider-looking candidate is
+# legitimate for them, so the inferred-provider guard NEVER blocks it.
+_FLEXIBLE_PROVIDERS: frozenset[str] = frozenset({"openrouter", "ollama"})
+
+
+def provider_safe_utility_model(
+    user_settings: "UserEffectiveSettings | None",
+    override_candidate: str | None,
+) -> str | None:
+    """Phase 175 XPROV-03 (D-03) — the shared cross-provider utility-model guard.
+
+    Returns a candidate model id ONLY when it is safe to send to the user's
+    active provider; otherwise returns ``None`` so the caller falls through to
+    its own provider-safe default (``_SUB_AGENT_MODEL_DEFAULTS[active]``). This
+    is the explicit-call surface Plan 04 threads onto the thread_title +
+    suggestion sites (the ``sub_agent_service.py`` 4th site is byte-frozen per
+    D-085-16 and keeps its own populated-list-only inline guard).
+
+    Rule (per the inferred provider, NOT list-membership — RESEARCH XPROV-03
+    Finding 6; fallback-bucket carve-out aligned with resolve_sub_agent_model_safely
+    per WR-01): drop a candidate when its inferred provider is a DIFFERENT KNOWN
+    provider than the active one, BEFORE any provider call. KEEP it when it is a
+    same-provider candidate, an UNRECOGNISED id (infers to the fallback bucket; may be
+    a valid custom / fine-tuned id), or the active provider is flexible
+    (openrouter/ollama route by arbitrary id). Return ``None`` on a falsy candidate.
+    In legacy / no-active-provider mode a RECOGNISED cross-provider id still drops to
+    ``None`` (the caller's own provider-safe default is safer than an unvalidated id).
+
+    T-175-01-02: this only changes WHICH utility model id is sent — it never
+    touches the caller's RLS/auth context (request-scoped per Phase-163 D-03).
+
+    Resolve-never-mutate (D-05): reads ``user_settings`` only; writes nothing.
+    """
+    active = (user_settings.active_provider if user_settings else "") or ""
+    if not override_candidate:
+        return None
+    # Flexible providers (openrouter/ollama) route by arbitrary id → never blocked.
+    if active in _FLEXIBLE_PROVIDERS:
+        return override_candidate
+    inferred = _infer_provider_for(override_candidate)
+    # WR-01 (Phase 175 code-review): align with the sibling gate
+    # resolve_sub_agent_model_safely on the fallback-bucket carve-out. An UNRECOGNISED
+    # id infers to the fallback bucket (_INFERENCE_FALLBACK_PROVIDER) — that is NOT a
+    # confident cross-provider mismatch (it may be a valid custom / fine-tuned id, e.g.
+    # an OpenAI ``ft:…`` model, the pattern table doesn't know), so pass it through
+    # instead of silently dropping it. Drop ONLY a candidate whose inferred provider is
+    # a DIFFERENT KNOWN provider than the active one.
+    #
+    # NOTE: the empty-active (legacy / no user_settings) case is INTENTIONALLY stricter
+    # here than the sibling — with no active provider AND no per-provider default to
+    # fall to, this helper's title/suggestion callers prefer dropping a RECOGNISED
+    # cross-provider id to None (→ their own provider-safe default) over sending it
+    # unvalidated. A real request always carries an active_provider; this is the edge
+    # case, and test_none_user_settings_cross_provider_returns_none pins it.
+    if inferred == active or inferred == _INFERENCE_FALLBACK_PROVIDER:
+        return override_candidate
+    return None
 
 
 def resolve_sub_agent_model_safely(
@@ -104,6 +168,36 @@ def resolve_sub_agent_model_safely(
         or fallback_model
         or settings.llm_model
     )
+
+    # 1b. Phase 175 XPROV-03 (D-03) — folded inferred-provider gate. BEFORE the
+    #     list-membership branch, catch a genuine cross-provider candidate even
+    #     when ``available_models`` is EMPTY (the blind spot the list-membership
+    #     branch below misses: the empty-list passthrough at step 3 leaked a
+    #     gpt-4o onto a non-openai-active user — the same leak task_service.py's
+    #     D-18 guard patched at ONE call site; folding it here closes it for
+    #     task_service's shared resolver call directly). Fire ONLY on a CONFIDENT
+    #     known-provider mismatch: the candidate matched a real provider pattern
+    #     that differs from the active provider, the active provider is not
+    #     flexible (openrouter/ollama route by arbitrary id), and a non-empty
+    #     per-provider default exists. An UNRECOGNISED id infers to the fallback
+    #     bucket and is NOT treated as a mismatch — it passes through unchanged
+    #     (D-14 byte-identical: an unvalidatable empty list never triggers the
+    #     fallback for an unknown id; same-provider candidates are untouched).
+    _inferred_provider = _infer_provider_for(candidate)
+    if (
+        _inferred_provider != _active_provider
+        and _inferred_provider != _INFERENCE_FALLBACK_PROVIDER
+        and _active_provider not in _FLEXIBLE_PROVIDERS
+        and _provider_default
+    ):
+        logger.warning(
+            "sub_agent_model=%r infers provider=%r but active_provider=%r "
+            "(cross-provider mismatch); using per-provider default %r to avoid a "
+            "cross-provider call (folded inferred-provider gate — closes the "
+            "empty-available_models blind spot list-membership missed).",
+            candidate, _inferred_provider, _active_provider, _provider_default,
+        )
+        return _provider_default
 
     # 2. Validate the candidate against the active provider's model list.
     #    This is the hardened safety net introduced by Plan 05 — it fires

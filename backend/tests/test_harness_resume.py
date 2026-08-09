@@ -302,8 +302,8 @@ async def test_sweep_reruns_active_phase(monkeypatch, fake_redis, mock_asyncpg_p
 
     async def _find(pool):
         return [
-            {"run_id": won, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": uuid.uuid4()},
-            {"run_id": lost, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": uuid.uuid4()},
+            {"run_id": won, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": uuid.uuid4(), "org_id": uuid.uuid4()},
+            {"run_id": lost, "thread_id": uuid.uuid4(), "current_phase_id": None, "user_id": uuid.uuid4(), "org_id": uuid.uuid4()},
         ]
 
     async def _claim(pool, run_id, lease_seconds):
@@ -353,7 +353,7 @@ async def test_ask_user_answered_not_reasked(monkeypatch, fake_redis, mock_async
 
     async def _find(pool):
         return [{"run_id": run_id, "thread_id": uuid.uuid4(),
-                 "current_phase_id": None, "user_id": uuid.uuid4()}]
+                 "current_phase_id": None, "user_id": uuid.uuid4(), "org_id": uuid.uuid4()}]
 
     async def _claim(pool, run_id, lease_seconds):
         return True
@@ -509,6 +509,7 @@ async def test_build_resume_context_current_user_id_is_str(mock_asyncpg_pool, fa
         "thread_id": uuid.uuid4(),
         "user_id": user_uuid_obj,
         "current_phase_id": None,
+        "org_id": uuid.uuid4(),  # Phase 163 — resume ctx builds an org-scoped service-role client
     }
 
     ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
@@ -577,7 +578,7 @@ async def test_resume_resolves_project_scope(monkeypatch, fake_redis, mock_async
     monkeypatch.setattr("app.services.harness.scope.assert_folder_scopes_subset", _fake_assert, raising=False)
 
     owner = uuid.uuid4()  # asyncpg returns UUID objects on the resume path
-    run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": owner, "inputs": {}}
+    run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": owner, "inputs": {}, "org_id": uuid.uuid4()}
     ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
 
     assert ctx.folder_subtree_ids == ["A", "B"], (
@@ -618,7 +619,7 @@ async def test_resume_unbound_scope_stays_none(monkeypatch, fake_redis, mock_asy
     monkeypatch.setattr(harness_engine, "_load_run_definition", _fake_load_def, raising=False)
     monkeypatch.setattr("app.services.harness.scope.resolve_project_subtree", _fake_resolve, raising=False)
 
-    run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": uuid.uuid4(), "inputs": {}}
+    run = {"run_id": uuid.uuid4(), "thread_id": uuid.uuid4(), "user_id": uuid.uuid4(), "inputs": {}, "org_id": uuid.uuid4()}
     ctx = await harness_engine._build_resume_context(run, fake_redis, mock_asyncpg_pool)
 
     assert ctx.folder_subtree_ids is None, (

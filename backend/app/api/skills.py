@@ -10,7 +10,15 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, StreamingResponse
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+# Phase 163 (TEN-02 / D-03): the skills CRUD + files + import/export handlers run on the
+# per-request user-JWT client (RLS-ENFORCED). skills / skill_files have authenticated own+global
+# SELECT + owner-scoped INSERT/UPDATE/DELETE policies (mig 108) and BEFORE-INSERT
+# autofill_org_id triggers, and the skill-files storage bucket is owner-path-scoped under
+# authenticated — so every handler here (incl. import_skill's file-upload BackgroundTask, which
+# writes skill_files + owner-path storage) works under the user-JWT client. The version-capture
+# trigger is SECURITY DEFINER, so version rows are still written on skill create/update. KEEP
+# .eq("user_id") (D-14) + run_in_threadpool (D-v2.5-01). The re-embed writer is out of scope (plan 09).
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.skill import (
     PublishGate,
     SkillCreate,
@@ -163,7 +171,7 @@ def _sibling_descriptions(
 ) -> list[str]:
     """Owner-scoped (own + global) sibling descriptions for the lint duplicate check.
 
-    Uses the SAME owner-scoped ``.or_(user_id.eq, is_global.eq.true)`` filter as
+    Uses the SAME owner-scoped ``.or_(user_id.eq, is_org_shared.eq.true)`` filter as
     ``list_skills`` — never another user's private skills (T-123-01-02). On PATCH the
     edited skill is excluded so a skill never flags itself as a duplicate. Never raises:
     a read failure degrades to an empty sibling list (the lint stays advisory).
@@ -172,7 +180,7 @@ def _sibling_descriptions(
         result = (
             supabase.table("skills")
             .select("id, description")
-            .or_(f"user_id.eq.{user_id},is_global.eq.true")
+            .or_(f"user_id.eq.{user_id},is_org_shared.eq.true")
             .execute()
         )
         rows = result.data or []
@@ -188,13 +196,13 @@ def _sibling_descriptions(
 @router.get("", response_model=list[SkillResponse])
 async def list_skills(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List all skills visible to the current user (owned + global), deduplicated."""
     result = (
         supabase.table("skills")
         .select("*")
-        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+        .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
         # CREATE-01 (D-05): is_system rows FIRST, then alphabetical — the built-in
         # skill-creator pins to the top of the Skills list. PostgREST emits
         # order=is_system.desc,name.asc. Chained multi-column order is an established
@@ -207,6 +215,11 @@ async def list_skills(
     for row in result.data:
         if row["id"] not in seen:
             seen.add(row["id"])
+            # SEED-091 / D-164-05 (TEN-06): hide the seeding owner's identity from non-owner
+            # readers of a global/system skill (the built-in is_system skill-creator is the
+            # cross-org-visible surface today). RLS gates the row, not the column — null here.
+            if (row.get("is_org_shared") or row.get("is_system")) and str(row.get("user_id")) != str(current_user["id"]):
+                row["user_id"] = None
             skills.append(row)
     return skills
 
@@ -215,7 +228,7 @@ async def list_skills(
 async def create_skill(
     body: SkillCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create a new skill owned by the current user."""
     # Phase 123 (WR-07): reject an empty/whitespace name. A blank name would render a
@@ -237,7 +250,7 @@ async def create_skill(
             "name": body.name.strip(),
             "description": body.description,
             "instructions": body.instructions,
-            "is_global": False,  # HARD-SET — never from the caller (D-08 / T-118-02-01)
+            "is_org_shared": False,  # HARD-SET — never from the caller (D-08 / T-118-02-01)
         })
         .execute()
     )
@@ -251,7 +264,7 @@ async def import_skill(
     file: UploadFile = File(...),
     background_tasks: BackgroundTasks = None,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Import skill(s) from a ZIP file in agentskills.io format."""
     # 1. Read and validate size
@@ -310,7 +323,7 @@ async def import_skill(
                     "name": fm["name"],
                     "description": fm.get("description", ""),
                     "instructions": instructions,
-                    "is_global": False,
+                    "is_org_shared": False,
                 })
                 .execute()
             ).data[0]
@@ -417,7 +430,7 @@ async def update_skill(
     skill_id: str,
     body: SkillUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Update name, description, or instructions of an owned skill."""
     update_data = body.model_dump(exclude_none=True)
@@ -457,7 +470,7 @@ async def update_skill(
 async def delete_skill(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete a skill and cascade-remove all associated storage files."""
     # Step 1: Fetch all file_paths for the skill
@@ -492,7 +505,7 @@ async def delete_skill(
 async def toggle_enabled(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Flip the is_enabled boolean on an owned skill."""
     # Step 1: Fetch current state
@@ -529,9 +542,9 @@ async def toggle_global(
     skill_id: str,
     body: TogglePublishBody | None = None,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Flip the is_global boolean on an owned skill. Only the owner can toggle.
+    """Flip the is_org_shared boolean on an owned skill. Only the owner can toggle.
 
     GATE-01 (D-07): the private→global direction is GATED. The server recomputes the publish
     gate from ``eval_runs`` (never trusting any client-supplied gate data) and REFUSES the flip
@@ -559,7 +572,7 @@ async def toggle_global(
     # Step 2: Compute new value
     # current.data is a list (select returns list); maybe_single behaviour varies by client version
     skill_row = current.data[0] if isinstance(current.data, list) else current.data
-    new_value = not skill_row["is_global"]
+    new_value = not skill_row["is_org_shared"]
 
     # Step 3 (GATE-01 / D-07): gate the private→global direction ONLY. Unshare (new_value is
     # False) falls straight through to the UPDATE — never gated, and the NEXT re-share re-gates
@@ -614,10 +627,10 @@ async def toggle_global(
             await run_in_threadpool(_insert_override)
         # gate.met is True → a straight publish, no override row.
 
-    # Step 4: Apply the is_global UPDATE (owner-scoped).
+    # Step 4: Apply the is_org_shared UPDATE (owner-scoped).
     result = (
         supabase.table("skills")
-        .update({"is_global": new_value})
+        .update({"is_org_shared": new_value})
         .eq("id", skill_id)
         .eq("user_id", current_user["id"])
         .execute()
@@ -629,7 +642,7 @@ async def toggle_global(
 async def get_publish_gate(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Return the server-computed publish gate for an owned skill (D-05).
 
@@ -661,15 +674,15 @@ async def get_publish_gate(
 async def list_skill_files(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List files attached to a skill (owner or global skill only)."""
     # Verify skill is accessible (own or global)
     skill = (
         supabase.table("skills")
-        .select("id, user_id, is_global")
+        .select("id, user_id, is_org_shared")
         .eq("id", skill_id)
-        .or_(f"user_id.eq.{current_user['id']},is_global.eq.true")
+        .or_(f"user_id.eq.{current_user['id']},is_org_shared.eq.true")
         .maybe_single()
         .execute()
     )
@@ -683,7 +696,15 @@ async def list_skill_files(
         .order("filename")
         .execute()
     )
-    return result.data
+    rows = result.data or []
+    # SEED-091 / D-164-05 (TEN-06, A3): skill_files rows carry no is_org_shared column, so key on
+    # the PARENT skill's ownership (fetched above). A non-owner only reaches here via the
+    # is_org_shared branch, so a mismatch means the seeding owner's identity would leak on every
+    # file row — null it. The owner reading their own skill keeps their user_id.
+    if str(skill.data.get("user_id")) != str(current_user["id"]):
+        for r in rows:
+            r["user_id"] = None
+    return rows
 
 
 @router.post("/{skill_id}/files", response_model=SkillFileResponse,
@@ -692,7 +713,7 @@ async def upload_skill_file(
     skill_id: str,
     file: UploadFile = File(...),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Upload a file to a skill. Only the skill owner can upload."""
     # 1. Read file and enforce 10 MB limit (checked before DB access)
@@ -752,7 +773,7 @@ async def delete_skill_file(
     skill_id: str,
     file_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete a file from a skill. Only the file owner can delete."""
     # 1. Fetch file row (owner only — enforces FILE-06)
@@ -782,7 +803,7 @@ async def delete_skill_file(
 async def export_skill(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Export a skill as a ZIP file in agentskills.io format."""
     # 1. Fetch skill (owner-only)

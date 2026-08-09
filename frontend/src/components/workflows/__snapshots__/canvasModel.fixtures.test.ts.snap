@@ -1,0 +1,1507 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`toCanvas sweep — 'branching (synthetic skip_to_phase)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:gather->assess",
+      "source": "gather",
+      "target": "assess",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:assess->draft",
+      "source": "assess",
+      "target": "draft",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "skip",
+      },
+      "id": "skip:assess->escalate",
+      "source": "assess",
+      "target": "escalate",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:draft->escalate",
+      "source": "draft",
+      "target": "escalate",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:escalate->__canvas__end",
+      "source": "escalate",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "gather",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · gather",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "gather",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_single",
+        "slug": "assess",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · assess",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "assess",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 3: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 2,
+        "phaseType": "llm_single",
+        "slug": "draft",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · draft",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "draft",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 4: Wait for your approval (llm_human_input)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 3,
+        "phaseType": "llm_human_input",
+        "slug": "escalate",
+        "subtitle": "Pauses here until you answer",
+        "technicalTitle": "Needs you · escalate",
+        "title": "Wait for your approval",
+        "waitsForYou": true,
+      },
+      "draggable": false,
+      "id": "escalate",
+      "position": {
+        "x": 960,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 1280,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'compliance-gap-report (Starter Librar…' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:retrieve->emit",
+      "source": "retrieve",
+      "target": "emit",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:emit->__canvas__end",
+      "source": "emit",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "retrieve",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · retrieve",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "retrieve",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": true,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_emit",
+        "slug": "emit",
+        "subtitle": "Fills your template and produces the file",
+        "technicalTitle": "Deliverable · emit",
+        "title": "Produce the deliverable",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "emit",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'doc_qa_human (canonical seed 4)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:draft->confirm",
+      "source": "draft",
+      "target": "confirm",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:confirm->finalize",
+      "source": "confirm",
+      "target": "finalize",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:finalize->__canvas__end",
+      "source": "finalize",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "draft",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · draft",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "draft",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Wait for your approval (llm_human_input)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_human_input",
+        "slug": "confirm",
+        "subtitle": "Pauses here until you answer",
+        "technicalTitle": "Needs you · confirm",
+        "title": "Wait for your approval",
+        "waitsForYou": true,
+      },
+      "draggable": false,
+      "id": "confirm",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 3: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 2,
+        "phaseType": "llm_single",
+        "slug": "finalize",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · finalize",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "finalize",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 960,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'empty draft (0 phases)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [],
+  "nodes": [],
+}
+`;
+
+exports[`toCanvas sweep — 'eval_coverage (the 5-phase maximum)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:split->fanout",
+      "source": "split",
+      "target": "fanout",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:fanout->deep_dive",
+      "source": "fanout",
+      "target": "deep_dive",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:deep_dive->confirm",
+      "source": "deep_dive",
+      "target": "confirm",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:confirm->summarize",
+      "source": "confirm",
+      "target": "summarize",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:summarize->__canvas__end",
+      "source": "summarize",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Prepare the inputs (programmatic)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "programmatic",
+        "slug": "split",
+        "subtitle": "A fixed step the server runs",
+        "technicalTitle": "Server step · split",
+        "title": "Prepare the inputs",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "split",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Work on the parts together (llm_batch_agents)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_batch_agents",
+        "slug": "fanout",
+        "subtitle": "Several assistants work in parallel",
+        "technicalTitle": "Parallel agents · fanout",
+        "title": "Work on the parts together",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "fanout",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 3: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 2,
+        "phaseType": "llm_agent",
+        "slug": "deep_dive",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · deep_dive",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "deep_dive",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 4: Wait for your approval (llm_human_input)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 3,
+        "phaseType": "llm_human_input",
+        "slug": "confirm",
+        "subtitle": "Pauses here until you answer",
+        "technicalTitle": "Needs you · confirm",
+        "title": "Wait for your approval",
+        "waitsForYou": true,
+      },
+      "draggable": false,
+      "id": "confirm",
+      "position": {
+        "x": 960,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 5: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 4,
+        "phaseType": "llm_single",
+        "slug": "summarize",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · summarize",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "summarize",
+      "position": {
+        "x": 1280,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 1600,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'literature_review (canonical seed 3)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:split->review",
+      "source": "split",
+      "target": "review",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:review->merge",
+      "source": "review",
+      "target": "merge",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:merge->__canvas__end",
+      "source": "merge",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Prepare the inputs (programmatic)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "programmatic",
+        "slug": "split",
+        "subtitle": "A fixed step the server runs",
+        "technicalTitle": "Server step · split",
+        "title": "Prepare the inputs",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "split",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Work on the parts together (llm_batch_agents)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_batch_agents",
+        "slug": "review",
+        "subtitle": "Several assistants work in parallel",
+        "technicalTitle": "Parallel agents · review",
+        "title": "Work on the parts together",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "review",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 3: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 2,
+        "phaseType": "llm_single",
+        "slug": "merge",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · merge",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "merge",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 960,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'non-contiguous phase_index [0,1,3]' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:first->second",
+      "source": "first",
+      "target": "second",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:stranded->__canvas__end",
+      "source": "stranded",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "first",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · first",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "first",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_single",
+        "slug": "second",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · second",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "second",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 4: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 3,
+        "phaseType": "llm_single",
+        "slug": "stranded",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · stranded",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "stranded",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 960,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'plan_execute_verify (canonical seed 2)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:plan->execute",
+      "source": "plan",
+      "target": "execute",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:execute->verify",
+      "source": "execute",
+      "target": "verify",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:verify->__canvas__end",
+      "source": "verify",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_single",
+        "slug": "plan",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · plan",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "plan",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_agent",
+        "slug": "execute",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · execute",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "execute",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 3: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 2,
+        "phaseType": "llm_single",
+        "slug": "verify",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · verify",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "verify",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 960,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'pm-risk-register (PM pack 2)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:retrieve->emit",
+      "source": "retrieve",
+      "target": "emit",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:emit->__canvas__end",
+      "source": "emit",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "retrieve",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · retrieve",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "retrieve",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": true,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_emit",
+        "slug": "emit",
+        "subtitle": "Fills your template and produces the file",
+        "technicalTitle": "Deliverable · emit",
+        "title": "Produce the deliverable",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "emit",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'pm-weekly-status-report (PM pack 1)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:retrieve->emit",
+      "source": "retrieve",
+      "target": "emit",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:emit->__canvas__end",
+      "source": "emit",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "retrieve",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · retrieve",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "retrieve",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": true,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_emit",
+        "slug": "emit",
+        "subtitle": "Fills your template and produces the file",
+        "technicalTitle": "Deliverable · emit",
+        "title": "Produce the deliverable",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "emit",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'research_summarize (canonical seed 1)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:research->summarize",
+      "source": "research",
+      "target": "summarize",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:summarize->__canvas__end",
+      "source": "summarize",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "research",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · research",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "research",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_single",
+        "slug": "summarize",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · summarize",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "summarize",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'risk-register (Starter Library 1)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:retrieve->emit",
+      "source": "retrieve",
+      "target": "emit",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:emit->__canvas__end",
+      "source": "emit",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "retrieve",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · retrieve",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "retrieve",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": true,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_emit",
+        "slug": "emit",
+        "subtitle": "Fills your template and produces the file",
+        "technicalTitle": "Deliverable · emit",
+        "title": "Produce the deliverable",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "emit",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'single phase (1 phase)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:answer->__canvas__end",
+      "source": "answer",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_single",
+        "slug": "answer",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · answer",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "answer",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'unresolvable skip (broken reference)' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:start->check",
+      "source": "start",
+      "target": "check",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "skip",
+      },
+      "id": "skip:check->?nonexistent",
+      "source": "check",
+      "target": "__canvas__unresolved:check:nonexistent",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:check->__canvas__end",
+      "source": "check",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "start",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · start",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "start",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Write it up (llm_single)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_single",
+        "slug": "check",
+        "subtitle": "Writes one piece in one pass",
+        "technicalTitle": "AI write step · check",
+        "title": "Write it up",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "check",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {
+        "declaredTarget": "nonexistent",
+        "fromSlug": "check",
+      },
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__unresolved:check:nonexistent",
+      "position": {
+        "x": 480,
+        "y": 200,
+      },
+      "selectable": false,
+      "type": "unresolvedSkip",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;
+
+exports[`toCanvas sweep — 'weekly-status-report (Starter Library…' > matches its committed snapshot (the drift tripwire) 1`] = `
+{
+  "edges": [
+    {
+      "data": {
+        "kind": "flow",
+      },
+      "id": "seq:retrieve->emit",
+      "source": "retrieve",
+      "target": "emit",
+      "type": "flow",
+    },
+    {
+      "data": {
+        "kind": "end",
+      },
+      "id": "end:emit->__canvas__end",
+      "source": "emit",
+      "target": "__canvas__end",
+    },
+  ],
+  "nodes": [
+    {
+      "ariaLabel": "Phase 1: Work out how to do it (llm_agent)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": false,
+        "notConnected": false,
+        "phaseIndex": 0,
+        "phaseType": "llm_agent",
+        "slug": "retrieve",
+        "subtitle": "Searches and decides its own next move",
+        "technicalTitle": "AI agent step · retrieve",
+        "title": "Work out how to do it",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "retrieve",
+      "position": {
+        "x": 0,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "ariaLabel": "Phase 2: Produce the deliverable (llm_emit)",
+      "ariaRole": "button",
+      "data": {
+        "armed": false,
+        "grounded": true,
+        "notConnected": false,
+        "phaseIndex": 1,
+        "phaseType": "llm_emit",
+        "slug": "emit",
+        "subtitle": "Fills your template and produces the file",
+        "technicalTitle": "Deliverable · emit",
+        "title": "Produce the deliverable",
+        "waitsForYou": false,
+      },
+      "draggable": false,
+      "id": "emit",
+      "position": {
+        "x": 320,
+        "y": 0,
+      },
+      "type": "phase",
+    },
+    {
+      "data": {},
+      "domAttributes": {
+        "aria-describedby": undefined,
+      },
+      "draggable": false,
+      "focusable": false,
+      "id": "__canvas__end",
+      "position": {
+        "x": 640,
+        "y": 0,
+      },
+      "selectable": false,
+      "type": "endCap",
+    },
+  ],
+}
+`;

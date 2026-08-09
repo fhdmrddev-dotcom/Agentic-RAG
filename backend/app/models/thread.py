@@ -98,6 +98,21 @@ class ThreadWorkflowState(BaseModel):
     # no write; the 092-05 F2 invariant holds). Owner-scoped via the existing
     # get_thread_workflow ownership check.
     latest_producer_run_id: UUID | None = None
+    # Phase 188 CR-03 — the workflow run this thread MOST RECENTLY held, resolved as
+    # ``active_workflow_run_id`` when set ELSE the thread's latest ``workflow_runs`` row by
+    # ``created_at``. It is the SAME value ``get_thread_workflow`` already computes to source
+    # ``phases`` below, surfaced rather than recomputed: no new query, no write.
+    #
+    # WHY IT IS NEEDED. ``finish_run`` NULLs ``threads.active_workflow_run_id`` in the same
+    # transaction as the terminal status (Phase 092 SC#2 — no dangling lock survives a
+    # terminal run). So the live anchor is absent for exactly the runs a "re-open this run"
+    # affordance exists to serve, and a consumer reading only the anchor can never reach a
+    # FINISHED run. This field is the anchor that survives termination; the anchor above
+    # remains the authority for mode / locked / lock_is_stale, which are unchanged.
+    #
+    # ADDITIVE and OPTIONAL — every existing consumer ignores it (the ``latest_producer_run_id``
+    # precedent directly above is the same shape for the same reason).
+    last_workflow_run_id: UUID | None = None
     # Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
     # (ordered by phase_index), so the frontend reconcile floor can rebuild an
     # honest timeline for a TERMINAL run (which previously returned [] / blanked).

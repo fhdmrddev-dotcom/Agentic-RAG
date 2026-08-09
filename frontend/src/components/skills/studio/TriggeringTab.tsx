@@ -17,8 +17,19 @@ interface Props {
   skillId: string
   /** Return to the Skills surface ("‹ Skills"), threaded from the Studio shell. */
   onBack: () => void
+  /** 176-02 (RENDER-04): the Studio shell's refreshVersions — the embedded tuner calls
+   *  it after a description proposal is approved so the shell re-derives the live version
+   *  (header vN + Versions LIVE badge) with no reload. Forwarded straight to the tuner. */
+  onVersionPromoted?: () => void
 }
 
-export function TriggeringTab({ skillId, onBack }: Props) {
-  return <SkillTunerPage skillId={skillId} onBack={onBack} embedded />
+export function TriggeringTab({ skillId, onBack, onVersionPromoted }: Props) {
+  return (
+    <SkillTunerPage
+      skillId={skillId}
+      onBack={onBack}
+      embedded
+      onVersionPromoted={onVersionPromoted}
+    />
+  )
 }

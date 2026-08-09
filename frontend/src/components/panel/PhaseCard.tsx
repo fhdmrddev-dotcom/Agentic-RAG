@@ -31,6 +31,10 @@ import { cn } from "@/lib/utils"
 import { phaseGlyph } from "@/lib/phaseGlyph"
 import { providerLogo } from "@/lib/providerLogo"
 import type { EmitFailure, EmitSubStep, Phase } from "@/types"
+// WR-05 — the status vocabulary moved to its own module so `PhaseTimeline` can read the
+// SAME words instead of printing the raw union member. See the marker below, where the
+// table used to stand, and that module's header for why the split was forced.
+import { statusMeta } from "./phaseStatusMeta"
 
 // ── PHASE_TYPE_LABEL (DATA-CONTRACT §5.1) — the 5 LOCKED literals → label + glyph
 //    + one-liner. UNKNOWN (forward-compat) falls back to the generic "Step" row;
@@ -49,34 +53,59 @@ const PHASE_TYPE_LABEL: Record<string, PhaseTypeMeta> = {
 }
 const UNKNOWN_PHASE_META: PhaseTypeMeta = { label: "Step", glyph: "•", oneLiner: "A workflow step ran." }
 
+// ⚠ DECLINED AT PHASE 189, AND THE DECLINATION IS RECORDED HERE RATHER THAN LEFT TO BE
+// DISCOVERED LATER (CONN-01). Phase 189 added a SEVENTH `phase_type` — the governed
+// external action — and deliberately did NOT add a seventh entry to this table.
+//
+// The table already declines one: `llm_emit` shipped at Phase 101.1 and was never given a
+// row, so an emit step has always degraded to the honest generic `UNKNOWN_PHASE_META`
+// ("Step") above. That degradation is the table's DESIGN, stated in its own header — this
+// map owns five labels and everything else reads as a generic step, which is why the
+// renderer never crashes on an unrecognised discriminator. Adding 189's type here would
+// invent a panel vocabulary for a type the panel never gained one for, and would leave the
+// table declining exactly one type for no stated reason — worse than declining two for a
+// reason anyone can read. The step's real vocabulary lives on the canvas, which is where
+// D-13's naming ladder renders it.
+//
+// ⚠ `STATUS_META` below is a DIFFERENT TABLE and is NOT declinable: it is declared
+// `Record<Phase["status"], StatusMeta>`, so the compiler forces a row. Declining a slot is
+// a decision that is only available where the compiler leaves one open. This one is keyed
+// by `Record<string, …>` and pinned by a test asserting its entry COUNT, so the declination
+// is mechanical rather than merely commented.
+
+/**
+ * The phase-type row. TOTAL: anything this table does not OWN reads as the generic
+ * unknown meta.
+ *
+ * ⚠ THE OWN-PROPERTY GUARD IS NOT CEREMONY (WR-04 site 2, 188.1-04), and it was measured
+ * RED before it was written. `PHASE_TYPE_LABEL` is a plain object literal, so it INHERITS
+ * `constructor`, `toString`, `__proto__` and friends. The shipped expression was
+ * `PHASE_TYPE_LABEL[phaseType] ?? UNKNOWN_PHASE_META`, and for those names the index
+ * returns a FUNCTION — never nullish, so the coalesce provably never fired and every
+ * consumer then read `.label` / `.glyph` / `.oneLiner` off it as `undefined`. The header
+ * above claims *"the renderer NEVER crashes on an unrecognized discriminator"*; that
+ * claim was true of a MISS and false of an inherited key, which is the distinction this
+ * guard adds rather than the promise it repeats. `phase.phaseType` is `string` and comes
+ * from the workflow definition's author-supplied JSONB — totality is a property of the
+ * lookup rather than of its current callers (`lib/phaseState.ts:65-75`, the house
+ * argument). Kept honest by `panel/__tests__/PhaseTimeline.test.tsx`'s 188.1-04
+ * falsification, which drives this component with a prototype key and asserts the
+ * rendered row is byte-equal to an ordinary unrecognised type's.
+ */
 function phaseTypeMeta(phaseType: string): PhaseTypeMeta {
-  return PHASE_TYPE_LABEL[phaseType] ?? UNKNOWN_PHASE_META
+  if (!Object.prototype.hasOwnProperty.call(PHASE_TYPE_LABEL, phaseType)) {
+    return UNKNOWN_PHASE_META
+  }
+  return PHASE_TYPE_LABEL[phaseType]
 }
 
-// ── STATUS_GLYPH (DATA-CONTRACT §5.3) — status → glyph + REAL text + AA color
-//    token (non-color-alone, UI-SPEC §A11Y). Status text uses --color-text /
-//    --panel-status-* (≥4.5:1) — NEVER --muted-foreground-dim (3.59:1 fail).
-//    `retrying` text reads "Attempt N" (filled in at render from phase.attempt). ──
-interface StatusMeta {
-  glyph: string
-  /** Base text (retrying substitutes "Attempt N" at render). */
-  text: string
-  /** Tailwind class for the AA-contrast status text color. */
-  textClass: string
-}
-const STATUS_META: Record<Phase["status"], StatusMeta> = {
-  pending: { glyph: "○", text: "Locked", textClass: "text-panel-muted-foreground" },
-  running: { glyph: "●", text: "Running", textClass: "text-[hsl(var(--panel-status-active))]" },
-  done: { glyph: "✓", text: "Complete", textClass: "text-[hsl(var(--panel-status-done))]" },
-  // Lightened red text on the dim fill clears 4.5:1 (UI-SPEC §A11Y contrast note).
-  failed: { glyph: "✕", text: "Failed", textClass: "text-[hsl(0_80%_80%)]" },
-  // WR-04: the pill LABEL TEXT uses the LIGHTENED --accent-violet-text (9.83:1
-  // dark / 8.52:1 light) to clear the ≥4.5:1 normal-text floor. The base
-  // --accent-violet (text-accent-violet/border-accent-violet) is graphic-level
-  // (≥3:1) and stays on the glyph + the card border below (UI-SPEC §Color).
-  retrying: { glyph: "↻", text: "Attempt", textClass: "text-accent-violet-text" },
-  skipped: { glyph: "⤳", text: "Skipped", textClass: "text-panel-muted-foreground" },
-}
+// ── STATUS_META (DATA-CONTRACT §5.3) — MOVED (review WR-05) ──────────────────────
+// The status vocabulary (the `StatusMeta` interface, the table and the 188.1-04
+// own-property guard `statusMeta`) now lives in `./phaseStatusMeta`, VERBATIM. It moved
+// because `PhaseTimeline` needs the same words — its doing-now line was printing the raw
+// `Phase["status"]` member at the user — and `react-refresh/only-export-components` is a
+// lint ERROR on a function exported beside a component (measured on this file, 3 → 4,
+// before the split). Nothing was retuned in the move; see that module's header.
 
 // ── SUBSTEP_META (Phase 101.1-04 / GAP-C / D-11) — the emit-moment sub-steps the
 //    harness streams via `phase_substep` (RESEARCH §5). A sealed forced emit is ATOMIC
@@ -243,7 +272,7 @@ export interface PhaseCardProps {
 
 export function PhaseCard({ phase, position }: PhaseCardProps) {
   const meta = phaseTypeMeta(phase.phaseType)
-  const status = STATUS_META[phase.status]
+  const status = statusMeta(phase.status)
   const isRunning = phase.status === "running"
   // GAP-C (D-11): a typed emit-failure value is failed-as-failed even before the phase
   // status flips to "failed" — the closed taxonomy renders the reason, never a 'done'.

@@ -36,6 +36,11 @@ interface Props {
   /** The live version number, supplied by the Studio shell (Plan 06). This tab is
    *  a pure renderer of the LIVE badge — it never derives which version is live. */
   liveVersionNumber: number
+  /** 176-02 (RENDER-04): a monotonic bump from the Studio shell (versionsNonce). When it
+   *  changes, this tab's own versions/runs/proposals self-fetch re-runs so a newly-promoted
+   *  version appears and its LIVE badge tracks the refreshed liveVersionNumber — with no
+   *  reload (BUG-260706-01). Default 0 for the standalone / no-op case. */
+  refreshNonce?: number
 }
 
 // ── Provenance chip: EXACTLY the five real SkillVersion.source values (Pitfall 1).
@@ -121,7 +126,7 @@ function fmtDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
 }
 
-export function VersionsTab({ skillId, liveVersionNumber }: Props) {
+export function VersionsTab({ skillId, liveVersionNumber, refreshNonce = 0 }: Props) {
   const [versions, setVersions] = useState<SkillVersion[]>([])
   const [runs, setRuns] = useState<EvalRun[]>([])
   const [proposals, setProposals] = useState<SkillProposal[]>([])
@@ -163,7 +168,9 @@ export function VersionsTab({ skillId, liveVersionNumber }: Props) {
         if (currentSkillRef.current !== requested) return
         setLoading(false)
       })
-  }, [skillId])
+    // refreshNonce (176-02): a bump forces this same self-fetch to re-run after a version
+    // is promoted so the newly-snapshotted version appears without a reload.
+  }, [skillId, refreshNonce])
 
   if (loading) {
     return (

@@ -269,6 +269,13 @@ async def write_file(
     template upload handler (Plan 100-04) passes kind='template_input' + a future
     expiry (D-12); every existing agent caller passes neither -> both default None
     -> NULL/NULL -> byte-identical (D-11).
+
+    Phase 163 (D-02/D-05): ``pool`` is duck-typed over an asyncpg Pool OR Connection
+    (only ``.fetchrow``/``.execute``/``.fetchval`` are used — never ``.acquire()``).
+    The REQUEST caller (workspace.py upload_template) now passes an RLS-enforced
+    ``get_user_pg_connection`` conn, so the whole upsert+version write runs under the
+    caller's org RLS inside ONE transaction; the AGENT tool caller (tool_dispatcher →
+    ``ctx.pool``) keeps the service-role pool. Same code, both paths.
     """
     path = validate_path(path)
     size = len(content)

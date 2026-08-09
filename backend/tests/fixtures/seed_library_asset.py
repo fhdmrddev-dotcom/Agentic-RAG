@@ -23,7 +23,7 @@ and the cross-provider scoreboard fill against:
 
 Security (threats T-101-01-04/05): the Supabase URL / service-role key / DB DSN are
 read NAME-ONLY from backend/.env via the existing dotenv loader — never hard-coded,
-never printed. The definition is scoped to created_by=<test user> (is_global=false)
+never printed. The definition is scoped to created_by=<test user> (is_system_global=false)
 and the Storage key to {user_id}/... — LOCAL-dev-only fixture data, no PII.
 
 Run from the repo root (the local Supabase stack must be UP — `supabase start`):
@@ -183,7 +183,7 @@ def upsert_definition(conn) -> None:
         cur.execute(
             """
             INSERT INTO public.workflow_definitions
-                (id, slug, version, name, status, definition, created_by, is_global)
+                (id, slug, version, name, status, definition, created_by, is_system_global)
             VALUES (%s, %s, %s, %s, 'published', %s::jsonb, %s, false)
             ON CONFLICT (id) DO NOTHING
             """,

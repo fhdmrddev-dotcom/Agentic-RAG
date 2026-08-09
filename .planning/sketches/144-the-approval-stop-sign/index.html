@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 144 — The approval stop sign (Phase 185)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  .flow { padding: 20px 30px 250px; zoom: .84; }
+
+  /* the proven mark, inherited from 143-A (the winner) — the corner seal is the
+     load-bearing carrier, the double-struck edge is reinforcement. */
+  .node.proven { border-color: hsl(220 30% 100% / .34); }
+  .node.proven .seal {
+    position: absolute; top: 11px; right: 11px; width: 21px; height: 21px; border-radius: 50%;
+    display: grid; place-items: center; font-size: 11px; z-index: 6;
+    background: hsl(220 30% 100% / .1); border: 1px solid hsl(220 30% 100% / .34); color: var(--color-text);
+  }
+  .seal { display: none; }
+  .node.proven .seal { display: grid; }
+
+  /* connector steps — Phases 189/190, drawn as a labelled forward preview */
+  .node.conn-step { border-style: dashed; }
+  /* The preview label sits INSIDE the card. It cannot go above it: in the 137-B
+     card the top edge belongs to the floating 3D mark, and an absolutely
+     positioned label there covers the very icon that says what the step is. */
+  .node.conn-step .soon {
+    display: inline-block; margin-top: 7px;
+    font-size: 9px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase;
+    color: var(--color-text-dim); padding: 1px 8px; border-radius: 999px;
+    border: 1px dashed var(--color-border); white-space: nowrap;
+  }
+
+  /* ══ VARIANT A — A COLLAR ON THE CARD ═════════════════════════════════════ */
+  .collar {
+    display: none; margin: 11px -20px -20px; padding: 8px 12px;
+    border-top: 1px dashed hsl(38 92% 60% / .45); border-radius: 0 0 22px 22px;
+    background: hsl(38 92% 60% / .1); color: hsl(38 92% 76%);
+    font-size: 11px; line-height: 1.45; align-items: center; justify-content: center; gap: 7px;
+  }
+  body.va .node.armed .collar { display: flex; }
+  body.va .node.armed.now .collar {
+    background: hsl(38 92% 60% / .26); color: hsl(38 92% 90%);
+    border-top-style: solid; border-top-color: hsl(38 92% 62% / .85);
+  }
+
+  /* ══ VARIANT B — A CHECKPOINT ON THE WAY IN ═══════════════════════════════ */
+  .gatemark {
+    display: none; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 30px; height: 30px; z-index: 8; place-items: center; font-size: 13px;
+    border-radius: 8px; background: var(--color-bg-elev1);
+    border: 1px dashed hsl(38 92% 60% / .6); color: hsl(38 92% 76%);
+  }
+  body.vb .conn.gated .gatemark { display: grid; }
+  body.vb .conn.gated .line { background: transparent;
+    background-image: repeating-linear-gradient(to right, var(--color-border) 0 4px, transparent 4px 8px); }
+  body.vb .conn.gated.now .gatemark {
+    border-style: solid; border-color: hsl(38 92% 62% / .95); background: hsl(38 60% 18%);
+    color: hsl(38 92% 90%); box-shadow: 0 0 22px -3px hsl(38 92% 62% / .7);
+  }
+  /* The label is wider than the 66px connector it sits on, so it needs its own
+     backing or it reads across the neighbouring cards. That width problem IS
+     part of what B costs — the mark has no room of its own. */
+  .gatelabel {
+    display: none; position: absolute; left: 50%; top: calc(50% + 26px); transform: translateX(-50%);
+    font-size: 10px; color: hsl(38 92% 74%); white-space: nowrap; z-index: 8; text-align: center;
+    background: hsl(220 30% 8% / .92); padding: 2px 8px; border-radius: 999px;
+    border: 1px solid hsl(38 92% 60% / .3);
+  }
+  body.vb .conn.gated .gatelabel { display: block; }
+
+  /* ══ the run states (Phase 188's colour, on the border) ═══════════════════ */
+  body.run-on .node.done { opacity: .6; }
+  body.run-on .node.now {
+    border-color: hsl(38 92% 62% / .9) !important;
+    box-shadow: 0 0 0 1px hsl(38 92% 62% / .5), 0 0 40px -6px hsl(38 92% 62% / .6),
+                0 24px 48px -22px rgba(0,0,0,.95) !important;
+  }
+  .runchip {
+    display: none; position: absolute; left: 50%; transform: translateX(-50%); bottom: -14px;
+    align-items: center; gap: 5px; border-radius: 999px; padding: 3px 11px; font-size: 10.5px;
+    white-space: nowrap; z-index: 9; background: hsl(38 60% 18%);
+    border: 1px solid hsl(38 92% 62% / .6); color: hsl(38 92% 86%);
+  }
+  body.run-on .node.now .runchip { display: inline-flex; }
+  /* in B the pause happens BEFORE the card, so the chip belongs to the connector */
+  body.vb.run-on .node.now .runchip { display: none; }
+
+  /* the approve bar that appears when the run is actually sitting there */
+  .approve {
+    position: absolute; left: 50%; transform: translateX(-50%); top: 26px; z-index: 30;
+    display: none; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 13px;
+    background: hsl(220 30% 8% / .96); border: 1px solid hsl(38 92% 62% / .5);
+    box-shadow: var(--shadow-lg); font-size: 12px; color: var(--color-text);
+  }
+  body.run-on .approve { display: flex; }
+  .approve .btn { font-size: 12px; padding: 6px 14px; }
+  .approve .what { color: var(--color-text-muted); font-size: 11.5px; max-width: 42ch; line-height: 1.5; }
+
+  .trythis {
+    position: absolute; left: 24px; bottom: 22px; z-index: 20; max-width: 320px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .28); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow-lg);
+  }
+  .trythis h5 { margin: 0 0 8px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.75; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 5px; }
+  .trythis li:last-child { margin-bottom: 0; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 8px; right: 9px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+
+  .verdict {
+    position: absolute; right: 24px; bottom: 22px; z-index: 20; max-width: 340px;
+    background: hsl(220 30% 8% / .95); backdrop-filter: blur(16px);
+    border: 1px solid var(--color-border); border-radius: 14px; padding: 13px 15px;
+    font-size: 11.5px; line-height: 1.7; color: var(--color-text-muted);
+  }
+  .verdict h5 { margin: 0 0 7px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .verdict b { color: var(--color-text); }
+  .verdict .bad { color: hsl(0 85% 76%); }
+  .verdict .good { color: hsl(142 71% 68%); }
+</style>
+</head>
+<body class="alive card-b va run-off">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 144</span>
+  <button class="variant-tab active" data-v="a" type="button">A: A collar on the step</button>
+  <button class="variant-tab" data-v="b" type="button">B: A checkpoint on the way in</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Workflow</span>
+  <span style="font-size:var(--text-sm);color:var(--color-text)">Monthly supplier risk report</span>
+  <span class="lbl" style="margin-left:14px">Run</span>
+  <div class="seg" id="runseg">
+    <button type="button" data-run="off" class="on">Not running</button>
+    <button type="button" data-run="on">It has reached the email step</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="lbl">Approval on the email step</span>
+  <div class="seg" id="armseg">
+    <button type="button" data-arm="on" class="on">Armed</button>
+    <button type="button" data-arm="off">Off</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="flow" id="flow"></div>
+    <div class="approve" id="approve"></div>
+  </div>
+
+  <div class="trythis" id="trythis">
+    <button class="close" type="button" id="closetry" aria-label="Hide">✕</button>
+    <h5>Three things to try</h5>
+    <ol>
+      <li>Without reading — <b>which step will stop and ask you?</b> And which one just sends?</li>
+      <li>Set the run to <b>reached the email step</b>. Does “waiting now” look different from “will wait”?</li>
+      <li>Turn the approval <b>Off</b>. Does the workflow start to look dangerous?</li>
+    </ol>
+  </div>
+  <div class="verdict" id="verdict"></div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="sketch-toolbar">
+  <span>144</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 144 — GOVERN-03. The approval stop sign on a risky step.
+
+   SETTLED AT INTAKE (operator, 2026-07-28): the checkpoint is a GATE ON the
+   risky step, NOT an extra step in the flow. Step count and step numbering
+   stay true — "step 4 of 5" keeps meaning what it says. Whether it
+   materialises as an `llm_human_input` phase underneath is an engine detail
+   the canvas hides. So both variants below keep 5 steps; they differ in WHERE
+   the stop sign lives, not in what the flow is made of.
+
+   WHY THE CONNECTOR STEPS ARE HERE (operator, 2026-07-28). Steps 4 and 5 are
+   an email-out and a file-to-shared-drive, drawn as a LABELLED FORWARD PREVIEW
+   of Phases 189 (governed external-action node, no live egress) and 190 (2-3
+   live connectors + the SSRF / credential / cross-tenant security work). They
+   are in this sketch on purpose: today only 9 steps in the whole corpus do
+   anything outbound, so an approval gate looks optional. The moment a workflow
+   can email a supplier or write to a shared drive, this gate stops being a
+   nice-to-have and becomes the main safety feature — and the roadmap already
+   says the external-action node "carries the Phase-185 action-risk approval
+   checkpoint by default" (189 SC#2). Drawing 144 without a connector would be
+   designing the seatbelt with no car.
+
+   The 3D connector marks are the ones already extracted and verified in
+   `themes/phase-icons-3d.js` (`connector_email`, `connector_link`), the same
+   set the shipped `PHASE_GLYPHS` map draws from.
+
+   INHERITED AND NOT RE-ASKED: 143-A's proven mark (corner seal load-bearing,
+   edge reinforcement) and 137-B's card. Phase 188's status colour is drawn on
+   the border, which is why the "waiting for you" state must ALSO read without
+   it — watch the collar / checkpoint, not the glow.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var STEPS = [
+  { icon: 'llm_agent_compass', title: 'Find the risks in our supplier files',
+    sub: 'Reads your contracts and incident reports', proven: true },
+  { icon: 'llm_single', title: 'Work out which suppliers look shaky',
+    sub: 'Judgement — no documents involved' },
+  { icon: 'llm_emit', title: 'Write the risk report',
+    sub: 'Every claim traceable to a document', proven: true },
+  { icon: 'connector_email', title: 'Email it to procurement',
+    sub: 'Sends the report outside the company', conn: true, risky: true, armable: true },
+  { icon: 'connector_link', title: 'File it in the shared drive',
+    sub: 'Writes the report to your team folder', conn: true, risky: true, armable: true }
+];
+
+var LEAD = {
+  a: '<b>A — The stop sign is worn by the step.</b> A step that needs your OK carries a collar along its ' +
+     'bottom edge saying so. The signal and the thing it guards are the same object, so there is never a ' +
+     'question about <i>which</i> step is going to stop. The cost: the card grows, and the collar has to ' +
+     'live below the seal and above the run chip without the bottom edge turning into a shelf.',
+  b: '<b>B — The stop sign is on the way in.</b> The line leading into the step carries a checkpoint mark, ' +
+     'and the run visibly halts <i>before</i> the card rather than inside it. Nothing is added to the card ' +
+     'at all. The cost: on a busy canvas the mark is small and lives in the gap between two steps — the ' +
+     'part of a flow people scan past.'
+};
+
+var VERDICT = {
+  a: '<h5>What A costs</h5>The collar is part of the card, so it is impossible to miss and impossible to ' +
+     'mis-assign. But the bottom edge of a 248px card is getting crowded: 143 put the seal top-right, the ' +
+     'run chip sits underneath, and the editing actions live on the bottom edge too. <b>Three things now ' +
+     'want that edge.</b> Watch the card grow when you arm it.',
+  b: '<h5>What B costs</h5>Nothing is added to the card, and the pause reads as what it actually is — the ' +
+     'run stopping <i>before</i> the action, not during it. <span class="bad">But the mark is 30px and it ' +
+     'lives in the gap between steps</span>, which is the part of a flow the eye skips. Arm and disarm the ' +
+     'email step and judge whether you would notice the difference in a room, on a laptop, in a hurry.'
+};
+
+var variant = 'a', running = false, armed = true;
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+/* the email step is index 3; the shared-drive step (index 4) is deliberately
+   NOT armed, so the contrast "this one asks, this one just does it" is on
+   screen at all times rather than described. */
+function isArmed(i) { return i === 3 ? armed : false; }
+
+function renderFlow() {
+  var html = '';
+  STEPS.forEach(function (s, i) {
+    if (i) {
+      var gated = variant === 'b' && isArmed(i);
+      html += '<div class="conn' + (gated ? ' gated' : '') + (gated && running ? ' now' : '') + '">' +
+        '<div class="line"></div><div class="tip"></div>' +
+        '<span class="gatemark" aria-hidden="true">✋</span>' +
+        '<span class="gatelabel">' + (running ? 'Waiting for your OK' : 'Stops here for your OK') + '</span>' +
+      '</div>';
+    }
+    var cls = 'node';
+    if (s.proven) cls += ' proven';
+    if (s.conn) cls += ' conn-step';
+    if (isArmed(i)) cls += ' armed';
+    if (running) { if (i === 3) cls += ' now'; else if (i < 3) cls += ' done'; }
+    html += '<div class="' + cls + '" data-i="' + i + '" tabindex="0" role="button"' +
+        ' aria-label="Step ' + (i + 1) + ': ' + esc(s.title) + (isArmed(i) ? ' — needs your approval' : '') + '">' +
+      '<span class="stepn">' + (i + 1) + '</span>' +
+      '<span class="seal" aria-hidden="true">⛨</span>' +
+      '<div class="icowrap">' + icon3d(s.icon, 52) + '</div>' +
+      '<div class="body">' +
+        '<div class="ttl">' + esc(s.title) + '</div>' +
+        '<div class="sub">' + esc(s.sub) + '</div>' +
+        (s.conn ? '<div class="soon">connector · later phase</div>' : '') +
+        '<div class="collar"><span>✋</span><span>' +
+          (running && i === 3 ? 'Waiting for your OK' : 'Waits for your OK before it sends') +
+        '</span></div>' +
+      '</div>' +
+      '<span class="runchip">Waiting for your OK</span>' +
+    '</div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  document.getElementById('flow').innerHTML = html;
+}
+
+function renderApprove() {
+  var el = document.getElementById('approve');
+  if (!running) { el.innerHTML = ''; return; }
+  el.innerHTML = armed
+    ? '<span style="font-size:15px">✋</span>' +
+      '<span class="what"><b>Before it sends.</b> The report is ready. Emailing it to procurement leaves ' +
+        'the company, so nothing goes out until you say so.</span>' +
+      '<button class="btn primary" type="button" data-act="ok">Send it</button>' +
+      '<button class="btn" type="button" data-act="no">Not yet</button>'
+    : '<span style="font-size:15px">⚠</span>' +
+      '<span class="what"><b>Nothing asked you.</b> Approval is off on this step, so the email has already ' +
+        'gone out. There is no bar here because there was no pause.</span>';
+  el.style.borderColor = armed ? 'hsl(38 92% 62% / .5)' : 'hsl(0 72% 55% / .5)';
+}
+
+function renderFoot() {
+  var nRisky = STEPS.filter(function (s) { return s.risky; }).length;
+  var nArmed = STEPS.filter(function (s, i) { return isArmed(i); }).length;
+  var bits = ['<span class="pill">' + nRisky + ' steps act outside the app · ' +
+              nArmed + ' will stop and ask</span>'];
+  bits.push('<span class="pill good">✓ Still 5 steps — the gate is on the step, not an extra step</span>');
+  bits.push(nArmed < nRisky
+    ? '<span class="pill bad">' + (nRisky - nArmed) + ' outbound step acts with no one asked</span>'
+    : '<span class="pill good">✓ Every outbound step asks first</span>');
+  bits.push('<span class="pill net">Steps 4–5 are connectors — a preview of Phases 189 / 190</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb');
+  document.body.classList.add('v' + variant);
+  document.body.classList.toggle('run-on', running);
+  document.body.classList.toggle('run-off', !running);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  document.getElementById('verdict').innerHTML = VERDICT[variant] +
+    '<div style="margin-top:9px;padding-top:8px;border-top:1px dashed var(--color-border);font-size:11px">' +
+    '<b>The point both variants make.</b> Step 5 writes to your shared drive and <i>nothing asks you</i>. ' +
+    'With no connectors that is harmless; the moment Phase 190 makes it real, an unarmed outbound step is ' +
+    'the whole risk. <b>Which argues the default should be armed-on, not armed-off.</b></div>';
+  renderFlow(); renderApprove(); renderFoot();
+}
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-run')) running = b.getAttribute('data-run') === 'on';
+  if (b.hasAttribute('data-arm')) armed = b.getAttribute('data-arm') === 'on';
+  render();
+});
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  var a = e.target.closest('[data-act]');
+  if (!a) return;
+  var el = document.getElementById('approve');
+  el.innerHTML = a.getAttribute('data-act') === 'ok'
+    ? '<span style="font-size:15px">✓</span><span class="what"><b>Sent.</b> The run carries on to the ' +
+      'shared-drive step — which, note, will not ask you anything.</span>'
+    : '<span style="font-size:15px">⏸</span><span class="what"><b>Held.</b> Nothing has left the company. ' +
+      'The run waits here until someone decides — it does not quietly time out and send.</span>';
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

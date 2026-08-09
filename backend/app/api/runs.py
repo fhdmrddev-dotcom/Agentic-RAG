@@ -57,7 +57,16 @@ from app.api.threads import (
     _RUN_STATUS_TO_TERMINAL_TYPE,
 )
 from app.config import settings
-from app.dependencies import get_current_user, get_redis, get_supabase
+# Phase 163 (TEN-02): get_user_supabase_client = the per-request user-JWT (RLS-enforced)
+# client the request handlers inject (D-03). get_supabase is KEPT for the D-05 carve-outs
+# only — the background harness/Deep continuation + the shared cancel/zombie-heal writer
+# (run_lifecycle) stay service-role (no auth.uid() off-request).
+from app.dependencies import (
+    get_current_user,
+    get_redis,
+    get_supabase,
+    get_user_supabase_client,
+)
 from app.utils.db import aexec
 
 router = APIRouter(prefix="/runs", tags=["runs"])
@@ -386,7 +395,7 @@ async def stream_run(
     run_id: UUID,
     since: str = "0",
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     # Step 1: ownership SELECT on runs row (D-062-12 / T-062-01).
@@ -496,7 +505,7 @@ async def submit_ask_user_response(
     run_id: UUID,
     body: AskUserResponseBody,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Submit a user response to a paused ask_user prompt (D-085-02).
@@ -665,8 +674,17 @@ def resolve_phase_available_tools(definition, active_slug: str) -> list:
     available_tools lives in the definition JSONB (per-phase config), NOT a
     workflow_phases column — so a Harness Continue MUST re-read it from the parsed
     WorkflowDefinition before resuming, never trust a stale row. Tool-bearing
-    phase configs (llm_agent / llm_batch_agents) carry the whitelist; other phase
-    types (llm_single / programmatic / llm_human_input) have none → empty list.
+    phase configs carry the whitelist; the rest have none → empty list, which is
+    why the read is a defensive getattr over the discriminated union.
+
+    ⚠ CORRECTED at Phase 189 (D-03 / D-26), in the commit that falsified it. The two
+    lists above used to be spelled out as "(llm_agent / llm_batch_agents)" and
+    "(llm_single / programmatic / llm_human_input)". Both were already incomplete
+    (llm_emit, added at 101.1, appears in neither) and 189 makes the first one wrong:
+    the 7th type, external_action, carries available_tools too, because D-03 puts its
+    chosen capability there so the step rides this very re-read and the phase_whitelist
+    dispatch backstop behind it. Enumerating union members in prose rots on every
+    additive growth, so the rule is stated instead of the roster.
     """
     for ps in definition.phases:
         if ps.slug == active_slug:
@@ -678,14 +696,23 @@ def resolve_phase_available_tools(definition, active_slug: str) -> list:
 async def continue_run(
     run_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # Phase 163 (D-05/D-09): service-role for the DETACHED continuation ONLY. Every
+    # request-scoped read/write below (ownership SELECTs, the continues_used update,
+    # the project-scope resolution) runs on the RLS-enforced `supabase`; the background
+    # harness re-drive (wf_ctx.supabase) and the Deep spawn_continuation_run producer
+    # stay service-role — the agent-loop async writer has no auth.uid() off-request.
+    service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     """Resume a cap_paused run within a fresh bounded budget (CONT-01)."""
     # ── Step 1: ownership SELECT → 404 (never leak existence; T-092-09) ──
     row_resp = await aexec(
         supabase.table("runs")
-        .select("run_id, status, thread_id, continues_used")
+        # Phase 163 (D-05): pull org_id off the RLS-verified run row so the Deep
+        # continuation's cap-paused read (load_cap_paused_tool_calls) can carry an
+        # org-scoping predicate on the service-role pool (belt-and-suspenders).
+        .select("run_id, status, thread_id, continues_used, org_id")
         .eq("run_id", str(run_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -826,6 +853,10 @@ async def continue_run(
         from uuid import uuid4 as _uuid4  # noqa: PLC0415
         from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
 
+        # Phase 163 (D-05): the harness re-drive substrate — _load_run_definition /
+        # get_active_phase / _insert_run (producer shell) / run_workflow are the
+        # agent-loop/run-lifecycle writers; they stay on the raw service-role pool
+        # (NOT get_user_pg_connection). The request-scoped ownership gate already ran.
         pool = await get_pg_pool()
         wf_run_uuid = (
             UUID(active_workflow_run_id)
@@ -1001,7 +1032,9 @@ async def continue_run(
                 # pre-resolved above) so a bound workflow stays inside its project across
                 # a Continue; an unbound workflow stays None (unscoped, unchanged). spawn
                 # + a fresh per-run semaphore complete the tool substrate.
-                supabase=supabase,
+                # Phase 163 (D-05/D-09): the harness re-drive is the agent-loop
+                # async-writer path — service-role, NOT the request's user-JWT client.
+                supabase=service_supabase,
                 folder_subtree_ids=_cont_subtree,
                 scoped_folder_path=None,
                 spawn=_spawn_harness_resume,
@@ -1045,18 +1078,31 @@ async def continue_run(
     else:
         # Deep: CONSUME the persisted dropped tool calls (SC#4).
         from app.db.runs import load_cap_paused_tool_calls  # noqa: PLC0415
-        from app.api.threads import spawn_continuation_run  # noqa: PLC0415
+        # Phase 162.5 Plan 03 (G-5 extraction): spawn_continuation_run moved to
+        # run_producer.py (folded onto the shared _finalize_producer_run).
+        from app.services.run_producer import spawn_continuation_run  # noqa: PLC0415
         from app.dependencies import get_pg_pool  # noqa: PLC0415
 
+        # Phase 163 (D-05): load_cap_paused_tool_calls + spawn_continuation_run are the
+        # Deep continuation run-lifecycle/producer writers — raw service-role pool.
         pool = await get_pg_pool()
         thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
-        dropped = await load_cap_paused_tool_calls(pool, thread_uuid)
+        # Phase 163 (D-05): org-scope the service-role cap-paused read when the run row
+        # carried org_id (row.get is None-safe for mock/legacy rows → byte-identical).
+        _cont_org_id = row.get("org_id")
+        _cont_org_uuid = (
+            UUID(_cont_org_id) if isinstance(_cont_org_id, str) else _cont_org_id
+        )
+        dropped = await load_cap_paused_tool_calls(
+            pool, thread_uuid, org_id=_cont_org_uuid
+        )
         await spawn_continuation_run(
             run_id=run_id,
             thread_id=thread_id,
             current_user=current_user,
             redis=redis,
-            supabase=supabase,
+            # Phase 163 (D-05/D-09): the Deep continuation producer is service-role.
+            supabase=service_supabase,
             dropped_tool_calls=dropped,
         )
 
@@ -1109,7 +1155,13 @@ async def continue_run(
 async def cancel_run(
     run_id: UUID,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
+    # Phase 163 (D-05/D-09): the Step-1 ownership SELECT below runs on the RLS-enforced
+    # `supabase` (the real cross-user gate now). `_cancel_run_internals` is the SHARED
+    # run-lifecycle cancel/zombie-heal WRITER (reused verbatim by the operator Kill path,
+    # which is cross-user + service-role by design) — it stays service-role here too so
+    # the shared helper receives one client type from both callers (behavior-preserving).
+    service_supabase: Client = Depends(get_supabase),
     redis: aioredis.Redis = Depends(get_redis),
 ):
     # ── Step 1: ownership SELECT (D-062-08 / D-062-12 / T-062-01 / T-062-02) ──
@@ -1146,7 +1198,9 @@ async def cancel_run(
         status=row["status"],
         thread_id=row["thread_id"],
         redis=redis,
-        supabase=supabase,
+        # Phase 163 (D-05): shared run-lifecycle writer — service-role (matches the
+        # operator Kill path); the owner gate above already enforced RLS ownership.
+        supabase=service_supabase,
     )
 
     # Always 204 — every sub-path (terminal-noop / task-cancelled / zombie-healed)

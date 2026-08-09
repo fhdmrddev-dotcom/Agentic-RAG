@@ -3,7 +3,7 @@
  *
  * Two behavioral proofs for the frontend half of the Built-in trust badge:
  *  (a) a system skill (`is_system`) renders a single "Built-in" pill; a non-system
- *      GLOBAL skill still renders "Global" (the ternary's else branch) — never both.
+ *      shared skill still renders "Shared with org" (the ternary's else branch) — never both.
  *  (b) owner-only actions (edit / delete / share / export) are HIDDEN when the viewer
  *      is not the owner (`isOwner` false) — the reflect-not-enforce protection
  *      (T-137.2-01), already correct because the system-owned built-in's `user_id`
@@ -50,7 +50,7 @@ function mkSkill(overrides: Partial<Skill> = {}): Skill {
     description: "Risk register.",
     instructions: "Build a spreadsheet…",
     is_enabled: true,
-    is_global: false,
+    is_org_shared: false,
     is_system: false,
     created_at: "2026-06-23T00:00:00Z",
     updated_at: "2026-06-23T00:00:00Z",
@@ -64,7 +64,7 @@ const handlers = {
   onSelect: vi.fn(),
   onDelete: vi.fn().mockResolvedValue(undefined),
   onToggleEnabled: vi.fn().mockResolvedValue(undefined),
-  onToggleGlobal: vi.fn().mockResolvedValue(undefined),
+  onToggleOrgShared: vi.fn().mockResolvedValue(undefined),
   onTryInChat: vi.fn(),
   onExport: vi.fn().mockResolvedValue(undefined),
 }
@@ -80,19 +80,19 @@ function renderCard(skill: Skill, currentUserId: string) {
 afterEach(() => cleanup())
 
 describe("SkillCard — Built-in badge (137.2-03 / CREATE-01 / D-01)", () => {
-  it("renders a single 'Built-in' pill for a system skill (never 'Global' too)", () => {
-    // The real built-in is BOTH is_system and is_global — the ternary must render
+  it("renders a single 'Built-in' pill for a system skill (never 'Shared with org' too)", () => {
+    // The real built-in is BOTH is_system and is_org_shared — the ternary must render
     // exactly one pill, and Built-in wins.
-    renderCard(mkSkill({ is_system: true, is_global: true }), "user-1")
+    renderCard(mkSkill({ is_system: true, is_org_shared: true }), "user-1")
 
     expect(screen.getByText(/built-in/i)).toBeInTheDocument()
-    expect(screen.queryByText(/^global$/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^shared with org$/i)).not.toBeInTheDocument()
   })
 
-  it("a non-system GLOBAL skill still shows 'Global', not 'Built-in' (the else branch)", () => {
-    renderCard(mkSkill({ is_system: false, is_global: true }), "user-1")
+  it("a non-system shared skill still shows 'Shared with org', not 'Built-in' (the else branch)", () => {
+    renderCard(mkSkill({ is_system: false, is_org_shared: true }), "user-1")
 
-    expect(screen.getByText(/^global$/i)).toBeInTheDocument()
+    expect(screen.getByText(/^shared with org$/i)).toBeInTheDocument()
     expect(screen.queryByText(/built-in/i)).not.toBeInTheDocument()
   })
 })
@@ -105,7 +105,7 @@ describe("SkillCard — owner actions reflect ownership (137.2-03 / T-137.2-01)"
 
   it("hides edit/delete/share/export for the system-owned built-in when the viewer is not the owner", () => {
     const { container } = renderCard(
-      mkSkill({ user_id: "00000000-0000-0000-0000-000000000001", is_system: true, is_global: true }),
+      mkSkill({ user_id: "00000000-0000-0000-0000-000000000001", is_system: true, is_org_shared: true }),
       "someone-else",
     )
 

@@ -43,6 +43,7 @@ import {
   disableUser,
   enableUser,
   exportPlatformAudit,
+  getFeatureVisibility,
   getModelRegistry,
   getOperatorAudit,
   getPlatformAudit,
@@ -53,6 +54,7 @@ import {
   recordControlPlaneEvent,
   revokeOperator,
   runModelDiscovery,
+  setFeatureAudience,
   setFeatureVisibility,
   setFlag,
   setModelCapability,
@@ -188,6 +190,10 @@ const DEFAULT_VISIBILITY: Record<GovernedFeature, FeatureAudience> = {
   model_management: "operators",
   workflow_authoring: "everyone",
   governance_health: "everyone",
+  // Phase 181 (REVERT-01 / D-181-01) — the visual-canvas master switch cold-defaults OFF
+  // for EVERYONE incl. operators (byte-identical to the backend `_GOVERNED_FEATURES`
+  // cold-default). The operator flips it On (audience "everyone") via the Off|On control.
+  visual_workflow_canvas: "off",
 }
 
 export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
@@ -213,9 +219,22 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
   const [registryRows, setRegistryRows] = useState<ModelRegistryRow[] | null>(null)
   // 069-A: the current per-feature audience map (enum values, never booleans). Seeded
   // from the day-one polarity (see DEFAULT_VISIBILITY); each flip updates it + records.
-  const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience>>(
+  // Phase 167 (VIS-01): the audience enum grows a third value `role` (a greenlist).
+  const [visibility, setVisibility] = useState<Record<GovernedFeature, FeatureAudience | "role">>(
     DEFAULT_VISIBILITY,
   )
+  // Phase 167 (VIS-01 / D-167-06): the greenlisted roles per feature — only meaningful when
+  // that feature's audience is `role`. Each role-flip writes through setFeatureAudience +
+  // updates this map (no read endpoint yet, mirrors the seeded-shell-state visibility map).
+  const [greenlist, setGreenlist] = useState<Record<GovernedFeature, string[]>>({
+    skill_studio: [],
+    model_management: [],
+    workflow_authoring: [],
+    governance_health: [],
+    // Phase 181 — the canvas master switch uses the Off|On control (never a role greenlist),
+    // but the map is a full Record<GovernedFeature, …>, so the key is present (always empty).
+    visual_workflow_canvas: [],
+  })
   // Phase 154 (D-01a): the two-audience toggle state is now the ONE app-wide
   // shared reveal context (was a local useState). Flipping it here and flipping
   // it in Settings move the SAME switch — no drift. The variable name stays
@@ -291,6 +310,33 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       /* keep the last-known registry (honest degrade, never a crash) */
     }
   }, [])
+  // WR-05: seed the visibility + greenlist maps from SERVER truth (GET /admin/visibility) on
+  // mount, so the operator never sees a stale DEFAULT audience after a reload. Defensive
+  // per-key merge (an absent/partial record keeps the day-one default); a read blip keeps the
+  // seeded defaults (honest degrade). The subsequent per-flip writes still update the maps live.
+  const fetchVisibility = useCallback(async () => {
+    try {
+      const map = await getFeatureVisibility()
+      if (!alive.current || !map) return
+      setVisibility((prev) => {
+        const next = { ...prev }
+        for (const key of Object.keys(next) as GovernedFeature[]) {
+          const aud = map[key]?.audience
+          if (aud) next[key] = aud
+        }
+        return next
+      })
+      setGreenlist((prev) => {
+        const next = { ...prev }
+        for (const key of Object.keys(next) as GovernedFeature[]) {
+          next[key] = map[key]?.roles ?? next[key] ?? []
+        }
+        return next
+      })
+    } catch {
+      /* keep the seeded day-one defaults (honest degrade, never a crash) */
+    }
+  }, [])
 
   // ── Platform-activity browse (067-A source #2). AuditTab owns the filter state and
   //    calls this with the resolved filters + page whenever they change; the shell owns
@@ -332,6 +378,8 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     fetchSignals()
     fetchRuns()
     fetchSettings()
+    // WR-05: seed the feature-visibility/greenlist maps from server truth once on mount.
+    void fetchVisibility()
 
     // Record ONE deliberate visit row, THEN read the ledger so the operator sees
     // their "Opened the Control Plane" row land (the D-07 honesty beat). If the
@@ -382,7 +430,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
       stopPolling()
       document.removeEventListener("visibilitychange", handleVisibility)
     }
-  }, [fetchSignals, fetchRuns, fetchSettings, fetchAudit])
+  }, [fetchSignals, fetchRuns, fetchSettings, fetchAudit, fetchVisibility])
 
   // ── Lazy roster load (068-A): fetch the users roster the first time the operator
   //    opens the Users & Access tab, and refresh it on every re-open. This keeps the
@@ -487,14 +535,23 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
     [fetchRoster, pulseRecording],
   )
 
-  // ── 069-A visibility write. The audience is an ENUM (never a boolean). On success we
-  //    optimistically reflect the new audience in the shell map (the write is recorded
-  //    server-side + propagates within the ~30s TTL) and pulse the band marker. On
-  //    failure we RE-THROW so the card surfaces its retry (and the map stays put). ──
+  // ── 069-A + 167 visibility write. The audience is an ENUM (never a boolean). The `role`
+  //    greenlist routes through setFeatureAudience (roles[] allowlist-validated server-side,
+  //    Plan 03); everyone/operators keep the binary setFeatureVisibility path. On success we
+  //    reflect the new audience (+ roles) in the shell map (recorded server-side, propagates
+  //    within the ~30s TTL) and pulse the band marker. On failure we RE-THROW so the card
+  //    surfaces its retry (and the map stays put). ──
   const handleSetVisibility = useCallback(
-    async (feature: GovernedFeature, audience: FeatureAudience) => {
-      await setFeatureVisibility(feature, audience)
-      if (alive.current) setVisibility((prev) => ({ ...prev, [feature]: audience }))
+    async (feature: GovernedFeature, audience: FeatureAudience | "role", roles: string[] = []) => {
+      if (audience === "role") {
+        await setFeatureAudience(feature, "role", roles)
+      } else {
+        await setFeatureVisibility(feature, audience)
+      }
+      if (alive.current) {
+        setVisibility((prev) => ({ ...prev, [feature]: audience }))
+        if (audience === "role") setGreenlist((prev) => ({ ...prev, [feature]: roles }))
+      }
       pulseRecording()
     },
     [pulseRecording],
@@ -750,6 +807,7 @@ export function ControlRoomPage({ identity, onBack }: ControlRoomPageProps) {
             />
             <FeatureVisibility
               visibility={visibility}
+              greenlist={greenlist}
               onSetVisibility={handleSetVisibility}
               showTechnical={showTechnical}
             />

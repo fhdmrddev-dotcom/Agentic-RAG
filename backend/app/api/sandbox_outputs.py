@@ -26,7 +26,9 @@ from fastapi.responses import RedirectResponse
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+# Phase 163 (D-03): the re-sign handler is request-scoped → RLS-enforced per-request
+# user-JWT client (the sandbox_files ownership fence + Storage sign run under the user).
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.utils.db import aexec
 
 router = APIRouter(prefix="/sandbox-outputs", tags=["sandbox-outputs"])
@@ -36,7 +38,7 @@ router = APIRouter(prefix="/sandbox-outputs", tags=["sandbox-outputs"])
 async def get_sandbox_output(
     storage_path: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     # Step 1: ownership fence — path-segment match.
     # storage_path layout (sandbox_service.py:103): "{user_id}/{execution_id}/{filename}"

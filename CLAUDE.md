@@ -19,12 +19,13 @@ interface; document ingestion is a manual file-upload flow.
 - All tables need Row-Level Security — users only see their own data (global folders/skills are the only shared scope)
 - Stream chat responses via SSE
 - Stateless chat completions — store and send chat history yourself, no provider-side thread state
-- Ingestion is manual file upload only — no connectors or automated pipelines
+- Ingestion is manual file upload only — no connectors or automated pipelines. **Dated, not permanent:** the operator's 2026-08-08 direction is that a connected drive (OneDrive/SharePoint/Google Drive) should auto-ingest — see `SEED-142`. Whoever ships the first sync connector changes this rule in the same commit; until then it holds.
 - Schema changes ship as numbered SQL migrations under `supabase/migrations/` at the repo root (the legacy `backend/supabase/migrations.archive/` is dead — see its README). Filenames must match `<digits>_name.sql` (e.g., `035_my_change.sql`); letter suffixes like `007b` are silently skipped by the Supabase CLI. **Apply each new migration to the live local DB by pasting it into the Supabase SQL editor — never `supabase db push`/`db reset`** (preserves dev data). Then regenerate the bootstrap artifact: `bash scripts/regenerate-full-schema.sh` — by default this dumps the live DB schema with no reset, rebuilding `supabase/full-schema.sql` (single-file deploy artifact for greenfield envs). Pass `--reset` only when you explicitly want to verify the migration sequence from a clean slate (CI / release verification — destructive: wipes local DB). Never hand-edit `full-schema.sql`. Full setup story: `supabase/SETUP.md`.
 - Supabase Realtime is a best-effort hint, **not** a source of truth — always reconcile via fetch on (re)connect (see decision D-v2.5-03)
 - Do not run blocking I/O (e.g. `supabase-py` calls) directly inside async handlers — wrap with `run_in_threadpool` (decision D-v2.5-01)
 - Multi-worker uvicorn is the default (`WORKER_COUNT=2`); see D-PRD-12 in `.planning/prd-reset/DECISIONS.md` for the singleton audit checklist and scaling guidance
 - Settings live in `user_settings` / `app_settings` and the Settings UI; env vars are for secrets and infra only
+- External integrations / connectors follow the recorded MCP-first verdict — `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first, first-party-thin, broad catalog sequenced with Open Platform; dated re-open trigger inside; pointer entry `D-v3.6-01`). No MCP client exists in the backend today; live outbound egress is Phase 190 (STRETCH).
 - **Provider-docs-first (evidence-based):** whenever work touches a specific provider (prompting, orchestration, context management, skill use, tool calls/tool use, streaming, structured output), research that provider's OWN official documentation first, then cross-check against our app's actual behavior with comparative analysis and real evidence (Supabase/DB, backend logs, LangSmith, live cross-provider UAT). Conventions do NOT transfer 1:1 between providers; keep provider-specific handling at the service boundary, never break the shared path. See `.planning/seeds/SEED-034-system-prompt-cross-provider-tool-use.md`.
 
 ## Local dev infrastructure
@@ -35,6 +36,74 @@ interface; document ingestion is a manual file-upload flow.
 - **Local-vs-cloud switch**: env vars only. `SUPABASE_URL` + `REDIS_URL` in `backend/.env` point at local containers by default; switch to cloud (Supabase project URL, Upstash `rediss://...`) without code changes. See `backend/.env.example` for the full var list.
 - **Run-buffer key conventions** (Phase 061+): `run:{run_id}` (Redis Stream — per-run event buffer), `runs_by_thread:{thread_id}` (sorted set — active runs per thread), `runs:active` (sorted set — all currently-streaming run_ids for global cleanup). Defined in code, not in any migration script.
 - **Setup guides**: `supabase/SETUP.md` for Supabase (local + cloud + migrations), `REDIS-SETUP.md` for Redis (local + cloud + key conventions). Read these when connecting a new environment or onboarding a contributor.
+
+## Parallel execution — worktrees are ENABLED (MANDATORY rules)
+
+`workflow.use_worktrees` is **`true`** as of 2026-08-10. It was `false` for a year, and that made
+every GSD phase fully serial: Phase 190 measured **10.8 h of execution for 19 plans**, against
+**5.7 h** if its eight waves had run in parallel — roughly **five hours lost to serialisation on
+one phase**. Sequential execution is not acceptable; treat parallelism as the default.
+
+**The reason it used to be off was real, and it is now SOLVED rather than ignored.** `git worktree
+add` checks out TRACKED files only, and four things verification depends on are gitignored, so a
+fresh worktree false-failed every plan:
+
+| Artifact | Size | Handling |
+|---|---|---|
+| `backend/venv` | **1.7 GB** | **junction** (copying is fatal) |
+| `frontend/node_modules` | **541 MB** | **junction** |
+| `backend/.env` | small | **copy** (a worktree must never mutate the operator's env) |
+| `frontend/.env.local` | small | **copy** |
+
+### The four rules
+
+1. **Every worktree MUST be bootstrapped before any command runs in it.** The executor's FIRST
+   action — before the HEAD assertion, before reading the plan — is:
+   ```bash
+   bash scripts/bootstrap-worktree.sh "$(pwd)"
+   ```
+   It is idempotent and fails loudly. A worktree that skipped it will report green typechecks and
+   red tests for reasons that look like the plan's fault.
+
+2. **Cap vitest workers in every parallel run: `GSD_VITEST_MAX_WORKERS=4`.** Measured on this
+   16-core box: two UNCAPPED concurrent vitest runs spawn ~16 workers each, and the
+   oversubscription surfaces as bare timeouts in suites the plan never touched — `failed 6` and
+   `failed 5` against a serial baseline of `failed 0`. **Capped at 4 each, two concurrent runs
+   agree exactly** (9 files / 23 tests failing, the known SEED-056 rot set, on both).
+   `scripts/vitest-count-gate.cjs` reads this env var; absent, single-run behaviour is unchanged.
+   This is very likely what Phases 190-16/17/18 saw and misattributed to `userEvent` delay.
+
+3. **NEVER `rm -rf` a bootstrapped worktree, and never let git do it either.** A recursive delete
+   FOLLOWS a junction and destroys the operator's real 1.7 GB `venv` — silently. `git worktree
+   remove --force` does not fall into that trap but fails outright (`Invalid argument`) and leaves
+   the directory behind. Always tear down with:
+   ```bash
+   bash scripts/teardown-worktree.sh <path>       # or --all-agents
+   ```
+   It detaches each junction as a reparse point first (`Directory.Delete(p, $false)` — the
+   non-recursive flag is load-bearing), then removes, then **asserts the source venv and
+   node_modules are still intact**.
+
+4. **Serialize any plan whose tests MUTATE the local database.** Worktrees isolate files, not
+   Postgres. Two plans writing the same local Supabase concurrently will interfere, and no
+   `files_modified` check can see it. Read-only/stubbed suites are safe — two concurrent full
+   `backend/tests/unit` runs were measured identical to serial (62 failed / 1986 passed on both).
+
+### Measured constraints worth not rediscovering
+
+- **Windows `MAX_PATH` binds.** `LongPathsEnabled` is **0** at the OS level here and
+  `core.longpaths` is unset, so the ceiling is 260 chars. The longest tracked path in this repo is
+  **138**, so a worktree root must stay under ~120 chars. Claude Code places worktrees at
+  `<repo>/.claude/worktrees/agent-<id>` = **66 chars** → 204/260, **56 chars of headroom**: fine.
+  A worktree under the scratchpad (123 chars) **fails** — `git worktree add` checks the files out,
+  then dies with *"Could not reset index file to revision 'HEAD'"* and rolls the whole thing back.
+  If a future base path is long, raising the OS registry flag needs admin **and a reboot** — an
+  operator action, never a silent one.
+- `.claude/worktrees/` is gitignored, so worktrees do not pollute `git status`.
+- Junctions need **no elevation**; create them with PowerShell `New-Item -ItemType Junction`.
+  `cmd //c mklink /J` has its `/J` switch mangled by MSYS path conversion under Git Bash.
+- Dispatch worktree agents **one message at a time** (`run_in_background: true`), never several
+  `Agent()` calls in one message — simultaneous `git worktree add` races on `.git/config.lock`.
 
 ## Deployment (cloud) — operator-gated
 
@@ -91,10 +160,44 @@ Phase 075.4 Plan 05 (D-075.4-H1 Wave 0) — closes the assumption-driven-UAT gap
 
 | Axis | Required coverage |
 |------|-------------------|
-| Cross-provider | OpenAI, Anthropic, Google, OpenRouter (4 providers — pick one representative model per axis) |
+| Cross-provider | **The FULL native roster + OpenRouter — 8 rows, not 4.** See the roster rule below. |
 | Multi-tool | At least 1 row exercising 2+ tools in one prompt (e.g., `search_documents` + `execute_code`) |
 | Parallel-thread | At least 1 row with Thread A streaming while Thread B accepts a new prompt |
 | Long-message | At least 1 row with ≥ 50 prior messages OR a ≥ 5 KB user prompt |
+
+**The cross-provider roster rule (amended 2026-07-31 — operator, during Phase 185 UAT).** This table
+previously said *"OpenAI, Anthropic, Google, OpenRouter (4 providers)"*, and that under-specification
+is why every scoreboard in this project has silently skipped half the product. The app ships **seven
+native providers** plus OpenRouter; testing four and calling it "cross-provider" tests the four we
+happen to think of first. The operator's standing direction is the **full native roster** — so the
+required set is:
+
+| | Provider | Note |
+|---|---|---|
+| 1 | OpenAI | |
+| 2 | Anthropic | native SDK |
+| 3 | Google | historically the highest-risk row for tool-call emission |
+| 4 | DeepSeek | `strict_json_schema` is **inert** (DEMOTED — no `/beta` base_url, D-122-04) |
+| 5 | Zhipu / GLM | |
+| 6 | MiniMax | |
+| 7 | Moonshot / Kimi | **the only `emit_tier: coerce` native rows** — the weakest emission guarantee in the registry |
+| 8 | OpenRouter | every OpenRouter row is `native_tools: False` — it is the non-native tool path, not a fifth flavour of the native one |
+
+**Derive the roster, never re-type it.** `MODEL_CAPABILITIES` is the source of truth — group by
+`provider` and take one representative per group, rather than transcribing the list above (which will
+rot the moment a provider is added). Prefer the **newest** model per provider, and prefer a
+**registry-backed** id: an id absent from `MODEL_CAPABILITIES` resolves `capability_source=inferred`
+and silently loses `emit_tier`, so the row would measure a weaker configuration than the one that
+ships (see SEED-040 §2026-07-31, and SEED-135).
+
+**Rows may be blocked, but never silently omitted.** A provider with no key configured, or one blocked
+by a known defect, is recorded as ⛔ with the reason and the blocking issue id — never dropped from the
+table. A scoreboard that lists only what passed is not a scoreboard.
+
+**Cheapest honest method** (proven in Phase 185): drive each row as a real run with a **per-request**
+`model` + `provider` on `POST /threads/{id}/messages`, and read verdicts from `workflow_runs` /
+`workflow_phases` / `harness_audit`. That scores the whole board **without mutating any global
+setting**, so the operator's environment is untouched and rows cannot contaminate each other.
 
 UAT rows MUST be authored under VALIDATION.md, NOT in PLAN.md tasks. Phase verification only passes when all 4 axes are exercised — Plan 05 E2E backstop covers 1-3 automated; long-message stays manual per provider.
 
@@ -110,6 +213,37 @@ These rules exist because the v2.6 075.x cascade (8 phases on the same streaming
 | **G-4 Lived-experience UAT gate** | Phase touches user-visible UI | Operator-defined "I'd recognize failure here" scenarios at scope-time (not post-hoc). Chrome MCP drives all 3 at phase verification — wire format + screenshot are insufficient. |
 | **G-5 Refactor between feature waves** | ≥ 3 prior phases on the same hot file (see ledger below) | Insert a dedicated refactor phase BEFORE the next feature phase on that file. Audit during discuss-phase. |
 | **G-6 Failure criteria upfront** | Writing SPEC.md or scoping a phase | Include `## How we'd know this failed` section with concrete observable conditions. If failure modes can't be enumerated, scope is not ready to plan. |
+| **G-7 Gap-closure round cap** | Verification returns `gaps_found` on a phase that has already run **2** gap-closure rounds | Do NOT route to `/gsd:plan-phase --gaps`. Triage every remaining finding as **fast-fix / defer-to-next-phase / accept** — unless a ROADMAP **success criterion** is actually unmet, which is the only thing that justifies a further round. A closure round may NEVER introduce a new user-facing capability: that is a phase, not a gap. |
+
+**G-7 in detail (ratified 2026-08-04 — operator, at Phase 187 close).**
+
+Phase 187 went from **15 plans on 2026-08-02 to 29 on 2026-08-04** across five gap-closure rounds. The tell at round 5: **both** remaining gaps lived in code round 5 had authored that same day (`DescribeKbPicker.tsx` created `f5a28e7e`; the count-gate pin block edited `51c44f37`) — a round 6 would have been 100% cleanup of round 5, while every ROADMAP success criterion was already verified. G-1 caps repeated phase INSERTS on a hot file; nothing capped repeated ROUNDS on a phase. This is that cap.
+
+Three structural mechanisms drive the runaway — none is anyone's mistake, which is why a rule is needed rather than more care:
+
+1. **The gate manufactures findings.** Every `execute-phase` ends with a standard-depth code review of code written that morning; such a review essentially always returns something → a must_have scores failed → `gaps_found` → straight back into `plan-phase --gaps`. Nothing in the loop asks *"is the phase GOAL met?"* as the terminating question — must_have bookkeeping outvotes it.
+2. **Each round adds must_haves, which are themselves new failure surface.** Phase 187's plan `187-29` existed ONLY to pin round 5's guards; its own headline must_have then failed. A pure-bookkeeping plan manufactured a gap.
+3. **Closure rounds smuggle in features.** "The loose door has no KB picker" is a MISSING CAPABILITY, not a defect in shipped code. Building it inside a closure round is both how 15 became 29 and why that round shipped a blocker — new surface, zero prior review cycles.
+
+**The mechanical check (run it — do not eyeball the round count):**
+
+```bash
+node scripts/check-gap-closure-rounds.cjs <phase>
+```
+
+Exit `0` = G-7 clear · `1` = G-7 fires · `2` = harness error. It derives the round count from the repository itself — `gap_closure_round:` frontmatter where present, falling back to the number of distinct commits that ADDED gap-closure plan files (that fallback is load-bearing: Phase 186's twelve gap plans carry no round field at all, and it still reads 3 correctly) — and prints the derivation so the number is auditable rather than asserted. It also fails `[new-capability-in-closure]` when a gap-closure plan's `files_modified` contains a non-test source file that did not exist when that plan was written; run against Phase 187 it names `DescribeKbPicker.tsx` unprompted, which is precisely the file that shipped CR-R5-01.
+
+Both failures have a WORDED escape hatch, never a boolean — `--unmet-criterion "SC#N: <what is not true>"` and `--capability-approved "<why this belongs here>"`. An override prints `G-7 passed WITH OVERRIDES` rather than `clear`, so a waved-through finding can never read as an absent one, and it must still be recorded under `STATE.md → Guardrail overrides` per the protocol below.
+
+**Run it at three points:** when `verify-work`/`execute-phase` returns `gaps_found`; before emitting any `--gaps` routing; and at the top of `/gsd:plan-phase {X} --gaps`.
+
+**Before emitting ANY `/gsd:plan-phase {X} --gaps` routing, the orchestrator MUST:**
+
+- **Report success-criteria status first.** If every ROADMAP success criterion is verified, say so plainly and present *stopping* as a real option — never route to the next round as though it were the only door.
+- **Date the offending code** (`git log --diff-filter=A -- <file>`). Gaps in the current round's own output are a signal to STOP, not to iterate.
+- **Size each fix.** ≤ 1 file / ≤ 10 lines with no schema or API surface is `/gsd:fast` under G-3 — never a round.
+
+**Closing a phase with owed manual UAT rows is legitimate**, and is often the right call — but state it as a DECISION, never as a claim that everything ran. Record the owed rows in the ROADMAP progress row and `STATE.md`, and name which row to run first.
 
 **Orchestrator protocol when a guardrail fires:**
 
@@ -127,12 +261,16 @@ These rules exist because the v2.6 075.x cascade (8 phases on the same streaming
 | `frontend/src/providers/StreamsProvider.tsx` | 068 / 075 / 075.4 / 075.6 / 075.7 (5+) | satisfied (075.7 — 2026-05-24) |
 | `frontend/src/hooks/useMessages.ts` | 063 / 063.1 / 067 / 067.5 / 075.7 (5+) | satisfied (075.7 — 2026-05-24) |
 | `backend/app/services/anthropic_service.py` | 074 / 075 / 075.4 / 075.6 (4+) | G-5 fires — adapter pattern audit due |
+| `frontend/src/components/workflows/WorkflowCanvas.tsx` | 183 (183-06, 183-08, 183-09) / 184 (184-10, 184-12, 184-13) / 185 (185-01, 185-08, 185-10) / 187 (187-08, 187-27) / 188 (188-07) / 188.1 (188.1-03) — **13 plans across 6 phases**, **1593 → 1292 lines**, still the largest workflow file. ⚠ Both figures in this cell were previously wrong and are corrected on measurement (2026-08-06, `git log -- <file>` + `wc -l`): the touch list read *9 plans across 3 phases* and silently omitted **Phase 187 as well as** 188 / 188.1, and the line count read **1574**, which was already stale before this phase opened — the measured pre-move figure is 1593. | **satisfied (188.1 — 2026-08-06).** `185-10` named the seam and 188.1 executed it: `PlaneEditingLayer` now lives in `PlaneEditingLayer.tsx` (268 L) and the exported `EDIT_AFFORDANCE` geometry table in `editAffordance.ts` (164 L), as a verbatim move measured at 22 insertions / 323 deletions with Plan 02's captured `AFFORDANCE_SHAPE_BASELINE` still deep-equal, `tsc` unmoved at 33 and `eslint src/components/workflows/` 6 → 5. The live ESM-cycle constraint `185-10` discovered — `WorkflowCanvas` imports `FlowEdge`'s VALUE at module scope for the `edgeTypes` map, so the extracted module must not import back — was **proved, not retired**: it is now enforced by a `?raw` cycle fence in `WorkflowCanvas.test.tsx` with inline positive controls, observed RED against a deliberate back-import, rather than by this prose. Note the file is still the largest in the tree at 1292 L; D5 (extracting the header / notice / bottom regions too) is deferred with its own trigger in `188.1-DEFERRED.md`. |
+| `frontend/src/components/workflows/PhaseNodeCard.tsx` | 184 (184-03, 184-08) / 185 (185-01 the 137-B rebuild, 185-08 docblocks, 185-09 the corner seal) / 188 (188-06 the run-reading arc, +301/−29) / 188.1 (188.1-04 the WR-04 own-guards, +47/−5) / **188.2 (188.2-06 THE CUT, 16 insertions / 499 deletions)** — **8 plans across 5 phases**, **797 → 274 lines**. ⚠ Two corrections on measurement (2026-08-07, `git log --oneline -- <file>` + `wc -l`): the cell read *7 plans across 4 phases, 797 lines* and did not yet name 188.2; and `git log` reports **10 commits** against those 8 plans, because 188-06 and 188.2-06 each landed twice. Both figures are defensible — the PLAN count is what this cell quotes, and the commit count is how it was derived, exactly as the `WorkflowCanvas.tsx` row above corrects itself on measurement. | **satisfied (188.2 — 2026-08-07).** The debt named at the 188.1-05 checkpoint was paid by a dedicated refactor phase, and it is recorded here with re-derivable figures rather than an assertion. **All three D-03 numbers, before → after: total `797 → 274` (−65.6 %) · CODE `249 → 100` · BODY (separator → EOF) `427 → 169`.** They come from a named line classifier (blank / comment / code, counting `{/* … */}` JSX comment blocks as comment) which was VALIDATED against the pre-cut file's known `797/518/249/30` before any after-number was trusted — re-run independently in `188.2-07` and reproduced exactly. Re-derive with: `git log --oneline -- <file>`; `wc -l <file>`; `grep -n "── The card ──" <file>` → **106**, so the body is lines 106–274; and the classifier over `git show 95a4c915:<file>` for the before column. **Where the code went — five sibling modules:** `phaseNodeCardContract.ts` (214 L, the six slot-contract types, zero runtime exports), `ownProperty.ts` (86 L, the WR-04 `own<T>()` guard, zero imports), `NodeCornerMarks.tsx` (272 L, the verdict mark + the ⛨ governance seal), `NodeRunOverlay.tsx` (319 L, the status ring + arc + pause chip) and `NodeIconWell.tsx` (167 L, the 3D mark). **⚠ The SUBTREE GREW: 797 → 1332 L, +67.1 % — roughly EIGHT times 188.1's +8 %, and it is stated rather than smoothed** (five new files carry their own headers, imports, props types and wrappers, out of a 797-line file whose prose was already 65 % of it). The card's own docblock carries the same measured figure so the sum cannot later read as a regression. **PROVED, not asserted:** the rendered DOM is byte-identical to the tree as it shipped — three whole-`innerHTML` baselines and three geometry matrices captured on the UNMOVED tree (all five destination modules answered *No such file or directory* at the capture commit) held green with **ZERO re-capture**; all seventeen negative source fences were re-scoped to the six-file subtree BEFORE one line moved, and three of them (`onClick=`, the graph-package scope, `dangerouslySetInnerHTML=`) were driven RED against real plants inside real destination files. The three invariants still bind, and one is now stronger than this cell used to imply: **a third badge is a typecheck error** — asserted NOWHERE before 188.2-01, now mechanically guarded by an `@ts-expect-error` control observed RED at 34 type errors and back at 33; **no focusable control may live inside the card** (the ✕ and ＋ live on the lane), whose leaf walk was driven RED against a planted `<button>` in `NodeCornerMarks.tsx`; and **badge slot 1 is still EMPTY and reserved for 189** (D-12). Deferred with its own trigger in `188.2-DEFERRED.md`: four inline `hasOwnProperty` guards left unconsolidated, and the card's remaining 161 comment lines. |
+| `backend/app/services/harness/phase_types.py` | 091 (091-03, 091-05, 091-08) / 092 (092-07 ×4) / 093 (093-05, 093-09) / 096 (×2) / 098 (098-03) / 099 (099-02 ×2) / 101 (101-05, 101-06) / 101.1 (101.1-03 ×2, -04, -06 ×4, -07) / 102 (102-04, 102-08) / 104 (104-03) / 120 (120-02) / 141 (141-02) / 185 (185-12) / 189 (189-09 the 7th executor, plus the WR-02 fix) — **35 commits across 14 phases** (+1 untagged `fix(ask_user)`), **1918 lines**. ⚠ **Added 2026-08-08 (plan `190-04`) with a correction to the figure that put it here:** `190-RESEARCH.md` § "G-5 hot-file ledger check" said 190 makes *"roughly its 6th substantive touch on `_exec_external_action`'s neighbourhood"*. Measured, that is FALSE in both directions and neither half was inherited — `git log --oneline -G"external_action" -- <file>` returns exactly **2** commits (`b09bb361` created the executor at 189-09; `8aa32de0` was 189's WR-02 fix), so 190 is the **3rd** touch on that neighbourhood and only its **2nd phase**; while the FILE itself is far hotter than the research implied at **35 commits / 14 phases**. Re-derive with: `git log --oneline -- backend/app/services/harness/phase_types.py \| wc -l` → 35; `wc -l` → 1918; `git log --format=%s -- <file> \| sed -E 's/^[a-z]+\(([^)-]+).*/\1/' \| sort -u` for the phase list; and `-G"external_action"` for the neighbourhood count. | **G-5 FIRES ON THE COUNT — extraction due, and deliberately NOT taken in 190.** 14 phases is far past the ≥3 threshold, so the row states the fire rather than explaining it away. It is not honoured in 190 for a measured reason: 190's whole change to this file is **one function** — D-16's `ctx.is_golden_run` send gate plus a delegation to the connector registry — so it adds a call-out, not a concern. The five-plus concerns that make the file big (the emit path, the fill/render path, the ask_user path, the tool-context builders, the seven executors) are inherited from 091-102 and are untouched here. **The row exists so the NEXT phase inherits a measured count instead of re-deriving it — and per G-5, a phase that adds a SECOND concern to this file produces a refactor recommendation first.** The natural seam, named but not taken: one module per executor under `harness/phase_types/`, the same shape the 188.2 card cut used. |
+| `frontend/src/components/workflows/PhaseFormPanel.tsx` | 140 / 183 / 184 / 185 (185-07 mount point only) — 1095 L | **G-5 fired at 185 and was HONOURED BY CONSTRUCTION.** 185 added a mount point, not a feature: measured `git diff --stat` over the whole phase is 23 ins / 6 del, of which 16 ins / 6 del are docblock prose and only **4 insertions reach the render body**. The dial, its refusal and the arming switch all live in `GovernanceSection.tsx`, their own file. Keep this shape — the next surface that needs the panel gets its own component and one gated line. |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature.
 
 ## Project skills
 
-- **Sketch findings for Agentic RAG** (design decisions, CSS patterns, visual direction for the live-execution UX — run-card frame, tool-call panel shape, long-run composition; the Phase 087 workspace panel — panel shell/collapse/mobile, file+diff viewer, ask_user interrupt, chat↔panel seam; the Phase 094 workflow-mode surfaces — harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the Phase 095 chat tool-card unification — the unified status-node rail frame, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons, and the build-once component inventory; AND the Phase 103 Workflow Studio — the requirement-first workflow Builder/authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 document detail panel — the right-side push/split document-detail shell (the shared shell that Phase 117 relationships + Phase 118 classification also inhabit), the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 virtual-folders surfaces — the no-DSL filter/view builder + relative-date control, the saved-Views sidebar group + shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 document relationships — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, masked "no access" row, re-fetch-not-optimistic remove) + the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell; AND the Phase 127 energized Workflow Studio re-skin — the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow, and the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map); AND the Phase 111.1 Settings surfaces — the reusable provider picker with the always-on 🔒 endpoint footer, the weight-not-friction re-embed confirm, the re-embed progress card; AND the Phase 118 auto-classification — suggested-never-moved chips + the dedicated rules surface; AND the Phase 119 governance-health home — signal cards + inline verb fix-rows, page writes nothing; AND the Phase 123/123.1 Trigger Tuner — held-out picks, N-column-configured-targets scoreboards, never-block lint, the real-scale editor lesson; AND the Phase 124 workflow soul + strict/loose two doors; AND the Phase 128 cross-provider chat polish — single-source provider logos, two elapsed-status homes, the user-prompt clamp; AND the Phase 137 Skill Studio — the focused Evals·Triggering·Versions surface, the lifecycle stepper, the expandable honest run rows, the immutable version table + compare; AND the Phase 137.1 eval production-clean — the grouped matrix card with one gate-feeder + history aggregation + deterministic analyst notes, the thin determinate unit bar + inline advisory case feedback, and the Settings engine-health tile board + judge-model knob; AND the Phase 146–148 Operator Control Room — the operator band+tabs shell with honest locks + the ⌥ Technical-names two-audience reveal, the always-on audit-ledger receipt vocabulary (✎ writes, consequence ≠ receipt) + the graded action-guards rule (victim-naming sheet / arm-to-confirm / direct flip), the pinned-vitals Control Plane (dependency health, active-runs-with-Kill, kill-switch grid + spatially-separated maintenance), the two-ledger audit browser (chip filters + recorded CSV), the users roster (last-active honesty, victim-naming disable, flagged operator grant), and the API-enforced feature-visibility audience map with the extensible-audience forward-compat contract) → `Skill("sketch-findings-agentic-rag")`. Auto-load when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI or its phase timeline, the workflow Builder/authoring, the publish gauntlet (its energized pip-strip + worded verdict), the live phase spine (PhaseCard/PhaseTimeline), provider/model logos anywhere or the icon convention, the Workflows page, the workflow run surface + its meaningful steps, the app navigation/IA, the composer, the document detail panel / ConfidenceChip / inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section + create-link typeahead picker, any Settings model picker / the engine-health card / the re-embed lifecycle, the classification suggestion or rules surfaces, the governance-health page, the Skill Studio (EvalsTab/TriggeringTab/VersionsTab, LifecycleStepper, RunBar, RunHistory, RunCaseDetail), the Trigger Tuner internals or any per-provider scoreboard, matrix runs / eval progress / judge case_feedback, any `/admin` Control-Room surface (OperatorBand, ControlRoomPage, HealthSignals, ActiveRunsSection, CapabilityGrid, MaintenancePanel, AuditTab, the users roster, the feature-visibility map) or any operator confirm-sheet / audit receipt / kill-switch / destructive-action guard, or any chat-surface component touching the agent's mid-execution moment.
+- **Sketch findings for Agentic RAG** (design decisions, CSS patterns, visual direction for the live-execution UX — run-card frame, tool-call panel shape, long-run composition; the Phase 087 workspace panel — panel shell/collapse/mobile, file+diff viewer, ask_user interrupt, chat↔panel seam; the Phase 094 workflow-mode surfaces — harness phase timeline, unified Deep/Harness execution surface, run honesty, 2-pill composer + mode clarity, Workflows page, NL workflow builder; the Phase 095 chat tool-card unification — the unified status-node rail frame, the never-vanishes run-status strip + follow-but-release scroll, the output-files hero/working split + per-extension file icons, and the build-once component inventory; AND the Phase 103 Workflow Studio — the requirement-first workflow Builder/authoring + read-only vertical phase-spine graph + side-panel forms, the 8-stage publish gauntlet with the judge hard-wall, the built Workflows page library+launch, the workflow run surface where the panel owns the meaningful phase spine + chat carries a thin run receipt, and the three-homes app navigation/IA contract; AND the Phase 112 document detail panel — the right-side push/split document-detail shell (the shared shell that Phase 117 relationships + Phase 118 classification also inhabit), the per-field ConfidenceChip, and honest inline metadata editing; AND the Phase 114 virtual-folders surfaces — the no-DSL filter/view builder + relative-date control, the saved-Views sidebar group + shared Folders+Views NavRow / folder-tree polish, and the Documents-page composition/layout; AND the Phase 117 document relationships — the chip-led grouped-by-direction relationships accordion added to the existing detail panel (outgoing/incoming inverse labels, masked "no access" row, re-fetch-not-optimistic remove) + the type-first searchable-typeahead create-link picker on the MoveToFolderDialog shell; AND the Phase 127 energized Workflow Studio re-skin — the publish-gauntlet pip/energy-spine + worded verdict + raw-on-demand, the quiet-idle/alive-active live step-flow, and the cross-cutting ICON CONVENTION (provider/model icons = single-source @lobehub/icons everywhere; phase-type icons = the shared 3D PHASE_GLYPHS map); AND the Phase 111.1 Settings surfaces — the reusable provider picker with the always-on 🔒 endpoint footer, the weight-not-friction re-embed confirm, the re-embed progress card; AND the Phase 118 auto-classification — suggested-never-moved chips + the dedicated rules surface; AND the Phase 119 governance-health home — signal cards + inline verb fix-rows, page writes nothing; AND the Phase 123/123.1 Trigger Tuner — held-out picks, N-column-configured-targets scoreboards, never-block lint, the real-scale editor lesson; AND the Phase 124 workflow soul + strict/loose two doors; AND the Phase 128 cross-provider chat polish — single-source provider logos, two elapsed-status homes, the user-prompt clamp; AND the Phase 137 Skill Studio — the focused Evals·Triggering·Versions surface, the lifecycle stepper, the expandable honest run rows, the immutable version table + compare; AND the Phase 137.1 eval production-clean — the grouped matrix card with one gate-feeder + history aggregation + deterministic analyst notes, the thin determinate unit bar + inline advisory case feedback, and the Settings engine-health tile board + judge-model knob; AND the Phase 146–148 Operator Control Room — the operator band+tabs shell with honest locks + the ⌥ Technical-names two-audience reveal, the always-on audit-ledger receipt vocabulary (✎ writes, consequence ≠ receipt) + the graded action-guards rule (victim-naming sheet / arm-to-confirm / direct flip), the pinned-vitals Control Plane (dependency health, active-runs-with-Kill, kill-switch grid + spatially-separated maintenance), the two-ledger audit browser (chip filters + recorded CSV), the users roster (last-active honesty, victim-naming disable, flagged operator grant), and the API-enforced feature-visibility audience map with the extensible-audience forward-compat contract; AND the Phase 185 Graded Governance surfaces — the detected-and-one-way grounding dial (the switch that visibly refuses + the “you can only undo a lock you created” rule), the shape-only canvas seal whose CORNER MARK is load-bearing (top-right of the card is claimed; governance spends no colour and no third badge), the binding “must prove it” vocabulary, the armed-on-by-default action-risk checkpoint, the review moment where the document IS the surface with backing marked inside it, and the one-place canvas↔review↔canvas round trip; AND the Phase 187 node-vocabulary + AI-seed surfaces — the layered node-face ladder (author name → config-derived → type sentence, computed never stored), the ⌥ Technical-names reveal that swaps the SUBTITLE not the title, the single-shot AI-seed arrival + its seed receipt that makes auto-applied grounding legible, and the template door that seeds the describe box rather than opening a second forward path; PLUS the canvas glyph vocabulary in `references/icon-convention.md` §4 — read it before drawing any canvas mark) → `Skill("sketch-findings-agentic-rag")`. Auto-load when building or refactoring ToolCallPanel, RunCard, StreamsProvider, MessageItem, MessageList, OutputFileCard, useMessages, the workspace panel, the harness/workflow run UI or its phase timeline, the workflow Builder/authoring, the publish gauntlet (its energized pip-strip + worded verdict), the live phase spine (PhaseCard/PhaseTimeline), provider/model logos anywhere or the icon convention, the Workflows page, the workflow run surface + its meaningful steps, the app navigation/IA, the composer, the document detail panel / ConfidenceChip / inline metadata editing, the documents-page right-side panel, the metadata filter/view builder, the saved-Views sidebar + folder tree (FolderNode/FolderTree NavRow), the document relationships panel section + create-link typeahead picker, any Settings model picker / the engine-health card / the re-embed lifecycle, the classification suggestion or rules surfaces, the governance-health page, the Skill Studio (EvalsTab/TriggeringTab/VersionsTab, LifecycleStepper, RunBar, RunHistory, RunCaseDetail), the Trigger Tuner internals or any per-provider scoreboard, matrix runs / eval progress / judge case_feedback, any `/admin` Control-Room surface (OperatorBand, ControlRoomPage, HealthSignals, ActiveRunsSection, CapabilityGrid, MaintenancePanel, AuditTab, the users roster, the feature-visibility map) or any operator confirm-sheet / audit receipt / kill-switch / destructive-action guard, any per-node grounding/governance surface or refusal copy, any approval / human-review checkpoint or the artefact-preview matrix, the workflow run surface and how a run relates to chat, or any chat-surface component touching the agent's mid-execution moment.
 
 ## graphify
 

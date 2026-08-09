@@ -1,290 +1,179 @@
 # Pitfalls Research
 
-**Domain:** Adding an operator/admin tier + secrets/model-registry management + run-time file-input surfaces + plain-language/citation UX to a mature, single-service-role, multi-provider RAG platform (v3.3 Operator UX)
-**Researched:** 2026-07-10
-**Confidence:** HIGH (grounded in the live codebase — `dependencies.py:19` service-role client, `template_render_service.py` provenance boundary, `user_settings.py` secrets-in-DB, `config.py` model registry + `model_capabilities_overrides` read path — cross-checked against SEED-024/078/104/108 and the four project landmines in the milestone brief). MEDIUM on the generic file-security facts (SSTI / zip-bomb / path-traversal), which are well-established and verified against this codebase's own existing defenses.
+**Domain:** Adding a drag-and-drop / no-code visual authoring canvas + non-technical run observability + external connectors ON TOP of an existing governed, multi-tenant harness workflow engine (v3.6 Visual / No-Code Workflow Studio)
+**Researched:** 2026-07-24
+**Confidence:** HIGH on the governance / round-trip / revert / connector pitfalls (grounded in the actual `WorkflowDefinition` model, `lint_workflow`, `publish_service`, and the org/RLS + secrets code); MEDIUM on competitor-specific patterns and React-Flow scale thresholds (WebSearch-verified, not measured in this repo).
 
-> **Scope note.** These are pitfalls specific to ADDING these features to *this* system, not a generic security checklist. Every prevention names a real file/seam and an owning phase-track. Generic "admin panels are risky" advice is omitted. Where a defense already exists in the codebase, the pitfall is the *regression risk* of the new surface breaking it — not re-deriving the defense.
+> **Framing.** This milestone is *not* building a workflow engine — the engine (locked ordered phases, per-phase `available_tools` whitelist, closed-registry validation gates, the 8-stage publish gauntlet with the `llm_judge` hard-wall, per-version immutable definitions) already exists and is trusted. The whole risk surface is the **new layer**: a visual editor that produces the *same* `WorkflowDefinition` JSON, a run view for people who can't read the developer timeline, a feature flag that must revert to *exactly today*, and connectors that reach outside the box. Every pitfall below is about that seam, not about generic React/FastAPI hygiene.
 
-> **Phase-track legend (v3.3 roadmap isn't created yet — this research feeds it). The four milestone tracks map to these working labels:**
-> - **P-ADMIN** — operator role tier + `/admin` shell + impersonation + role-gated visibility (Track 2; SEED-012/095/099). **Must land FIRST** — the `require_operator` boundary that every other write-UI sits behind.
-> - **P-KILL** — kill-switch / maintenance-mode / feature-flag control plane (Track 2; SEED-078).
-> - **P-REGISTRY** — dynamic model registry + live `/models` discovery (Track 3; SEED-088/040).
-> - **P-SECRETS** — settings unification + secrets hardening (Track 3; SEED-024).
-> - **P-FILE** — run-time template upload (SEED-110) + per-workflow KB folder-scope (SEED-112) + RAG→sandbox original-bytes bridge (SEED-108) (Track 1).
-> - **P-ATTACH** — agent-driven skill file attachment, a WRITE-capable tool (Track 1; FILE-01 / SEED-104).
-> - **P-INSTALL** — install wizard + Solo/Team/Enterprise presets (Track 3, STRETCH; SEED-003).
-> - **P-UX** — plain-language relabel (SEED-085) + inline citation attribution (SEED-033) + a11y (SEED-092).
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: The service-role client is the ONLY isolation gate — `/admin` routes have no RLS backstop
+### Pitfall 1: The canvas becomes a second, drift-prone rule engine (governance fork)
 
 **What goes wrong:**
-A new `/admin` route (user list, audit browser, "view this user's threads") ships with a role decorator but a missing or wrong `.eq("user_id", …)` filter, and silently returns *every* user's data. Teams assume "RLS will catch a cross-user query." On this backend it will not.
+The natural way to give a business user "live in-canvas validation" ("you can't connect these two nodes", "this phase needs an approval before it can publish") is to re-implement the rules in TypeScript on the client so the UI can grey out invalid moves instantly. Within one or two phases the client rules and the server's real gate (`lint_workflow` + the `WorkflowDefinition` strict model + the publish gauntlet) drift. The canvas then either (a) blocks a flow the server would happily accept (frustrating), or worse (b) *permits* a flow the server rejects only at publish — so the "can't draw an invalid workflow" promise is a lie, and a business user hits a wall of developer-jargon gauntlet errors after 20 minutes of drawing.
 
 **Why it happens:**
-`get_supabase()` builds the client with `settings.supabase_service_role_key` (`backend/app/dependencies.py:19`). **The entire backend already bypasses Postgres RLS.** Per-user isolation today is enforced purely by explicit application-layer `WHERE user_id = current_user.id` filters in each route. RLS policies exist in the schema but only bite the frontend's anon-key path and Realtime — never the FastAPI service path. So an `/admin` route that *intends* to read across users has zero database-level backstop: the WHERE clause plus the role check ARE the entire boundary.
+Round-trip latency. Developers want instant feedback on the canvas, the real validators are Python (`reachability.py`, `publish_service.py`, `workflow_authoring._check_grounding_fidelity`), and calling the server on every node drag feels heavy. So they port "just the easy rules" to the client and it snowballs.
 
 **How to avoid:**
-Treat every `/admin` route as "one typo from a full-tenant leak." (1) A single `require_operator` FastAPI dependency, default-deny, applied at the router level — not per-handler. (2) Cross-user reads go through a *small, reviewed* set of operator query helpers, never ad-hoc `.select()` in the handler. (3) Add a test that hits every `/admin` route with a normal user's JWT and asserts 403. (4) Do NOT rely on adding real per-user Postgres RLS as the fix now — that's the v3.4 rewrite (Pitfall 3); in v3.3 the discipline is explicit, audited, reviewed WHERE clauses.
+- **One source of structural truth, reused — never re-authored.** `lint_workflow()` (`backend/app/services/harness/reachability.py`) is already a *pure, I/O-free* function returning typed `LintError`s (orphan / unsatisfiable-skip / no-terminal / bad-index / input-unsatisfied). Expose it behind a stateless `POST /workflows/validate` (draft-in → `LintError[]` + the `WorkflowDefinition.model_validate` result out). The canvas calls THAT — debounced (~300–500ms) — and renders the errors on the offending nodes. The client owns *presentation* of errors, never their *definition*.
+- **Whitelist / grounding checks stay server-side too.** The `available_tools` per-phase whitelist, the folder-scope ⊆ project-subtree assertion, and skill_ref membership already live server-side in `_check_grounding_fidelity` (T-103-02-03, "KB content can never whitelist itself"). The node config panel must offer tools/skills/folders from a **server-provided grounding bundle** (the same one NL authoring assembles in `_assemble_grounding`), not a client-hardcoded list — otherwise a business user can type a tool name the whitelist would reject.
+- **Distinguish the three validation tiers and surface all three in-canvas, but compute all three on the server:** (1) *shape* = `WorkflowDefinition.model_validate` (`extra="forbid"`), (2) *structure* = `lint_workflow`, (3) *publishability* = the gauntlet's cheap pre-run stages (business_requirement present, no unvalidatable interactive phase). Only the golden-run + judge stages stay publish-time (they cost a real LLM run).
+- **The canvas can only emit the closed vocabulary.** Nodes map to the 6 `phase_type` literals and the 9 `ValidatorSpec.kind` literals — both LOCKED sets. The palette is generated FROM those literals, so a new node type is impossible to draw unless the model gains a member.
 
 **Warning signs:**
-An `/admin` handler with a raw `.select("*")` and no user scoping; an endpoint that returns data for a normal-user JWT; a code review that says "RLS protects this."
+- A `validate`-like function appears in `frontend/src/` that enumerates phase types or tool names.
+- The canvas shows a node as "valid" but publish returns a `lint`-stage or `definition_invalid` block.
+- Grounding lists (tools/folders/skills) are imported from a frontend constant instead of fetched.
 
-**Phase to address:** P-ADMIN (build the `require_operator` boundary before any operator query lands).
+**Phase to address:** In-Canvas Governance phase (the shared-validator endpoint), landed *before* any node vocabulary or free editing. This is the load-bearing phase of the milestone.
 
 ---
 
-### Pitfall 2: Impersonation that mints a real victim session or drops the operator's identity from the audit trail
+### Pitfall 2: The flag-off state is not byte-identical to today (the revert gate is a lie) — HARD GATE #1
 
 **What goes wrong:**
-"View as user" is implemented by minting the target user's Supabase JWT (or by swapping `current_user.id` mid-request). Every downstream write — `audit_log`, `messages`, `documents`, settings — is then attributed to the *impersonated* user, not the operator. You permanently lose "operator X acted as user Y," which is exactly the record an insider-abuse or support investigation needs. Worse, a minted victim session over the service-role backend can do anything the victim can, with no dual-control.
+Operator HARD requirement #1 is: flip the flag → land on *exactly* today's behavior, as a **tested** acceptance gate. The common failure is a flag that hides the new *UI* but leaves behind non-revertible residue: a schema migration that's `NOT NULL` or changes an existing column, a new required field on `WorkflowDefinition` that makes old published rows fail `model_validate`, a route that's always mounted, or an accidental edit to the two existing authoring doors ("Describe & run" / "Author & govern") or to `PhaseTimeline`/`PhaseCard`/the run surface. Now "flag off" is a *different* system than v3.5, and the revert is unsafe precisely when you need it (something broke).
 
 **Why it happens:**
-Supabase Auth makes it easy (`auth.admin.generateLink`, service-role token minting), and "just become the user" is the shortest path to a working demo. The audit gap is invisible until someone asks "who did this?"
+Feature flags are treated as a UI-visibility toggle, not a system-state contract. Migrations feel unrelated to "the flag". And the existing surfaces (`WorkflowBuilderPage`, `PhaseSpineGraph`, `PhaseTimeline`) are shared code — a "small improvement" while you're in there silently changes the flag-off baseline.
 
 **How to avoid:**
-Impersonation is a **dual-identity, read-mostly** server context: the request carries `actor_id = operator` AND `subject_id = target_user`, and BOTH are stamped into `operator_audit_log` on every action. Never mint the target's real session. Default impersonation to read-only; any write-as-user requires a second explicit confirmation and is logged as `operator_acting_as`. Put a persistent, un-dismissable "You are viewing as <user>" banner in the UI so an operator can't forget they're impersonating.
+- **Additive-only, nullable-only schema — the model already proves the pattern.** Every field added to `WorkflowDefinition` since v2.9 (`project_folder_id`, `inputs`, `assets`, `business_requirement`, `category`) is `X | None = ...` specifically so "old JSONB rows `model_validate()` to defaults" (the zero-migration lock comment in `harness.py`). New canvas metadata (node positions, layout) MUST follow the identical additive-optional rule, and must NEVER be a field the *engine* reads. If a migration isn't a pure additive nullable column, it does not ship in this milestone.
+- **Flag-gate at every layer, not just the render.** The flag lives in `app_settings` (the established pattern — `tool_dispatcher` reads `getattr(load_app_settings(), flag_attr)`; MODEL-02 `llm_model_locked` is the precedent). New routes (`/workflows/validate`, canvas save, connector CRUD) must 404/refuse when off (the `require_operator` byte-identical-404 pattern from Phase 146 is the model). The composer/nav entry point hides. The engine path is untouched either way.
+- **Make revert a real test, not a claim.** Author a `test_revert_byte_identical` gate: with the flag OFF, (1) the two existing authoring doors render and function identically to a captured v3.5 baseline, (2) an existing published workflow still runs and produces the same deliverable, (3) `GET /workflows` and the run surface return the same shapes, (4) the new routes 404. This is the milestone's acceptance gate — it runs in CI and is re-run live at milestone close.
+- **Treat the existing doors + run surface as frozen contracts.** Any diff to `WorkflowBuilderPage`, `PhaseSpineGraph`, `PhaseTimeline`, `PhaseCard`, or the run surface must be *additive behind the flag* (a new prop defaulting to today's behavior), never a rewrite. G-5 hot-file audit at discuss-phase catches this.
 
 **Warning signs:**
-Audit rows during impersonation show only the victim's id; there's a code path that generates or returns a token for another user; impersonation grants write with no distinct log action.
+- A migration in this milestone is anything other than `ADD COLUMN ... NULL` / a new table.
+- The revert story is described in prose ("just turn it off") but no test asserts it.
+- A PR touches `PhaseTimeline.tsx` or the run surface without a flag guard.
+- Old published workflows 500 or 422 on load after a definition-model change.
 
-**Phase to address:** P-ADMIN.
+**Phase to address:** Revert Foundation phase — the FIRST phase of the milestone. The flag, the layered gating, and the `test_revert_byte_identical` gate ship before any canvas work, so every subsequent phase inherits a proven off-switch.
 
 ---
 
-### Pitfall 3: Modeling the operator role in a shape that poisons the v3.4 multi-tenancy RLS rewrite (one-way door)
+### Pitfall 3: Lossy / corrupting canvas↔definition round-trip (layout data poisons the immutable definition)
 
 **What goes wrong:**
-v3.3 adds the operator tier as an `is_admin` boolean on the user row, or as "a user who belongs to a special org." Then v3.4 — the multi-tenancy RLS rewrite across ~18 tables, the highest-risk apply the platform will ever do — has to special-case the operator inside every new org-scoped policy, or unwind the boolean. The role model chosen in v3.3 is a one-way door the milestone brief explicitly flags.
+The canvas needs per-node x/y positions, zoom, edge waypoints, collapsed/expanded UI state. The tempting shortcut is to stuff that layout blob *into* the `WorkflowDefinition` JSONB (it's already JSON, it's right there). Two failures follow: (1) `extra="forbid"` on `_StrictBase` **rejects** unknown keys, so either the save 422s or someone relaxes `extra` and blows the injection guard (T-090-01); (2) if layout is co-mingled, then a pure cosmetic drag (moving a node 3px) mutates the *definition* → creates a new version → triggers the golden-run gauntlet, and the immutability/version story becomes meaningless. The inverse loss also happens: importing a definition authored by NL or the existing doors (which have NO layout) into the canvas produces overlapping nodes at 0,0 because there's no layout to round-trip.
 
 **Why it happens:**
-The SYSTEM operator (super_admin / operator — governs the deployment) and the future ORG roles (owner/admin/member/viewer — govern a tenant's data) *feel* like the same "roles" feature, so they get one table/column. D-PRD-14 already distinguishes them; it's easy to collapse under time pressure.
+"It's all JSON" conflates two things with opposite lifecycles: the **governed definition** (validated, versioned, immutable-on-publish, engine-consumed) and **presentation layout** (cosmetic, per-user, freely mutable, never engine-read). React-Flow's own `toObject()` returns nodes+edges+viewport as one blob, which nudges you toward storing it whole.
 
 **How to avoid:**
-Model the SYSTEM operator as a **separate principal**, orthogonal to org membership — a distinct `operator_users` table keyed to the auth user, with deployment-global scope and no dependence on `org_id`. Ship cheap `org_id` stub columns where the brief calls for them, but the operator's *identity and authority must not be expressed through org shape*. Write down the invariant: "an operator is not a user-in-an-org; the v3.4 RLS policies will scope *users* by org and leave the operator principal untouched."
+- **Two columns, never one.** Definition stays in `workflow_definitions.definition` (untouched, engine-owned). Layout goes in a *separate* additive nullable column or side table (`workflow_layouts`, keyed by definition id + optionally user id) that the engine never reads and `lint_workflow` never sees. A layout write does not bump the definition version.
+- **The definition is the source of truth for graph *topology*; layout only positions it.** Nodes/edges the canvas shows are *derived from* `phases[]` + the `phase_index` sequential edges + parsed `skip_to_phase:<slug>` edges (exactly the edge set `reachability.py` already builds — reuse that adjacency logic so the canvas and the linter agree on what an edge IS). Deleting a canvas edge maps to editing a `skip_to_phase` disposition or a phase; it can never create a topology the linter doesn't understand.
+- **Deterministic auto-layout for definitions with no saved layout** (NL-seeded drafts, the existing doors, imported starters). A layout algorithm (e.g. dagre/elk vertical spine, mirroring today's `PhaseSpineGraph`) runs when `workflow_layouts` has no row — so every definition opens cleanly in the canvas whether or not it was born there.
+- **Round-trip test as a gate:** `definition → canvas model → definition` must be byte-identical on the definition half for every one of the 4 canonical seed shapes + the PM pack. Layout round-trips separately and is allowed to be absent.
 
 **Warning signs:**
-An `is_admin`/`role` column on the `users`/`user_settings` table; operator permission checks that read org membership; any place the operator's authority is derived from what org they're in.
+- `extra="forbid"` is relaxed on any harness model, or a `position`/`x`/`y`/`layout` key appears inside `definition`.
+- Moving a node creates a new `workflow_definitions` version or re-arms the publish gauntlet.
+- Opening an NL-authored or starter workflow in the canvas shows stacked nodes at the origin.
 
-**Phase to address:** P-ADMIN (schema shape locked here; verified against the v3.4 RLS plan).
+**Phase to address:** Canvas↔Definition Round-Trip phase (the serialization contract + auto-layout), immediately after the Revert Foundation and alongside/just-before In-Canvas Governance.
 
 ---
 
-### Pitfall 4: A new run-time template-upload path that breaks the existing provenance→engine security boundary (SSTI)
+### Pitfall 4: Dishonest run observability — "done" when a gate failed, or nodes mapped to the wrong events
 
 **What goes wrong:**
-SEED-110 turns template upload from v2.9's one-run ephemeral into a repeatable run-time input. A new upload handler infers the fill engine from file *content* or *extension*, or a "save this run's template to my library" feature promotes an uploaded file to a trusted `AssetRef` — and an untrusted upload reaches the Jinja/`docxtpl` engine. Now a user-supplied `{{ ''.__class__.__mro__[1].__subclasses__() }}` payload executes server-side template injection inside the render.
+The non-technical run view is meant to show "which node is active, inputs/outputs, gate pass/fail" in plain language. The failure modes: (a) the friendly view collapses a `gate_failed` / `run_failed` into a green "done" checkmark because it only listens for `phase_completed`; (b) it maps a `phase_transition` or a sub-agent's events onto the wrong node (the harness fans out `llm_batch_agents` and spawns sub-agents — those emit on a *producer* stream, keyed differently from the workflow `run_id`); (c) on browser reconnect it replays a stale Realtime snapshot and shows a run as "still on step 2" when it actually failed at step 4 minutes ago. For a business user who *trusts* the pretty view, a dishonest "done" is worse than a raw log — they ship a broken deliverable believing a gate passed.
 
 **Why it happens:**
-The existing defense is *structural but invisible*: `select_engine()` in `backend/app/services/template_render_service.py:936` routes by **provenance, not content** — `kind='template_input'` (untrusted) → `run_replace` (non-Jinja, scalar-only), a library `AssetRef` (trusted) → `docxtpl`/Jinja, with a hard `assert engine != "docxtpl"` on the untrusted branch (D-02). A new code path that doesn't stamp `kind='template_input'`, or that promotes uploads into the library, silently defeats it. `SandboxedEnvironment(autoescape=True)` is defense-in-depth, not the primary control.
+The engine's event vocabulary is honest and specific (`phase_started`, `phase_transition`, `phase_completed`, `gate_passed`, `gate_failed`, `run_failed`, plus `delta`/`sources`/`citations`), and it deliberately **never emits `phase_completed` for a failed emit phase** (WR-01). But a "simplified" UI that only subscribes to the happy-path events *loses the failure signal by omission*. And Realtime is a best-effort hint (D-v2.5-03), so a naive UI that trusts the last pushed event lies on reconnect.
 
 **How to avoid:**
-Every run-time upload is stamped `kind='template_input'` at the ingress boundary and can *only* route to `run_replace`. Library promotion (upload → reusable trusted template) is NOT an implicit provenance carry — it must be an explicit author/review action that re-stamps provenance deliberately. Add a test that feeds a Jinja-payload upload and asserts it renders literally (never evaluates) and that `select_engine('template_input')` can never return `docxtpl`.
+- **Model the friendly node state as a total function over the FULL event set, not a happy-path subset.** Each node is exactly one of `pending / active / passed / failed / skipped / waiting-for-you`. A node is `passed` ONLY on `phase_completed`; `gate_failed` → `failed`; `run_failed` → the active node `failed` and downstream `skipped`; `llm_human_input` pause → `waiting-for-you`. No event → stays `pending`. Never infer success from absence.
+- **Reconcile on (re)connect — the standing rule.** D-v2.5-03: Realtime is a hint, the fetch is truth. On mount/reconnect, fetch the authoritative run+phase state (the `run:{run_id}` Redis Stream supports replay-and-tail per run_id, Phase 061+) and rebuild node states from that, THEN attach the live tail. The run surface already does this — the friendly view must not invent a new, hint-trusting path.
+- **Map events by keying, correctly, once.** Sub-agent / batch-fan-out events ride the producer stream; the friendly view subscribes to the workflow `run_id` phase events and shows aggregate progress ("Reviewing 5 documents…"), NOT individual sub-agent chatter mis-attributed to a node. Build the node↔event map in ONE place with a test per event type.
+- **Honesty over prettiness is a design contract, not a nicety.** Reuse the run-honesty lessons already banked (174 run-state honesty, 095 never-vanishes run-status strip). A failed gate must be *visibly* failed in plain language ("The approval step didn't pass — here's why"), with a reveal to the raw named-failures for whoever wants them.
 
 **Warning signs:**
-Any engine selection keyed off extension/MIME/content; a "save to library" that copies the upload's provenance; a new render entry point that imports `docxtpl`/`jinja2` for an upload path.
+- The friendly view only has handlers for `phase_started` / `phase_completed`.
+- A run shows all-green but the deliverable is missing or the publish/run audit says `gate_failed`.
+- Reconnecting mid-run shows a different (earlier) state than a fresh page load.
+- Sub-agent deltas appear as node status changes.
 
-**Phase to address:** P-FILE.
+**Phase to address:** Non-Technical Run Observability phase, after the round-trip + governance phases (it needs the node↔phase mapping those establish). G-2 sketch-first applies (it's a live "feels like" surface).
 
 ---
 
-### Pitfall 5: File-upload surface trusts MIME/extension → zip bombs, decompression bombs, path traversal, oversized files
+### Pitfall 5: Autosave version explosion + multi-user edit clobber on a shared workflow
 
 **What goes wrong:**
-`.docx`/`.pptx`/`.xlsx` are ZIP containers. A malicious "template" is a renamed executable, a zip bomb (a few KB that decompresses to GB), or carries entries with `../../` paths. The template-variable parser opens `zipfile.ZipFile(io.BytesIO(data))` on the raw bytes (`template_render_service.py:381`), and the sandbox render unzips it again — a crafted archive OOMs the worker or (if any code extracts to a path derived from an entry name) writes outside the intended directory.
+A drag canvas invites continuous autosave. If every autosave writes a new `workflow_definitions` row/version, the version table explodes and the immutability semantics blur (which version is "the" draft?). Separately, v3.4 shipped org-shared workflows — two people in the same org can now open the *same* workflow. With last-write-wins PATCH (the current `updateWorkflowDraft` model, single-author), user B's save silently overwrites user A's edits, or an in-flight publish golden-run reads a half-saved draft.
 
 **Why it happens:**
-Extension/MIME are attacker-controlled and easy to trust. `zipfile` will happily open a bomb; the decompression ratio isn't checked unless you check it. This isn't hypothetical here — the platform already hit real OOM on legitimate large files (the thesis-PDF `MemoryError` in the PyMuPDF subprocess, PROJECT.md Phase 071.2).
+The existing Builder is single-author, describe-first, save-on-edit — it was never designed for continuous autosave or concurrent editors. The org-shared scope (`is_org_shared`) is new underneath it. `publish_definition` already had to add a `status='draft'` WHERE-guard to survive a concurrent double-publish race (WR-03) — that same class of race now applies to *editing*.
 
 **How to avoid:**
-At the upload boundary: (1) validate magic bytes, not extension; (2) hard-cap raw file size; (3) before extract, cap total *uncompressed* size and compression ratio (reject > ~100:1); (4) reject any zip entry whose normalized path is absolute or escapes the target dir; (5) cap member count. The existing parser already fails *safe* on a corrupt zip (returns `None`, never crashes) — extend that posture to *malicious* zips, not just malformed ones.
+- **Draft edits mutate ONE draft row in place; versions are minted only at publish.** The model already works this way — `publish_definition` flips draft→published and returns the new version; a Tweak forks a fresh v(N+1) *draft*. Autosave PATCHes the single draft row (debounced), it does NOT create versions. Layout autosave is even cheaper (separate table, Pitfall 3).
+- **Optimistic concurrency on the draft row.** Add a `revision`/`updated_at` token; a PATCH carries the token it read and the server rejects a stale write (409 → the client reloads and re-applies). This is the edit-time analog of the WR-03 publish guard. For v3.6, "second editor gets a soft lock / read-only + a 'someone's editing' banner" is an acceptable first cut; silent clobber is not.
+- **Never publish a dirty draft.** The publish path must snapshot/read the persisted draft, and the golden run must not race an in-flight autosave (reuse the draft-status guard).
 
 **Warning signs:**
-`zipfile.ZipFile(untrusted_bytes)` with no prior size/ratio guard; extraction to `os.path.join(dir, entry.filename)` without path normalization; upload accepted purely on `content-type`.
+- `workflow_definitions` row count grows on every keystroke/drag.
+- Two testers editing one org-shared workflow lose each other's changes.
+- A publish golden-run occasionally validates a definition that doesn't match what the author sees.
 
-**Phase to address:** P-FILE.
+**Phase to address:** Concurrency & Autosave phase (draft-in-place + optimistic token + soft lock), bundled with or immediately after the Round-Trip phase. Its UAT MUST include a parallel-thread / two-editor row (the SC#10 parallel axis is exactly this class of bug).
 
 ---
 
-### Pitfall 6: The RAG→sandbox file bridge (SEED-108) as a cross-user exfiltration / RLS-scope hole
+### Pitfall 6: SSRF, credential leakage, and cross-tenant credential bleed from user-wired connectors — HARD REQ #3
 
 **What goes wrong:**
-A `fetch_document_file` tool that copies a KB document's original bytes into the sandbox resolves `documents.file_path` and streams Storage bytes **without re-applying the owner/global scope that `read_document` uses** — so an agent (steered by prompt injection in a shared document) fetches another user's file by id. Or the materialized confidential file is written out to the `sandbox-outputs` bucket and surfaced as a downloadable output card, exfiltrating it. Or a large file streamed into the container OOMs it.
+The moment a business user can type a URL (webhook target, "call this API", email/JIRA endpoint) or wire a connector, four classic no-code holes open: (1) **SSRF** — the user (or an attacker who compromised a low-priv account) points a connector at `http://169.254.169.254/…` (cloud metadata), `http://localhost:8000` (our own backend), or an internal service, and the *server* fetches it with server credentials; (2) **credential leakage in run logs / the friendly run view** — an OAuth token or API key echoed into a `delta`/output and shown to the user or persisted in `harness_audit`; (3) **cross-tenant credential bleed** — a connector credential stored without org scoping, so an org-shared workflow run resolves *another org's* token; (4) **data exfil** — a business user wires an untrusted external endpoint and the workflow POSTs the org's KB contents to it. n8n shipped a real CVE where SSRF protection *only applied when a credential was attached* — the exact "we half-protected it" trap.
 
 **Why it happens:**
-The backend is service-role (Pitfall 1), so the Storage read has no DB-level owner check — the tool must re-implement the scope check that `_handle_read_document` already applies (`tool_dispatcher.py:237`). SEED-108 flags all three: RLS scope, size/streaming, and that the *write* direction (`copy_from_runtime`) already exists so the exfil path is one hop away. Sandbox sessions are cached per-thread (CLAUDE.md), so a mis-keyed cache could also leak a materialized file across threads.
+Connectors are the app's first outbound-to-arbitrary-URL surface (today ingestion is manual upload only, "no connectors or automated pipelines" — CLAUDE.md). All prior egress is to known providers via the gateway. The threat model for *user-supplied destinations* is brand new, and the multi-tenant + secrets-at-rest machinery (org RLS, Fernet `enc:v1:`) exists but was built for provider keys, not per-connector per-org credentials.
 
 **How to avoid:**
-The bridge tool reuses the **same** owner/global resolver as `read_document` — centralize it so the two can't drift. Cap bytes and stream to disk (never into model context — SEED-108 already specifies this). Key the materialization path by `user_id` + `thread_id` so a cached sandbox session can't serve another owner's file. Treat "materialize KB file" as read-scoped exactly like `read_document`; never widen it to global. SC#10 applies (new tool on the agent loop) — prove all four providers call it correctly and none leak cross-user.
+- **Answer the own-framework-vs-Open-Platform question FIRST, on security grounds.** SEED-013 already frames connectors (REST API + MCP + service accounts + webhooks) with a security posture (per-consumer rate-limit, org-aware permissions as a hard B2B prerequisite, "a service account that can read another org's KB is a customer-loss event"). Building a *second, bespoke* connector framework in the canvas milestone means threat-modeling egress twice and drifting from SEED-013's substrate. **Recommendation for the roadmap: v3.6 ships connectors as a thin, tightly-scoped MVP on the SEED-013/MCP substrate (or defers deep connectors to sequence with Open Platform), NOT a from-scratch canvas-owned connector engine.** Let research/requirements make the call explicitly — but the default should minimize the net-new egress surface.
+- **Egress allow-list + SSRF guard on EVERY outbound fetch, unconditionally.** Resolve the target host, block RFC-1918 / link-local / loopback / metadata IPs, block redirects to them, enforce an operator-managed allow-list of destination domains per org. The guard applies whether or not a credential is attached (the n8n CVE lesson). No user-supplied URL is fetched raw.
+- **Credentials are org-scoped, encrypted, and resolved server-side by reference.** Reuse the Phase-150 Fernet `enc:v1:` at-rest pattern and the org RLS (`workflow_definitions.org_id`, `get_service_role_supabase` *refuses* to construct without an explicit org — that discipline extends to connector credential reads). A phase references a credential by id; the token is injected at execution, never stored in the definition JSONB and never returned to the client.
+- **Secrets never touch logs, audit, or the friendly run view.** A redaction pass on `delta`/output/`harness_audit` metadata; the DeepSeek DSML-leak guard is the precedent for "strip provider-shaped junk before it reaches the user" — a connector-secret redactor is the same shape at the egress boundary.
+- **Rate-limit + abuse controls per org/connector** (Redis token bucket — SEED-013 already specifies this) so one workflow can't hammer JIRA/email into a ban or run up a bill.
 
 **Warning signs:**
-The bridge resolves a doc by id without an owner/global check; bytes flow into the model context; a materialized file appears in `sandbox-outputs`; no size cap.
+- Any code path does `requests.get(user_supplied_url)` / `httpx` to a host not on an allow-list.
+- A connector credential row has no `org_id`, or is readable by another org in a leak test.
+- A token appears in a log line, an audit metadata blob, or the run view.
+- SSRF protection is conditional on "if credential attached".
 
-**Phase to address:** P-FILE (bridge tool; cross-links `sandbox_service.copy_from_runtime`).
+**Phase to address:** External Connectors phase — sequenced LAST in the milestone (or split out to Open Platform), each connector-touching phase gets a mandatory `/gsd:secure-phase` SECURITY.md with `threats_open: 0` (the established bar for trust-boundary phases: 146–150/153/154/158/159). Cross-tenant isolation gets a dedicated leak test (the SEED-124/125 org-leak precedent).
 
 ---
 
-### Pitfall 7: The agent-driven skill-attach tool is a WRITE-capable, cross-tenant surface shipped without its own threat model
+### Pitfall 7: A canvas that's still too technical — or so dumbed-down it can't express a real process (adoption failure)
 
 **What goes wrong:**
-`attach_skill_file` (FILE-01 / SEED-104) lets the agent write a file into a skill. If it can target a **global** skill, an agent driven by a poisoned document writes attacker-controlled content into a skill *other users load* → stored prompt-injection / supply-chain across tenants. Or it overwrites a built-in protected skill (skill-creator), or attaches to a skill the user doesn't own, because the *tool* path bypasses the permission checks that live only on the HTTP endpoint.
+Two opposite misses, both fatal to the "Legal/HR/Finance user draws their own process" goal. (a) **Jargon leak:** the nodes say `llm_agent`, `available_tools`, `skip_to_phase`, `citations_required`, `folder_scope`, `emitter: render_template` — the business user bounces because it reads like the developer's `WorkflowDefinition`, not their process. (b) **Over-simplification:** the vocabulary is so reduced ("Do a thing" → "Get a result") that it can't express branching on a gate, an approval step, a batch-over-documents fan-out, or a template-fill deliverable — so real processes can't be built and users fall back to asking a developer, defeating the milestone.
 
 **Why it happens:**
-The only skill-file write path today is `_upload_skill_files` in `backend/app/api/skills.py` — reachable only from an authenticated browser request. A new tool wired into `tool_dispatcher` is a *different* entry point that must re-assert every check the HTTP endpoint enforces. SEED-104 explicitly calls this out: "a new WRITE-capable tool is a real security-relevant surface" and defers it precisely so it gets its own discuss→plan→execute with a threat model.
+The 6 phase types + 9 validator kinds are an *engineering* ontology. Mapping them to business verbs ("Find documents", "Ask the AI", "Get approval", "Produce a report") is real product work that's easy to under-invest in ("we'll just relabel the enum"). Over-simplification happens when the vocabulary is designed from the *simplest* demo, not from the actual PM/Legal/HR processes the engine already runs.
 
 **How to avoid:**
-Owner-scoped only — the tool can never write to a global skill or a built-in protected skill (SEED-101). Reuse the existing `skill_files` table + `skill-files` bucket (don't invent a new store), and put the RLS/owner check *in the tool dispatcher*, not just the HTTP layer. Size/type caps; no silent overwrite (version or refuse). SC#10 cross-provider proof that all providers call it correctly (a mis-formatted tool call must fail closed, not write garbage).
+- **Build the business-verb ↔ phase-type map as a first-class, tested artifact, extending existing work.** v3.3 LANG-01 shipped a plain-language layer behind an advanced reveal; SEED-085 is the user-vs-admin terminology split; Phase 124 shipped the workflow "soul" + strict/loose doors. The node vocabulary is the *next* layer on those, not a fresh invention. Every business verb maps deterministically to a phase config; the reveal ("Technical names" ⌥, the Phase 146–148 two-audience pattern) shows the underlying type for whoever wants it.
+- **Validate expressiveness against the REAL shipped workflows.** The PM flagship pack (charter/status-report/risk-register), the curated Starter Library, and the 4 canonical seed shapes must ALL be drawable and readable in the business vocabulary. If a starter can't be expressed, the vocabulary is too thin — that's the acceptance bar, not a hand-picked toy.
+- **AI-seeds, human-refines (both, not either/or).** NL authoring (SEED-051, realized in 103) seeds a draft canvas the user then edits. This hides the hardest part (choosing phase types + wiring) behind plain English, then lets the user adjust visually — the best-of-both the operator asked for. Guard the seam: the AI-seeded draft must pass the SAME server validation as a hand-drawn one (no privileged path).
+- **Sketch-first (G-2) with operator-defined "I'd recognize failure here" scenarios** (G-4) on the canvas, node config, and vocabulary — a real Legal/HR/Finance process is the lived-experience UAT, not a wire-format check.
 
 **Warning signs:**
-The tool can name a `skill_id` the caller doesn't own; global skills are writable via the tool; the tool path doesn't share the endpoint's validation; no cross-provider UAT on the new tool.
+- A node label or config field shows a raw enum literal (`llm_agent`, `skip_to_phase`) with no plain-language layer.
+- A shipped starter/PM-pack workflow cannot be reconstructed in the canvas.
+- Users in UAT ask "what's a phase / a gate / a whitelist?"
+- The only workflows demoable are 3-node happy paths.
 
-**Phase to address:** P-ATTACH.
+**Phase to address:** Business Vocabulary + AI-Seeded Canvas phase (after governance + round-trip are solid, so the vocabulary sits on a validated model). G-2 sketch-first is mandatory here.
 
 ---
-
-### Pitfall 8: Planning secrets work against the STALE brief — re-solving a shipped problem while missing the real gap (plaintext keys in Postgres)
-
-**What goes wrong:**
-The v3.3 brief (authored 2026-05-10, flagged STALE in PROJECT.md) says "migrate secrets off a plain-text json file." But **Phase 081.1 already eliminated `settings_override.json`** (`user_settings.py` docstring: "Phase 081.1 Plan 03: file-based settings_override.json eliminated"). A team that plans against the brief writes a task to "delete the json file" that's already done, and *misses the actual remaining risk*: provider API keys now live as **plaintext columns in the `app_settings` DB row** (`openai_api_key`, `anthropic_api_key`, …) with no encryption-at-rest. A DB dump or service-role leak exposes every provider key.
-
-**Why it happens:**
-The brief is a year stale (PROJECT.md warns the internals must be "re-authored against the live codebase during requirements"). Planning from the brief instead of the code re-derives solved problems.
-
-**How to avoid:**
-Verify live state first: keys are already read from DB with an env fallback (`env_key = getattr(env_settings, key_field, "")`, `user_settings.py:397`), masked from the frontend ("real key — never sent to frontend"), and sentinel-guarded on write (`save_app_settings` rejects invalid/sentinel keys). The *real* v3.3 secrets work is: (1) encryption-at-rest or a secret-ref indirection for the DB columns; (2) extend the "never to frontend" invariant to **logs and audit rows**; (3) the settings *unification* + env-var live-vs-restart classification inventory (SEED-024 §strengthen). Do NOT remove the env fallback (Pitfall 9).
-
-**Warning signs:**
-A plan task named "delete settings_override.json"; scoping that assumes secrets are on disk; a readback path that returns the real key; a provider key appearing in a log line or `operator_audit_log`.
-
-**Phase to address:** P-SECRETS.
-
----
-
-### Pitfall 9: Secrets migration that breaks the local↔cloud env-var switch (local dev must keep working)
-
-**What goes wrong:**
-Hardening secrets, the team makes the DB the *only* source of provider keys and removes the env fallback. Local dev — which has no DB-stored key and relies on `backend/.env` — stops booting or silently loses provider access. This violates the CLAUDE.md red line: "local vs cloud is a pure env-var switch; no hardcoded URLs/paths/keys."
-
-**Why it happens:**
-"Secrets belong in the secret store, not env" is a good cloud instinct that forgets the local-first contract. The env→DB precedence (`_val(row, key_field, key_field, env_key)`) is load-bearing for local dev and must survive any hardening.
-
-**How to avoid:**
-Keep the precedence: DB value if present, else env fallback. Any encryption/secret-ref layer wraps the DB column only; env stays the plaintext local path. Add a boot test: with an empty `app_settings` and keys only in `.env`, the backend resolves providers. Never make a DB read *mandatory* for a secret that env can supply.
-
-**Warning signs:**
-Local backend fails to reach a provider after a secrets change; a code path that raises when the DB key is absent instead of falling back to env; SETUP.md needing new manual DB-seeding steps to run locally.
-
-**Phase to address:** P-SECRETS.
-
----
-
-### Pitfall 10: Settings/secrets save that swallows errors — the silent-failure trap, already hit once
-
-**What goes wrong:**
-The provider-key UI returns a success-looking response but persists nothing. The operator believes the key is set; provider calls fail with auth errors *later*, disconnected from the cause. This exact class already bit the project: "AI-Model save silently failed (no DB column, errors swallowed). Fixed mig 078" (memory).
-
-**Why it happens:**
-The write hits a validation reject (the sentinel guard `save_app_settings` *correctly* rejects an invalid/sentinel key) or a schema gap, and the error is caught-and-ignored so the UI shows 200. The guard doing the right thing at the DB layer is worthless if the UI doesn't surface the rejection.
-
-**How to avoid:**
-Never swallow a settings/secret write error — surface the sentinel-guard rejection to the UI verbatim. Round-trip verify: write → read back → confirm the masked key prefix changed. Show "saved" only after the readback confirms persistence. This is also the honest-save contract for every new admin knob, not just keys.
-
-**Warning signs:**
-A save returns 200 but readback shows the old/sentinel value; try/except around the write with a bare `pass`/log-only; the UI has no "saved & verified" state distinct from "request sent."
-
-**Phase to address:** P-SECRETS (pattern reused by P-REGISTRY, P-ADMIN, P-KILL writes).
-
----
-
-### Pitfall 11: Live `/models` discovery auto-enables models with GUESSED capabilities → silent loss of native tools
-
-**What goes wrong:**
-A discovery sweep pulls model IDs from each provider's `/models` and auto-enables them with default/inferred capabilities. But `/models` returns *IDs, not capabilities* — native-tool support, context window, forced-emit tier are not discoverable. If the guess is wrong, or the discovered `model_id`'s case/spelling doesn't exactly match a `MODEL_CAPABILITIES` key, the model silently degrades to no-tools: the agent makes zero tool calls with no error. This is the exact case-sensitivity trap that already happened ("zhipu/minimax lose native tools on case-sensitive MODEL_CAPABILITIES miss", memory).
-
-**Why it happens:**
-Discovery *looks* complete when the picker fills with models. The registry read path already merges `model_capabilities_overrides` (enabled rows) into `MODEL_CAPABILITIES` via `get_model_capability_async` (`config.py:669`), and `get_model_capability` falls back to *inferred* capabilities on a miss (`confidence="inferred"`) — a silent, tool-losing default. Provider drift compounds it: a model present this sweep vanishes next sweep, leaving enabled rows pointing at dead IDs.
-
-**How to avoid:**
-Discovery **proposes**, a human **confirms** capabilities before enable — the Phase 096 D-05 precedent (operator-approved diff, newest-first, `CURATE_STALE` accounting). Exact-match the registry key with case-normalization at the boundary (the documented sanitize point). Never auto-enable native-tool support — default `native_tools`/`forced_emission` to the SAFE (off) side and require explicit opt-in. Flag `confidence="inferred"` rows in the admin UI as "capabilities unverified."
-
-**Warning signs:**
-A known tool-capable model makes zero tool calls in a run; a production model served with `confidence="inferred"`; enabled registry rows for models the latest `/models` sweep didn't return.
-
-**Phase to address:** P-REGISTRY.
-
----
-
-### Pitfall 12: Kill-switch / maintenance mode wired to a restart-required knob, or failing OPEN
-
-**What goes wrong:**
-The operator flips "disable web_search" (or the panic switch) and nothing happens — because the flag was read at import/startup like `WORKER_COUNT`/`SANDBOX_ENABLED`, which genuinely can't hot-reload. Or the capability check FAILS OPEN: when the flag read errors, the capability runs anyway, so a melting-down provider stays live during the exact incident the switch exists for. SEED-078's rule: "a kill-switch that needs a restart is not a kill-switch."
-
-**Why it happens:**
-The hot-reload substrate exists (the `app_settings` row read through a ~30s TTL cache, `user_settings.py`), so it's tempting to add flags anywhere — including next to knobs that bind at worker boot. And "on error, allow" is the accidental default of most `try/except`-wrapped checks.
-
-**How to avoid:**
-Flags live in `app_settings.feature_flags` (JSONB), read through the TTL cache with targeted invalidation on write, so a flip propagates ≤30s with no restart. Capability-boundary checks FAIL CLOSED where disabling is the safe default (sandbox fleet, web_search, provider quarantine). Use the SEED-024 env-var classification inventory to mark each knob `live` vs `restart-required` at the point of edit — never wire a kill-switch to a `restart-required` value. Honest UX when a capability is off ("temporarily disabled by your operator"), not a cryptic error.
-
-**Warning signs:**
-A flag flip that "doesn't take effect"; a disabled capability that still runs when the flag read throws; a maintenance mode that either kills in-flight runs or fails to stop new ones.
-
-**Phase to address:** P-KILL.
-
----
-
-### Pitfall 13: Role-gated visibility retrofitted in the UI but not at the API boundary
-
-**What goes wrong:**
-The admin nav item / button is hidden in React for non-operators, but the FastAPI route is ungated — any authenticated user hits it directly (curl, devtools). Combined with the service-role backend (Pitfall 1), an ungated `/admin` endpoint returns cross-user data to any logged-in user. Retrofit gating also drifts: some surfaces gated, some not, because the check is duplicated per-component.
-
-**Why it happens:**
-Hiding UI is the visible, demoable half; the API check is the invisible, load-bearing half. Retrofitting onto an existing app means the check is added surface-by-surface instead of at a chokepoint.
-
-**How to avoid:**
-Gate at the API boundary FIRST with the single `require_operator` dependency (Pitfall 1); UI hiding is cosmetic-only and never the security control. One source of truth for "is operator." Default-deny for any new `/admin` route (router-level dependency, not opt-in per handler). Entitlement/feature gating (tier visibility) rides the same flag substrate as P-KILL (SEED-078/080) — one home, not a fourth ad-hoc boolean.
-
-**Warning signs:**
-An `/admin` route reachable with a normal JWT; a feature check that exists only in the frontend; per-component role logic that varies across surfaces.
-
-**Phase to address:** P-ADMIN (boundary) + P-KILL (shared gating substrate).
-
----
-
-### Pitfall 14: Inline citation attribution that fabricates provenance (post-hoc citation)
-
-**What goes wrong:**
-An inline source chip (SEED-033) is attached to a sentence the model didn't actually derive from that source, or cites a retrieved chunk that wasn't used — because attribution is generated by a *second* "which source fits?" LLM pass rather than from what was actually retrieved/used. The platform already saw this exact overclaim: DeepSeek/MiniMax said "converted your docx / real page layout" when they had *reconstructed from text* (SEED-108) — attribution dishonesty erodes the trust the whole RAG product sells.
-
-**Why it happens:**
-Post-hoc "cite this answer" is easy and looks authoritative. But an LLM asked to justify its own output will confidently attach a plausible-looking source it never used.
-
-**How to avoid:**
-Adopt the discipline the template-fill path already proved: `check_coverage()` in `template_render_service.py` marks a value CITED **only if its `source_chunk_id` was actually in the retrieved set** — an invented/absent citation counts as uncited. Inline chat citation must key attribution to the run's retrieval-set / tool-result provenance (a set-membership test), not a re-ask. When provenance is unknown, show "no source" — never a guessed one. Cross-provider honesty parity (the SRH-01 / emit-honesty precedent) so attribution behaves the same across all providers.
-
-**Warning signs:**
-A citation pointing at a chunk not in the run's `retrieved_ids`; identical answer text attributed to different sources across providers; a "cite" step that's a separate LLM call over the finished answer.
-
-**Phase to address:** P-UX (attribution engine), cross-links P-FILE honesty (SEED-108).
-
----
-
-### Pitfall 15: Plain-language relabeling that breaks muscle memory, API contracts, or audit history
-
-**What goes wrong:**
-The two-audience plain-language layer (SEED-085) renames a mode, button, or field. Users can't find a feature they knew. Worse, if the label doubles as an enum value, `operator_audit_log` action name, or API field, the rename breaks stored audit rows, integrations, and history queries. And a11y-blind renames leave stale `aria-label`s.
-
-**Why it happens:**
-"Just rename it to something friendlier" treats display strings as free text, but some of them are load-bearing keys. The Deep/Explorer/Harness pill history (v3.1 removed the Harness pill) shows mode renames need care.
-
-**How to avoid:**
-Relabel the **display layer only**; keep enum/action/DB/API values stable behind a display map. Provide a transition affordance ("formerly X"). Update `aria-label`s with the visible label. Critically, a UX relabel of the composer/mode must not touch Deep Mode's runtime — Deep Mode stays byte-identical (gated no-op; the milestone red line). Verify the blob-hash/no-op invariant after any composer relabel.
-
-**Warning signs:**
-A display string used as a dict key, audit action, or DB enum; a rename that changes a persisted value; an audit query that returns fewer rows after a relabel; Deep Mode behavior shifting after a "cosmetic" change.
-
-**Phase to address:** P-UX (cross-links the Deep-byte-identical landmine).
 
 ## Technical Debt Patterns
 
@@ -292,123 +181,146 @@ Shortcuts that seem reasonable but create long-term problems.
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Operator as an `is_admin` boolean on the user row | 1-line role model | Poisons the v3.4 RLS rewrite (18 tables); can't separate SYSTEM vs ORG authority (Pitfall 3) | **Never** — use a separate `operator_users` principal |
-| Auto-enable `/models`-discovered models with inferred capabilities | Zero-touch model list | Silent no-tools degradation + dead-model rows (Pitfall 11) | **Never** — discovery proposes, human confirms |
-| Hide admin UI without gating the API | Fast demo | Ungated service-role route = full-tenant leak (Pitfall 13) | **Never** for `/admin` |
-| Provider keys as plaintext `app_settings` columns (current state) | Works today; env fallback keeps local dev | No encryption-at-rest; DB dump = all keys leak (Pitfall 8) | OK for single-tenant self-host; **not** for the hosted multi-tenant SaaS line |
-| Impersonation by minting the target's session | Reuses existing auth | Audit attributes actions to the victim; no dual-control (Pitfall 2) | **Never** — dual-identity context only |
-| Promote an uploaded template to the library by carrying its provenance | Nice "reuse my template" UX | Reopens the SSTI door (Pitfall 4) | **Never** — explicit re-stamp on promotion |
-| Kill-switch/flag stored next to import-bound env knobs | One flag namespace | A switch that needs a restart isn't a switch (Pitfall 12) | **Never** — live knobs only, classified via the env inventory |
-| One big `app_settings` JSONB blob for all new admin knobs | Fast to add rows | No per-key audit/rollback; write contention; concurrent-write clobber | Only if each key still has `updated_by`/`updated_at` + targeted invalidation |
+| Port validation rules to client TS for instant canvas feedback | Snappy UX, no round-trip | Drifts from `lint_workflow`/gauntlet; "can't draw invalid" becomes false; publish-wall of jargon | **Never** for rule *definition*. Client may cache/render server-computed errors only. |
+| Store node layout inside `WorkflowDefinition` JSONB | One blob, one save | 422s on `extra="forbid"` or forces relaxing the injection guard; cosmetic drags mint versions/re-arm gauntlet | **Never.** Separate layout column/table, engine never reads it. |
+| Autosave = new definition version | Simple undo/history | Version explosion; immutability semantics blur; publish reads dirty draft | **Never.** PATCH one draft row; version only at publish. |
+| Friendly run view listens only to happy-path events | Simplest UI | Shows "done" on `gate_failed`/`run_failed`; business user ships broken deliverable | **Never.** Total function over the full event set. |
+| Build a bespoke canvas-owned connector framework | Ships in-milestone, no cross-team seq | Two egress threat models to maintain; drifts from SEED-013/MCP substrate; double the SSRF/credential surface | Only if research explicitly rejects the Open-Platform substrate AND scope is a tightly-guarded MVP. |
+| Trust Realtime's last pushed event for run state | No fetch on reconnect | Stale "still running" after a failure (D-v2.5-03 violation) | **Never.** Reconcile-on-fetch, then tail. |
+| Relax `extra="forbid"` to accept canvas metadata | Fewer 422s during dev | Re-opens T-090-01 injection guard on the engine's input | **Never.** Keep new fields additive-nullable + typed. |
+| Undo/redo as ad-hoc client state snapshots | Quick to build | Diverges from the persisted draft; undo "un-saves" server state incorrectly; corrupts round-trip | Only if undo operates on the same canvas→definition model that's persisted; test undo→save→reload. |
+
+---
 
 ## Integration Gotchas
 
-Common mistakes when connecting to the platform's own external services.
+Common mistakes when connecting to external services (the connector track).
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Supabase (service-role client) | Assume RLS protects `/admin` cross-user queries | RLS is inert on the backend path (`dependencies.py:19`); enforce in app + `require_operator`, reviewed WHERE clauses |
-| Supabase Auth (impersonation) | Mint the target user's JWT / session | Dual-identity server context (actor + subject), stamp both to audit, never a real victim session |
-| Supabase Realtime | Push admin state (active runs, kill-switch, maintenance banner) and trust delivery | Best-effort hint only (D-v2.5-03) — reconcile via fetch on (re)connect; a kill-switch must NOT depend on Realtime delivery |
-| `llm_sandbox` (per-thread cached) | Materialize a KB file into a shared/mis-keyed session; write it to `sandbox-outputs` | Scope by `user_id`+`thread_id`, size-cap, stream-to-disk, no exfil to output bucket (Pitfall 6) |
-| Provider `/models` endpoints | Trust returned "capabilities"; loose ID matching | IDs only — author capabilities, exact-case key match, human-confirm before enable (Pitfall 11) |
-| `app_settings` TTL cache | Expect an instant flag flip; hot-reload an import-bound knob | ≤30s propagation + targeted invalidation; env-bound knobs (`WORKER_COUNT`, `SANDBOX_ENABLED`) never hot-reload (Pitfall 12) |
-| Supabase Storage (`documents.file_path`, `skill-files`) | Read/write by path without owner re-check (backend is service-role) | Re-apply the `read_document`/skill owner scope in the tool path, not just the HTTP endpoint |
+| User-supplied webhook / API URL | Fetch it server-side raw; SSRF to metadata/internal (n8n CVE: guarded only when credential attached) | Unconditional SSRF guard + per-org destination allow-list; block RFC-1918/link-local/loopback/redirects; fetch nothing off-list. |
+| Email / JIRA / OAuth tokens | Store in the definition or a global credential table; return to client | Org-scoped credential store, Fernet `enc:v1:` at rest (Phase-150 pattern); reference by id; inject at execution; never in JSONB/client. |
+| Cross-org shared workflow with a connector | Resolve credential without org scoping → cross-tenant bleed | Resolve credentials via the org-requiring service-role path (`get_service_role_supabase` refuses without org); dedicated cross-org leak test. |
+| Outbound run logs / audit | Token echoed into `delta`/output/`harness_audit` metadata | Redaction pass at the egress boundary (DeepSeek-DSML-strip precedent); secrets never logged/audited/shown. |
+| Rate limits / provider bans | Unbounded connector calls per run | Redis token-bucket per org/connector (SEED-013 spec); operator-tunable defaults. |
+| MCP as the connector substrate | Assume MCP spec is stable | Pin the MCP spec version; plan a deprecation cycle (SEED-013 risk note). |
+| Blocking connector I/O in an async handler | `httpx`/`requests` on the event loop → stalls all workers | Wrap blocking connector calls in `run_in_threadpool` (D-v2.5-01) or use an async client end-to-end. |
+
+---
 
 ## Performance Traps
 
-Patterns that work at small scale but fail as usage grows. This product targets org-scale production (`project_target_scale`).
+Patterns that work at small scale but fail as usage grows.
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Audit-log browser does a full-table scan | `/admin` audit page slow; timeouts | Index on `(created_at, actor_id, action)`; keyset pagination, not OFFSET | ~100k+ audit rows |
-| Live `/models` called on every registry read | Slow settings page; provider rate-limit 429s | Cache discovery; scheduled sweep, not per-request; read from `model_capabilities_overrides` | N providers × frequent reads |
-| Sandbox materialization of large KB files | Container OOM (echoes thesis-PDF `MemoryError`) | Size cap + stream-to-disk; never into model context | Files > ~100MB or many concurrent bridges |
-| Zip decompression on upload without a guard | Memory spike / worker DoS from one request | Uncompressed-size + ratio cap before extract | A single crafted zip bomb |
-| Feature-flag / entitlement check per request without cache | DB hammering under load | The existing ~30s TTL cache substrate | High RPS across workers |
-| Operator "view all users' threads/runs" unpaginated | Memory blowup; slow render | Server-side pagination + scoping from day one | Thousands of users/runs |
+| Non-memoized React-Flow nodes/edges | Whole canvas re-renders on any state change or single-node drag; drag jank | `React.memo` custom nodes, `useCallback` handlers, node/edge components declared outside parent; only the moved node + its edges re-render | Noticeable ~50 nodes; painful 100–200 |
+| Validate-on-every-drag round-trips | Server hammered; laggy feedback | Debounce (~300–500ms) the `POST /workflows/validate`; validate on settle, not per pixel | Any real-time drag with server validation |
+| Heavy node CSS (shadows/gradients/animations) | Slow paint at scale | Keep node styles lean; reserve glassmorphic/animated flourishes for idle, not during drag | 100+ nodes |
+| Loading full definition + layout + grounding eagerly | Slow canvas open on large workflows | Load definition first (renders spine), fetch grounding/layout async; auto-layout when absent | Large definitions / many folders/skills in grounding |
+| Multi-tenant fan-out (org-shared workflows list) | N+1 or unindexed org queries; slow Workflows page per org | Indexed `org_id` reads (RLS already scopes); paginate; the SEED-013 per-consumer concern applies | Many orgs × many workflows |
+| Golden-run gauntlet on cosmetic edits | Real LLM run fires on a node move | Layout writes bypass versioning entirely (Pitfall 3); gauntlet only on explicit publish | Any autosave that touches the definition |
+
+---
 
 ## Security Mistakes
 
-Domain-specific issues beyond OWASP basics.
+Domain-specific security issues beyond general web security.
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Ungated `/admin` route on a service-role backend | Any authenticated user reads ALL users' data | `require_operator` router dependency, default-deny, 403 test per route |
-| Untrusted upload reaches the Jinja engine | Server-side template injection (RCE-in-sandbox) | Preserve provenance routing (`select_engine` → `run_replace` for uploads); library promotion re-stamps explicitly |
-| Trusting MIME/extension on docx/pptx/xlsx uploads | Zip bomb DoS; path-traversal write; renamed executable | Magic-byte check + uncompressed-size/ratio caps + entry-path validation + file-size cap |
-| Agent skill-attach tool can write a global skill | Cross-tenant stored prompt-injection / supply-chain | Owner-scoped only; no global/built-in write; RLS check in the tool dispatcher |
-| RAG→sandbox bridge without owner re-check | Cross-user file read; exfil via output card | Reuse `read_document`'s owner/global resolver; no write to `sandbox-outputs` |
-| Provider key in logs / audit rows / frontend readback | Full key leak | Extend "never to frontend" to logs + audit; mask everywhere; encrypt-at-rest the DB column |
-| Impersonation without dual-identity audit | Insider abuse invisible; repudiation | Stamp actor + subject on every impersonated action |
-| Citation attached to an unused/absent source | User trusts a fabricated source; RAG-trust collapse | Attribution from the run's retrieval-set only (set-membership, like `check_coverage`) |
+| Client-side-only whitelist / gate enforcement | Business user (or attacker) submits a definition bypassing tool whitelist / grounding | ALL enforcement server-side (`_check_grounding_fidelity`, `lint_workflow`, gauntlet); canvas can only *display* server verdicts. |
+| New routes not flag-gated | Canvas/connector endpoints reachable with flag off → un-reverted attack surface | Byte-identical-404 gate on every new route (Phase-146 `require_operator` pattern). |
+| Connector SSRF (guarded only with credential) | Metadata theft, internal enumeration, RCE (n8n CVE class) | Unconditional SSRF guard + allow-list on every outbound fetch. |
+| Cross-org credential / KB bleed via shared workflow | Customer-loss event (SEED-013); org A reads org B's tokens/KB | Org-scoped everything; `get_service_role_supabase` requires org; leak test per connector (SEED-124/125 precedent). |
+| Secret leakage in run view / audit / logs | Token exfil to the user or persisted | Redaction at egress; secrets referenced-not-embedded; never in `definition` JSONB. |
+| Relaxing `extra="forbid"` for canvas keys | Re-opens injection into the engine's typed input (T-090-01) | Keep strict; canvas metadata lives outside the definition model. |
+| AI-seeded draft on a privileged path | NL seed skips the grounding/lint gate a hand-drawn one passes | AI-seeded and hand-drawn drafts pass the IDENTICAL server validation. |
+
+---
 
 ## UX Pitfalls
 
+Common user experience mistakes in this domain.
+
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Relabel that breaks muscle memory | Users can't find known features | Display-layer rename only + "formerly X" transition tooltip |
-| Kill-switch with no honest "disabled by operator" state | Users hit cryptic errors when a capability is off | Explicit disabled-state messaging (SEED-078) |
-| Over-citation (a chip on every sentence) | Noise; paradoxically lowers trust | Cite where provenance is real; blank where unknown |
-| a11y retrofit only on new `/admin` surfaces | Deep Midnight glass/gradient theme still fails WCAG AA | Audit contrast app-wide, not just new pages (SEED-092) |
-| Maintenance/drain mode with no banner | Confusing rejected writes | Drain new runs, let in-flight finish, show a banner |
-| Model picker floods with every discovered model | Choice overload; typo/dead models selectable | Curated + explicit "custom" badge for user-added mappings (SEED-024 §6) |
-| Admin knobs with no live-vs-restart marker | Operator changes a value, nothing happens, guesses why | Per-row `live` / `restart required` marker at the point of edit (SEED-024 §strengthen) |
+| Jargon leak (`llm_agent`, `skip_to_phase`, `folder_scope`) | Business user bounces; "this isn't for me" | Business-verb vocabulary + ⌥ Technical-names reveal (LANG-01 / SEED-085 / two-audience pattern). |
+| Over-simplified vocabulary | Can't express approval/branch/fan-out/template-fill; users fall back to devs | Validate expressiveness against PM pack + Starter Library + 4 seed shapes as the bar. |
+| Dishonest "done" on a failed gate | Ships a broken deliverable trusting the green check | Plain-language failure state ("The approval step didn't pass — here's why") + raw reveal. |
+| Publish-wall after 20 min of drawing | Frustration; wasted work | Live in-canvas validation (server-computed) surfaces errors on nodes as you build. |
+| Silent clobber on shared-workflow co-edit | Lost work, distrust | Soft lock / optimistic token + "someone's editing" banner. |
+| Overlapping nodes at origin on import | Looks broken on first open | Deterministic auto-layout when no saved layout (NL/starter/existing-door definitions). |
+| Overwhelming the run view with sub-agent chatter | Cognitive overload | Aggregate progress per node ("Reviewing 5 documents…"), raw detail behind a reveal. |
+
+---
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **`/admin` routes:** often missing the API-boundary role check (only UI hidden) — verify a normal-user JWT gets **403 on every** `/admin` route.
-- [ ] **Impersonation:** often missing dual-identity audit — verify `operator_audit_log` records **both** actor and subject on an impersonated action, and no victim session is minted.
-- [ ] **Operator role model:** often missing v3.4-compatibility — verify the operator is a **separate principal**, not an `is_admin` flag or org member.
-- [ ] **Secrets UI:** often missing round-trip verify + env fallback — verify save→read shows the masked prefix, sentinel rejects surface to the UI, AND local dev with keys only in `.env` still boots.
-- [ ] **Template upload:** often missing provenance stamp + zip guard — verify an uploaded template routes to `run_replace` (never `docxtpl`) and a zip bomb / traversal entry is rejected.
-- [ ] **Skill-attach tool:** often missing tool-dispatcher RLS check + SC#10 — verify all 4 providers call it, owner-scoped, no global/built-in write.
-- [ ] **RAG→sandbox bridge:** often missing owner re-check + size cap — verify a cross-user doc id 404s and a huge file streams (not OOMs), and never lands in `sandbox-outputs`.
-- [ ] **Model registry:** often missing capability confirmation — verify a discovered model isn't auto-enabled with inferred native tools; case-mismatch doesn't silently drop tools.
-- [ ] **Kill-switch:** often missing fail-closed + hot-reload — verify a flip takes effect ≤30s with no restart, and a flag-read error **disables** (not enables) the capability.
-- [ ] **Citation:** often missing provenance-set check — verify every cited chunk was actually in the run's `retrieved_ids`.
-- [ ] **Deep Mode:** often missing byte-identical proof after a UX relabel — verify the gated no-op / blob hash is unchanged.
-- [ ] **SC#10 cross-provider:** any new tool (bridge, attach) or agent-loop/UI-state change — verify the 4-axis UAT (4 providers × multi-tool × parallel-thread × long-message) is authored under VALIDATION.md.
+Things that appear complete but are missing critical pieces.
+
+- [ ] **Feature flag:** UI hides when off — but verify NO non-nullable migration, all new routes 404, both existing doors + run surface byte-identical, old published workflows still run. `test_revert_byte_identical` green.
+- [ ] **In-canvas validation:** shows errors — but verify it calls the server `lint_workflow`/`model_validate`, not a client re-implementation; a canvas-"valid" workflow actually publishes.
+- [ ] **Round-trip:** canvas opens a workflow — but verify `definition → canvas → definition` is byte-identical (definition half), layout is in a separate store, and a node move does NOT mint a version.
+- [ ] **Run view:** shows progress — but verify `gate_failed`/`run_failed` render as *failed* (not omitted), reconnect reconciles-on-fetch (not stale hint), sub-agent events aren't mis-mapped to nodes.
+- [ ] **Vocabulary:** nodes have friendly labels — but verify every PM-pack + Starter workflow is drawable/readable, and a Technical-names reveal exists.
+- [ ] **Connectors:** email/JIRA works in a demo — but verify SSRF guard fires unconditionally, credentials are org-scoped + encrypted + never logged, cross-org leak test passes, rate-limit exists.
+- [ ] **Concurrency:** autosave works solo — but verify two editors on one org-shared workflow don't clobber, and publish can't read a dirty draft.
+- [ ] **Perf:** smooth at 10 nodes — but verify memoization holds at 100–200 nodes and validate-on-drag is debounced.
+
+---
 
 ## Recovery Strategies
 
+When pitfalls occur despite prevention, how to recover.
+
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Cross-user leak via ungated `/admin` route | HIGH | Revoke route; audit access logs (hard to know what leaked); add `require_operator`; notify affected; add 403 regression test |
-| SSTI via mis-provenanced upload | HIGH | Sandbox containment limits blast radius (network-less), but rotate any secret reachable in the render env; patch the provenance boundary; audit rendered outputs |
-| Operator role shape poisons v3.4 RLS | HIGH | Schema unwind mid-rewrite (the highest-risk apply) — avoid by choosing the separate-principal model **now** |
-| Plaintext provider-key DB leak | HIGH | Rotate ALL provider keys immediately; add encryption-at-rest; audit `operator_audit_log`/logs for prior exposure |
-| Silent no-tools model degradation | LOW | Fix the registry key case-match; re-enable native tools; re-run the eval scoreboard |
-| Fabricated inline citation shipped | MEDIUM | Switch attribution to retrieval-set membership; re-verify cross-provider; add a "cited chunk ∈ retrieved" assertion |
-| Kill-switch that didn't fire (import-bound / fail-open) | MEDIUM | Move the flag to the `app_settings` live substrate; flip the check to fail-closed; reclassify the knob live-vs-restart |
+| Flag-off not byte-identical (bad migration shipped) | HIGH | If the migration is additive-nullable it's usually harmless; if it changed/NOT-NULLed a column, forward-fix with a compensating additive migration (never a `db reset`); add the missing `test_revert_byte_identical` and re-baseline. |
+| Client validation drifted from server | MEDIUM | Delete the client rules; route the canvas to the server `validate` endpoint; add a "canvas-valid ⟺ publishable" contract test. |
+| Layout co-mingled into definition | MEDIUM | Migration to split layout into its own column/table; strip layout keys from existing `definition` JSONB; restore `extra="forbid"` if it was relaxed. |
+| Dishonest run view shipped | MEDIUM | Rebuild node-state as a total function over all events; add a per-event-type mapping test; force reconcile-on-fetch. |
+| Version explosion from autosave | MEDIUM | Migration to collapse draft history to one row per draft; switch autosave to in-place PATCH; version only at publish. |
+| Connector SSRF / credential leak found | HIGH | Kill-switch the connector capability (operator kill-switch grid exists, Phase 146–148); add the SSRF guard + org-scoping + redaction; rotate any exposed credentials; leak test before re-enable. |
+| Cross-org credential bleed | HIGH (trust) | Immediate kill-switch; audit which orgs were exposed; org-scope the credential store; notify per the operator audit trail. |
+
+---
 
 ## Pitfall-to-Phase Mapping
 
-| Pitfall | Prevention Phase | Verification |
-|---------|------------------|--------------|
-| 1. Service-role is the only gate | P-ADMIN | 403 for normal JWT on every `/admin` route; reviewed operator query helpers |
-| 2. Impersonation identity/audit | P-ADMIN | Dual-id (actor+subject) in `operator_audit_log`; no minted victim session |
-| 3. Operator role poisons v3.4 RLS | P-ADMIN | Separate `operator_users` principal; org-agnostic authority; checked against v3.4 RLS plan |
-| 4. Upload breaks provenance boundary | P-FILE | Jinja-payload upload renders literally; `select_engine('template_input')` can't return `docxtpl` |
-| 5. MIME/zip-bomb/traversal | P-FILE | Magic-byte + ratio/size caps + entry-path validation on a crafted archive |
-| 6. RAG→sandbox exfil/scope | P-FILE | Cross-user doc id 404s; size cap; no `sandbox-outputs` write; SC#10 4-axis |
-| 7. Skill-attach WRITE tool | P-ATTACH | Owner-scoped, no global write, dispatcher-level RLS, SC#10 all providers |
-| 8. Stale-brief / plaintext keys | P-SECRETS | Verify live state; encrypt-at-rest; keys absent from logs/audit/frontend |
-| 9. Local↔cloud env switch | P-SECRETS | Backend boots with keys only in `.env`, empty `app_settings` |
-| 10. Silent save failure | P-SECRETS | Save→readback verify; sentinel reject surfaced to UI |
-| 11. Model discovery capability guessing | P-REGISTRY | Human-confirm before enable; exact-case match; inferred rows flagged |
-| 12. Kill-switch restart/fail-open | P-KILL | ≤30s hot-reload, no restart; fail-closed on read error |
-| 13. UI-only role gating | P-ADMIN + P-KILL | API-boundary gate; single source of truth; default-deny new routes |
-| 14. Fabricated citation | P-UX | Cited chunk ∈ `retrieved_ids`; cross-provider parity |
-| 15. Relabel breaks contracts | P-UX | Display-only rename; enum/audit/DB values stable; Deep Mode byte-identical |
+How roadmap phases should address these pitfalls. (Phase *topics*, not final numbers — the roadmapper assigns numbers; ordering rationale is load-bearing.)
+
+| Pitfall | Prevention Phase (topic + order) | Verification |
+|---------|----------------------------------|--------------|
+| 2. Non-byte-identical revert (HARD GATE #1) | **P1 — Revert Foundation** (FIRST) | `test_revert_byte_identical` green in CI + live at close; all new routes 404 with flag off; no non-nullable migration in the milestone. |
+| 3. Lossy/corrupting round-trip | **P2 — Canvas↔Definition Round-Trip** | `definition→canvas→definition` byte-identical (4 seeds + PM pack); layout in separate store; node move mints no version. |
+| 1. Governance fork / drift-prone rules | **P3 — In-Canvas Governance** (shared validator endpoint) | Canvas-"valid" ⟺ server-publishable contract test; grounding lists server-provided; `extra="forbid"` intact. |
+| 5. Autosave version explosion + co-edit clobber | **P4 — Concurrency & Autosave** | Two-editor parallel UAT row (SC#10 parallel axis); version count flat under autosave; publish can't read dirty draft. |
+| 7. Too-technical / too-simple vocabulary (adoption) | **P5 — Business Vocabulary + AI-Seeded Canvas** (G-2 sketch-first) | Every PM-pack/Starter drawable+readable; Technical-names reveal; AI-seed uses identical validation. |
+| 4. Dishonest run observability | **P6 — Non-Technical Run Observability** (G-2 sketch-first) | Full-event-set node-state test; reconnect reconciles-on-fetch; failed gate visibly failed; SC#10 cross-provider run rows. |
+| 6. SSRF / credential / cross-tenant connector | **P7 — External Connectors** (LAST or deferred to Open Platform) | `secure-phase` SECURITY.md `threats_open:0`; unconditional SSRF guard; org-scoped encrypted credentials; cross-org leak test. |
+| Perf traps (React-Flow scale, multi-tenant fan-out) | Woven into **P2/P6** + a **P8 — Scale Hardening** pass if needed | 100–200-node canvas stays responsive; validate-on-drag debounced; org-list reads indexed. |
+
+**Ordering rationale:** The revert gate (P1) must exist before anything else so every later phase is built on a proven off-switch (HARD gate #1). The round-trip contract (P2) and the shared-validator governance endpoint (P3) are the load-bearing foundation the vocabulary (P5) and run view (P6) sit on — build them before the "feels like" surfaces. Connectors (P7) carry the highest new security surface and the own-framework-vs-Open-Platform decision, so they come last (or split to the Open Platform track), each fully `secure-phase`'d. This ordering keeps the engine's governance rails *expressed visually and enforced server-side* at every step, honoring the D-14 red line: no new runtime, Deep byte-identical, harness flag-gated.
+
+---
 
 ## Sources
 
-- **Live codebase (HIGH):** `backend/app/dependencies.py:19` (service-role client — RLS bypass), `backend/app/services/template_render_service.py` (`select_engine` provenance boundary :936, `check_coverage` citation-set membership :416, `SandboxedEnvironment(autoescape=True)` :657, `zipfile` on untrusted bytes :381), `backend/app/models/user_settings.py` (settings_override.json eliminated, plaintext key columns + env fallback :397, sentinel guard `save_app_settings`, `model_capabilities_overrides` read :316), `backend/app/config.py` (`get_model_capability`/`_async` :498/:669, `confidence="inferred"` fallback), `backend/app/services/tool_dispatcher.py` (`_handle_read_document` owner scope :237).
-- **Seeds (HIGH):** SEED-108 (RAG→sandbox bridge — RLS/size/exfil), SEED-104 (agent skill-attach WRITE tool threat model), SEED-024 (settings unification, env live-vs-restart classification, model-picker surfacing), SEED-078 (kill-switch/maintenance/feature-flag substrate, fail-closed, D-PRD-14 SYSTEM-vs-ORG role split).
-- **Project memory / decisions (HIGH):** service-role RLS bypass; case-sensitive `MODEL_CAPABILITIES` miss drops native tools; settings save silent-failure (mig 078); Deep-Mode byte-identical red line; SC#10 4-axis cross-provider mandate; Supabase Realtime best-effort (D-v2.5-03); thesis-PDF `MemoryError` (large-file OOM precedent).
-- **Established security knowledge (MEDIUM, verified against this codebase's own defenses):** Jinja SSTI via `SandboxedEnvironment` escapes; OOXML/ZIP decompression bombs and path traversal in office-document uploads; post-hoc LLM citation fabrication.
+- **Codebase (HIGH — authoritative for this app):**
+  - `backend/app/models/harness.py` — `WorkflowDefinition` strict model (`extra="forbid"`, D-07), 6 discriminated `phase_type`s, per-phase `available_tools` whitelist, `ValidatorSpec` (9 kinds), additive-nullable extension pattern, structural `model_validator`s.
+  - `backend/app/services/harness/reachability.py` — `lint_workflow` pure structural gate (orphan / unsatisfiable-skip / no-terminal / bad-index / input-unsatisfied) + the edge-set construction to reuse in-canvas.
+  - `backend/app/services/harness/publish_service.py` — the multi-stage publish gauntlet, the `llm_judge` hard-wall, honest structured blocks, WR-01/WR-03/WR-04 honesty guards.
+  - `backend/app/services/workflow_authoring.py` — `_check_grounding_fidelity` (server-side whitelist/folder/skill grounding; "KB can't whitelist itself"), NL-seed path.
+  - `backend/app/services/harness_engine.py` — the run-event vocabulary (`phase_started`/`phase_transition`/`phase_completed`/`gate_passed`/`gate_failed`/`run_failed`) + WRITE-before-EMIT (D-v2.5-03) + never-`phase_completed`-on-failed-emit (WR-01).
+  - `frontend/src/pages/WorkflowBuilderPage.tsx`, `PhaseSpineGraph`, `PhaseTimeline`/`PhaseCard` — the existing (single-author, describe-first, read-only-spine) surfaces to extend, not fork.
+  - `CLAUDE.md` / `.planning/PROJECT.md` — D-14 red line, Realtime-is-a-hint (D-v2.5-03), org RLS + `get_service_role_supabase` org-requirement, Fernet `enc:v1:` secrets (Phase 150), operator kill-switches (146–148), `app_settings` flag pattern, "no connectors" today.
+  - `.planning/seeds/SEED-123` (anchor — ease↔governance heart problem + 3 HARD gates), `SEED-013` (connector substrate, org-aware permissions as B2B prerequisite, SSRF/rate-limit/metering risks).
+- **External (MEDIUM — WebSearch-verified, current):**
+  - React Flow performance guidance — [reactflow.dev/learn/advanced-use/performance](https://reactflow.dev/learn/advanced-use/performance), [Synergy Codes optimization guide](https://www.synergycodes.com/blog/guide-to-optimize-react-flow-project-performance), [xyflow discussion #4975](https://github.com/xyflow/xyflow/discussions/4975).
+  - n8n SSRF (guarded only when credential attached) + multi-tenant credential isolation — [n8n issue #28218](https://github.com/n8n-io/n8n/issues/28218), [Six n8n CVEs / Upwind](https://www.upwind.io/feed/six-n8n-cves-one-day-workflow-security), [Wednesday Solutions multi-tenant n8n](https://www.wednesday.is/writing-articles/building-multi-tenant-n8n-workflows-for-agency-clients), [Reco secure n8n](https://www.reco.ai/hub/secure-n8n-workflows).
+  - Competitor governance reconciliation (Glean agent access policies / alignment checks / human oversight by risk tier / audit logging; Beam allowed-actions + tool-access + escalation paths) — [Glean agent governance](https://www.glean.com/product/agent-governance), [Glean guardrail decisions](https://www.glean.com/blog/7-essential-guardrail-decisions-for-deploying-enterprise-ai-agents-successfully), [Beam platform](https://beam.ai/platform).
 
 ---
-*Pitfalls research for: v3.3 Operator UX — admin tier, secrets/model-registry management, run-time file inputs, plain-language/citation UX on a service-role multi-provider RAG platform*
-*Researched: 2026-07-10*
+*Pitfalls research for: Visual / No-Code Workflow Studio on a governed multi-tenant harness engine (v3.6)*
+*Researched: 2026-07-24*

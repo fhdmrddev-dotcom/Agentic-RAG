@@ -80,7 +80,7 @@ describe("WorkflowBuilderPage — describe-first empty Builder", () => {
 
   it("shows ONE calm project-folder picker once folders load (the only added control)", async () => {
     mockListFolders.mockResolvedValue([
-      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
     ])
     render(<WorkflowBuilderPage />)
     const picker = await screen.findByTestId("project-folder-picker")
@@ -145,7 +145,7 @@ describe("WorkflowBuilderPage — single state transition + honest failure", () 
 
   it("forwards the chosen project_folder_id to generate + shows the bound NAME in the header", async () => {
     mockListFolders.mockResolvedValue([
-      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+      { id: "f1", user_id: "u", name: "Project Meridian", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
     ])
     mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
     const { default: userEvent } = await import("@testing-library/user-event")
@@ -207,7 +207,7 @@ describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing
 
   it("seeds the bound-folder NAME in the header from the loaded definition", async () => {
     mockListFolders.mockResolvedValue([
-      { id: "f9", user_id: "u", name: "Risk KB", parent_id: null, is_global: false, created_at: "", updated_at: "" },
+      { id: "f9", user_id: "u", name: "Risk KB", parent_id: null, is_org_shared: false, created_at: "", updated_at: "" },
     ])
     const bound = { ...draft3, project_folder_id: "f9" }
     render(<WorkflowBuilderPage initial={{ definition: bound, draftId: "draft-77" }} />)
@@ -227,13 +227,32 @@ describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing
     expect(mockCreate).not.toHaveBeenCalled()
   })
 
-  it("Save draft shows a transient 'Saved ✓' confirmation on success", async () => {
+  /**
+   * Phase 184-11 (R6) — THE ONE FORCED ASSERTION EDIT OF THIS PLAN, recorded here as
+   * well as in the SUMMARY so a reader of the test does not have to go looking.
+   *
+   * The expected LITERAL moved from `Saved ✓` to `Saved · still a draft`, and nothing
+   * else did. The wording is operator-locked in 184-CONTEXT `<specifics>` — *"the save
+   * state says 'Saved · still a draft' — no word implying published, ever"* — because
+   * Phase 184 makes this header the place an author decides whether their work is safe,
+   * and a bare "Saved ✓" beside a `◆ Publish…` button is exactly the ambiguity the
+   * locked wording exists to remove. The assertion's PURPOSE is unchanged and still
+   * measured: an explicit save produces a transient, visible, honest confirmation.
+   *
+   * The alternatives were considered and rejected. `Saved ✓ · still a draft` would have
+   * kept this literal green as a substring (`toHaveTextContent` matches substrings) and
+   * would have shipped a wording nobody locked; asserting only the qualifier would have
+   * stopped pinning the confirmation itself.
+   */
+  it("Save draft shows a transient 'Saved · still a draft' confirmation on success", async () => {
     mockUpdate.mockResolvedValue({})
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
     render(<WorkflowBuilderPage initial={{ definition: draft3, draftId: "draft-77" }} />)
     await user.click(screen.getByTestId("builder-save-draft"))
-    expect(await screen.findByTestId("builder-save-confirm")).toHaveTextContent("Saved ✓")
+    expect(await screen.findByTestId("builder-save-confirm")).toHaveTextContent(
+      "Saved · still a draft",
+    )
   })
 
   it("Save draft shows an honest error state when the persist fails", async () => {
@@ -250,8 +269,11 @@ describe("WorkflowBuilderPage — OPEN existing (initial) boots into the editing
 describe("WorkflowBuilderPage — fresh build Save (no initial) creates ONCE then PATCHes", () => {
   it("first Save on a freshly-generated draft calls createWorkflowDraft, second Save PATCHes", async () => {
     mockGenerate.mockResolvedValue({ ok: true, definition: draft3 })
-    mockCreate.mockResolvedValue({ id: "created-1", version: 1 })
-    mockUpdate.mockResolvedValue({})
+    // 186-07: the create response carries the row's OPAQUE concurrency token, and the
+    // second save must echo THAT value — not the one the session started with (there
+    // was none) and not a re-derived one.
+    mockCreate.mockResolvedValue({ id: "created-1", version: 1, token: "tok-from-create" })
+    mockUpdate.mockResolvedValue({ id: "created-1", version: 1, token: "tok-from-patch" })
     const { default: userEvent } = await import("@testing-library/user-event")
     const user = userEvent.setup()
     render(<WorkflowBuilderPage />)
@@ -263,8 +285,16 @@ describe("WorkflowBuilderPage — fresh build Save (no initial) creates ONCE the
     await waitFor(() => expect(mockCreate).toHaveBeenCalledTimes(1))
     expect(await screen.findByTestId("builder-save-confirm")).toBeInTheDocument()
     // Second Save → PATCH the now-known id, no second create.
+    //
+    // 186-07 RETARGET, not a relaxation: the call now carries a THIRD argument, so the
+    // shipped two-argument matcher could no longer describe a correct call. The assertion
+    // is STRENGTHENED rather than widened — the id is still pinned, and the token the
+    // create minted is pinned alongside it, which is the guard that the write is
+    // concurrency-checked at all.
     await user.click(screen.getByTestId("builder-save-draft"))
-    await waitFor(() => expect(mockUpdate).toHaveBeenCalledWith("created-1", expect.anything()))
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith("created-1", expect.anything(), "tok-from-create"),
+    )
     expect(mockCreate).toHaveBeenCalledTimes(1)
   })
 })

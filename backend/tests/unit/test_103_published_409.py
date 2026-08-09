@@ -10,9 +10,25 @@ UPDATE/DELETE; the route catches ``asyncpg.exceptions.CheckViolationError`` -> H
 409, never a silent overwrite or a 500. The re-read after the 409 must show the
 published row's ``definition`` JSONB UNCHANGED.
 
-Live :54322 via psycopg2 / asyncpg (module-level skip-guard).
+PHASE 186 (F4 / D-186-09) — EXTENDED, NEVER REPLACED. Two things changed and both are
+asserted below: (1) a published-row PATCH now answers **409 already_published** instead
+of 404, because the route disambiguates a 0-row write with an owner-scoped probe rather
+than collapsing it to "not found"; (2) the PATCH 409's detail is an OBJECT carrying
+``code``, so the client stops matching prose. The shipped SENTENCE is byte-identical, the
+DELETE 409 stays a bare string on purpose, and the no-mutation assertions — the actual
+security outcome — are untouched.
+
+Live :54322 via psycopg2 / asyncpg.
 CONVENTION (Phase 102 posture): imports INSIDE the test bodies; the DB connect is
-guarded.
+guarded, so nothing here ever FAILS for want of a database.
+
+WHICH TESTS SKIP WITHOUT POSTGRES — WR-06. The skip is a property of the tests that need a
+database, not of this file. The two published-row FREEZE tests open a real asyncpg pool and
+carry their own ``@pytest.mark.skipif``; the two ``*_maps_check_violation_to_409`` tests are
+mock-only (``get_pg_pool`` patched to an ``AsyncMock``) and run EVERYWHERE, including a CI
+with no Postgres. Until WR-06 a module-level ``pytestmark`` gated all four, so the 23514 ->
+409 mapping — the route contract in the T-103-01-02 threat model — was unproven wherever the
+local stack was down: a guard that hides the invariant it defends is not a guard.
 """
 
 from __future__ import annotations
@@ -40,9 +56,11 @@ def _pg_reachable(dsn: str = _DSN) -> bool:
 
 PG_AVAILABLE = _pg_reachable()
 
-pytestmark = pytest.mark.skipif(
-    not PG_AVAILABLE,
-    reason=f"Local Postgres on {_DSN} not reachable; skipping live published-row-409 tests",
+#: ONE home for the skip sentence, so the per-test decorators cannot drift apart. Byte
+#: identical to the module-level ``pytestmark`` reason it replaced (WR-06), so the skip
+#: report reads exactly as it did before.
+_LIVE_DB_REASON = (
+    f"Local Postgres on {_DSN} not reachable; skipping live published-row-409 tests"
 )
 
 
@@ -77,11 +95,20 @@ def _published_definition(slug: str) -> dict:
 #    by patching the DB fn to raise the real CheckViolationError.
 
 
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
-async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
-    """LIVE: a PATCH against the OWNER's published row matches 0 draft rows -> 404,
-    and the published ``definition`` is UNCHANGED (the published-row freeze — the
-    draft routes can never mutate a published workflow)."""
+async def test_patch_published_row_is_immutable_via_route_409_and_no_mutation():
+    """LIVE: a PATCH against the OWNER's published row matches 0 draft rows and the
+    published ``definition`` is UNCHANGED (the published-row freeze — the draft routes
+    can never mutate a published workflow).
+
+    PHASE 186 (F4 / D-186-09) — THE STATUS MOVED, THE FREEZE DID NOT. Before 186 the
+    0-row write collapsed to ``None`` -> 404. Now the route runs an OWNER-SCOPED probe to
+    name the real cause, finds ``status='published'``, and answers **409
+    ``already_published``** — the same sentence the publish route has always used, now
+    object-shaped so the client branches on a code instead of matching prose. The
+    load-bearing assertion is unchanged and still below: the row did not move.
+    """
     import asyncpg
     from fastapi import HTTPException
 
@@ -96,7 +123,7 @@ async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
         body = _published_definition(slug)
         async with pool.acquire() as con:
             def_id = await con.fetchval(
-                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
                 "VALUES ($1, 1, $2, 'published', $3::jsonb, $4, false) RETURNING id",
                 slug, body["name"], __import__("json").dumps(body), owner,
             )
@@ -109,8 +136,17 @@ async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
                     body=WorkflowDefinition.model_validate(patched),
                     current_user={"id": str(owner)},
                 )
-            # The draft-only guard refuses the published row -> 404 (no mutation):
-            assert exc.value.status_code == 404
+            # The draft-only guard refuses the published row -> 409 (no mutation):
+            assert exc.value.status_code == 409
+            # F4: object-shaped, machine-readable, and the shipped sentence intact.
+            assert isinstance(exc.value.detail, dict)
+            assert exc.value.detail["code"] == "already_published"
+            assert (
+                exc.value.detail["message"]
+                == "workflow is published and cannot be modified"
+            )
+            # A published refusal carries NO token — there is nothing to retry against.
+            assert "token" not in exc.value.detail
             async with pool.acquire() as con:
                 after = await con.fetchval(
                     "SELECT definition->>'name' FROM workflow_definitions WHERE id = $1", def_id
@@ -123,6 +159,7 @@ async def test_patch_published_row_is_immutable_via_route_404_and_no_mutation():
         await pool.close()
 
 
+@pytest.mark.skipif(not PG_AVAILABLE, reason=_LIVE_DB_REASON)
 @pytest.mark.asyncio
 async def test_delete_published_row_is_immutable_via_route_404_and_row_survives():
     """LIVE: a DELETE against the OWNER's published row matches 0 draft rows -> 404,
@@ -140,7 +177,7 @@ async def test_delete_published_row_is_immutable_via_route_404_and_row_survives(
         body = _published_definition(slug)
         async with pool.acquire() as con:
             def_id = await con.fetchval(
-                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_global) "
+                "INSERT INTO workflow_definitions (slug, version, name, status, definition, created_by, is_system_global) "
                 "VALUES ($1, 1, $2, 'published', $3::jsonb, $4, false) RETURNING id",
                 slug, body["name"], __import__("json").dumps(body), owner,
             )
@@ -168,7 +205,12 @@ async def test_patch_route_maps_check_violation_to_409():
     """T-103-01-02 / key_links: when the immutability trigger fires (the TOCTOU race
     the draft guard normally prevents), the PATCH route catches the real asyncpg
     ``CheckViolationError`` (23514) and maps it to HTTP 409 — never a 500 or a silent
-    overwrite. Driven by patching the DB fn to raise the genuine error."""
+    overwrite. Driven by patching the DB fn to raise the genuine error.
+
+    DELIBERATELY UNGUARDED (WR-06): the pool is an ``AsyncMock`` and no connection is ever
+    opened, so there is nothing for a ``skipif`` to guard. Adding one to match the two live
+    freeze tests above would delete this mapping's only proof from any CI without a local
+    database."""
     from unittest.mock import AsyncMock, patch
 
     import asyncpg
@@ -195,12 +237,20 @@ async def test_patch_route_maps_check_violation_to_409():
                 current_user={"id": str(__import__("uuid").uuid4())},
             )
     assert exc.value.status_code == 409  # 23514 -> 409
+    # F4 (Phase 186): the race backstop answers with the SAME object shape as the
+    # ``already_published`` cause — one concept, one body, so the client never has to
+    # know which of the two paths produced it.
+    assert isinstance(exc.value.detail, dict)
+    assert exc.value.detail["code"] == "already_published"
+    assert exc.value.detail["message"] == "workflow is published and cannot be modified"
 
 
 @pytest.mark.asyncio
 async def test_delete_route_maps_check_violation_to_409():
     """T-103-01-02 / key_links: the DELETE route maps a genuine CheckViolationError
-    (23514) to HTTP 409 (the trigger-fires / race path)."""
+    (23514) to HTTP 409 (the trigger-fires / race path).
+
+    DELIBERATELY UNGUARDED (WR-06) — mock-only, same reasoning as the PATCH case above."""
     from unittest.mock import AsyncMock, patch
 
     import asyncpg
@@ -222,3 +272,8 @@ async def test_delete_route_maps_check_violation_to_409():
                 current_user={"id": str(__import__("uuid").uuid4())},
             )
     assert exc.value.status_code == 409  # 23514 -> 409
+    # Phase 186: the DELETE 409 keeps its BARE STRING detail, deliberately — a delete is
+    # not on the autosave path and has no stale-vs-published ambiguity to resolve. Pinned
+    # so the asymmetry with the PATCH 409 above reads as a decision, not as drift.
+    assert isinstance(exc.value.detail, str)
+    assert exc.value.detail == "workflow is published and cannot be modified"

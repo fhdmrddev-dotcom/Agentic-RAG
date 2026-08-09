@@ -47,7 +47,10 @@ import {
   type WorkflowDefinitionJSON,
   type WorkflowDeletePreview,
 } from "@/lib/api"
-import { type BuilderInitial } from "@/pages/WorkflowBuilderPage"
+// Phase 184.1-01 (D-184.1-04): the ONE canvas-gate rule, imported rather than
+// re-derived — three components now need the answer and a hand-copied three-part
+// predicate is exactly the drift this project keeps getting bitten by.
+import { type BuilderInitial, useCanvasGate } from "@/pages/WorkflowBuilderPage"
 import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 // Phase 124-02 Task 1 (WUX-01): the soul atoms (tier + glyph + needs) now come from
 // the ONE shared soulData module (Plan 01 extracted them VERBATIM from this page —
@@ -106,11 +109,15 @@ interface WorkflowsPageProps {
 type PageView = "library" | "builder"
 
 export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
+  // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
+  // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
+  // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
+  const canvasEnabled = useCanvasGate()
   const [pageView, setPageView] = useState<PageView>("library")
   // null = "All projects"; "__unbound__" = unbound; else a folder id.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   const [published, setPublished] = useState<PublishedWorkflow[]>([])
-  // Phase 143 (WF-01): the curated Starters shelf (is_global + category='starter').
+  // Phase 143 (WF-01): the curated Starters shelf (is_system_global + category='starter').
   const [starters, setStarters] = useState<PublishedWorkflow[]>([])
   const [drafts, setDrafts] = useState<WorkflowDraftRow[]>([])
   const [runFor, setRunFor] = useState<PublishedWorkflow | null>(null)
@@ -123,8 +130,18 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   //                     view (Open a draft = edit-in-place; Tweak a published =
   //                     edit the freshly-forked copy). `draftId` is the row every
   //                     save PATCHes; `label` is the header caption.
+  //
+  // Phase 186-07 (D-186-07): `token` rides along — the OPAQUE concurrency token for the
+  // row `draftId` names. It is carried at every seeding site below and echoed verbatim by
+  // `useDraftPersistence`; nothing on this page reads inside it. `null` means "no token
+  // yet", which is the honest reading for a route that has not created a row.
   const [builderInitial, setBuilderInitial] = useState<
-    { definition: WorkflowDefinitionJSON; draftId: string; label: string } | null
+    {
+      definition: WorkflowDefinitionJSON
+      draftId: string
+      label: string
+      token: string | null
+    } | null
   >(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
@@ -146,7 +163,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     const projectArg = selectedProjectId && selectedProjectId !== UNBOUND ? selectedProjectId : null
     const seq = ++publishedSeqRef.current
     // Phase 143 (D-143-2a): the Workflows-page Published shelf is MINE-only — pass
-    // scope:"mine" so the curated Starters + the mig-061 dev scaffolds (both is_global)
+    // scope:"mine" so the curated Starters + the mig-061 dev scaffolds (both is_system_global)
     // stop double-rendering here; they live in the Starters shelf. Only THIS call site
     // opts in — the composer picker + WorkspacePanel keep the default global feed.
     const rows = await listPublishedWorkflows(projectArg, undefined, { scope: "mine" })
@@ -219,6 +236,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           definition: forked,
           draftId: created.id,
           label: `Tweak · ${wf.slug} v${nextVersion}`,
+          // 186-07: the create response's own token guards the fork's first PATCH.
+          token: created.token,
         })
         setPageView("builder")
       } catch (e) {
@@ -233,7 +252,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   //    same-slug Tweak's v(N+1)) — required because UNIQUE(slug, version) is GLOBAL
   //    across all users, so two forkers of ONE shared starter can't both mint
   //    <slug> v(N+1). The server (createWorkflowDraft → POST /workflows) forces
-  //    is_global=false / status=draft / created_by=caller; the published starter row
+  //    is_system_global=false / status=draft / created_by=caller; the published starter row
   //    stays frozen. On a 409 slug/version collision (astronomically unlikely hash
   //    clash) retry once with a fresh hash (Pitfall 5). Lands in the Builder (D-143-1a). ──
   const onUseStarter = useCallback(
@@ -255,6 +274,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             definition: forked,
             draftId: created.id,
             label: `From starter · ${starter.name}`,
+            // 186-07: same as Tweak — the fresh copy's create response carries it.
+            token: created.token,
           })
           setPageView("builder")
           return
@@ -276,18 +297,48 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       definition: (draft.definition ?? {}) as WorkflowDefinitionJSON,
       draftId: draft.id,
       label: `Edit · ${draft.name ?? draft.slug} v${draft.version}`,
+      // 186-07: the ONE route that does not create — the drafts list itself now serves
+      // the token (186-03), so an edit-in-place session is guarded from its first write.
+      // `?? null` because a shelf row read before that field shipped simply has none, and
+      // an unguarded first write is the honest fallback rather than a crash.
+      token: draft.token ?? null,
     })
     setPageView("builder")
   }, [])
 
+  // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
+  // token to carry. `useDraftPersistence` creates the row on the first write and adopts
+  // the token that create returns, which is the same posture as `token: null`.
   const openBuilderFresh = useCallback(() => {
     setBuilderInitial(null)
     setPageView("builder")
   }, [])
 
+  /**
+   * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's host half.
+   *
+   * THERE IS NO ROUTER HERE (the three-homes contract: navigation is a `useState`
+   * switch), so there is no route-change hook and no router blocker. The Builder knows
+   * whether its draft is dirty; this page owns the `← Workflows` breadcrumb. So the
+   * Builder REGISTERS a predicate and the breadcrumb asks it before switching view.
+   *
+   * A REF, not state: registering must not re-render this page, and the breadcrumb reads
+   * the latest predicate at click time rather than through a closure that could be stale.
+   * When no Builder is mounted — the fresh-build chooser, the describe door, the library
+   * itself — the ref is null and `backToLibrary` behaves exactly as it did before this
+   * plan.
+   */
+  const canLeaveBuilderRef = useRef<(() => boolean) | null>(null)
+  const registerCanLeave = useCallback((canLeave: (() => boolean) | null) => {
+    canLeaveBuilderRef.current = canLeave
+  }, [])
+
   // ── Back to the library: refresh both shelves so a newly-created/edited draft
   //    (or a tweaked fork) appears WITHOUT a manual browser refresh. ──
   const backToLibrary = useCallback(() => {
+    // The guard runs FIRST and its refusal is total: nothing is refetched, no view
+    // changes, and the author is left exactly where they were with their work intact.
+    if (canLeaveBuilderRef.current !== null && !canLeaveBuilderRef.current()) return
     setPageView("library")
     refetchDrafts().catch(console.error)
     refetchPublished().catch(console.error)
@@ -305,22 +356,43 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
 
   // ── BUILDER host (the Build-card / Open / Tweak destination — three-homes, no router). ──
   if (pageView === "builder") {
+    /**
+     * Phase 184.1-01 (D-184.1-01 / D-184.1-02) — the breadcrumb group, declared once and
+     * drawn either in this page's own band (flag off, exactly as it ships) or inside the
+     * Builder's merged header row (flag on).
+     *
+     * `backToLibrary` — and with it the whole unsaved-work leave guard — stays owned HERE.
+     * What moves is where the button is PAINTED, not what it closes over: the node travels
+     * down as an opaque child and neither the door shell nor the Builder reads anything out
+     * of it. That is the difference between this re-flow and a refactor.
+     */
+    const breadcrumbGroup = (
+      <>
+        <button
+          type="button"
+          data-testid="builder-back"
+          onClick={backToLibrary}
+          className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
+        >
+          ← Workflows
+        </button>
+        <span className="text-[13px] font-medium text-foreground">
+          {builderInitial ? builderInitial.label : "Build a workflow"}
+        </span>
+        <NetNewFlag />
+      </>
+    )
+
     return (
       <div className="flex h-full flex-col bg-background">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-2">
-          <button
-            type="button"
-            data-testid="builder-back"
-            onClick={backToLibrary}
-            className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            ← Workflows
-          </button>
-          <span className="text-[13px] font-medium text-foreground">
-            {builderInitial ? builderInitial.label : "Build a workflow"}
-          </span>
-          <NetNewFlag />
-        </div>
+        {/* D-184.1-01 — flag off ⇒ this band renders exactly as it always has, and the two
+            merge props below are genuinely absent from the element. Flag on ⇒ no band here;
+            the group is hosted downstream. */}
+        {!canvasEnabled && (
+          <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+            {breadcrumbGroup}
+          </div>
+        )}
         <div className="min-h-0 flex-1">
           {/* WUX-02 (047-A): the Studio authoring entry forks into the two-door shell.
               A FRESH build opens at the "both" chooser; Open/Tweak land straight in the
@@ -333,17 +405,42 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
             def={builderInitial?.definition as DefShape | undefined}
             // Open/Tweak land in the govern door; a fresh build opens at "both".
             initialDoor={builderInitial ? "govern" : "both"}
+            // Phase 184.1-01 — SPREAD-CONDITIONAL (the D-14 idiom): with the flag off both
+            // keys are ABSENT from the element, so the door shell and the Builder are
+            // reached by a call that is byte-for-byte the one that shipped.
+            {...(canvasEnabled ? { inline: true, headerLead: breadcrumbGroup } : {})}
             // OPEN/TWEAK: the existing definition + its real row id flows straight
             // through to the Builder's `initial` (saves PATCH it). Absent → fresh build.
+            //
+            // 186-07: `token` is listed EXPLICITLY here, and that is the whole point of
+            // the line. This is a hand-built object, not a spread — a token added to the
+            // state above but forgotten here would produce a Builder that autosaves with
+            // no guard at all, and the symptom would be a silent clobber rather than a
+            // type error.
             initial={
               builderInitial
-                ? ({ definition: builderInitial.definition, draftId: builderInitial.draftId } as BuilderInitial)
+                ? ({
+                    definition: builderInitial.definition,
+                    draftId: builderInitial.draftId,
+                    token: builderInitial.token,
+                  } as BuilderInitial)
                 : undefined
             }
-            renderPublish={(_def, draftId) =>
+            // Phase 184-11 (D-184-16 debt 1): the Builder registers its unsaved-work
+            // predicate here; the breadcrumb above consults it.
+            registerCanLeave={registerCanLeave}
+            renderPublish={(_def, draftId, blockedReason, onPublishRunning) =>
               draftId ? (
                 <PublishGauntlet
                   definitionId={draftId}
+                  // Phase 186-07 (D-186-12): the gauntlet reports its in-flight flag back
+                  // to the Builder, which HOLDS autosave while it is set. Forwarded, never
+                  // interpreted — this page adds no publish state of its own.
+                  onRunningChange={onPublishRunning}
+                  // Phase 184-11 (R12): the reason publish is blocked, straight from the
+                  // Builder's live verdict. `undefined` on every other call site, which is
+                  // what keeps their trigger byte-identical.
+                  blockedReason={blockedReason}
                   // Phase 124-03 Task 2 (WUX-01, D-06): thread the authored definition
                   // (already supplied by the Builder's renderPublish) into the prepended
                   // pub-scale soul block. Additive only — zero change to the publish flow.
@@ -981,6 +1078,9 @@ function RunModal({
 }) {
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
+  // F4: read the SAME gate `doRun` reads, so the destination line cannot drift from the
+  // destination. Called here rather than threaded as a prop — one reader, no new surface.
+  const canvasEnabled = useCanvasGate()
 
   // ── WFIN-02 (D-LOCK-01) + WR-05: the KB-scope <select>. The "" option is ALWAYS the
   //    resting selection and truthfully labels the server-applied scope: for a BOUND
@@ -1254,8 +1354,28 @@ function RunModal({
           </p>
         </div>
         <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          <span className="text-[12px] text-muted-foreground">
-            Run opens a <b className="text-foreground">new chat thread</b> and streams there.
+          {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
+              going to. 188-09 retargeted `doRun` to the run surface, and the modal still
+              said "Run opens a new chat thread and streams there" right above the button.
+              It is the LAST thing a person reads before committing, so it is the one place
+              the surface cannot be vague about where they are about to land.
+
+              It is NOT a flat string swap, because there are genuinely two destinations:
+              CR-05 gated the retarget on the canvas flag, and with the flag OFF `doRun`
+              still falls through to the shipped `selectThread` + chat path. So the copy
+              reads the SAME gate the launch reads — one source, and it cannot drift from
+              the behaviour by construction. */}
+          <span className="text-[12px] text-muted-foreground" data-testid="run-destination">
+            {canvasEnabled ? (
+              <>
+                Run opens this workflow&apos;s <b className="text-foreground">run surface</b>. The
+                chat thread is still created, and stays reachable from there.
+              </>
+            ) : (
+              <>
+                Run opens a <b className="text-foreground">new chat thread</b> and streams there.
+              </>
+            )}
           </span>
           <div className="flex items-center gap-2">
             <button

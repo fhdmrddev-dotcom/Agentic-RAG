@@ -18,7 +18,7 @@ function makeNode(overrides: Partial<FolderNode> = {}): FolderNode {
     user_id: "user-1",
     name: "My Folder",
     parent_id: null,
-    is_global: false,
+    is_org_shared: false,
     created_at: "2026-01-01T00:00:00Z",
     updated_at: "2026-01-01T00:00:00Z",
     children: [],
@@ -45,7 +45,7 @@ const defaultProps = {
   creatingInParentId: null,
   onCreateCommit: vi.fn(),
   onCreateCancel: vi.fn(),
-  onToggleGlobal: vi.fn(),
+  onToggleOrgShared: vi.fn(),
 }
 
 describe("FolderNode", () => {
@@ -77,17 +77,17 @@ describe("FolderNode", () => {
 
   it("shows Folder icon always", () => {
     const { container } = renderWithTooltip(
-      <FolderNodeComponent node={makeNode({ is_global: false })} {...defaultProps} />
+      <FolderNodeComponent node={makeNode({ is_org_shared: false })} {...defaultProps} />
     )
     // Folder icon is present (lucide renders as svg)
     const svgs = container.querySelectorAll("svg")
     expect(svgs.length).toBeGreaterThan(0)
   })
 
-  it("shows global badge when is_global=true", () => {
+  it("shows global badge when is_org_shared=true", () => {
     const { container } = renderWithTooltip(
       <FolderNodeComponent
-        node={makeNode({ is_global: true })}
+        node={makeNode({ is_org_shared: true })}
         {...defaultProps}
       />
     )
@@ -97,10 +97,10 @@ describe("FolderNode", () => {
     expect(globalBadge?.textContent).toBe("G")
   })
 
-  it("does not show global badge when is_global=false", () => {
+  it("does not show global badge when is_org_shared=false", () => {
     const { container } = renderWithTooltip(
       <FolderNodeComponent
-        node={makeNode({ is_global: false })}
+        node={makeNode({ is_org_shared: false })}
         {...defaultProps}
       />
     )

@@ -4,10 +4,10 @@
  * Locks the sidebar "Automation" group of the locked G-2 sketch 037-A:
  *  - renders an "Automation" group header.
  *  - each rule row uses the SHARED NavRow with the 037-A anatomy (● name, G pill
- *    when is_global, condition summary, → folder action, enabled toggle, ⋯ kebab).
+ *    when is_system_global, condition summary, → folder action, enabled toggle, ⋯ kebab).
  *  - the enabled toggle calls updateRule(id, {enabled}); the kebab offers edit + delete
  *    (delete → deleteRule).
- *  - the G pill shows only for is_global rules.
+ *  - the G pill shows only for is_system_global rules.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
@@ -49,7 +49,7 @@ const privateEnabled: ClassificationRule = {
   name: "Acme Invoices",
   match_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "invoice" }] },
   suggest_folder_id: "folder-fin",
-  is_global: false,
+  is_system_global: false,
   enabled: true,
 }
 
@@ -59,7 +59,7 @@ const globalDisabled: ClassificationRule = {
   name: "Global Contracts",
   match_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "contract" }] },
   suggest_folder_id: "folder-legal",
-  is_global: true,
+  is_system_global: true,
   enabled: false,
 }
 
@@ -100,7 +100,7 @@ describe("AutomationGroup", () => {
     expect(screen.getByText(/Finance/)).toBeInTheDocument()
   })
 
-  it("the G pill shows only for is_global rules", () => {
+  it("the G pill shows only for is_system_global rules", () => {
     renderGroup()
     // Exactly one global rule → exactly one G pill.
     const pills = screen.getAllByText("G")

@@ -59,26 +59,78 @@ export class ApiError extends Error {
   }
 }
 
-/** Phase 148 (VIS-01 / D-04) — the four governed feature keys (the effective-map
- *  keys of `GET /features`). skill_studio + model_management are Operators-only on
- *  the day-one map; workflow_authoring + governance_health are Everyone (148-05). */
+/** Phase 148 (VIS-01 / D-04) — the governed feature keys (the effective-map keys of
+ *  `GET /features`). skill_studio + model_management are Operators-only on the day-one
+ *  map; workflow_authoring + governance_health are Everyone (148-05). Phase 181
+ *  (REVERT-01 / D-181-01) adds `visual_workflow_canvas` — the v3.6 visual-canvas master
+ *  switch, cold-default `"off"` (hidden from EVERYONE incl. operators; the SEED-115
+ *  enum-not-boolean contract). It joins the effective map automatically. */
 export type GovernedFeature =
   | "skill_studio"
   | "model_management"
   | "workflow_authoring"
   | "governance_health"
+  | "visual_workflow_canvas"
+
+// ⚠ THIS UNION IS STALE AGAINST THE SERVER, DELIBERATELY AND WITH AN OWNER — see
+// `D-190-DEF-09` in `.planning/phases/190-…/deferred-items.md`. Plan 190-09 added
+// `"live_connectors"` to the backend's `_VISIBILITY_FEATURES` (`api/admin.py`) and
+// `_GOVERNED_FEATURES` (`models/user_settings.py`, cold default `"off"`), so
+// `GET /features` DOES return the key (`api/features.py:81` iterates
+// `_GOVERNED_FEATURES`). It is NOT added here by plan 190-16 because widening this union
+// makes five `Record<GovernedFeature, …>` exhaustive maps fail to typecheck — two of them
+// inside `/admin`, which phase 190's D-25 fences ("do not add anything to /admin") — and
+// the honest completion of that half is a `FeatureVisibility.FEATURES` operator card,
+// which is a user-facing capability and belongs to its own plan, not to the Settings table.
+// 190-16 therefore reads the key through ONE documented, fail-closed reader
+// (`settings/connectionsCopy.ts` → `liveConnectorsOnFrom`) rather than half-widening the
+// type. Both halves — this union AND the operator card — land in the same later commit.
 
 /** The caller's effective feature→visible map. Partial so the fail-CLOSED `{}`
  *  fallback (hook error / pre-resolve) type-checks — an absent key reads as hidden. */
 export type EffectiveFeatures = Partial<Record<GovernedFeature, boolean>>
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 166 (D-166-06) — the active-org id injected as an `X-Org-Id` header on
+// EVERY authed request. This is a per-device UI HINT, never trusted: the server
+// re-validates it against the caller's membership (Plan 01 `get_active_org_id`,
+// on a user-JWT/RLS connection) and a forged/stale value reaches no data (403).
+//
+// Read module-level here — exactly like the access token is read from
+// `supabase.auth.getSession()` — so every existing authed call auto-carries the
+// header with ZERO call-site churn. `OrgProvider` is the sole WRITER (it calls
+// `setActiveOrgId` synchronously on every switch, D-166-08, so any effect keyed on
+// the active org sees the new header before it runs). We seed the module var from
+// localStorage at load so the very first authed call after a page reload already
+// carries the rehydrated org, before OrgProvider's mount effect re-syncs it.
+// ─────────────────────────────────────────────────────────────────────────────
+export const ACTIVE_ORG_STORAGE_KEY = "active-org-id"
+
+let _activeOrgId: string | null =
+  typeof window !== "undefined" ? window.localStorage.getItem(ACTIVE_ORG_STORAGE_KEY) : null
+
+/** The active org id injected as `X-Org-Id` (a hint — the server re-validates it). */
+export function getActiveOrgId(): string | null {
+  return _activeOrgId
+}
+
+/** Set the active org id for the header seam. Called by OrgProvider on every
+ *  switch (synchronously, D-166-08) + on mount (rehydrate). Persisting to
+ *  localStorage is OrgProvider's job (the `ACTIVE_ORG_STORAGE_KEY` single source). */
+export function setActiveOrgId(orgId: string | null): void {
+  _activeOrgId = orgId
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
   if (!token) throw new Error("Not authenticated")
+  const orgId = getActiveOrgId()
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
+    // Phase 166 (D-166-06): server RE-VALIDATES this against membership — never trusted.
+    ...(orgId ? { "X-Org-Id": orgId } : {}),
   }
 }
 
@@ -368,6 +420,11 @@ export interface StreamCallbacks {
     durationMs: number,
     outputFiles: OutputFile[],
     error?: string,
+    /** WR-02 (176): present only when the run was auto-healed (missing module
+     * installed + code re-run). The re-run streams NO code_stdout/code_stderr
+     * deltas, so the live card still holds the pre-heal error text; when set, the
+     * client replaces the streamed outputLines with this healed run of record. */
+    healed?: { stdout: string; stderr: string },
   ) => void
   /** Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01): cumulative
    * sandbox-output file list emitted after the agent loop terminates.
@@ -448,6 +505,15 @@ export interface StreamCallbacks {
    *  phase_completed for it). FLAT phase/phase_index/failure. Panel-only — the
    *  handler writes phasesByThread, never bucketsBySurface. */
   onPhaseFailed?: (phase: string, phaseIndex: number, failure?: string) => void
+  /** 189 review CR-02: phase_recorded_not_sent SSE — a governed external-action phase
+   *  RECORDED the action it intended to take and sent nothing
+   *  (`workflow_phases.status='recorded_not_sent'`; the engine emits no phase_completed
+   *  for it). Without this event the card never left `running` and BOTH store sweeps
+   *  upgraded it to `done`, so the live surface printed "✓ Complete" for the one step
+   *  whose whole point is that it did not complete — while a reload showed "Not sent".
+   *  FLAT phase/phase_index. Panel-only — the handler writes phasesByThread, never
+   *  bucketsBySurface. */
+  onPhaseRecordedNotSent?: (phase: string, phaseIndex: number) => void
   /** phase_transition SSE — moved between phases (FLAT from_phase/to_phase/via;
    *  via==="skip_to_phase" marks the from-phase skipped). */
   onPhaseTransition?: (from: string, to: string, via: string) => void
@@ -730,6 +796,14 @@ export async function subscribeToRun(
             parsed.duration_ms as number,
             (parsed.output_files ?? []) as OutputFile[],
             parsed.error as string | undefined,
+            // WR-02 (176): healed re-run's authoritative output, present only when the
+            // backend auto-healed a missing module and re-ran the code.
+            parsed.healed
+              ? {
+                  stdout: (parsed.stdout as string | undefined) ?? "",
+                  stderr: (parsed.stderr as string | undefined) ?? "",
+                }
+              : undefined,
           )
         // Phase 075.1 Plan 04 Atom E (B-260519-11 + BUG-260514-01) —
         // cumulative final-outputs panel. Backend emits exactly one
@@ -784,7 +858,8 @@ export async function subscribeToRun(
             tool_call_id: parsed.tool_call_id as string,
             prompt: parsed.prompt as string,
             options: (parsed.options ?? []) as string[],
-            timeout_seconds: parsed.timeout_seconds as number,
+            // Phase 185: `null` = no deadline (the armed action-risk checkpoint).
+            timeout_seconds: parsed.timeout_seconds as number | null,
             // D-12 (Phase 093): additive — the prior-phase draft the user confirms.
             // Optional; absent on older streams → undefined (harmless).
             draft: parsed.draft as string | undefined,
@@ -874,6 +949,15 @@ export async function subscribeToRun(
             parsed.phase as string,
             parsed.phase_index as number,
             parsed.failure as string | undefined,
+          )
+        // 189 review CR-02: a governed external-action phase that RECORDED and sent
+        // nothing gets its own event (the engine emits no phase_completed for it, and
+        // emitting nothing left the card `running` for both sweeps to paint `done`).
+        // NO return (cursor still advances, exactly like phase_failed). Panel-only.
+        else if (t === "phase_recorded_not_sent" && callbacks.onPhaseRecordedNotSent)
+          callbacks.onPhaseRecordedNotSent(
+            parsed.phase as string,
+            parsed.phase_index as number,
           )
         else if (t === "phase_transition" && callbacks.onPhaseTransition)
           callbacks.onPhaseTransition(
@@ -1223,6 +1307,20 @@ export interface ThreadWorkflowState {
    *  terminal/absent. PURE additive read (no new query, no write — the 092-05 F2
    *  invariant holds). */
   latest_producer_run_id?: string | null
+  /** Phase 188 CR-03 — the `workflow_runs` row this thread MOST RECENTLY held: the live
+   *  `active_workflow_run_id` when set, ELSE the thread's latest `workflow_runs` row. It is
+   *  the SAME value the server already resolves to source `phases` below, surfaced rather
+   *  than recomputed.
+   *
+   *  ⚠ Read THIS, not `active_workflow_run_id`, whenever the target is "the run this thread
+   *  ran" rather than "the run this thread is running now". `finish_run` NULLs the live
+   *  anchor in the same transaction as the terminal status (Phase 092 SC#2), so the anchor is
+   *  absent for exactly the FINISHED runs a re-open affordance serves.
+   *
+   *  ⚠ It is a `workflow_runs.id`, NEVER a producer `runs.run_id` — see
+   *  `latest_producer_run_id` directly above, which is the OTHER table. Both are bare uuids,
+   *  so a swap typechecks and then resolves nothing. */
+  last_workflow_run_id?: string | null
   /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
    *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
    *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
@@ -1282,7 +1380,7 @@ export async function listPublishedWorkflows(
   signal?: AbortSignal,
   /** Phase 143 (WF-01 / D-143-2b): the Workflows-page Published shelf opts into
    *  `scope: "mine"` so the backend AND-narrows to `created_by = me` (dropping the
-   *  bare `is_global`), de-duping the curated Starters + the mig-061 dev scaffolds
+   *  bare `is_system_global`), de-duping the curated Starters + the mig-061 dev scaffolds
    *  that now render in their own Starters shelf. EVERY other caller (the composer
    *  Harness picker, the WorkspacePanel run-soul recovery) OMITS it and keeps the
    *  byte-identical global-OR-mine feed those surfaces depend on (Pitfall 3). */
@@ -1303,7 +1401,7 @@ export async function listPublishedWorkflows(
 }
 
 /** Phase 143 (WF-01 / D-143-2) — GET /workflows/starters. The curated Starters-shelf
- *  feed: `is_global` published definitions carrying `definition.category = 'starter'`
+ *  feed: `is_system_global` published definitions carrying `definition.category = 'starter'`
  *  (a server-side JSONB-path predicate, `list_starter_workflows`). No project/user
  *  scope — curated globals are world-readable by the mig-056 SELECT policy, so this
  *  is a clone of listPublishedWorkflows with NO query params. The Workflows page
@@ -1576,12 +1674,13 @@ export async function listFolders(): Promise<Folder[]> {
   return res.json() as Promise<Folder[]>
 }
 
-export async function createFolder(name: string, parentId: string | null, isGlobal = false): Promise<Folder> {
+export async function createFolder(name: string, parentId: string | null, isOrgShared = false): Promise<Folder> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/folders`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ name, parent_id: parentId, is_global: isGlobal }),
+    // Phase 165 (MIG-02): the wire field is is_org_shared (folders = FUNCTIONAL org-share).
+    body: JSON.stringify({ name, parent_id: parentId, is_org_shared: isOrgShared }),
   })
   if (!res.ok) throw new Error("Failed to create folder")
   return res.json() as Promise<Folder>
@@ -1607,15 +1706,15 @@ export async function deleteFolder(id: string): Promise<void> {
   if (!res.ok) throw new Error("Failed to delete folder")
 }
 
-export async function toggleFolderGlobal(id: string): Promise<Folder> {
+export async function toggleFolderOrgShared(id: string): Promise<Folder> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/folders/${id}/toggle-global`, {
     method: "PATCH",
     headers,
   })
   if (!res.ok) {
-    if (res.status === 403) throw new Error("Only the folder owner can toggle global status")
-    throw new Error("Failed to toggle folder global status")
+    if (res.status === 403) throw new Error("Only the folder owner can change org sharing")
+    throw new Error("Failed to update folder sharing")
   }
   return res.json() as Promise<Folder>
 }
@@ -1681,17 +1780,17 @@ export class PublishGateError extends Error {
   }
 }
 
-export async function toggleSkillGlobal(id: string, override?: boolean): Promise<Skill> {
+export async function toggleSkillOrgShared(id: string, override?: boolean): Promise<Skill> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/skills/${id}/toggle-global`, {
     method: "PATCH",
     headers,
-    // Only the private→global publish direction sends a body ({ override }); the
-    // ungated global→private unshare direction (no arg) sends none — unchanged.
+    // Only the private→org-shared publish direction sends a body ({ override }); the
+    // ungated shared→private unshare direction (no arg) sends none — unchanged.
     ...(override !== undefined ? { body: JSON.stringify({ override }) } : {}),
   })
   if (!res.ok) {
-    if (res.status === 403) throw new Error("Only the skill owner can toggle global status")
+    if (res.status === 403) throw new Error("Only the skill owner can change org sharing")
     if (res.status === 409) {
       // Structured publish-gate refusal — detail is an OBJECT { error, gate }, NOT
       // a string (do NOT route through proposalError's string path). Surface the
@@ -2343,6 +2442,66 @@ export async function setJudgeModel(model: string): Promise<FullAppSettings> {
   return updateSettings({ harness_judge_model: model })
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 167 VIS-02 (D-167-04) — the per-user default-model preference client.
+//
+// The FIRST concrete SEED-116 two-layer preference: the operator/org governs the
+// ENABLED allowed-set + the lock; the user picks a default WITHIN it. Both fns hit
+// the RLS-scoped /me/preferences route (Plan 04) — getAuthHeaders() auto-carries the
+// caller's JWT (the write is keyed on auth.uid() server-side). The server is the
+// source of truth: PUT re-validates the model ∈ the allowed-set (400 otherwise) and
+// re-derives the effective pair, so the picker stays server-derived (never optimistic).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** The two-layer model-default view (`GET/PUT /me/preferences`, Plan 04). `default_model`
+ *  is the caller's own raw preference (null = unset → the operator default flows);
+ *  `effective_model` is what a new chat actually defaults to under the SEED-116 compose
+ *  (surfaced in the footer, never blank — falls back to the org default); `locked` surfaces
+ *  the operator lock (disable the picker + name the governed default); `allowed_models` is
+ *  the operator/org ENABLED set the picker offers (the user can never pick outside it). */
+export interface ModelDefault {
+  default_model: string | null
+  effective_model: string | null
+  locked: boolean
+  allowed_models: string[]
+}
+
+/** Read the caller's per-user default model + the two-layer context (`GET /me/preferences`).
+ *  A defensive `?? fallback` unwrap keeps the picker honest if the server omits a field. */
+export async function getModelDefault(): Promise<ModelDefault> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/me/preferences`, { headers, cache: "no-store" })
+  if (!res.ok) throw new ApiError("Failed to load your default model.", res.status)
+  const body = (await res.json()) as Partial<ModelDefault>
+  return {
+    default_model: body.default_model ?? null,
+    effective_model: body.effective_model ?? null,
+    locked: body.locked ?? false,
+    allowed_models: body.allowed_models ?? [],
+  }
+}
+
+/** Set (or clear) the caller's own default model (`PUT /me/preferences`). Pass `null` to
+ *  clear the override (the operator default flows). The server validates the model ∈ the
+ *  enabled allowed-set (400 otherwise — T-167-13) and honors the lock, then returns the
+ *  fresh two-layer view so the picker re-reads server-derived state (never optimistic). */
+export async function setModelDefault(model: string | null): Promise<ModelDefault> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/me/preferences`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ default_model: model }),
+  })
+  if (!res.ok) throw new ApiError("Failed to save your default model.", res.status)
+  const body = (await res.json()) as Partial<ModelDefault>
+  return {
+    default_model: body.default_model ?? null,
+    effective_model: body.effective_model ?? null,
+    locked: body.locked ?? false,
+    allowed_models: body.allowed_models ?? [],
+  }
+}
+
 // Phase 111.1 EMBED-05 — re-embed lifecycle (Plan 05 backend). Counts are derived
 // live from document_chunks on every fetch (the source of truth — reconcile-on-fetch,
 // D-v2.5-03); `status` is a cosmetic hint reconciled against the counts (counts win).
@@ -2787,7 +2946,7 @@ export async function listMetadataFields(): Promise<MetadataFieldDef[]> {
 
 /** POST /document-views — persist the current filter as a named saved view
  *  (D-114-1: Save-as-view just persists what you're looking at). The server
- *  hard-sets `is_global=false` (the body never supplies it). Returns the new
+ *  hard-sets `is_system_global=false` (the body never supplies it). Returns the new
  *  `SavedView`. */
 export async function createView(
   name: string,
@@ -2980,14 +3139,14 @@ export async function deleteRelationship(id: string): Promise<void> {
 //
 // Thin consumers of the leak-safe classification-rules router (Plans 02/03):
 //   GET    /classification-rules                          list own + global rules
-//   POST   /classification-rules                          create a rule (is_global server-owned)
+//   POST   /classification-rules                          create a rule (is_system_global server-owned)
 //   PATCH  /classification-rules/{id}                      update an owned rule (incl. the enabled toggle)
 //   DELETE /classification-rules/{id}                      delete an owned rule (204; 404-tolerant)
 //   PATCH  /documents/{id}/classification/accept           accept the suggestion (moves + stamps prior_folder_id)
 //   PATCH  /documents/{id}/classification/dismiss          dismiss the suggestion (clears _classification; no move)
 //
 // The client is NOT a trust boundary — the `match_expr` whitelist validation, the
-// `is_global` hard-set, the own+global leak-safe reads, and the accept-move folder
+// `is_system_global` hard-set, the own+global leak-safe reads, and the accept-move folder
 // re-check are all enforced server-side. The builder's "would match N" live count
 // REUSES the existing `resolveAdHoc`/`resolveFilterCount` (a rule's `match_expr` is
 // the SAME `ViewFilter` AST) — NO new count fn, NO new backend endpoint. Undo reuses
@@ -3007,7 +3166,7 @@ export async function listRules(): Promise<ClassificationRule[]> {
 }
 
 /** POST /classification-rules — create a named rule. The body is
- *  `{ name, match_expr, suggest_folder_id }` ONLY — it NEVER supplies `is_global`
+ *  `{ name, match_expr, suggest_folder_id }` ONLY — it NEVER supplies `is_system_global`
  *  (the server hard-sets it false; mirrors `createView`, T-118-04-01). The server
  *  re-runs the `match_expr` whitelist + operand validation (the client is not a
  *  trust boundary). Returns the new `ClassificationRule`. */
@@ -3155,6 +3314,38 @@ export interface WorkflowDraftRow {
   version: number
   name: string | null
   definition?: WorkflowDefinitionJSON | null
+  /**
+   * OPAQUE concurrency token (Phase 186 / D-186-07). Echo it VERBATIM on the next
+   * PATCH and treat it as bytes with no internal structure.
+   *
+   * NEVER PARSE IT INTO A JS DATE VALUE — not with the `Date` constructor, not with
+   * `Date.parse`, not with any library that wraps either. Postgres keeps microseconds
+   * and a JS date value keeps only milliseconds, so a parsed-and-re-rendered token is
+   * truncated and matches ZERO rows: every save would then refuse as stale (probed
+   * against the live database, 2026-08-01). The server renders it and the server
+   * compares it; this client only carries it.
+   */
+  token: string
+}
+
+/**
+ * What a draft WRITE answers with — the create (201) and the PATCH (200) return the
+ * identical shape, so both share this type (Phase 186 / D-186-07).
+ *
+ * `token` is the value the NEXT write must echo. A save that dropped it would leave the
+ * following one guarded by a token the server has already superseded, which is a
+ * self-inflicted stale refusal on the second keystroke.
+ *
+ * NOTE ON THE PATCH's RETURN TYPE. `updateWorkflowDraft` was declared as returning
+ * `WorkflowDefinitionJSON`; that was a type lie from the start — the route has always
+ * answered `DraftCreateResponse` (`api/workflows.py`), and nothing read the result, so
+ * nothing noticed. It is corrected here rather than left, because the autosave hook now
+ * genuinely reads the response to chain the next write.
+ */
+export interface WorkflowDraftWriteResult {
+  id: string
+  version: number
+  token: string
 }
 
 /** The structured result of POST /workflows/generate. The route returns HTTP 200
@@ -3198,11 +3389,56 @@ export class WorkflowNotFoundError extends Error {
   }
 }
 
-/** POST /workflows — create a draft. Returns {id, version}. */
+/**
+ * The draft moved since this session read it → HTTP 409 coded `stale_token`
+ * (Phase 186 / D-186-09). Another tab, another device, or the same author's older
+ * window wrote first; this write matched 0 rows and was refused rather than applied.
+ *
+ * `currentToken` is the token the server holds NOW. It exists so that "overwrite with
+ * what's on screen" costs ONE more PATCH instead of a re-read followed by a PATCH.
+ * Returning it leaks nothing: the server's disambiguating re-read is owner-scoped, so
+ * this is a token for a row the caller already owns. It is `null` when the refusal
+ * carried no token, and it is opaque here exactly as everywhere else — echo it, never
+ * inspect it.
+ */
+export class WorkflowStaleTokenError extends Error {
+  readonly currentToken: string | null
+  constructor(currentToken: string | null = null) {
+    super("this draft was changed somewhere else since you loaded it")
+    this.name = "WorkflowStaleTokenError"
+    this.currentToken = currentToken
+  }
+}
+
+/**
+ * `PATCH /workflows/{id}` answered HTTP 422 — the draft's SHAPE was rejected before the
+ * handler ran, so nothing was written (Phase 186 / D-186-04). A mid-edit definition can
+ * legitimately reach this state, and the honest answer is "not saved, and here is why",
+ * never a false `Saved ✓`.
+ *
+ * THE RAW BODY IS LOGGED HERE AND CARRIED NO FURTHER — the
+ * `WorkflowValidateUnreadableError` precedent, copied deliberately. The constructor
+ * writes it to the console once, at this boundary, and this error's `message` is a FIXED
+ * business-plain sentence with nothing interpolated into it. A validation body is a list
+ * of internal field paths and framework phrasing; pretty-printing it onto an authoring
+ * surface aimed at business users would leak implementation detail and still not say what
+ * to do. The class exists so the hook can branch on `name` rather than parse a string.
+ */
+export class WorkflowDraftUnreadableError extends Error {
+  constructor(rawBody?: unknown) {
+    super("the draft's shape could not be read, so nothing was saved")
+    this.name = "WorkflowDraftUnreadableError"
+    // Logged, never shown. One line, at the boundary that received it.
+    console.warn("PATCH /workflows/{id} → 422 (shape rejected before the handler):", rawBody)
+  }
+}
+
+/** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
+ *  token seeds the session, because three of the Builder's four entry routes create). */
 export async function createWorkflowDraft(
   def: WorkflowDefinitionJSON,
   signal?: AbortSignal,
-): Promise<{ id: string; version: number }> {
+): Promise<WorkflowDraftWriteResult> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/workflows`, {
     method: "POST",
@@ -3211,7 +3447,7 @@ export async function createWorkflowDraft(
     signal,
   })
   if (!res.ok) throw new Error(`Failed to create workflow draft (status ${res.status})`)
-  return (await res.json()) as { id: string; version: number }
+  return (await res.json()) as WorkflowDraftWriteResult
 }
 
 /** GET /workflows/drafts — the caller's own draft rows (owner-scoped server-side). */
@@ -3222,25 +3458,66 @@ export async function listDraftWorkflows(signal?: AbortSignal): Promise<Workflow
   return (await res.json()) as WorkflowDraftRow[]
 }
 
-/** PATCH /workflows/{id} — update a draft. Throws WorkflowConflictError on 409
- *  (the row is published/frozen) and WorkflowNotFoundError on 404 — a 409/404 is
- *  NEVER swallowed as success (T-103-03-04). */
+/**
+ * PATCH /workflows/{id} — update a draft. Throws WorkflowConflictError on 409
+ * (the row is published/frozen) and WorkflowNotFoundError on 404 — a 409/404 is
+ * NEVER swallowed as success (T-103-03-04).
+ *
+ * `token` is the opaque concurrency token from the response that seeded this session
+ * (Phase 186 / D-186-07). When present it travels as the conditional-request header,
+ * and the server refuses the write if the row moved since that token was minted. When
+ * absent NO header is sent and the server runs today's unguarded UPDATE — the
+ * deliberate one-release concession for a tab that was already open when the guard
+ * shipped, recorded on the route as well.
+ *
+ * The token is inserted BEFORE `signal` in the argument list. That is safe because no
+ * call site passed a third argument (verified by grep across `frontend/src`, 186-03).
+ */
 export async function updateWorkflowDraft(
   id: string,
   def: WorkflowDefinitionJSON,
+  token?: string | null,
   signal?: AbortSignal,
-): Promise<WorkflowDefinitionJSON> {
-  const headers = await getAuthHeaders()
+): Promise<WorkflowDraftWriteResult> {
+  const authHeaders = (await getAuthHeaders()) as Record<string, string>
+  // The header is ADDED, never substituted: a missing token must send no header at
+  // all, not an empty one (an empty conditional value would guard against nothing
+  // while still reading as guarded).
+  const headers: Record<string, string> =
+    typeof token === "string" && token.length > 0
+      ? { ...authHeaders, "If-Match": token }
+      : authHeaders
   const res = await fetch(`${API_BASE}/workflows/${id}`, {
     method: "PATCH",
     headers,
     body: JSON.stringify(def),
     signal,
   })
-  if (res.status === 409) throw new WorkflowConflictError()
+  if (res.status === 409) {
+    // Phase 186: this arm used to throw the body away, which made a second 409 cause
+    // invisible. Read it, and branch on the machine `code` — NEVER on the prose, and
+    // never on a narrowed union: `code` stays `string` because the SERVER owns the
+    // refusal vocabulary (the `Verdict.code` rule below, VALID-03 / D-182-06). A client
+    // allow-list would make this a second, drifting copy of a one-owner vocabulary.
+    const body = (await res.json().catch(() => ({}))) as {
+      detail?: { code?: string; token?: string }
+    }
+    const code = body.detail?.code
+    if (code === "stale_token") throw new WorkflowStaleTokenError(body.detail?.token ?? null)
+    // EVERY other value lands here: a missing body, a body that would not parse, a body
+    // with no `detail`, and a code minted after this client shipped. That is today's
+    // behaviour, kept deliberately — a refusal we cannot classify must never become a
+    // success (the WR-02 malformed-body rule, `publishWorkflow` below).
+    throw new WorkflowConflictError()
+  }
+  if (res.status === 422) {
+    // Read the body for the LOG only; a body that will not parse must not mask the 422.
+    const rawBody = await res.json().catch(() => null)
+    throw new WorkflowDraftUnreadableError(rawBody)
+  }
   if (res.status === 404) throw new WorkflowNotFoundError()
   if (!res.ok) throw new Error(`Failed to update workflow draft (status ${res.status})`)
-  return (await res.json()) as WorkflowDefinitionJSON
+  return (await res.json()) as WorkflowDraftWriteResult
 }
 
 /** DELETE /workflows/{id} — delete a draft (204). Throws WorkflowConflictError on
@@ -3255,6 +3532,277 @@ export async function deleteWorkflowDraft(id: string, signal?: AbortSignal): Pro
   if (res.status === 409) throw new WorkflowConflictError()
   if (res.status === 404) throw new WorkflowNotFoundError()
   if (!res.ok) throw new Error(`Failed to delete workflow draft (status ${res.status})`)
+}
+
+// ── Phase 184-06 (VALID-02 / VALID-03 · D-184-13 / D-184-14) — the FIRST clients of
+//    the two canvas routes Phase 182 shipped and nothing called. Both are consumed
+//    EXACTLY as shipped: this plan changes no backend file. ─────────────────────────
+
+/**
+ * One finding from `POST /workflows/validate`, exactly as the wire carries it.
+ *
+ * `code` IS DECLARED AS `string`, DELIBERATELY, AND MUST STAY THAT WAY (VALID-03 /
+ * D-182-06). The SERVER owns the whole verdict vocabulary — reachability's lint codes,
+ * grounding's fidelity codes, the two the route mints itself, and the degraded marker —
+ * and the route's own classifier FAILS CLOSED, meaning a code nobody has classified yet
+ * comes back at the hard severity rather than the soft one. The client's job is to render
+ * whatever arrives, including codes it has never seen; Phase 185 adds more of them and
+ * this file must need no edit for that. Narrowing this to a union of literals would make
+ * the client a second, drifting copy of a vocabulary that has exactly one owner — which is
+ * the red line the whole server-validation seam exists to hold. Do not "helpfully" narrow it.
+ *
+ * `phase` is the phase SLUG (== the canvas node id), or `null` for a workflow-wide
+ * finding, which therefore needs a home in the problems tray rather than on a node.
+ *
+ * ONE SHAPE, TWO DECLARATIONS, AND A COMPILE-TIME BRIDGE. `builderStore.ts` declares the
+ * structurally identical `ServerVerdict`, because it landed first and because the two
+ * modules cannot import each other: the store carries a source fence forbidding it from
+ * naming this API client at all (an undo must never be able to write to the server), and
+ * this client must not import a store that type-imports `WorkflowBuilderPage`. So instead
+ * of a silent second copy, `useLiveValidation.ts` — the one module that legitimately sees
+ * both — carries a mutual-assignability assertion, making any drift a typecheck error.
+ */
+export interface Verdict {
+  code: string
+  phase: string | null
+  message: string
+  severity: "error" | "incomplete"
+}
+
+/**
+ * The always-200 envelope of `POST /workflows/validate`, returned UNTOUCHED.
+ *
+ * `ok === (verdicts.length === 0)` is the server's invariant, not a client derivation —
+ * an `incomplete`-only verdict set still reports not-ok, because an unfinished draft
+ * cannot publish either. Nothing here interprets, filters, re-orders or re-classifies
+ * the array.
+ */
+export interface ValidateResponse {
+  ok: boolean
+  verdicts: Verdict[]
+}
+
+/**
+ * `GET /workflows/grounding-bundle` — the server-sourced palette of valid building
+ * blocks (the CANVAS-04 tool whitelist, the KB folder tree, the enabled skills).
+ *
+ * `degraded` IS THE HONESTY FIELD AND IT IS NOT OPTIONAL READING. It names the registries
+ * whose read FAILED, sorted. An EMPTY array is the ONLY value that means "this palette is
+ * complete" — because a registry blip serves `{folders: [], skills: []}` at HTTP 200,
+ * which is byte-indistinguishable from an author who genuinely owns nothing. A picker
+ * that renders an empty-but-normal dropdown on a failed read is telling the user
+ * something false, so a caller MUST branch on this rather than on emptiness.
+ */
+export interface GroundingBundle {
+  tools: string[]
+  /** D-185-09 — the SERVER's safety-defining list of knowledge-base-reading tool names.
+   *  The client intersects it with a step's `available_tools` to PREDICT the lock; it
+   *  never enforces (the run-time gate is server-side and unconditional), so a wrong
+   *  read here is a display bug by construction. Never re-declare this list client-side. */
+  kb_tools: string[]
+  folders: { id: string; name: string; parent_id: string | null }[]
+  skills: { id: string; name: string | null }[]
+  template_placeholders: string[]
+  degraded: string[]
+}
+
+/**
+ * `POST /workflows/validate` answered HTTP 422 — the definition's SHAPE was rejected
+ * before the handler ran (the model's forbid-extra-keys tier, or one of the two
+ * cross-field model validators), so the always-200 envelope was bypassed entirely.
+ *
+ * THE RAW BODY IS LOGGED HERE AND CARRIED NO FURTHER (D-184-14 / T-184-06-01). The
+ * constructor writes it to the console once, at this boundary, and the error's `message`
+ * is a FIXED business-plain sentence with nothing interpolated into it. A validation
+ * error body is a list of internal field paths and framework phrasing; pretty-printing it
+ * onto an authoring surface aimed at business users would leak implementation detail and
+ * still not tell them what to do. Turning those bodies into something a person can act on
+ * is a server-side envelope change that is deliberately deferred — it is not a job for a
+ * client-side formatter, and this class exists so the hook can branch on `name` rather
+ * than parse a string.
+ */
+export class WorkflowValidateUnreadableError extends Error {
+  constructor(rawBody?: unknown) {
+    super("the workflow's shape could not be read by the validator")
+    this.name = "WorkflowValidateUnreadableError"
+    // Logged, never shown. One line, at the boundary that received it.
+    console.warn("POST /workflows/validate → 422 (shape rejected before the handler):", rawBody)
+  }
+}
+
+/**
+ * POST /workflows/validate — the live structural check (VALID-02).
+ *
+ * Takes a RAW definition, never a draft id, so an UNSAVED draft validates with no save
+ * and no row. Returns the `{ok, verdicts}` envelope verbatim: no severity classifier, no
+ * code allow-list, no friendly-message map. The 422 branch is typed and comes BEFORE the
+ * generic not-ok throw, because a shape rejection and an unreachable server are different
+ * things the caller must be able to word differently (D-184-14).
+ *
+ * `signal` is the house signature and is what makes the live loop's abort-on-new-edit
+ * possible; an abort surfaces as the usual DOM abort error and is the caller's to ignore.
+ */
+export async function validateWorkflow(
+  def: WorkflowDefinitionJSON,
+  signal?: AbortSignal,
+): Promise<ValidateResponse> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/validate`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(def),
+    signal,
+  })
+  if (res.status === 422) {
+    // Read the body for the LOG only; a body that will not parse must not mask the 422.
+    let body: unknown = null
+    try {
+      body = await res.json()
+    } catch {
+      body = null
+    }
+    throw new WorkflowValidateUnreadableError(body)
+  }
+  if (!res.ok) throw new Error(`Failed to validate workflow (status ${res.status})`)
+  return (await res.json()) as ValidateResponse
+}
+
+/**
+ * GET /workflows/grounding-bundle — the palette (CANVAS-04).
+ *
+ * `templateAssetId` is appended only when supplied; the base palette returns an empty
+ * placeholder list. The response is returned untouched, `degraded` included — see the
+ * `GroundingBundle` docblock for why that field, and not emptiness, is what a caller
+ * must branch on.
+ */
+export async function getGroundingBundle(
+  templateAssetId?: string,
+  signal?: AbortSignal,
+): Promise<GroundingBundle> {
+  const headers = await getAuthHeaders()
+  const query =
+    templateAssetId !== undefined && templateAssetId !== null && templateAssetId !== ""
+      ? `?template_asset_id=${encodeURIComponent(templateAssetId)}`
+      : ""
+  const res = await fetch(`${API_BASE}/workflows/grounding-bundle${query}`, { headers, signal })
+  if (!res.ok) throw new Error(`Failed to load the grounding bundle (status ${res.status})`)
+  return (await res.json()) as GroundingBundle
+}
+
+// ── Phase 188 Plan 08 (RUNVIZ-03 / D-188-14 / D-188-15) — the ONE net-new read that
+//    gives a workflow RUN an address. Mirrors `GET /workflow-runs/{id}` (Plan 03).
+//    Sited beside the two other canvas-gated reads above rather than beside
+//    `getThreadWorkflow`, because it shares their gate, not their router. ──────────
+
+/** One durable `workflow_phases` row as the run read returns it (backend
+ *  `WorkflowRunPhaseRead`). `status` is the **DB-native** vocabulary
+ *  (`pending | active | completed | failed | skipped`) and is deliberately
+ *  untranslated on the wire — `@/lib/phaseState`'s `phaseStatusFromDb` owns the one
+ *  mapping to the client union, and this client must never grow a second one.
+ *  `phase_type` is derived server-side from the definition JSON (the table stores no
+ *  such column), so it is nullable for a slug the definition no longer names. */
+export interface WorkflowRunPhase {
+  slug: string
+  phase_index: number
+  status: string
+  phase_type: string | null
+}
+
+/**
+ * One workflow run + the definition version that RAN + its durable phase spine
+ * (backend `WorkflowRunRead`, `api/workflow_runs.py`).
+ *
+ * ⚠ **THE ID TRAP.** `WorkflowRunRead.id` is a `workflow_runs.id`. It is **NOT**
+ * `PostMessageResponse.run_id`, which is the producer `runs` row consumed by
+ * `GET /runs/{id}/stream`. **They are different tables with different id spaces** —
+ * `backend/app/api/runs.py:714-729` has to resolve a `workflow_runs.id` handed to a
+ * `runs` route as a documented repair, which is the whole reason this route is spelled
+ * `/workflow-runs/{id}` and not `/runs/{id}` (D-188-15). Navigating the run surface with
+ * the wrong one yields a page that resolves nothing, and the two ids look identical
+ * (both bare uuids), so the compiler cannot help — read the field name.
+ *
+ * **Why `definition` is returned INLINE, and why it is the version that ACTUALLY ran
+ * (D-188-14).** The server joins it on `workflow_runs.definition_id`, never by slug:
+ * `listPublishedWorkflows` only ever returns the *current* published version, so a
+ * re-opened older run resolved by slug would be drawn against a definition it never
+ * executed — a spine whose steps the run never had. Carrying it inline also means a
+ * terminal run renders with no stream and no second fetch.
+ *
+ * **`claimed_at` is the ONLY honest elapsed anchor.** `workflow_runs` has no
+ * `started_at` and no `completed_at` (measured — `supabase/full-schema.sql`), so a
+ * duration is `updated_at − claimed_at` and a null `claimed_at` means the run has not
+ * started processing at all. See `WorkflowRunPage`'s elapsed contract (D-188-18).
+ *
+ * The degrade path Plan 03 recorded: if the definition row cannot be read, the server
+ * returns `workflow_name: ""` / `workflow_slug: ""` / `workflow_version: 0` /
+ * `definition: null` rather than 404ing. Treat an empty `workflow_name` as "definition
+ * unavailable", never render the empty string.
+ */
+export interface WorkflowRunRead {
+  /** `workflow_runs.id` — NOT `PostMessageResponse.run_id`. See the docblock. */
+  id: string
+  /** The thread this run streamed into. The deliverable list and the live phase slice
+   *  are both reachable from it, which is why no new file endpoint was needed. */
+  thread_id: string
+  definition_id: string
+  workflow_name: string
+  workflow_slug: string
+  workflow_version: number
+  /** `active | paused | cap_paused | completed | failed | cancelled` — the
+   *  `workflow_runs_status_check` members. Consumers must map it TOTALLY: an
+   *  unrecognised value reads as unknown, never as success. */
+  status: string
+  created_at: string | null
+  /** When the worker picked the run up. **The elapsed anchor** — null ⇒ queued. */
+  claimed_at: string | null
+  updated_at: string | null
+  /** The raw `workflow_definitions.definition` JSONB of the version that ran. */
+  definition: WorkflowDefinitionJSON | null
+  phases: WorkflowRunPhase[]
+}
+
+/**
+ * GET /workflow-runs/{id} — the run read (Plan 03). Ownership-gated server-side: a run
+ * belonging to another account is indistinguishable from one that does not exist, and
+ * both are a 404.
+ *
+ * Throws the shipped status-carrying `ApiError` rather than the bare `Error` most reads
+ * in this file use, because the run surface has to WORD a 404 ("That run isn't
+ * available.") differently from a 5xx ("We couldn't load this run."). That is the
+ * existing in-tree convention (`ApiError`, used by `postMessage`), not a second one —
+ * the alternative would have been a bespoke error class per outcome, which is what
+ * `getWorkflowDeletePreview` does and what this deliberately does not multiply.
+ * `ApiError`'s 403 side-effect cannot fire here: it is gated on the exact
+ * `VISIBILITY_REFUSAL` literal, and this route's gate answers `{"detail": "Not Found"}`.
+ *
+ * ⚠ APPENDED BY 188.1-04 (WR-07), not a rewrite of the above. The run id is now encoded
+ * into the path segment. The ownership gate this docblock already describes is the
+ * SECURITY control and is unchanged; the encode is the defensive URL construction that
+ * pairs with it, in the `listRelationships` register. A falsification in
+ * `pages/WorkflowRunPage.test.tsx` asserts the URL a mocked `fetch` actually RECEIVES for
+ * `runId = "a/b"` — it was observed RED before the encode was written.
+ *
+ * The unused `signal` parameter is DELIBERATELY left alone (D4). The same review
+ * paragraph proposed threading an `AbortController` through it; that changes request-
+ * cancellation behaviour on a live polling surface and is a behaviour change this
+ * refactor phase may not make. Re-open trigger: the next phase touching
+ * `WorkflowRunPage`'s fetch lifecycle, or a superseded read causing a visible defect.
+ */
+export async function getWorkflowRun(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<WorkflowRunRead> {
+  const headers = await getAuthHeaders()
+  // encodeURIComponent the id (WR-07): run ids are UUIDs today so this is safe in
+  // practice, but `/`, `?` and `#` are STRUCTURAL in a path segment — defensive URL
+  // construction keeps a non-UUID value from reshaping the request the client sends
+  // (and pairs with the route's ownership gate, which answers a uniform 404).
+  const res = await fetch(`${API_BASE}/workflow-runs/${encodeURIComponent(runId)}`, {
+    headers,
+    signal,
+  })
+  if (!res.ok) throw new ApiError(`Failed to load the run (status ${res.status})`, res.status)
+  return (await res.json()) as WorkflowRunRead
 }
 
 // ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
@@ -3937,8 +4485,11 @@ export interface UserRosterPage {
  *  the SEED-115 extensible-audience forward-compat contract: the two-position control
  *  is the degenerate two-audience case of a value designed to grow into an audience
  *  picker (IdP groups / departments at v3.4). `everyone` = all end users see it;
- *  `operators` = operators only (end users are refused server-side, not just hidden). */
-export type FeatureAudience = "everyone" | "operators"
+ *  `operators` = operators only (end users are refused server-side, not just hidden);
+ *  `off` = hidden from EVERYONE incl. operators — the Phase 181 (REVERT-01 / D-181-01)
+ *  master switch that hides an entire feature layer (the visual_workflow_canvas Off state,
+ *  resolved BEFORE the operator bypass so flag-off is byte-identical for all). */
+export type FeatureAudience = "everyone" | "operators" | "off"
 
 /** Read the users roster (`GET /admin/users`, 148-06). Plain authed GET — the router
  *  gate returns 404 to non-operators; this cross-user read is floor-EXEMPT (the `/runs`
@@ -4024,6 +4575,53 @@ export async function setFeatureVisibility(
     method: "PUT",
     headers,
     body: JSON.stringify({ feature, audience }),
+  })
+  if (!res.ok) throw new ApiError("Failed to update feature visibility.", res.status)
+}
+
+/** Phase 167 (VIS-01 / D-167-06) — the 4-tier org roles a `role` greenlist can name.
+ *  The server allowlist-validates every role ⊆ this set (400 on a bad role); the client
+ *  control is render-only (never the boundary — T-167-10b). */
+export type GreenlistRole = "super-admin" | "org-admin" | "dept-admin" | "member"
+
+/** One governed feature's persisted visibility record (`GET /admin/visibility`, Phase 167
+ *  WR-05). `audience` is the ENUM value (cold-default aware); `roles` is the greenlist,
+ *  meaningful only when `audience === "role"`. */
+export interface FeatureVisibilityRecord {
+  audience: FeatureAudience | "role"
+  roles: GreenlistRole[]
+}
+
+/** Read the persisted per-feature audience + greenlist map (`GET /admin/visibility`, Phase 167
+ *  WR-05). Seeds the Control Room's visibility/greenlist UI from SERVER truth on mount so an
+ *  operator never sees a stale default audience after a reload. Operator-gated (404 to
+ *  non-operators); floor-EXEMPT config read. Returns a `{feature: {audience, roles}}` map. */
+export async function getFeatureVisibility(): Promise<
+  Record<GovernedFeature, FeatureVisibilityRecord>
+> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/visibility`, { headers, cache: "no-store" })
+  if (!res.ok) throw new ApiError("Failed to load feature visibility.", res.status)
+  const body = (await res.json()) as { features?: Record<GovernedFeature, FeatureVisibilityRecord> }
+  return body.features ?? ({} as Record<GovernedFeature, FeatureVisibilityRecord>)
+}
+
+/** Set a governed feature's audience to a ROLE greenlist (`PUT /admin/visibility`, Phase
+ *  167 / VIS-01 / D-167-06). Extends setFeatureVisibility's binary audience to the `role`
+ *  audience: the SAME allowlist-validated PUT, plus a `roles[]` greenlist the server checks
+ *  ⊆ the 4-tier set BEFORE any write (400 otherwise — SQLi-safe). The greenlist resolver
+ *  makes hide == refuse (the UI hide and the API 403 can never disagree). Pass `roles=[]`
+ *  for the everyone/operators audiences — they ignore it. */
+export async function setFeatureAudience(
+  feature: GovernedFeature,
+  audience: string,
+  roles: string[] = [],
+): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/admin/visibility`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({ feature, audience, roles }),
   })
   if (!res.ok) throw new ApiError("Failed to update feature visibility.", res.status)
 }
@@ -4431,4 +5029,777 @@ export async function getPublicConfig(): Promise<PublicConfig | null> {
   } catch {
     return null
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 166 (ADMIN-01..05) — the org-admin surface client (the user-side mirror
+// of the /admin operator client above). Backs `useOrgPermissionsProbe`, the org
+// switcher, the read-only Members tab, and the lighter org-scoped Audit tab.
+//
+// SECURITY NOTE (mirror of the /admin note): these functions decide RENDERING
+// ONLY. The backend `require_org_manage` router gate (Plan 01) over mig 104's
+// `current_user_has_permission` SECDEF helper is the sole authority — a forged
+// `can_manage`/`can_audit_view` in the browser reaches no data (a non-manager's
+// `/org/members` + `/org/audit` return 403). `X-Org-Id` is a hint the server
+// re-validates against membership; a spoofed active org is a 403, never trusted.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One membership row from `GET /org/me` `memberships[]` (org_members JOIN
+ *  organizations). Feeds the org switcher — which renders only at 2+ (D-166-02). */
+export interface OrgMembership {
+  org_id: string
+  name: string
+  role: string
+}
+
+/** The org-permissions probe payload from `GET /org/me` (Plan 01). `can_manage`
+ *  gates the shell/rail shield; `can_audit_view` unlocks the cross-member audit
+ *  read; `memberships` feeds the switcher. RENDER-ONLY (the backend gate is the wall). */
+export interface OrgPermissions {
+  /** The server-validated active org (null only on the fail-closed default). */
+  org_id: string | null
+  role: string
+  can_manage: boolean
+  can_audit_view: boolean
+  /** Phase 168 (SSO-01): true while the caller holds `sso:manage` — gates the SSO tab
+   *  (render-only; the backend `require_sso_manage` gate is the wall, T-168-06). Lockstep
+   *  sibling of `can_manage`/`can_audit_view`; fail-closed default `false`. */
+  can_manage_sso: boolean
+  memberships: OrgMembership[]
+}
+
+/** The server-derived adoption projection (Phase 167 / INV-01): `active` (a membership
+ *  row exists), `pending` (a still-pending invite, no membership yet), `not-yet-invited`
+ *  (neither). Computed server-side via `derive_adoption_state` — NEVER a client flag. */
+export type AdoptionState = "not-yet-invited" | "pending" | "active"
+
+/** One roster row from `GET /org/members` (org_members JOIN auth.users). `email` is null
+ *  if unresolved. Phase 167 adds the server-derived adoption `state` (members are always
+ *  `active`) for the roster's adoption chip (INV-01). */
+export interface OrgMember {
+  user_id: string
+  email: string | null
+  role: string
+  joined_at: string | null
+  /** Server-derived adoption state (INV-01). A membership row is always `active`. */
+  state?: AdoptionState
+}
+
+/** A still-PENDING invitee surfaced on `GET /org/members` `pending_invitations[]` (Phase
+ *  167 / INV-01). It is NOT yet an `org_members` row — it carries the invite `id` (for
+ *  resend/revoke) + the `pending` adoption state so the roster renders it as a pending chip. */
+export interface PendingInvitation {
+  id: string
+  email: string | null
+  role: string
+  status: string
+  state: AdoptionState
+  invited_at: string | null
+  expires_at: string | null
+}
+
+/** One server page of the org members roster. 1-based; the server clamps
+ *  `page_size` <= 100. `total` is the org's member count (COUNT behind the manage gate).
+ *  Phase 167 adds `pending_invitations` — the org's still-pending invitees for the roster
+ *  adoption chips (INV-01); optional so pre-167 callers/fixtures still typecheck. */
+export interface OrgMembersPage {
+  members: OrgMember[]
+  pending_invitations?: PendingInvitation[]
+  page: number
+  page_size: number
+  total: number
+}
+
+/** One org-scoped `audit_log` row from `GET /org/audit`. Same RAW platform
+ *  vocabulary as the operator platform-audit (`action_type` is a code the UI maps
+ *  to a plain-first label); `org_id` is always the active org (never cross-org). */
+export interface OrgAuditRow {
+  id: string
+  user_id: string | null
+  action_type: string
+  metadata: Record<string, unknown> | null
+  created_at: string
+  org_id: string
+}
+
+/** The filter shape for the org audit browse (the lighter cut — single source,
+ *  no CSV, no user filter). `since` is a chip preset (7d/30d/90d); `actionType`
+ *  maps to the single `action_type` query param. */
+export interface OrgAuditFilters {
+  since?: string | null
+  actionType?: string | null
+}
+
+/** One server page of the org audit browse. `scope` is the load-bearing honesty
+ *  flag: `"all"` = the caller holds `org:audit_view` (all org rows); `"own"` = the
+ *  RLS-honest degrade (own rows only) the UI banners — NEVER a silent empty list
+ *  (D-166-04). `total` is the COUNT of the (scoped) filtered set for the pager. */
+export interface OrgAuditPage {
+  entries: OrgAuditRow[]
+  total: number
+  page: number
+  page_size: number
+  scope: "all" | "own"
+}
+
+/** The org-permissions probe. Calls `GET /org/me` (floor-exempt) and returns the
+ *  caller's org identity + permissions + memberships. Mirrors `getOperatorProbe`
+ *  (typed GET, `ApiError` on non-OK) but has NO 404→null idiom — every member
+ *  reaches their own org's probe (200). The active org is carried by the `X-Org-Id`
+ *  header (server-validated), so no arg is needed. RENDER-ONLY (backend gate is the wall). */
+export async function getOrgPermissions(): Promise<OrgPermissions> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/me`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the org permissions.", res.status)
+  const body = (await res.json()) as Partial<OrgPermissions>
+  return {
+    org_id: body.org_id ?? null,
+    role: body.role ?? "member",
+    can_manage: body.can_manage ?? false,
+    can_audit_view: body.can_audit_view ?? false,
+    // Phase 168 (SSO-01): fail-closed unwrap — an absent/false flag hides the SSO tab.
+    can_manage_sso: body.can_manage_sso ?? false,
+    memberships: body.memberships ?? [],
+  }
+}
+
+/** Read the read-only org members roster (`GET /org/members`, Plan 01 — manager-only).
+ *  Mirrors `getUsersRoster`: 1-based pagination, `pageSize` clamped server-side, an
+ *  envelope `{members, page, page_size, total}` unwrapped defensively (CR-01 precedent). */
+export async function getOrgMembers(page = 1, pageSize = 50): Promise<OrgMembersPage> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams({
+    page: String(Math.max(1, page)),
+    page_size: String(pageSize),
+  })
+  const res = await fetch(`${API_BASE}/org/members?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the org members.", res.status)
+  const body = (await res.json()) as Partial<OrgMembersPage>
+  return {
+    members: body.members ?? [],
+    // Phase 167 (INV-01): the still-pending invitees for the roster's adoption chips.
+    pending_invitations: body.pending_invitations ?? [],
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+    total: body.total ?? 0,
+  }
+}
+
+/** Shared query-string builder for the org audit browse (the lighter single-source
+ *  cut of `platformAuditParams`). */
+function orgAuditParams(filters: OrgAuditFilters): URLSearchParams {
+  const params = new URLSearchParams()
+  if (filters.since) params.set("since", filters.since)
+  if (filters.actionType) params.set("action_type", filters.actionType)
+  return params
+}
+
+/** Browse the org-scoped `audit_log` (`GET /org/audit`, Plan 01 — manager-only).
+ *  Mirrors `getPlatformAudit` (params builder + defensive envelope unwrap) but keeps
+ *  the single-source `scope` flag: on the own-only degrade the UI banners "you see
+ *  only your own activity" instead of a silent empty list (D-166-04). 1-based
+ *  pagination; the server clamps `pageSize` <= 100. */
+export async function getOrgAudit(
+  filters: OrgAuditFilters,
+  page = 1,
+  pageSize = 50,
+): Promise<OrgAuditPage> {
+  const headers = await getAuthHeaders()
+  const params = orgAuditParams(filters)
+  params.set("page", String(Math.max(1, page)))
+  params.set("page_size", String(pageSize))
+  const res = await fetch(`${API_BASE}/org/audit?${params}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the org audit activity.", res.status)
+  const body = (await res.json()) as Partial<OrgAuditPage>
+  return {
+    entries: body.entries ?? [],
+    total: body.total ?? 0,
+    page: body.page ?? page,
+    page_size: body.page_size ?? pageSize,
+    scope: body.scope === "all" ? "all" : "own",
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 168 (SSO-01) — the SSO connection client fns. Backs the SSO tab (the
+// org-admin manage surface) + the identifier-first login route lookup + the
+// silent JIT provision that runs on the SSO callback.
+//
+// SECURITY NOTE (mirror of the /org note above): the manage fns decide RENDERING
+// ONLY. The backend `require_sso_manage` router gate (Plan 04) over mig 104's
+// `current_user_has_permission` SECDEF helper is the sole authority — a forged
+// `can_manage_sso` in the browser reaches no data (T-168-06). The management
+// token / any provider secret is NEVER returned to or stored in the browser
+// (T-168-04) — only the opaque `provider_id` + lifecycle fields cross the wire.
+//
+// `getSsoRoute` is the ONE exception to the `getAuthHeaders` shape: it is called
+// PRE-auth from the login page (before any session/active-org exists), so it is a
+// BARE fetch with no `Authorization`/`X-Org-Id` — the endpoint is membership-free
+// and boolean-only (anti-enumeration, T-168-10). `createSsoProvider` /
+// `updateSsoProvider` read the server `{detail}` before throwing so the four
+// UI-SPEC create-error messages (public-domain reject, metadata-URL unreachable,
+// etc.) surface verbatim to the SsoTab (mirror of postMessage's 099-08 unwrap).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One SSO connection row from `GET /org/sso/providers` (Plan 04). `provider_id` is the
+ *  opaque GoTrue provider handle (null only in the brief create window); `status` is server
+ *  truth — only `active` routes logins (`pending_approval` awaits operator approval, D-168-05).
+ *  NO secret / management token is ever present on this shape (T-168-04). */
+export interface SsoConfig {
+  id: string
+  email_domain: string
+  provider_id: string | null
+  status: "pending_approval" | "active" | "disabled"
+  approved_at: string | null
+}
+
+/** Read a non-OK response's FastAPI `{detail}` string (or a fallback) so the server's
+ *  actionable create/update copy (public-domain reject, unreachable metadata URL) survives
+ *  onto the thrown `ApiError` (mirror of postMessage's 099-08 detail unwrap). */
+async function ssoErrorDetail(res: Response, fallback: string): Promise<string> {
+  const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+  return typeof body?.detail === "string" ? body.detail : fallback
+}
+
+/** Look up whether an email domain routes to an active SSO connection (`GET
+ *  /org/sso/route?domain=`, Plan 04). Called PRE-auth from the identifier-first login page,
+ *  so it is a BARE fetch — NO `Authorization`, NO `X-Org-Id` (the endpoint is fully public +
+ *  boolean-only, anti-enumeration T-168-10). Defensive `{ sso: body.sso ?? false }`. The
+ *  login form fails OPEN to the password field if this throws (D-168-02 / SC#3). */
+export async function getSsoRoute(domain: string): Promise<{ sso: boolean }> {
+  const params = new URLSearchParams({ domain })
+  const res = await fetch(`${API_BASE}/org/sso/route?${params}`)
+  if (!res.ok) throw new ApiError("Failed to look up the SSO route.", res.status)
+  const body = (await res.json()) as { sso?: boolean }
+  return { sso: body.sso ?? false }
+}
+
+/** List the active org's SSO connections (`GET /org/sso/providers`, Plan 04 — sso:manage-
+ *  gated). Mirrors `getOrgMembers`: `getAuthHeaders()` auto-injects `X-Org-Id`, `ApiError`
+ *  on non-OK, a defensive envelope unwrap. */
+export async function listSsoConfigs(): Promise<SsoConfig[]> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the SSO connections.", res.status)
+  const body = (await res.json()) as { providers?: SsoConfig[] }
+  return body.providers ?? []
+}
+
+/** Create an SSO connection from an IdP metadata URL + email domain (`POST
+ *  /org/sso/providers`, Plan 04 — sso:manage-gated). The server calls the provider-CRUD API
+ *  first (fail-closed), rejects public domains 422 BEFORE any provider call (Control 1), and
+ *  lands the row `pending_approval` (D-168-05). The server `{detail}` is surfaced verbatim so
+ *  the SsoTab renders the actionable create-error copy. NEVER carries a secret in/out. */
+export async function createSsoProvider(
+  metadataUrl: string,
+  emailDomain: string,
+): Promise<SsoConfig> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ metadata_url: metadataUrl, email_domain: emailDomain }),
+  })
+  if (!res.ok) {
+    throw new ApiError(await ssoErrorDetail(res, "Failed to add the SSO connection."), res.status)
+  }
+  return (await res.json()) as SsoConfig
+}
+
+/** Update an SSO connection (`PUT /org/sso/providers/{id}`, Plan 04 — sso:manage-gated). A
+ *  domain change re-runs the public-domain blocklist server-side; the server `{detail}` is
+ *  surfaced verbatim (same actionable-copy contract as create). */
+export async function updateSsoProvider(
+  id: string,
+  patch: { metadata_url?: string; email_domain?: string },
+): Promise<SsoConfig> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers/${id}`, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) {
+    throw new ApiError(await ssoErrorDetail(res, "Failed to update the SSO connection."), res.status)
+  }
+  return (await res.json()) as SsoConfig
+}
+
+/** Remove an SSO connection (`DELETE /org/sso/providers/{id}`, Plan 04 — sso:manage-gated).
+ *  The server deletes the GoTrue provider FIRST, then the row (no orphan, T-168-09); a 502
+ *  keeps the row on upstream failure. Returns 204 No Content (no body to parse). */
+export async function deleteSsoProvider(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/providers/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to remove the SSO connection.", res.status)
+}
+
+/** Silently provision org membership for a first-time SSO user (`POST /org/sso/provision`,
+ *  Plan 04 — get_current_user ONLY, NO X-Org-Id / org gate). The server resolves the org from
+ *  the caller's AUTHENTICATED SSO identity (`auth.identities`, never a client claim) and
+ *  hardcodes role `member` (D-168-03 / T-168-03 — the client sends NO role/org). Idempotent +
+ *  join-additive (safe to call on every SIGNED_IN); a password user gets a 200 no-op
+ *  (`joined: false`). Fired by `OrgProvider` on an SSO session before the `/org/me` re-probe. */
+export async function provisionSso(): Promise<{
+  org_id: string | null
+  role: string | null
+  joined: boolean
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/sso/provision`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to provision the SSO membership.", res.status)
+  const body = (await res.json()) as {
+    org_id?: string | null
+    role?: string | null
+    joined?: boolean
+  }
+  return {
+    org_id: body.org_id ?? null,
+    role: body.role ?? null,
+    joined: body.joined ?? false,
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Org invitations (Phase 167 / INV-01 + INV-02) — the invitation client fns.
+//
+// Mirrors the `getOrgMembers`/`getOrgAudit` shape exactly: `getAuthHeaders()` auto-
+// injects the active-org `X-Org-Id` (D-166-06) so the server RE-VALIDATES the caller's
+// org membership + the `org:invite` gate (the client is never the boundary — T-167-17);
+// `ApiError` on non-OK; a defensive `?? fallback` envelope unwrap. The write bodies
+// (send/accept) are JSON-serialized. Delivery is link-first (D-167-02): send/resend
+// return the raw-token invite LINK for the inviter to copy/share (T-167-18 — the raw
+// token lives ONLY in that link, never stored/logged separately).
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One invitation row from `GET /org/invitations` (Phase 167). `token_hash` is NEVER
+ *  returned (T-161-04) — only the lifecycle-visible fields. `status` ∈
+ *  pending/accepted/expired/revoked. */
+export interface Invitation {
+  id: string
+  email: string | null
+  role: string
+  status: string
+  expires_at: string | null
+  invited_by?: string | null
+  created_at?: string | null
+}
+
+/** `POST /org/invitations` result — the copy/share `link` (raw token, link-first
+ *  D-167-02) + the created pending `invitation`. */
+export interface SendInvitationResult {
+  link: string
+  invitation: Invitation
+}
+
+/** `POST /org/invitations/accept` result — the org the invitee JOINED, their granted
+ *  `role`, and `joined` (true on the first successful join; false on an idempotent
+ *  already-accepted re-accept). */
+export interface AcceptInvitationResult {
+  org_id: string
+  role: string
+  joined: boolean
+}
+
+/** Send an org invitation (`POST /org/invitations`; org:invite-gated server-side).
+ *  Returns the link-first copy/share URL (D-167-02) + the created pending invitation.
+ *  The role is validated server-side to member/org-admin (400 otherwise). */
+export async function sendInvitation(
+  email: string,
+  role: string,
+): Promise<SendInvitationResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ email, role }),
+  })
+  if (!res.ok) throw new ApiError("Failed to send the invitation.", res.status)
+  const body = (await res.json()) as Partial<SendInvitationResult>
+  return {
+    link: body.link ?? "",
+    invitation: (body.invitation ?? {}) as Invitation,
+  }
+}
+
+/** List the active org's invitations (`GET /org/invitations`; org:invite-gated). An
+ *  optional `status` chip filters by lifecycle state. `token_hash` is never returned. */
+export async function listInvitations(status?: string): Promise<Invitation[]> {
+  const headers = await getAuthHeaders()
+  const params = new URLSearchParams()
+  if (status) params.set("status", status)
+  const qs = params.toString()
+  const res = await fetch(`${API_BASE}/org/invitations${qs ? `?${qs}` : ""}`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the invitations.", res.status)
+  const body = (await res.json()) as { invitations?: Invitation[] }
+  return body.invitations ?? []
+}
+
+/** Re-mint a fresh token + expiry for a pending invite (`POST /org/invitations/{id}/resend`;
+ *  org:invite-gated). Returns the FRESH copy/share link (D-167-02). A non-pending /
+ *  cross-org id → 404 server-side. */
+export async function resendInvitation(id: string): Promise<{ link: string }> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations/${id}/resend`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to resend the invitation.", res.status)
+  const body = (await res.json()) as { link?: string }
+  return { link: body.link ?? "" }
+}
+
+/** Revoke a pending invite (`DELETE /org/invitations/{id}`; org:invite-gated). A soft
+ *  `status='revoked'` flip server-side (keeps the audit trail); a non-pending / cross-org
+ *  id → 404. Returns 204 No Content (no body to parse). */
+export async function revokeInvitation(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) throw new ApiError("Failed to revoke the invitation.", res.status)
+}
+
+/** Accept an invitation via its raw token (`POST /org/invitations/accept`; INV-02 — the
+ *  JIT seam). Token-gated server-side (get_current_user ONLY): the org comes from the
+ *  VALIDATED token, NOT the `X-Org-Id` header (which the accept route ignores — an
+ *  invitee is not yet a member). Idempotent + join-additive (D-167-01). Consumed by
+ *  Plan 06's accept landing. */
+export async function acceptInvitation(token: string): Promise<AcceptInvitationResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/org/invitations/accept`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ token }),
+  })
+  if (!res.ok) throw new ApiError("Failed to accept the invitation.", res.status)
+  const body = (await res.json()) as Partial<AcceptInvitationResult>
+  return {
+    org_id: body.org_id ?? "",
+    role: body.role ?? "member",
+    joined: body.joined ?? false,
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 190 (CONN-02 / CONN-03) — the connector-connection client
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// Five functions in this file's EXISTING bare-`fetch` shape: `getAuthHeaders()`, an explicit
+// `res.ok` check, a typed cast. There is deliberately NO generic request wrapper in api.ts
+// and this phase does not introduce one — a wrapper here would be a 5 000-line refactor
+// smuggled in behind a feature.
+//
+// ⚠ THE COPY IS NOT HERE. Every string below is a DEVELOPER message (the `listThreads`
+// idiom, "Failed to …"), never a sentence a person reads. UI-SPEC §4c's six refusal
+// sentences and §4b's two refusal blocks are authored in the component layer as exported
+// identifiers (the `GovernanceSection.tsx:10-17` idiom), so they can be asserted by
+// character-identity. What this layer owes the component is the SERVER'S OWN `reason_code`,
+// unmodified — that code is the key into the closed §4c map, and a client that invents its
+// own wording for it produces a seventh sentence nobody ratified.
+//
+// The check action's client function landed with its endpoint in plan 190-15, in one commit —
+// the seam plan 190-09 named. Six functions now.
+
+/** The closed capability set (the backend `ConnectorCapability`, mig 116's CHECK, and
+ *  `EXTERNAL_ACTION_CAPABILITIES` are the other three spellings of this one set). */
+export type ConnectorCapability = "send_email" | "create_ticket" | "post_message"
+
+/** SMTP destination facts. There is NO password field — the credential rides `secret` on
+ *  the create/update body and is never echoed back (T7). `tls` is a closed two-member union
+ *  because D-07 requires TLS either way; there is no plaintext-SMTP member to choose. */
+export interface SendEmailConnectionConfig {
+  host: string
+  port: number
+  from_address: string
+  /** The NON-secret half of the SMTP credential pair (D-03). */
+  username?: string | null
+  tls: "starttls" | "implicit"
+}
+
+/** Jira Cloud destination facts. `account_email` is the basic-auth USERNAME half (D-03) — a
+ *  non-secret fact, which is what lets the pair be shown to an org admin without decrypting
+ *  anything. The API token rides `secret`. */
+export interface CreateTicketConnectionConfig {
+  base_url: string
+  project_key: string
+  account_email: string
+}
+
+/** Slack destination facts — a channel, and NOTHING else (D-02). There is deliberately no
+ *  `base_url` / `host` / `webhook_url`: Slack's API host is a module constant in
+ *  `app/security/egress.py`, so one of the three destinations is unforgeable by
+ *  construction. Do not add a URL field here to "make the form symmetric". */
+export interface PostMessageConnectionConfig {
+  default_channel: string
+}
+
+export type ConnectorConnectionConfig =
+  | SendEmailConnectionConfig
+  | CreateTicketConnectionConfig
+  | PostMessageConnectionConfig
+
+/** What a client is allowed to learn about a connection.
+ *
+ *  WARNING — THIS TYPE MUST NEVER DECLARE A CREDENTIAL FIELD, IN EITHER FORM. The real gate
+ *  is the Pydantic `ConnectorConnectionResponse`, which declares neither, is `extra='forbid'`,
+ *  and whose projection is fenced by a module-scope assert that makes adding one an IMPORT
+ *  failure (proved by a plant in `test_190_connectors_api.py`, observed RED as a collection
+ *  error). This type is documentation — and documentation that names a field the server never
+ *  sends invites a component to render it: first as `undefined`, then, the day somebody
+ *  "fixes" the backend to match the type, for real.
+ *
+ *  `last_check_verdict` is a QUALITY HINT the picker renders (UI-SPEC §6d), never an
+ *  authorization boundary — mig 116 says so in the column's own COMMENT. A `failed`
+ *  connection is still listed and still bindable. */
+export interface ConnectorConnection {
+  id: string
+  org_id: string
+  capability: ConnectorCapability
+  name: string
+  config: ConnectorConnectionConfig
+  is_enabled: boolean
+  last_checked_at?: string | null
+  last_check_verdict?: "not_checked" | "ok" | "failed" | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+/** A new connection. `org_id` / `created_by` are absent on purpose — the server hard-sets
+ *  both from the authenticated caller, and a body field for either would be a
+ *  tenant-selection parameter (the D-14 leak with a friendlier name). */
+export interface ConnectorConnectionCreate {
+  capability: ConnectorCapability
+  name: string
+  config: ConnectorConnectionConfig
+  /** Write-only plaintext, at this boundary and nowhere else. Encrypted before it touches
+   *  the database and never rendered back to any browser once saved (UI-SPEC §3d). */
+  secret: string
+}
+
+/** All-optional. A present `secret` is a REPLACE, never a merge — and it resets the stored
+ *  verdict to `not_checked` server-side. `capability` is absent on purpose: changing it
+ *  would orphan both the config shape and the stored credential in one edit. */
+export interface ConnectorConnectionUpdate {
+  name?: string
+  config?: ConnectorConnectionConfig
+  secret?: string
+  is_enabled?: boolean
+}
+
+/** An `ApiError` that also carries the server's machine-readable refusal code.
+ *
+ *  UI-SPEC §4d's single most likely copy defect is flattening REFUSED (we declined to open
+ *  the socket, for a security property) / UNREACHABLE (allowed, nothing answered) /
+ *  REJECTED (we reached it and IT said no) into one "could not connect". Three states, three
+ *  headings, three next steps — and the client can only keep them apart if it keeps the
+ *  server's own code. So `reasonCode` is surfaced verbatim and is NEVER translated here. */
+export class ConnectorApiError extends ApiError {
+  readonly reasonCode: string | null
+  constructor(message: string, status: number, reasonCode: string | null) {
+    super(message, status)
+    this.name = "ConnectorApiError"
+    this.reasonCode = reasonCode
+  }
+}
+
+/** Pull `detail.reason_code` out of a refusal body without inventing one.
+ *
+ *  The server sends `{"detail": {"reason_code": "...", "message": "..."}}` for the refusals
+ *  that have a code (today: `no_encryption_key`, UI-SPEC §4b moment 9 — Save goes DISABLED)
+ *  and a plain string `detail` for the ones that do not. A body carrying no code yields
+ *  `null`, which the component renders as its generic branch — never as a fabricated code
+ *  that would key into the closed §4c map and print the wrong sentence. */
+async function readConnectorReasonCode(res: Response): Promise<string | null> {
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    const detail = body?.detail
+    if (detail && typeof detail === "object" && "reason_code" in detail) {
+      const code = (detail as { reason_code?: unknown }).reason_code
+      return typeof code === "string" ? code : null
+    }
+  } catch {
+    // A non-JSON body (a proxy's HTML 502, an empty 204) is not a refusal we can key on.
+  }
+  return null
+}
+
+/** `GET /connectors/connections` — every connection in the caller's active org, optionally
+ *  narrowed to one capability (the picker's read; mig 116's `(org_id, capability)` index is
+ *  exactly this pattern). Org-WIDE: read and bind are available to every member (U-02), so a
+ *  non-admin author can still populate the picker. */
+export async function listConnectorConnections(
+  capability?: string,
+): Promise<ConnectorConnection[]> {
+  const headers = await getAuthHeaders()
+  const qs = capability ? `?capability=${encodeURIComponent(capability)}` : ""
+  const res = await fetch(`${API_BASE}/connectors/connections${qs}`, { headers })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to list connections",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection[]>
+}
+
+/** `GET /connectors/connections/{id}` — 404 for an absent id AND for another org's, with no
+ *  way to tell them apart. Do not "improve" the caller by branching on that 404. */
+export async function getConnectorConnection(id: string): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}`, { headers })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to load the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
+}
+
+/** `POST /connectors/connections` — org admins only, enforced SERVER-side (U-02). The panel
+ *  removes the button for a non-admin, but the refusal that matters is this request's.
+ *  A 503 whose `reasonCode` is `no_encryption_key` is UI-SPEC §4b moment 9: a refusal the
+ *  person cannot fix, so Save goes DISABLED rather than staying enabled over a retry. */
+export async function createConnectorConnection(
+  body: ConnectorConnectionCreate,
+): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to create the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
+}
+
+/** `PATCH /connectors/connections/{id}` — org admins only. Ownership is validated server-side
+ *  BEFORE the body is interpreted, so an unowned id 404s whatever was sent; no status here
+ *  reveals whether an id exists in some other org. */
+export async function updateConnectorConnection(
+  id: string,
+  body: ConnectorConnectionUpdate,
+): Promise<ConnectorConnection> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to update the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorConnection>
+}
+
+/** `DELETE /connectors/connections/{id}` — org admins only. 204 No Content, so there is no
+ *  body to parse. UI-SPEC §2g's graded guard (the victim-naming confirm) lives in the
+ *  component; this function is the wire call it makes once the person has confirmed. */
+export async function deleteConnectorConnection(id: string): Promise<void> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}`, {
+    method: "DELETE",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to delete the connection",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+}
+
+/** UI-SPEC §4d's THREE STATES, and they must survive to the client as DISTINCT values.
+ *
+ *  `refused`     — WE declined to open the socket, for a security property. `reasonCode`
+ *                  keys into §4c's CLOSED six-row sentence table; there is no vendor to
+ *                  quote, so `provider_message` is empty on this branch.
+ *  `unreachable` — the address is allowed and nothing answered on it. The next step is the
+ *                  network, not the token.
+ *  `rejected`    — we reached it and IT said no. This is the only bucket §5b's *"The host
+ *                  rejected this credential"* is written for.
+ *
+ *  Collapsing these into one "could not connect" is the single most likely copy defect on
+ *  this surface, and THIS TYPE is where that collapse would first become possible — a union
+ *  of three is a compile error away from becoming a boolean. Do not widen it to a string. */
+export type ConnectorCheckBucket = "refused" | "unreachable" | "rejected"
+
+/** The result of one credential check (`POST /connectors/connections/{id}/check`).
+ *
+ *  ⚠ A CHECK RETURNS A VERDICT — never the credential, in either form. The enforcing gate is
+ *  the Pydantic `ConnectorCheckResponse` (no `secret` field, no `secret_ciphertext` field,
+ *  `extra='forbid'`); this type is documentation, and documentation that named a credential
+ *  field would invite a component to render it.
+ *
+ *  `bucket` is `null` on success. `reasonCode` is the SERVER'S OWN code, unmodified — a
+ *  client that invents its own wording for it produces a seventh sentence nobody ratified. */
+export interface ConnectorCheckResult {
+  ok: boolean
+  verdict: "ok" | "failed"
+  /** WHO we authenticated as, as the vendor names it. §5c renders *"Authenticated as
+   *  {identity}"*, and it is the half that makes a green check mean something: a credential
+   *  that works for the WRONG account is a distinct failure from one that does not work. */
+  identity: string | null
+  /** The destination that was contacted, derived from the STORED row — never from a body. */
+  host: string
+  port: number | null
+  checked_at: string | null
+  bucket: ConnectorCheckBucket | null
+  /** The vendor's words VERBATIM — unparaphrased, untranslated, untruncated (071-A, the rule
+   *  §5b's `what the host said, verbatim` block binds). `""` when the vendor said nothing. */
+  provider_message: string
+  /** The guard's own `egress.REFUSAL_REASONS` code on a `refused` bucket, else `null`. */
+  reason_code: string | null
+}
+
+/** `POST /connectors/connections/{id}/check` — org admins only, enforced SERVER-side (U-02).
+ *
+ *  ⚠ IT SENDS NO BODY, AND THAT IS THE SECURITY PROPERTY RATHER THAN AN OMISSION. The check
+ *  runs on the connection ALREADY STORED, so no plaintext secret ever crosses the wire for a
+ *  non-storage purpose — and it exercises the same org-scoped resolver a RUN uses, which is
+ *  what makes a green verdict evidence about the row the engine will actually resolve. Do
+ *  not "improve" this by posting the form's fields.
+ *
+ *  It has a SIDE EFFECT (it writes the stored verdict and its timestamp), which is why it is
+ *  a POST on its own path rather than a query parameter on the read. Callers should re-fetch
+ *  the connection list afterwards rather than flipping a chip optimistically (the 068-A rule).
+ *
+ *  Authors no user-facing sentence: §5c's headline and §4c's six refusal sentences live in
+ *  the component layer as exported identifiers so they can be asserted by character-identity.
+ *  A string here is a string nobody tests for drift. */
+export async function checkConnectorConnection(id: string): Promise<ConnectorCheckResult> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/connectors/connections/${id}/check`, {
+    method: "POST",
+    headers,
+  })
+  if (!res.ok) {
+    throw new ConnectorApiError(
+      "Failed to check the credential",
+      res.status,
+      await readConnectorReasonCode(res),
+    )
+  }
+  return res.json() as Promise<ConnectorCheckResult>
 }

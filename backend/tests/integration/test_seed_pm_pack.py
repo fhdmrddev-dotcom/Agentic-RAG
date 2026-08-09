@@ -8,7 +8,7 @@ whole module SKIPS cleanly (never errors) when the local stack is down, mirrorin
 
 What is proven (the four load-bearing properties — RESEARCH ## Validation Architecture):
   - Test 1 (seed smoke + idempotency): run the seed twice → exactly 2 PM def rows
-    (pm-weekly-status-report + pm-risk-register), is_global=false, created_by=DEMO_USER_ID,
+    (pm-weekly-status-report + pm-risk-register), is_system_global=false, created_by=DEMO_USER_ID,
     status='published'. No duplicates.
   - Test 2 (def shape): each seeded def is the 2-phase ``llm_agent``(search_documents)→
     ``llm_emit``(render_template) shape with ``assets[0].kind=='template'``, a non-null
@@ -17,7 +17,7 @@ What is proven (the four load-bearing properties — RESEARCH ## Validation Arch
     (so it passes the publish gauntlet's interactive-phase pre-block).
   - Test 3 (immutability): a deliberate UPDATE of a seeded published row's ``definition``
     raises the trigger's CheckViolation (DELETE-then-INSERT is the only refresh path).
-  - Test 4 (RLS isolation): the demo folder is is_global=false and the corpus is owner-scoped
+  - Test 4 (RLS isolation): the demo folder is is_org_shared=false and the corpus is owner-scoped
     (no cross-tenant leak — the migration-019 pollution mechanism is avoided).
 
 The live corpus EMBEDDINGS step stays OFF here: the seed's ``ingest_corpus`` only fires
@@ -126,7 +126,7 @@ def _fetch_pm_defs(cur, module):
     ``test_seed_smoke_and_idempotency`` still proves the refresh path.
     """
     cur.execute(
-        "SELECT slug, is_global, created_by, status, definition "
+        "SELECT slug, is_system_global, created_by, status, definition "
         "FROM public.workflow_definitions "
         "WHERE created_by = %s AND id IN %s "
         "ORDER BY slug",
@@ -136,7 +136,7 @@ def _fetch_pm_defs(cur, module):
 
 
 def test_seed_smoke_and_idempotency():
-    """Run the seed TWICE → exactly 2 PM def rows, is_global=false, created_by=DEMO_USER_ID,
+    """Run the seed TWICE → exactly 2 PM def rows, is_system_global=false, created_by=DEMO_USER_ID,
     status='published'. No duplicates (defs refresh via DELETE-then-INSERT, never UPDATE)."""
     import psycopg2
 
@@ -151,8 +151,8 @@ def test_seed_smoke_and_idempotency():
         slugs = sorted(r[0] for r in rows)
         assert slugs == sorted(PM_SLUGS), f"expected exactly {PM_SLUGS}, got {slugs}"
         assert len(rows) == 2, f"expected exactly 2 seeded PM def rows (no duplicates), got {len(rows)}"
-        for slug, is_global, created_by, status, _definition in rows:
-            assert is_global is False, f"{slug}: must be is_global=false (per-account, never global)"
+        for slug, is_system_global, created_by, status, _definition in rows:
+            assert is_system_global is False, f"{slug}: must be is_system_global=false (per-account, never global)"
             assert str(created_by) == DEMO_USER_ID, f"{slug}: created_by must be the demo uid"
             assert status == "published", f"{slug}: must be published"
     finally:
@@ -174,7 +174,7 @@ def test_def_shape_is_two_phase_fill():
         rows = _fetch_pm_defs(cur, module)
         assert len(rows) == 2, f"expected 2 seeded PM def rows, got {len(rows)}"
 
-        for slug, _is_global, _created_by, _status, definition in rows:
+        for slug, _is_system_global, _created_by, _status, definition in rows:
             # psycopg2 returns jsonb as a parsed dict; tolerate a str just in case.
             d = definition if isinstance(definition, dict) else json.loads(definition)
             phases = d["phases"]
@@ -260,7 +260,7 @@ def test_published_def_update_blocked_by_immutability_trigger():
 
 
 def test_rls_isolation_demo_folder_is_per_account():
-    """The demo folder is is_global=false (so the migration-019 pollution RLS cannot surface
+    """The demo folder is is_org_shared=false (so the migration-019 pollution RLS cannot surface
     its docs to other tenants) AND every document in it is owned by the demo uid (no
     cross-tenant leak — the falsifiable owner-scoping check)."""
     import psycopg2
@@ -273,14 +273,14 @@ def test_rls_isolation_demo_folder_is_per_account():
         cur = conn.cursor()
         # Resolve the demo folder (the seed created/looked it up under the demo uid).
         cur.execute(
-            "SELECT id, is_global FROM public.folders "
+            "SELECT id, is_org_shared FROM public.folders "
             "WHERE user_id = %s AND name = %s ORDER BY created_at ASC LIMIT 1",
             (DEMO_USER_ID, module.DEMO_FOLDER_NAME),
         )
         frow = cur.fetchone()
         assert frow is not None, "the seed must create the per-account demo folder"
-        folder_id, is_global = frow
-        assert is_global is False, "the demo folder must be is_global=false (never global)"
+        folder_id, is_org_shared = frow
+        assert is_org_shared is False, "the demo folder must be is_org_shared=false (never global)"
 
         # No document in the demo folder may belong to a different owner (owner-scoping).
         cur.execute(
