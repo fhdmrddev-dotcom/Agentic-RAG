@@ -152,8 +152,11 @@ sends behind six ordered gates, the author can bind a connection on the canvas, 
 Connections ships whole, and the credential check runs on the stored connection and provably
 sends nothing. **But the requirement's word is *run*, and the phase's own demo sentence is the
 acceptance bar: it is half built and zero demonstrated.** Measured at close against the live
-database: **0** `connector_connections` rows, **0** workflow definitions of *any* status containing
-an `external_action` phase, and `live_connectors` absent from `feature_visibility` (⇒ cold default
+database: **0** `connector_connections` rows, ~~**0** workflow definitions of *any* status containing
+an `external_action` phase~~ — **CORRECTED 2026-08-09: there are 5, one of them PUBLISHED
+(`ff3c6ca3` "Weekly Status Report", `send_email`, authored at Phase 189's UAT). The close's SQL
+read `definition->'phases'` on a jsonb column holding a JSON string scalar, which silently returns
+zero rows. So the authoring link of `BLOCK-190-UAT-01` is ALREADY SATISFIED** — and `live_connectors` absent from `feature_visibility` (⇒ cold default
 `off`). **No message, ticket or email has left this application.**
 → **Closing condition: the three live-send rows in `190-VALIDATION.md` § Manual-Only
 Verifications**, which need operator-provided destinations (D-30) plus the artefact chain

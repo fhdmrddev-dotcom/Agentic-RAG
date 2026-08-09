@@ -403,15 +403,33 @@ local database (`psycopg2`, `127.0.0.1:54322`) on 2026-08-09:
 ```
 connector_connections rows                                    → 0
 workflow_definitions by status                                → published 129 · draft 79
-published defs containing an external_action phase            → 0
-ANY def (any status) containing an external_action phase      → (no rows)
+published defs containing an external_action phase            → 1   ⚠ CORRECTED
+ANY def (any status) containing an external_action phase      → 5   ⚠ CORRECTED
 app_settings.feature_visibility                               → {skill_studio, model_management,
                                                                  governance_health, workflow_authoring,
                                                                  visual_workflow_canvas}
                                                                  — `live_connectors` ABSENT ⇒ cold default "off"
 ```
 
-So the chain each row needs is **three links long and none exists**:
+> ### ⚠ CORRECTION (2026-08-09, at phase verification) — the two `external_action` counts above were FALSE
+>
+> The close's SQL read `definition->'phases'`, but **`workflow_definitions.definition` is a jsonb
+> column holding a JSON *string scalar* for 194 of 222 rows**, so that expression silently returns
+> zero rows rather than erroring. Re-derived two ways that agree: a raw
+> `definition::text LIKE '%external_action%'` → **5**, and a Python walk after unwrapping the
+> string scalar. The published one is **`ff3c6ca3` "Weekly Status Report"** (`send_email`), authored
+> during Phase 189's UAT.
+>
+> A second level error compounded it: **`phase_type` lives inside `phase["config"]`, not at the
+> phase top level** — a structural walk reading `phase["phase_type"]` also returns 0. Both the
+> close's query and the first correction attempt made that mistake.
+>
+> **Consequence — this is the part that matters: `BLOCK-190-UAT-01` is TWO links, not three.**
+> Link 1 below is already satisfied. The owed rows need a destination and the flag; **they do not
+> need authoring.** The correct query form is
+> `((definition #>> '{}')::jsonb)` first, then read `phase['config']['phase_type']`.
+
+So the chain each row needs is **two links long; link 1 is already satisfied**:
 
 1. **an `external_action` step authored into a definition, and that definition published** — zero
    definitions in the entire database contain one;
