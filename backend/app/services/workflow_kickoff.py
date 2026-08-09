@@ -429,8 +429,46 @@ async def build_harness_run_context(
                 "(failing closed to avoid whole-KB retrieval)"
             )
         # unbound → fall through to unscoped (None) search (unchanged)
+    # ── Phase 190 UAT fix (D-14) — the run's ORG, without which no connector can send ──────
+    # `_exec_external_action` scopes every credential lookup by `getattr(ctx, "org_id", None)`
+    # and FAILS CLOSED when it is absent, which is correct: an unscoped credential read is the
+    # cross-org leak D-14 exists to prevent. The RESUME builder has set it since Phase 163
+    # (`harness_engine._build_resume_context`, with its own fallback fetch) — but THIS builder,
+    # the live-kickoff path every ordinary run takes, never did. So the guard was
+    # unconditionally closed on the live path and a bound connection could never send —
+    # measured 2026-08-10 on the first real Slack UAT, which recorded `recorded_not_sent` with
+    # "the run carries no org, so no credential can be scoped to it" while `workflow_runs.org_id`
+    # was populated on all 203 rows by the migration-106 trigger. Phase 190's own tests missed it
+    # because every one of them injected a `SimpleNamespace` ctx that DID carry `org_id` — the
+    # shape the shipped path never produces (the same class as review finding WR-01).
+    #
+    # Read from `workflow_runs` rather than threading a parameter: that row IS the authority for
+    # "the RUN's org", which is the exact phrase D-14 is written in. Failure stays None so the
+    # guard keeps failing closed — a send must never become possible because a lookup errored.
+    _wf_org_id = None
+    try:
+        _wf_org_row = await pool.fetchrow(
+            "SELECT org_id FROM workflow_runs WHERE id = $1",
+            active_workflow_run_id if isinstance(active_workflow_run_id, UUID)
+            else UUID(str(active_workflow_run_id)),
+        )
+        _wf_org_id = _wf_org_row["org_id"] if _wf_org_row else None
+    except Exception as _org_exc:  # noqa: BLE001 — never fail a run over this read
+        logger.warning(
+            "190 D-14: could not resolve the run's org for workflow_run %s (%s); external_action "
+            "steps will record rather than send", active_workflow_run_id, _org_exc,
+        )
+    if _wf_org_id is None:
+        logger.warning(
+            "190 D-14: workflow_run %s has no org_id — any bound connector step will record, "
+            "not send", active_workflow_run_id,
+        )
+
     wf_ctx = SimpleNamespace(
         run_id=active_workflow_run_id,
+        # Phase 190 (D-14) — see the block above. The credential resolver takes org_id as a
+        # REQUIRED positional with no default; this is where the live path supplies it.
+        org_id=_wf_org_id,
         # Facet A (092-07): the producer runs.run_id is the FK target
         # for sub-agent parent_run_id; ctx.run_id stays the workflow_run
         # id for audit/terminal/definition/resume-match.

@@ -837,6 +837,15 @@ async def _drive_golden_run(
     )
 
     # ── 4. build the minimal validation ctx (mirrors _build_resume_context) ──────
+    # ⚠ Phase 190 UAT fix (D-14/D-16): `org_id` is DELIBERATELY ABSENT here, and its absence is
+    # a FENCE, not the oversight that was just repaired in the live-kickoff and resume builders.
+    # A golden run is a publish VALIDATION — D-16 already forbids it performing the external
+    # action, and `_exec_external_action` reads `getattr(ctx, "org_id", None)` and fails CLOSED
+    # without it. Withholding the org therefore makes a publish-time send impossible for a
+    # SECOND, independent reason: if the `is_golden_run` gate is ever removed or bypassed, the
+    # credential still cannot be scoped and the step records instead of sending. Do NOT "fix"
+    # this to match the sibling builders — the asymmetry is the point. Any future need for an
+    # org here must add it TOGETHER with an explicit publish-time send prohibition.
     ctx = SimpleNamespace(
         run_id=run_id,
         producer_run_id=_producer_id,  # real `runs` shell (sub-agent FK), NOT the workflow_run id
