@@ -125,7 +125,50 @@ and this one caveat is named.
 |---|------|----------|-----------------|---------|
 | **W0-1** | `tests/test_harness_engine.py::test_a_golden_run_of_an_external_action_performs_no_egress` | **D-16** — publishing must not send | **190-13**, on the send commit, then green on the gate in that **same** commit | ✅ **and the fence itself was repaired first** — it was VACUOUS (bound no connection; `live_connectors` off by cold default), so it could not have fired on the commit it was armed for. Both preconditions now set AND asserted inside it |
 | **W0-2** | `tests/unit/test_190_cross_org_credential.py` | **D-14** — org A must not resolve org B's connection | **190-01** (weak, module-missing) → **190-06** (MEANINGFUL: the leak REPRODUCED) | ✅ `RESOLVED SECRET FOR ORG A : xoxb-ORG-B-REAL-BOT-TOKEN-…` / `LEAKED : True` |
-| **W0-3** | `tests/unit/test_190_egress_ordering.py` | **D-06** — the guard runs BEFORE credential resolution | **190-01** (weak) → **190-02** (behavioural) → **190-13** (the n8n ordering driven into production source) | ✅ and **worse than the drive predicted**: an unbound step aimed at `169.254.169.254` raised **nothing at all** |
+| **W0-3** | `tests/unit/test_190_egress_ordering.py` | **D-06** — the guard runs BEFORE credential resolution | **190-01** (weak) → **190-02** (behavioural) → **190-13** (the n8n ordering driven into production source) | ⚠ **✅ CORRECTED — see the block immediately below.** The ordering IS driven and the RED was real (an unbound step aimed at `169.254.169.254` raised **nothing at all**), but the ✅ over-stated its SCOPE: three of the four cases drive a duck-typed config the shipped model **rejects**, so what W0-3 proves for `create_ticket` / `send_email` is narrower than this row read |
+
+### ⚠ CORRECTION TO W0-3's ✅ — code review **WR-01**, 2026-08-09
+
+**A false ✅ is corrected here rather than left standing.** This is a documentation fix, not
+a code fix: WR-01's code half is DEFERRED as `D-190-DEF-10` (its honest repair touches
+`ExternalActionPhaseConfig`'s `extra='forbid'` contract and the D-13 config shape, and there
+is **no reachable bypass** — both binders call `validate_destination` as their first
+statement). What is not deferred is the score.
+
+**What the row claimed:** that D-06's pre-credential ordering is proved.
+
+**What is actually true, measured:**
+
+`_pre_credential_destination` returns the step's `base_url` if one exists, else the
+per-capability constant `{"post_message": SLACK_API_BASE, "create_ticket": None,
+"send_email": None}`. `ExternalActionPhaseConfig` is a `_StrictBase` (`extra='forbid'`) and
+carries **no `base_url`** — `models/harness.py:257` adds `connection_id` and nothing else. So
+for a real, model-validated step:
+
+| capability | GATE 3 before the credential |
+|---|---|
+| `post_message` | validates the code constant `https://slack.com/api/` — always passes |
+| `create_ticket` | `destination is None` → **`validate_destination` is never called** |
+| `send_email` | `destination is None` → **`validate_destination` is never called** |
+
+Three of `test_190_egress_ordering.py`'s five cases drive a duck-typed `SimpleNamespace`
+carrying `base_url` — a shape the shipped model rejects — and **the test file says so itself**
+(`:45-52`: *"A duck-typed config therefore cannot catch a model that rejects the destination
+field … Recorded here as a known limit of this drive, not as a property it proves"*). The
+fourth case (`…_on_a_MODEL_VALIDATED_phase`, added at 190-13) is the one that drives the real
+model, and it uses `post_message` **precisely because** that is the only capability whose
+destination is knowable with no credential and no row.
+
+The executor's own docblock (`phase_types.py:2097-2104`) states the property as an absolute —
+*"a send with **no credential bound at all** raises the EGRESS REFUSAL rather than a
+missing-credential error"* — and that sentence is **false for two of the three capabilities as
+shipped**. It is corrected in `D-190-DEF-10`'s entry rather than here.
+
+**What W0-3 does prove, stated narrowly and truthfully:** for `post_message`, the guard runs
+before the resolver, and the recorded call order `["egress", "resolve"]` is asserted on the
+SHIPPED config shape. For the other two capabilities the guard runs at the BINDER — before the
+socket, after the resolve — which is a real property but not the structural one D-06 exists to
+make regression-proof.
 
 **Wave 0 files — all created, all green at HEAD (counts re-derived per file at close):**
 
@@ -546,12 +589,14 @@ requires over a comfortable one.
 | 3 | A credential appears in the definition JSONB, an SSE frame, an API response, or a log line | T5 / T6 / T7 | ⚠ **DRIVEN for three of the four surfaces; the SSE frame is ARGUED.** JSONB ✅ (190-12 plant 1) · API response ✅ (190-06/190-09, an **import failure**) · log line ✅ (190-06 case 5, the *ciphertext* assertion) · rendered DOM ✅ (190-16 plant G, 190-18 plant J). **No test asserts over an emitted `phase_*` SSE frame** — see § What is ARGUED |
 | 4 | Org B's workflow successfully sends using org A's connection | W0-2 / T8 | ✅ **DRIVEN, and the leak was REPRODUCED before it was closed** — org A held org B's decrypted bot token. Closed on **two** gates, the second driven independently |
 | 5 | A request reaches `169.254.169.254`, `127.0.0.1`, or any RFC1918 address | T1 / T4 (29-address corpus) | ✅ **DRIVEN.** Four separate clause deletions, each naming its own address; plus T3's **twenty logged requests** to the metadata endpoint under the redirect plant |
-| 6 | The guard passes because a credential was **absent** (the n8n inversion) | W0-3 | ✅ **DRIVEN, and worse than predicted** — the wrong ordering raised **nothing at all**: a step aimed at `169.254.169.254` returned the ordinary *"Not sent — recorded"* because nothing ever looked |
+| 6 | The guard passes because a credential was **absent** (the n8n inversion) | W0-3 | ⚠ **CORRECTED 2026-08-09 (code review WR-01) — DRIVEN, and the RED was worse than predicted** (the wrong ordering raised **nothing at all**: a step aimed at `169.254.169.254` returned the ordinary *"Not sent — recorded"* because nothing ever looked) — **but the ✅ over-stated its SCOPE.** The pre-credential guard is structural for `post_message` only; for `create_ticket` and `send_email` the shipped model carries no `base_url`, so GATE 3's destination is `None` and `validate_destination` is not called before the resolve. No reachable bypass (both binders validate first). Full measurement in § *CORRECTION TO W0-3's ✅*; code half deferred as `D-190-DEF-10` |
 | 7 | A `PhaseFormPanel.tsx` / `PhaseNodeCard.tsx` diff is non-empty | D-23 / D-24 numstat fences | ✅ **DRIVEN phase-wide at close** — all eight files empty against **both** candidate bases and the worktree, existence confirmed at each rev first |
 | 8 | One email arrives twice from one run | D-18 at-most-once; manual Row A | ⚠ **HALF DRIVEN.** *At-most-once* is asserted mechanically in all three adapters — exactly one call reaches the binder on failure, **with the recorder's second queued response a SUCCESS on purpose**, so a retrying adapter would have reported a send rather than failing noisily; `retry`/`backoff`/`sleep` are fenced per line. **The "arrives twice" half needs Row A and is OWED** |
 
-**Six of eight fully driven. Two carry a named, non-driven half. Nothing is asserted without
-saying which it is.**
+**Five of eight fully driven. Three carry a named, non-driven or narrower-than-claimed half
+(3, 6, 8). Nothing is asserted without saying which it is.** ⚠ The count moved from *six of
+eight* on 2026-08-09 when row 6's ✅ was corrected by code review WR-01; it is restated rather
+than silently adjusted, because a score that only ever improves is not a score.
 
 ---
 

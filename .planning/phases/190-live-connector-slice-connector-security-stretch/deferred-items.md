@@ -407,3 +407,307 @@ to turn live sending on. Fix as ONE `/gsd:quick`: widen the union, add the five 
 author the `FEATURES` entry (Off | On control, `offOn={def.key === …}` — the
 `visual_workflow_canvas` precedent at `FeatureVisibility.tsx:147-156, :311` is the exact shape).
 Mark this entry resolved naming the audience the card writes.
+
+---
+
+## D-190-DEF-10 — WR-01: GATE 3 is a no-op in production for `create_ticket` and `send_email`, and its fence drives a config the model forbids
+
+**Found by:** the Phase-190 code review (`190-REVIEW.md` WR-01), 2026-08-09.
+**Routed:** DEFER the code, FIX the score. Both halves were done in the review-fix round.
+
+**The measurement, re-derived rather than inherited.** `_pre_credential_destination` returns
+the step's `base_url` if one exists, else the per-capability constant
+`{"post_message": SLACK_API_BASE, "create_ticket": None, "send_email": None}`.
+`ExternalActionPhaseConfig` is a `_StrictBase` (`extra='forbid'`) and carries **no
+`base_url`** — `models/harness.py` adds `connection_id` and nothing else. So on the shipped
+path:
+
+| capability | GATE 3, before any credential work |
+|---|---|
+| `post_message` | validates the code constant `https://slack.com/api/` — always passes |
+| `create_ticket` | `destination is None` → `validate_destination` is **never called** |
+| `send_email` | `destination is None` → `validate_destination` is **never called** |
+
+**Why it is DEFERRED and not fixed.** There is **no reachable bypass today**:
+`send_pinned_http` and `open_pinned_smtp` both call `validate_destination` as their first
+statement, so no socket opens unvalidated. What is missing is the ORDERING property D-06
+exists to make structural rather than incidental. The honest repair is not a one-liner — it
+touches `ExternalActionPhaseConfig`'s `extra='forbid'` contract and the D-13 config shape
+(190-06 deliberately settled that non-secret destination config lives on the CONNECTION ROW,
+not the step, and `test_190_egress_ordering.py` asserts that settlement), so undoing it to
+satisfy a fence would be the tail wagging the dog. That is a scoping decision, not a
+line-count one, and it belongs to a plan rather than a fix round (G-7: a closure round may not
+add capability, and this is closer to a design change than a defect repair).
+
+**What WAS done in the fix round, because a false ✅ is not deferrable:**
+`190-VALIDATION.md`'s W0-3 row and its G-6 row 6 are corrected in place, with the measurement
+above written into a new § *CORRECTION TO W0-3's ✅*, and the "six of eight fully driven"
+count restated as five of eight. The correction states exactly what W0-3 does prove
+(`post_message`'s ordering, on the SHIPPED config shape) and what it does not.
+
+**Two things this entry does NOT claim to have fixed, and they are the re-open work:**
+
+1. **The executor's docblock still over-states the property.** `_exec_external_action`'s block
+   reads *"a send with **no credential bound at all** raises the EGRESS REFUSAL rather than a
+   missing-credential error"* as an absolute. True for `post_message`, false for the other
+   two. Correcting it means writing the true, narrower, per-capability sentence — which is
+   easy, but writing it BESIDE a fence that still cannot see the production path would be
+   documenting a gap rather than closing one, so both move together or neither does.
+2. **The fence has nothing real to bite on for `create_ticket`.** The property those two
+   capabilities actually need is BINDER-level and is asserted **nowhere**: drive
+   `jira_adapter.Adapter.send` with a stub credential whose `.secret` property RECORDS access,
+   aim it at a refused host, and assert `EgressRefused` is raised **and** `.secret` was never
+   read. `jira_adapter.py:100-108` records that gap in prose only.
+
+**Re-open trigger — ANY of:** the next plan that opens `ExternalActionPhaseConfig` or
+`_pre_credential_destination`; a **fourth capability** arriving (D-04's own trigger — the
+`None` default would silently extend the gap to it); `/gsd:secure-phase` re-running on this
+tree and reading the executor docblock as a claim; or the Open Platform milestone (SEED-013)
+moving adapters behind an MCP client, where the pre-credential ordering stops being ours to
+assert at all. **Fix in ONE commit, both halves: the narrowed docblock AND the binder-level
+drive.**
+
+---
+
+## D-190-DEF-11 — WR-03's UI half: nothing clears `connection_id` when the step's capability changes
+
+**Found by:** the Phase-190 code review (`190-REVIEW.md` WR-03), 2026-08-09.
+**Half of it was FIXED in the review-fix round; this is the half that was not.**
+
+`ExternalActionSection`'s capability rows call `onChange(name)`, which patches `capability`
+only. Nothing clears `config.connection_id` — not the section, not `ConnectionPicker` (which
+writes only on `<select>` change), not `PhaseFormPanel` (`0 0` by D-23). So binding a Slack
+connection and then switching the step to *Creates a ticket* leaves a **stranded reference**
+in the JSONB, and the author is actively told there is nothing to clean up: the picker's list
+read is capability-filtered so `bound` is `undefined` and the footer reads *"🔒 nothing bound
+— this step will record, not send"*, while `notConnectedOf` sees a non-empty string and drops
+the canvas badge, so the canvas says the step is complete.
+
+**What WAS fixed (commit `50d058e3`):** the RUN is now honest. The executor's mismatch check
+was a bare `ValueError` — not an `AdapterError`, so nothing caught it, and the run died with
+no `text`, no `failure` sentence and none of D-17's four terminals. It now returns the shipped
+`recorded_not_sent` terminal with a logged warning. That is the half that decides whether a
+user sees a stack trace or the shipped vocabulary, and it does not depend on any UI behaving.
+
+**Why the UI half is deferred:** it is a frontend change on the workflow-builder surface
+(`ConnectionPicker.tsx` and/or `ExternalActionSection.tsx`) inside a backend-security fix
+round, it needs its own count-gate + `tsc -p tsconfig.app.json` cycle, and it is entangled
+with **WR-04** (`D-190-DEF-13`) — both are "the reference does not resolve" wearing different
+clothes, and fixing them separately means touching `notConnectedOf`,
+`canvasModel.buildPhaseData` and the picker twice.
+
+**Re-open trigger:** the next plan that opens `ConnectionPicker.tsx` or
+`ExternalActionSection.tsx` — or the first author who reports a step that reads *"complete"*
+on the canvas and *"nothing bound"* in the panel. **Fix it together with WR-04**, in one
+commit, since both are resolved by passing the fetched connection list into the badge
+resolution as DATA.
+
+---
+
+## D-190-DEF-12 — WR-05's panel half: Save is not disabled for an incomplete connection
+
+**Found by:** the Phase-190 code review (`190-REVIEW.md` WR-05), 2026-08-09.
+**The DEFECT is fixed; this is the ergonomics half.**
+
+**What WAS fixed (commit `f64a0ebb`):** the models. `name`, `secret`, `host`, `from_address`,
+`base_url`, `project_key`, `account_email` and `default_channel` are all `NonEmpty`, and
+`port` is `Field(ge=1, le=65535)` (which also closes **IN-03**). An entirely empty connection
+is no longer creatable through the API, through curl, or through any future caller — the
+review's own Fix section names the model as the right home *"where both the API and any future
+caller are covered"*.
+
+**What is deferred:** the review's second sentence — *"Mirror it in the panel with a
+`saveBlocked` term so the button is disabled rather than the request 422'ing."*
+`ConnectionFormPanel.tsx:625` computes `saveBlocked` as `saveRefusal?.kind === "cipher"` only,
+so an incomplete form still round-trips to the server. **Measured, so the consequence is known
+rather than assumed:** the panel already renders an honest refusal for this — a 422 lands in
+`saveRefusalFrom(error)` as `kind: "generic"` and the `saveRefusal?.kind === "generic"` block
+at `:1460` renders it with `role="status"`. Nothing is silent; it is one round trip less
+pleasant than it should be.
+
+**Why deferred:** `ConnectionFormPanel.tsx` is a ~1500-line file with a 63-case suite and a
+character-identity copy contract (190-18's closed six-row refusal map). A completeness term
+needs its own RED-first drive plus the count gate plus `tsc`, which is a frontend plan, not a
+line in a backend security fix round.
+
+**Re-open trigger:** the next plan that opens `ConnectionFormPanel.tsx`, **or** the first UAT
+row that reaches sketch 156-A's *Add a connection* panel (⛔ owed today — zero connections
+exist and the create surface is gated off). Whoever does it should key the term off the same
+per-capability required-field set the models now declare, rather than re-typing it.
+
+---
+
+## D-190-DEF-13 — WR-04: the canvas badge and the panel footer disagree about whether a step is connected
+
+**Found by:** the Phase-190 code review (`190-REVIEW.md` WR-04), 2026-08-09. **Not fixed.**
+
+`notConnectedOf` (`phaseVocabulary.ts:811-813`) returns `false` for any non-empty-string
+`connection_id` — it validates the SHAPE of the reference and nothing about the referent. The
+picker, one panel away, resolves the reference against the live list and filters out disabled
+rows (`ConnectionPicker.tsx:231`), so it reports `bound === undefined` for the same step.
+
+**The failure:** an author binds a connection; an org admin later disables it (UI-SPEC §2g's
+`⏻ Disabled`, a first-class supported action) or deletes it. Open the workflow and the canvas
+shows **no `Not connected` badge** — the step reads as finished — while the panel footer reads
+*"🔒 nothing bound"* and the run produces `recorded_not_sent`. Two surfaces, one step, opposite
+answers, and **the one an author scans first is the one that is wrong.** The whole point of
+D-24's state-conditional badge is that the canvas answers *"is this step finished?"*, and a
+dangling reference is exactly the state it should still flag.
+
+**The shape of the fix, named so the next author does not re-derive it:** `notConnectedOf`
+reads `PhaseSpecJSON` and cannot fetch, so the resolution must arrive as DATA.
+`canvasModel.buildPhaseData` already resolves `notConnected` once and passes it as data
+(`canvasModel.ts:145-175`) — pass the Builder's fetched connection list into that resolution
+and treat *"bound id not present among the ENABLED connections for this capability"* as
+not-connected. Keep `notConnectedOf`'s two-line shape (D-24) by widening its second line to
+take an optional resolved-set argument defaulting to today's behaviour, so `PhaseNode.tsx` and
+`PhaseNodeCard.tsx` stay at `0 0`.
+
+**Why deferred:** a frontend change on the fenced canvas subtree inside a backend security fix
+round, and it must land with **D-190-DEF-11** — the two are the same defect from two
+directions.
+
+**Re-open trigger:** the next plan that opens `phaseVocabulary.ts`, `canvasModel.ts` or
+`ConnectionPicker.tsx`, or the first UAT row that disables a bound connection and re-opens the
+workflow. ⚠ Whatever lands must re-verify the eight D-23/D-24 empty-diff fences in the same
+commit.
+
+---
+
+## D-190-DEF-14 — WR-06: `require_visible` short-circuits for operators BEFORE reading the audience, so the connector WRITE surface is open while the switch is OFF
+
+**Found by:** the Phase-190 code review (`190-REVIEW.md` WR-06), 2026-08-09. **Not fixed.**
+
+**Stated plainly, because it is the one deferral here with a live consequence:** with
+`live_connectors` at its cold default `"off"`, an **operator** can still create, edit and
+delete connector connections — i.e. can still store a live tenant credential — through
+`POST /connectors/connections` from curl or from a stale tab, even though the Settings UI has
+correctly removed every write affordance for that state.
+
+The operator no-op in `dependencies.py:541-542` runs **before** the `"off"` test.
+`GET /features` (`api/features.py:70-72`) does the opposite and honours `"off"` for everyone
+*including operators*, deliberately, per D-181-01; `require_canvas` (`dependencies.py:668-671`)
+also checks the flag first. So this dependency is the odd one out among three consumers of the
+same idea. `D-190-DEF-07`'s resolution table asserts branch (b) was chosen because *"a phase
+whose whole discipline is not over-claiming should not ship a live-credential WRITE surface
+more open than its plan says"* — and for the operator audience it is exactly that.
+
+**Why it is deferred rather than fixed here, measured:** `require_visible` is **shared by four
+other governed features**. Moving the `"off"` test above the operator no-op changes the
+behaviour of every one of them in the same commit, and at least one may depend on an operator
+reaching a surface they have switched off for everyone else. That is a cross-feature
+governance decision with its own blast radius — not a line in a connector fix round — and
+getting it wrong locks an operator out of their own Control Room.
+
+**The narrower, safer shape if the broad one is judged too wide:** add a dedicated
+`require_live_connectors` that composes the `"off"` check with `require_visible`, leaving the
+four other consumers untouched. Whichever is chosen, it should also
+`await ensure_settings_fresh()` — same root cause as CR-02, which was fixed in the executor
+but **not** in this dependency.
+
+**Interim mitigation, so the exposure is bounded rather than open-ended:** the write path is
+still behind `require_org_manage` (org-admin or super-admin) AND migration 116's `org:manage`
+RLS policies AND — since commit `f64a0ebb` — migration 118's column privileges. An operator
+storing a credential while the switch is off cannot cause a SEND: the executor's GATE 2 is
+independent, and CR-03 made it require a positive `"everyone"`.
+
+**Re-open trigger:** ANY of — the next plan that opens `dependencies.py`'s `require_visible`;
+`D-190-DEF-09`'s Control Room card landing (the operator will then have a real UI for this
+switch and the mismatch becomes visible); or the first operator who reports being able to save
+a connection the banner says they cannot.
+
+---
+
+## D-190-DEF-15 — the Info findings (IN-01, IN-02, IN-04), and where IN-03 went
+
+**Found by:** the Phase-190 code review, 2026-08-09.
+
+**IN-03 is NOT deferred — it was folded into WR-05's fix** (commit `f64a0ebb`). A non-numeric
+SMTP port became `0`, and `validate_destination`'s
+`resolved_port = port or parsed.port or _DEFAULT_PORTS[scheme]` treats `0` as FALSY and
+substitutes 465/587 — so someone who typed `four sixty five` got a working connection on a
+port they never chose. `Port = Annotated[int, Field(ge=1, le=65535)]` makes it a refusal.
+Driven by `test_190_review_fix_data_layer.py`'s per-field case for `port=0`.
+
+The other three are documentation / ergonomics and are deferred:
+
+**IN-01 — `harness_engine.py:802-836`'s WR-06 block still describes Phase 190 in the future
+tense.** It reads *"once Phase 190 wires a real send, PUBLISHING a workflow would PERFORM THE
+EXTERNAL ACTION"* and *"PHASE 190 OWNS THE FIX and it is one of two shapes"*. 190 took shape 1
+(the `is_golden_run` gate) and the trigger test is green. `_exec_external_action`'s docblock
+was rewritten to mark its superseded invariants; this one was not, so a future reader of the
+engine will believe the defect is still open.
+**Fix:** append a dated `RESOLVED 2026-08-09 (Phase 190 / D-16 — shape 1)` note in the block's
+own superseded-quote style, **without deleting the reasoning**.
+**Re-open trigger:** the next plan that opens `harness_engine.py`, or `/gsd:docs-update`.
+
+**IN-02 — `ExternalActionSection`'s six "purity" fences no longer prove anything about the
+section's behaviour.** They read the SOURCE OF THAT ONE FILE for `useEffect`, `fetch(` and
+`@/lib/api`. This phase moved all three into `ConnectionPicker.tsx`, which the section now
+renders unconditionally — so the fences pass and the section is no longer a pure leaf: every
+render with a capability selected opens a network request. `190-VALIDATION.md` §M4 scores them
+✅ *"re-run post-mount"*, which is TRUE but no longer means what the row implies.
+⚠ This is the same class as WR-01 — a green fence measuring a property that moved — and it is
+recorded here rather than left as a ✅ that reads stronger than it is.
+**Fix:** either restate the fences as *"this file names no transport"* (honest and still
+useful) or extend the walk to the modules this file imports, so the property matches the claim.
+**Re-open trigger:** the next plan that opens `ExternalActionSection.tsx` or its test — which
+is also `D-190-DEF-11`'s trigger, so they should land together.
+
+**IN-04 — `SendEmailConfig.username` is unreachable from the UI.** `configFromDraft` never
+writes it and the panel has no field for it, so `smtp_adapter._identity` always falls back to
+`from_address`. The model, migration 116's comment and the `lib/api.ts` type all declare the
+field. For any provider whose SMTP username is not the mailbox address (SES, Mailgun, most
+relay services) the connection can be created and can **never authenticate**, with no
+configuration path.
+⚠ Slightly sharper after the fix round: WR-05 now constrains `host`, `from_address` and
+`secret`, and `username` was DELIBERATELY left unconstrained-optional (D-03 — it is absent for
+every host whose login IS the mailbox), so the model is now explicit that the field is
+optional-by-design rather than merely unpopulated.
+**Fix:** either add the field to UI-SPEC §3b's form or drop it from the model, so the three
+spellings agree.
+**Re-open trigger:** the `send_email` UAT row (⛔ owed — D-30, and it needs a
+publicly-routable TLS SMTP host), or the first operator whose relay rejects the mailbox
+address as a username.
+
+---
+
+## D-190-DEF-16 — `full-schema.sql` carries NO ACLs, so a privilege-narrowing migration is invisible to every greenfield bootstrap
+
+**Found during:** the CR-01 fix, 2026-08-09, while regenerating the bootstrap artifact.
+**Partially closed in the same commit (`f64a0ebb`); the general case is deferred.**
+
+**Measured, not assumed.** `scripts/regenerate-full-schema.sh` runs
+`pg_dump --schema-only --no-owner --no-privileges`, so:
+
+```
+$ grep -c '^GRANT\|^REVOKE' supabase/full-schema.sql   ->  0     (before the fix)
+```
+
+Migration 118's `COMMENT` survived the regeneration; its `REVOKE` / `GRANT` did **not**. A
+greenfield project bootstrapped from `full-schema.sql` alone would therefore have shipped with
+`secret_ciphertext` readable over PostgREST by every authenticated org member — the exact
+defect 118 exists to close, silently absent.
+
+**What was done:** the CR-01 grant is mirrored into `scripts/full-schema-supplement.sql`,
+which the script appends verbatim, and the supplement's own maintenance note now lists **ACLs**
+as a fourth thing `pg_dump` cannot carry (beside storage buckets, the auth trigger and realtime
+memberships). `grep -c` on the regenerated artifact now returns 4.
+
+**What is deferred, and it is the part that will bite someone else:** the mirroring is
+**manual and unfenced**. Nothing detects a future migration that narrows a privilege and
+forgets the supplement — the same class of same-commit-sync obligation CLAUDE.md already
+fences twice (`Dockerfile.sandbox` ↔ `docs/SANDBOX-PACKAGES.md`, and
+`scripts/check-deploy-drift.sh` for deploy artifacts), and it deserves the same treatment.
+
+**Two candidate shapes, neither taken here:**
+1. **Drop `--no-privileges`** from the dump. Honest and total, but it emits every table's ACLs
+   (a very large diff) and may reference roles a fresh project does not have at paste time —
+   it needs its own verification pass against a real greenfield project, which is a plan.
+2. **A drift check**: a script that greps `supabase/migrations/*.sql` for `GRANT` / `REVOKE`
+   and asserts each such statement's table appears in `full-schema-supplement.sql`. Cheap,
+   fenced, and in the exact shape of `check-deploy-drift.sh`.
+
+**Re-open trigger:** the next migration that contains `GRANT` or `REVOKE` — or the first
+greenfield/cloud deploy after which a privilege is observed missing. Whoever hits it should
+take shape 2 and register it beside the existing drift checks.
