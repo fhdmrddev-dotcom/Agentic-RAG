@@ -53,7 +53,7 @@ export function buildImportMessage(result: SkillImportResult): { text: string; i
 }
 
 export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEvals }: Props) {
-  const { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleGlobal } = useSkills()
+  const { skills, loading, loadSkills, createSkill, updateSkill, deleteSkill, toggleEnabled, toggleOrgShared } = useSkills()
   const { user } = useAuth()
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
@@ -171,7 +171,7 @@ export function SkillsPage({ onTryInChat, onTuneSkill, onOpenStudio, onReviewEva
                   onEdit={(s) => { setSelectedSkill(s); setIsCreatingNew(false) }}
                   onDelete={deleteSkill}
                   onToggleEnabled={toggleEnabled}
-                  onToggleGlobal={toggleGlobal}
+                  onToggleOrgShared={toggleOrgShared}
                   onTryInChat={onTryInChat ?? (() => {})}
                   onExport={exportSkill}
                   onReviewEvals={onReviewEvals}

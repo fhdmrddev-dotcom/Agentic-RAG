@@ -74,3 +74,78 @@ adds/edits a seed workflow's prompts, OR when v2.9 workflow-authoring begins (NL
 a quality gate), OR at a milestone close that claims workflows "work." Until then, 093's
 migration-065 prompt fix + the Dimension-5 manual pass/fail row are the interim guard; this
 seed owns the durable automated measurement.
+
+## Update 2026-07-31 — the missing second half: nothing routes a bad run back into the DEFINITION
+
+Surfaced during Phase 185 operator UAT (2026-07-30/31). Everything above this line stops at
+**MEASUREMENT**. Re-read §"Likely shape if promoted": drive the workflow path, score it against goldens
+or a rubric, add validators, gate NL-generated workflows before publish. All four end at a **number**.
+Nothing in this seed — or anywhere in the codebase — takes a bad run and turns it into a **change to the
+workflow definition**. That is the unclaimed half, and the operator asked for it directly on 2026-07-31:
+*"flexibility to modify, to fine-tune"* workflows.
+
+### The asymmetry is visible in the schema, not just in the prose
+
+Skills got the entire loop. Workflows got none of it:
+
+| Piece | Skills | Workflows |
+|---|---|---|
+| Eval history keyed to the versioned artefact | `eval_runs.skill_id NOT NULL REFERENCES skills(id)` + `skill_version_id` (`supabase/migrations/080_eval_runs_and_results.sql:42-55`) | none — no `workflow_id` column anywhere in the eval substrate |
+| Per-case verdicts + operator ratings | `081_eval_verdict_and_ratings.sql`, `085_eval_matrix_duration_case_feedback.sql` | none |
+| Held-out cases | Phase 123/123.1 Trigger Tuner held-out picks | none |
+| Run evidence → proposed edit → approval → new version → auto re-eval | `skill_proposals` (`083_skill_proposals.sql`, Phase 135 SI-01) — proposes an instruction-body edit, creates a `skill_versions` row `source='self_improve'` **only on approval**, then auto re-evals | **no analog** |
+| Versioned definition to write back into | `skill_versions` | `workflow_definitions` (`056_workflow_definitions.sql`, `(slug, version)` unique) — **exists, but nothing writes a new version from run evidence** |
+
+The last row is the point: the write target already exists. The loop that would use it does not.
+
+### What the second half is
+
+1. **Per-workflow eval history keyed to the definition version that produced it** — every run scored and
+   retained, not just the pre-publish verdict. A workflow's quality is a trend, not a snapshot.
+2. **Held-out cases per workflow** — so a definition change is measured against cases it was NOT tuned
+   on. The idiom is already built and validated on the skills side; this is a port, not an invention.
+3. **A proposal path** — run evidence → a proposed edit to the definition (a phase prompt, a validator,
+   a KB scope, a `field_map`) → operator approve/reject → a new `workflow_definitions` version → auto
+   re-eval against the held-out set → promote or not. Mirror `skill_proposals`' lifecycle, including the
+   rule that the new version row is created **only on approval** so history stays clean of abandoned
+   drafts.
+
+### The publish gauntlet is NOT this, and here is the measured reason
+
+The publish judge is a **one-shot gate at publish time**, and it is model-fragile. On 2026-07-30 with
+`harness_judge_model=gemini-3.5-flash`, the publish judge returned failure `provider_error` with
+`overall_score` null and **no verdict at all** (run `da5541c0`). The operator switched
+`harness_judge_model` to `gpt-5.5` at 20:13:20; the golden run at 20:13:38 (`ced8005d`) passed with
+`overall_score 82` and `publish_succeeded`. A gate that can go silent on a model swap cannot double as
+the quality history. Keep them separate: **gate at publish, history across runs.**
+
+The passing judge summary, verbatim, is the shape a per-run record should retain — because *this* is what
+an operator acts on when deciding what to change; `82` is not:
+
+> "six obligation rows, each with source_clause, current_state, gap, severity, and owner, every populated
+> cell carrying a citation to a named knowledge-base document, and the one unsupported field
+> (report_title) correctly nulled rather than invented ... it is legitimately cited, so grounding holds."
+
+### Hard precondition: the reported reason must BE the rejection reason
+
+The same UAT produced the inverse failure mode, and any feedback loop built on run verdicts inherits it:
+
+- **BUG-260730-01** (fixed by plan 185-12): the auto-attached `retrieved_and_cited` citation gate demanded
+  inline `[1]`/`(doc-N)` markers that **nothing ever instructed the model to write**. A correctly-detected
+  grounded step retrieved correctly and still failed 3/3 attempts. Fixed by telling the producer — never
+  by weakening the gate.
+- **BUG-260730-02** (open): the emit step's failure was surfaced as *"citations_required: no field_map on
+  output"* while the audit showed `citation_coverage_pct 100.0`, zero uncited, zero invented. The real
+  rejection was `covers_template=false`. The executor's precise message **was computed and then discarded**
+  in favour of the gate's generic one.
+
+A proposal engine fed BUG-260730-02's message would go fix citations on a run whose citations were
+perfect. So the second half has a dependency, not just a scope: **a run's reported failure reason must be
+its actual failure reason** before any of it is worth building.
+
+### Trigger and owner — unchanged
+
+Same trigger, same owner; this is not a new seed. Add to `trigger_when`: **any phase that ships workflow
+authoring or editing, including the v3.6 Workflow Studio (Phases 181-189)**. The owner stays "the durable
+automated measurement" — with the correction that measurement whose only consumer is a dashboard is half
+a system.

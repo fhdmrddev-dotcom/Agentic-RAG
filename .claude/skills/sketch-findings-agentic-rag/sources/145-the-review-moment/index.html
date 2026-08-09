@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 145 — The review moment (Phase 185 / feeds 188)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  .stage { display: block; position: relative; }
+
+  /* ══ the run surface — NOT the chat stream ═══════════════════════════════ */
+  .runsurface { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .runhdr {
+    flex-shrink: 0; display: flex; align-items: center; gap: 12px;
+    padding: 11px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1);
+  }
+  .runhdr .nm { font-family: var(--font-headline); font-weight: 600; font-size: 13.5px; color: var(--color-text); }
+  .runhdr .st {
+    display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 11px;
+    font-size: 11px; background: hsl(38 60% 18%); border: 1px solid hsl(38 92% 62% / .6); color: hsl(38 92% 86%);
+  }
+  .runhdr .back { font-size: 11.5px; color: var(--color-text-dim); }
+
+  /* the compact spine — five dots, one per step */
+  .spine { display: flex; align-items: center; gap: 0; margin-left: auto; }
+  .spine .sd {
+    width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 9px; font-family: var(--font-mono); border: 1px solid var(--color-border);
+    background: var(--color-muted); color: var(--color-text-dim); position: relative;
+  }
+  .spine .sd.done { background: hsl(142 71% 45% / .18); border-color: hsl(142 71% 45% / .45); color: hsl(142 71% 72%); }
+  .spine .sd.now  { background: hsl(38 60% 20%); border-color: hsl(38 92% 62% / .85); color: hsl(38 92% 88%);
+                    box-shadow: 0 0 16px -2px hsl(38 92% 62% / .7); }
+  .spine .sd .pv { position: absolute; top: -4px; right: -4px; font-size: 8px; }
+  .spine .gap { width: 16px; height: 1px; background: var(--color-border); }
+
+  .runbody { flex: 1; min-height: 0; display: flex; }
+
+  /* ══ THE DOCUMENT ════════════════════════════════════════════════════════ */
+  .docwrap { flex: 1; min-width: 0; overflow: auto; padding: 22px; display: flex; flex-direction: column; align-items: center; }
+  .page {
+    width: 100%; max-width: 660px; background: #f7f7f4; color: #1c1c1a; border-radius: 4px;
+    padding: 34px 40px 40px; box-shadow: 0 24px 60px -20px rgba(0,0,0,.8); font-size: 13px; line-height: 1.7;
+    font-family: "Georgia", serif;
+  }
+  .page h1 { font-size: 19px; margin: 0 0 3px; font-family: "Georgia", serif; }
+  .page .meta { font-size: 11px; color: #6a6a63; margin-bottom: 20px; font-family: var(--font-sans); }
+  .page h2 { font-size: 14px; margin: 22px 0 8px; }
+  .page table { width: 100%; border-collapse: collapse; font-size: 11.5px; font-family: var(--font-sans); }
+  .page th {
+    text-align: left; padding: 7px 8px; border-bottom: 2px solid #d5d5cd; font-weight: 600; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .04em; color: #55554e;
+  }
+  .page td { padding: 8px; border-bottom: 1px solid #e3e3db; vertical-align: top; }
+
+  /* the payoff: which values are backed, marked IN the document */
+  .cite {
+    display: inline-block; font-family: var(--font-sans); font-size: 9.5px; color: #2d6a4f;
+    background: #dff0e6; border: 1px solid #a9d5bd; border-radius: 4px; padding: 0 4px;
+    margin-left: 4px; white-space: nowrap; cursor: help; vertical-align: 1px;
+  }
+  .opin {
+    display: inline-block; font-family: var(--font-sans); font-size: 9.5px; color: #7a5a11;
+    background: #f6ecd2; border: 1px solid #e0cb96; border-radius: 4px; padding: 0 4px;
+    margin-left: 4px; white-space: nowrap; cursor: help; vertical-align: 1px;
+  }
+  body.marks-off .cite, body.marks-off .opin { display: none; }
+  body.marks-off .page td.backed { background: transparent; }
+
+  /* the coverage strip — the REAL check_coverage vocabulary */
+  .coverage {
+    width: 100%; max-width: 660px; margin: 0 0 14px; padding: 10px 13px; border-radius: 11px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 11.5px;
+    background: hsl(142 71% 45% / .09); border: 1px solid hsl(142 71% 45% / .32); color: hsl(142 71% 74%);
+  }
+  .coverage.warn { background: hsl(38 92% 60% / .1); border-color: hsl(38 92% 60% / .38); color: hsl(38 92% 78%); }
+  .coverage b { color: #fff; }
+  .coverage .sep { color: var(--color-text-dim); }
+
+  /* the "we cannot show you this" honesty block */
+  .blind {
+    width: 100%; max-width: 660px; padding: 26px 24px; border-radius: 14px; text-align: center;
+    background: hsl(0 55% 14% / .5); border: 1px dashed hsl(0 72% 55% / .55); color: hsl(0 85% 84%);
+  }
+  .blind h3 { margin: 0 0 8px; font-size: 15px; font-family: var(--font-headline); color: hsl(0 90% 88%); }
+  .blind p { margin: 0 0 6px; font-size: 12px; line-height: 1.7; color: hsl(0 60% 82%); }
+  .blind .dl { margin-top: 14px; }
+
+  /* the long-document summary instead of 40 pages nobody reads */
+  .longnote {
+    width: 100%; max-width: 660px; margin-bottom: 14px; padding: 12px 14px; border-radius: 12px;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    font-size: 11.5px; line-height: 1.7; color: var(--color-text-muted);
+  }
+  .longnote b { color: var(--color-text); }
+  .longnote ul { margin: 7px 0 0; padding-left: 18px; }
+
+  /* ══ VARIANT A — the approve bar is docked to the document ═══════════════ */
+  .dock {
+    flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 13px 20px;
+    border-top: 1px solid hsl(38 92% 62% / .45); background: hsl(38 30% 10% / .96);
+  }
+  .dock .q { flex: 1; min-width: 0; font-size: 12.5px; color: var(--color-text); line-height: 1.5; }
+  .dock .q b { color: hsl(38 92% 88%); }
+  .dock .sub2 { display: block; font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
+
+  /* ══ VARIANT B — the panel holds the document, the spine holds the call ══ */
+  .sidepanel {
+    flex-shrink: 0; width: 400px; border-left: 1px solid var(--color-border);
+    background: var(--color-bg-elev1); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .sidepanel header { flex-shrink: 0; padding: 12px 15px; border-bottom: 1px solid var(--color-border);
+                      display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+  .sidepanel .scroll { flex: 1; min-height: 0; overflow: auto; padding: 15px; }
+  .stepsL { flex: 1; min-width: 0; overflow: auto; padding: 24px; }
+  /* a step list does not need 1000px of width, and capping it leaves a clear
+     lane for the helper card in B */
+  .stepRow {
+    max-width: 600px;
+    display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border-radius: 13px;
+    border: 1px solid var(--color-border); background: var(--color-surface); margin-bottom: 10px;
+  }
+  .stepRow.done { opacity: .55; }
+  .stepRow.now {
+    border-color: hsl(38 92% 62% / .8); background: hsl(38 30% 12% / .7);
+    box-shadow: 0 0 30px -8px hsl(38 92% 62% / .5);
+  }
+  .stepRow .n { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+                font-size: 10px; font-family: var(--font-mono); border: 1px solid var(--color-border);
+                color: var(--color-text-dim); flex-shrink: 0; }
+  .stepRow .tt { font-size: 13px; color: var(--color-text); font-weight: 500; }
+  .stepRow .ss { font-size: 11px; color: var(--color-text-muted); margin-top: 3px; line-height: 1.5; }
+  .stepRow .acts2 { display: flex; gap: 7px; margin-top: 11px; flex-wrap: wrap; }
+  .stepRow .btn { font-size: 11.5px; padding: 6px 12px; }
+  .miniseal { color: hsl(142 71% 68%); font-size: 11px; margin-left: 6px; }
+
+  .pagemini { max-width: none; padding: 20px 22px; font-size: 11px; }
+  .pagemini h1 { font-size: 15px; }
+  .pagemini table { font-size: 10px; }
+
+  .trythis {
+    /* clears the docked approve bar — a helper card must never sit on the one
+       control the sketch exists to test */
+    position: absolute; left: 18px; bottom: 92px; z-index: 40; max-width: 300px;
+    background: hsl(220 30% 8% / .96); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .3); border-radius: 14px; padding: 13px 15px;
+    box-shadow: var(--shadow-lg);
+  }
+  /* B has no docked bar but does have a step list on the left, so the card
+     moves into the lane between the steps and the file panel */
+  body.vb .trythis { left: auto; right: 420px; }
+  .trythis h5 { margin: 0 0 8px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 18px; font-size: 11.5px; line-height: 1.7; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 5px; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 8px; right: 9px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+</style>
+</head>
+<body class="alive va art-doc">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 145</span>
+  <button class="variant-tab active" data-v="a" type="button">A: The document is the surface</button>
+  <button class="variant-tab" data-v="b" type="button">B: Steps on the left, document on the right</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">What the run produced</span>
+  <div class="seg" id="artseg">
+    <button type="button" data-art="doc" class="on">A Word report</button>
+    <button type="button" data-art="blind">Something we cannot show</button>
+    <button type="button" data-art="long">A 40-page report</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="lbl">Backing marks</span>
+  <div class="seg" id="markseg">
+    <button type="button" data-marks="on" class="on">Show what is backed</button>
+    <button type="button" data-marks="off">Plain document</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="runsurface">
+    <div class="runhdr">
+      <span class="back">← Workflows</span>
+      <span class="nm">Monthly supplier risk report</span>
+      <span class="st">✋ Waiting for you</span>
+      <div class="spine" id="spine"></div>
+    </div>
+    <div class="runbody" id="runbody"></div>
+    <div class="dock" id="dock"></div>
+  </div>
+
+  <div class="trythis" id="trythis">
+    <button class="close" type="button" id="closetry" aria-label="Hide">✕</button>
+    <h5>Three things to try</h5>
+    <ol>
+      <li>Before approving — <b>which numbers here came from a document</b>, and which are the AI's opinion?</li>
+      <li>Switch to <b>Something we cannot show</b>. Does it stop you, or does approving look the same?</li>
+      <li>Switch to <b>A 40-page report</b>. What do you get instead of 40 pages?</li>
+    </ol>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="sketch-toolbar">
+  <span>145</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 145 — the review moment. What you see before you say yes.
+
+   TWO OPERATOR QUESTIONS, 2026-07-28, and they turn out to be one question.
+
+   (1) "When we reach a step that needs human review — the report could be a
+        Word or PDF artefact — how does the user VIEW it before deciding to
+        proceed with the email?"  Sketch 144 did not answer this: its approve
+        bar said "the report is ready · Send it / Not yet" and gave you nowhere
+        to look. A human checkpoint you cannot see through is a rubber stamp.
+
+   (2) "Workflows currently run and appear in the chat. We need to isolate or
+        distinguish a workflow from normal chat."  VERIFIED IN CODE, not taken
+        on trust: `WorkflowsPage.tsx` launches a workflow by creating a thread
+        and REDIRECTING INTO CHAT (`createThread` + kickoff). The panel owns
+        the phase spine and chat carries a thin receipt (the Phase 103
+        decision) — but you are still standing in the chat surface.
+
+   You cannot draw "what do I see before I approve" without deciding where you
+   are standing when you see it. So BOTH variants below are drawn on a
+   DEDICATED WORKFLOW RUN SURFACE — its own header, its own spine, no message
+   list, no composer. That shared move is this sketch's real proposal, and it
+   is evidence FOR PHASE 188 (Non-Technical Run Observability: "a business view
+   distinct from the developer timeline, painted from the same run stream"),
+   not a commitment inside Phase 185.
+
+   WHAT IS REAL HERE:
+   · The coverage vocabulary is the shipped `citations_required` validator in
+     `validator_kinds.py` — deterministic mode wraps `check_coverage`, which
+     returns `uncited_value_count`, `invented_citation_count` and
+     `uncited_leaves`. "18 of 18 values cited · 0 invented sources" is that
+     function's actual output shape, not a slogan.
+   · The document itself is produced by `llm_emit` with the `render_template`
+     emitter (docxtpl, Phase 101) — the shipped "attach a template, the AI
+     fills it" path the operator described.
+   · The preview stack exists: `FilePreview.tsx`, `CsvTablePreview.tsx`,
+     `FilesSection.tsx` in the workspace panel. B reuses it rather than
+     inventing a second one.
+
+   INHERITED: 143-A's corner seal for a proven step, 144's approval gate.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var STEPS = [
+  { t: 'Find the risks in our supplier files', s: 'Read 34 contracts and 112 incident records', proven: true },
+  { t: 'Work out which suppliers look shaky',  s: 'Ranked them by exposure — its own judgement' },
+  { t: 'Write the risk report',                s: 'Filled your risk-register template', proven: true },
+  { t: 'Email it to procurement',              s: 'Waiting for your OK before anything leaves', now: true },
+  { t: 'File it in the shared drive',          s: 'Has not run yet' }
+];
+
+var ROWS = [
+  { sup: 'Nordwind Logistics', risk: 'Two late-delivery penalties triggered in Q3',
+    cited: 'Incident log, 14 Aug', sev: 'High', why: 'Ranked highest — repeat breaches' },
+  { sup: 'Baytree Components', risk: 'Insurance certificate expired 11 June',
+    cited: 'Contract §7.2', sev: 'High', why: 'Uninsured exposure' },
+  { sup: 'Calder Freight', risk: 'Single-source for three critical parts',
+    cited: 'Supplier master, row 41', sev: 'Medium', why: 'No second source yet' },
+  { sup: 'Orre Materials', risk: 'Price variation clause invoked twice',
+    cited: 'Contract §4.5', sev: 'Low', why: 'Within tolerance' }
+];
+
+var LEAD = {
+  a: '<b>A — The document is the surface.</b> The run stops, and the thing you are being asked about fills ' +
+     'the screen. The approve bar is docked to the document itself, so the decision and the evidence are ' +
+     'one object and you cannot press <i>Send</i> without the report in front of you. The steps compress ' +
+     'to five dots in the header.',
+  b: '<b>B — Steps on the left, document on the right.</b> The run reads as a list of steps you can follow, ' +
+     'and the deliverable opens in the panel that already ships for previewing files. The approve buttons ' +
+     'sit on the paused step, where the pause is. Familiar, and reuses built components — but the decision ' +
+     'and the evidence are two objects, side by side.'
+};
+
+var variant = 'a', art = 'doc', marks = true;
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+function spineHTML() {
+  return STEPS.map(function (s, i) {
+    var cls = 'sd' + (s.now ? ' now' : (i < 3 ? ' done' : ''));
+    return (i ? '<span class="gap"></span>' : '') +
+      '<span class="' + cls + '" title="' + esc(s.t) + '">' + (i + 1) +
+      (s.proven ? '<span class="pv">⛨</span>' : '') + '</span>';
+  }).join('');
+}
+
+function coverageHTML() {
+  if (art === 'blind') return '';
+  return '<div class="coverage' + (art === 'long' ? ' warn' : '') + '">' +
+    '<span>⛨ <b>' + (art === 'long' ? '206 of 206' : '18 of 18') + '</b> values in this document are ' +
+      'traceable to a source</span>' +
+    '<span class="sep">·</span><span><b>0</b> invented sources</span>' +
+    '<span class="sep">·</span><span>the severity column is the AI\'s judgement, not a document</span>' +
+  '</div>';
+}
+
+function pageHTML(mini) {
+  return '<div class="page' + (mini ? ' pagemini' : '') + '">' +
+    '<h1>Supplier risk register</h1>' +
+    '<div class="meta">Month ending 31 July 2026 · produced from your risk-register template</div>' +
+    '<p>Four suppliers carry open risk this month. Each risk below is drawn from a document in your ' +
+      'knowledge base. Severity is an assessment, not a quotation.</p>' +
+    '<h2>Open risks</h2>' +
+    '<table><thead><tr><th>Supplier</th><th>Risk</th><th>Severity</th></tr></thead><tbody>' +
+    ROWS.map(function (r) {
+      return '<tr>' +
+        '<td class="backed">' + esc(r.sup) + '</td>' +
+        '<td class="backed">' + esc(r.risk) +
+          '<span class="cite" title="Backed by: ' + esc(r.cited) + '">⛨ ' + esc(r.cited) + '</span></td>' +
+        '<td>' + esc(r.sev) +
+          '<span class="opin" title="' + esc(r.why) + '">AI judgement</span></td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>' +
+  '</div>';
+}
+
+function blindHTML() {
+  return '<div class="blind">' +
+    '<h3>We cannot show you this one</h3>' +
+    '<p><b>supplier-risk-register.pdf</b> — 1.4 MB. This file type has no preview here, so approving now ' +
+      'means approving something you have not read.</p>' +
+    '<p>That is allowed. It is not hidden.</p>' +
+    '<div class="dl"><button class="btn" type="button" data-act="dl">Download and read it first</button></div>' +
+  '</div>';
+}
+
+function longHTML() {
+  return '<div class="longnote"><b>40 pages. You are not going to read them now, and pretending otherwise ' +
+    'helps nobody.</b> So here is what a reviewer actually needs before saying yes:' +
+    '<ul>' +
+      '<li><b>206 of 206</b> values traceable to a source · <b>0</b> invented sources</li>' +
+      '<li><b>3 sections</b> are the AI\'s own assessment rather than quotation — severity ratings, the ' +
+        'exposure ranking, and the recommended actions</li>' +
+      '<li><b>Nothing changed</b> in the 34 pages of appendix since last month\'s approved version</li>' +
+    '</ul></div>' + pageHTML(false);
+}
+
+function bodyContent(mini) {
+  if (art === 'blind') return blindHTML();
+  if (art === 'long')  return longHTML();
+  return coverageHTML() + pageHTML(mini);
+}
+
+function renderBody() {
+  var el = document.getElementById('runbody');
+  if (variant === 'a') {
+    el.innerHTML = '<div class="docwrap">' +
+      (art === 'doc' ? '' : '') + bodyContent(false) + '</div>';
+    return;
+  }
+  el.innerHTML =
+    '<div class="stepsL">' +
+      STEPS.map(function (s, i) {
+        var cls = 'stepRow' + (s.now ? ' now' : (i < 3 ? ' done' : ''));
+        return '<div class="' + cls + '">' +
+          '<span class="n">' + (i + 1) + '</span>' +
+          '<div style="flex:1;min-width:0">' +
+            '<div class="tt">' + esc(s.t) + (s.proven ? '<span class="miniseal">⛨</span>' : '') + '</div>' +
+            '<div class="ss">' + esc(s.s) + '</div>' +
+            (s.now ? '<div class="acts2">' +
+              '<button class="btn primary" type="button" data-act="ok">Send it</button>' +
+              '<button class="btn" type="button" data-act="no">Not yet</button>' +
+              '<button class="btn" type="button" data-act="open">Open the report →</button>' +
+            '</div>' : '') +
+          '</div>' +
+        '</div>';
+      }).join('') +
+    '</div>' +
+    '<aside class="sidepanel">' +
+      '<header><span>▤</span><span style="flex:1;min-width:0">' +
+        (art === 'blind' ? 'supplier-risk-register.pdf' : 'supplier-risk-register.docx') +
+        '</span></header>' +
+      '<div class="scroll">' + bodyContent(true) + '</div>' +
+    '</aside>';
+}
+
+function renderDock() {
+  var el = document.getElementById('dock');
+  if (variant === 'b') { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML =
+    '<span style="font-size:16px">✋</span>' +
+    '<span class="q"><b>Send this to procurement?</b>' +
+      '<span class="sub2">' +
+        (art === 'blind'
+          ? 'You have not been able to read it. Sending anyway is your call, and it will be recorded as such.'
+          : 'Nothing has left the company yet. Emailing it puts this document outside.') +
+      '</span></span>' +
+    '<button class="btn primary" type="button" data-act="ok">Send it</button>' +
+    '<button class="btn" type="button" data-act="no">Not yet</button>';
+}
+
+function renderFoot() {
+  var bits = ['<span class="pill">Step 4 of 5 · paused</span>'];
+  bits.push('<span class="pill good">✓ A run surface of its own — no message list, no composer</span>');
+  bits.push(variant === 'a'
+    ? '<span class="pill good">✓ You cannot press Send without the document in front of you</span>'
+    : '<span class="pill warn">The decision and the evidence are two objects</span>');
+  bits.push(art === 'blind'
+    ? '<span class="pill bad">Approving blind — said out loud, not hidden</span>'
+    : '<span class="pill net">Coverage is the real check_coverage output, not a slogan</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb');
+  document.body.classList.add('v' + variant);
+  document.body.classList.toggle('marks-off', !marks);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  document.getElementById('spine').innerHTML = spineHTML();
+  renderBody(); renderDock(); renderFoot();
+}
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-art'))   art = b.getAttribute('data-art');
+  if (b.hasAttribute('data-marks')) marks = b.getAttribute('data-marks') === 'on';
+  render();
+});
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  var a = e.target.closest('[data-act]'); if (!a) return;
+  var act = a.getAttribute('data-act');
+  var el = document.getElementById('dock');
+  if (act === 'dl') {
+    a.closest('.blind').insertAdjacentHTML('beforeend',
+      '<p style="margin-top:12px;color:hsl(38 92% 80%)">Downloaded. The run is still waiting — it does ' +
+      'not time out and send while you read.</p>');
+    return;
+  }
+  var msg = act === 'ok'
+    ? '<span style="font-size:16px">✓</span><span class="q"><b>Sent.</b>' +
+      '<span class="sub2">Recorded as approved by you' +
+      (art === 'blind' ? ', <b>without a preview</b> — the record says so.' : ', with the report shown.') +
+      ' The run continues to the shared-drive step.</span></span>'
+    : '<span style="font-size:16px">⏸</span><span class="q"><b>Held.</b>' +
+      '<span class="sub2">Nothing has left the company. The run waits here until someone decides — it ' +
+      'does not quietly time out and send.</span></span>';
+  if (variant === 'a') { el.innerHTML = msg; return; }
+  if (act === 'open') { return; }
+  var row = a.closest('.stepRow');
+  row.querySelector('.acts2').outerHTML =
+    '<div class="ss" style="margin-top:9px;color:hsl(38 92% 80%)">' +
+      (act === 'ok' ? 'Sent — recorded as approved by you.' : 'Held. Nothing has left the company.') + '</div>';
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

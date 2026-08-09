@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 146 — The round trip (Phase 185 / feeds 188)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  .stage { display: block; position: relative; }
+  .surface { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+
+  /* ══ the journey ribbon — where you are in the whole trip ════════════════ */
+  .ribbon {
+    flex-shrink: 0; display: flex; align-items: center; gap: 0; padding: 9px 20px;
+    border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1); flex-wrap: wrap;
+  }
+  .ribbon .j {
+    display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px;
+    font-size: 11px; color: var(--color-text-dim); border: 1px solid transparent; white-space: nowrap;
+  }
+  .ribbon .j.past { color: var(--color-text-muted); }
+  .ribbon .j.at {
+    color: hsl(38 92% 88%); background: hsl(38 60% 18%); border-color: hsl(38 92% 62% / .6);
+  }
+  .ribbon .j.at.ok { color: hsl(142 71% 80%); background: hsl(142 60% 15%); border-color: hsl(142 71% 50% / .6); }
+  .ribbon .j.at.bad { color: hsl(0 90% 84%); background: hsl(0 55% 17%); border-color: hsl(0 78% 58% / .6); }
+  .ribbon .arw { color: var(--color-text-dim); font-size: 10px; padding: 0 3px; }
+  .ribbon .where { margin-left: auto; font-size: 11px; color: var(--color-text-dim); }
+  .ribbon .where b { color: var(--color-text); }
+
+  .body2 { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+
+  /* ══ the canvas layer ════════════════════════════════════════════════════ */
+  .canvasLayer { position: absolute; inset: 0; overflow: auto; }
+  /* bottom band reserved for the two note cards, so the flow is never sat on */
+  .miniflow { display: flex; align-items: center; padding: 30px 34px 210px; min-width: max-content; min-height: 100%; }
+  .mnode {
+    position: relative; flex-shrink: 0; width: 214px; padding: 26px 15px 15px; margin-top: 24px;
+    border-radius: 18px; text-align: center;
+    background: linear-gradient(160deg, hsl(220 30% 100% / .075), hsl(220 30% 100% / .022));
+    border: 1px solid hsl(220 30% 100% / .11); backdrop-filter: blur(14px);
+    box-shadow: 0 1px 0 hsl(220 30% 100% / .13) inset, 0 20px 40px -20px rgba(0,0,0,.95);
+  }
+  .mnode.proven { border-color: hsl(220 30% 100% / .34); }
+  .mnode .sl { position: absolute; top: 8px; right: 9px; font-size: 10px; color: var(--color-text); }
+  .mnode .nn { position: absolute; top: 8px; left: 9px; font-size: 9px; font-family: var(--font-mono);
+               color: var(--color-text-dim); }
+  .mnode .tt { font-size: 12px; color: var(--color-text); font-weight: 600; line-height: 1.35;
+               font-family: var(--font-headline); }
+  .mnode .ss { font-size: 10px; color: var(--color-text-muted); margin-top: 4px; line-height: 1.45; }
+  .mnode.done  { opacity: .55; }
+  .mnode.now   { border-color: hsl(38 92% 62% / .9);
+                 box-shadow: 0 0 0 1px hsl(38 92% 62% / .5), 0 0 34px -6px hsl(38 92% 62% / .6); }
+  .mnode.okd   { border-color: hsl(142 71% 50% / .8); box-shadow: 0 0 26px -8px hsl(142 71% 50% / .6); }
+  .mnode.failed{ border-color: hsl(0 78% 58% / .9); box-shadow: 0 0 0 1px hsl(0 78% 58% / .5), 0 0 34px -6px hsl(0 78% 58% / .6); }
+  .mconn { flex-shrink: 0; width: 46px; height: 2px; background: var(--color-border); }
+  .mchip {
+    position: absolute; left: 50%; transform: translateX(-50%); bottom: -12px; white-space: nowrap;
+    font-size: 9.5px; padding: 2px 8px; border-radius: 999px; z-index: 5;
+  }
+  .mnode.now .mchip    { background: hsl(38 60% 18%); border: 1px solid hsl(38 92% 62% / .6); color: hsl(38 92% 86%); }
+  .mnode.okd .mchip    { background: hsl(142 60% 15%); border: 1px solid hsl(142 71% 50% / .6); color: hsl(142 71% 82%); }
+  .mnode.failed .mchip { background: hsl(0 55% 17%); border: 1px solid hsl(0 78% 58% / .6); color: hsl(0 90% 86%); }
+
+  /* ══ the review layer — takes over when a pause happens ══════════════════ */
+  .reviewLayer {
+    position: absolute; inset: 0; z-index: 20; display: none; flex-direction: column;
+    background: hsl(220 32% 5% / .93); backdrop-filter: blur(6px);
+  }
+  body.reviewing .reviewLayer { display: flex; }
+  /* A: it grows out of the canvas and the canvas stays visible behind it.
+     B: it is a different place, so the canvas is not behind it at all. */
+  body.vb .reviewLayer { background: var(--color-bg); backdrop-filter: none; }
+  body.vb.reviewing .canvasLayer { display: none; }
+
+  .rvhdr {
+    flex-shrink: 0; display: flex; align-items: center; gap: 11px; padding: 11px 20px;
+    border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1);
+  }
+  .rvhdr .bk { font-size: 11.5px; color: var(--color-primary); cursor: pointer; }
+  .rvhdr .bk:hover { text-decoration: underline; }
+  .rvhdr .ti { font-family: var(--font-headline); font-size: 13px; color: var(--color-text); font-weight: 600; }
+  .rvhdr .fn { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+
+  .rvbody { flex: 1; min-height: 0; overflow: auto; padding: 20px; display: flex; flex-direction: column; align-items: center; }
+  .card660 { width: 100%; max-width: 640px; }
+
+  .page { background: #f7f7f4; color: #1c1c1a; border-radius: 4px; padding: 26px 32px 30px;
+          box-shadow: 0 20px 50px -18px rgba(0,0,0,.8); font-size: 12.5px; line-height: 1.7; }
+  .page h1 { font-size: 17px; margin: 0 0 3px; font-family: "Georgia", serif; }
+  .page h2 { font-size: 13px; margin: 16px 0 6px; font-family: "Georgia", serif; }
+  .page .meta { font-size: 10.5px; color: #6a6a63; margin-bottom: 14px; font-family: var(--font-sans); }
+  .page p { margin: 0 0 9px; font-family: "Georgia", serif; }
+  .page ul { margin: 0 0 9px; padding-left: 20px; font-family: "Georgia", serif; }
+  .page table { width: 100%; border-collapse: collapse; font-size: 11px; font-family: var(--font-sans); }
+  .page th { text-align: left; padding: 6px 7px; border-bottom: 2px solid #d5d5cd; font-size: 10px;
+             text-transform: uppercase; letter-spacing: .04em; color: #55554e; }
+  .page td { padding: 6px 7px; border-bottom: 1px solid #e3e3db; vertical-align: top; }
+  .cite { display: inline-block; font-family: var(--font-sans); font-size: 9px; color: #2d6a4f;
+          background: #dff0e6; border: 1px solid #a9d5bd; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+  .opin { display: inline-block; font-family: var(--font-sans); font-size: 9px; color: #7a5a11;
+          background: #f6ecd2; border: 1px solid #e0cb96; border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+
+  .plain { background: hsl(220 30% 4% / .7); border: 1px solid var(--color-border); border-radius: 10px;
+           padding: 16px 18px; font-family: var(--font-mono); font-size: 12px; line-height: 1.7;
+           white-space: pre-wrap; color: var(--color-text); }
+  .csvt { width: 100%; border-collapse: collapse; font-size: 11.5px;
+          background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
+  .csvt th { text-align: left; padding: 8px 10px; background: var(--color-muted); color: var(--color-text-muted);
+             font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+  .csvt td { padding: 8px 10px; border-top: 1px solid var(--color-border); color: var(--color-text); }
+  .imgbox { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; }
+
+  .cannot {
+    padding: 24px; border-radius: 14px; text-align: center;
+    background: hsl(0 55% 14% / .5); border: 1px dashed hsl(0 72% 55% / .55); color: hsl(0 85% 84%);
+  }
+  .cannot h3 { margin: 0 0 8px; font-size: 15px; font-family: var(--font-headline); color: hsl(0 90% 88%); }
+  .cannot p { margin: 0 0 7px; font-size: 12px; line-height: 1.65; color: hsl(0 60% 84%); }
+
+  .coverage {
+    margin-bottom: 12px; padding: 9px 12px; border-radius: 10px; font-size: 11.5px; line-height: 1.6;
+    background: hsl(142 71% 45% / .09); border: 1px solid hsl(142 71% 45% / .32); color: hsl(142 71% 74%);
+  }
+  .coverage b { color: #fff; }
+
+  .rvdock {
+    flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 12px 20px;
+    border-top: 1px solid hsl(38 92% 62% / .45); background: hsl(38 30% 10% / .96);
+  }
+  .rvdock .q { flex: 1; min-width: 0; font-size: 12.5px; color: var(--color-text); line-height: 1.5; }
+  .rvdock .q b { color: hsl(38 92% 88%); }
+  .rvdock .sub2 { display: block; font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
+
+  /* ══ the "what went wrong" notice ═══════════════════════════════════════ */
+  .wrong {
+    position: absolute; left: 50%; transform: translateX(-50%); top: 16px; z-index: 30; max-width: 620px;
+    padding: 12px 15px; border-radius: 13px; font-size: 12px; line-height: 1.65;
+    background: hsl(220 30% 8% / .97); box-shadow: var(--shadow-lg); display: none;
+  }
+  body.haswrong .wrong { display: block; }
+  .wrong h5 { margin: 0 0 5px; font-size: 12.5px; font-family: var(--font-headline); font-weight: 600; }
+  .wrong .acts3 { display: flex; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+  .wrong .btn { font-size: 11.5px; padding: 5px 11px; }
+  .wrong.bad  { border: 1px solid hsl(0 78% 58% / .6); color: hsl(0 85% 86%); }
+  .wrong.bad h5 { color: hsl(0 90% 90%); }
+  .wrong.warn { border: 1px solid hsl(38 92% 62% / .55); color: hsl(38 92% 84%); }
+  .wrong.warn h5 { color: hsl(38 92% 92%); }
+
+  /* ══ the two engine truths this sketch had to correct ═══════════════════ */
+  .truth {
+    /* clears the approve dock — a note must never sit on the control under test */
+    position: absolute; right: 16px; bottom: 84px; z-index: 25; max-width: 350px;
+    padding: 12px 14px; border-radius: 13px; font-size: 11px; line-height: 1.65;
+    background: hsl(0 45% 10% / .96); border: 1px solid hsl(0 72% 55% / .5); color: hsl(0 70% 86%);
+    box-shadow: var(--shadow-lg);
+  }
+  .truth h5 { margin: 0 0 6px; font-size: 11.5px; font-family: var(--font-headline);
+              color: hsl(0 90% 90%); font-weight: 600; }
+  .truth b { color: #fff; }
+  .truth code { font-family: var(--font-mono); font-size: 10px; }
+  .truth + .truth { display: none; }
+
+  .trythis {
+    position: absolute; left: 16px; bottom: 84px; z-index: 25; max-width: 300px;
+    background: hsl(220 30% 8% / .96); backdrop-filter: blur(16px);
+    border: 1px solid hsl(239 100% 82% / .3); border-radius: 14px; padding: 12px 14px;
+    box-shadow: var(--shadow-lg);
+  }
+  .trythis h5 { margin: 0 0 7px; font-size: 12px; font-family: var(--font-headline);
+                color: var(--color-text); font-weight: 600; }
+  .trythis ol { margin: 0; padding-left: 17px; font-size: 11px; line-height: 1.7; color: var(--color-text-muted); }
+  .trythis li { margin-bottom: 4px; }
+  .trythis b { color: var(--color-text); }
+  .trythis .close { position: absolute; top: 7px; right: 8px; background: none; border: 0;
+                    color: var(--color-text-dim); cursor: pointer; font-size: 14px; line-height: 1; }
+</style>
+</head>
+<body class="alive va">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 146</span>
+  <button class="variant-tab active" data-v="a" type="button">A: One place — the canvas is the run <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" type="button">B: Two places — build here, run there</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Where the run is</span>
+  <div class="seg" id="stateseg">
+    <button type="button" data-st="build">Building</button>
+    <button type="button" data-st="running">Running</button>
+    <button type="button" data-st="paused" class="on">Paused — needs you</button>
+    <button type="button" data-st="after">After you approved</button>
+  </div>
+  <span class="lbl" style="margin-left:10px">It produced</span>
+  <div class="seg" id="artseg">
+    <button type="button" data-art="docx" class="on">Word report</button>
+    <button type="button" data-art="md">Markdown</button>
+    <button type="button" data-art="txt">Plain text</button>
+    <button type="button" data-art="csv">A table</button>
+    <button type="button" data-art="png">A chart</button>
+    <button type="button" data-art="none">Nothing to show</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="lbl">Went wrong</span>
+  <div class="seg" id="wrongseg">
+    <button type="button" data-w="none" class="on">Nothing</button>
+    <button type="button" data-w="timeout">Nobody answered</button>
+    <button type="button" data-w="closed">You closed the tab</button>
+    <button type="button" data-w="other">Someone else approved</button>
+    <button type="button" data-w="failafter">Next step failed</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="surface">
+    <div class="ribbon" id="ribbon"></div>
+    <div class="body2">
+      <div class="canvasLayer"><div class="miniflow" id="miniflow"></div></div>
+      <div class="reviewLayer">
+        <div class="rvhdr" id="rvhdr"></div>
+        <div class="rvbody"><div class="card660" id="rvbody"></div></div>
+        <div class="rvdock" id="rvdock"></div>
+      </div>
+      <div class="wrong" id="wrong"></div>
+      <div class="truth" id="truth"></div>
+      <div class="trythis" id="trythis">
+        <button class="close" type="button" id="closetry" aria-label="Hide">✕</button>
+        <h5>Four things to try</h5>
+        <ol>
+          <li>Walk <b>Where the run is</b> left to right. Do you always know where you are and how to get back?</li>
+          <li>Cycle <b>It produced</b>. Which ones can you actually read? (Note which one cannot.)</li>
+          <li>Set <b>Went wrong → Nobody answered</b>. Read what the engine does today.</li>
+          <li>Then <b>Next step failed</b> — after you already said yes.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="foot" id="foot"></div>
+
+<div class="sketch-toolbar">
+  <span>146</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 146 — the round trip. Canvas → run → pause → review → back → done,
+   every output type, and everything that goes wrong on the way.
+
+   Operator, 2026-07-28: "how is this coming from the actual canvas — does it
+   open separately, then when I take an action does it return to the canvas and
+   continue? I want the linkages, the views, the switches, the different types
+   of outputs, whether they render correctly, and everything that could go
+   wrong."
+
+   ── TWO ENGINE TRUTHS THIS SKETCH HAD TO CORRECT ─────────────────────────
+   Both were found by reading the shipped code while drawing this, and both
+   FALSIFY a claim sketch 145 made. They are drawn in-surface, in red, rather
+   than quietly fixed — because each one is a Phase-185 scope item.
+
+   (1) THE APPROVAL GATE DOES NOT HOLD. `_exec_llm_human_input`
+       (phase_types.py) blocks via `subscribe_for_response(..., timeout_seconds)`
+       — default **300s**, hard cap 1800 (`settings.ask_user_max_timeout_seconds`).
+       On timeout the helper returns None, `answer` becomes `""`, and the phase
+       RETURNS NORMALLY — so the workflow ADVANCES. In this flow the next step
+       is the email. Sketch 145 said "Not yet holds · it does not quietly time
+       out and send". That is false today. GOVERN-03 may reuse the
+       llm_human_input SUBSTRATE but must NOT inherit its timeout disposition:
+       an action-risk gate has to fail CLOSED.
+
+   (2) THE FLAGSHIP DELIVERABLE IS THE ONE THING THAT CANNOT BE PREVIEWED.
+       `FilePreview.tsx` routes by mime/ext: markdown → MarkdownRenderer,
+       csv → CsvTablePreview, code → ShikiCode, text/* → <pre>, image → <img>,
+       EVERYTHING ELSE → a download fallback. docx / pptx / xlsx / pdf are in
+       "everything else". And `llm_emit` + the `render_template` emitter
+       (docxtpl) produces **.docx**. So the single most important artefact a
+       workflow makes is the one a reviewer cannot see. Sketch 145 drew a Word
+       document rendering beautifully in-app — aspirational, not shipped.
+
+   Everything else here is the real shape: the five steps, the corner seal from
+   143-A, the coverage vocabulary from `check_coverage`, and the file types the
+   shipped preview stack really does and does not handle.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var STEPS = [
+  { t: 'Find the risks in our supplier files', s: 'Reads your contracts and incident reports', proven: true },
+  { t: 'Work out which suppliers look shaky', s: 'Judgement — no documents involved' },
+  { t: 'Write the risk report', s: 'Every claim has to trace to a document', proven: true },
+  { t: 'Email it to procurement', s: 'Sends the report outside the company' },
+  { t: 'File it in the shared drive', s: 'Writes the report to your team folder' }
+];
+
+var JOURNEY = [
+  { k: 'build',   w: 'Building it' },
+  { k: 'running', w: 'Running' },
+  { k: 'paused',  w: 'Needs you' },
+  { k: 'review',  w: 'Reading it' },
+  { k: 'after',   w: 'Running on' },
+  { k: 'done',    w: 'Done' }
+];
+
+var ARTS = {
+  docx: { fn: 'supplier-risk-register.docx', can: false, label: 'Word report' },
+  md:   { fn: 'supplier-risk-summary.md',    can: true,  label: 'Markdown' },
+  txt:  { fn: 'supplier-notes.txt',          can: true,  label: 'Plain text' },
+  csv:  { fn: 'open-risks.csv',              can: true,  label: 'A table' },
+  png:  { fn: 'exposure-by-supplier.png',    can: true,  label: 'A chart' },
+  none: { fn: null,                          can: null,  label: 'Nothing to show' }
+};
+
+var LEAD = {
+  a: '<b>A — One place. The canvas you built on is the canvas you watch.</b> Launching does not take you ' +
+     'anywhere; the same flow lights up as it runs. When a step needs you, the document grows over the ' +
+     'canvas and the canvas stays visible behind it. You approve, it closes, and you are already where the ' +
+     'run continues. There is never a "where did it go" moment — but the canvas has to carry two jobs.',
+  b: '<b>B — Two places. Build here, run there.</b> The canvas is for designing; launching moves you to a ' +
+     'run view with its own step list, and a <i>← back to the canvas</i> switch returns you. Each surface ' +
+     'does one job well. The cost is a hand-off: you leave the thing you were just looking at, and every ' +
+     'return trip is a decision about where you land.'
+};
+
+var state = 'paused', art = 'docx', wrong = 'none';
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+
+function atKey() {
+  if (state === 'build') return 'build';
+  if (state === 'running') return 'running';
+  if (state === 'paused') return 'review';
+  return wrong === 'failafter' ? 'after' : 'done';
+}
+
+function renderRibbon() {
+  var at = atKey(), seen = false;
+  var cls = wrong === 'failafter' ? ' bad' : (state === 'after' ? ' ok' : '');
+  var html = JOURNEY.map(function (j) {
+    var c = 'j';
+    if (j.k === at) { c += ' at' + cls; seen = true; }
+    else if (!seen) c += ' past';
+    return '<span class="' + c + '">' + esc(j.w) + '</span>';
+  }).join('<span class="arw">›</span>');
+  var whereWord = state === 'build' ? 'the canvas'
+    : state === 'running' ? (variantIsA() ? 'the canvas, watching' : 'the run view')
+    : state === 'paused' ? (variantIsA() ? 'the canvas, with the report open over it' : 'the review, away from the canvas')
+    : (variantIsA() ? 'the canvas, watching' : 'the run view');
+  html += '<span class="where">You are on <b>' + esc(whereWord) + '</b></span>';
+  document.getElementById('ribbon').innerHTML = html;
+}
+
+function variantIsA() { return document.body.classList.contains('va'); }
+
+function nodeState(i) {
+  if (state === 'build') return '';
+  if (state === 'running') return i < 2 ? 'done' : (i === 2 ? 'now' : '');
+  if (state === 'paused')  return i < 3 ? 'done' : (i === 3 ? 'now' : '');
+  /* after approval */
+  if (wrong === 'failafter') return i < 3 ? 'done' : (i === 3 ? 'okd' : (i === 4 ? 'failed' : ''));
+  return i <= 3 ? (i === 3 ? 'okd' : 'done') : 'done';
+}
+
+function nodeChip(i) {
+  var st = nodeState(i);
+  /* "executing" and "waiting for a person" are NOT the same state and must never
+     share a word — conflating them is the Pitfall-4 dishonesty in miniature. */
+  if (st === 'now') return state === 'running' ? 'Running now' : 'Waiting for you';
+  if (st === 'okd') return '✓ You approved it';
+  if (st === 'failed') return 'Failed here';
+  return '';
+}
+
+function renderCanvas() {
+  document.getElementById('miniflow').innerHTML = STEPS.map(function (s, i) {
+    var st = nodeState(i), chip = nodeChip(i);
+    return (i ? '<div class="mconn"></div>' : '') +
+      '<div class="mnode ' + st + (s.proven ? ' proven' : '') + '">' +
+        '<span class="nn">' + (i + 1) + '</span>' +
+        (s.proven ? '<span class="sl">⛨</span>' : '') +
+        '<div class="tt">' + esc(s.t) + '</div>' +
+        '<div class="ss">' + esc(s.s) + '</div>' +
+        (chip ? '<span class="mchip">' + esc(chip) + '</span>' : '') +
+      '</div>';
+  }).join('');
+}
+
+function artBody() {
+  var a = ARTS[art];
+  if (art === 'none') {
+    return '<div class="cannot" style="background:hsl(220 30% 8% / .8);border-color:var(--color-border);color:var(--color-text-muted)">' +
+      '<h3 style="color:var(--color-text)">This step produced no document</h3>' +
+      '<p>It updated a record and moved on. There is nothing to read — so the only thing you can review is ' +
+      'what it says it did, and the steps it took to get there.</p>' +
+      '<p style="color:var(--color-text-dim)">An approval screen that shows an empty frame here would be worse ' +
+      'than one that says this out loud.</p></div>';
+  }
+  if (!a.can) {
+    return '<div class="cannot">' +
+      '<h3>We cannot show you a ' + esc(art.toUpperCase()) + ' here</h3>' +
+      '<p><b>' + esc(a.fn) + '</b> — the preview only renders markdown, plain text, code, tables and images. ' +
+      'Word, PowerPoint, Excel and PDF are download-only today.</p>' +
+      '<p><b>This is the file your template produces.</b> So unless this changes, every template deliverable ' +
+      'is approved without being read.</p>' +
+      '<div style="margin-top:13px"><button class="btn" type="button" data-act="dl">Download and read it first</button></div>' +
+      '</div>';
+  }
+  var cov = '<div class="coverage">⛨ <b>18 of 18</b> values traceable to a source · <b>0</b> invented sources · ' +
+            'the severity ratings are the AI\'s judgement, not a document</div>';
+  if (art === 'md') {
+    return cov + '<div class="page">' +
+      '<h1>Supplier risk summary</h1><div class="meta">rendered from markdown</div>' +
+      '<p>Four suppliers carry open risk this month.</p><h2>Open risks</h2><ul>' +
+      '<li><b>Nordwind Logistics</b> — two late-delivery penalties in Q3<span class="cite">⛨ Incident log, 14 Aug</span> · High<span class="opin">AI judgement</span></li>' +
+      '<li><b>Baytree Components</b> — insurance certificate expired 11 June<span class="cite">⛨ Contract §7.2</span> · High<span class="opin">AI judgement</span></li>' +
+      '<li><b>Calder Freight</b> — single-source for three critical parts<span class="cite">⛨ Supplier master, row 41</span> · Medium<span class="opin">AI judgement</span></li>' +
+      '</ul></div>';
+  }
+  if (art === 'txt') {
+    return cov + '<div class="plain">SUPPLIER RISK — month ending 31 July 2026\n\n' +
+      '  Nordwind Logistics   High     two late-delivery penalties in Q3   [Incident log, 14 Aug]\n' +
+      '  Baytree Components   High     insurance certificate expired       [Contract 7.2]\n' +
+      '  Calder Freight       Medium   single-source, three parts          [Supplier master r41]\n' +
+      '  Orre Materials       Low      price variation invoked twice       [Contract 4.5]\n\n' +
+      'Severity ratings are an assessment, not a quotation.</div>';
+  }
+  if (art === 'csv') {
+    return cov + '<table class="csvt"><thead><tr><th>supplier</th><th>risk</th><th>severity</th><th>source</th></tr></thead><tbody>' +
+      '<tr><td>Nordwind Logistics</td><td>Two late-delivery penalties</td><td>High</td><td>Incident log, 14 Aug</td></tr>' +
+      '<tr><td>Baytree Components</td><td>Insurance certificate expired</td><td>High</td><td>Contract §7.2</td></tr>' +
+      '<tr><td>Calder Freight</td><td>Single-source, three parts</td><td>Medium</td><td>Supplier master, row 41</td></tr>' +
+      '<tr><td>Orre Materials</td><td>Price variation invoked twice</td><td>Low</td><td>Contract §4.5</td></tr>' +
+      '</tbody></table>';
+  }
+  /* png */
+  return cov + '<div class="imgbox"><svg viewBox="0 0 420 170" width="100%" role="img" aria-label="Exposure by supplier">' +
+    '<text x="0" y="12" fill="#9aa3b8" font-size="11" font-family="sans-serif">Exposure by supplier (£k)</text>' +
+    [['Nordwind', 148], ['Baytree', 121], ['Calder', 74], ['Orre', 31]].map(function (r, i) {
+      var y = 32 + i * 32;
+      return '<text x="0" y="' + (y + 11) + '" fill="#c7cddd" font-size="10" font-family="sans-serif">' + r[0] + '</text>' +
+        '<rect x="72" y="' + y + '" width="' + r[1] + '" height="15" rx="3" fill="hsl(239 84% 67%)" opacity="0.85"/>' +
+        '<text x="' + (78 + r[1]) + '" y="' + (y + 11) + '" fill="#9aa3b8" font-size="10" font-family="sans-serif">' + r[1] + '</text>';
+    }).join('') + '</svg></div>';
+}
+
+function renderReview() {
+  document.body.classList.toggle('reviewing', state === 'paused');
+  if (state !== 'paused') return;
+  var a = ARTS[art];
+  document.getElementById('rvhdr').innerHTML =
+    '<span class="bk" data-act="back">' + (variantIsA() ? '← back to the flow' : '← back to the run') + '</span>' +
+    '<span class="ti">Before it emails procurement</span>' +
+    (a.fn ? '<span class="fn">' + esc(a.fn) + '</span>' : '<span class="fn">no file</span>');
+  document.getElementById('rvbody').innerHTML = artBody();
+  document.getElementById('rvdock').innerHTML =
+    '<span style="font-size:15px">✋</span>' +
+    '<span class="q"><b>Send this to procurement?</b><span class="sub2">' +
+      (a.can === false
+        ? 'You have not been able to read it. Approving anyway is your call and is recorded as such.'
+        : a.can === null
+          ? 'There is no document to read. You are approving the action, not a deliverable.'
+          : 'Nothing has left the company yet.') +
+    '</span></span>' +
+    '<button class="btn primary" type="button" data-act="ok">Send it</button>' +
+    '<button class="btn" type="button" data-act="no">Not yet</button>';
+}
+
+var WRONGS = {
+  timeout: { cls: 'bad', h: 'Nobody answered — and today the run does NOT wait',
+    b: 'The shipped step blocks for <b>timeout_seconds</b> (default <b>300s</b>, hard cap 1800). On timeout the ' +
+       'answer becomes an empty string and the phase <b>completes normally</b> — so the run carries on and the ' +
+       'email goes. <b>An approval that expires into "yes" is not an approval.</b> Phase 185 has to make the ' +
+       'action-risk gate fail CLOSED: no answer means it never proceeds, however long it takes.',
+    acts: '<button class="btn" type="button" data-act="dismiss">I have read this</button>' },
+  closed: { cls: 'warn', h: 'You closed the tab while it was waiting',
+    b: 'The question is a durable row, not a screen — so it survives. Coming back, you land on the run and it is ' +
+       'still asking. <b>But the clock above is still running</b>, so "it survives a refresh" and "it waits for ' +
+       'you" are two different promises, and only the first one is true today.',
+    acts: '<button class="btn" type="button" data-act="dismiss">Understood</button>' },
+  other: { cls: 'warn', h: 'Someone else approved it while you were looking',
+    b: 'Workflows are shareable across an organisation, so two people can be on this screen at once. The buttons ' +
+       'must go away and say <i>who</i> decided and when — not fail silently on the second click. ' +
+       '<b>Whose problem:</b> the co-editing guard is Phase 186; this is its run-time twin and should be named there.',
+    acts: '<button class="btn" type="button" data-act="dismiss">Understood</button>' },
+  failafter: { cls: 'bad', h: 'You approved — then the next step failed',
+    b: 'The email went. The shared-drive step did not. <b>Your approval is not undone by a later failure and must ' +
+       'never look like it was</b> — the canvas shows step 4 approved and green, step 5 failed and red. Retrying ' +
+       'step 5 must not silently re-run step 4 and send a second email.',
+    acts: '<button class="btn" type="button" data-act="dismiss">Understood</button>' }
+};
+
+function renderWrong() {
+  var w = WRONGS[wrong];
+  document.body.classList.toggle('haswrong', !!w);
+  if (!w) return;
+  var el = document.getElementById('wrong');
+  el.className = 'wrong ' + w.cls;
+  el.innerHTML = '<h5>' + w.h + '</h5><div>' + w.b + '</div><div class="acts3">' + w.acts + '</div>';
+}
+
+function renderTruth() {
+  document.getElementById('truth').innerHTML =
+    '<h5>Two engine truths found while drawing this</h5>' +
+    '<b>1.</b> The approval step times out at <code>300s</code> and then <b>continues</b> — sketch 145\'s ' +
+    '"it never quietly times out" was wrong. <br><b>2.</b> <code>.docx</code> — what your template actually ' +
+    'produces — is <b>download-only</b>; markdown, text, code, tables and images all preview fine.';
+}
+
+function renderFoot() {
+  var a = ARTS[art];
+  var bits = [];
+  bits.push('<span class="pill">' + (variantIsA() ? 'One surface' : 'Two surfaces') + ' · you are ' +
+    (state === 'paused' ? 'in the review' : 'on the ' + (variantIsA() ? 'canvas' : (state === 'build' ? 'canvas' : 'run view'))) + '</span>');
+  bits.push(a.can === true ? '<span class="pill good">✓ ' + esc(a.label) + ' renders today</span>'
+    : a.can === false ? '<span class="pill bad">✗ ' + esc(a.label) + ' is download-only today</span>'
+    : '<span class="pill warn">No artefact — approving the action, not a document</span>');
+  bits.push(variantIsA()
+    ? '<span class="pill good">✓ No hand-off — you never leave the flow</span>'
+    : '<span class="pill warn">Every return trip is a decision about where you land</span>');
+  if (wrong !== 'none') bits.push('<span class="pill bad">Failure mode on screen</span>');
+  document.getElementById('foot').innerHTML = bits.join('');
+}
+
+function render() {
+  document.getElementById('lead').innerHTML = LEAD[variantIsA() ? 'a' : 'b'];
+  renderRibbon(); renderCanvas(); renderReview(); renderWrong(); renderTruth(); renderFoot();
+}
+
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active');
+  document.body.classList.remove('va', 'vb');
+  document.body.classList.add('v' + b.getAttribute('data-v'));
+  render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-st'))  state = b.getAttribute('data-st');
+  if (b.hasAttribute('data-art')) art = b.getAttribute('data-art');
+  if (b.hasAttribute('data-w'))   wrong = b.getAttribute('data-w');
+  render();
+});
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  var a = e.target.closest('[data-act]'); if (!a) return;
+  var act = a.getAttribute('data-act');
+  if (act === 'dismiss') { document.body.classList.remove('haswrong'); return; }
+  if (act === 'dl') {
+    a.closest('.cannot').insertAdjacentHTML('beforeend',
+      '<p style="margin-top:11px;color:hsl(38 92% 82%)">Downloaded — but note the clock above did not stop ' +
+      'while you read it.</p>');
+    return;
+  }
+  if (act === 'back') {
+    state = 'paused';
+    document.getElementById('rvdock').innerHTML =
+      '<span class="q" style="color:var(--color-text-muted);font-size:12px">' +
+      (variantIsA()
+        ? 'You closed the report. In A the run is right behind it, still waiting — nothing was lost and nothing was decided.'
+        : 'You went back to the run view. The step is still asking; the report is one click away again.') +
+      '</span><button class="btn" type="button" data-act="reopen">Open the report again</button>';
+    return;
+  }
+  if (act === 'reopen') { render(); return; }
+  var el = document.getElementById('rvdock');
+  el.innerHTML = act === 'ok'
+    ? '<span style="font-size:15px">✓</span><span class="q"><b>Sent.</b><span class="sub2">Recorded as approved by you' +
+      (ARTS[art].can === false ? ', <b>without a preview</b>' : '') +
+      '. ' + (variantIsA()
+        ? 'The report closes and you are already on the flow, watching step 5 start.'
+        : 'You are returned to the run view, where step 5 has started.') + '</span></span>'
+    : '<span style="font-size:15px">⏸</span><span class="q"><b>Held.</b><span class="sub2">Nothing has left the ' +
+      'company — <b>but see the note bottom-right: today the step still expires.</b></span></span>';
+  if (act === 'ok') {
+    setTimeout(function () {
+      state = 'after';
+      document.querySelectorAll('#stateseg button').forEach(function (x) { x.classList.remove('on'); });
+      document.querySelector('#stateseg [data-st="after"]').classList.add('on');
+      render();
+    }, 1100);
+  }
+});
+
+document.getElementById('closetry').addEventListener('click', function () {
+  document.getElementById('trythis').style.display = 'none';
+});
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+render();
+</script>
+</body>
+</html>

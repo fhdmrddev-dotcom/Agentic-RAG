@@ -184,7 +184,7 @@ async def test_start_returns_run_id_and_zadds_run_buffer():
     """POST .../tuner/runs as the owner returns a run id (non-blocking, D-06) and ZADDs
     ``runs:active`` + the per-skill sorted set (Phase-061+ transport)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
 
@@ -301,7 +301,7 @@ async def test_visible_skill_foreign_run_id_returns_404_both_routes():
     — never started for THIS skill, present in the shared buffer keyspace — must 404 on BOTH,
     and the foreign buffer's content must NOT be returned (non-vacuous)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_with_tuner_runs([skill_row], store={})  # no tuner_runs row for any run
     fake_redis = _FakeRedis()
 
@@ -362,7 +362,7 @@ async def test_stream_legitimate_in_flight_run_passes_membership_gate():
     the SSE body (the shared replay_tail_consumer's xread tail is covered by the runs.py
     tests; here we only prove the membership gate let a legitimate member through)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
     run_id = uuid4()
@@ -391,7 +391,7 @@ async def test_results_carry_both_fires_and_no_false_subscores():
     """Drive the background job to completion (service mocked) and assert the GET results
     scoreboard carries BOTH fires AND no_false per provider cell (042-A)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     # CR-01: the GET binds run_id<->skill via the live per-skill set OR the durable tuner_runs
@@ -473,7 +473,7 @@ async def test_provider_columns_score_concurrently():
     happen). Also assert gather preserves target ORDER (deterministic cells) — concurrency must
     not reorder the scoreboard. cases × repeats stay serial INSIDE a column."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     stored = {}
@@ -563,7 +563,7 @@ async def test_start_caps_targets_no_unbounded_fanout():
     scored (T-123-04-02 / DoS guard). We assert the run id response echoes the capped target
     set AND the background job scores no more than the cap."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
 
     # Build a target list 3x the cap.
@@ -630,7 +630,7 @@ async def test_duplicate_concurrent_run_returns_409():
     (``tuner_inflight:{skill_id}``) to simulate a run already in-flight in ANOTHER worker.
     The losing POST's ``SET NX`` then returns None -> 409."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     # Pre-set the cross-worker in-flight claim (an active run owns it). The per-process set is
     # deliberately NOT seeded — proving the Redis claim is the real gate (defeats WORKER_COUNT=2).
@@ -672,7 +672,7 @@ async def test_empty_model_targets_dropped_from_count_and_dispatch():
     the echoed (post-filter) ``targets`` is empty AND the background job got an empty target
     list (no fan-out onto an unscorable lane)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
 
@@ -783,9 +783,9 @@ async def test_get_latest_cross_user_returns_404():
 async def test_get_latest_global_skill_visible():
     """A GLOBAL skill's latest tuner run is readable by a SECOND user (the owner-OR-global
     gate — D-08). OTHER_USER (not the skill's owner) passes the ``.or_(own,global)`` gate
-    because is_global=true, and reads the stored latest scoreboard."""
+    because is_org_shared=true, and reads the stored latest scoreboard."""
     global_skill = {"id": GLOBAL_SKILL_ID, "name": "Shared Skill", "description": "A shared skill.",
-                    "user_id": OWNER["id"], "is_global": True}
+                    "user_id": OWNER["id"], "is_org_shared": True}
     stored = {"_row": {
         "skill_id": GLOBAL_SKILL_ID, "user_id": OWNER["id"], "run_id": str(uuid4()),
         "scoreboard": {"skill_id": GLOBAL_SKILL_ID, "candidates": [], "winner_index": None,
@@ -824,7 +824,7 @@ async def test_latest_result_persists_after_run():
     """After ``_run_tuner_job`` completes, the latest scoreboard is upserted into tuner_runs
     (one row for that skill_id) and GET-latest returns it — survives a Redis flush (D-07)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     stored = {}
@@ -905,7 +905,7 @@ async def test_rerun_overwrites_latest():
     """A second run for the SAME skill upserts on_conflict=skill_id — the stored latest row is
     OVERWRITTEN (one row, latest-wins), never a second accumulated row (D-07)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     stored = {}
     sb = _supabase_with_tuner_runs([skill_row], store=stored)
@@ -952,7 +952,7 @@ async def test_seeded_cases_returned():
     (seeded/sibling) for an OWNED skill (D-05). Cross-user → 404 (owner-scoped, no catalog
     leak)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
 
@@ -1135,7 +1135,7 @@ async def test_seeded_cases_GET_returns_capped_slice_plus_total():
     sibling-provenance should_not entries AND a top-level `total` == the full uncapped
     sibling-sourced count; should_fire is untouched (non-vacuous: > cap distinct siblings)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
 
@@ -1336,7 +1336,7 @@ async def test_target_count_excludes_all_error_column():
     cell carries measured=False / a non-zero error_count while the measured cell is
     measured=True (TT-12)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     stored = {}
@@ -1402,7 +1402,7 @@ async def test_target_count_equals_len_targets_when_all_measure():
     target_count == len(targets) — the TT-12 fix only excludes all-error columns, never
     under-counts a real measurement (TT-12 preserved path)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     stored = {}
     sb = _supabase_with_tuner_runs([skill_row], store=stored)
@@ -1477,7 +1477,7 @@ async def test_all_error_run_records_no_winner():
     persists a scoreboard with winner_index=None / winner_description=None — the job never
     badges a noise winner from a degenerate signal."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     stored = {}
@@ -1522,7 +1522,7 @@ async def test_all_should_not_run_renders_fires_axis_unmeasured():
     whose ``fires`` axis is the unmeasured sentinel None — NEVER a fabricated 1.0 — proving the
     honest empty axis flows through the REAL job, not just the build_cell unit."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     stored = {}
@@ -1585,7 +1585,7 @@ async def test_provider_start_emitted_before_provider_done():
     with stage="provider_start" carrying provider+model for EACH measured target, emitted
     BEFORE that target's tuner_provider_done (TT-07 — the lane-flip honesty signal)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_id = uuid4()
     stored = {}
@@ -1698,7 +1698,7 @@ async def test_cancel_foreign_run_id_returns_404():
     test_visible_skill_foreign_run_id_returns_404_both_routes). The cancel flag is NEVER set
     for an unbound run_id, and the in-flight claim of the unrelated skill is NOT released."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
     foreign_run_id = str(uuid4())
@@ -1743,7 +1743,7 @@ async def test_cancel_owned_inflight_run_sets_flag_and_keeps_claim():
     concurrent run while the old one is still burning paid calls). The membership set + the
     in-flight claim are both pre-seeded (the start route's state)."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     sb = _supabase_returning_skill([skill_row])
     fake_redis = _FakeRedis()
     run_id = str(uuid4())
@@ -1824,7 +1824,7 @@ async def test_job_finally_cas_release_preserves_a_newer_runs_claim():
     A's job finishes (its ``finally`` CAS-releases), B's claim must STILL be held — proving the
     real job path uses the owner-checked release, not a blind DELETE."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
     fake_redis = _FakeRedis()
     run_a = uuid4()
     run_b = uuid4()
@@ -1870,7 +1870,7 @@ async def test_run_stops_early_when_cancel_flag_preset():
     persist a durable scoreboard (no tuner_runs upsert), and still runs its finally cleanup (the
     inflight key is cleared, runs:active is ZREM'd) — TT-08 checkpoint."""
     skill_row = {"id": SKILL_ID, "name": "Risk Register", "description": "Fill a risk register.",
-                 "user_id": OWNER["id"], "is_global": False}
+                 "user_id": OWNER["id"], "is_org_shared": False}
 
     async def _classify(target_model, catalog_lines, user_prompt, user_settings):
         return TriggerDecision(would_load="risk register" in user_prompt.lower(),

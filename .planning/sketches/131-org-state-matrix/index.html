@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 131 — Org State Matrix</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  body { padding-top: 0; }
+
+  /* ── State control strip (shared across variants) ── */
+  .state-strip {
+    position: sticky; top: 45px; z-index: 90;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    background: hsl(220 40% 5% / 0.92);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-border);
+    padding: 9px 20px; font-size: var(--text-xs);
+  }
+  .state-group { display: flex; align-items: center; gap: 6px; }
+  .state-group > .glabel {
+    color: var(--color-text-dim); text-transform: uppercase;
+    letter-spacing: 0.07em; font-size: 10px; margin-right: 2px;
+  }
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-full); overflow: hidden; }
+  .seg button {
+    background: transparent; color: var(--color-text-muted); border: none;
+    padding: 4px 11px; font-size: 11px; font-family: var(--font-sans); cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .seg button:hover:not(.on) { color: var(--color-text); }
+
+  /* ── Stage ── */
+  .stage { padding: 26px 20px 90px; display: flex; justify-content: center; }
+  .device {
+    width: 100%; max-width: 1080px; height: 640px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    overflow: hidden; display: flex; background: var(--color-bg);
+    box-shadow: var(--shadow-lg); position: relative;
+  }
+
+  /* ── Rail ── */
+  .rail {
+    width: 210px; flex: none; background: var(--color-bg-elev1);
+    border-right: 1px solid var(--color-border); display: flex; flex-direction: column;
+    transition: width var(--dur-base) var(--ease-out);
+  }
+  .device[data-rail="collapsed"] .rail { width: 58px; }
+  .rail-brand { display: flex; align-items: center; gap: 9px; padding: 14px 14px 10px; }
+  .brand-mark {
+    width: 30px; height: 30px; flex: none; border-radius: 9px;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
+    box-shadow: 0 2px 10px hsl(239 84% 67% / 0.4);
+  }
+  .brand-word { font-family: var(--font-headline); font-weight: 700; font-size: 15px; white-space: nowrap; }
+  .device[data-rail="collapsed"] .brand-word,
+  .device[data-rail="collapsed"] .nav-label,
+  .device[data-rail="collapsed"] .anchor-text { display: none; }
+
+  .rail-nav { flex: 1; padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .nav-item {
+    display: flex; align-items: center; gap: 11px; padding: 8px 10px; border-radius: var(--radius-sm);
+    color: var(--color-text-muted); font-size: var(--text-sm); cursor: pointer; white-space: nowrap;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+  .nav-item:hover { background: var(--color-accent); color: var(--color-text); }
+  .nav-item.active { background: var(--color-primary-dim); color: var(--color-primary); }
+  .nav-item svg { flex: none; }
+  .device[data-rail="collapsed"] .nav-item { justify-content: center; padding: 8px 0; }
+
+  .rail-foot { padding: 8px; border-top: 1px solid var(--color-border-soft); display: flex; flex-direction: column; gap: 3px; }
+
+  /* footer utility row (theme + shields) */
+  .foot-shields { display: flex; align-items: center; gap: 4px; padding: 2px 4px 4px; }
+  .device[data-rail="collapsed"] .foot-shields { flex-direction: column; }
+  .shield-btn {
+    width: 30px; height: 30px; flex: none; border-radius: 8px; border: 1px solid transparent;
+    display: grid; place-items: center; cursor: pointer; color: var(--color-text-dim);
+    transition: all var(--dur-fast) var(--ease-out); background: transparent;
+  }
+  .shield-btn:hover { background: var(--color-accent); color: var(--color-text); }
+  .shield-btn.op { color: var(--color-warning); }
+  .shield-btn.op:hover { background: var(--color-warning-dim); }
+  .shield-btn.org { color: var(--color-primary); border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+  .shield-btn.org:hover { background: hsl(239 100% 82% / 0.22); }
+  .device[data-role="member"] .shield-btn.org { display: none; } /* honest vanish */
+  .device:not([data-operator="on"]) .shield-btn.op { display: none; }
+
+  /* identity anchor */
+  .anchor {
+    display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: var(--radius-md);
+    cursor: pointer; transition: background var(--dur-fast) var(--ease-out); border: 1px solid transparent;
+    position: relative;
+  }
+  .anchor:hover { background: var(--color-accent); }
+  .avatar {
+    width: 32px; height: 32px; flex: none; border-radius: var(--radius-full);
+    background: linear-gradient(135deg, var(--color-primary-strong), hsl(239 84% 67% / 0.55));
+    display: grid; place-items: center; color: #fff; font-weight: 600; font-size: 13px;
+  }
+  .anchor-text { min-width: 0; line-height: 1.25; }
+  .anchor-name { font-size: var(--text-sm); font-weight: 500; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .anchor-sub { font-size: 11px; color: var(--color-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 5px; }
+
+  /* org name in anchor sub (unified identity variants echo the org here) */
+  .org-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); flex: none; }
+
+  /* ── Role badge (the shared vocab element) ── */
+  .role-badge {
+    display: inline-flex; align-items: center; gap: 4px; border-radius: var(--radius-full);
+    padding: 1px 8px; font-size: 10.5px; font-weight: 500; white-space: nowrap;
+    border: 1px solid transparent;
+  }
+  .role-badge.admin { color: var(--color-primary); background: var(--color-primary-dim); border-color: var(--color-primary-glow); }
+  .role-badge.member { color: var(--color-text-muted); background: var(--color-muted); border-color: var(--color-border); }
+
+  /* ── Menu popover ── */
+  .menu {
+    position: absolute; bottom: 64px; left: 8px; width: 268px; z-index: 40;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    animation: fadeSlideUp var(--dur-base) var(--ease-out); overflow: hidden;
+  }
+  .device[data-rail="collapsed"] .menu { left: 60px; bottom: 60px; }
+  .menu-head { padding: 13px 14px; display: flex; gap: 11px; align-items: center; border-bottom: 1px solid var(--color-border-soft); }
+  .menu-head .avatar { width: 38px; height: 38px; font-size: 15px; }
+  .menu-id { min-width: 0; flex: 1; }
+  .menu-id .n { font-weight: 600; font-size: var(--text-sm); }
+  .menu-id .e { font-size: 11.5px; color: var(--color-text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu-id .rb { margin-top: 4px; }
+
+  .menu-section-label {
+    padding: 9px 14px 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--color-text-dim);
+  }
+  .org-row {
+    display: flex; align-items: center; gap: 10px; padding: 8px 14px; cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .org-row:hover { background: var(--color-accent); }
+  .org-ic {
+    width: 26px; height: 26px; flex: none; border-radius: 7px; display: grid; place-items: center;
+    font-weight: 700; font-size: 12px; color: #fff;
+  }
+  .org-ic.nw { background: linear-gradient(135deg, #3b82f6, #6366f1); }
+  .org-ic.ac { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+  .org-meta { flex: 1; min-width: 0; }
+  .org-meta .on { font-size: var(--text-sm); font-weight: 500; }
+  .org-meta .os { font-size: 10.5px; color: var(--color-text-dim); }
+  .org-check { color: var(--color-primary); opacity: 0; }
+  .org-row.active .org-check { opacity: 1; }
+  .org-row.active { background: var(--color-primary-dim); }
+
+  .menu-item {
+    display: flex; align-items: center; gap: 10px; padding: 9px 14px; cursor: pointer;
+    color: var(--color-text); font-size: var(--text-sm);
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .menu-item:hover { background: var(--color-accent); }
+  .menu-item.org-admin-entry { color: var(--color-primary); }
+  .menu-item.danger { color: var(--color-text-muted); }
+  .menu-item.danger:hover { color: var(--color-danger); }
+  .menu-div { height: 1px; background: var(--color-border-soft); margin: 4px 0; }
+  .device[data-role="member"] .org-admin-entry { display: none; } /* honest vanish */
+  .device[data-orgs="solo"] .switcher-section { display: none; } /* no switcher chrome solo */
+
+  /* ── Main ── */
+  .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+  /* resting view */
+  .resting {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; color: var(--color-text-dim); text-align: center; padding: 20px;
+  }
+  .resting .rh { font-family: var(--font-headline); font-size: var(--text-xl); color: var(--color-text-muted); font-weight: 700; }
+  .device[data-view="shell"] .resting { display: none; }
+  .device:not([data-view="shell"]) .shell { display: none; }
+
+  /* ── Org-admin shell ── */
+  .shell { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .band {
+    display: flex; align-items: center; gap: 12px; padding: 15px 22px 13px;
+    border-bottom: 1px solid var(--color-border);
+    background: linear-gradient(180deg, var(--color-primary-dim), transparent);
+  }
+  .band-org {
+    width: 34px; height: 34px; flex: none; border-radius: 9px; display: grid; place-items: center;
+    font-weight: 700; font-size: 14px; color: #fff;
+    background: linear-gradient(135deg, #3b82f6, #6366f1);
+  }
+  .band-org.ac { background: linear-gradient(135deg, #8b5cf6, #d946ef); }
+  .band-title { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-lg); }
+  .chip-orgadmin {
+    font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; font-weight: 600;
+    color: var(--color-primary); background: var(--color-primary-dim);
+    border: 1px solid var(--color-primary-glow); border-radius: var(--radius-full); padding: 2px 9px;
+  }
+  .band-spacer { flex: 1; }
+  .rec-marker { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-dim); }
+  .rec-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 0 3px var(--color-success-dim); }
+  .tech-toggle {
+    font-size: 11px; color: var(--color-text-muted); border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 3px 8px; cursor: pointer; background: transparent;
+  }
+  .tech-toggle:hover { color: var(--color-text); background: var(--color-accent); }
+
+  .tabs { display: flex; gap: 2px; padding: 4px 16px 0; border-bottom: 1px solid var(--color-border); overflow-x: auto; }
+  .tab {
+    padding: 9px 13px; font-size: var(--text-sm); color: var(--color-text-muted); cursor: pointer;
+    border-bottom: 2px solid transparent; white-space: nowrap; display: flex; align-items: center; gap: 6px;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  .tab:hover { color: var(--color-text); }
+  .tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .tab.locked { color: var(--color-text-dim); cursor: default; }
+  .tab.locked:hover { color: var(--color-text-dim); }
+  .lock-ic { opacity: 0.7; }
+
+  .tabbody { flex: 1; overflow: auto; padding: 22px; }
+  .body-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .body-head h3 { font-family: var(--font-headline); font-size: var(--text-base); font-weight: 700; margin: 0; }
+  .tech-name { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); display: none; }
+  .device[data-tech="on"] .tech-name { display: inline; }
+
+  .roster { border: 1px solid var(--color-border); border-radius: var(--radius-md); overflow: hidden; max-width: 620px; }
+  .rrow { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-top: 1px solid var(--color-border-soft); }
+  .rrow:first-child { border-top: none; }
+  .rrow .avatar { width: 30px; height: 30px; font-size: 12px; }
+  .rrow .rinfo { flex: 1; min-width: 0; }
+  .rrow .rn { font-size: var(--text-sm); font-weight: 500; }
+  .rrow .rs { font-size: 11px; color: var(--color-text-dim); }
+
+  .locked-panel {
+    max-width: 520px; margin: 20px auto; text-align: center; padding: 34px 24px;
+    border: 1px dashed var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface);
+  }
+  .locked-panel .li { color: var(--color-text-dim); margin-bottom: 10px; }
+  .locked-panel .lt { font-weight: 600; margin-bottom: 6px; }
+  .locked-panel .ld { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  /* member-can't-manage banner (in shell when someone forces a member view — foil) */
+  .rls-note {
+    max-width: 620px; margin-bottom: 14px; padding: 10px 13px; font-size: 12px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-muted); color: var(--color-text-muted); display: flex; gap: 8px; align-items: flex-start;
+  }
+
+  /* variant note pill */
+  .vnote {
+    max-width: 1080px; margin: 0 auto 4px; padding: 8px 14px; font-size: 12px; color: var(--color-text-muted);
+    border-left: 2px solid var(--color-primary); background: var(--color-primary-dim);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  }
+  .vnote b { color: var(--color-primary); }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+
+  /* unified-identity cohesion cue (variant B/C): a subtle shared card frame */
+  .device[data-unified="on"] .anchor { border-color: var(--color-border-soft); background: hsl(220 30% 8% / 0.5); }
+  .device[data-unified="on"] .menu-head { background: var(--color-primary-dim); }
+
+  .hint { text-align: center; font-size: 11px; color: var(--color-text-dim); padding-bottom: 6px; }
+  kbd { font-family: var(--font-mono); background: var(--color-muted); border: 1px solid var(--color-border); border-radius: 4px; padding: 1px 5px; font-size: 10px; }
+</style>
+</head>
+<body>
+
+<!-- Variant tabs -->
+<div class="variant-nav">
+  <span class="label">Sketch 131 · Org state matrix</span>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: As-shipped faithful</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: Unified org-identity</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Switcher + per-org role <span class="star">★</span></button>
+</div>
+
+<!-- Shared state matrix control strip -->
+<div class="state-strip">
+  <div class="state-group">
+    <span class="glabel">Role</span>
+    <div class="seg" id="seg-role">
+      <button data-role="member" onclick="setState('role','member')">Member</button>
+      <button data-role="admin" class="on" onclick="setState('role','admin')">Org-admin</button>
+    </div>
+  </div>
+  <div class="state-group">
+    <span class="glabel">Orgs</span>
+    <div class="seg" id="seg-orgs">
+      <button data-orgs="solo" class="on" onclick="setState('orgs','solo')">Solo</button>
+      <button data-orgs="multi" onclick="setState('orgs','multi')">Multi (2+)</button>
+    </div>
+  </div>
+  <div class="state-group">
+    <span class="glabel">Rail</span>
+    <div class="seg" id="seg-rail">
+      <button data-rail="expanded" class="on" onclick="setState('rail','expanded')">Expanded</button>
+      <button data-rail="collapsed" onclick="setState('rail','collapsed')">Collapsed</button>
+    </div>
+  </div>
+  <div class="state-group">
+    <span class="glabel">View</span>
+    <div class="seg" id="seg-view">
+      <button data-view="resting" class="on" onclick="setState('view','resting')">Resting</button>
+      <button data-view="menu" onclick="setState('view','menu')">Menu open</button>
+      <button data-view="shell" onclick="setState('view','shell')">Admin shell</button>
+    </div>
+  </div>
+  <div class="state-group">
+    <span class="glabel">Also operator</span>
+    <div class="seg" id="seg-op">
+      <button data-op="off" class="on" onclick="setState('op','off')">Off</button>
+      <button data-op="on" onclick="setState('op','on')">On</button>
+    </div>
+  </div>
+</div>
+
+<div class="variant active" id="variant-a"></div>
+<div class="variant" id="variant-b"></div>
+<div class="variant" id="variant-c"></div>
+
+<div class="hint">Flip the matrix above. Watch the org shield <b>vanish</b> for a member · the switcher appear only at 2+ orgs · in C, selecting an org changes your role.</div>
+
+<!-- Sketch toolbar -->
+<div class="sketch-toolbar">
+  <span>theme</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+// ── icons ──
+const IC = {
+  chat:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>',
+  search:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>',
+  docs:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>',
+  flow:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M10 6.5h4a3 3 0 0 1 3 3V14"/></svg>',
+  skill:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 2 2.4 5 5.6.8-4 4 1 5.6L12 20l-5 2.4 1-5.6-4-4 5.6-.8z"/></svg>',
+  sun:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  opShield:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+  orgShield:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>',
+  check:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m20 6-11 11-5-5"/></svg>',
+  chevron:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>',
+  lock:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+  users:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg>',
+};
+
+// ── global matrix state ──
+const S = { role:'admin', orgs:'solo', rail:'expanded', view:'resting', op:'off', activeOrg:'nw', tab:'members', active:'a' };
+
+// per-org role model (variant C honesty): you're a member at Northwind, org-admin at Acme
+const ORG_ROLE = { nw:'member', ac:'admin' };
+const ORGS = {
+  nw:{ name:'Northwind Co', icon:'nw', tag:'8 members' },
+  ac:{ name:'Acme Robotics', icon:'ac', tag:'24 members' },
+};
+
+const VCFG = {
+  a:{ unified:false, perOrg:false,
+      note:'<b>A — As-shipped faithful.</b> The shipped 079-C anchor + 080-A shell, rendered across the state matrix. Baseline: the switcher, role badge, and shield-mirror behave exactly as built.' },
+  b:{ unified:true, perOrg:false,
+      note:'<b>B — Unified org-identity primitive.</b> One reused identity block (avatar · org name · org-scoped role badge) renders <i>identically</i> in the rail anchor, the menu header, and the shell band — the badge is one component, not three look-alikes. The family-cohesion thesis.' },
+  c:{ unified:true, perOrg:true,
+      note:'<b>C — Switcher + per-org role honesty.</b> B’s unified block, plus the underexplored multi-org truth: your role is <i>org-scoped</i>. Switch to Northwind → you’re a <b>Member</b> (shield vanishes); switch to Acme → <b>Org-admin</b> (shield returns). Role follows the org you’re in.' },
+};
+
+function roleForView(){
+  // In variant C, role is derived from the active org; elsewhere it's the toggle.
+  if (VCFG[S.active].perOrg && S.orgs==='multi') return ORG_ROLE[S.activeOrg];
+  return S.role;
+}
+
+function frame(v){
+  const cfg = VCFG[v];
+  const role = roleForView();
+  const activeOrg = ORGS[S.activeOrg];
+  const roleBadge = role==='admin'
+    ? '<span class="role-badge admin">◆ Org-admin</span>'
+    : '<span class="role-badge member">Member</span>';
+
+  // anchor sub-line: unified variants echo the active org name; faithful shows email
+  const anchorSub = cfg.unified
+    ? '<span class="org-dot"></span>'+activeOrg.name
+    : 'riley@northwind.co';
+
+  // switcher section (multi only)
+  const switcher = `
+    <div class="switcher-section">
+      <div class="menu-section-label">Organizations</div>
+      ${Object.keys(ORGS).map(k=>{
+        const o=ORGS[k]; const on = k===S.activeOrg?'active':'';
+        const perRole = ORG_ROLE[k]==='admin'
+          ? '<span class="role-badge admin" style="font-size:9.5px;padding:0 6px;">◆ Org-admin</span>'
+          : '<span class="role-badge member" style="font-size:9.5px;padding:0 6px;">Member</span>';
+        return `<div class="org-row ${on}" onclick="pickOrg('${k}')">
+            <div class="org-ic ${o.icon}">${o.name[0]}</div>
+            <div class="org-meta"><div class="on">${o.name}</div>
+              <div class="os">${cfg.perOrg ? '' : o.tag}${cfg.perOrg?'':' · '}</div></div>
+            ${cfg.perOrg?perRole:''}
+            <span class="org-check">${IC.check}</span>
+          </div>`;
+      }).join('')}
+      <div class="menu-div"></div>
+    </div>`;
+
+  const menu = `
+    <div class="menu">
+      <div class="menu-head">
+        <div class="avatar">R</div>
+        <div class="menu-id">
+          <div class="n">Riley Chen</div>
+          <div class="e">riley@northwind.co</div>
+          <div class="rb">${roleBadge}</div>
+        </div>
+      </div>
+      ${switcher}
+      <div style="padding:5px 0;">
+        <div class="menu-item org-admin-entry" onclick="setState('view','shell')">
+          ${IC.orgShield}<span>Organization admin</span>
+        </div>
+        <div class="menu-item" onclick="toggleTheme()">${IC.sun}<span>Theme</span></div>
+        <div class="menu-div"></div>
+        <div class="menu-item danger">Sign out</div>
+      </div>
+    </div>`;
+
+  // shell tabs: 5 live + 2 locked (167 unlocked Invitations, 168 unlocked SSO)
+  const liveTabs = [
+    ['members','Members', IC.users],
+    ['invites','Invitations & Roles', null],
+    ['sso','SSO', null],
+    ['settings','Settings', null],
+    ['audit','Audit', null],
+  ];
+  const lockedTabs = [['sub','Subscription'],['ret','Retention']];
+  const tabsHtml = liveTabs.map(([id,label])=>`
+      <div class="tab ${S.tab===id?'active':''}" onclick="setTab('${id}')">${label}</div>`).join('')
+    + lockedTabs.map(([id,label])=>`
+      <div class="tab locked">${label}<span class="lock-ic">${IC.lock}</span></div>`).join('');
+
+  // shell body
+  let body;
+  if (['sub','ret'].includes(S.tab)) S.tab='members';
+  if (S.tab==='members'){
+    body = `
+      <div class="body-head"><h3>Members</h3><span class="tech-name">org_members</span></div>
+      <div class="roster">
+        ${[['Riley Chen','riley@northwind.co','R','admin'],
+           ['Dana Osei','dana@'+ (S.activeOrg==='ac'?'acme.co':'northwind.co') ,'D','member'],
+           ['Sam Wu','sam@'+ (S.activeOrg==='ac'?'acme.co':'northwind.co'),'S','member']]
+          .map(([n,e,i,r])=>`
+          <div class="rrow"><div class="avatar">${i}</div>
+            <div class="rinfo"><div class="rn">${n}</div><div class="rs">${e}</div></div>
+            ${r==='admin'?'<span class="role-badge admin">◆ Org-admin</span>':'<span class="role-badge member">Member</span>'}
+          </div>`).join('')}
+      </div>`;
+  } else if (S.tab==='audit'){
+    body = `<div class="body-head"><h3>Audit</h3><span class="tech-name">audit_log</span></div>
+      <div class="rls-note">${IC.orgShield}<div><b style="color:var(--color-text);">Every action recorded.</b> With <span class="mono">org:audit_view</span> you see all members’ activity; without it, RLS shows only your own — never a silent empty list.</div></div>
+      <div class="roster" style="max-width:620px;">
+        ${['Invited sam@northwind.co (Member)','Changed org display name','Removed SSO for oldcorp.com']
+          .map((t,i)=>`<div class="rrow"><div class="rinfo"><div class="rn">${t}</div><div class="rs">Riley Chen · ${i+1}h ago</div></div></div>`).join('')}
+      </div>`;
+  } else if (S.tab==='settings'){
+    body = `<div class="body-head"><h3>Settings</h3><span class="tech-name">organizations</span></div>
+      <div class="roster" style="max-width:520px;">
+        <div class="rrow"><div class="rinfo"><div class="rn">Organization name</div><div class="rs">${activeOrg.name}</div></div></div>
+        <div class="rrow"><div class="rinfo"><div class="rn">Default model</div><div class="rs">claude-sonnet-5</div></div></div>
+      </div>`;
+  } else {
+    // invites / sso live tabs — light stub pointing at 133
+    const t = S.tab==='sso'?'Single sign-on':'Invitations & Roles';
+    body = `<div class="body-head"><h3>${t}</h3></div>
+      <div class="locked-panel" style="border-style:solid;">
+        <div class="lt">Lives here — detailed in sketch 133</div>
+        <div class="ld">This tab is live (shipped 16${S.tab==='sso'?'8':'7'}). Its polished layout is sketch 133 (org management surfaces).</div>
+      </div>`;
+  }
+
+  const shell = `
+    <div class="shell">
+      <div class="band">
+        <div class="band-org ${activeOrg.icon}">${activeOrg.name[0]}</div>
+        <div class="band-title">${activeOrg.name}</div>
+        <span class="chip-orgadmin">Org admin</span>
+        ${role==='admin'?'<span class="role-badge admin">◆ Org-admin</span>':''}
+        <div class="band-spacer"></div>
+        <div class="rec-marker"><span class="rec-dot"></span>Every action recorded</div>
+        <button class="tech-toggle" onclick="toggleTech()">⌥ Technical names</button>
+      </div>
+      <div class="tabs">${tabsHtml}</div>
+      <div class="tabbody">${body}</div>
+    </div>`;
+
+  return `
+    <div class="vnote">${cfg.note}</div>
+    <div class="stage">
+      <div class="device" data-role="${role}" data-orgs="${S.orgs}" data-rail="${S.rail}"
+           data-view="${S.view}" data-operator="${S.op}" data-unified="${cfg.unified?'on':'off'}" data-tech="off">
+        <div class="rail">
+          <div class="rail-brand"><div class="brand-mark">A</div><div class="brand-word">Aether</div></div>
+          <div class="rail-nav">
+            <div class="nav-item active">${IC.chat}<span class="nav-label">Chat</span></div>
+            <div class="nav-item">${IC.search}<span class="nav-label">Search</span></div>
+            <div class="nav-item">${IC.docs}<span class="nav-label">Documents</span></div>
+            <div class="nav-item">${IC.flow}<span class="nav-label">Workflows</span></div>
+            <div class="nav-item">${IC.skill}<span class="nav-label">Skills</span></div>
+          </div>
+          <div class="rail-foot">
+            <div class="foot-shields">
+              <button class="shield-btn" title="Theme">${IC.sun}</button>
+              <button class="shield-btn op" title="Operator controls">${IC.opShield}</button>
+              <button class="shield-btn org" title="Organization admin" onclick="setState('view','shell')">${IC.orgShield}</button>
+            </div>
+            <div class="anchor" onclick="toggleMenu(event)">
+              <div class="avatar">R</div>
+              <div class="anchor-text">
+                <div class="anchor-name">Riley Chen</div>
+                <div class="anchor-sub">${anchorSub}</div>
+              </div>
+            </div>
+            ${S.view==='menu'?menu:''}
+          </div>
+        </div>
+        <div class="main">
+          <div class="resting">
+            <div class="rh">Good morning, Riley</div>
+            <div>Ask anything, or pick up a thread.</div>
+          </div>
+          ${role==='admin'?shell:''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function render(){
+  document.getElementById('variant-'+S.active).innerHTML = frame(S.active);
+}
+function showVariant(v){
+  S.active=v; S.view='resting';
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.getElementById('variant-'+v).classList.add('active');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active', t.dataset.v===v));
+  syncSeg('view','resting');
+  render();
+}
+function setState(k,val){
+  if(k==='view' && val!=='shell'){ /* ok */ }
+  S[k]=val;
+  if(k==='role' && val==='member') S.view = S.view==='shell'?'resting':S.view; // member can't be in shell
+  if(k==='orgs' && val==='solo') S.activeOrg='nw';
+  syncSeg(k,val);
+  render();
+}
+function syncSeg(k,val){
+  const map={role:'seg-role',orgs:'seg-orgs',rail:'seg-rail',view:'seg-view',op:'seg-op'};
+  const seg=document.getElementById(map[k]); if(!seg) return;
+  seg.querySelectorAll('button').forEach(b=>{
+    const key = k==='op'?'op':k;
+    b.classList.toggle('on', b.dataset[key]===val);
+  });
+}
+function toggleMenu(e){ e.stopPropagation(); S.view = S.view==='menu'?'resting':'menu'; syncSeg('view',S.view); render(); }
+function pickOrg(k){ S.activeOrg=k; if(VCFG[S.active].perOrg){ S.role=ORG_ROLE[k]; syncSeg('role',S.role);} render(); }
+function setTab(id){ S.tab=id; render(); }
+function toggleTech(){ const d=document.querySelector('.variant.active .device'); d.dataset.tech = d.dataset.tech==='on'?'off':'on'; }
+function toggleTheme(){ /* noop in sketch */ }
+
+// click-away closes menu
+document.addEventListener('click',(e)=>{
+  if(S.view==='menu' && !e.target.closest('.anchor') && !e.target.closest('.menu')){
+    S.view='resting'; syncSeg('view','resting'); render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>

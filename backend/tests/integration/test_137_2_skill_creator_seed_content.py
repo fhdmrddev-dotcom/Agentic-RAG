@@ -22,7 +22,7 @@ catch it before the next expensive multi-round live UAT cycle. This test is that
 catch.
 
 WHAT THIS PROVES: queries `public.skills` (`instructions`, `is_system`,
-`is_global`) for the fixed built-in row id
+`is_org_shared`) for the fixed built-in row id
 (`00000000-0000-0000-0000-000000000010`) against the LIVE local Postgres and
 asserts the CURRENTLY SEEDED text still contains every required marker and none
 of the forbidden ones. SELECT-only — no DB mutation anywhere in this module.
@@ -103,7 +103,7 @@ async def _skill_creator_row(pool):
     to this environment by the time this test runs).
     """
     return await pool.fetchrow(
-        "SELECT is_system, is_global, instructions "
+        "SELECT is_system, is_org_shared, instructions "
         "FROM public.skills WHERE id = $1",
         _SKILL_CREATOR_ID,
     )
@@ -127,14 +127,14 @@ _MISSING_ROW_MSG = (
 
 @pytest.mark.asyncio
 async def test_builtin_skill_creator_row_is_system_and_global(pg_pool):
-    """The seeded built-in skill-creator row exists with is_system=is_global=true."""
+    """The seeded built-in skill-creator row exists with is_system=is_org_shared=true."""
     row = await _skill_creator_row(pg_pool)
     assert row is not None, _MISSING_ROW_MSG
     assert row["is_system"] is True, (
         f"skill-creator row is_system={row['is_system']!r}, expected True"
     )
-    assert row["is_global"] is True, (
-        f"skill-creator row is_global={row['is_global']!r}, expected True"
+    assert row["is_org_shared"] is True, (
+        f"skill-creator row is_org_shared={row['is_org_shared']!r}, expected True"
     )
 
 

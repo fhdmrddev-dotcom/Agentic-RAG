@@ -191,6 +191,13 @@ class _ClosableEventStream:
         self._raw = raw_stream
         self._provider = active_provider_name
         self._calling_mode = calling_mode
+        # XPROV-02b (Phase 175): set True inside _normalize the moment a DeepSeek DSML
+        # leak begins (tool-call markup written as visible text). The consumer reads it
+        # post-drain and emits the existing 'error' SSE event so the turn ends honestly
+        # instead of silently incomplete. Stays False for clean/non-deepseek streams
+        # (D-14 default-inert) — the consumer's read is getattr-defaulted so plain
+        # anthropic/google generators (which lack this attr) are byte-identical.
+        self.dsml_leaked = False
         self._gen = self._normalize()
 
     def __iter__(self):
@@ -317,6 +324,12 @@ class _ClosableEventStream:
                                 _visible, _dsml_pending, _dsml_leaking
                             )
                         )
+                        # XPROV-02b: once the opener appears, _dsml_leaking latches
+                        # True — surface it on the instance so the consumer can emit
+                        # one honest 'error' post-drain. Idempotent; never edits the
+                        # per-chunk emit dicts or the finish dict (Option B, D-14).
+                        if _dsml_leaking:
+                            self.dsml_leaked = True
                     if _visible:
                         yield {"type": "delta", "content": _visible}
                 else:
@@ -424,6 +437,18 @@ class _ClosableEventStream:
                     "finish_reason": _finish_reason,
                     "tool_calls": _fin_tcs,
                 }
+
+        # Stream-end DSML flush (XPROV-02a / Phase 175). The deepseek strip holds a
+        # short trailing fragment in _dsml_pending when a chunk ends in a partial
+        # OPENER prefix (it may be the opener split across chunks). If the stream ends
+        # while that fragment is still held AND we are NOT leaking, the fragment is
+        # real content — flush it as a final delta so a deepseek turn ending mid-prefix
+        # doesn't silently swallow it. Reachable ONLY on the deepseek path (only the
+        # deepseek-gated strip populates _dsml_pending) → every other provider is
+        # byte-identical. If we ARE leaking at stream end, flush nothing (the markup
+        # stays suppressed — the SC#2 no-dirty-render floor holds).
+        if _dsml_pending and not _dsml_leaking:
+            yield {"type": "delta", "content": _dsml_pending}
 
         # Stream end — emit the accumulated usage so the consumer SUMs it across
         # iterations (byte-identical to the pre-extraction per-chunk += for the

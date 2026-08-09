@@ -7,7 +7,11 @@ text, so ~16 KB of raw markup leaked into the chat. `_strip_deepseek_tool_markup
 suppresses that markup from the moment the opener appears (prose before it is kept).
 It does NOT re-parse the call into a real tool_call — that is a tracked follow-up.
 """
+from types import SimpleNamespace
+
+from app.services.openai_service import CallingMode
 from app.services.provider_gateway.openai_compat import (
+    _ClosableEventStream,
     _DSML_OPENER,
     _strip_deepseek_tool_markup,
 )
@@ -74,3 +78,64 @@ def test_ascii_pipe_lookalike_does_not_trigger():
     # A message that happens to contain ASCII pipes must NOT be suppressed.
     text = "run `cat a | grep b` and <DSML> stays too"
     assert _feed([text]) == text
+
+
+# --- Stream-end flush (XPROV-02a, Phase 175) ----------------------------------
+# The pure _feed cases above prove the per-chunk strip. These drive the full
+# _normalize generator (the real stream-end path) to prove the trailing
+# _dsml_pending fragment is flushed — and that the SC#2 floor still holds.
+
+
+def _fake_chunk(content=None, finish_reason=None, usage=None):
+    """A minimal OpenAI-SDK-shaped streaming chunk for driving _normalize."""
+    delta = SimpleNamespace(content=content, reasoning_content=None, tool_calls=None)
+    choice = SimpleNamespace(delta=delta, finish_reason=finish_reason)
+    return SimpleNamespace(choices=[choice], usage=usage)
+
+
+def _drive(chunks, provider="deepseek"):
+    """Run the full _normalize path over fake raw chunks; return the event dicts."""
+    stream = _ClosableEventStream(chunks, provider, CallingMode.NATIVE)
+    return list(stream)
+
+
+def test_stream_end_flushes_trailing_partial_opener_fragment():
+    # A deepseek turn whose final visible chunk is a partial-opener PREFIX ("<｜",
+    # non-leaking) holds that fragment in _dsml_pending mid-stream. At stream end it
+    # MUST be flushed as a final delta so content is not silently swallowed.
+    partial = _DSML_OPENER[:2]  # "<｜" — a real prefix of the opener, never the full opener
+    events = _drive([_fake_chunk("hello "), _fake_chunk(partial)])
+    deltas = [e["content"] for e in events if e["type"] == "delta"]
+    assert deltas == ["hello ", partial]
+
+
+def test_stream_end_does_not_flush_when_leaking():
+    # A deepseek turn still leaking at stream end (opener already seen) MUST flush
+    # nothing — the markup stays suppressed (the SC#2 no-dirty-render floor).
+    leak_chunk = "ok " + _DSML_OPENER + "tool_calls>"
+    events = _drive([_fake_chunk(leak_chunk), _fake_chunk("\ntrailing markup")])
+    deltas = [e["content"] for e in events if e["type"] == "delta"]
+    assert deltas == ["ok "]
+
+
+def test_stream_end_flush_long_turn_floor_holds():
+    # Long deepseek turn: many clean chunks, THEN the opener mid-stream. Prose before
+    # the opener is preserved; the opener + everything after is suppressed; nothing is
+    # flushed at end (leaking).
+    chunks = [_fake_chunk(f"line {i} ") for i in range(30)]
+    chunks.append(_fake_chunk("tail " + _DSML_OPENER + "tool_calls>x"))
+    chunks.append(_fake_chunk(" more suppressed"))
+    events = _drive(chunks)
+    joined = "".join(e["content"] for e in events if e["type"] == "delta")
+    assert joined == "".join(f"line {i} " for i in range(30)) + "tail "
+    assert _DSML_OPENER not in joined
+
+
+def test_non_deepseek_never_flushes_and_is_byte_identical():
+    # Non-deepseek provider: the DSML strip branch is never entered, so a chunk that
+    # merely LOOKS like a partial opener passes through verbatim and nothing is held
+    # or flushed at stream end (D-14 default-inert).
+    partial = _DSML_OPENER[:2]
+    events = _drive([_fake_chunk("hi "), _fake_chunk(partial)], provider="openai")
+    deltas = [e["content"] for e in events if e["type"] == "delta"]
+    assert deltas == ["hi ", partial]

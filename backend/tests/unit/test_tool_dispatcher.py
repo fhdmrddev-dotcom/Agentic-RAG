@@ -303,3 +303,388 @@ async def test_workspace_read_coerces_str_int_line_args() -> None:
     assert isinstance(captured["start_line"], int)
     assert isinstance(captured["end_line"], int)
     assert result.result == "hello world"
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03) — reliable declared library install + bounded auto-heal.
+# ---------------------------------------------------------------------------
+from unittest.mock import MagicMock  # noqa: E402
+
+
+class _FakeConsole:
+    """Stand-in for llm_sandbox's ConsoleOutput (exit_code + stdout + stderr)."""
+
+    def __init__(self, exit_code: int = 0, stdout: str = "", stderr: str = ""):
+        self.exit_code = exit_code
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def test_pip_install_uses_system_interpreter_no_stream_callbacks():
+    """_pip_install must issue `python -m pip install` via session.execute_command
+    with NO on_stdout/on_stderr stream callbacks (non-stream => reliable exit_code),
+    targeting the SAME interpreter as `python -u` (Defect B)."""
+    from app.services.tool_dispatcher import _pip_install
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(exit_code=0)
+
+    res = _pip_install(session, ["fpdf2", "some-pkg"])
+
+    assert res.exit_code == 0
+    assert session.execute_command.call_count == 1
+    (cmd,), kwargs = session.execute_command.call_args
+    assert cmd.startswith("python -m pip install --disable-pip-version-check ")
+    assert "fpdf2" in cmd and "some-pkg" in cmd
+    # No stream callbacks => non-streaming => reliable exit_code.
+    assert "on_stdout" not in kwargs and "on_stderr" not in kwargs
+
+
+@pytest.mark.asyncio
+async def test_declared_install_retries_once_and_surfaces_stderr():
+    """A declared install returning a non-zero exit code is retried EXACTLY once,
+    and on persistent failure the pip stderr is surfaced (NOT swallowed)."""
+    from app.services.tool_dispatcher import _install_declared_libraries
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(
+        exit_code=1, stderr="ERROR: No matching distribution found for badpkg"
+    )
+
+    stderr = await _install_declared_libraries(session, ["badpkg"])
+
+    # exactly two calls: initial attempt + one retry (D-02.1)
+    assert session.execute_command.call_count == 2
+    assert "No matching distribution" in stderr
+
+
+@pytest.mark.asyncio
+async def test_declared_install_retry_success_returns_empty():
+    """A transient failure that succeeds on the single retry surfaces NO error."""
+    from app.services.tool_dispatcher import _install_declared_libraries
+
+    session = MagicMock()
+    session.execute_command.side_effect = [
+        _FakeConsole(exit_code=1, stderr="temporary network error"),
+        _FakeConsole(exit_code=0),
+    ]
+
+    stderr = await _install_declared_libraries(session, ["fpdf2"])
+
+    assert session.execute_command.call_count == 2
+    assert stderr == ""
+
+
+@pytest.mark.asyncio
+async def test_declared_install_success_first_try_single_call():
+    """A clean install proceeds with a single call and no surfaced error."""
+    from app.services.tool_dispatcher import _install_declared_libraries
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(exit_code=0)
+
+    stderr = await _install_declared_libraries(session, ["fpdf2"])
+
+    assert session.execute_command.call_count == 1
+    assert stderr == ""
+
+
+# ---------------------------------------------------------------------------
+# EXEC-01 (Phase 176-03) — run-scoped ModuleNotFound auto-heal + honest result.
+# ---------------------------------------------------------------------------
+class _FakeCtx:
+    """Minimal ToolContext stand-in exposing only the heal-bound inputs."""
+
+    def __init__(self, redis=None, run_id=None, thread_id=None):
+        self.redis = redis
+        self.run_id = run_id
+        # CR-01 (176): the wall-clock abort needs a thread_id to kill_session on
+        # overrun. Absent (None) → the bounded helper runs unbounded (no-timeout).
+        self.thread_id = thread_id
+
+
+def test_extract_missing_module_reads_stderr_and_stdout():
+    from app.services.tool_dispatcher import _extract_missing_module
+
+    assert _extract_missing_module(
+        "", "ModuleNotFoundError: No module named 'fpdf2'"
+    ) == "fpdf2"
+    # mirrors _classify_runtime_gap out_l (stdout is scanned too, lowercased)
+    assert _extract_missing_module(
+        "Traceback...\nModuleNotFoundError: No module named 'seaborn'", ""
+    ) == "seaborn"
+    assert _extract_missing_module("all good", "") is None
+
+
+def test_install_failed_detail_shape():
+    from app.services.tool_dispatcher import _install_failed_detail
+
+    detail = _install_failed_detail("badpkg", "ERROR: " + "x" * 500)
+    assert detail["module"] == "badpkg"
+    assert len(detail["reason"]) <= 300  # truncated ~300 chars
+    assert "Could not install badpkg" in detail["hint"]
+    # preinstalled-lib hint from docs/SANDBOX-PACKAGES.md
+    assert "reportlab" in detail["hint"] and "pandas" in detail["hint"]
+    assert "Do not retry" in detail["hint"]
+
+
+@pytest.mark.asyncio
+async def test_autoheal_installs_and_reruns_once():
+    """(b) An undeclared ModuleNotFoundError installs X via `python -m pip install`
+    then re-runs the code exactly once (threadpool-wrapped) and adopts the result."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    session.execute_command.side_effect = [
+        _FakeConsole(exit_code=0),                      # pip install fpdf2
+        _FakeConsole(exit_code=0, stdout="PDF built"),  # re-run of python -u <file>
+    ]
+    ctx = _FakeCtx(redis=None, run_id=None)  # call-local bound path
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is not None and result.get("exec_result") is not None
+    assert result["exec_result"].stdout == "PDF built"
+    calls = session.execute_command.call_args_list
+    assert len(calls) == 2
+    assert "python -m pip install" in calls[0].args[0] and "fpdf2" in calls[0].args[0]
+    assert calls[1].args[0] == "python -u /tmp/run-abc.py"
+
+
+@pytest.mark.asyncio
+async def test_autoheal_run_scoped_bound_second_miss_no_reinstall():
+    """(c) A module already heal-attempted THIS run (per-run Redis set says so) goes
+    straight to the honest result — the run-scoped store is consulted, no re-install."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    redis = MagicMock()
+    redis.sismember = AsyncMock(return_value=True)  # already attempted this run
+    redis.sadd = AsyncMock()
+    redis.expire = AsyncMock()
+    ctx = _FakeCtx(redis=redis, run_id="run-123")
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    redis.sismember.assert_awaited_once()
+    assert redis.sismember.await_args.args[0] == "heal_attempted:run-123"
+    # NO install / re-run — straight to the honest result
+    assert session.execute_command.call_count == 0
+    assert result is not None and result.get("install_failed") is not None
+    assert result["install_failed"]["module"] == "fpdf2"
+
+
+@pytest.mark.asyncio
+async def test_autoheal_redis_unavailable_falls_back_to_call_local():
+    """(d) Redis raising on the bound check/record must NOT break execute_code —
+    the heal falls back to the call-local set and still proceeds/bounds once."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    session.execute_command.side_effect = [
+        _FakeConsole(exit_code=0),                       # pip install
+        _FakeConsole(exit_code=0, stdout="ok"),          # re-run
+    ]
+    redis = MagicMock()
+    redis.sismember = AsyncMock(side_effect=RuntimeError("redis down"))
+    redis.sadd = AsyncMock(side_effect=RuntimeError("redis down"))
+    redis.expire = AsyncMock(side_effect=RuntimeError("redis down"))
+    ctx = _FakeCtx(redis=redis, run_id="run-xyz")
+    fallback: set[str] = set()
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=fallback,
+    )
+
+    # did not raise; healed via call-local fallback
+    assert result is not None and result.get("exec_result") is not None
+    assert "fpdf2" in fallback  # recorded in the call-local bound
+    assert session.execute_command.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_autoheal_install_failure_returns_honest_result():
+    """A genuine bad package: install fails → honest install_failed with pip stderr,
+    NO re-run."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    session.execute_command.return_value = _FakeConsole(
+        exit_code=1, stderr="ERROR: No matching distribution found for badpkg"
+    )
+    ctx = _FakeCtx(redis=None, run_id=None)
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'badpkg'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is not None and result.get("install_failed") is not None
+    assert result["install_failed"]["module"] == "badpkg"
+    assert "No matching distribution" in result["install_failed"]["reason"]
+    # install attempt (retry x1) happened, but NO re-run of the code
+    assert session.execute_command.call_count == 2  # install + one retry
+    assert all(
+        "python -m pip install" in c.args[0]
+        for c in session.execute_command.call_args_list
+    )
+
+
+@pytest.mark.asyncio
+async def test_autoheal_known_missing_module_not_healed():
+    """A KNOWN_MISSING permanent gap (markitdown) is left to _classify_runtime_gap —
+    the auto-heal passes through (None), never installs."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    ctx = _FakeCtx(redis=None, run_id=None)
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'markitdown'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is None
+    assert session.execute_command.call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_autoheal_declared_failure_no_module_surfaces_honestly():
+    """(a) A persistent declared-install failure with no ModuleNotFound in output
+    still surfaces an honest result (not swallowed)."""
+    from app.services.tool_dispatcher import _autoheal_missing_module
+
+    session = MagicMock()
+    ctx = _FakeCtx(redis=None, run_id=None)
+
+    result = await _autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="RuntimeError: something unrelated",
+        declared_install_stderr="ERROR: No matching distribution found for badpkg",
+        healed_fallback=set(),
+    )
+
+    assert result is not None and result.get("install_failed") is not None
+    assert "No matching distribution" in result["install_failed"]["reason"]
+    assert session.execute_command.call_count == 0  # nothing to heal, just surface
+
+
+# ---------------------------------------------------------------------------
+# CR-01 (Phase 176) — the heal re-run + pip installs must be bounded by the SAME
+# wall-clock ceiling the PRIMARY run uses (096/SEED-063), so a healed-then-runaway
+# script (or a hung `pip install`) can't wedge the run into a 40-minute zombie.
+# ---------------------------------------------------------------------------
+import threading  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_sandbox_timeout_kills_container_and_raises(monkeypatch):
+    """A blocking sandbox call that overruns the wall-clock ceiling KILLS the
+    container (the only way to free an uncancellable thread) and raises
+    _SandboxCommandTimeout — mirroring the primary run's 096/SEED-063 abort."""
+    from app.services import tool_dispatcher as td
+
+    killed: dict = {}
+    monkeypatch.setattr(
+        td.sandbox_manager, "kill_session", lambda tid: killed.setdefault("tid", tid)
+    )
+
+    release = threading.Event()
+
+    def _blocking(_cmd):
+        # Bounded wait so the abandoned executor thread ALWAYS frees (never hangs
+        # pytest at exit); the ceiling below fires long before this returns.
+        release.wait(timeout=2.0)
+        return _FakeConsole(exit_code=0)
+
+    with pytest.raises(td._SandboxCommandTimeout):
+        await td._run_bounded_sandbox(
+            _blocking, "python -u /tmp/x.py", thread_id="thread-runaway", timeout_s=0.05
+        )
+
+    # The container was killed to free the wedged thread.
+    assert killed.get("tid") == "thread-runaway"
+    release.set()  # free the abandoned thread promptly
+
+
+@pytest.mark.asyncio
+async def test_run_bounded_sandbox_disabled_ceiling_runs_unbounded(monkeypatch):
+    """timeout_s in {None, 0, <0} disables the cap (operator escape hatch) — the call
+    completes and kill_session is NEVER touched."""
+    from app.services import tool_dispatcher as td
+
+    killed: dict = {}
+    monkeypatch.setattr(
+        td.sandbox_manager, "kill_session", lambda tid: killed.setdefault("tid", tid)
+    )
+
+    for disabled in (None, 0, -1):
+        res = await td._run_bounded_sandbox(
+            lambda _c: _FakeConsole(exit_code=0, stdout="ok"),
+            "python -u /tmp/x.py", thread_id="t", timeout_s=disabled,
+        )
+        assert res.stdout == "ok"
+    assert killed == {}  # never killed on the disabled path
+
+
+@pytest.mark.asyncio
+async def test_autoheal_rerun_timeout_surfaces_honest_and_no_exec_result(monkeypatch):
+    """CR-01: when the healed RE-RUN overruns the ceiling, the auto-heal returns an
+    honest `install_failed` (installed-but-aborted) and adopts NO exec_result — so the
+    run is a clean, honest failure instead of a wedged zombie."""
+    from app.services import tool_dispatcher as td
+
+    async def _fake_bounded(func, *args, thread_id, timeout_s):
+        # pip install (func is _pip_install) succeeds; the `python -u` re-run overruns.
+        if func is td._pip_install:
+            return _FakeConsole(exit_code=0)
+        raise td._SandboxCommandTimeout(timeout_s)
+
+    monkeypatch.setattr(td, "_run_bounded_sandbox", _fake_bounded)
+
+    session = MagicMock()
+    ctx = _FakeCtx(redis=None, run_id=None, thread_id="thread-heal")
+
+    result = await td._autoheal_missing_module(
+        session=session, ctx=ctx, code_file="/tmp/run-abc.py",
+        stdout="", stderr="ModuleNotFoundError: No module named 'fpdf2'",
+        declared_install_stderr="", healed_fallback=set(),
+    )
+
+    assert result is not None
+    assert result.get("exec_result") is None  # aborted re-run is NOT adopted
+    assert result.get("install_failed") is not None
+    assert result["install_failed"]["module"] == "fpdf2"
+    assert "aborted" in result["install_failed"]["reason"].lower()
+
+
+@pytest.mark.asyncio
+async def test_declared_install_pip_timeout_surfaces_honest_reason(monkeypatch):
+    """CR-01: a hung `pip install` (network stall) that overruns the ceiling surfaces
+    an honest aborted reason (never silently swallowed, never a wedged run)."""
+    from app.services import tool_dispatcher as td
+
+    async def _fake_bounded(func, *args, thread_id, timeout_s):
+        raise td._SandboxCommandTimeout(timeout_s)
+
+    monkeypatch.setattr(td, "_run_bounded_sandbox", _fake_bounded)
+
+    session = MagicMock()
+    stderr = await td._install_declared_libraries(
+        session, ["fpdf2"], thread_id="thread-x", timeout_s=0.05
+    )
+
+    assert "aborted" in stderr.lower()
+    assert "limit" in stderr.lower()

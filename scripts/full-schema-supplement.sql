@@ -20,9 +20,15 @@
 -- MAINTENANCE: when a NEW migration adds a storage bucket, an auth.users
 -- trigger, or a realtime table, mirror it here (idempotently). Sources:
 --   storage  -> migrations 017 (skill-files), 029 (documents, sandbox-outputs),
---               054 (workspace-files)
+--               054 (workspace-files), 111 (skill-files read policy: legacy global
+--               flag retired -> s.is_system OR s.is_org_shared, D-165-01), 112 (skill-files
+--               read policy: shared branch ORG-GATED to current_user_org_ids(), SEED-125 CR-02)
 --   auth     -> migration 001 (on_auth_user_created)
 --   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
+--   ACLs     -> migration 118 (connector_connections.secret_ciphertext column grant,
+--               CR-01). pg_dump runs with --no-privileges, so ANY migration that
+--               narrows a table privilege must be mirrored here or it is absent from
+--               every greenfield bootstrap.
 -- ============================================================
 
 
@@ -76,7 +82,13 @@ DROP POLICY IF EXISTS "Users can delete own sandbox outputs" ON storage.objects;
 CREATE POLICY "Users can delete own sandbox outputs" ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
 
--- skill-files policies (read allows owner OR files belonging to a global skill)
+-- skill-files policies (read allows owner OR files belonging to a system built-in
+-- OR an org-shared skill WITHIN the caller's org — mig 112 SEED-125 CR-02: the shared
+-- branch is ORG-GATED to genuinely match the mig-109 skill_files TABLE-RLS shape
+-- [is_system universal OUTSIDE the org gate; owner/is_org_shared INSIDE
+-- org_id ∈ current_user_org_ids()]. mig 111's earlier "reconciled" comment was inaccurate —
+-- its branch was s.is_system OR s.is_org_shared with NO org predicate, a cross-org read leak;
+-- 112 closes it. Storage RLS runs under the user JWT so auth.uid()/current_user_org_ids() resolve.)
 DROP POLICY IF EXISTS "Users can read own skill files" ON storage.objects;
 CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO authenticated
   USING (
@@ -86,7 +98,14 @@ CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO 
       OR EXISTS (
         SELECT 1 FROM public.skill_files sf
         JOIN public.skills s ON s.id = sf.skill_id
-        WHERE sf.file_path = name AND s.is_global = true
+        WHERE sf.file_path = name
+          AND (
+            s.is_system = true
+            OR (
+              s.org_id IN (SELECT public.current_user_org_ids())
+              AND (s.user_id = (select auth.uid()) OR s.is_org_shared = true)
+            )
+          )
       )
     )
   );
@@ -112,14 +131,39 @@ CREATE POLICY "workspace_storage_delete_own" ON storage.objects FOR DELETE TO au
 -- ============================================================
 -- 3. Auth: auto-create a profile row on signup (trigger on auth.users)
 -- ============================================================
+-- NOTE: keep this body in sync with migration 105 §D (public.handle_new_user). pg_dump emits
+-- handle_new_user in the public dump ABOVE, but this supplement copy is appended LAST, so this is
+-- the definition a greenfield paste actually keeps. It must therefore carry the SAME mig-105
+-- extension: provision a personal org for every new signup (identical logic to mig 105 §A), wrapped
+-- in an inner EXCEPTION-WHEN-OTHERS swallow so org-creation failure can NEVER abort the auth.users
+-- INSERT / break signup (T-162-05). KEEP security definer + pinned search_path (T-162-06). If a future
+-- migration changes handle_new_user, update this copy in the SAME commit or greenfield deploys drift.
 create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
+  returns trigger
+  language plpgsql
+  security definer set search_path = public
+  as $$
+declare
+  v_org_id uuid;
 begin
   insert into public.profiles (id, display_name)
-  values (new.id, new.raw_user_meta_data->>'display_name');
+  values (new.id, new.raw_user_meta_data->>'display_name')
+  on conflict (id) do nothing;
+
+  -- defensive personal-org provisioning — identical logic to mig 105 §A, swallowed so a failure
+  -- logs a WARNING and returns normally instead of aborting the signup INSERT.
+  begin
+    if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      v_org_id := public.create_org_with_default_dept(
+                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+      insert into public.org_members (org_id, user_id, role)
+      values (v_org_id, new.id, 'org-admin')
+      on conflict (org_id, user_id) do nothing;
+    end if;
+  exception when others then
+    raise warning 'handle_new_user: personal-org creation failed for %: %', new.id, sqlerrm;
+  end;
+
   return new;
 end;
 $$;
@@ -142,3 +186,53 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ============================================================
+-- 5. Column-level privilege: connector_connections.secret_ciphertext
+--    (migration 118 / Phase 190 code-review finding CR-01)
+-- ============================================================
+-- ⚠ WHY THIS LIVES HERE RATHER THAN IN THE DUMP: regenerate-full-schema.sh runs
+--    `pg_dump --no-privileges`, so full-schema.sql carries NO ACLs AT ALL
+--    (`grep -c '^GRANT\|^REVOKE' supabase/full-schema.sql` -> 0, measured
+--    2026-08-09). Migration 118 is therefore INVISIBLE to the generated dump —
+--    its COMMENT survives, its GRANT does not. A greenfield project bootstrapped
+--    from full-schema.sql alone would ship with `secret_ciphertext` readable over
+--    PostgREST by every authenticated org member, which is exactly the defect 118
+--    exists to close.
+--
+--    The rest of this file's ACL story is unchanged: Supabase's stock
+--    `GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role`
+--    default privileges are what give every other table its grants, and that is
+--    still the right posture for every table that holds no secret. This one holds
+--    a tenant credential, so it opts out — and the opt-out has to be re-stated in
+--    a place the bootstrap can see.
+--
+--    Idempotent, like everything else in this file: REVOKE and GRANT are.
+--
+--    ⚠ ORDER MATTERS AGAINST THE DEFAULT PRIVILEGES. This block must run AFTER
+--    the table exists and after any blanket grant, which it does: the supplement
+--    is appended at the END of full-schema.sql.
+REVOKE ALL ON public.connector_connections FROM anon;
+REVOKE ALL ON public.connector_connections FROM authenticated;
+
+-- One column per line so the OMISSION is visible in a diff. The column that is not
+-- here is `secret_ciphertext`.
+GRANT SELECT (
+    id,
+    org_id,
+    created_by,
+    capability,
+    name,
+    config,
+    is_enabled,
+    last_checked_at,
+    last_check_verdict,
+    created_at,
+    updated_at
+) ON public.connector_connections TO authenticated;
+
+-- Writes stay at TABLE level, INCLUDING the secret column: the org-admin create/edit
+-- path runs on the user-JWT client and must be able to store an `enc:v1:` envelope.
+-- A role may INSERT into and UPDATE a column it can never SELECT.
+GRANT INSERT, UPDATE, DELETE ON public.connector_connections TO authenticated;

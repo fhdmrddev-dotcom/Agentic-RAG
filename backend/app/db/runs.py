@@ -15,6 +15,19 @@ dicts/lists for tool_calls / source_refs. No per-call serialization here.
 SECURITY (T-073-02): ALL value substitutions use $N positional placeholders.
 No f-strings or string-interpolation methods on SQL strings, ever. asyncpg's
 native parameter binding makes SQL injection impossible at this layer.
+
+Phase 163 (D-05) — org posture of this module (the agent-loop async writer path):
+  * This module runs on the RAW service-role asyncpg pool (get_pg_pool → the
+    postgres/BYPASSRLS role). It has NO auth.uid() (it executes off the request,
+    inside the detached producer/agent-loop task), so it is NOT converted to the
+    per-request user-JWT client — the request-seam swap (D-03) covers the REST path.
+  * WRITES stay org-safe WITHOUT threading org_id: insert_run / insert_assistant_message
+    OMIT org_id → the mig-106 BEFORE-INSERT autofill triggers (runs_autofill_org_id /
+    messages autofill-from-parent-thread) stamp it from the parent. finalize_run is a
+    PK-keyed UPDATE (WHERE run_id = $1, globally unique) — no cross-org ambiguity.
+  * OWNERSHIP READS are widened org-aware as defense-in-depth: load_cap_paused_tool_calls
+    accepts an optional org_id and adds `AND org_id = $2` when the caller has org context
+    (belt-and-suspenders on the service-role path — D-14), else stays byte-identical.
 """
 
 from datetime import datetime
@@ -110,7 +123,7 @@ async def finalize_run(
 
 
 async def load_cap_paused_tool_calls(
-    pool: asyncpg.Pool, thread_id: UUID
+    pool: asyncpg.Pool, thread_id: UUID, *, org_id: UUID | None = None
 ) -> list[dict]:
     """The persisted dropped tool calls from the LATEST cap-pause carrier row.
 
@@ -124,19 +137,40 @@ async def load_cap_paused_tool_calls(
     Scans the carrier the /pending way (system rows are filtered from /snapshot),
     keyed by the run's thread, newest first. Returns ``[]`` when no carrier exists.
     ``$N`` placeholders only (T-073-02).
+
+    Phase 163 (D-05 / D-14): this runs on the service-role pool (no auth.uid()). When
+    the caller has org context (``org_id`` — e.g. continue_run threads it from the
+    RLS-verified run row), an ``AND org_id = $2`` predicate is added as belt-and-
+    suspenders org-scoping on the BYPASSRLS path. ``org_id=None`` keeps the read
+    byte-identical (back-compat for any caller without org context).
     """
-    row = await pool.fetchrow(
-        """
-        SELECT tool_calls
-        FROM messages
-        WHERE thread_id = $1
-          AND role = 'system'
-          AND tool_calls @> '[{"kind": "iteration_cap_paused"}]'::jsonb
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        thread_id,
-    )
+    if org_id is not None:
+        row = await pool.fetchrow(
+            """
+            SELECT tool_calls
+            FROM messages
+            WHERE thread_id = $1
+              AND org_id = $2
+              AND role = 'system'
+              AND tool_calls @> '[{"kind": "iteration_cap_paused"}]'::jsonb
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            thread_id, org_id,
+        )
+    else:
+        row = await pool.fetchrow(
+            """
+            SELECT tool_calls
+            FROM messages
+            WHERE thread_id = $1
+              AND role = 'system'
+              AND tool_calls @> '[{"kind": "iteration_cap_paused"}]'::jsonb
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            thread_id,
+        )
     if row is None:
         return []
     return list(row["tool_calls"] or [])

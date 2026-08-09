@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 072 — Run-Inputs Modal</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  /* ── Component styles (theme vars come from ../themes/default.css) ── */
+  body {
+    font-family: var(--font-sans);
+    color: var(--color-text);
+    background: var(--color-bg);
+    padding-top: 46px;                 /* clear the fixed variant tab bar */
+    min-height: 100vh;
+  }
+
+  /* Faux Workflows-library backdrop (dimmed, behind every variant) */
+  #backdrop {
+    position: fixed; inset: 46px 0 0 0; z-index: 1;
+    padding: var(--space-8);
+    filter: blur(2px) brightness(0.55);
+    pointer-events: none;
+    overflow: hidden;
+  }
+  #backdrop h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0 0 var(--space-5); }
+  .bd-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); max-width: 960px; }
+  .bd-card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: var(--space-4); height: 128px;
+  }
+  .bd-card .t { font-weight: 600; font-size: var(--text-sm); }
+  .bd-card .s { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: 6px; }
+  .bd-card .run { margin-top: var(--space-4); color: var(--color-primary); font-size: var(--text-xs); font-weight: 600; }
+
+  /* ── Modal shell ── */
+  .stage {
+    position: fixed; inset: 46px 0 0 0; z-index: 10;
+    display: grid; place-items: center;
+    background: rgba(0,0,0,0.62); backdrop-filter: blur(3px);
+    padding: var(--space-6);
+  }
+  .modal {
+    width: min(560px, 94vw);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: pop var(--dur-base) var(--ease-out);
+  }
+  @keyframes pop { from { transform: translateY(8px) scale(.985); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .m-head {
+    display: flex; align-items: center; gap: var(--space-2);
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .m-head .doc { font-size: 16px; }
+  .m-head .name { font-weight: 700; font-size: var(--text-md); font-family: var(--font-headline); }
+  .m-head .ver { margin-left: auto; font-size: var(--text-xs); color: var(--color-text-dim); font-family: var(--font-mono); }
+
+  .m-body { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-4); }
+
+  .m-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-top: 1px solid var(--color-border);
+    background: var(--color-bg-elev1);
+  }
+  .foot-note { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .foot-note b { color: var(--color-text); }
+
+  /* Fields */
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .flabel { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); display: flex; align-items: center; gap: 8px; }
+  .flabel .req { font-size: var(--text-xs); color: var(--color-text-dim); font-weight: 500; }
+
+  textarea, select, input[type=text] {
+    font-family: var(--font-sans); font-size: var(--text-base);
+    color: var(--color-text);
+    background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 9px 11px; width: 100%;
+    transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+  }
+  textarea { resize: vertical; min-height: 62px; }
+  textarea:focus, select:focus, input:focus { outline: none; border-color: var(--color-primary-strong); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+  select { appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237f8bb0' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px; }
+
+  .hint { font-size: var(--text-xs); color: var(--color-text-muted); }
+  .hint .k { font-family: var(--font-mono); color: var(--color-text); }
+
+  /* Scope: inline dropdown w/ default tag (Variant A) */
+  .scope-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  .scope-row select { width: auto; min-width: 210px; }
+  .default-tag {
+    font-size: var(--text-xs); color: var(--color-primary);
+    background: var(--color-primary-dim); border-radius: var(--radius-full);
+    padding: 2px 9px; font-weight: 600;
+  }
+
+  /* Scope: 3-way segmented toggle (Variant B/C — Perplexity ref) */
+  .seg { display: inline-flex; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 3px; gap: 3px; }
+  .seg button {
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600;
+    color: var(--color-text-muted); background: transparent; border: 0; cursor: pointer;
+    padding: 7px 13px; border-radius: var(--radius-sm);
+    transition: all var(--dur-fast) var(--ease-out); white-space: nowrap;
+  }
+  .seg button:hover { color: var(--color-text); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary-glow); }
+  .seg .tiny { font-size: 10px; opacity: .8; margin-left: 5px; font-weight: 500; }
+
+  .subpick { margin-top: 9px; animation: fade var(--dur-base); }
+  @keyframes fade { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; } }
+
+  /* Upload — quiet button (Variant A) */
+  .upload-btn {
+    display: inline-flex; align-items: center; gap: 8px; align-self: flex-start;
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; color: var(--color-text);
+    background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    padding: 8px 13px; cursor: pointer; transition: all var(--dur-fast);
+  }
+  .upload-btn:hover { background: var(--color-accent); border-color: var(--color-primary-glow); }
+
+  /* Upload — dropzone (Variant B) */
+  .dropzone {
+    border: 1.5px dashed var(--color-border); border-radius: var(--radius-md);
+    padding: var(--space-5); text-align: center; cursor: pointer;
+    color: var(--color-text-muted); font-size: var(--text-sm);
+    transition: all var(--dur-base) var(--ease-out); background: var(--color-bg);
+  }
+  .dropzone:hover, .dropzone.drag { border-color: var(--color-primary); color: var(--color-text); background: var(--color-primary-dim); }
+  .dropzone .big { font-size: 22px; display: block; margin-bottom: 8px; }
+  .dropzone .accepts { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 7px; }
+
+  /* Uploaded file card */
+  .file-card {
+    display: flex; align-items: center; gap: var(--space-3);
+    background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+    animation: fade var(--dur-base);
+  }
+  .file-icon {
+    width: 30px; height: 38px; border-radius: 4px; flex-shrink: 0; position: relative;
+    background: hsl(217 91% 60% / .18); border: 1px solid hsl(217 91% 60% / .4);
+    display: grid; place-items: end center;
+  }
+  .file-icon .ext { font-size: 8px; font-weight: 800; color: hsl(217 91% 72%); letter-spacing: .5px; margin-bottom: 4px; }
+  .file-meta { flex: 1; min-width: 0; }
+  .file-meta .fn { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-meta .fs { font-size: var(--text-xs); color: var(--color-text-muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .ok { color: var(--color-success); font-weight: 600; }
+  .file-x { background: transparent; border: 0; color: var(--color-text-dim); cursor: pointer; font-size: 16px; padding: 4px; border-radius: 4px; transition: all var(--dur-fast); }
+  .file-x:hover { color: var(--color-danger); background: var(--color-danger-dim); }
+
+  .validating { display: flex; align-items: center; gap: 9px; font-size: var(--text-sm); color: var(--color-text-muted); padding: 10px 2px; }
+  .spinner { width: 14px; height: 14px; border: 2px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .err { color: var(--color-danger); font-size: var(--text-sm); display: flex; align-items: center; gap: 7px; padding: 4px 0; }
+
+  /* Trust boundary note (WFIN-01 threat model, shown honestly) */
+  .trust { display: flex; align-items: flex-start; gap: 8px; font-size: var(--text-xs); color: var(--color-text-dim); }
+  .trust svg { flex-shrink: 0; margin-top: 1px; }
+
+  /* NET-NEW honesty flag (matches app convention) */
+  .netnew { font-size: 9px; font-weight: 800; letter-spacing: .4px; color: var(--color-accent-violet);
+    background: hsl(258 90% 66% / .13); border: 1px solid hsl(258 90% 66% / .35);
+    padding: 1px 6px; border-radius: var(--radius-full); vertical-align: middle; }
+
+  /* Buttons */
+  .btn { font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 600; cursor: pointer;
+    border-radius: var(--radius-sm); padding: 8px 15px; border: 1px solid transparent; transition: all var(--dur-fast); }
+  .btn-ghost { background: transparent; border-color: var(--color-border); color: var(--color-text-muted); }
+  .btn-ghost:hover { color: var(--color-text); background: var(--color-accent); }
+  .btn-primary { background: var(--color-primary-strong); color: white; }
+  .btn-primary:hover { filter: brightness(1.08); box-shadow: var(--shadow-glow-primary); }
+  .btn-row { display: flex; gap: var(--space-2); }
+
+  /* Divider label between sections */
+  .divider { height: 1px; background: var(--color-border-soft); margin: 2px 0; }
+
+  /* Two-step (Variant C) */
+  .stepbar { display: flex; align-items: center; gap: 10px; font-size: var(--text-xs); color: var(--color-text-dim); padding: 0 var(--space-4); margin-top: -6px; }
+  .stepbar .dot { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--color-border); font-weight: 700; font-size: 10px; }
+  .stepbar .dot.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+  .stepbar .line { flex: 1; height: 1px; background: var(--color-border); }
+  .receipt { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); display: flex; flex-direction: column; gap: 11px; }
+  .r-row { display: flex; gap: var(--space-3); font-size: var(--text-sm); }
+  .r-row .lab { color: var(--color-text-dim); width: 108px; flex-shrink: 0; }
+  .r-row .val { color: var(--color-text); font-weight: 500; }
+
+  /* Panel-mode preview (Variant C toggle) */
+  .panelview { position: fixed; inset: 46px 0 0 0; z-index: 10; display: none; background: var(--color-bg); }
+  .panelview.show { display: flex; }
+  .pv-chat { flex: 1; padding: var(--space-8); color: var(--color-text-dim); }
+  .pv-chat .msg { max-width: 460px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: var(--space-4); margin-bottom: var(--space-3); }
+  .pv-panel { width: 380px; border-left: 1px solid var(--color-border); background: var(--color-surface); padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4); box-shadow: var(--shadow-lg); }
+  .pv-panel h3 { margin: 0; font-family: var(--font-headline); font-size: var(--text-md); }
+
+  .cmode-toggle { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--color-text-muted); cursor: pointer; user-select: none; }
+  .cmode-toggle input { width: auto; }
+
+  /* ── Variant tab bar (fixed top) ── */
+  #variant-nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9998; height: 46px;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    display: flex; align-items: center; gap: 6px; padding: 0 12px;
+    font-family: var(--font-sans);
+  }
+  #variant-nav .brand { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); margin-right: 8px; }
+  .variant-tab {
+    font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer;
+    color: var(--color-text-muted); background: transparent; border: 1px solid transparent;
+    padding: 6px 12px; border-radius: var(--radius-sm); transition: all var(--dur-fast);
+  }
+  .variant-tab:hover { color: var(--color-text); }
+  .variant-tab.active { color: var(--color-text); background: var(--color-accent); border-color: var(--color-border); }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+
+  /* Sketch toolbar */
+  #tools {
+    position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui; font-size: 12px;
+    background: rgba(0,0,0,0.72); color: #fff; padding: 8px 12px; border-radius: 8px; opacity: 0.42;
+    transition: opacity var(--dur-base); display: flex; align-items: center; gap: 10px;
+  }
+  #tools:hover { opacity: 1; }
+  #tools select, #tools button { font-size: 11px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 3px 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- ── Variant navigation ── -->
+<div id="variant-nav">
+  <span class="brand">072 · run-inputs-modal</span>
+  <button class="variant-tab active" onclick="showVariant('a', this)">A: Inline-grows ★ Selected</button>
+  <button class="variant-tab" onclick="showVariant('b', this)">B: 3-way scope + dropzone</button>
+  <button class="variant-tab" onclick="showVariant('c', this)">C: Two-step / panel</button>
+</div>
+
+<!-- ── Shared dimmed backdrop (faux Workflows library) ── -->
+<div id="backdrop">
+  <h1>Workflows</h1>
+  <div class="bd-grid">
+    <div class="bd-card"><div class="t">Vendor-risk portfolio review</div><div class="s">Score vendors · draft committee brief</div><div class="run">▶ Run</div></div>
+    <div class="bd-card"><div class="t">Contract obligation extract</div><div class="s">Pull dates & renewals from a contract</div><div class="run">▶ Run</div></div>
+    <div class="bd-card"><div class="t">RFP response drafter</div><div class="s">Fill the response template from KB</div><div class="run">▶ Run</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════ VARIANT A — Inline-grows ══════════════════ -->
+<div id="variant-a" class="variant active">
+  <div class="stage">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Run Vendor-risk portfolio review">
+      <div class="m-head">
+        <span class="doc">📄</span>
+        <span class="name">Vendor-risk portfolio review</span>
+        <span class="ver">v4</span>
+      </div>
+      <div class="m-body">
+
+        <!-- Scope — inline dropdown, author default tagged -->
+        <div class="field">
+          <span class="flabel">Knowledge base <span class="netnew">EDITABLE · NET-NEW</span></span>
+          <div class="scope-row">
+            <select id="a-scope" onchange="aScopeChange()">
+              <option value="all">All documents</option>
+              <option value="proc" selected>📁 Procurement KB</option>
+              <option value="vendor">📁 Q3 Vendor Docs</option>
+              <option value="legal">📁 Legal &amp; Contracts</option>
+            </select>
+            <span class="default-tag" id="a-default">workflow default</span>
+          </div>
+          <span class="hint">Retrieval is limited to this folder for this run — the model can't widen it (server-enforced, Phase-098 resolver).</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Template upload — quiet button -->
+        <div class="field">
+          <span class="flabel">Template <span class="req">optional</span> <span class="netnew">NET-NEW</span></span>
+          <div id="a-upload-slot">
+            <button class="upload-btn" onclick="aUpload(false)">⬆ Upload a template…</button>
+          </div>
+          <div class="trust">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Stored as untrusted input — read by the agent, <b>never run as code or fed to the fill engine</b>.</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Kickoff -->
+        <div class="field">
+          <span class="flabel">What should this run work on?</span>
+          <textarea rows="2" placeholder="Describe the task for this run…">Score the Q3 vendors and draft the committee brief.</textarea>
+        </div>
+
+        <p class="hint">This workflow expects: <span class="k">portfolio_file, review_quarter</span></p>
+      </div>
+      <div class="m-foot">
+        <span class="foot-note">Run opens a <b>new chat thread</b> and streams there.</span>
+        <div class="btn-row">
+          <button class="btn btn-ghost">Cancel</button>
+          <button class="btn btn-primary">▶ Run workflow</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ VARIANT B — 3-way scope toggle + dropzone ══════════════════ -->
+<div id="variant-b" class="variant">
+  <div class="stage">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Run Vendor-risk portfolio review">
+      <div class="m-head">
+        <span class="doc">📄</span>
+        <span class="name">Vendor-risk portfolio review</span>
+        <span class="ver">v4</span>
+      </div>
+      <div class="m-body">
+
+        <!-- Scope — segmented 3-way (Perplexity reference) -->
+        <div class="field">
+          <span class="flabel">Where should it search? <span class="netnew">NET-NEW</span></span>
+          <div class="seg" role="tablist">
+            <button role="tab" onclick="bScope('all', this)">All documents</button>
+            <button role="tab" class="on" onclick="bScope('bound', this)">📁 Procurement KB <span class="tiny">default</span></button>
+            <button role="tab" onclick="bScope('pick', this)">Pick a folder…</button>
+          </div>
+          <div id="b-subpick"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Template upload — dropzone -->
+        <div class="field">
+          <span class="flabel">Template <span class="req">optional</span> <span class="netnew">NET-NEW</span></span>
+          <div id="b-upload-slot">
+            <div class="dropzone" id="b-dz"
+                 ondragover="event.preventDefault(); this.classList.add('drag')"
+                 ondragleave="this.classList.remove('drag')"
+                 ondrop="event.preventDefault(); this.classList.remove('drag'); bUpload(false)"
+                 onclick="bUpload(false)">
+              <span class="big">⬇</span>
+              Drop a template here, or <b style="color:var(--color-primary)">browse</b>
+              <div class="accepts">.docx · .pptx · .xlsx · .csv — up to 20 MB</div>
+            </div>
+          </div>
+          <div class="trust">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            <span>Stored as untrusted input — read by the agent, <b>never run as code or fed to the fill engine</b>.</span>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field">
+          <span class="flabel">What should this run work on?</span>
+          <textarea rows="2" placeholder="Describe the task for this run…">Score the Q3 vendors and draft the committee brief.</textarea>
+        </div>
+
+        <p class="hint">This workflow expects: <span class="k">portfolio_file, review_quarter</span></p>
+      </div>
+      <div class="m-foot">
+        <span class="foot-note">Run opens a <b>new chat thread</b> and streams there.</span>
+        <div class="btn-row">
+          <button class="btn btn-ghost">Cancel</button>
+          <button class="btn btn-primary">▶ Run workflow</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ VARIANT C — Two-step / panel ══════════════════ -->
+<div id="variant-c" class="variant">
+  <div class="stage" id="c-stage">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="Run Vendor-risk portfolio review">
+      <div class="m-head">
+        <span class="doc">📄</span>
+        <span class="name">Vendor-risk portfolio review</span>
+        <span class="ver">v4</span>
+      </div>
+
+      <div class="stepbar" style="padding-top:12px">
+        <span class="dot on" id="c-d1">1</span> <span id="c-l1" style="color:var(--color-text)">Inputs</span>
+        <span class="line"></span>
+        <span class="dot" id="c-d2">2</span> <span id="c-l2">Confirm</span>
+      </div>
+
+      <!-- Step 1 — inputs -->
+      <div class="m-body" id="c-step1">
+        <div class="field">
+          <span class="flabel">Where should it search? <span class="netnew">NET-NEW</span></span>
+          <div class="seg">
+            <button onclick="cScope('all', this)">All documents</button>
+            <button class="on" onclick="cScope('bound', this)">📁 Procurement KB <span class="tiny">default</span></button>
+            <button onclick="cScope('pick', this)">Pick a folder…</button>
+          </div>
+        </div>
+        <div class="divider"></div>
+        <div class="field">
+          <span class="flabel">Template <span class="req">optional</span> <span class="netnew">NET-NEW</span></span>
+          <div id="c-upload-slot"><button class="upload-btn" onclick="cUpload(false)">⬆ Upload a template…</button></div>
+        </div>
+        <div class="divider"></div>
+        <div class="field">
+          <span class="flabel">What should this run work on?</span>
+          <textarea id="c-kick" rows="2">Score the Q3 vendors and draft the committee brief.</textarea>
+        </div>
+      </div>
+
+      <!-- Step 2 — confirm receipt -->
+      <div class="m-body" id="c-step2" style="display:none">
+        <div class="receipt">
+          <div class="r-row"><span class="lab">Workflow</span><span class="val">Vendor-risk portfolio review <span style="color:var(--color-text-dim);font-family:var(--font-mono)">v4</span></span></div>
+          <div class="r-row"><span class="lab">Searches</span><span class="val" id="c-r-scope">📁 Procurement KB</span></div>
+          <div class="r-row"><span class="lab">Template</span><span class="val" id="c-r-file" style="color:var(--color-text-dim)">— none —</span></div>
+          <div class="r-row"><span class="lab">Task</span><span class="val" id="c-r-kick">Score the Q3 vendors and draft the committee brief.</span></div>
+        </div>
+        <div class="trust">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/></svg>
+          <span>Opens a new thread and streams there. Scope is server-enforced; the template is stored untrusted.</span>
+        </div>
+      </div>
+
+      <div class="m-foot">
+        <label class="cmode-toggle"><input type="checkbox" onchange="cPanel(this.checked)"> show as right-side panel</label>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="c-back" style="display:none" onclick="cStep(1)">← Back</button>
+          <button class="btn btn-primary" id="c-next" onclick="cStep(2)">Next →</button>
+          <button class="btn btn-primary" id="c-run" style="display:none">▶ Run workflow</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel-mode preview -->
+  <div class="panelview" id="c-panelview">
+    <div class="pv-chat">
+      <div class="msg" style="color:var(--color-text)"><b>Vendor-risk portfolio review</b><br><span style="color:var(--color-text-muted);font-size:var(--text-sm)">Set the inputs on the right, then Run. The run streams here in this thread.</span></div>
+      <div class="msg" style="opacity:.5">…</div>
+    </div>
+    <div class="pv-panel">
+      <h3>▸ Run inputs</h3>
+      <div class="field">
+        <span class="flabel" style="font-size:var(--text-xs)">Where should it search?</span>
+        <div class="seg" style="flex-wrap:wrap">
+          <button onclick="cScope('all', this)">All docs</button>
+          <button class="on" onclick="cScope('bound', this)">📁 Procurement KB</button>
+          <button onclick="cScope('pick', this)">Pick…</button>
+        </div>
+      </div>
+      <div class="field">
+        <span class="flabel" style="font-size:var(--text-xs)">Template</span>
+        <button class="upload-btn" onclick="alert('same upload flow, docked')">⬆ Upload…</button>
+      </div>
+      <div class="field">
+        <span class="flabel" style="font-size:var(--text-xs)">Task</span>
+        <textarea rows="3">Score the Q3 vendors and draft the committee brief.</textarea>
+      </div>
+      <button class="btn btn-primary" style="margin-top:auto">▶ Run workflow</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Sketch toolbar ── -->
+<div id="tools">
+  <span>🎛</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="setVW('375px')">📱</button>
+  <button onclick="setVW('768px')">▭</button>
+  <button onclick="setVW('100%')">🖥</button>
+  <button onclick="simulateBad()" title="simulate a rejected file">✕ bad file</button>
+</div>
+
+<script>
+  function showVariant(id, btn) {
+    document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('variant-' + id).classList.add('active');
+    btn.classList.add('active');
+  }
+
+  // Viewport preview — constrain modal width
+  function setVW(w) {
+    document.querySelectorAll('.modal').forEach(m => { m.style.width = (w === '100%') ? 'min(560px,94vw)' : 'min(' + w + ',94vw)'; });
+  }
+
+  // ── Shared upload state machine ──
+  const FILE = { name: 'committee-brief-template.docx', size: '48 KB', ext: 'DOCX' };
+  let BAD = false;
+  function simulateBad() { BAD = !BAD; alert(BAD ? 'Next upload will be REJECTED (e.g. an .exe / bad magic bytes).' : 'Next upload will succeed.'); }
+
+  function fileCardHTML(onRemove) {
+    return '<div class="file-card">' +
+      '<div class="file-icon"><span class="ext">' + FILE.ext + '</span></div>' +
+      '<div class="file-meta"><div class="fn">' + FILE.name + '</div>' +
+      '<div class="fs">' + FILE.size + ' · <span class="ok">✓ validated</span> · <span style="color:var(--color-text-dim)">kind=template_input</span></div></div>' +
+      '<button class="file-x" onclick="' + onRemove + '" title="remove">✕</button></div>';
+  }
+  function validatingHTML() { return '<div class="validating"><span class="spinner"></span> Checking file type & size…</div>'; }
+  function errHTML(reset) { return '<div class="err">✕ <span>Only .docx / .pptx / .xlsx / .csv are allowed — <a href="#" style="color:var(--color-primary)" onclick="' + reset + '; return false">try another</a></span></div>'; }
+
+  function runUpload(slotId, resetFn, removeFn) {
+    const slot = document.getElementById(slotId);
+    slot.innerHTML = validatingHTML();
+    setTimeout(() => {
+      slot.innerHTML = BAD ? errHTML(resetFn) : fileCardHTML(removeFn);
+    }, 650);
+  }
+
+  // Variant A
+  function aUpload() { runUpload('a-upload-slot', 'aReset()', 'aReset()'); }
+  function aReset() { document.getElementById('a-upload-slot').innerHTML = '<button class="upload-btn" onclick="aUpload()">⬆ Upload a template…</button>'; }
+  function aScopeChange() {
+    const v = document.getElementById('a-scope').value;
+    document.getElementById('a-default').style.display = (v === 'proc') ? 'inline' : 'none';
+  }
+
+  // Variant B
+  function bUpload() { runUpload('b-upload-slot', 'bReset()', 'bReset()'); }
+  function bReset() {
+    document.getElementById('b-upload-slot').innerHTML =
+      '<div class="dropzone" id="b-dz" ondragover="event.preventDefault(); this.classList.add(\'drag\')" ondragleave="this.classList.remove(\'drag\')" ondrop="event.preventDefault(); this.classList.remove(\'drag\'); bUpload()" onclick="bUpload()"><span class="big">⬇</span>Drop a template here, or <b style="color:var(--color-primary)">browse</b><div class="accepts">.docx · .pptx · .xlsx · .csv — up to 20 MB</div></div>';
+  }
+  function bScope(kind, btn) {
+    btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    const sub = document.getElementById('b-subpick');
+    if (kind === 'pick') {
+      sub.innerHTML = '<div class="subpick"><select><option>📁 Q3 Vendor Docs</option><option>📁 Legal &amp; Contracts</option><option>📁 PM Demo Project</option></select></div>';
+    } else { sub.innerHTML = ''; }
+  }
+
+  // Variant C
+  let cFile = false;
+  function cUpload() {
+    const slot = document.getElementById('c-upload-slot');
+    slot.innerHTML = validatingHTML();
+    setTimeout(() => {
+      if (BAD) { slot.innerHTML = errHTML('cReset()'); cFile = false; }
+      else { slot.innerHTML = fileCardHTML('cReset()'); cFile = true; }
+    }, 650);
+  }
+  function cReset() { document.getElementById('c-upload-slot').innerHTML = '<button class="upload-btn" onclick="cUpload()">⬆ Upload a template…</button>'; cFile = false; }
+  let cScopeLabel = '📁 Procurement KB';
+  function cScope(kind, btn) {
+    btn.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    cScopeLabel = kind === 'all' ? 'All documents' : (kind === 'pick' ? '📁 (choose at pick)' : '📁 Procurement KB');
+  }
+  function cStep(n) {
+    document.getElementById('c-step1').style.display = n === 1 ? 'flex' : 'none';
+    document.getElementById('c-step2').style.display = n === 2 ? 'flex' : 'none';
+    document.getElementById('c-d1').classList.toggle('on', n === 1);
+    document.getElementById('c-d2').classList.toggle('on', n === 2);
+    document.getElementById('c-l1').style.color = n === 1 ? 'var(--color-text)' : '';
+    document.getElementById('c-l2').style.color = n === 2 ? 'var(--color-text)' : '';
+    document.getElementById('c-next').style.display = n === 1 ? 'inline-block' : 'none';
+    document.getElementById('c-back').style.display = n === 2 ? 'inline-block' : 'none';
+    document.getElementById('c-run').style.display = n === 2 ? 'inline-block' : 'none';
+    if (n === 2) {
+      document.getElementById('c-r-scope').textContent = cScopeLabel;
+      document.getElementById('c-r-kick').textContent = document.getElementById('c-kick').value || '— (no task described) —';
+      const rf = document.getElementById('c-r-file');
+      if (cFile) { rf.textContent = FILE.name + ' (' + FILE.size + ')'; rf.style.color = 'var(--color-text)'; }
+      else { rf.textContent = '— none —'; rf.style.color = 'var(--color-text-dim)'; }
+    }
+  }
+  function cPanel(on) {
+    document.getElementById('c-stage').style.display = on ? 'none' : 'grid';
+    document.getElementById('c-panelview').classList.toggle('show', on);
+  }
+</script>
+</body>
+</html>

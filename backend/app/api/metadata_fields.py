@@ -3,7 +3,7 @@
 Mirrors the skills router (own + global CRUD, get_current_user, RLS) with two
 deliberate deviations driven by the threat register:
 
-  - create HARD-SETS is_global=False (T-111-03-01) — a user can never author a
+  - create HARD-SETS is_system_global=False (T-111-03-01) — a user can never author a
     global field def; the RLS WITH CHECK at migration 071:168 forces it too.
   - update/delete are own-scoped and collapse a cross-user miss to 404-not-403
     (T-111-03-03, D-v2.6-04 — the safer non-leaking pattern).
@@ -16,7 +16,7 @@ service swallows errors, so the LIVE round-trip is the real verification
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.metadata_field import (
     MetadataFieldCreate,
     MetadataFieldResponse,
@@ -31,7 +31,7 @@ router = APIRouter(prefix="/metadata-fields", tags=["metadata-fields"])
 @router.get("", response_model=list[MetadataFieldResponse])
 async def list_metadata_fields(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List the caller's own field definitions plus global ones (deduped)."""
     return await metadata_field_service.list_field_definitions(
@@ -43,7 +43,7 @@ async def list_metadata_fields(
 async def create_metadata_field(
     body: MetadataFieldCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Define a custom metadata field owned by the caller (never global)."""
     # Own-scoped duplicate pre-check — migration 071 has no unique constraint on
@@ -64,7 +64,7 @@ async def create_metadata_field(
         options=body.options,
         enabled=body.enabled,
         supabase=supabase,
-        # is_global intentionally NOT passed — the service hard-sets it False.
+        # is_system_global intentionally NOT passed — the service hard-sets it False.
     )
 
     # Fire the audit row. write_audit_entry is async and SWALLOWS errors, so it
@@ -83,7 +83,7 @@ async def update_metadata_field(
     field_id: str,
     body: MetadataFieldUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Update an owned field definition (404 on a cross-user miss, not 403)."""
     data = body.model_dump(exclude_none=True)
@@ -101,7 +101,7 @@ async def update_metadata_field(
 async def delete_metadata_field(
     field_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete an owned field definition (404 on a cross-user miss, not 403)."""
     removed = await metadata_field_service.delete_field_definition(

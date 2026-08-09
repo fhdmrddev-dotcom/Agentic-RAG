@@ -42,6 +42,39 @@ def _raise_401():
     raise HTTPException(status_code=http_status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
 
 
+# ── Phase 165 (MIG-02) org-membership mock routing ────────────────────────────
+# Plan 165-02 added `_resolve_caller_org_ids` -> a leading
+# `supabase.table("org_members").select("org_id").eq("user_id", ...)` query at the FRONT of
+# get_globally_visible_folder_ids (folder_utils.py — list_documents calls it). Route THAT one
+# query to a canned caller-org result (table-name-keyed dispatch) so it never consumes an
+# entry from the ordered `execute.side_effect` lists below — the existing positional own-docs /
+# global-folder / modal-count sequences stay aligned, and future insertions won't re-break them.
+CALLER_ORG_ID = "00000000-0000-0000-0000-0000000000a1"
+
+
+@pytest.fixture(autouse=True)
+def _route_org_members(mock_builder):
+    """Dispatch `table("org_members")` to a canned org-membership result; everything else
+    keeps returning the shared side_effect-driven builder (so positional lists stay intact)."""
+    from tests.conftest import _supabase  # noqa: PLC0415
+
+    org_result = MagicMock()
+    org_result.data = [{"org_id": CALLER_ORG_ID}]
+    org_builder = MagicMock()
+    org_builder.select.return_value = org_builder
+    org_builder.eq.return_value = org_builder
+    org_builder.execute.return_value = org_result
+
+    def _dispatch(name, *args, **kwargs):
+        return org_builder if name == "org_members" else mock_builder
+
+    _supabase.table.side_effect = _dispatch
+    try:
+        yield
+    finally:
+        _supabase.table.side_effect = None
+
+
 # ── GET /documents ─────────────────────────────────────────────────────────────
 
 class TestListDocuments:
@@ -255,8 +288,10 @@ class TestUploadDocument:
         mock_builder.neq.return_value = mock_builder
         mock_builder.limit.return_value = mock_builder
         # execute calls: 1=folder validation, 2=dedup check (no match), 3=stale check (no match), 4=insert
+        # Folder validation selects `id, user_id` and enforces owner == uploader (the Phase-163
+        # RLS-gate owner check), so the mocked folder row MUST carry the uploader's user_id.
         mock_builder.execute.side_effect = [
-            _make_result({"id": FOLDER_ID}),               # folder validation: found
+            _make_result({"id": FOLDER_ID, "user_id": USER_ID}),  # folder validation: found, owned by uploader
             _make_result([]),                              # dedup: no existing
             _make_result([]),                              # stale: no stale
             _make_result([_doc_row(folder_id=FOLDER_ID)]),  # insert result
@@ -943,17 +978,22 @@ class TestFullMarkdown:
         from app.api.documents import ingest_document
         from tests.conftest import _supabase
 
-        mock_builder.execute.side_effect = [
-            _make_result([]),  # status -> processing
-            _make_result([]),  # insert chunks
-            _make_result([]),  # status -> completed (with full_markdown)
-        ]
+        # ingest_document's completion path now issues ~10 sequential sync writes/reads
+        # (status/ingestion_step badges [Phase 56], prior-metadata SELECT [Phase 112],
+        # chunk insert, pdf_extraction_runs telemetry [Phase 71], chunk-count recount) before
+        # the final status='completed' UPDATE. A fixed ordered side_effect list is brittle
+        # against that drift, so return an empty result for EVERY execute and assert on the
+        # recorded UPDATE calls instead. metadata_enrichment_mode='legacy' keeps the patched
+        # extract_metadata path (avoids the enriched sample_for_extraction branch).
+        mock_builder.execute.side_effect = None
+        mock_builder.execute.return_value = _make_result([])
 
         with patch("app.api.documents.chunk_text", return_value=["chunk1"]), \
              patch("app.api.documents.embed_chunks", return_value=[[0.1, 0.2]]), \
              patch("app.api.documents.extract_metadata", return_value=None), \
              patch("app.api.documents.load_app_settings") as mock_settings:
             mock_settings.return_value.embedding_model = None
+            mock_settings.return_value.metadata_enrichment_mode = "legacy"
             ingest_document(DOC_ID, "Full document text here", USER_ID, _supabase)
 
         # Find the completion update call (the one with "completed" status)

@@ -13,6 +13,9 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
 import phaseSpineSource from "./PhaseSpine?raw"
+// The sibling vertical spine's source — read here so the "one glyph map" invariant
+// is asserted across BOTH consumers from one place (183-04 Task 3).
+import phaseSpineGraphSource from "./PhaseSpineGraph?raw"
 import { PhaseSpine } from "./PhaseSpine"
 import type { DefShape } from "./soulData"
 
@@ -103,5 +106,14 @@ describe("PhaseSpine — horizontal glyph-dot row", () => {
     // The glyph map is imported from soulData, not re-declared locally.
     expect(phaseSpineSource).not.toMatch(/const PHASE_GLYPHS/)
     expect(phaseSpineSource).toMatch(/soulData/)
+  })
+
+  it("neither spine re-declares the glyph map — soulData is its ONE home (D-183-13)", () => {
+    // Phase 183-04 cut the vertical spine's private duplicate (the flat text marks
+    // Phase 127 retired). Asserting BOTH consumers from one place is what makes
+    // "the glyph map has ONE home" a tree property rather than a per-file habit.
+    expect(phaseSpineSource).not.toMatch(/const PHASE_GLYPHS/)
+    expect(phaseSpineGraphSource).not.toMatch(/const PHASE_GLYPHS/)
+    expect(phaseSpineGraphSource).toMatch(/soulData/)
   })
 })

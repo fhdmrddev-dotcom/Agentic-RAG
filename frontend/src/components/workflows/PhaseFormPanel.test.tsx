@@ -18,11 +18,12 @@
  *  - a field change calls onChange; a blur/save calls onPersist.
  */
 import { describe, it, expect, vi } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { fireEvent, render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
 import { PhaseFormPanel } from "./PhaseFormPanel"
-import type { PhaseSpecJSON } from "./PhaseSpineGraph"
+import { minimalPhaseFor, PHASE_TYPE_ORDER } from "./definitionOps"
+import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> = {}): PhaseSpecJSON {
   return {
@@ -44,6 +45,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^function/i)).toBeInTheDocument()
@@ -63,6 +65,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -81,6 +84,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -99,6 +103,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const chips = screen.getByTestId("tools-chips")
@@ -116,6 +121,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const maxParallel = screen.getByLabelText(/parallel workers/i) as HTMLInputElement
@@ -131,6 +137,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -156,6 +163,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -175,6 +183,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     // The "strict" caption is shown plainly (no enum jargon required to understand it).
@@ -188,6 +197,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     // The helper sentences are rendered as plain VISIBLE text (queryable via getByText),
@@ -215,7 +225,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     ]
     for (const [config, helper] of cases) {
       const { unmount } = render(
-        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} />,
+        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} onClose={noop} />,
       )
       expect(screen.getByText(helper)).toBeInTheDocument()
       unmount()
@@ -223,14 +233,20 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
   })
 
   it("the file-check / sourcing-strictness controls are ABSENT on every non-llm_emit type", () => {
-    const nonEmit = ["programmatic", "llm_single", "llm_agent", "llm_batch_agents", "llm_human_input"]
+    // ⚠ DERIVED FROM THE SHIPPED ORDER (Phase 189), and the decision is recorded rather
+    // than left to a hand-typed list. This claim is "these controls belong to the
+    // DELIVERABLE and to nothing else", which quantifies over every OTHER type — so a
+    // 7th type belongs in the subset by the claim's own words, and a literal five-element
+    // array had silently stopped covering the union the moment `llm_emit` was not the
+    // only thing that could be added. `minimalPhaseFor` builds each config, so every arm
+    // (including `external_action`'s required `capability`) stays correct by construction
+    // instead of by an `if` ladder that has to be remembered.
+    const nonEmit = PHASE_TYPE_ORDER.filter((type) => type !== "llm_emit")
+    expect(nonEmit).toHaveLength(PHASE_TYPE_ORDER.length - 1)
     for (const pt of nonEmit) {
-      const config: Record<string, unknown> = { phase_type: pt }
-      if (pt !== "programmatic") config.prompt = "x"
-      if (pt === "programmatic") config.fn = "f"
-      if (pt === "llm_agent" || pt === "llm_batch_agents") config.available_tools = []
+      const config = minimalPhaseFor(pt, "some-slug", 0).config
       const { unmount } = render(
-        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} />,
+        <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} onClose={noop} />,
       )
       expect(screen.queryByLabelText(/file check/i)).not.toBeInTheDocument()
       expect(screen.queryByLabelText(/sourcing strictness/i)).not.toBeInTheDocument()
@@ -247,6 +263,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         folderNames={{ [uuid]: "Vendors — 2025 Assessments" }}
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const scope = screen.getByTestId("folder-scope-display")
@@ -268,6 +285,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         skillNames={{ [skillId]: "Risk Scoring Rubric" }}
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByTestId("skill-name").textContent).toContain("Risk Scoring Rubric")
@@ -284,6 +302,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={onChange}
         onPersist={onPersist}
+        onClose={noop}
       />,
     )
     const prompt = screen.getByLabelText(/^instructions/i)
@@ -301,6 +320,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     const root = container.firstElementChild as HTMLElement
@@ -316,6 +336,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         open={false}
         onChange={noop}
         onPersist={noop}
+        onClose={noop}
       />,
     )
     expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument()
@@ -326,5 +347,54 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     const src = phaseFormPanelSource
     expect(src).not.toMatch(/position:\s*(absolute|fixed)/)
     expect(src).not.toMatch(/fixed inset|absolute inset/)
+  })
+})
+
+/**
+ * Phase 183-09 (GAP-1). The panel shipped with NO discoverable close: its only exit was
+ * re-activating the same node, which a user has no way to know. The close handler is a
+ * REQUIRED prop so "a panel the user cannot dismiss" is not a representable state.
+ *
+ * NOTE for a future reader: during the RED window of 183-09 these two tests passed
+ * `onClose` to a component whose props did not declare it yet, so `tsc` reported a
+ * phase-file error until Task 2 landed the prop. That was expected and is not a defect
+ * to "fix" by deleting the prop.
+ */
+describe("PhaseFormPanel — dismissal (183-09 / GAP-1)", () => {
+  it("the open panel header carries exactly one announced close control", () => {
+    const onClose = vi.fn()
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_single", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={onClose}
+      />,
+    )
+    // Positive control: this render really IS the open branch, not the rail.
+    expect(screen.queryByTestId("phase-form-rail")).not.toBeInTheDocument()
+
+    const close = screen.getByTestId("phase-form-close")
+    expect(close.tagName).toBe("BUTTON")
+    expect(close.getAttribute("type")).toBe("button")
+    // Announced as a sentence — the glyph alone is not an accessible name.
+    expect(screen.getByRole("button", { name: /close/i })).toBe(close)
+
+    // `fireEvent` — one click driver across every suite this plan touches (the
+    // d3-drag landmine bans `user-event` inside the canvas plane, and a second driver
+    // here would invite it back by example).
+    fireEvent.click(close)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it("the resting rail renders NO close control", () => {
+    // Expected to pass at RED — this is a guard against the fix over-reaching into the
+    // collapsed rail, not a GAP-1 reproduction.
+    render(
+      <PhaseFormPanel phase={null} open={false} onChange={noop} onPersist={noop} onClose={noop} />,
+    )
+    expect(screen.getByTestId("phase-form-rail")).toBeInTheDocument()
+    expect(screen.queryByTestId("phase-form-close")).not.toBeInTheDocument()
   })
 })

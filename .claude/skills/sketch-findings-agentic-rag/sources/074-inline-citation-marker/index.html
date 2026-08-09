@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sketch 074 — Inline Citation Marker</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { font-family: var(--font-sans); color: var(--color-text); background: var(--color-bg); padding-top: 46px; min-height: 100vh; }
+
+  /* ── Chat stage (mirrors the real left-aligned assistant message) ── */
+  .stage { max-width: 760px; margin: 0 auto; padding: var(--space-8) var(--space-6) 120px; transition: max-width var(--dur-base) var(--ease-out); }
+  .intro h1 { font-family: var(--font-headline); font-size: var(--text-xl); margin: 0 0 6px; }
+  .intro p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0 0 var(--space-6); line-height: 1.55; }
+
+  .turn { display: flex; gap: var(--space-3); margin-bottom: var(--space-6); animation: fadeSlideUp var(--dur-slow) var(--ease-out); }
+  .turn.user { flex-direction: row-reverse; }
+  .avatar { width: 30px; height: 30px; border-radius: var(--radius-full); flex-shrink: 0; display: grid; place-items: center; font-size: 14px; }
+  .avatar.bot { background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+  .avatar.me { background: var(--color-accent); color: var(--color-text-muted); }
+  .bubble.user-b { background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg); padding: 9px 14px; max-width: 70%; font-size: var(--text-sm); }
+  .answer { flex: 1; min-width: 0; }
+  .answer .meta-line { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); margin-bottom: 7px; }
+  .answer p { font-size: var(--text-base); line-height: 1.72; margin: 0 0 var(--space-4); color: var(--color-text); }
+  .answer strong { color: var(--color-text); font-weight: 650; }
+
+  /* ── THE MARKER (three forms; shared behavior) ── */
+  /* claim wrapper — used to make the whole grounded span highlightable on marker hover */
+  .claim { transition: background var(--dur-fast) var(--ease-out); border-radius: 3px; }
+  .claim.lit { background: var(--color-primary-dim); box-shadow: 0 0 0 2px var(--color-primary-dim); }
+
+  /* form A — superscript numeral chip */
+  .cite-sup { font-family: var(--font-mono); font-size: 0.62em; font-weight: 700; vertical-align: super; line-height: 0; color: var(--color-primary); background: var(--color-primary-dim); border-radius: 4px; padding: 1px 4px; margin-left: 1px; cursor: pointer; transition: all var(--dur-fast); user-select: none; }
+  .cite-sup:hover { background: var(--color-primary-glow); color: #fff; }
+
+  /* form B — bracketed baseline pill */
+  .cite-pill { display: inline-flex; align-items: center; font-family: var(--font-mono); font-size: 0.74em; font-weight: 700; color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-sm); padding: 0 5px; margin: 0 1px; cursor: pointer; transition: all var(--dur-fast); vertical-align: baseline; user-select: none; }
+  .cite-pill:hover { background: var(--color-primary-strong); color: #fff; border-color: var(--color-primary-strong); }
+
+  /* form C — grounded-span underline + end-dot */
+  .cite-span { border-bottom: 1.5px solid var(--color-primary-glow); cursor: pointer; transition: all var(--dur-fast); padding-bottom: 1px; }
+  .cite-span:hover { border-bottom-color: var(--color-primary); background: var(--color-primary-dim); }
+  .cite-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary); margin-left: 3px; vertical-align: middle; cursor: pointer; transition: transform var(--dur-fast); }
+  .cite-span:hover + .cite-dot, .cite-dot:hover { transform: scale(1.5); }
+
+  /* marker appearing on settle */
+  .attaching { animation: markerPop var(--dur-base) var(--ease-bounce); }
+  @keyframes markerPop { 0% { opacity: 0; transform: translateY(-3px) scale(.6); } 100% { opacity: 1; transform: none; } }
+
+  /* hover peek (074 only teases it — full click-through is sketch 075) */
+  .peek { position: absolute; z-index: 60; width: 300px; background: var(--color-surface-hi); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 11px 13px; font-size: var(--text-xs); opacity: 0; pointer-events: none; transform: translateY(4px); transition: all var(--dur-fast); }
+  .peek.show { opacity: 1; transform: none; }
+  .peek .pk-head { display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); color: var(--color-text-muted); margin-bottom: 6px; }
+  .peek .pk-num { color: var(--color-primary); font-weight: 700; }
+  .peek .pk-pass { color: var(--color-text-muted); font-style: italic; line-height: 1.5; }
+  .peek .pk-foot { margin-top: 8px; font-size: 10px; color: var(--color-text-dim); display: flex; justify-content: space-between; }
+
+  /* ── absence-as-signal ⓘ affordance (tiered-guidance rule #13: ⓘ, never a banner) ── */
+  .absence-hint { display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 11px; color: var(--color-text-dim); }
+  .info-dot { width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--color-text-dim); color: var(--color-text-dim); display: inline-grid; place-items: center; font-size: 10px; font-family: var(--font-mono); cursor: help; position: relative; }
+  .info-dot:hover { color: var(--color-primary); border-color: var(--color-primary); }
+  .info-pop { position: absolute; bottom: 130%; left: -8px; width: 260px; background: var(--color-surface-hi); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 10px 12px; font-size: 11.5px; line-height: 1.5; color: var(--color-text-muted); opacity: 0; pointer-events: none; transform: translateY(4px); transition: all var(--dur-fast); z-index: 70; }
+  .info-dot:hover .info-pop { opacity: 1; transform: none; }
+  .info-pop b { color: var(--color-text); }
+
+  /* ── restructured References footer (keyed to markers — operator pick; full treatment in 075) ── */
+  .refs { margin-top: var(--space-5); border-top: 1px solid var(--color-border-soft); padding-top: var(--space-3); }
+  .refs-head { display: flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--color-text-muted); cursor: pointer; user-select: none; }
+  .refs-head:hover { color: var(--color-text); }
+  .refs-body { margin-top: 10px; display: none; flex-direction: column; gap: 8px; }
+  .refs-body.open { display: flex; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .ref-row { display: flex; gap: 10px; font-size: var(--text-xs); padding: 7px 9px; border-radius: var(--radius-sm); background: var(--color-muted); transition: background var(--dur-fast); }
+  .ref-row.lit { background: var(--color-primary-dim); box-shadow: inset 2px 0 0 var(--color-primary); }
+  .ref-num { font-family: var(--font-mono); font-weight: 700; color: var(--color-primary); flex-shrink: 0; }
+  .ref-meta { min-width: 0; }
+  .ref-file { color: var(--color-text); font-weight: 600; }
+  .ref-loc { color: var(--color-text-dim); margin-left: 6px; }
+  .ref-pass { color: var(--color-text-muted); font-style: italic; margin-top: 3px; line-height: 1.45; }
+
+  /* ── stream-replay + state controls ── */
+  .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: var(--space-6); padding: 11px 13px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+  .controls .lbl { font-size: 11px; font-family: var(--font-mono); color: var(--color-text-dim); text-transform: uppercase; letter-spacing: .05em; }
+  .ctl-btn { font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--color-text-muted); background: transparent; border: 1px solid var(--color-border); padding: 6px 12px; border-radius: var(--radius-sm); transition: all var(--dur-fast); }
+  .ctl-btn:hover { color: var(--color-text); background: var(--color-accent); border-color: var(--color-primary-glow); }
+  .ctl-btn.primary { color: var(--color-primary); border-color: var(--color-primary-glow); background: var(--color-primary-dim); }
+  .caret { display: inline-block; width: 8px; height: 1.05em; background: var(--color-primary); margin-left: 2px; vertical-align: text-bottom; animation: caretBlink 1s steps(1) infinite; }
+  .settle-note { font-size: 11px; color: var(--color-success); display: none; align-items: center; gap: 5px; margin-top: 4px; }
+  .settle-note.show { display: inline-flex; animation: fadeSlideUp var(--dur-base); }
+
+  .wire-flag { font-size: 9px; font-weight: 800; color: var(--color-accent-violet); background: hsl(258 90% 66% / .13); border: 1px solid hsl(258 90% 66% / .35); padding: 1px 6px; border-radius: var(--radius-full); vertical-align: middle; }
+  .legend { margin-top: var(--space-8); font-size: 11.5px; color: var(--color-text-dim); line-height: 1.7; border-top: 1px dashed var(--color-border); padding-top: var(--space-4); }
+  .legend b { color: var(--color-text-muted); }
+
+  /* variant nav + tools (house chrome) */
+  #variant-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998; height: 46px; background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+  #variant-nav .brand { font-size: 11px; color: var(--color-text-dim); font-family: var(--font-mono); margin-right: 8px; }
+  .variant-tab { font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--color-text-muted); background: transparent; border: 1px solid transparent; padding: 6px 12px; border-radius: var(--radius-sm); transition: all var(--dur-fast); }
+  .variant-tab:hover { color: var(--color-text); }
+  .variant-tab.active { color: var(--color-text); background: var(--color-accent); border-color: var(--color-border); }
+  #tools { position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui; font-size: 12px; background: rgba(0,0,0,0.72); color: #fff; padding: 8px 12px; border-radius: 8px; opacity: 0.42; transition: opacity var(--dur-base); display: flex; align-items: center; gap: 10px; }
+  #tools:hover { opacity: 1; }
+  #tools select, #tools button { font-size: 11px; background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; padding: 3px 6px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">074 · inline-citation-marker</span>
+  <button class="variant-tab active" onclick="pick('a', this)">A: Superscript chip ★ Selected</button>
+  <button class="variant-tab" onclick="pick('b', this)">B: Bracketed pill</button>
+  <button class="variant-tab" onclick="pick('c', this)">C: Grounded-span underline</button>
+</div>
+
+<div class="stage" id="stage">
+  <div class="intro">
+    <h1>Inline citations — the marker</h1>
+    <p>
+      Per-claim, <b>sparing</b> markers keyed to the run's <b>actual</b> retrieval set (marker&nbsp;<code>n</code> = <code>citations[n]</code>, set-membership by construction — never a post-hoc re-ask).
+      One sentence below carries <b>no marker</b> on purpose: that's general knowledge (absence-as-signal). Hover a marker to feel it's live; the full click-through is <b>Sketch&nbsp;075</b>.
+    </p>
+  </div>
+
+  <div class="controls">
+    <span class="lbl">Try it</span>
+    <button class="ctl-btn primary" onclick="replay()">▶ Replay the stream</button>
+    <button class="ctl-btn" onclick="reset()">↺ Reset (settled)</button>
+    <span class="settle-note" id="settleNote">✓ citations attached — keyed to the run's retrieval set</span>
+  </div>
+
+  <!-- User turn -->
+  <div class="turn user">
+    <div class="avatar me">You</div>
+    <div class="bubble user-b">What drove the Q3 revenue growth, and how did margins hold up?</div>
+  </div>
+
+  <!-- Assistant turn -->
+  <div class="turn">
+    <div class="avatar bot">✦</div>
+    <div class="answer">
+      <div class="meta-line">anthropic · claude-opus-4-7 · turn 1 · 🔍 search_documents → 3 chunks</div>
+      <div id="answerBody"></div>
+
+      <div class="absence-hint">
+        <span class="info-dot">ⓘ
+          <span class="info-pop"><b>Unmarked sentences are the model's general knowledge.</b> Only claims grounded in what the agent retrieved this run carry a citation. No citation = not from your documents.</span>
+        </span>
+        <span>Unmarked claims read as general knowledge</span>
+      </div>
+
+      <!-- Restructured, numbered References footer (operator pick — keyed to the markers) -->
+      <div class="refs">
+        <div class="refs-head" onclick="toggleRefs()"><span id="refsCaret">▸</span> <span id="refsCount">References · 3 sources</span> <span class="wire-flag">numbering net-new</span></div>
+        <div class="refs-body" id="refsBody">
+          <div class="ref-row" id="ref-1"><span class="ref-num">[1]</span><div class="ref-meta"><span class="ref-file">board_minutes_q3.md</span><span class="ref-loc">· Chunk 4 · 0.63</span><div class="ref-pass">"…total revenue of $18.4M, up 30.9% from $14.1M in Q3 last year, the strongest quarter on record…"</div></div></div>
+          <div class="ref-row" id="ref-2"><span class="ref-num">[2]</span><div class="ref-meta"><span class="ref-file">revenue_bridge_q3.pdf</span><span class="ref-loc">· Chunk 11 · 0.58</span><div class="ref-pass">"…enterprise renewals contributed $2.9M of the lift; net-new logo count rose 14% quarter over quarter…"</div></div></div>
+          <div class="ref-row" id="ref-3"><span class="ref-num">[3]</span><div class="ref-meta"><span class="ref-file">retention_analysis.md</span><span class="ref-loc">· Full document · 0.55</span><div class="ref-pass">"…blended gross margin steady at 71% (70.8% the prior quarter) despite a step-up in infrastructure spend…"</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <b>What's real vs net-new.</b> The retrieval set, passages, filenames, chunk indices &amp; similarity are <b>already wired</b> (the <code>citations</code> SSE event + <code>source_refs</code>). Net-new: rendering markers <i>inside</i> the streamed markdown, the <code>[n]</code>-to-claim binding (the model emits <code>[n]</code> against the numbered set it was handed — set-membership-safe), and the footer numbering. <b>Honesty behavior shown:</b> markers attach on <i>settle</i>, not speculatively mid-token — during streaming the body is calm and unmarked.
+  </div>
+</div>
+
+<div class="peek" id="peek"></div>
+
+<div id="tools">
+  <label>theme
+    <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+      <option value="default">Default</option>
+    </select>
+  </label>
+  <span>view</span>
+  <button onclick="setW('400px')">📱</button>
+  <button onclick="setW('720px')">▭</button>
+  <button onclick="setW('760px')">🖥</button>
+</div>
+
+<script>
+  // ── The answer, as claim segments. Each grounded claim carries a citation index into the run's set. ──
+  // segments: {text, cite: n|null}  — cite=null => general knowledge (no marker)
+  const SEGMENTS = [
+    { text: "Revenue grew ", cite: null, bold: false },
+    { text: "30.9% YoY", cite: null, bold: true },
+    { text: " in Q3", cite: 1, boundary: true },
+    { text: ", driven mainly by enterprise renewals and a 14% lift in net-new logos", cite: 2, boundary: true },
+    { text: ". Gross margin held roughly flat at ", cite: null },
+    { text: "71%", cite: null, bold: true },
+    { text: " despite higher infrastructure spend", cite: 3, boundary: true },
+    { text: ". In general, SaaS businesses at this stage trade a little margin for growth — so flat margin alongside 30%+ growth is a healthy signal.", cite: null }, // ← GENERAL KNOWLEDGE, no marker
+  ];
+
+  let variant = 'a';
+  let settled = true;
+
+  function marker(n, v) {
+    if (v === 'a') return `<sup class="cite-sup" data-n="${n}" onmouseenter="peekOn(this,${n})" onmouseleave="peekOff()" onclick="litRef(${n})">${n}</sup>`;
+    if (v === 'b') return `<span class="cite-pill" data-n="${n}" onmouseenter="peekOn(this,${n})" onmouseleave="peekOff()" onclick="litRef(${n})">[${n}]</span>`;
+    return `<span class="cite-dot" data-n="${n}" onmouseenter="peekOn(this,${n})" onmouseleave="peekOff()" onclick="litRef(${n})"></span>`;
+  }
+
+  // Build the answer paragraph for the current variant. showMarkers=false renders the calm streaming body.
+  function buildAnswer(showMarkers) {
+    let html = '<p>';
+    // group consecutive segments up to each cite boundary so form C can underline the whole grounded span
+    let spanOpen = false;
+    SEGMENTS.forEach((s) => {
+      const t = s.bold ? `<strong>${s.text}</strong>` : s.text;
+      if (variant === 'c' && s.cite && showMarkers) {
+        // wrap this segment's text as a grounded span, add dot after
+        html += `<span class="cite-span" data-n="${s.cite}" onmouseenter="litClaim(this)" onmouseleave="unlitClaim(this)" onclick="litRef(${s.cite})">${t}</span>` + marker(s.cite, 'c');
+      } else {
+        html += t;
+        if (s.cite && showMarkers) html += marker(s.cite, variant);
+      }
+    });
+    html += '</p>';
+    return html;
+  }
+
+  function render() {
+    document.getElementById('answerBody').innerHTML = buildAnswer(settled);
+    if (settled) markAttaching();
+  }
+
+  function markAttaching() {
+    document.querySelectorAll('.cite-sup,.cite-pill,.cite-dot').forEach((el,i) => {
+      el.classList.add('attaching');
+      el.style.animationDelay = (i*60)+'ms';
+    });
+  }
+
+  function pick(v, btn) {
+    variant = v; settled = true;
+    document.querySelectorAll('.variant-tab').forEach(t => t.classList.remove('active'));
+    btn.classList.add('active');
+    render();
+  }
+
+  function reset() { settled = true; document.getElementById('settleNote').classList.remove('show'); render(); }
+
+  // ── streaming replay: type the body unmarked, then attach markers on settle ──
+  let streamTimer = null;
+  function replay() {
+    if (streamTimer) clearInterval(streamTimer);
+    settled = false;
+    document.getElementById('settleNote').classList.remove('show');
+    const full = SEGMENTS.map(s => s.text).join('');
+    const body = document.getElementById('answerBody');
+    let i = 0;
+    const step = 3; // chars per tick
+    streamTimer = setInterval(() => {
+      i += step;
+      if (i >= full.length) {
+        clearInterval(streamTimer); streamTimer = null;
+        // settle: render final body WITH markers
+        setTimeout(() => {
+          settled = true; render();
+          document.getElementById('settleNote').classList.add('show');
+        }, 260);
+        body.innerHTML = '<p>' + escapeHtml(full) + '</p>';
+        return;
+      }
+      body.innerHTML = '<p>' + escapeHtml(full.slice(0, i)) + '<span class="caret"></span></p>';
+    }, 24);
+  }
+  function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+  // ── hover peek (tease; full click-through is 075) ──
+  const PASS = {
+    1: { file: 'board_minutes_q3.md', loc: 'Chunk 4 · 0.63', pass: '"…total revenue of $18.4M, up 30.9% from $14.1M in Q3 last year, the strongest quarter on record…"' },
+    2: { file: 'revenue_bridge_q3.pdf', loc: 'Chunk 11 · 0.58', pass: '"…enterprise renewals contributed $2.9M of the lift; net-new logo count rose 14% QoQ…"' },
+    3: { file: 'retention_analysis.md', loc: 'Full document · 0.55', pass: '"…blended gross margin steady at 71% (70.8% the prior quarter) despite a step-up in infra spend…"' },
+  };
+  function peekOn(el, n) {
+    const p = PASS[n]; const pk = document.getElementById('peek');
+    pk.innerHTML = `<div class="pk-head"><span class="pk-num">[${n}]</span> ${p.file}</div><div class="pk-pass">${p.pass}</div><div class="pk-foot"><span>${p.loc}</span><span>click → open (075)</span></div>`;
+    const r = el.getBoundingClientRect();
+    pk.style.left = Math.min(r.left, window.innerWidth - 320) + 'px';
+    pk.style.top = (r.bottom + window.scrollY + 8) + 'px';
+    pk.classList.add('show');
+  }
+  function peekOff() { document.getElementById('peek').classList.remove('show'); }
+
+  function litClaim(el){ el.classList.add('lit'); }
+  function unlitClaim(el){ el.classList.remove('lit'); }
+
+  // clicking a marker lights its footer row (and opens the footer) — the seam into 075
+  function litRef(n) {
+    const body = document.getElementById('refsBody');
+    if (!body.classList.contains('open')) toggleRefs();
+    document.querySelectorAll('.ref-row').forEach(r => r.classList.remove('lit'));
+    const row = document.getElementById('ref-'+n);
+    row.classList.add('lit');
+    row.scrollIntoView({behavior:'smooth', block:'center'});
+    setTimeout(()=>row.classList.remove('lit'), 1600);
+  }
+
+  function toggleRefs() {
+    const b = document.getElementById('refsBody');
+    b.classList.toggle('open');
+    document.getElementById('refsCaret').textContent = b.classList.contains('open') ? '▾' : '▸';
+  }
+
+  function setW(w){ document.getElementById('stage').style.maxWidth = w; }
+
+  render();
+</script>
+</body>
+</html>

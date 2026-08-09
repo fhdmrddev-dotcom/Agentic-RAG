@@ -219,6 +219,104 @@ def test_get_workflow_is_pure_read_never_writes(
         )
 
 
+# ── Phase 188 CR-03: the anchor that SURVIVES termination ────────────────────
+#
+# ``finish_run`` NULLs ``threads.active_workflow_run_id`` in the same transaction as the
+# terminal status (Phase 092 SC#2 — no dangling lock survives a terminal run). That clear is
+# correct and is NOT undone. Its consequence is that any consumer resolving "the run this
+# thread ran" from the LIVE anchor alone gets ``None`` for exactly the finished runs a
+# re-open affordance exists to serve — which is how the panel's run receipt came to render
+# only while a run was live.
+#
+# This endpoint ALREADY resolved anchor-then-latest, since Phase 098-UAT, to source its
+# ``phases`` array. The fix surfaces that same resolved id instead of recomputing it: no new
+# query, no write, no migration.
+
+
+def test_last_workflow_run_id_survives_the_anchor_clear(
+    client, mock_asyncpg_pool, mock_execute_result
+):
+    """A thread whose anchor was cleared by ``finish_run`` still names its last run.
+
+    Falsifiable: delete the ``last_workflow_run_id=`` kwarg from the response and this goes
+    red at the id assertion while ``active_workflow_run_id`` stays legitimately ``None``.
+    """
+    thread_id = uuid.uuid4()
+    last_run_id = uuid.uuid4()
+    # The terminal shape: mode is back to "deep" precisely BECAUSE the anchor is gone.
+    mock_execute_result.data = {
+        "id": str(thread_id),
+        "active_workflow_run_id": None,
+    }
+    # With no anchor the workflow_runs join and the producer probe are both skipped, so the
+    # fetchrow order is: (1) the deep cap_paused probe; (2) the latest workflow_runs row.
+    mock_asyncpg_pool.set_fetchrow_results([None, {"id": last_run_id}])
+    # No durable phase rows -> the definition lookup never runs (kept out of the queue above).
+    mock_asyncpg_pool.set_fetch_results([[]])
+
+    # Phase 163 moved this endpoint's reconcile reads onto the RLS user-JWT connection
+    # (``get_user_pg_connection`` -> ``app.dependencies.get_pg_pool``), so BOTH seams are
+    # patched — the ``app.api.threads`` one alone records nothing and every read silently
+    # returns None. (The sibling ``patch_get_pg_pool`` helper in test_dual_mode_wiring.py is
+    # the established shape; several older tests in THIS file still patch one seam and are
+    # red at HEAD for exactly that reason. Not fixed here — out of this fix pass's scope.)
+    with patch("app.api.threads.get_pg_pool",
+               AsyncMock(return_value=mock_asyncpg_pool)),          patch("app.dependencies.get_pg_pool",
+               AsyncMock(return_value=mock_asyncpg_pool)):
+        resp = client.get(f"/threads/{thread_id}/workflow")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    # The anchor is legitimately gone — this is the state the receipt could not serve.
+    assert body["active_workflow_run_id"] is None
+    assert body["mode"] == "deep"
+    # …and the surviving id is on the wire.
+    assert body["last_workflow_run_id"] == str(last_run_id)
+    # STILL a pure read (the 092 invariant this whole endpoint is held to).
+    for sql, _ in mock_asyncpg_pool.calls:
+        upper = sql.upper()
+        assert "UPDATE" not in upper and "INSERT" not in upper and "DELETE" not in upper
+
+
+def test_last_workflow_run_id_is_the_live_anchor_while_a_run_is_under_way(
+    client, mock_asyncpg_pool, mock_execute_result
+):
+    """Mid-run the field IS the live anchor — the fallback is reached only when it is gone.
+
+    This is the guard against the fix drifting into "always the latest row", which would make
+    a thread that somehow holds an older anchor point at a run it is not running.
+    """
+    thread_id = uuid.uuid4()
+    run_id = uuid.uuid4()
+    mock_execute_result.data = {
+        "id": str(thread_id),
+        "active_workflow_run_id": str(run_id),
+    }
+    mock_asyncpg_pool.set_fetchrow_results([
+        {
+            "status": "active",
+            "continues_used": 0,
+            "definition_slug": "wf",
+            "definition_name": "WF",
+            "current_phase_slug": "a",
+            "current_phase_index": 0,
+            "total_phases": 2,
+        },
+        {"run_id": uuid.uuid4(), "status": "streaming"},  # F2 producer probe — non-terminal
+        None,                                             # deep cap_paused probe
+    ])
+    mock_asyncpg_pool.set_fetch_results([[]])
+
+    with patch("app.api.threads.get_pg_pool",
+               AsyncMock(return_value=mock_asyncpg_pool)),          patch("app.dependencies.get_pg_pool",
+               AsyncMock(return_value=mock_asyncpg_pool)):
+        resp = client.get(f"/threads/{thread_id}/workflow")
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["last_workflow_run_id"] == str(run_id) == body["active_workflow_run_id"]
+
+
 # ── Phase 098 / PROJ-01 (D-03): published-workflows project_folder_id filter ──
 # Offline filter unit tests — assert the JSONB-path predicate + the TEXT-bound
 # param only appear when a project_folder_id is supplied, and that user-scope is
@@ -243,8 +341,8 @@ async def test_list_published_workflows_project_filter(mock_asyncpg_pool):
     sql, args = mock_asyncpg_pool.calls[-1]
     # JSONB-path predicate present, user-scope preserved and evaluated first.
     assert "definition->>'project_folder_id'" in sql
-    assert "is_global = true OR created_by = $1" in sql
-    assert sql.index("is_global = true OR created_by = $1") < sql.index(
+    assert "is_system_global = true OR created_by = $1" in sql
+    assert sql.index("is_system_global = true OR created_by = $1") < sql.index(
         "definition->>'project_folder_id'"
     )
     # Exactly two bound params: user_id ($1), then the project folder as TEXT ($2).

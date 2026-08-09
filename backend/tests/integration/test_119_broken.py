@@ -377,7 +377,7 @@ async def masked_target(pg_pool):
 
     global_folder = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, true)",
+        "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, true)",
         global_folder, user_a, "A-shared-broken-119",
     )
     subject = await _seed_doc(pg_pool, user_a, title="mask-subject", folder_id=global_folder)

@@ -30,8 +30,8 @@ function TreeNodeRow({ node, depth }: { node: any; depth: number }) {
           <FileText className="w-3.5 h-3.5 text-primary/60 flex-shrink-0" />
         )}
         <span className="truncate">{node.name}</span>
-        {node.is_global && (
-          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">global</span>
+        {node.is_org_shared && (
+          <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">shared</span>
         )}
       </div>
       {Array.isArray(node.documents) && node.documents.map((doc: any, i: number) => (

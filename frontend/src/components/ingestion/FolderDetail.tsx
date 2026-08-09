@@ -29,10 +29,10 @@ export function FolderDetail({ folder, documents, subfolderCount }: FolderDetail
 
   return (
     <div className="flex items-center gap-4 px-4 py-2.5 rounded-lg border bg-muted/30 text-sm text-muted-foreground">
-      {folder.is_global && (
+      {folder.is_org_shared && (
         <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
           <Globe className="h-3 w-3" />
-          Global
+          Shared with org
         </span>
       )}
       <span className="inline-flex items-center gap-1">

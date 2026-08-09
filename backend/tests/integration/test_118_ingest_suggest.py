@@ -93,11 +93,11 @@ async def user_with_rule_and_folder(pg_pool):
         user_id, f"phase-118-ingest-{user_id}@test.local",
     )
     await pg_pool.execute(
-        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, false)",
+        "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, false)",
         folder_id, user_id, "Invoices",
     )
     await pg_pool.execute(
-        "INSERT INTO classification_rules (id, user_id, name, match_expr, suggest_folder_id, is_global, enabled) "
+        "INSERT INTO classification_rules (id, user_id, name, match_expr, suggest_folder_id, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, $5, false, true)",
         rule_id, user_id, "Invoices",
         {"op": "and", "conditions": [{"field": "document_type", "op": "eq", "value": "invoice"}]},
@@ -148,8 +148,8 @@ async def test_matching_rule_writes_classification_not_move(pg_pool, user_with_r
 
     rules = (
         sb.table("classification_rules").select("*")
-        .or_(f"user_id.eq.{ctx['user_id']},is_global.eq.true")
-        .eq("enabled", True).order("is_global").order("created_at").execute()
+        .or_(f"user_id.eq.{ctx['user_id']},is_system_global.eq.true")
+        .eq("enabled", True).order("is_system_global").order("created_at").execute()
     ).data or []
     metadata = {"document_type": "invoice", "author": "Acme Corp"}
     whitelist = {"document_type", "language", "title", "author", "summary", "date", "topics"}

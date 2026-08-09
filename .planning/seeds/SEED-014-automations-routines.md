@@ -195,3 +195,69 @@ Beyond what Phases 1–3 already cover, HITL escalation introduces:
 - **v3.3** — the public API/MCP schemas (SEED-013 Theme A) that make the *external-orchestration* path (n8n owns the branch) possible.
 - **v3.4** — the *internal reactive automation* path (this seed): event bus + triggered runs + the pending-human-approval run state + human-review queue.
 - Existing in-seed pieces this builds on: `confidence.low` triggered-run event (Phase 2 event-bus producers) and `feedback.thumbs-down` (the learning-loop close-out).
+
+## Update 2026-07-31 — workflows are a missing trigger target, and the output-routing paragraph is RETRACTED
+
+Surfaced during Phase 185 operator UAT (2026-07-30/31), mid-v3.6 Workflow Studio. Two changes to this
+seed: one addition, one retraction. Neither is a new seed — both correct THIS seed's Phase 1.
+
+### A. `workflow_id` must be a first-class trigger target alongside `skill_id`
+
+**Verified: every schema this seed and its PRD propose is skill-keyed, with no workflow slot.**
+
+- This seed, §Scope Phase 1 item 1, verbatim: *"**`scheduled_runs` table** — `(id, user_id, skill_id,
+  schedule_cron, inputs_json, last_run_at, next_run_at, status, error)`."*
+- `.planning/PRDs/v3.5-automations.md:42`, verbatim: *"New `scheduled_runs` table with cron-shaped trigger
+  (`cron_expression text`, `timezone text`, `next_run_at timestamptz`, `last_run_at timestamptz`, `org_id
+  uuid`, `owner_user_id uuid`, **`skill_id uuid` FK**, `inputs_json jsonb`, `status text`, `error text`)."*
+- Same PRD line 50: `routine_definitions … action_skill_id uuid fk`; line 224: *"Routine action = Skill
+  execution … `routine_definitions.action_skill_id uuid fk skills(id)`"*. The action unit is exclusively
+  a skill, at every layer.
+- This seed's own framing reinforces it (`relates_to` SEED-002): *"Do not plan automations as a separate
+  primitive — plan them as a runtime mode for skills."* That was right in v2.5. It is now incomplete.
+
+**Nothing has been built yet** — `grep -r scheduled_runs supabase/migrations/` returns zero hits; the only
+occurrences repo-wide are this seed, the v3.5 PRD, and `MIGRATION-RESERVATIONS.md`. So this is a free
+change today and an expensive migration later.
+
+**Why workflows are now the better-shaped automation unit than skills.** Since this seed was planted,
+`workflow_definitions` shipped (`supabase/migrations/056_workflow_definitions.sql`, versioned by a
+`(slug, version)` unique constraint) and v3.6 is building the Studio on top of it. A published workflow
+already has: a versioned definition, a phase spine, a lint/validate seam, an 8-stage publish gauntlet with
+a judge hard-wall, and a run surface. A skill has an instruction body. For "every Monday, run the contract
+obligation review," the workflow is the thing an operator would actually schedule.
+
+**Shape when planned:** make the action a **discriminated target on ONE column pair** —
+`action_kind text CHECK (action_kind IN ('skill','workflow'))` plus `action_skill_id` /
+`action_workflow_definition_id` — not a second `scheduled_workflow_runs` table bolted on a milestone
+later. Version-pinning applies to both (`routine_definitions.action_skill_version_id` per the PRD's
+Q-v3.4-07 already has an exact workflow analog: pin `workflow_definitions.version` at routine publish).
+
+### B. RETRACTED — Phase 1 item 4 "Output routing" (result lands in a designated chat thread)
+
+**Status: SUPERSEDED-PENDING as of 2026-07-31. The text stays above for the audit trail. Do NOT build it
+as written.**
+
+The retracted text is §Scope Phase 1 item 4, verbatim: *"**Output routing** — automation result lands in a
+designated thread (e.g., 'Automations > Weekly Contract Review'). User sees results in chat history
+alongside their conversations."* The PRD's `output_thread_id` column
+(`.planning/PRDs/v3.5-automations.md:45`, and AUTOM-SCHED-01 which *verifies* on it) inherits the same
+retraction.
+
+**Why.** The operator explicitly rejected workflow output being dumped into chat on 2026-07-31. This is
+not a preference expressed in the abstract — it is a live defect the project is already paying to remove:
+memory `project_workflow_runs_leak_into_chat` records that launching a workflow today creates a thread and
+redirects into Chat, the fix is owned by **Phase 188**, and sketch 145 validates a dedicated run surface
+with **no message list and no composer**. Built as written, this paragraph would re-create the exact leak
+Phase 188 is deleting — on a brand-new code path, at automation scale, unattended. It deepens the problem
+being fixed.
+
+**What should replace it (decided by the automations phase, not settled here):** the routine's result is a
+**run** on the workflow/run surface — the durable `runs` row + run-backed streaming this seed already
+leans on (§Why the existing architecture is unusually well-suited) is the record. Delivery to a human is a
+separate, explicit channel: Realtime as a best-effort hint (D-v2.5-03), an outgoing webhook (SEED-013
+Phase 3), or a digest. Chat insertion, if it survives at all, is an **opt-in per-routine setting and never
+the default**.
+
+**Re-open condition for the retracted text:** only if Phase 188 ships the dedicated run surface AND the
+operator subsequently asks for a chat mirror of routine results. Absent both, the paragraph stays dead.

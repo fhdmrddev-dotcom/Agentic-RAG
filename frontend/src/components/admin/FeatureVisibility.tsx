@@ -33,20 +33,46 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
+  Users,
   Workflow,
   type LucideIcon,
 } from "lucide-react"
 
-import type { FeatureAudience, GovernedFeature } from "@/lib/api"
+import type { FeatureAudience, GovernedFeature, GreenlistRole } from "@/lib/api"
 import { cn } from "@/lib/utils"
+
+// Phase 167 (VIS-01 / D-167-06) — the third, extensible audience. The binary
+// everyone|operators grows a `role` greenlist here; the SEED-115 forward-compat contract
+// (an enum, never a boolean) is exactly what made this a drop-in, no design change.
+type AudienceValue = FeatureAudience | "role"
+
+// The 4-tier org roles a greenlist can name (lowest → highest privilege). The write is
+// server allowlist-validated against the SAME set (400 on a bad role — T-167-10b); this
+// control is render-only. Rich group management (IdP groups / departments) stays deferred.
+const GREENLIST_ROLES: readonly { key: GreenlistRole; label: string }[] = [
+  { key: "member", label: "Member" },
+  { key: "dept-admin", label: "Dept admin" },
+  { key: "org-admin", label: "Org admin" },
+  { key: "super-admin", label: "Super admin" },
+]
 
 interface FeatureVisibilityProps {
   /** The current audience per governed feature (the shell's source of truth). An
-   *  ENUM value, never a boolean — the SEED-115 forward-compat contract. */
-  visibility: Record<GovernedFeature, FeatureAudience>
-  /** Flip a feature's audience → `PUT /admin/visibility` with the enum value. Direct
-   *  with a receipt (066 — reversible, no victim). Resolves on success, rejects on failure. */
-  onSetVisibility: (feature: GovernedFeature, audience: FeatureAudience) => Promise<void>
+   *  ENUM value, never a boolean — the SEED-115 forward-compat contract. Phase 167
+   *  adds the `role` audience (a greenlist). */
+  visibility: Record<GovernedFeature, AudienceValue>
+  /** The greenlisted roles per feature (Phase 167 / VIS-01) — only consulted when a
+   *  feature's audience is `role`. Optional (defaults to none) so the pure-leaf a11y
+   *  callers can omit it. */
+  greenlist?: Record<GovernedFeature, string[]>
+  /** Flip a feature's audience → `PUT /admin/visibility` with the enum value (+ a `roles[]`
+   *  greenlist for the `role` audience). Direct with a receipt (066 — reversible, no victim).
+   *  Resolves on success, rejects on failure. */
+  onSetVisibility: (
+    feature: GovernedFeature,
+    audience: AudienceValue,
+    roles?: string[],
+  ) => Promise<void>
   /** When true, reveal the raw route prefixes behind the ⌥ Technical-names toggle. */
   showTechnical: boolean
 }
@@ -113,12 +139,28 @@ const FEATURES: readonly FeatureDef[] = [
     refusedApi: "Document-governance endpoints.",
     routePrefixes: "/document-governance",
   },
+  // Phase 181 (REVERT-01 / D-181-03) — the v3.6 visual-canvas master switch. UNLIKE the
+  // four above, this key renders an Off | On control (below), NOT the Everyone|Operators|
+  // By-role triad: On writes audience "everyone", Off writes "off" (hidden from EVERYONE
+  // incl. operators). Cold-default Off = today's product exactly (the tested revert gate).
+  {
+    key: "visual_workflow_canvas",
+    name: "Visual workflow canvas",
+    desc: "The drag-and-drop visual authoring + live-run canvas. Off = today's product exactly.",
+    livesOn: "Workflows",
+    glyph: Workflow,
+    uiSurface: "The visual canvas authoring door and its run view.",
+    refusedApi:
+      "Canvas view + validate/save/canvas routes (existing Describe & run / Author & govern stay open).",
+    routePrefixes: "/canvas routes (flag-gated 404)",
+  },
 ]
 
 /** The 069-A audience rows: enum control, amber-never-red, consequence line + the
  *  expandable enforcement details, and a ✎ receipt per flip. Lives below the roster. */
 export function FeatureVisibility({
   visibility,
+  greenlist,
   onSetVisibility,
   showTechnical,
 }: FeatureVisibilityProps) {
@@ -128,8 +170,9 @@ export function FeatureVisibility({
         <h3 className="font-headline text-base font-bold text-foreground">Feature visibility</h3>
       </div>
       <p className="mb-3 text-xs text-muted-foreground/80">
-        Choose who can see each advanced feature. Operators-only is API-enforced — end users are
-        refused server-side, not just hidden. Every change is recorded with your name.
+        Choose who can see each advanced feature. Operators-only and role greenlists are
+        API-enforced — end users are refused server-side, not just hidden. Every change is
+        recorded with your name.
       </p>
 
       <div className="space-y-2.5">
@@ -138,6 +181,7 @@ export function FeatureVisibility({
             key={def.key}
             def={def}
             audience={visibility[def.key] ?? "operators"}
+            roles={greenlist?.[def.key] ?? []}
             onSetVisibility={onSetVisibility}
             showTechnical={showTechnical}
           />
@@ -152,12 +196,18 @@ export function FeatureVisibility({
 function FeatureCard({
   def,
   audience,
+  roles,
   onSetVisibility,
   showTechnical,
 }: {
   def: FeatureDef
-  audience: FeatureAudience
-  onSetVisibility: (feature: GovernedFeature, audience: FeatureAudience) => Promise<void>
+  audience: AudienceValue
+  roles: string[]
+  onSetVisibility: (
+    feature: GovernedFeature,
+    audience: AudienceValue,
+    roles?: string[],
+  ) => Promise<void>
   showTechnical: boolean
 }) {
   const [busy, setBusy] = useState(false)
@@ -165,15 +215,26 @@ function FeatureCard({
   const [receipt, setReceipt] = useState<string | null>(null)
 
   const opOnly = audience === "operators"
+  const isRole = audience === "role"
   const Glyph = def.glyph
 
-  async function flipTo(next: FeatureAudience) {
-    if (busy || next === audience) return
+  // The ONE write path (save-on-select): persist the audience (+ roles[] for the role
+  // greenlist), stamp a ✎ receipt, and re-throw-as-failed on error. The shell owns the
+  // source-of-truth map — this leaf never optimistically flips.
+  async function write(next: AudienceValue, nextRoles: string[]) {
     setBusy(true)
     setFailed(false)
     try {
-      await onSetVisibility(def.key, next)
-      setReceipt(next === "operators" ? "Set to Operators only · recorded" : "Set to Everyone · recorded")
+      await onSetVisibility(def.key, next, nextRoles)
+      setReceipt(
+        next === "operators"
+          ? "Set to Operators only · recorded"
+          : next === "off"
+            ? "Turned Off · recorded"
+            : next === "role"
+              ? "Set to selected roles · recorded"
+              : "Set to Everyone · recorded",
+      )
       window.setTimeout(() => setReceipt(null), 4000)
     } catch {
       setFailed(true)
@@ -182,14 +243,34 @@ function FeatureCard({
     }
   }
 
+  async function flipTo(next: AudienceValue) {
+    if (busy || next === audience) return
+    // Switching TO role carries the currently-greenlisted roles (may be empty → the
+    // resolver denies until at least one is picked — surfaced by the hint below).
+    await write(next, next === "role" ? roles : [])
+  }
+
+  async function toggleRole(role: GreenlistRole) {
+    if (busy) return
+    const nextRoles = roles.includes(role)
+      ? roles.filter((r) => r !== role)
+      : [...roles, role]
+    await write("role", nextRoles)
+  }
+
   return (
     <div
       data-feature={def.key}
       data-audience={audience}
       className={cn(
         "rounded-[10px] border px-3.5 py-3 transition-colors",
-        // Amber-warmed when Operators-only — NEVER kill-switch red.
-        opOnly ? "border-amber-500/30 bg-amber-500/[0.05]" : "border-border bg-card",
+        // Amber-warmed when Operators-only — NEVER kill-switch red. Role greenlists read
+        // org-indigo (a targeted grant, not a lock-down); Everyone stays calm/neutral.
+        opOnly
+          ? "border-amber-500/30 bg-amber-500/[0.05]"
+          : isRole
+            ? "border-primary/30 bg-primary/[0.05]"
+            : "border-border bg-card",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
@@ -197,7 +278,11 @@ function FeatureCard({
           <div
             className={cn(
               "flex h-8 w-8 flex-none items-center justify-center rounded-lg",
-              opOnly ? "bg-amber-500/15 text-amber-400" : "bg-muted text-muted-foreground",
+              opOnly
+                ? "bg-amber-500/15 text-amber-400"
+                : isRole
+                  ? "bg-primary/15 text-primary"
+                  : "bg-muted text-muted-foreground",
             )}
           >
             <Glyph className="h-4 w-4" aria-hidden="true" />
@@ -219,15 +304,64 @@ function FeatureCard({
               <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />✎ {receipt}
             </span>
           )}
-          <AudienceSegments audience={audience} busy={busy} onFlip={flipTo} />
+          <AudienceSegments
+            audience={audience}
+            busy={busy}
+            onFlip={flipTo}
+            offOn={def.key === "visual_workflow_canvas"}
+          />
         </div>
       </div>
 
-      {/* Consequence line — the API-enforced beat, shown only when Operators-only. */}
+      {/* Role greenlist chip picker — shown only for the `role` audience (minimal; rich
+          group management deferred). Toggling a chip writes the updated roles[] through the
+          SAME server-validated seam. An empty greenlist denies everyone but operators. */}
+      {isRole && (
+        <div className="mt-2.5">
+          <div className="mb-1.5 text-[11px] font-medium text-muted-foreground">
+            Visible to these roles
+            {roles.length === 0 && (
+              <span className="ml-1 text-amber-400">— pick at least one</span>
+            )}
+          </div>
+          <div role="group" aria-label="Greenlisted roles" className="flex flex-wrap gap-1.5">
+            {GREENLIST_ROLES.map(({ key, label }) => {
+              const on = roles.includes(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  disabled={busy}
+                  onClick={() => void toggleRole(key)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+                    on
+                      ? "bg-primary/15 text-primary ghost-border"
+                      : "border border-border bg-muted/40 text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {on && <Check className="h-3 w-3" aria-hidden="true" />}
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Consequence line — the API-enforced beat, shown for Operators-only OR a role greenlist. */}
       {opOnly && (
         <div className="mt-2 text-[11px] font-medium leading-snug text-amber-400">
           End users no longer see {def.name} — and their API calls to it are refused server-side,
           not just hidden.
+        </div>
+      )}
+      {isRole && (
+        <div className="mt-2 text-[11px] font-medium leading-snug text-primary">
+          Only the selected role{roles.length === 1 ? "" : "s"} see {def.name} — everyone else is
+          refused server-side, not just hidden.
         </div>
       )}
 
@@ -256,7 +390,11 @@ function FeatureCard({
           <div className="flex gap-2">
             <dt className="w-28 flex-none font-medium text-muted-foreground">Who can see it</dt>
             <dd className="text-foreground/90">
-              {opOnly ? "Operators only." : "Everyone (all signed-in users)."}
+              {opOnly
+                ? "Operators only."
+                : isRole
+                  ? `Roles: ${roles.join(", ") || "none selected"}.`
+                  : "Everyone (all signed-in users)."}
             </dd>
           </div>
           {showTechnical && (
@@ -271,17 +409,52 @@ function FeatureCard({
   )
 }
 
-/** The two-position audience segmented control — Everyone | ⛨ Operators only. Reads +
- *  writes an ENUM (never a boolean); designed to grow into an audience picker (SEED-115). */
+/** The audience segmented control — Everyone | ⛨ Operators only | 👥 By role. Reads +
+ *  writes an ENUM (never a boolean); the SEED-115 forward-compat contract is what let the
+ *  `role` greenlist drop in as a third position (Phase 167 / VIS-01).
+ *
+ *  Phase 181 (REVERT-01 / D-181-03): when `offOn` is set (the visual_workflow_canvas
+ *  master switch) the control collapses to a TWO-position Off | On variant — On writes
+ *  audience `"everyone"`, Off writes `"off"` (hidden from everyone incl. operators). The
+ *  `SegButton` primitive + the `onFlip` plumbing are reused verbatim; only the button set
+ *  differs for this one key (NOT the Everyone|Operators|By-role triad). */
 function AudienceSegments({
   audience,
   busy,
   onFlip,
+  offOn = false,
 }: {
-  audience: FeatureAudience
+  audience: AudienceValue
   busy: boolean
-  onFlip: (next: FeatureAudience) => void
+  onFlip: (next: AudienceValue) => void
+  offOn?: boolean
 }) {
+  if (offOn) {
+    return (
+      <div
+        role="radiogroup"
+        aria-label="Audience"
+        className="inline-flex items-center gap-0.5 rounded-md border border-border bg-muted/40 p-0.5"
+      >
+        <SegButton
+          selected={audience === "off"}
+          busy={busy}
+          tone="operators"
+          onClick={() => onFlip("off")}
+        >
+          Off
+        </SegButton>
+        <SegButton
+          selected={audience === "everyone"}
+          busy={busy}
+          tone="everyone"
+          onClick={() => onFlip("everyone")}
+        >
+          On
+        </SegButton>
+      </div>
+    )
+  }
   return (
     <div
       role="radiogroup"
@@ -305,12 +478,22 @@ function AudienceSegments({
         <ShieldCheck className="h-3 w-3" aria-hidden="true" />
         Operators only
       </SegButton>
+      <SegButton
+        selected={audience === "role"}
+        busy={busy}
+        tone="role"
+        onClick={() => onFlip("role")}
+      >
+        <Users className="h-3 w-3" aria-hidden="true" />
+        By role
+      </SegButton>
     </div>
   )
 }
 
 /** One segment. Selected "everyone" reads success-tone; selected "operators" reads
- *  amber — NEVER kill-switch red. Unselected is calm/muted. */
+ *  amber — NEVER kill-switch red; selected "role" reads org-indigo. Unselected is
+ *  calm/muted. */
 function SegButton({
   children,
   selected,
@@ -321,7 +504,7 @@ function SegButton({
   children: ReactNode
   selected: boolean
   busy: boolean
-  tone: "everyone" | "operators"
+  tone: "everyone" | "operators" | "role"
   onClick: () => void
 }) {
   return (
@@ -336,6 +519,7 @@ function SegButton({
         !selected && "text-muted-foreground hover:text-foreground",
         selected && tone === "everyone" && "bg-success/15 text-success",
         selected && tone === "operators" && "bg-amber-500/15 text-amber-400",
+        selected && tone === "role" && "bg-primary/15 text-primary",
       )}
     >
       {children}

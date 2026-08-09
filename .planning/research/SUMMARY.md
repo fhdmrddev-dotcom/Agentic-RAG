@@ -1,153 +1,180 @@
 # Project Research Summary
 
-**Project:** Agentic RAG platform — v3.3 "Operator UX" milestone
-**Domain:** Subsequent-milestone integration on a mature, self-hosted B2B agentic-RAG platform (React/Vite + FastAPI + Supabase + Redis) — adding an operator/admin tier, dynamic model + secrets management, workflow run-inputs (file upload + KB scoping), and a plain-language/citation/a11y UX layer, benchmarked against Glean and Beam AI.
-**Researched:** 2026-07-10
+**Project:** Agentic RAG - v3.6 Visual / No-Code Workflow Studio
+**Domain:** Drag-and-drop visual authoring canvas + non-technical live run-observability layer, added ON TOP of an existing governed multi-tenant harness workflow engine (build-on-not-rewrite)
+**Researched:** 2026-07-24
 **Confidence:** HIGH
 
 ## Executive Summary
 
-v3.3 is an **integration milestone, not a greenfield build** — and the single biggest finding across all four research files is that the live codebase has already quietly solved more of this milestone than the planning brief assumed. The stale `PRDs/v3.2-operator-ux.md` (authored 2026-05-10, before the entire v2.7–v3.2 workflow/skill/DM surface shipped) is wrong on its two most load-bearing technical claims: **secrets are no longer on disk** (`settings_override.json` was eliminated in Phase 081.1; the real remaining gap is *encryption-at-rest* of plaintext provider-key columns in `app_settings`), and **the dynamic model registry already has a live table + hot-path read** (`model_capabilities_overrides`, migration 053) — only the write UI and a discovery service are missing. Both corrections, plus a third — the backend runs entirely on the Supabase **service-role key**, so `/admin` routes have **zero RLS backstop** and every isolation guarantee must be enforced in application code — recur across STACK, ARCHITECTURE, and PITFALLS and should be treated as the ground truth for requirements, superseding the brief.
+This is not a workflow-engine build - it is a UX and integration project over a governed engine that already exists and is trusted. The harness engine (WorkflowDefinition, reachability.lint_workflow, the 8-stage publish gauntlet with the llm_judge hard-wall, per-phase tool whitelists, per-version immutability) already does the hard governance work; v3.6's job is to express that governance visually through a drag-and-drop canvas and a plain-language run view, without forking or duplicating it. All four researchers converged independently on the same shape: add @xyflow/react (React Flow v12 - MIT, React-19-compatible, uses the app's existing zustand internally) as a pure client-side projection of WorkflowDefinition; constrain it to the engine's linear phase-spine grammar (ordered phases + one skip_to_phase branch) rather than a free DAG; reuse the existing draft-CRUD, publish, and NL-generation routes verbatim; and add exactly one new server route, POST /workflows/validate, that reuses lint_workflow plus the grounding-fidelity checks so the canvas can never drift from the gauntlet it must ultimately pass.
 
-The recommended approach is deliberately low-new-dependency and pattern-reuse-first: nearly every backend package the milestone needs (`cryptography`, `filetype`, `defusedxml`, `pyjwt`) is **already installed transitively**, and every net-new capability — the admin shell, the model registry write UI, run-time file inputs, and per-run KB scoping — plugs into an existing seam (`_TOOL_REGISTRY`, `admin.py`, `config.get_model_capability_async`, `harness/scope.py`, the whitelist-gated template-render engine) rather than requiring new infrastructure. The FEATURES research (a mandatory Glean/Beam competitor study) confirms this integration-first posture is also the competitively correct one: Glean, Beam AI, Perplexity Enterprise, Dust, and Onyx all converge on the same shapes — an admin console with users/roles/models/audit, declared typed run inputs, per-agent/per-run KB scope selection, and inline per-claim citation markers with absence-as-signal — and this app already owns the retrieval-scope resolver, the citation data channel, and (uniquely) a sandboxed code-execution + skill-eval capability none of the named competitors match.
+The headline competitive finding is a category difference, not a feature race: nobody in the field (Glean, Beam AI, n8n, Zapier, Flowise/LangFlow) enforces governance structurally at author-time - they validate node config or bolt guardrails on at run-time, and their open canvases become "confusing" / "too crowded" as logic grows (independently reported across sources). Our engine already makes governance the shape of the artifact itself; surfacing that live in the canvas ("you cannot draw an invalid/unsafe workflow") is the one thing no competitor can copy without rebuilding their engine. Everything else - AI-seeded drafts, business vocabulary, templates, per-node model choice - is largely reuse of work already shipped (SEED-051 NL authoring, SEED-085 terminology, v3.3 plain-language layer, v3.4 org RLS).
 
-The key risk is security-shaped, not feature-shaped: because there is no RLS backstop, an admin route with a missing `WHERE user_id = …` filter is a full-tenant data leak, not a partial one, and the operator-role schema choice is a genuine **one-way door** against the v3.4 multi-tenancy RLS rewrite (a system-level `operator_users` principal, orthogonal to org membership, is the only safe shape). Secondary risks cluster around the new WRITE-capable and file-ingestion surfaces (agent skill-attach, RAG→sandbox bridge, run-time template upload) reaching provenance-sensitive paths (the Jinja/`docxtpl` SSTI boundary) without re-deriving the owner-scope and provenance checks that already exist elsewhere in the codebase. Mitigation is consistent across PITFALLS: a single `require_operator` FastAPI dependency at the router level (default-deny, 404 not 403), reuse (never duplicate) existing owner/provenance resolvers, fail-closed kill-switches, and human-confirmed (never auto-enabled) model-capability discovery.
+The key risks all live at the seam between the new visual layer and the old governed engine, and the four researchers name the same five: (1) the revert gate lies if any migration isn't purely additive-nullable or any new route isn't flag-gated at every layer; (2) client-side validation drifts from the server gauntlet if anyone ports lint_workflow to TypeScript; (3) node layout data poisons the immutable WorkflowDefinition JSONB if positions aren't kept in a separate, engine-blind store; (4) the friendly run view lies if it only listens to happy-path events and silently shows "done" on a failed gate; and (5) connectors - the field's classic SSRF / credential-leakage / cross-tenant-bleed trap (n8n shipped exactly this CVE class) - must ride the existing per-phase tool whitelist and be sequenced last, ideally onto the not-yet-started Open Platform (SEED-013) MCP substrate rather than as a bespoke framework built twice.
 
 ## Key Findings
 
 ### Recommended Stack
 
-The stack conclusion is "declare what's already resolved, add almost nothing new." Backend: `cryptography` (Fernet/AESGCM) for app-layer envelope encryption of secrets — explicitly **not** `pgsodium`, which Supabase has placed in a deprecation cycle — plus `filetype` (pure-Python magic-byte sniffing, no libmagic) and `defusedxml` (XXE-safe OOXML parsing) for the new upload surfaces, and `pyjwt` for optional impersonation tokens; all four are already installed transitively. Live `/models` discovery lifts the existing `scripts/curate_models.py` (already covers all 8 providers) onto `httpx` as a backend service. Frontend needs exactly two new dev-only packages — `@axe-core/playwright` and `eslint-plugin-jsx-a11y` — for the WCAG AA gate; everything else (Radix primitives, `dompurify`, `react-markdown`, `vitest-axe`) is reused as-is. ClamAV/`clamd` malware scanning is explicitly gated as STRETCH/Enterprise-only, not CORE.
+The entire net-new runtime cost is one canvas library plus two small helpers - everything else composes what's already installed (React 19.2.4, Vite 8, Tailwind, shadcn/ui, zustand 5, react-query 5). No backend Python additions are required for the canvas or run-viz; both read/write the existing WorkflowDefinition JSON via the existing authoring API and the existing Redis run stream.
 
 **Core technologies:**
-- `cryptography` (Fernet/AESGCM, already 46.0.7) — app-layer encryption of `app_settings` provider-key columns — chosen over pgsodium (deprecating) and Supabase Vault (couples decrypt to a SQL view that fights the existing sync TTL-cache read path)
-- `filetype` + `defusedxml` (already installed) — magic-byte content sniffing + XXE-safe XML parsing for template/skill uploads — pure-Python, no libmagic system dependency (Windows-dev-hostile alternative avoided)
-- `operator_users` table + Postgres RLS + a FastAPI `require_operator` dependency — the operator role tier — explicitly **not** a JWT custom-claim/token-hook (reserved for v3.4 per-org RBAC) and **not** a policy-engine library (Casbin/oso), which would fight the existing RLS model
-- `app_settings.feature_flags` (existing 30s TTL-cached substrate) — kill-switch/maintenance-mode — explicitly **not** a feature-flag SaaS (Unleash/Flagsmith/LaunchDarkly), which is over-scoped for a handful of global booleans
-- `@axe-core/playwright` + `eslint-plugin-jsx-a11y` (new, dev-only) — the WCAG AA automated gate and shift-left lint, riding on Radix's built-in accessible primitives for the new admin dialogs
+- @xyflow/react (React Flow v12, ^12.11.2) - the node-based canvas (draggable phase-nodes, edges, pan/zoom, isValidConnection, controlled state). MIT-licensed, peer react: ">=17" (React 19 explicitly in-range - the app is on React 19.2.4, not React 18), and decisively it uses zustand internally, the exact store already shipped. Nodes/edges render as ordinary React components, so custom phase-nodes are plain Tailwind/shadcn JSX. Use @xyflow/react, never the frozen old reactflow (v11) package name.
+- zundo (^2.3.0) - the one gap React Flow leaves: undo/redo. A less than 1 KB temporal middleware built for zustand v5 - no reason to hand-roll an immer-patch history stack.
+- react-hook-form + zod + @hookform/resolvers (optional, shadcn-idiomatic) - for richer node-config side-panel forms. Hard constraint: Pydantic on the server stays authoritative; zod is a client-side mirror for instant field hints only, never a fork of the validation source of truth.
+- elkjs - defer. The authored graph is a deterministic vertical spine; a hand-rolled layout (as PhaseSpineGraph.tsx already does) is sufficient. Add elkjs only if run-viz ever needs to depict llm_batch_agents fan-out as a branching layout (prefer over dagre, which is unmaintained).
+
+**What NOT to use:** LangGraph/LangChain (violates the raw-SDK rule and would fork the runtime the harness engine already owns), Flowise/LangFlow/n8n as an embedded runtime (study their UX only - running any of them creates a second, competing engine), tldraw (non-MIT SDK license + mandatory watermark in production).
 
 ### Expected Features
 
-The FEATURES research's Glean/Beam competitor study (operator-mandated, headline section) found the industry has fully converged on a small set of patterns this milestone should adopt directly: attachable/scoped knowledge sources per agent or run, declared typed run-input fields (including a `file` type), a six-surface admin console (data/connectors, users+roles, model management, usage/analytics, governance/audit, active-runs monitoring with kill/re-run), role-gated "feature greenlists," and inline per-claim citation markers where the *absence* of a marker (not an explicit label) signals general-knowledge vs. grounded content. The app already has unique competitive edges worth defending and marketing: sandboxed agent-driven code execution, the Skill Eval Studio, 8-provider routing, and a self-host/own-your-data local↔cloud env-var switch — none of which Glean or Beam AI match.
+**Must have (table stakes):** editable node canvas (the read-only phase-spine made editable), side-panel node configuration (the PhaseConfig discriminated union already IS the form schema), business-friendly node vocabulary ("Find documents", "Ask the AI", "Get approval" - extends v3.3 LANG-01 + SEED-085), AI-seeded canvas (wire the existing NL generator, SEED-051, onto the canvas instead of a form), templates/starter flows (Starter Library already shipped), node-level validation badges (lint_workflow output surfaced per-node), live run observability, versioning/drafts/revert (already exist - immutable-on-publish + UNIQUE(slug, version)), HITL approval as a visible node (llm_human_input phase type already exists), and some external-action node (the connector question - see below).
 
-**Must have (table stakes):**
-- Operator role tier + `/admin` shell (health, active runs + kill, user list, audit browser) — the keystone; every other write-UI in the milestone sits behind it
-- Model-management write UI over the already-live `model_capabilities_overrides` table — highest ROI, lowest cost in the whole milestone
-- User-selectable KB scope on workflows (author default + run override), reusing the Phase 098 scope resolver — the operator's headline ask (SEED-112)
-- Typed run inputs + run-time file upload (SEED-110 + FILE-01, sharing one upload/threat-model pattern)
-- Inline per-claim citation markers (SEED-033) — universal across every competitor studied; the single largest UI/streaming lift in the milestone
+**Should have (the headline differentiator):** build-time FLOW validation live in the canvas - "you cannot draw an invalid or unsafe workflow." No named competitor validates the flow, only node config (n8n's red/green badges) or run-time behavior. This is our category-level win because governance is the shape of the artifact, not a bolted-on check. Also differentiating: structural governance rendered as literal canvas rails (locked order, tool whitelists, gates you can't wire around), per-claim cited deliverables (nobody else grounds business documents), cross-provider per-step model choice, RLS-enforced multi-tenant per-department authoring, and an AI-seed that structurally cannot emit an unsafe node (the response schema IS the extra="forbid" union).
 
-**Should have (competitive):**
-- Role-gated feature visibility / "greenlists" (SEED-099) — hide eval/model-mgmt/advanced surfaces from end users
-- Plain-language two-audience labels (SEED-085), extending the existing Phase-124 strict↔loose two-door pattern app-wide
-- RAG↔sandbox original-bytes bridge (SEED-108) — a genuine differentiator none of the studied competitors offer at this depth
-
-**Defer (v2+ / v3.4):**
-- Install wizard + Solo/Team/Enterprise deployment presets (SEED-003) — the single biggest lift in the brief; document as env-var bundles instead
-- IdP/SSO group-based permissions and the full multi-tenant org/billing model — explicitly a v3.4 one-way door
-- Per-user granular ACL matrix — premature before IdP groups exist
+**Defer / anti-features:** a fully-open drag-anything-to-anything DAG canvas (the field's own recurring failure mode - "becomes confusing," "too crowded" - and it would let a business user compose an ungoverned flow); building a bespoke 275/400-app connector catalog from scratch (a "forever job" per SEED-013 - adopt MCP instead); a raw code/custom-script node on the business canvas (keep code inside the sandboxed execute_code phase); a user-facing "autonomy level" slider that loosens governance (Beam ships one - wrong for a governed builder); a second parallel run-execution route/runtime for the visual layer (violates D-14); replacing the two existing authoring doors (hard-requirement #1); real-time collaborative multi-cursor editing (not table stakes, heavy CRDT infra, defer).
 
 ### Architecture Approach
 
-v3.3 is almost entirely an **integration** exercise onto existing seams, not new subsystems. Every track has a concrete, verified plug-in point: new agent tools register in the flat `_TOOL_REGISTRY` dict (`tool_dispatcher.py`) without touching the just-extracted, hot-file-ledger-flagged `threads.py`; model-capability resolution stays exclusively in the provider-agnostic `config.get_model_capability_async` (never forked per-provider); KB-scope binding reuses the Phase 098 `harness/scope.py` resolver and the `phase_types.py` intersection seam; template fill reuses the provenance-gated `select_engine()` boundary that already refuses to route untrusted uploads to the Jinja/`docxtpl` engine; and the admin shell extends the already-existing (if minimal) `admin.py` router and `/admin/backpressure` endpoint rather than building a new backend surface from scratch.
+The canvas is a pure projection of WorkflowDefinition, never a second source of truth: one client-side serializer (canvasModel.ts) provides toCanvas(def) and fromCanvas(nodes, edges), and every write still goes through the existing POST "" / PATCH /{id} / POST /{id}/publish / POST /generate routes, which already model_validate the body as WorkflowDefinition. The server never sees "nodes/edges." Node positions live outside the definition JSONB - either computed deterministically at render (MVP, zero migration) or in a new nullable workflow_layouts side table the engine never reads - because WorkflowDefinition is extra="forbid" and stuffing layout into it would corrupt the golden-run hash and the publish immutability trigger. Live in-canvas validation is a new, thin POST /workflows/validate route that reuses lint_workflow + _check_grounding_fidelity verbatim (never a client re-implementation - this is the anti-drift seam). Run-observability is a second view, not a second data path: CanvasRunView reads the same usePhases(threadId) hook PhaseTimeline already uses, keyed by phase.slug === node id, so the developer timeline and the business graph view are two presentations over one Redis-backed run stream. The whole layer is gated by one new governed feature key (visual_workflow_canvas, default "operators"), following the exact v3.3 skill_studio pattern, so flipping it off is provably byte-identical to today.
 
 **Major components:**
-1. `operator_users` table + `require_operator` FastAPI dependency + `/admin` route tree (`admin.py`) — the net-new Track 2 foundation everything else depends on
-2. `model_capabilities_overrides` write route/UI + a new `model_discovery_service.py` (lifted from `curate_models.py`) — Track 3's cheapest high-value closure over an already-live read path
-3. Run-input channel (`RunModal → onLaunch → doRun → sendMessage → create_workflow_run.inputs`) carrying both the uploaded-template reference and the selected folder scope — the shared Track 1 plumbing for SEED-110 and SEED-112
-4. `_TOOL_REGISTRY` additions — `fetch_document_file` (KB→sandbox, read), `attach_skill_file` (agent→skill, write) — each reusing an existing owner-scope resolver rather than inventing a new one
-5. Inline-citation rendering layer over `MessageItem`/SSE — attribution keyed to the run's actual retrieval-set (set-membership, not a post-hoc LLM re-ask), layered on top of the existing citation data channel
+1. WorkflowCanvas (React Flow host) + canvasModel.ts (the one serializer seam) + PhaseNode.tsx custom nodes - the authoring surface, sibling to (not replacing) WorkflowBuilderPage/PhaseSpineGraph.
+2. POST /workflows/validate + harness/canvas_validate.py - server-authoritative live lint, reusing reachability.lint_workflow and the grounding-fidelity checks.
+3. CanvasRunView - business-friendly run-viz painting node state from the existing usePhases(threadId)/phasesByThread slice; no new Redis events, no new demux.
+4. workflow_layouts (optional, nullable side table) - free-placement node positions, engine-blind, dead-until-flagged.
 
 ### Critical Pitfalls
 
-1. **The service-role client is the only isolation gate — `/admin` routes have no RLS backstop.** The entire backend reads/writes via the Supabase service-role key, so a missing `WHERE user_id =` filter on an admin route is a full-tenant leak, not a scoped one. Avoid with a single `require_operator` dependency applied at the router level (default-deny), a small reviewed set of cross-user query helpers, and a 403-regression test on every `/admin` route for a normal user's JWT.
-2. **Modeling the operator role in a shape that poisons the v3.4 multi-tenancy RLS rewrite.** An `is_admin` boolean or "special org" model is a one-way door that forces v3.4 to special-case the operator inside every new org-scoped policy. Avoid by making `operator_users` a separate, org-agnostic principal from day one.
-3. **A new run-time template-upload path that breaks the existing provenance→engine security boundary (SSTI).** The app's real defense is that uploads are provenance-stamped (`kind='template_input'`) and structurally barred from the Jinja/`docxtpl` engine — a new upload handler that infers engine from content/extension, or a "save to library" that silently carries provenance, defeats this. Never let library-promotion be implicit.
-4. **Planning secrets work against the stale brief instead of the live code.** The brief's "get keys off disk" is already done (Phase 081.1); the real gap is plaintext columns in `app_settings` with no encryption-at-rest, and any fix must preserve the env-fallback that keeps local dev working (never make a DB read mandatory for a secret env can supply).
-5. **Live model discovery auto-enabling capabilities that `/models` endpoints never actually return.** Only 2 of 8 providers return capability metadata (token limits); auto-enabling native-tool support on a guess reproduces the exact case-sensitivity "silent no-tools" bug already hit once in production. Discovery must propose; a human must confirm before enable.
+1. **The canvas becomes a second, drift-prone rule engine.** Porting lint_workflow/gauntlet rules to client TypeScript for instant feedback will drift from the server truth within one or two phases. Fix: expose lint_workflow behind a debounced POST /workflows/validate; the client only ever renders server-computed errors, never defines them; grounding lists (tools/folders/skills) come from a server-provided bundle, never a frontend constant.
+2. **Flag-off is not byte-identical to today (HARD GATE #1 failure).** A flag that only hides UI but leaves a non-nullable migration, an always-mounted route, or a silent edit to the existing doors/run surface makes "revert" unsafe exactly when it's needed. Fix: additive-nullable-only schema, require_visible/404-gate every new route at every layer, and a real test_revert_byte_identical CI + live-close gate - not a prose claim.
+3. **Lossy/corrupting canvas-to-definition round-trip.** Stuffing node x/y/layout into the WorkflowDefinition JSONB either 422s on extra="forbid" or, worse, forces relaxing the injection guard (T-090-01) and turns a cosmetic node drag into a new definition version that re-arms the golden-run gauntlet. Fix: layout lives in a separate nullable column/table the engine never reads; the definition round-trip is tested byte-identical across the 4 canonical seed shapes + the PM pack.
+4. **Dishonest run observability.** A "simplified" run view that only subscribes to happy-path events will show a green "done" on a gate_failed/run_failed - a business user ships a broken deliverable trusting the checkmark. Fix: model node state as a total function over the full event set (never infer success from absence), and reconcile-on-fetch on every reconnect (Realtime is a hint, not truth - the standing D-v2.5-03 rule).
+5. **SSRF / credential leakage / cross-tenant bleed from connectors (HARD REQ #3's sharpest edge).** The moment a business user wires an email/JIRA/webhook target, the classic no-code holes open - n8n shipped a real CVE where SSRF protection was only active "when a credential is attached." Fix: an unconditional egress allow-list + SSRF guard on every outbound fetch regardless of credential state, org-scoped Fernet-encrypted credentials resolved server-side by reference (never in the definition JSONB or the client), and a dedicated cross-org leak test before any connector ships.
 
 ## Implications for Roadmap
 
-Based on combined research, the four milestone tracks are largely independent in scope but have one hard sequencing dependency and one soft (operator-directed) research gate. Suggested phase structure:
+Research converges strongly on one dependency-ordered build sequence - the roadmap should follow it directly. Almost every table-stakes feature depends on something that already exists; the only genuinely net-new backend surface is external connectors, which is correctly last and thinnest, not the foundation.
 
-### Phase 1: Operator foundation — `operator_users` + `/admin` shell + RBAC boundary
-**Rationale:** Every other admin-gated write (model registry, kill-switch, audit browser) needs the `get_current_operator` dependency and `operator_audit_log` to exist first; STACK, ARCHITECTURE, and PITFALLS all independently converge on "this must land first." It is also the phase where the one-way-door schema decision (Pitfall 3) gets locked, so it must be scoped deliberately, not rushed.
-**Delivers:** `operator_users` table (system-level, org-agnostic), `require_operator` FastAPI dependency (default-deny, router-level), `operator_audit_log`, `/admin` frontend route tree separate from `SettingsPage`, RBAC gate swapped onto the existing `/admin/backpressure` endpoint, `org_id` nullable/no-FK stub columns extended to core tables.
-**Addresses:** Track 2 table-stakes (admin console persona split, operator role tier) from FEATURES.md Part 3/5.
-**Avoids:** Pitfalls 1 (service-role-only isolation), 2 (impersonation identity/audit — if impersonation ships here), 3 (operator-role v3.4 poisoning), 13 (UI-only role gating).
+### Phase 1: Revert Foundation
+**Rationale:** Operator HARD gate #1 (preserve-v1, tested revert-at-any-time) must be provably true before any feature work lands on top of it - every later phase inherits a proven off-switch.
+**Delivers:** New governed feature key visual_workflow_canvas in _GOVERNED_FEATURES (default "operators", the exact v3.3 skill_studio pattern), gated nav entry, an empty gated route, and a test_revert_byte_identical CI gate asserting both existing authoring doors + the run surface are unchanged with the flag off.
+**Addresses:** Hard-req #1 (preserve-v1/revert).
+**Avoids:** Pitfall 2 (flag-off not byte-identical).
 
-### Phase 2: Model & settings management — registry write UI + discovery + secrets-at-rest
-**Rationale:** ARCHITECTURE and STACK both flag this as the highest-ROI/lowest-cost closure in the milestone — the read path (`model_capabilities_overrides`, `get_model_capability_async`) is already live; only the write UI, an RLS write policy or service-role write route, and a discovery service are missing. Secrets encryption is a separable sub-phase that can split off if capacity is tight.
-**Delivers:** operator-gated write route/UI for `model_capabilities_overrides`, `model_discovery_service.py` (lifted from `curate_models.py`, `httpx`-based, per-provider degrade-gracefully), app-layer `cryptography` envelope encryption of `app_settings` secret columns with the env-fallback precedence preserved.
-**Uses:** `cryptography` (Fernet/AESGCM), `httpx`, the existing `config.get_model_capability_async` 4-tier resolver.
-**Implements:** the "discovery proposes, human confirms" pattern (never auto-enable native-tool capabilities); the round-trip-verified secrets save (never silently swallow a write error).
+### Phase 2: Server Validation Seam
+**Rationale:** Every later phase (editable canvas, AI-seed, vocabulary) needs a place to check its work without drifting from the gauntlet - build the anti-drift seam before anything calls it.
+**Delivers:** POST /workflows/validate + harness/canvas_validate.py, reusing WorkflowDefinition.model_validate, reachability.lint_workflow, and _check_grounding_fidelity verbatim.
+**Uses:** Backend-only reuse - no @xyflow/react required yet.
+**Implements:** The shared-validator architecture (one lint implementation, never re-authored client-side).
+**Avoids:** Pitfall 1 (governance fork).
 
-### Phase 3: Workflow file-input cluster — after Glean/Beam UX research gate
-**Rationale:** FEATURES and ARCHITECTURE both note the operator explicitly directed Glean/Beam research to precede locking the Run-modal scope/upload UX (SEED-112); ARCHITECTURE further recommends an internal build order within the cluster — `fetch_document_file` (pure new read tool, lowest coupling) before `attach_skill_file` (a WRITE tool whose threat model becomes the reference pattern) before the two Run-modal surfaces (SEED-110 template upload + SEED-112 folder scope, which share one run-input channel and should ship together).
-**Delivers:** `fetch_document_file` tool (KB→sandbox bridge, size-capped, owner-rescoped), `attach_skill_file` tool (agent→skill, owner-scoped only, no global/built-in write), a Run-modal upload control + editable folder-scope picker wired through `create_workflow_run.inputs`.
-**Addresses:** Track 1 table-stakes and differentiators from FEATURES.md Part 3 (declared typed inputs, run-time file upload, user-selectable KB scope, RAG↔sandbox bridge).
-**Avoids:** Pitfalls 4 (SSTI via broken provenance boundary), 5 (zip-bomb/MIME-spoofing), 6 (RAG→sandbox cross-user exfiltration), 7 (skill-attach as an ungated cross-tenant write surface).
+### Phase 3: Read-Only Canvas
+**Rationale:** Prove the projection (toCanvas) and the node vocabulary skeleton before adding write/persistence complexity.
+**Delivers:** WorkflowCanvas.tsx rendering an existing WorkflowDefinition via @xyflow/react, deterministic auto-layout (no elkjs yet), read-only (nodesDraggable=false).
+**Uses:** @xyflow/react, canvasModel.toCanvas.
+**Implements:** Canvas-as-pure-projection pattern (layout computed, not persisted).
 
-### Phase 4: User-friendliness — inline citations, plain language, WCAG AA
-**Rationale:** Inline citations touch the G-5 hot files (SSE stream, `MessageItem.tsx`) and are explicitly flagged G-2 sketch-first (live UI, "feels like"); WCAG AA audits best once the new admin + Run-modal surfaces from Phases 1–3 already exist. This is also the largest single-feature lift per FEATURES.md's prioritization matrix, so it benefits from landing last with the rest of the surface stable.
-**Delivers:** inline per-claim citation markers (attribution keyed to the run's actual retrieval-set, never a post-hoc re-ask), the plain-language two-audience label layer extending Phase-124's two-door, an axe-automated + manual-keyboard WCAG AA pass across all net-new surfaces.
-**Addresses:** Track 4 table-stakes from FEATURES.md Part 3 (universal industry convergence on inline markers + absence-as-signal).
-**Avoids:** Pitfall 14 (fabricated/post-hoc citation attribution), Pitfall 15 (relabeling that breaks enum/audit/API contracts or the Deep-Mode byte-identical invariant).
+### Phase 4: Editable Canvas (Round-Trip)
+**Rationale:** The core deliverable - the milestone doesn't exist without editable nodes/edges - but only after the projection and validation seams are proven so drift can't sneak in.
+**Delivers:** Add/move/connect/delete -> canvasModel.fromCanvas -> live-validate (Phase 2) -> save via the EXISTING draft CRUD (create-once-then-PATCH). Optional workflow_layouts side table only if free placement is confirmed at sketch.
+**Addresses:** Editable node canvas, side-panel node config (table stakes).
+**Avoids:** Pitfall 3 (lossy round-trip / layout-in-JSONB).
+
+### Phase 5: Concurrency & Autosave
+**Rationale:** v3.4 already made workflows org-shareable; a drag canvas invites continuous autosave, so the clobber/version-explosion risk must be closed before real usage, not discovered live.
+**Delivers:** Draft edits PATCH one row in place (never mint a version); optimistic-concurrency token or soft lock for two-editor org-shared workflows; publish guarded against reading a dirty draft.
+**Avoids:** Pitfall 5 (autosave version explosion / co-edit clobber). UAT MUST include a parallel-thread/two-editor row (SC#10 parallel axis).
+
+### Phase 6: Business Vocabulary + AI-Seeded Canvas
+**Rationale:** G-2 fires (sketch-first mandatory - node vocabulary is a "feels like" surface). Sits on the validated model from Phases 2-4 so vocabulary work isn't built on shifting ground.
+**Delivers:** Business-verb to phase-type map (extends v3.3 LANG-01 + SEED-085) with a Technical-names reveal; wiring of the existing POST /generate NL draft (SEED-051) into toCanvas.
+**Addresses:** Business-friendly vocabulary, AI-seeded canvas (table stakes); the "AI-seed that can't emit an unsafe node" differentiator.
+**Avoids:** Pitfall 7 (jargon leak or over-simplified vocabulary) - validate expressiveness against the PM pack + Starter Library + all 4 canonical seed shapes as the acceptance bar, not a toy demo.
+
+### Phase 7: Non-Technical Run-Observability
+**Rationale:** G-2 fires again (live "feels like" surface). Needs the node-to-phase-slug identity established in Phase 3/4 (toCanvas node id equals phase.slug).
+**Delivers:** CanvasRunView reading the same usePhases(threadId) slice PhaseTimeline uses - no new Redis events, no new demux - painting pending/active/passed/failed/skipped/waiting-for-you as a total function over the full event set.
+**Addresses:** Live run observability, "the field's blind spot" differentiator (a genuinely non-technical run view; n8n/Flowise are developer-grade, Beam is shallow).
+**Avoids:** Pitfall 4 (dishonest "done" on a failed gate) - reconcile-on-fetch on reconnect (D-v2.5-03), never trust Realtime alone.
+
+### Phase 8: External Connectors - LAST, thin, sequenced
+**Rationale:** Highest new security surface (the app's first outbound-to-arbitrary-destination capability), and it carries the own-framework-vs-Open-Platform decision the operator explicitly wants research to settle. Sequenced last so it never gates the UX-first core.
+**Delivers:** Research verdict is MCP-first, first-party-thin, Open-Platform-sequenced - do NOT build a bespoke connector catalog inside v3.6. Model a connector as an MCP-backed action node governed by the existing per-phase tool whitelist (zero new governance concept); ship 2-3 first-party high-value connectors (email out, JIRA/ticket create, Slack notify) as the demo-able story; credentials org-scoped via the existing Fernet enc:v1: pattern, resolved server-side by reference, never in the definition JSONB. Everything broader (full catalog, inbound webhooks, service accounts, public API) sequences with Open Platform (SEED-013), not forked into v3.6. Correction to carry into requirements: SEED-031 is NOT the connector seed - it's "Direct Provider SDK Integrations" (DeepSeek/Kimi/MiniMax/GLM, LLM providers, already folded into 076.1). The real connector track is SEED-013 (plus sibling SEED-014 Automations & Routines).
+**Addresses:** Hard-req #3 (external-integration story).
+**Avoids:** Pitfall 6 (SSRF / credential leakage / cross-tenant bleed - the n8n "guarded only when credential attached" CVE class). Each connector-touching phase gets a mandatory /gsd:secure-phase with threats_open: 0, plus a dedicated cross-org leak test (the SEED-124/125 precedent).
+
+### Phase 9 (conditional): Scale Hardening
+**Rationale:** Only if a real workflow or a real org fan-out exceeds the expected small scale (harness workflows are typically 5-50 phases).
+**Delivers:** React Flow onlyRenderVisibleElements + node memoization if node counts exceed roughly 100-150; elkjs auto-layout only if llm_batch_agents fan-out needs a branching visual; indexed org-scoped reads for the Workflows list at many-orgs times many-workflows scale.
 
 ### Phase Ordering Rationale
 
-- **Dependency-driven, not just thematic:** ARCHITECTURE's explicit "suggested build order" places the operator boundary (Phase 1) before the model-registry write path (Phase 2) before any admin-gated write, which PITFALLS independently corroborates via the `require_operator`-first framing repeated across nearly every pitfall.
-- **Cheapest-highest-value early:** the model registry (Phase 2) is sequenced early specifically because STACK and ARCHITECTURE both establish that its hard part (the read path, the discovery logic) is already done — it is the fastest visible win and de-risks the milestone's velocity.
-- **Research-gated grouping:** Phase 3 is deliberately positioned after (or interleaved with) the operator-mandated Glean/Beam UX study for the Run-modal scope/upload controls, per the SEED-112 directive noted in both FEATURES and ARCHITECTURE.
-- **Hot-file and sketch-first discipline last:** Phase 4 is sequenced last because it is the only track touching G-5 hot files under active ledger tracking (`MessageItem.tsx`, `StreamsProvider.tsx`) and requires a G-2 sketch gate — safer once the rest of the milestone's surfaces are stable and there's less concurrent churn on those files.
+- **Governance-before-features:** Phases 1-2 (revert flag, validation seam) are pure infrastructure with zero user-visible surface, deliberately shipped before any canvas pixel exists - both HARD gates (#1 revert, structural governance) depend on nothing else being built first.
+- **Read-before-write:** Phase 3 (read-only) proves the projection model cheaply before Phase 4 commits to full round-trip persistence - catches serializer bugs before they're compounded by concurrency.
+- **Foundation-before-feels-like:** Vocabulary (6) and run-viz (7) are explicitly sequenced after the round-trip (4) and concurrency (5) foundations are solid, per Pitfalls research - G-2 sketch-first surfaces need a stable model underneath them, not a moving target.
+- **Connectors last by design, not neglect:** every researcher independently placed connectors at the end - Architecture frames it as an unstarted-dependency risk (SEED-013 is a 6-10 phase milestone), Pitfalls frames it as the highest new security surface, Features frames it as "don't build a forever-maintenance catalog," Stack frames the framework choice as MEDIUM confidence requiring an operator decision.
 
 ### Research Flags
 
-Phases likely needing deeper research during planning:
-- **Phase 3 (workflow file-input cluster):** the operator has explicitly mandated Glean/Beam UX research as a precondition (SEED-112); the Run-modal scope-selector and upload-control shapes are not yet locked and should get a `/gsd:plan-phase --research-phase` or dedicated UX sketch pass.
-- **Phase 4 (inline citations):** flagged by ARCHITECTURE as the largest single lift in the milestone, touching the SSE stream + G-5 hot files; needs a G-2 sketch-first pass before implementation, and the attribution-fabrication pitfall (14) needs its set-membership design nailed down before coding.
-- **Secrets sub-phase (within Phase 2):** the choice between app-layer `cryptography` (recommended) and Supabase Vault has real environment-portability tradeoffs (self-hosted `VAULT_ENC_KEY` provisioning) that should be re-confirmed against the operator's actual self-host deployment targets before locking.
+Needs deeper research/decision during planning:
+- **Phase 8 (Connectors):** the own-framework-vs-Open-Platform-sequencing decision is explicitly framed, not resolved, by research - this needs an operator decision at requirements/discuss-phase time before Phase 8 can be planned in detail. Also needs a /gsd:secure-phase pass (SSRF/credential/cross-tenant threat model) given it's the app's first user-supplied-destination egress surface.
+- **Phase 4 (Editable Canvas):** whether the workflow_layouts side table ships in v3.6 or is deferred (auto-layout-only MVP) is a sketch-time UX call, not fully closed by research.
+- **Phase 6 & 7:** both trigger G-2 (sketch-first mandatory - /gsd:sketch before /gsd:plan-phase) per the workflow guardrails; treat as "needs a sketch pass," not "needs external research."
 
-Phases with standard patterns (skip research-phase):
-- **Phase 1 (operator foundation):** the `operator_users` + RLS + FastAPI-dependency shape is well-precedented in the codebase's own Supabase Auth + RLS patterns and confirmed against Supabase's own docs; no deep API research needed, mainly careful schema-shape discipline (Pitfall 3).
-- **Phase 2 (model registry write UI):** the read path, discovery script, and table shape are all already live and verified with file:line citations; this is largely "write the UI over what exists."
+Phases with standard, well-documented patterns (reuse-heavy, low research risk):
+- **Phase 1 (Revert Foundation):** identical to the shipped v3.3 skill_studio/model_management feature-flag pattern - known-good, just repeat it.
+- **Phase 2 (Validation Seam):** pure server-side reuse of lint_workflow, already pure/tested.
+- **Phase 3 (Read-Only Canvas):** React Flow's controlled-mode + custom-node pattern is HIGH-confidence, officially documented, and directly maps onto PhaseSpineGraph.tsx's existing glyph/parsing logic.
+- **Phase 5 (Concurrency):** mirrors the existing publish_definition WR-03 draft-status-guard pattern already proven in this codebase.
+
+### Watch item for discuss-phase (not a research flag, an orchestrator note)
+
+This milestone will put 6+ phases through PhaseSpineGraph.tsx, WorkflowBuilderPage.tsx, PhaseTimeline.tsx/PhaseCard.tsx, and StreamsProvider.tsx in sequence - the same hot-file class that triggered G-5 refactor phases in the 075.x chat-surface cascade. Track a parallel hot-file ledger for these workflow-studio files from Phase 1 onward and apply G-5 (refactor-before-3rd-touch) proactively rather than reactively.
 
 ## Confidence Assessment
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | Existing-stack facts verified directly against live code + migrations (installed package versions, existing tables/routes); external facts (pgsodium deprecation, Supabase Vault, axe-core/eslint-jsx-a11y versions) verified against official Supabase/PyPI/npm sources, checked 2026-07. |
-| Features | MEDIUM-HIGH | Internal/existing-app facts are HIGH (verified against milestone context + code). Competitor claims sourced from Glean's own current docs (HIGH) and Beam AI's marketing pages + third-party reviews (MEDIUM — thinner public documentation, glossy claims flagged explicitly). Cross-checks (Perplexity, Copilot, Dust, Onyx) are lighter-touch but corroborate the primary Glean pattern. |
-| Architecture | HIGH | Every substrate claim verified against live code with file:line citations; the stale PRD's internals were explicitly treated as hypotheses and corrected against the codebase rather than trusted. |
-| Pitfalls | HIGH | Grounded in the live codebase's own security boundaries (service-role client, provenance-routing engine selector, settings/secrets read path) cross-checked against project SEEDs and prior incident memory (case-sensitive MODEL_CAPABILITIES miss, silent settings-save failure). Generic file-security facts (SSTI/zip-bomb/path-traversal) are MEDIUM but well-established and verified against this codebase's own existing defenses. |
+| Stack | HIGH | Canvas library choice verified against npm registry, xyflow repo package.json, and official docs (React-19 peer range, zustand-internal fact, MIT license). Connector-framework option space is explicitly MEDIUM/framed-not-decided by design. |
+| Features | MEDIUM-HIGH | Competitor patterns (Glean/Beam/n8n/Zapier/Flowise/LangFlow) cross-corroborated across 4+ independent sources each with marketing-page inflation discounted; internal engine-mapping (what we already have) is HIGH from direct codebase reads. |
+| Architecture | HIGH | Every integration point (routes, models, hooks, tables) was read directly from the live source tree and named verbatim, not inferred. Competitor/library architectural comparisons are MEDIUM. |
+| Pitfalls | HIGH | Governance-fork, round-trip, revert, and connector pitfalls are grounded in the actual WorkflowDefinition model, lint_workflow, publish_service, and existing org/RLS + Fernet secrets code. Competitor-specific patterns and React-Flow scale thresholds are MEDIUM (WebSearch-verified, not measured in this repo). |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Model-registry write mechanism (RLS write policy vs. service-role route):** ARCHITECTURE flags this as an open question — `model_capabilities_overrides` currently has read-only RLS (`model_overrides_read_all`); whether the write goes through a new RLS policy referencing `operator_users` or a service-role route behind the operator gate needs to be decided during Phase 2 planning.
-- **SEED-112 scope-control shape (definition-time field vs. run-input selector vs. both):** explicitly blocked on the operator-mandated Glean/Beam research; FEATURES supplies strong directional guidance (Perplexity's 3-way toggle as the UX model) but the final control shape is not locked and should be a discuss-phase/sketch output, not assumed from this research.
-- **Secrets backend choice (app-layer `cryptography` vs. Supabase Vault):** STACK recommends app-layer as default but explicitly frames Vault as a legitimate alternative depending on self-host deployment posture; confirm against actual deployment targets before Phase 2 implementation.
-- **Install wizard / deployment-preset scope (SEED-003):** both FEATURES and ARCHITECTURE flag this as the milestone's biggest potential lift and a natural STRETCH/defer candidate; needs an explicit CORE/STRETCH/DEFER decision during requirements definition rather than being silently assumed out of scope.
-- **Impersonation ("view as user") scope:** PITFALLS treats this as in-scope for Track 2 (Pitfall 2, dual-identity audit requirement) but FEATURES/ARCHITECTURE don't explicitly confirm it's a v3.3 CORE requirement vs. a nice-to-have; confirm during requirements whether "Sign in as user" ships this milestone or is deferred.
+- **Connector scope decision (own MVP slice vs. pure Open-Platform sequencing):** genuinely open - SEED-013 is an unstarted 6-10 phase milestone with its own timeline; the roadmap needs an explicit operator call at requirements time on whether Phase 8 ships a live email/JIRA demo in v3.6 or is fully deferred.
+- **workflow_layouts side table vs. pure auto-layout MVP:** left as a sketch-time decision by both Stack and Architecture research; resolve during Phase 3/4 discuss-phase, not before.
+- **MCP spec version pinning:** Features/Architecture both flag MCP as the recommended connector substrate but note the spec is still evolving - Phase 8 needs to pin a version and plan a deprecation cycle (SEED-013's own risk note).
+- **Concurrency mechanism (soft lock vs. optimistic token):** Pitfalls research explicitly calls "second editor gets a soft lock / read-only banner" an "acceptable first cut" - the precise UX (block vs. warn vs. merge) needs a sketch/discuss-phase decision, not a research answer.
+- **elkjs need for llm_batch_agents fan-out visualization:** deferred by all four researchers pending confirmation that run-viz actually needs to depict batch fan-out as a branching layout - revisit at Phase 7 sketch.
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- Live codebase (this session, file:line verified): `backend/app/dependencies.py:19`, `backend/app/models/user_settings.py`, `backend/app/config.py:498-701`, `backend/app/services/tool_dispatcher.py:248-276,707-960,1076-1123,3189`, `backend/app/services/template_render_service.py:381,416,657,936`, `backend/app/api/admin.py:21-72`, `backend/app/api/runs.py:1097`, `backend/app/api/skills.py:113-158`, `backend/app/api/documents.py:473-1074`, `backend/app/harness/scope.py`, `backend/app/harness/phase_types.py:300-359`, `backend/app/harness/emitters.py`, `supabase/migrations/053_settings_unification.sql`, `supabase/migrations/068_workspace_template_ephemeral.sql`, `supabase/migrations/071_dm_foundations.sql`, `frontend/src/components/workflows/WorkflowsPage.tsx:515-847`, `frontend/src/components/chat/ChatLayout.tsx:314`, `frontend/src/components/chat/MessageItem.tsx:442`, `backend/venv/Lib/site-packages` (installed package audit)
-- Official docs: [Supabase pgsodium (deprecation)](https://supabase.com/docs/guides/database/extensions/pgsodium), [Supabase Vault](https://supabase.com/docs/guides/database/vault), [Supabase Custom Claims & RBAC](https://supabase.com/docs/guides/database/postgres/custom-claims-and-role-based-access-control-rbac), [Supabase Custom Access Token Hook](https://supabase.com/docs/guides/auth/auth-hooks/custom-access-token-hook), [cryptography Fernet docs](https://cryptography.io/en/latest/fernet/), [Playwright Accessibility Testing](https://playwright.dev/docs/accessibility-testing)
-- [Glean docs](https://docs.glean.com/) — how agents work, knowledge source types, admin console, roles/permissions, agent governance, citations, file upload, pricing (current 2026, official)
+- Live codebase reads (all four research files): backend/app/models/harness.py, backend/app/db/workflows.py, backend/app/api/workflows.py, backend/app/services/harness/publish_service.py, reachability.py, validators.py, phase_types.py, backend/app/services/workflow_authoring.py, backend/app/services/harness_engine.py, backend/app/dependencies.py, backend/app/models/user_settings.py, frontend/src/components/workflows/PhaseSpineGraph.tsx, frontend/src/pages/WorkflowBuilderPage.tsx, frontend/src/components/panel/PhaseTimeline.tsx, frontend/src/providers/StreamsProvider.tsx, frontend/src/hooks/useEffectiveFeatures.ts, frontend/package.json.
+- npm registry / xyflow repo packages/react/package.json (via gh api) - @xyflow/react 12.11.2, peer react ">=17", MIT.
+- reactflow.dev + Migrate to React Flow 12 guide + Performance docs.
+- zundo (npm/GitHub) - v2.3.0, zustand v4.2+/v5 temporal middleware.
+- tldraw license docs - non-MIT, production license-key + watermark.
+- Planning docs: .planning/PROJECT.md (v3.6 + D-14), .planning/seeds/SEED-123 (anchor), .planning/seeds/SEED-013 (Open Platform / connector substrate), .planning/seeds/SEED-031 (verified: LLM-provider seed, NOT connectors).
 
 ### Secondary (MEDIUM confidence)
-- [Beam AI](https://beam.ai/) marketing pages + [Capterra](https://www.capterra.com/p/10017154/Beam-AI/) / [skywork.ai](https://skywork.ai/skypage/en/Beam-AI-In-Depth:-Your-2025-Guide-to-Agentic-Process-Automation/1975589906492878848) reviews — thinner public docs than Glean, glossy claims noted
-- [Perplexity Enterprise](https://www.perplexity.ai/hub/blog/introducing-internal-knowledge-search-and-spaces), [Dust docs](https://docs.dust.tt/docs/managing-datasources), [Onyx/Danswer GitHub+docs](https://github.com/onyx-dot-app/onyx) — lighter-touch cross-checks corroborating the primary Glean pattern
-- File-validation best practices (magic bytes vs. Content-Type): multiple corroborating sources ([MIME/magic-bytes guide](https://zerotool.dev/blog/mime-type-lookup-guide/), [python-magic comparison](https://codecut.ai/python-magic-file-type-detection/))
-- ClamAV self-hosting tradeoffs: [ClamAV docs](https://docs.clamav.net/), [antivirus-API comparison](https://www.attachmentscanner.com/blog/best_antivirus_api_malware_scanning_comparison)
+- Glean product/docs (glean.com/product/agent-builder, docs.glean.com/agents, glean.com/product/agent-governance, glean.com/connectors) - canvas model, permission-inheritance governance, MCP+OpenAPI connector extension.
+- Beam AI (beam.ai/platform, beam.ai/ai-agents) - autonomy dial + HITL + command-center dashboard.
+- n8n docs + CVE writeups (docs.n8n.io, n8n issue #28218, Upwind "Six n8n CVEs") - node-level-only validation, RBAC/projects, the SSRF-only-when-credential-attached CVE class.
+- Zapier (zapier.com AI Guardrails, approval-process automation) - run-time content-safety governance.
+- Flowise/LangFlow comparisons (blckalpaca.at, huggingface.co blog, leanware.co) - open-canvas complexity trap corroboration.
+- MCP-as-2026-standard (workos.com, dev.to, generect.com) - 500-1,000+ servers, Anthropic/OpenAI/Google adoption.
+- Nango / Paragon / Composio connector-platform comparisons (nango.dev blog, composio.dev) - connector-framework option space.
+- React Flow performance guidance (Synergy Codes optimization guide, xyflow discussion #4975) - memoization/virtualization thresholds.
 
 ### Tertiary (LOW confidence)
-- [arXiv 2605.06635 "Cited but Not Verified"](https://arxiv.org/html/2605.06635v1) — citation-precision caution, single academic source, directionally used to justify precision-over-coverage in the inline-citation design (Pitfall 14)
-- `.planning/PRDs/v3.2-operator-ux.md` — explicitly treated as a stale hypothesis document throughout; its business decisions (D-PRD-01..15) retained but its technical internals (§5/§6) are superseded by the live-code findings above
+- None flagged - all four research files rated their non-codebase sources MEDIUM (WebSearch-verified, multi-source corroborated) rather than LOW.
 
 ---
-*Research completed: 2026-07-10*
+*Research completed: 2026-07-24*
 *Ready for roadmap: yes*

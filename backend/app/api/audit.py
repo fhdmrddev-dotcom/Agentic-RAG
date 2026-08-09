@@ -10,6 +10,15 @@ from supabase import Client
 
 from app.dependencies import get_current_user, get_supabase
 
+# ── Phase 163 (TEN-02 / D-03 / D-10) — audit_log client policy ────────────────
+# These two reads KEEP the hardened service-role client (classified carve-out, marked
+# ``# service-role:`` at each Depends). ``audit_log`` has RLS ENABLED but ONLY an
+# authenticated INSERT policy (mig 108 / full-schema.sql:4502) — there is NO authenticated
+# SELECT policy — so a per-request user-JWT read would be RLS-DENIED and return an EMPTY page,
+# silently breaking the audit browser + CSV export (the same reason plan 07 kept
+# knowledge_health.py service-role). Owner-scoping stays the app-code ``.eq("user_id")`` gate
+# in ``_apply_filters`` (D-14). The D-10 nullable-org branch lives only on the INSERT policy;
+# operator/cross-user audit browsing is the separate ``/admin`` surface (require_operator).
 router = APIRouter(prefix="/audit-logs", tags=["audit"])
 
 
@@ -82,7 +91,7 @@ async def export_audit_logs(
     since: str | None = Query(None),
     action_type: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: audit_log has NO authenticated SELECT policy — user-JWT read returns empty; owner-scoped .eq(user_id) (D-14)
 ):
     """Export all matching audit log entries as CSV (per D-05)."""
     user_id = current_user["id"]
@@ -119,7 +128,7 @@ async def list_audit_logs(
     since: str | None = Query(None),
     action_type: str | None = Query(None),
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_supabase),  # service-role: audit_log has NO authenticated SELECT policy — user-JWT read returns empty; owner-scoped .eq(user_id) (D-14)
 ):
     """Return paginated audit log entries for the current user (per D-01, D-06)."""
     user_id = current_user["id"]

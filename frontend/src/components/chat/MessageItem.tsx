@@ -1,5 +1,5 @@
 import { memo, useLayoutEffect, useRef, useState } from "react"
-import { Sparkles, Loader2, RotateCcw, Square, User, Play } from "lucide-react"
+import { Sparkles, Loader2, RotateCcw, Square, User, Play, Ban } from "lucide-react"
 import type { Message } from "@/types"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -472,6 +472,25 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
             {message.modelFallbackNotice.message}
           </div>
         )}
+        {/* Phase 174 Plan 03 (STATE-01b / D-04 / D-06 / sketch 129-C amber tier) — the
+            honest administrative-block bubble. When a workflow launch is refused by the
+            workflows kill-switch (an ApiError.status===403 raised BEFORE any run/message is
+            inserted), StreamsProvider's catch stamps `blockedNotice` onto this empty
+            assistant placeholder. Reuses the `model-fallback-notice` amber primitive verbatim
+            (border-amber-400/30 bg-amber-400/10 text-amber-400/90 — no bespoke CSS, D-06) +
+            adds a Ban glyph so the tier is never color-alone (A10 / WCAG 1.4.1). The server
+            string renders as React TEXT children ONLY — never dangerouslySetInnerHTML
+            (A23/T-174-03-01 XSS-safe). A SIBLING of the content block (shows with empty
+            content). Absent → nothing extra (the non-blocked path is byte-identical). */}
+        {message.role === "assistant" && message.blockedNotice && (
+          <div
+            data-testid="blocked-notice"
+            className="mt-2 flex items-center gap-1.5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-400/90"
+          >
+            <Ban className="w-3.5 h-3.5 flex-shrink-0" aria-label="Blocked" />
+            <span>{message.blockedNotice.message}</span>
+          </div>
+        )}
         {message.content ? (
           <div ref={setMessageBody} className="text-sm text-foreground">
             {isMessageStreaming && (message.tool_calls?.length ?? 0) > 0 && message.role === "assistant" ? (
@@ -617,7 +636,12 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
           // No tools yet — first LLM call is thinking
           <span className="flex items-center gap-2 text-muted-foreground text-sm animate-fadeSlideUp">
             <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null)}</span>
+            {/* Phase 174 / STATE-03: count already-stamped cross-provider reasoning
+                as activity so the pre-first-token window reads "Reasoning…" instead
+                of the dead "Setting up agent…". Scoped to the reasoning-before-any-
+                token window (no content yet). Anthropic/Google never emit reasoning,
+                so they keep the calm fallback (by design). No new backend state (D-08). */}
+            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null, !message.content && !!message.reasoningContent)}</span>
             <span className="flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />

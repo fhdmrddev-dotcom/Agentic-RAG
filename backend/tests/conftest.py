@@ -109,10 +109,30 @@ from app.dependencies import (  # noqa: E402
     authenticate_operator_request,
     get_current_user,
     get_supabase,
+    get_user_supabase_client,
 )
+
+
+def _user_supabase_override():
+    """Phase 163 (TEN-02) test seam — mirror the get_supabase override onto the
+    Wave-4 user-JWT client dep.
+
+    The chat/workspace handlers now inject the per-request user-JWT client via
+    ``Depends(get_user_supabase_client)`` instead of ``Depends(get_supabase)``. The
+    unit/integration suite mocks the DB by overriding ``get_supabase`` (centrally
+    to ``_supabase`` here, or locally per-test to a bespoke ``sb``). Resolve THAT
+    same current override at request time so every existing ``get_supabase`` test
+    seam keeps working without re-wiring each test — unit tests never exercise real
+    RLS, so the service-role mock is the correct stand-in. In production the real
+    ``get_user_supabase_client`` builds the per-request anon+Bearer client.
+    """
+    override = app.dependency_overrides.get(get_supabase)
+    return override() if override is not None else _supabase
+
 
 app.dependency_overrides[get_current_user] = lambda: mock_user_data
 app.dependency_overrides[get_supabase] = lambda: _supabase
+app.dependency_overrides[get_user_supabase_client] = _user_supabase_override
 # Phase 146 (ADMIN-01 / WR-02): the /admin gate resolves the caller via its own
 # auto_error=False dependency (folds absent/invalid JWTs into a 404). Override it
 # to inject a clean fake operator identity so gated-route tests reach the real
@@ -145,6 +165,9 @@ def reset_mocks():
     # Restore canonical dependency overrides (tests may swap get_supabase locally)
     app.dependency_overrides[get_current_user] = lambda: mock_user_data
     app.dependency_overrides[get_supabase] = lambda: _supabase
+    # Phase 163 (TEN-02): keep the Wave-4 user-JWT client dep mirrored onto whatever
+    # get_supabase currently resolves to (default _supabase, or a test's local sb).
+    app.dependency_overrides[get_user_supabase_client] = _user_supabase_override
     # Phase 146 (ADMIN-01 / WR-02): restore the /admin auth override so a test that
     # pops it (the pre-auth 404 regression) never contaminates the next test.
     app.dependency_overrides[authenticate_operator_request] = lambda: mock_user_data

@@ -28,8 +28,8 @@ beforeEach(() => {
   createView.mockReset()
   updateView.mockReset()
   resolveFilterCount.mockResolvedValue(42)
-  createView.mockResolvedValue({ id: "v1", name: "n", filter_expr: { op: "and", conditions: [] }, is_global: false })
-  updateView.mockResolvedValue({ id: "v1", name: "n", filter_expr: { op: "and", conditions: [] }, is_global: false })
+  createView.mockResolvedValue({ id: "v1", name: "n", filter_expr: { op: "and", conditions: [] }, is_system_global: false })
+  updateView.mockResolvedValue({ id: "v1", name: "n", filter_expr: { op: "and", conditions: [] }, is_system_global: false })
 })
 
 /** Compose one `title is invoice` condition through the popover. */
@@ -122,7 +122,7 @@ describe("FilterBar", () => {
         op: "and" as const,
         conditions: [{ field: "title", op: "eq" as const, value: "invoice" }],
       },
-      is_global: false,
+      is_system_global: false,
     }
     // Wrap so onChange feeds back into `value` — mirrors how IngestionPage drives
     // the controlled bar (setFilter), so a chip edit actually re-renders the chip.

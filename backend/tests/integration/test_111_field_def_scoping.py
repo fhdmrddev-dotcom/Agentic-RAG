@@ -1,7 +1,7 @@
 """Phase 111 Wave-0 (RED) — 2-user field-def scoping (D-111-6).
 
 The app-code read of metadata_field_definitions uses an explicit
-`.or_(user_id.eq.{B}, is_global.eq.true)` filter (the service path runs under
+`.or_(user_id.eq.{B}, is_system_global.eq.true)` filter (the service path runs under
 the service role, so RLS does NOT auto-scope — the app MUST scope). A 2-user
 cross-leak negative: with user A's private row + a global row seeded, B's
 scoped read returns ONLY B-own + global, NEVER A's private row.
@@ -125,29 +125,29 @@ async def test_scoped_read_excludes_other_users_private_field(pg_pool, two_users
     # A's private field.
     a_id = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_global) "
+        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_system_global) "
         "VALUES ($1, $2, $3, false)",
         a_id, user_a, "a_private_field",
     )
-    # A global field (user_id NULL, is_global true).
+    # A global field (user_id NULL, is_system_global true).
     g_id = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_global) "
+        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_system_global) "
         "VALUES ($1, NULL, $2, true)",
         g_id, "phase111_global_scope_probe",
     )
     # B's own field.
     b_id = uuid4()
     await pg_pool.execute(
-        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_global) "
+        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_system_global) "
         "VALUES ($1, $2, $3, false)",
         b_id, user_b, "b_own_field",
     )
 
-    # The EXACT app-code predicate: (user_id = B) OR (is_global = true).
+    # The EXACT app-code predicate: (user_id = B) OR (is_system_global = true).
     rows = await pg_pool.fetch(
         "SELECT id FROM public.metadata_field_definitions "
-        "WHERE (user_id = $1 OR is_global = true)",
+        "WHERE (user_id = $1 OR is_system_global = true)",
         user_b,
     )
     visible = {r["id"] for r in rows}

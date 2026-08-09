@@ -162,12 +162,12 @@ async def ingest_seed(pg_pool):
         user_id, f"phase-118-real-splice-{user_id}@test.local",
     )
     await pg_pool.execute(
-        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, false)",
+        "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, false)",
         folder_id, user_id, "Invoices",
     )
     await pg_pool.execute(
         "INSERT INTO classification_rules "
-        "(id, user_id, name, match_expr, suggest_folder_id, is_global, enabled) "
+        "(id, user_id, name, match_expr, suggest_folder_id, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, $5, false, true)",
         rule_id, user_id, "Invoices",
         {"op": "and", "conditions": [{"field": "document_type", "op": "eq", "value": "invoice"}]},
@@ -219,12 +219,12 @@ async def ingest_seed_bad_rule(pg_pool):
         user_id, f"phase-118-bad-rule-{user_id}@test.local",
     )
     await pg_pool.execute(
-        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, false)",
+        "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, false)",
         folder_id, user_id, "BadFolder",
     )
     await pg_pool.execute(
         "INSERT INTO classification_rules "
-        "(id, user_id, name, match_expr, suggest_folder_id, is_global, enabled) "
+        "(id, user_id, name, match_expr, suggest_folder_id, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, $5, false, true)",
         rule_id, user_id, "Bad Rule",
         # "xor" is not a valid op → ViewFilter.model_validate raises ValidationError

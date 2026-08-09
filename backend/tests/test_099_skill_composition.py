@@ -734,7 +734,7 @@ class _FakeSkillFilesQuery:
 
 _AUTHORED_COLS = {
     "slug", "version", "name", "description", "status",
-    "definition", "created_by", "is_global", "org_id",
+    "definition", "created_by", "is_system_global", "org_id",
 }
 
 

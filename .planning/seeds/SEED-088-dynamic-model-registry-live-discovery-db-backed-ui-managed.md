@@ -199,3 +199,91 @@ to touch **5 code sites + 1 DB row** in lock-step:
   pins only `gpt-5.4-mini` for OpenAI today).
 - **`curate_models.py` re-verify** once the operator's key has GA access (confirms the exact API ids are
   `gpt-5.6-sol/terra/luna` and not a dated/preview variant, and fills real context/output caps).
+
+---
+
+## Addendum (2026-07-31): two residuals from Phase 185 operator UAT — the picker list is incomplete, and "reflected everywhere" vs "registry-only gates" cannot both hold
+
+Surfaced during Phase 185 operator UAT (2026-07-30/31) on the v3.6 Workflow Studio. Both residuals are
+about the SAME model id — `gemini-3.6-flash`, set as `app_settings.llm_model`, **absent from
+`MODEL_CAPABILITIES`**. Nothing errored. Two different things went quietly wrong.
+
+### Residual A — the picker enumeration omits the two pickers that actually gate on the registry
+
+This seed says (§Target architecture, closing line): *"All pickers (chat, extraction, embedding) then
+read from this one source."* That enumeration is short by two, and the two it omits are precisely the
+ones that **reject or silently refuse** a non-registry model:
+
+1. **The JUDGE picker** — `frontend/src/components/settings/JudgeModelPicker.tsx:31,71-74` offers
+   "ONLY registry-known models" by construction, and the write path enforces it server-side:
+   `backend/app/api/settings.py:448-457` raises **400 `Unknown judge model: {id}`** whenever
+   `get_model_capability(id).get("capability_source") != "registry"` (D-12 / T-137.1-J1).
+2. **The EVAL-TARGET picker** — `frontend/src/components/skills/studio/EvalsTab.tsx:710` feeds `RunBar`
+   with `models={activeProvider?.models ?? []}`, i.e. **straight from `provider_model_lists`** — the
+   exact list this seed's tier-1 discovery is meant to populate — while the run-start endpoint
+   `backend/app/api/evals.py:205-209` raises **400 `Unknown model: {id}`** on the same
+   `capability_source != "registry"` test.
+
+**The collision is structural, not hypothetical:** the moment discovery writes a newly-released id into
+`provider_model_lists`, the eval picker *offers* it and the eval start *rejects* it. One surface, two
+sources of truth. Any phase that ships tier 1 without touching these two pickers ships that bug.
+
+*(Adjacent, from reading the code — inference, not live-verified: `eval_runner_service.py:809-813`'s
+`if not cap: … unknown_model` branch appears unreachable, because `get_model_capability`
+(`config.py:529-551`) always returns a dict — registry hit or inferred defaults, never None. The real
+gate is the API 400 above. Worth confirming during the phase rather than trusting the comment.)*
+
+**And registry membership is NOT the capability the judge picker thinks it is.** `gemini-3.5-flash` IS
+registry-known (`config.py:327`, `emit_tier: "force"`) and still failed as judge: with
+`harness_judge_model=gemini-3.5-flash` the publish judge returned failure `provider_error`,
+`overall_score` null, **no verdict at all** (run `da5541c0`, 2026-07-30). The operator changed
+`harness_judge_model` to `gpt-5.5` at 20:13:20; the golden run at 20:13:38 (`ced8005d`) passed with
+`overall_score 82` and `publish_succeeded`. The SAME Google model (`gemini-3.6-flash`) ran the workflow
+itself successfully in BOTH runs → this is **judge-on-Google specifically, not Google generally**.
+
+- **Mechanism candidate — HIGH confidence on the schema loss, MEDIUM on the manifestation, NEVER
+  live-verified (say so in any phase doc that cites this):** `JudgeVerdict.model_json_schema()` contains
+  `$defs` plus a `$ref` for the nested criteria array; `_GOOGLE_UNSUPPORTED_SCHEMA_KEYS` in
+  `backend/app/services/google_service.py` **strips both `$ref` and `$defs`**, which would leave
+  `criteria.items` as a content-free `{}` on the wire. HIGH confidence the wire schema loses criteria's
+  shape. MEDIUM confidence that is what surfaces as `provider_error`. Nobody has captured the outbound
+  request body to confirm it.
+- **Registry consequence:** this is the judge-side twin of Addendum-2026-06-17 item 3 ("List ≠
+  extraction-capable"). The registry needs a probe-derived **judge-capable** signal alongside the
+  emit-capable one, and the judge picker should surface it — a registry-only allowlist filters the wrong
+  axis. Note that a registry-only gate gave the operator *no protection whatsoever* here.
+
+### Residual B — the unresolved tension: discovery produces `inferred` BY CONSTRUCTION, and `inferred` means `coerce`
+
+**Measured, same UAT:** `app_settings.llm_model = gemini-3.6-flash` is not in `MODEL_CAPABILITIES`, so it
+resolved `capability_source=inferred` with `emit_tier=None`, and the workflow's emit phase **silently ran
+at tier `"coerce"` instead of `"force"`** (`harness_audit.emit_rendered.tier`, run `da5541c0`). No error,
+no banner, nothing in the UI. Every registered sibling carries `emit_tier: "force"`
+(`config.py:322/323/327/330`).
+
+The mechanism is exact and is a straight line through three files:
+
+- `get_model_capability` (`config.py:529-551`) returns either a registry row or `_build_inferred_defaults`.
+  There is no third outcome — a discovered model is `inferred` **by construction**.
+- `_build_inferred_defaults` (`config.py:497-526`) emits **no `emit_tier` key at all**.
+- The single consumer reads `cap.get("emit_tier", "coerce")` (`backend/app/services/forced_emit.py:376`),
+  which is exactly what `config.py:205` mandates and `config.py:208` calls "default-SAFE". Default-safe
+  for an *unknown* model is default-*degraded* for a *known-good, newly-released* one.
+
+**So the seed's two promises are mutually exclusive as written.** "Every new model reflected everywhere
+with zero code change" (§Operator vision) and "registry-only gates" (judge write, eval start, and the
+default-`coerce` emit ladder) cannot both hold. One must yield. Three ways, none free:
+
+1. **Discovery promotes to `capability_source="registry"`** after writing `model_capabilities_overrides`.
+   Then a DB row MUST carry `emit_tier`, and the per-model probe from Addendum-2026-06-17 item 2 becomes
+   **mandatory infrastructure, not a nice-to-have** — you cannot infer `force` vs `coerce`, you can only
+   measure it.
+2. **Gates accept `inferred`, but every inferred-cap consumer FAILS LOUD** instead of silently defaulting.
+   Running an emit phase at `coerce` when the operator picked a flagship becomes a visible banner on the
+   run, not a field in an audit blob nobody reads.
+3. **Gates stay registry-only and the promise is scoped down** — discovery is list-only for the chat path,
+   and judge / eval / emit paths stay curated. Honest, cheapest, and the smallest version of this seed.
+
+**This choice belongs in the dynamic-registry phase's recorded decisions, taken BEFORE any picker is
+rewired.** It is a product decision about what "zero code change" means, not an implementation detail to
+be settled by whoever writes the discovery service first.

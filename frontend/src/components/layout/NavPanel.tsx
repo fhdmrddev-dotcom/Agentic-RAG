@@ -1,6 +1,11 @@
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { LogOut, Plus, Sparkles, Moon, Sun, Shield, Menu, type LucideIcon } from "lucide-react"
+import { Plus, Sparkles, Shield, Menu, type LucideIcon } from "lucide-react"
+import { ProfileMenu } from "./ProfileMenu"
+// Phase 166 Plan 05 (ADMIN-01 / D-166-05): NavPanel is inside OrgProvider in the app,
+// so the indigo org-admin shield reads `canManage` via the non-throwing useOrgOptional()
+// — render-only (the backend gate is the wall) and null-safe where no provider is mounted.
+import { useOrgOptional } from "@/providers/OrgProvider"
 import type { ActiveView } from "@/App"
 // Phase 103 (REQ-7) — the single shared nav source (kills the triplication).
 // Phase 148 (VIS-01 / D-04): the rail renders the effective-features-FILTERED
@@ -105,6 +110,10 @@ export function NavPanel({
   onToggleExpanded,
 }: Props) {
   const isControlRoom = activeView === "control-room"
+  const isOrgAdmin = activeView === "org-admin"
+  // Phase 166 (ADMIN-01 / D-166-05): the render-only org-manage flag from OrgProvider.
+  // useOrgOptional is non-throwing → null (canManage=false) where no provider is mounted.
+  const canManage = useOrgOptional()?.canManage ?? false
 
   return (
     <div
@@ -168,15 +177,30 @@ export function NavPanel({
         ))}
       </div>
 
-      {/* Footer: theme toggle, probe-gated operator shield, sign out. */}
+      {/* Footer: the org + operator shields, then the merged ProfileMenu identity anchor.
+          Phase 166 (079-C): theme + Sign out moved INTO the ProfileMenu popover — there is
+          no standalone theme RailItem and no bare Sign out RailItem here anymore. */}
       <div className={cn("flex flex-col gap-1 mt-auto", expanded ? "items-stretch" : "items-center")}>
-        <RailItem
-          expanded={expanded}
-          icon={theme === "dark" ? Sun : Moon}
-          label={theme === "dark" ? "Light Mode" : "Dark Mode"}
-          onClick={onToggleTheme}
-          className="text-muted-foreground hover:text-sidebar-foreground hover:bg-accent/40"
-        />
+        {/* Phase 166 (ADMIN-01 / D-166-05): the indigo org-admin Shield-mirror — the
+            user-side mirror of the operator shield, sitting directly parallel to it
+            (079-C). Same lucide Shield glyph, re-tinted org-INDIGO (never the operator
+            zone's reserved warning tint). Rendered ONLY when canManage; honestly ABSENT
+            (never disabled) for a member. Kept OUTSIDE navItems (the D-07 contract holds for
+            the org shield too), active-highlights when in the org-admin shell. */}
+        {canManage && (
+          <RailItem
+            expanded={expanded}
+            icon={Shield}
+            label="Organization admin"
+            active={isOrgAdmin}
+            onClick={() => onNavigate("org-admin")}
+            className={
+              isOrgAdmin
+                ? "bg-indigo-500/15 text-indigo-400"
+                : "text-indigo-400/80 hover:text-indigo-400 hover:bg-indigo-500/10"
+            }
+          />
+        )}
 
         {/* Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield. Amber lucide
             Shield (distinct from Governance's ShieldCheck), active-highlights when in
@@ -197,12 +221,15 @@ export function NavPanel({
           />
         )}
 
-        <RailItem
-          expanded={expanded}
-          icon={LogOut}
-          label="Sign out"
-          onClick={onSignOut}
-          className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+        {/* Phase 166 (ADMIN-03 / ADMIN-05 / 079-C): the merged rail-footer identity anchor
+            (identity + role badge + org switcher at 2+ orgs + theme + Sign out). Replaces
+            the bare Sign out RailItem; still receives theme/onToggleTheme/onSignOut and
+            forwards them. `collapsed` mirrors the rail's icon-spine state. */}
+        <ProfileMenu
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+          onSignOut={onSignOut}
+          collapsed={!expanded}
         />
       </div>
     </div>

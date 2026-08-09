@@ -84,21 +84,26 @@ def test_suggestion_emit_still_precedes_terminal_sentinel() -> None:
     that triggers _shielded_finalize.
 
     Phase 089 Plan 03 (G-5 verbatim move): the suggestion emit + the entire
-    agent-loop body MOVED verbatim into ``app.services.agent_loop.run_agent_loop``
-    (the producer-shell ``_shielded_finalize`` STAYS in threads.py). The Rule 3
-    invariant is preserved structurally: ``run_agent_loop`` runs to completion
-    (emitting suggestions) BEFORE it returns to ``agent_runner``, whose ``finally``
-    then triggers ``_shielded_finalize`` (the terminal sentinel owner). So the
-    assertion is now split across the two modules: the suggestion emit lives in
-    ``run_agent_loop`` (agent_loop.py), and ``_shielded_finalize`` lives in
-    threads.py — the loop module ALWAYS completes before the finalizer.
+    agent-loop body MOVED verbatim into ``app.services.agent_loop.run_agent_loop``.
+    Phase 162.5 Plan 03 (G-5 extraction): the producer-shell finalizer moved
+    VERBATIM from threads.py::_shielded_finalize into the shared
+    ``run_producer._finalize_producer_run`` (unified for the Deep producer AND the
+    Deep-run continuation). The Rule 3 invariant is preserved structurally:
+    ``run_agent_loop`` runs to completion (emitting suggestions) BEFORE it returns
+    to ``run_producer``, whose ``finally`` then triggers ``_finalize_producer_run``
+    (the terminal sentinel owner). So the assertion is now split across the two
+    modules: the suggestion emit lives in ``run_agent_loop`` (agent_loop.py), and
+    the finalizer lives in ``run_producer.py`` — the loop module ALWAYS completes
+    before the finalizer.
     """
     loop_src = (
         Path(__file__).parent.parent.parent / "app" / "services" / "agent_loop.py"
     )
     loop_text = loop_src.read_text(encoding="utf-8")
-    threads_src = Path(__file__).parent.parent.parent / "app" / "api" / "threads.py"
-    threads_text = threads_src.read_text(encoding="utf-8")
+    producer_src = (
+        Path(__file__).parent.parent.parent / "app" / "services" / "run_producer.py"
+    )
+    producer_text = producer_src.read_text(encoding="utf-8")
 
     # Locate suggestion emit — now in run_agent_loop (agent_loop.py)
     sugg_match = re.search(
@@ -112,16 +117,20 @@ def test_suggestion_emit_still_precedes_terminal_sentinel() -> None:
     sugg_pos = sugg_match.start()
 
     # The suggestion emit must live inside run_agent_loop (the agent body that
-    # always runs to completion before returning to agent_runner's finally).
+    # always runs to completion before returning to run_producer's finally).
     run_loop_def = loop_text.find("async def run_agent_loop(")
     assert run_loop_def != -1
     assert sugg_pos > run_loop_def, (
         "Suggestion emit must live inside run_agent_loop (the agent body which "
-        "always completes before agent_runner's finally triggers _shielded_finalize)."
+        "always completes before run_producer's finally triggers _finalize_producer_run)."
     )
 
-    # _shielded_finalize (the terminal-sentinel owner) STAYS in threads.py.
-    assert "async def _shielded_finalize():" in threads_text, (
-        "_shielded_finalize must STAY in threads.py (producer-shell concern) — "
-        "it owns the terminal sentinel that fires AFTER run_agent_loop returns."
+    # Phase 162.5 Plan 03 (G-5 extraction): the producer-shell finalizer (the
+    # terminal-sentinel owner) now lives in run_producer.py as the shared
+    # _finalize_producer_run (was threads.py::_shielded_finalize). Only its
+    # physical home moved — the runtime invariant is unchanged.
+    assert "async def _finalize_producer_run(" in producer_text, (
+        "the producer-shell finalizer must live in run_producer.py "
+        "(_finalize_producer_run) — it owns the terminal sentinel that fires "
+        "AFTER run_agent_loop returns (Phase 162.5-03 G-5 extraction)."
     )

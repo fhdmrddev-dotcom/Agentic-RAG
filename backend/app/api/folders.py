@@ -1,9 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase
+from app.dependencies import get_current_user, get_user_supabase_client
 from app.models.folder import FolderCreate, FolderMoveRequest, FolderUpdate, FolderResponse
-from app.utils.folder_utils import fetch_visible_folders
+from app.utils.folder_utils import fetch_visible_folders, _null_foreign_global_owner
 
 router = APIRouter(prefix="/folders", tags=["folders"])
 
@@ -11,32 +11,34 @@ router = APIRouter(prefix="/folders", tags=["folders"])
 @router.get("", response_model=list[FolderResponse])
 async def list_folders(
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List all folders visible to the current user (owned + global subtree)."""
     folders = await fetch_visible_folders(supabase, current_user["id"])
     folders.sort(key=lambda f: f["name"])
-    return folders
+    # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders.
+    return _null_foreign_global_owner(folders, current_user["id"])
 
 
 @router.get("/{folder_id}/children", response_model=list[FolderResponse])
 async def list_children(
     folder_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List direct children of a folder that are visible to the current user."""
     visible = await fetch_visible_folders(supabase, current_user["id"])
     children = [f for f in visible if f["parent_id"] == folder_id]
     children.sort(key=lambda f: f["name"])
-    return children
+    # SEED-091 / D-164-05 (TEN-06): null the seeding owner on non-owned global folders.
+    return _null_foreign_global_owner(children, current_user["id"])
 
 
 @router.post("", response_model=FolderResponse, status_code=status.HTTP_201_CREATED)
 async def create_folder(
     body: FolderCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create a new folder. Validates parent_id ownership if provided."""
     if body.parent_id:
@@ -69,7 +71,7 @@ async def create_folder(
             "user_id": current_user["id"],
             "name": body.name.strip(),
             "parent_id": str(body.parent_id) if body.parent_id else None,
-            "is_global": body.is_global,
+            "is_org_shared": body.is_org_shared,
         })
         .execute()
     )
@@ -81,7 +83,7 @@ async def rename_folder(
     folder_id: str,
     body: FolderUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Rename a folder. Only the owner can rename."""
     # Fetch current folder to know its parent_id for duplicate name check
@@ -132,7 +134,7 @@ async def rename_folder(
 async def delete_folder(
     folder_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete a folder and all documents inside it (storage + DB + chunks)."""
     # 1. Collect this folder and all descendant folder IDs (BFS)
@@ -171,9 +173,9 @@ async def delete_folder(
 async def toggle_global(
     folder_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
-    """Toggle is_global on a folder. Only the folder owner can toggle."""
+    """Toggle is_org_shared on a folder. Only the folder owner can toggle."""
     # 1. Fetch current folder (owner-only)
     current = (
         supabase.table("folders")
@@ -189,11 +191,11 @@ async def toggle_global(
             detail="Folder not found or you are not the owner",
         )
 
-    new_value = not current.data["is_global"]
+    new_value = not current.data["is_org_shared"]
 
     result = (
         supabase.table("folders")
-        .update({"is_global": new_value})
+        .update({"is_org_shared": new_value})
         .eq("id", folder_id)
         .eq("user_id", current_user["id"])
         .execute()
@@ -208,7 +210,7 @@ async def move_folder(
     folder_id: str,
     body: FolderMoveRequest,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Move a folder to a different parent. parent_id=null moves to root."""
     # 1. Validate new parent accessibility (if not moving to root)

@@ -194,7 +194,7 @@ async def _seed_field_def(pool, user_id, *, field_key, field_type):
     operand validator (WR-01) see its type."""
     await pool.execute(
         "INSERT INTO public.metadata_field_definitions "
-        "(id, user_id, field_key, field_type, is_global, enabled) "
+        "(id, user_id, field_key, field_type, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, false, true)",
         uuid4(), user_id, field_key, field_type,
     )

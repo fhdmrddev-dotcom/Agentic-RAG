@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils"
  * a PEER to the Folders + Views groups. Clones the ViewsGroup shape (group header +
  * shared NavRow list + kebab actions) — each rule row builds from the SHARED NavRow
  * (NEVER a FolderNode clone), with a Zap icon (vs the amber folder / funnel view), the
- * tooltip-labeled `G` global pill (`isGlobal={rule.is_global}`), and Edit / Delete
+ * tooltip-labeled `G` shared pill (`isShared={rule.is_system_global}`), and Edit / Delete
  * kebab actions.
  *
  * The 037-A rule-row anatomy: `● name [G] · condition (mono) → 📁 action · [toggle] · ⋯`
@@ -144,11 +144,11 @@ export function AutomationGroup({
       ) : (
         rules.map((rule) => {
           const isDeleting = deletingId === rule.id
-          // AR-118-05: globals are admin/service-role-seeded and own-scoped on the
-          // server, so a non-owned global rule can't be toggled/edited/deleted from
+          // AR-118-05: built-ins are admin/service-role-seeded and own-scoped on the
+          // server, so a non-owned built-in rule can't be toggled/edited/deleted from
           // here (the mutation would 404). Gate the affordances rather than letting
-          // them fail silently. (A user's own rule is always is_global=false.)
-          const owned = !rule.is_global
+          // them fail silently. (A user's own rule is always is_system_global=false.)
+          const owned = !rule.is_system_global
           const folderName = rule.suggest_folder_id
             ? folderNames[rule.suggest_folder_id] ?? "a folder"
             : "no folder"
@@ -158,7 +158,8 @@ export function AutomationGroup({
                 icon={Zap}
                 iconClassName={rule.enabled ? "text-emerald-400" : "text-muted-foreground/40"}
                 name={rule.name}
-                isGlobal={rule.is_global}
+                isShared={rule.is_system_global}
+                sharedLabel="Built-in — shared with everyone"
                 actions={
                   <>
                     {/* Live enabled toggle (037-A) — PATCHes updateRule(id,{enabled}). */}
@@ -169,9 +170,9 @@ export function AutomationGroup({
                       aria-label={
                         owned
                           ? `${rule.enabled ? "Disable" : "Enable"} rule ${rule.name}`
-                          : `${rule.name} is a global rule — read only`
+                          : `${rule.name} is a built-in rule — read only`
                       }
-                      title={owned ? undefined : "Global rule — read only"}
+                      title={owned ? undefined : "Built-in rule — read only"}
                       disabled={togglingId === rule.id || !owned}
                       onClick={(e) => {
                         e.stopPropagation()
@@ -200,9 +201,9 @@ export function AutomationGroup({
                           size="sm"
                           className="h-6 w-6 p-0 disabled:cursor-not-allowed"
                           aria-label={
-                            owned ? `Actions for ${rule.name}` : `${rule.name} — global rule, read only`
+                            owned ? `Actions for ${rule.name}` : `${rule.name} — built-in rule, read only`
                           }
-                          title={owned ? undefined : "Global rule — read only"}
+                          title={owned ? undefined : "Built-in rule — read only"}
                           disabled={!owned}
                           onClick={(e) => e.stopPropagation()}
                         >

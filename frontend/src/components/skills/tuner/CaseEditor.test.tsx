@@ -27,7 +27,7 @@ const SKILL: Skill = {
   description: "Fires on SQL.",
   instructions: "Write SQL.",
   is_enabled: true,
-  is_global: false,
+  is_org_shared: false,
   is_system: false,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),

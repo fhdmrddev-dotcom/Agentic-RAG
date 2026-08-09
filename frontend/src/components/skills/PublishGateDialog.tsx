@@ -27,7 +27,7 @@ interface Props {
 
 /**
  * Phase 136 (GATE-01 / D-05) — the THIN publish-gate confirm dialog on the
- * "Share globally" (private→global) action. It renders the SERVER-computed gate
+ * "Share with org" (private→org-shared) action. It renders the SERVER-computed gate
  * status only (`getPublishGate`) — never any client-side gate math (D-07). It is
  * deliberately undesigned: AlertDialog primitives only, no new design-system
  * chrome (Phase 137 / PANEL-01 owns the designed experience). Force-publish just
@@ -95,10 +95,10 @@ export function PublishGateDialog({ skillId, open, onOpenChange, onConfirm, onRe
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Share this skill globally?</AlertDialogTitle>
+          <AlertDialogTitle>Share this skill with your org?</AlertDialogTitle>
           <AlertDialogDescription>
-            Sharing makes this skill available to everyone. An eval must pass on the
-            current version before it can be published.
+            Sharing makes this skill available to everyone in your org. An eval must
+            pass on the current version before it can be published.
           </AlertDialogDescription>
         </AlertDialogHeader>
 

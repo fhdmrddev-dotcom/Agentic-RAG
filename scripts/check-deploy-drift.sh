@@ -96,6 +96,10 @@ OMITTED_FROM_ONEBOX=(
   DATABASE_URL POSTGRES_DB POSTGRES_HOST POSTGRES_PASSWORD POSTGRES_PORT POSTGRES_USER
   # embeddings base URL — optional; falls back to the LLM provider endpoint
   EMBEDDING_BASE_URL
+  # invitation email (Phase 167) — optional; only when EMAIL_PROVIDER=resend. The default
+  # EMAIL_PROVIDER=none logs the invite link and needs neither. (EMAIL_PROVIDER itself IS in
+  # onebox.env.example, so it is not omitted here.)
+  RESEND_API_KEY INVITE_FROM_EMAIL
 )
 
 FAILURES=()

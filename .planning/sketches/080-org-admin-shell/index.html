@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 080 — Org-Admin Shell (7 tabs)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+  .variant-nav { position: static; flex-shrink: 0; }
+
+  /* control strip */
+  .ctl {
+    flex-shrink: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    padding: 7px 20px; background: hsl(220 30% 7% / 0.94);
+    border-bottom: 1px solid var(--color-border);
+    font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted);
+  }
+  .ctl .grp { display: inline-flex; align-items: center; gap: 6px; }
+  .ctl .k { color: var(--color-text-dim); text-transform: uppercase; letter-spacing: .08em; }
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button { background: transparent; color: var(--color-text-muted); border: 0; padding: 3px 9px;
+    font-family: inherit; font-size: 11px; cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .seg button + button { border-left: 1px solid var(--color-border); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .ctl .hint { color: var(--color-text-dim); margin-left: auto; font-style: italic; }
+
+  .vdesc { flex-shrink: 0; padding: 8px 20px; font-size: var(--text-xs); color: var(--color-text-muted);
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border-soft); }
+  .vdesc b { color: var(--color-text); }
+  .vdesc .q { color: var(--color-primary); font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; margin-right: 8px; }
+
+  /* ── shell ── */
+  .shell { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+    background: radial-gradient(120% 60% at 50% -20%, hsl(220 30% 8% / .5), var(--color-bg)); }
+
+  /* band (A org-indigo / B amber-mirror) */
+  .band { flex-shrink: 0; display: none; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 24px; }
+  .band.on { display: flex; }
+  .band-org { border-bottom: 1px solid var(--color-primary-glow); background: linear-gradient(to bottom, hsl(239 100% 82% / 0.06), transparent); }
+  .band-amber { border-bottom: 1px solid hsl(38 92% 60% / 0.25); background: linear-gradient(to bottom, hsl(38 92% 60% / 0.07), transparent); }
+  .band .brand { display: flex; align-items: center; gap: 10px; font-family: var(--font-headline); font-size: var(--text-lg); font-weight: 800; color: var(--color-text); }
+  .band .brand svg { width: 20px; height: 20px; }
+  .band-org .brand svg { color: var(--color-primary); }
+  .band-amber .brand svg { color: var(--color-warning); }
+  .band .brand .sub { font-family: var(--font-sans); font-weight: 500; font-size: var(--text-xs); color: var(--color-text-dim); padding-left: 2px; }
+  .zone-chip { font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .12em; padding: 2px 7px; border-radius: var(--radius-sm); }
+  .band-org .zone-chip { color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); }
+  .band-amber .zone-chip { color: var(--color-warning); background: var(--color-warning-dim); border: 1px solid hsl(38 92% 60% / 0.3); }
+  .spacer { flex: 1; }
+  .rec { display: inline-flex; align-items: center; gap: 7px; font-size: var(--text-xs); color: var(--color-text-muted); }
+  .rec .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); box-shadow: 0 0 6px hsl(142 71% 45% / .6); }
+  .backbtn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: var(--radius-md);
+    background: transparent; border: 0; color: var(--color-text-muted); font-size: var(--text-sm); cursor: pointer; font-family: inherit; }
+  .backbtn:hover { background: var(--color-accent); color: var(--color-text); }
+  .langbtn { padding: 4px 9px; border-radius: var(--radius-sm); background: var(--color-muted); border: 1px solid var(--color-border);
+    color: var(--color-text-muted); font-family: var(--font-mono); font-size: 10px; cursor: pointer; }
+  .langbtn:hover { color: var(--color-text); border-color: var(--color-primary-glow); }
+  .langbtn.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+
+  /* role badge */
+  .role { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: var(--radius-full);
+    font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .04em; }
+  .role.admin { background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); }
+  .role.member { background: var(--color-muted); color: var(--color-text-muted); border: 1px solid var(--color-border); }
+
+  /* lighter page header (variant C) */
+  .pagehead { flex-shrink: 0; display: none; align-items: center; gap: 14px; padding: 22px 24px 10px; }
+  .pagehead.on { display: flex; }
+  .pagehead .oi { width: 38px; height: 38px; border-radius: var(--radius-md); display: grid; place-items: center;
+    background: var(--color-primary-dim); color: var(--color-primary); }
+  .pagehead h1 { font-family: var(--font-headline); font-size: var(--text-2xl); margin: 0; color: var(--color-text); }
+  .pagehead .meta { font-size: var(--text-xs); color: var(--color-text-dim); display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+
+  /* tabs */
+  .tabs { flex-shrink: 0; display: flex; gap: 2px; padding: 0 20px; border-bottom: 1px solid var(--color-border);
+    overflow-x: auto; }
+  .tab { position: relative; display: inline-flex; align-items: center; gap: 7px; padding: 11px 14px 12px;
+    background: transparent; border: 0; color: var(--color-text-muted); font-size: var(--text-sm); font-family: inherit;
+    cursor: pointer; white-space: nowrap; border-bottom: 2px solid transparent; transition: all var(--dur-fast) var(--ease-out); }
+  .tab:hover { color: var(--color-text); }
+  .tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+  .tab.locked { color: var(--color-text-dim); }
+  .tab.locked:hover { color: var(--color-text-muted); }
+  .tab .lock { width: 12px; height: 12px; opacity: .8; }
+  .tab .tech { font-family: var(--font-mono); font-size: 9px; color: var(--color-text-dim); }
+
+  /* content */
+  .content { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 24px; }
+  .panel { display: none; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .panel.on { display: block; }
+  .panel-title { font-family: var(--font-headline); font-size: var(--text-lg); color: var(--color-text); margin: 0 0 3px; }
+  .panel-sub { font-size: var(--text-sm); color: var(--color-text-dim); margin-bottom: 16px; }
+  .panel-sub .tech { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); }
+
+  .banner { display: flex; gap: 10px; align-items: flex-start; padding: 10px 13px; border-radius: var(--radius-md);
+    background: var(--color-muted); border: 1px solid var(--color-border); font-size: var(--text-xs); color: var(--color-text-muted); margin-bottom: 16px; }
+  .banner.warn { background: var(--color-warning-dim); border-color: hsl(38 92% 60% / 0.3); color: hsl(38 92% 74%); }
+  .banner svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+
+  /* instrument table (068-A) */
+  .tbl { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .tbl th { text-align: left; font-family: var(--font-mono); font-size: 10px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--color-text-dim); padding: 8px 12px; border-bottom: 1px solid var(--color-border); }
+  .tbl td { padding: 11px 12px; border-bottom: 1px solid var(--color-border-soft); vertical-align: middle; }
+  .tbl tr:hover td { background: hsl(220 30% 8% / .5); }
+  .who { display: flex; align-items: center; gap: 10px; }
+  .who .av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex-shrink: 0;
+    font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--color-text);
+    background: linear-gradient(135deg, hsl(239 55% 38%), hsl(258 55% 40%)); }
+  .who .nm { font-weight: 600; color: var(--color-text); }
+  .who .em { font-size: var(--text-xs); color: var(--color-text-dim); }
+  .cell-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .you-tag { font-family: var(--font-mono); font-size: 9px; color: var(--color-primary); background: var(--color-primary-dim);
+    padding: 1px 5px; border-radius: var(--radius-sm); margin-left: 6px; }
+
+  /* audit list */
+  .chips { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+  .chip { padding: 4px 11px; border-radius: var(--radius-full); border: 1px solid var(--color-border);
+    background: var(--color-surface); color: var(--color-text-muted); font-size: var(--text-xs); cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out); }
+  .chip:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .chip.on { background: var(--color-primary-dim); color: var(--color-primary); border-color: var(--color-primary-glow); }
+  .arow { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--color-border-soft); }
+  .arow .ai { width: 30px; height: 30px; border-radius: var(--radius-md); display: grid; place-items: center; flex-shrink: 0;
+    background: var(--color-muted); color: var(--color-text-muted); }
+  .arow .atxt { flex: 1; min-width: 0; }
+  .arow .atxt .line { color: var(--color-text); font-size: var(--text-sm); }
+  .arow .atxt .line b { font-weight: 600; }
+  .arow .atxt .tgt { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); background: var(--color-primary-dim);
+    padding: 1px 6px; border-radius: var(--radius-sm); }
+  .arow .atime { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-dim); flex-shrink: 0; }
+
+  /* settings cards */
+  .card { border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface);
+    padding: 16px 18px; margin-bottom: 14px; }
+  .card h3 { font-family: var(--font-headline); font-size: var(--text-base); margin: 0 0 3px; color: var(--color-text); }
+  .card .desc { font-size: var(--text-xs); color: var(--color-text-dim); margin-bottom: 12px; }
+  .field { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--color-border-soft); }
+  .field .fl { width: 150px; font-size: var(--text-sm); color: var(--color-text-muted); }
+  .field .fv { flex: 1; color: var(--color-text); font-size: var(--text-sm); }
+  .field input { flex: 1; background: var(--color-bg-elev1); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    color: var(--color-text); padding: 7px 10px; font-family: inherit; font-size: var(--text-sm); }
+
+  /* locked tab (061-B honesty, no roadmap numbers) */
+  .locked-panel { display: grid; place-items: center; min-height: 340px; text-align: center; }
+  .locked-panel .lockwrap { max-width: 380px; }
+  .locked-panel .lockglyph { width: 46px; height: 46px; margin: 0 auto 16px; border-radius: var(--radius-lg);
+    display: grid; place-items: center; background: var(--color-muted); border: 1px solid var(--color-border); color: var(--color-text-dim); }
+  .locked-panel h3 { font-family: var(--font-headline); font-size: var(--text-lg); color: var(--color-text-muted); margin: 0 0 8px; }
+  .locked-panel .soon { color: var(--color-text-dim); font-size: var(--text-sm); line-height: 1.6; }
+  .locked-panel .badge { display: inline-block; margin-top: 16px; font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--color-text-dim); background: var(--color-muted); border: 1px solid var(--color-border);
+    padding: 4px 10px; border-radius: var(--radius-full); }
+
+  .tech-only { display: none; }
+  body.technical .tech-only { display: inline; }
+
+  .note { font-size: var(--text-xs); color: var(--color-text-dim); margin-top: 10px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 080 · Org-admin shell (7 tabs)</span>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: Org-indigo band <span class="star">★</span></button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: Amber-mirror band</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Lighter page header</button>
+</div>
+
+<div class="ctl">
+  <span class="grp"><span class="k">Cross-member audit</span>
+    <span class="seg" id="seg-audit">
+      <button class="on" onclick="setAuditView(true)">has org:audit_view</button>
+      <button onclick="setAuditView(false)">no — sees own</button>
+    </span>
+  </span>
+  <span class="grp"><span class="k">Labels</span>
+    <span class="seg" id="seg-lang">
+      <button class="on" onclick="setTech(false)">Plain</button>
+      <button onclick="setTech(true)">⌥ Technical</button>
+    </span>
+  </span>
+  <span class="hint">Click a tab — 3 are live (Members · Audit · Settings), 4 are locked “coming soon” placeholders</span>
+</div>
+
+<div class="vdesc" id="vdesc"></div>
+
+<div class="shell">
+  <!-- band A: org indigo -->
+  <header class="band band-org on" data-band="a">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/></svg>
+      Acme Corp <span class="sub">Organization</span>
+    </div>
+    <span class="zone-chip">ORG ADMIN</span>
+    <span class="role admin">◆ Org-admin</span>
+    <span class="cell-mono tech-only">org_id · 8f2a…acme</span>
+    <span class="spacer"></span>
+    <button class="langbtn" id="langA" onclick="setTech(!state.tech)">⌥ Technical names</button>
+    <span class="rec"><span class="dot"></span> every action recorded</span>
+    <button class="backbtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Back to app</button>
+  </header>
+
+  <!-- band B: amber mirror -->
+  <header class="band band-amber" data-band="b">
+    <div class="brand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/></svg>
+      Acme Corp <span class="sub">Organization</span>
+    </div>
+    <span class="zone-chip">ORG ADMIN</span>
+    <span class="role admin">◆ Org-admin</span>
+    <span class="spacer"></span>
+    <span class="rec"><span class="dot"></span> every action recorded</span>
+    <button class="backbtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Back to app</button>
+  </header>
+
+  <!-- header C: lighter -->
+  <header class="pagehead" data-band="c">
+    <div class="oi"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M9 17h.01M15 17h.01"/></svg></div>
+    <div>
+      <h1>Acme Corp</h1>
+      <div class="meta">Organization · <span class="role admin">◆ Org-admin</span></div>
+    </div>
+    <span class="spacer"></span>
+    <button class="backbtn"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg> Back to app</button>
+  </header>
+
+  <!-- tabs -->
+  <div class="tabs" id="tabs"></div>
+
+  <!-- content -->
+  <div class="content" id="content"></div>
+</div>
+
+<div class="sketch-toolbar">
+  <span>080</span>
+  <button onclick="setTech(!state.tech)">Labels</button>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const state = { variant: 'a', tab: 'members', auditView: true, tech: false };
+
+const TABS = [
+  { id: 'members',      label: 'Members',            tech: 'org_members', live: true },
+  { id: 'audit',        label: 'Audit',              tech: 'audit_log',   live: true },
+  { id: 'settings',     label: 'Settings',           tech: 'org config',  live: true },
+  { id: 'invitations',  label: 'Invitations & Roles',tech: 'invitations', live: false, soon: 'Invite teammates by email or a share link, assign who is an admin, and see who has accepted. Roles and departments live here too.' },
+  { id: 'sso',          label: 'SSO',                tech: 'saml',        live: false, soon: 'Let members sign in through your own identity provider (SAML 2.0), so access follows your company directory.' },
+  { id: 'subscription', label: 'Subscription',       tech: 'entitlements',live: false, soon: 'See your plan, the number of seats in use, and usage against your limits.' },
+  { id: 'retention',    label: 'Retention',          tech: 'retention',   live: false, soon: 'Choose how long documents, chats, and logs are kept before they are cleaned up.' },
+];
+
+const MEMBERS = [
+  { init: 'JR', name: 'Jordan Rivera', email: 'jordan@acme.io', role: 'admin',  joined: 'Jan 2026', last: '2 min ago',  you: true },
+  { init: 'MP', name: 'Morgan Patel',  email: 'morgan@acme.io', role: 'member', joined: 'Feb 2026', last: '3 h ago' },
+  { init: 'SK', name: 'Sam Kim',       email: 'sam@acme.io',    role: 'member', joined: 'Mar 2026', last: 'yesterday' },
+  { init: 'AO', name: 'Ada Okoro',     email: 'ada@acme.io',    role: 'member', joined: 'Apr 2026', last: '5 days ago' },
+];
+
+const AUDIT = [
+  { who: 'Jordan Rivera', verb: 'updated document metadata', tgt: 'Q3-forecast.xlsx', time: '2 min ago',  kind: 'document', mine: true },
+  { who: 'Morgan Patel',  verb: 'ran a workflow',            tgt: 'Contract Review',  time: '22 min ago', kind: 'workflow', mine: false },
+  { who: 'Sam Kim',       verb: 'uploaded a document',       tgt: 'vendor-msa.pdf',   time: '1 h ago',    kind: 'document', mine: false },
+  { who: 'Jordan Rivera', verb: 'created a skill',           tgt: 'Invoice Extractor',time: '3 h ago',    kind: 'skill',    mine: true },
+  { who: 'Ada Okoro',     verb: 'moved a document',          tgt: 'Legal / NDAs',     time: 'yesterday',  kind: 'document', mine: false },
+];
+let auditFilter = 'all';
+
+const VDESC = {
+  a: '<span class="q">Q-warmth</span><b>Org-indigo band.</b> The Control-Room band+tabs shape, but tinted in the org identity indigo (matching 079-C’s rail shield) — reserving amber strictly for the operator zone. Carries org name + ORG-ADMIN chip + role badge + the “every action recorded” marker + plain-first ⌥ Technical-names. The recommended reading of 079.',
+  b: '<span class="q">Q-warmth</span><b>Amber-mirror band.</b> Literally the operator band styling, differentiated only by glyph + label. Foil: does amber wrongly read as “operator / danger zone” for what is really the user’s own org home? Compare against A.',
+  c: '<span class="q">Q-warmth</span><b>Lighter page header.</b> No full band — just an org title + role + Back, then tabs. Reads more like a Settings page than a Control Room. Calmer, but loses the recording-marker honesty + the zone-crossing “felt” moment.',
+};
+
+/* ── tabs ── */
+function renderTabs() {
+  document.getElementById('tabs').innerHTML = TABS.map(t => {
+    const active = t.id === state.tab;
+    const lock = t.live ? '' : '<svg class="lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>';
+    return '<button class="tab ' + (active?'active':'') + ' ' + (t.live?'':'locked') + '" onclick="setTab(\'' + t.id + '\')">'
+      + t.label + ' ' + lock
+      + '<span class="tech">' + t.tech + '</span>'
+      + '</button>';
+  }).join('');
+}
+
+/* ── content ── */
+function renderContent() {
+  const t = TABS.find(x => x.id === state.tab);
+  const c = document.getElementById('content');
+  if (!t.live) { c.innerHTML = lockedPanel(t); return; }
+  if (t.id === 'members')  c.innerHTML = membersPanel();
+  if (t.id === 'audit')    c.innerHTML = auditPanel();
+  if (t.id === 'settings') c.innerHTML = settingsPanel();
+}
+
+function membersPanel() {
+  const rows = MEMBERS.map(m =>
+    '<tr><td><div class="who"><div class="av">' + m.init + '</div>'
+    + '<div><div class="nm">' + m.name + (m.you ? '<span class="you-tag">YOU</span>' : '') + '</div>'
+    + '<div class="em">' + m.email + '</div></div></div></td>'
+    + '<td>' + (m.role === 'admin' ? '<span class="role admin">◆ Org-admin</span>' : '<span class="role member">Member</span>') + '</td>'
+    + '<td class="cell-mono">' + m.joined + '</td>'
+    + '<td class="cell-mono">' + m.last + '</td></tr>'
+  ).join('');
+  return '<div class="panel on"><h2 class="panel-title">Members</h2>'
+    + '<div class="panel-sub">Everyone in Acme Corp <span class="tech-only tech">· org_members</span> — read-only for now.</div>'
+    + '<div class="banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+    + 'Inviting teammates and changing roles arrives with <b>Invitations &amp; Roles</b> — this list is read-only today.</div>'
+    + '<table class="tbl"><thead><tr><th>Member</th><th>Role</th><th>Joined</th><th>Last active</th></tr></thead>'
+    + '<tbody>' + rows + '</tbody></table></div>';
+}
+
+function auditPanel() {
+  const chips = [['all','All'],['document','Documents'],['workflow','Workflows'],['skill','Skills']]
+    .map(([k,l]) => '<button class="chip ' + (auditFilter===k?'on':'') + '" onclick="setAuditFilter(\'' + k + '\')">' + l + '</button>').join('');
+  let rows = AUDIT.filter(a => (state.auditView || a.mine) && (auditFilter==='all' || a.kind===auditFilter));
+  const glyph = { document:'▤', workflow:'⛓', skill:'✦' };
+  const list = rows.length ? rows.map(a =>
+    '<div class="arow"><div class="ai">' + (glyph[a.kind]||'•') + '</div>'
+    + '<div class="atxt"><div class="line"><b>' + a.who + '</b> ' + a.verb + ' <span class="tgt">' + a.tgt + '</span>'
+    + (a.mine ? '<span class="you-tag">you</span>' : '') + '</div></div>'
+    + '<div class="atime">' + a.time + '</div></div>'
+  ).join('') : '<div class="note" style="padding:24px 4px">No matching activity.</div>';
+
+  const banner = state.auditView
+    ? '<div class="banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>You hold <b>org:audit_view</b> — you can see activity across all members of Acme Corp.</div>'
+    : '<div class="banner warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Without <b>org:audit_view</b> you see only <b>your own</b> activity (row-level security enforces this) — cross-member rows are hidden.</div>';
+
+  return '<div class="panel on"><h2 class="panel-title">Audit</h2>'
+    + '<div class="panel-sub">Activity in Acme Corp <span class="tech-only tech">· audit_log</span>. CSV export &amp; deeper filters come later.</div>'
+    + banner + '<div class="chips">' + chips + '</div>' + list + '</div>';
+}
+
+function settingsPanel() {
+  return '<div class="panel on"><h2 class="panel-title">Organization settings</h2>'
+    + '<div class="panel-sub">The org-config home <span class="tech-only tech">· behind org:manage</span>.</div>'
+    + '<div class="card"><h3>Organization profile</h3><div class="desc">How Acme Corp appears to its members.</div>'
+    + '<div class="field"><span class="fl">Name</span><input value="Acme Corp" /></div>'
+    + '<div class="field"><span class="fl">Members</span><span class="fv">4 people · 1 admin</span></div>'
+    + '<div class="field"><span class="fl">Created</span><span class="fv">January 2026</span></div></div>'
+    + '<div class="banner"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>'
+    + 'This is a <b>light first cut</b>. The broader configuration knobs (models, extraction, retention defaults) move here in a later pass — today they stay where they already live.</div></div>';
+}
+
+function lockedPanel(t) {
+  return '<div class="panel on locked-panel"><div class="lockwrap">'
+    + '<div class="lockglyph"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>'
+    + '<h3>' + t.label + ' — coming soon</h3>'
+    + '<div class="soon">' + t.soon + '</div>'
+    + '<div class="badge">will light up right here</div>'
+    + '</div></div>';
+}
+
+/* ── setters ── */
+function setTab(id) { state.tab = id; renderTabs(); renderContent(); }
+function setAuditView(v) { state.auditView = v; segOn('seg-audit', v?0:1); if (state.tab==='audit') renderContent(); }
+function setAuditFilter(k) { auditFilter = k; renderContent(); }
+function setTech(v) {
+  state.tech = v; document.body.classList.toggle('technical', v);
+  segOn('seg-lang', v?1:0);
+  const la = document.getElementById('langA'); if (la) la.classList.toggle('on', v);
+}
+function segOn(id, idx) { const s=document.getElementById(id); [...s.children].forEach((b,i)=>b.classList.toggle('on', i===idx)); }
+
+function showVariant(v) {
+  state.variant = v;
+  document.querySelectorAll('.variant-tab').forEach(t => t.classList.toggle('active', t.dataset.v===v));
+  document.querySelectorAll('[data-band]').forEach(b => {
+    const on = b.dataset.band === v;
+    b.classList.toggle('on', on);
+  });
+  document.getElementById('vdesc').innerHTML = VDESC[v];
+}
+
+renderTabs();
+renderContent();
+showVariant('a');
+</script>
+</body>
+</html>

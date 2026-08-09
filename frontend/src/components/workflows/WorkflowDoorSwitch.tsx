@@ -31,6 +31,7 @@
  */
 import { useState } from "react"
 import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
+import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { type DefShape } from "@/components/workflows/soulData"
 
@@ -48,6 +49,13 @@ export interface WorkflowDoorSwitchProps {
   renderPublish?: (
     def: import("@/pages/WorkflowBuilderPage").BuilderDefinition,
     draftId: string | null,
+    /** Phase 184-11 (R12): the publish-blocking reason, or null. Passed straight
+     *  through — this shell neither derives it nor reads it. */
+    blockedReason?: string | null,
+    /** Phase 186-07 (D-186-12): the publish-in-flight reporter the Builder's write loop
+     *  holds on. Passed straight through, same as the reason above — the shell neither
+     *  calls it nor observes it. */
+    onPublishRunning?: (running: boolean) => void,
   ) => React.ReactNode
   /** The describe-CTA handler — the loose door forwards the describe text to the
    *  EXISTING draft/generate path (the shell adds no new sink; D-01/T-124-08). */
@@ -55,6 +63,34 @@ export interface WorkflowDoorSwitchProps {
   /** Which door to open initially (default "both"). Open/Tweak land in "govern"
    *  (the fork is the Studio authoring entry — D-01/D-05). */
   initialDoor?: DoorState
+  /** Phase 184-11 (D-184-16 debt 1) — the Builder's leave-guard registration seam,
+   *  passed straight through to the govern door's `WorkflowBuilderPage`. This shell
+   *  owns no dirty state and consults nothing; it is a wire, not a participant. While
+   *  the chooser or the describe door is showing, NO Builder is mounted and nothing is
+   *  registered, so the host's breadcrumb behaves exactly as it does today. */
+  registerCanLeave?: (canLeave: (() => boolean) | null) => void
+  /**
+   * Phase 184.1-01 (D-184.1-01) — render this shell's door control WITHOUT its own
+   * bordered band, so the Builder's merged header row can host it.
+   *
+   * ADDITIVE AND OPTIONAL, in the same shape as the governance-rails prop the Builder's
+   * step-inspector panel gained in 184-09 (named in prose rather than by its identifier:
+   * this file's own suite greps the source to zero for that component, and a guard that
+   * only passes by making a comment lie is a broken guard):
+   * ABSENT ⇒ today's markup, byte-identical, which is what keeps the 13 shipped
+   * assertions in `WorkflowDoorSwitch.test.tsx` passing unmodified and the flag-off app
+   * exactly as it ships. This shell does NOT read the canvas flag at all — the host page
+   * evaluates the one shared gate rule and passes the answer down as this prop, so there is
+   * no second copy of the gate here to drift from it. (Stated without naming that rule's
+   * identifier: the header suite greps this source to zero for it, and a guard that only
+   * passes by making a comment lie is a broken guard.)
+   */
+  inline?: boolean
+  /** The HOST's band content (the `← Workflows` breadcrumb group), passed through
+   *  untouched. This shell renders it and reads nothing out of it — `backToLibrary` and
+   *  every other handler in it stay owned by `WorkflowsPage` (D-184.1-02). Only
+   *  meaningful alongside `inline`. */
+  headerLead?: React.ReactNode
 }
 
 export function WorkflowDoorSwitch({
@@ -63,6 +99,9 @@ export function WorkflowDoorSwitch({
   renderPublish,
   onDescribeDraft,
   initialDoor = "both",
+  registerCanLeave,
+  inline,
+  headerLead,
 }: WorkflowDoorSwitchProps) {
   const [door, setDoor] = useState<DoorState>(initialDoor)
   const [describe, setDescribe] = useState("")
@@ -70,6 +109,18 @@ export function WorkflowDoorSwitch({
   // the govern-door Builder AND asks it to auto-run the draft. Sticky until the user
   // returns to the chooser (goBoth) so a Builder remount can't re-fire the generate.
   const [handoffDraft, setHandoffDraft] = useState(false)
+  /**
+   * Phase 187-26 (GAP A): the knowledge base the author chose BEFORE the AI drafts.
+   *
+   * `""` means "not chosen", which is the state D-187-11 is about — and it is now a state
+   * the author ELECTED rather than one the door imposed by having no control at all. It
+   * lives beside `describe` and is deliberately NOT cleared by `goBoth`: the hand-off is a
+   * one-shot and must not re-fire, but a considered pick is not undone by looking around.
+   *
+   * It reaches the generator through the govern door's Builder, NOT through
+   * `onDescribeDraft` — that is a parent OBSERVER hook, not a channel into the Builder.
+   */
+  const [kbFolderId, setKbFolderId] = useState("")
   const canDraft = describe.trim().length > 0
 
   // Return to the "both" chooser AND clear the one-shot draft hand-off (so re-entering
@@ -91,26 +142,43 @@ export function WorkflowDoorSwitch({
   //    folder-scope / model with live tier recompute + the LOCKED always-on judge
   //    (D-05). ──
   if (door === "govern") {
+    /**
+     * Phase 184.1-01 — the door group, declared ONCE and drawn either in this shell's own
+     * band (today) or in the Builder's merged row (`inline`). `goBoth` never changes hands:
+     * the button keeps closing over this component's state wherever the node is rendered,
+     * which is what makes the merge a re-flow rather than a refactor (D-184.1-02).
+     *
+     * `ml-auto` is dropped ONLY when inline: in this shell's own band it is what pushes the
+     * judge badge to the far edge, but inside the merged row's already-right-aligned trailing
+     * group it would open a gap between the label and the badge. Concatenated so the non-inline
+     * string is character-for-character the class list that shipped.
+     */
+    const doorGroup = (
+      <>
+        <button
+          type="button"
+          data-testid="both-doors"
+          onClick={goBoth}
+          className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
+        >
+          ‹ both doors
+        </button>
+        <span className="text-[13px] font-medium text-foreground">🔧 Author &amp; govern</span>
+        <span
+          data-testid="judge-locked"
+          title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)."
+          className={`${inline ? "" : "ml-auto "}inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet`}
+        >
+          <span aria-hidden="true">🔒</span> judge always-on
+        </span>
+      </>
+    )
+
     return (
       <div data-testid="door-govern" className="flex h-full flex-col bg-background">
-        <div className="flex items-center gap-3 border-b border-border px-4 py-2">
-          <button
-            type="button"
-            data-testid="both-doors"
-            onClick={goBoth}
-            className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
-          >
-            ‹ both doors
-          </button>
-          <span className="text-[13px] font-medium text-foreground">🔧 Author &amp; govern</span>
-          <span
-            data-testid="judge-locked"
-            title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)."
-            className="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"
-          >
-            <span aria-hidden="true">🔒</span> judge always-on
-          </span>
-        </div>
+        {!inline && (
+          <div className="flex items-center gap-3 border-b border-border px-4 py-2">{doorGroup}</div>
+        )}
         <div className="min-h-0 flex-1">
           {/* The govern door IS the existing Builder — its advanced governance
               controls are delegated, with live tier recompute + the locked judge.
@@ -122,6 +190,16 @@ export function WorkflowDoorSwitch({
             renderPublish={renderPublish}
             initialDescribe={describe}
             autoDraft={handoffDraft}
+            // Phase 187-26 (GAP A): the door's KB choice, carried into the EXISTING
+            // generate call so a fast-path workflow can be born BOUND. `""` (nobody
+            // picked) leaves the Builder's own initializer at exactly today's value.
+            initialProjectFolderId={kbFolderId}
+            registerCanLeave={registerCanLeave}
+            // SPREAD-CONDITIONAL, the D-14 idiom this file's sibling `rails` prop uses:
+            // without `inline` the two slots must be genuinely ABSENT from the element, not
+            // present-and-undefined, so the Builder's flag-off branch is reached by a page
+            // that was handed nothing at all.
+            {...(inline ? { headerLead, headerTrail: doorGroup } : {})}
           />
         </div>
       </div>
@@ -134,6 +212,13 @@ export function WorkflowDoorSwitch({
     return (
       <div data-testid="door-describe" className="flex h-full flex-col bg-background">
         <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+          {/* Phase 184.1-01: with `inline` the HOST has stopped drawing its own band, so
+              this one adopts the breadcrumb. Without it, `undefined && …` renders nothing
+              and this band is byte-identical to the one that shipped. The describe door is
+              not the cramped surface the phase is about, but the `← Workflows` control must
+              never simply disappear — an author with no way back is a worse defect than a
+              tall header. */}
+          {inline && headerLead}
           <button
             type="button"
             data-testid="both-doors"
@@ -164,6 +249,12 @@ export function WorkflowDoorSwitch({
               rows={5}
               className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             />
+            {/* Phase 187-26 (GAP A): somewhere to say what this work is ABOUT, before the
+                AI drafts. OPTIONAL by construction — it renders nothing when there are no
+                folders to offer, it touches no enablement rule, and ignoring it gives
+                today's behaviour exactly. Its own file, so this shell gains a mount and
+                not a surface (the D-187-14 shape). */}
+            <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"
@@ -223,6 +314,13 @@ export function WorkflowDoorSwitch({
   // ── BOTH DOORS (default chooser) — two big side-by-side door cards. ──
   return (
     <div data-testid="workflow-doors" className="flex h-full flex-col bg-background">
+      {/* Phase 184.1-01: same reason as the describe door — the chooser has no control of
+          its own that leaves the Builder, so with `inline` set it hosts the host's
+          breadcrumb. This reproduces today's two-row shape rather than improving on it,
+          which is correct: the chooser is not the surface the operator reported. */}
+      {inline && headerLead && (
+        <div className="flex items-center gap-3 border-b border-border px-4 py-2">{headerLead}</div>
+      )}
       <div className="flex flex-col gap-1 border-b border-border px-6 py-4">
         <h1 className="text-[18px] font-semibold text-foreground">How do you want to build this?</h1>
         <p className="text-[13px] text-muted-foreground">

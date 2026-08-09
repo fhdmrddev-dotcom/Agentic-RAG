@@ -25,7 +25,7 @@ def test_uid_accepts_uuid_object_and_string():
 def test_uid_rejects_or_grammar_breakout():
     # A value crafted to escape `user_id.eq.<...>` into an extra `.or_()` term.
     with pytest.raises(ValueError):
-        _uid("00000000-0000-0000-0000-000000000000,is_global.eq.true")
+        _uid("00000000-0000-0000-0000-000000000000,is_system_global.eq.true")
 
 
 def test_uid_rejects_non_uuid():

@@ -425,6 +425,45 @@ def test_existing_rows_valid():
 mock_user_data = {"id": "00000000-0000-0000-0000-000000000001", "email": "test@example.com"}
 
 
+def _rls_pool_stub():
+    """A get_user_pg_connection-compatible pool stub (Phase 163) for the direct-call
+    raw-route tests. The raw route now reads the file row + content under RLS via
+    ``get_user_pg_connection`` (pool.acquire() → conn.transaction() → conn.execute(SET
+    LOCAL …)). get_file_by_id / _get_file_content are separately faked and IGNORE the
+    conn, so the acquired conn only needs to satisfy the SET-LOCAL execute + txn CM.
+    """
+    from unittest.mock import AsyncMock, MagicMock
+
+    conn = MagicMock()
+    conn.execute = AsyncMock(return_value=None)  # SET LOCAL ROLE + both set_config calls
+
+    class _Txn:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+    conn.transaction = MagicMock(return_value=_Txn())
+
+    class _Acquire:
+        async def __aenter__(self):
+            return conn
+
+        async def __aexit__(self, *exc):
+            return False
+
+    pool = MagicMock()
+    pool.acquire = MagicMock(return_value=_Acquire())
+    return pool
+
+
+async def _fake_dep_get_pg_pool():
+    """Async stand-in for ``app.dependencies.get_pg_pool`` (what get_user_pg_connection
+    awaits) → the RLS-conn pool stub above."""
+    return _rls_pool_stub()
+
+
 def test_safe_download_filename_strips_header_injection():
     """The Content-Disposition filename comes from a tool-written path, so any
     CR/LF/quote must be neutralized — no header-splitting out of the attachment
@@ -480,12 +519,12 @@ async def test_raw_route_returns_exact_inline_bytes(monkeypatch):
         return row["content_inline"]
 
     monkeypatch.setattr(ws, "_verify_thread_ownership", _noop_ownership)
-    monkeypatch.setattr(ws, "get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr("app.dependencies.get_pg_pool", _fake_dep_get_pg_pool)
     monkeypatch.setattr(ws, "get_file_by_id", _fake_get_file_by_id)
     monkeypatch.setattr(ws, "_get_file_content", _fake_get_content)
 
     resp = await ws.download_workspace_file_raw(
-        thread_id=tid, file_id=fid, current_user=mock_user_data, supabase=object()
+        thread_id=tid, file_id=fid, request=object(), current_user=mock_user_data, supabase=object()
     )
     assert resp.status_code == 200
     assert resp.body == docx_bytes  # EXACT bytes, not str-decoded
@@ -513,12 +552,12 @@ async def test_raw_route_expired_template_404(monkeypatch):
         return {"id": fid, "thread_id": tid, "path": "/t.docx", "is_expired": True}
 
     monkeypatch.setattr(ws, "_verify_thread_ownership", _noop_ownership)
-    monkeypatch.setattr(ws, "get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr("app.dependencies.get_pg_pool", _fake_dep_get_pg_pool)
     monkeypatch.setattr(ws, "get_file_by_id", _fake_get_file_by_id)
 
     with pytest.raises(HTTPException) as ei:
         await ws.download_workspace_file_raw(
-            thread_id=tid, file_id=fid, current_user=mock_user_data, supabase=object()
+            thread_id=tid, file_id=fid, request=object(), current_user=mock_user_data, supabase=object()
         )
     assert ei.value.status_code == 404
 
@@ -544,11 +583,11 @@ async def test_raw_route_cross_thread_404(monkeypatch):
                 "path": "/t.docx", "is_expired": False}
 
     monkeypatch.setattr(ws, "_verify_thread_ownership", _noop_ownership)
-    monkeypatch.setattr(ws, "get_pg_pool", _fake_get_pool)
+    monkeypatch.setattr("app.dependencies.get_pg_pool", _fake_dep_get_pg_pool)
     monkeypatch.setattr(ws, "get_file_by_id", _fake_get_file_by_id)
 
     with pytest.raises(HTTPException) as ei:
         await ws.download_workspace_file_raw(
-            thread_id=tid, file_id=fid, current_user=mock_user_data, supabase=object()
+            thread_id=tid, file_id=fid, request=object(), current_user=mock_user_data, supabase=object()
         )
     assert ei.value.status_code == 404

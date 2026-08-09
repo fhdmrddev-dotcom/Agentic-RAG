@@ -1,12 +1,17 @@
 import json
 import logging
+import uuid
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from typing import AsyncIterator
 
 import asyncpg
+import httpx
 import redis.asyncio as aioredis
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from supabase import create_client, Client
+from starlette.concurrency import run_in_threadpool
+from supabase import create_client, Client, ClientOptions
 
 from app.config import settings
 from app.services.operator_service import is_operator, write_operator_audit
@@ -105,6 +110,126 @@ async def get_pg_pool() -> asyncpg.Pool:
     return _pg_pool
 
 
+# ── Phase 163 (TEN-01/TEN-02) — Front-B per-request DB-context factories ───────
+# THE atomic-crux seam: turn a validated request identity into an RLS-ENFORCED DB
+# context. These are ADDITIVE + dead-until-wired — Wave-4 plans swap the router
+# ``Depends`` seams onto them; nothing here changes app behavior yet. The existing
+# ``get_supabase()`` / ``get_pg_pool()`` / ``get_current_user()`` seams stay the
+# source of truth and are byte-unchanged.
+#
+# D-04 note: local JWKS / ES256 verification (PyJWT ``PyJWKClient``) is an OPTIONAL
+# future latency optimization on ``get_current_user()``'s GoTrue round-trip — it is
+# NOT wired here and is NOT a blocker. The ``SET LOCAL`` claims below come straight
+# from the already-validated ``current_user["id"]``; GoTrue validation stays the
+# fallback. The role swap + claims are decoupled from that optimization by design.
+
+
+async def _apply_rls_user_context(conn: asyncpg.Connection, uid: str) -> None:
+    """Turn RLS ON for ``uid`` on an ACQUIRED connection inside an OPEN transaction.
+
+    THE load-bearing sequence (do not reorder):
+
+    1. ``SET LOCAL ROLE authenticated`` FIRST — the pool DSN role is ``postgres``
+       (BYPASSRLS), so setting claims WITHOUT this role swap is a silent no-op
+       (Pitfall 1). This is the single line that actually turns RLS on; a
+       bare-claims connection keeps ``current_user = postgres`` and sees every row.
+    2. BOTH GUC forms, PARAMETERIZED (never string-interpolated — SQLi): the legacy
+       per-claim ``request.jwt.claim.sub`` (local-safe) AND the JSON blob
+       ``request.jwt.claims`` (cloud). Setting both makes ``auth.uid()`` resolve
+       regardless of which variant THIS database's ``auth.uid()`` reads (D-02).
+    3. ``is_local := true`` (the 3rd ``set_config`` arg) — MANDATORY on the shared
+       pool: every ``SET LOCAL`` auto-reverts at COMMIT, so claims can never leak to
+       the next pool borrower (Pitfall 3). ``false`` would leak identity across users.
+
+    Reused verbatim by the Phase-163 test harness (``tests/integration/_rls_harness``)
+    so the request factory and the leak / cluster tests can never drift on the exact
+    role-first + both-GUC-forms shape.
+    """
+    await conn.execute("SET LOCAL ROLE authenticated")
+    await conn.execute(
+        "SELECT set_config('request.jwt.claim.sub', $1, true)", str(uid)
+    )
+    await conn.execute(
+        "SELECT set_config('request.jwt.claims', $1, true)",
+        json.dumps({"sub": str(uid), "role": "authenticated"}),
+    )
+
+
+@asynccontextmanager
+async def get_user_pg_connection(
+    request: Request, current_user: dict
+) -> AsyncIterator[asyncpg.Connection]:
+    """Acquire an RLS-enforced asyncpg connection for the current user (D-02).
+
+    Reuses the EXISTING singleton pool (``get_pg_pool()`` — no new pool, no new DSN).
+    Opens a transaction, applies the role swap + both-GUC-forms context, and yields
+    the connection; the COMMIT at context exit auto-reverts every ``SET LOCAL``.
+
+    ``request`` is accepted for the router ``Depends`` contract (Wave-4 wiring). The
+    claims come SOLELY from ``current_user["id"]`` — already validated by
+    ``get_current_user`` — so this is decoupled from the optional D-04 JWKS path.
+    """
+    uid = current_user["id"]
+    pool = await get_pg_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            await _apply_rls_user_context(conn, uid)
+            yield conn
+
+
+_shared_httpx: httpx.Client | None = None
+
+
+def _get_shared_httpx() -> httpx.Client:
+    """Lazy shared SYNC httpx transport for the per-request user-JWT supabase clients.
+
+    Reusing ONE transport across per-request clients avoids a connection-pool fanout
+    under load (Pitfall 2). Mirrors the ``get_redis()`` / ``get_pg_pool()`` lazy
+    singleton shape; the app lifespan closes it best-effort alongside them.
+    """
+    global _shared_httpx
+    if _shared_httpx is None:
+        _shared_httpx = httpx.Client()
+    return _shared_httpx
+
+
+def get_user_supabase(request: Request, current_user: dict, token: str) -> Client:
+    """Build a NEW per-request supabase-py client bound to the caller's JWT (D-03).
+
+    Uses the ANON key + an ``Authorization: Bearer <token>`` header so PostgREST runs
+    as ``authenticated`` and RLS is ENFORCED. It NEVER mutates the shared
+    ``get_supabase()`` singleton — mutating that singleton's PostgREST auth header
+    races across concurrent requests / ``WORKER_COUNT=2`` workers and bleeds one
+    user's identity into another's request (Pitfall 2). A shared httpx transport
+    avoids per-request connection fanout.
+
+    supabase-py calls still BLOCK — callers keep their ``run_in_threadpool`` wrapper
+    (D-v2.5-01); do NOT remove it.
+    """
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_anon_key,  # ANON key — NOT service_role (which BYPASSES RLS)
+        options=ClientOptions(
+            headers={"Authorization": f"Bearer {token}"},
+            httpx_client=_get_shared_httpx(),
+        ),
+    )
+
+
+def get_service_role_supabase(org_id: str) -> Client:
+    """Hardened service-role (BYPASSRLS) client factory — REFUSES a missing org (D-05).
+
+    Mirrors ``get_supabase()`` construction but RAISES when ``org_id`` is falsy: a
+    BYPASSRLS client must never be built without an explicit org scope. Retained ONLY
+    for the four fully-async writers (agent loop, eval runner, harness engine,
+    re-embed) + legitimate cross-tenant ops, whose queries add an ``org_id``
+    predicate. Mirrors the refuse-without-scope posture of ``require_operator``.
+    """
+    if not org_id:
+        raise ValueError("get_service_role_supabase requires an explicit org_id")
+    return create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+
 async def _is_banned(user_id: str) -> bool:
     """Phase 148 (T-148-02 / T-148-04) — is this user disabled (banned_until in the future)?
 
@@ -149,6 +274,26 @@ async def get_current_user(
             detail="This account is disabled — contact your administrator.",
         )
     return identity
+
+
+# ── Phase 163 (TEN-02) — the FastAPI-injectable user-JWT client seam ───────────
+# ``get_user_supabase`` (above) takes an EXPLICIT ``token`` arg (called directly by
+# the Phase-163 test harness with a literal token), so it is not itself
+# ``Depends()``-able — FastAPI cannot resolve a bare ``token: str``. This thin async
+# adapter IS the router ``Depends()`` seam the Wave-4 chat/workspace handlers swap
+# onto: it resolves the validated identity (``get_current_user``) + the raw bearer
+# token (``bearer_scheme`` — the SAME token ``get_current_user`` just validated) and
+# hands both to the factory. FastAPI caches ``get_current_user`` per-request, so a
+# handler declaring BOTH ``current_user`` and this client still resolves
+# ``get_current_user`` exactly once. run_in_threadpool still wraps the blocking
+# supabase-py calls at every call site (D-v2.5-01); the client returned here is
+# per-request + ANON-key+Bearer, so RLS is ENFORCED on the swapped read/write path.
+async def get_user_supabase_client(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+) -> Client:
+    return get_user_supabase(request, current_user, credentials.credentials)
 
 
 # ── Phase 146 (ADMIN-01) — operator gate + append-only audit floor ────────────
@@ -302,31 +447,523 @@ async def operator_audit_floor(
         logger.error("operator audit floor failed: %s", exc)  # swallow (D-05 precedent)
 
 
-# ── Phase 148 (VIS-01) — per-endpoint feature-visibility gate ──────────────────
+# ── Phase 148 (VIS-01) / Phase 167 (D-167-06) — per-endpoint feature-visibility gate ──
+# The 4 org role tiers (mig 104 CHECK), ranked so a caller with 2+ memberships resolves to
+# their HIGHEST role (the Glean "highest-role-wins" primary tier). Unknown role -> -1 (never
+# the highest) so a malformed membership can only ever fail-closed.
+_ROLE_RANK: dict[str, int] = {"member": 0, "dept-admin": 1, "org-admin": 2, "super-admin": 3}
+
+
+def _highest_role(roles: list[str]) -> str | None:
+    """Reduce a caller's memberships to their single highest role (fail-closed)."""
+    ranked = [(_ROLE_RANK.get(r, -1), r) for r in roles if r]
+    return max(ranked)[1] if ranked else None
+
+
+async def resolve_caller_role(
+    request: Request | None, current_user: dict
+) -> tuple[str | None, set[str]]:
+    """Resolve the caller's effective org role + group set for the greenlist gate (D-167-06).
+
+    CR-01 (review): the role is resolved AGAINST THE CALLER'S ACTIVE ORG — NEVER
+    ``_highest_role`` across ALL memberships. Every user is provisioned as ``org-admin`` of
+    their OWN personal org (mig 105 §A backfill + the ``handle_new_user`` signup trigger),
+    so a highest-role-across-memberships scan returns ``org-admin`` for EVERY authenticated
+    user — which grants any ``role:["org-admin"]``-greenlisted feature to everyone AND denies
+    every ``role:["member"]`` feature to everyone (the exact broken-access-control inversion
+    the greenlist exists to prevent). Resolution order:
+
+    1. ``request.state.org_role`` — already resolved + validated AS THE CALLER by
+       ``get_active_org_id`` (D-166-06); no extra query when the request went through it.
+    2. Otherwise (endpoints that attach ``require_visible`` WITHOUT ``get_active_org_id``, and
+       ``GET /features``) resolve the caller's role for the VALIDATED ``X-Org-Id`` active org —
+       the header the 166 client injects on every request. The lookup runs AS THE CALLER on a
+       user-JWT/RLS connection (``auth.uid()`` resolves to the caller — never the BYPASSRLS
+       pool), so a spoofed / non-member org returns no row.
+    3. FAIL-CLOSED to ``member`` (the least-privileged real role) when no active org can be
+       validated — an absent/malformed ``X-Org-Id``, a non-member org, or any read failure.
+       ``member`` (never the personal-org ``org-admin``, never a highest-role scan) means a
+       plain member of a shared org resolves to ``member``: ``role:["org-admin"]`` no longer
+       leaks to everyone, and ``role:["member"]`` no longer denies everyone.
+
+    ``caller_groups`` is an empty (extensible) set this phase — the groups table is deferred
+    (RESEARCH OQ2); the resolver already unions against it. NEVER raises.
+    """
+    role = getattr(getattr(request, "state", None), "org_role", None)
+    if role:
+        return role, set()
+    if request is None:
+        return "member", set()  # no request context -> fail-closed to the least-privileged role
+    # Resolve the caller's role in their VALIDATED active org (the X-Org-Id header). NEVER a
+    # highest-role scan across memberships (CR-01: personal-org org-admin defeats the greenlist).
+    try:
+        header_org = request.headers.get("X-Org-Id")
+    except Exception:  # noqa: BLE001 — a malformed request object -> fail-closed member
+        return "member", set()
+    org_uuid = _to_uuid(header_org) if header_org else None
+    if org_uuid is None:
+        return "member", set()  # no valid active org -> fail-closed member
+    try:
+        async with get_user_pg_connection(request, current_user) as conn:
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+        # A non-member (or spoofed) X-Org-Id matches no row under RLS -> fail-closed member.
+        return (row["role"] if row is not None else "member"), set()
+    except Exception:  # noqa: BLE001 — any read failure -> fail-closed member (never highest-role)
+        return "member", set()
+
+
 def require_visible(feature: str):
-    """VIS-01 API-layer visibility gate (D-03). A dependency FACTORY.
+    """VIS-01 API-layer visibility gate (D-03 / D-167-06). A dependency FACTORY.
 
     Returns an async dependency that is a literal NO-OP for operators AND for
     Everyone-audience features (Deep Mode / the Run + chat-model-picker carve-outs stay
-    byte-identical), and raises **403 — NOT 404** for a non-operator hitting an
-    Operators-only feature. The /admin surface keeps its byte-identical 404; a governed
-    product feature is a deliberate 403 an end user can understand (these are features
-    they may legitimately have seen before a flip). ``is_operator`` is the ONE swappable
-    boundary — SEED-115 later flips it to "is in group X" with zero change here.
+    byte-identical), and raises **403 — NOT 404** for a non-operator who is not greenlisted.
+    The /admin surface keeps its byte-identical 404; a governed product feature is a
+    deliberate 403 an end user can understand (these are features they may legitimately have
+    seen before a flip). ``is_operator`` is the ONE swappable boundary.
+
+    D-167-06 — EXTENDED IN PLACE, never forked: after the operator + everyone no-ops, a
+    ``role``-audience feature resolves the caller's org role (``resolve_caller_role``) and
+    runs the Glean precedence-merge (``resolve_feature_access``). A caller whose role/group
+    isn't greenlisted — or whose role can't be resolved — falls through to the existing 403
+    (fail-closed). ``request`` carries a default so the operator/everyone unit tests keep
+    calling ``_dep(current_user=...)``; FastAPI still injects it by annotation at runtime.
 
     Attach PER-ENDPOINT on the governed authoring/management endpoints ONLY — never at a
     router level that would gate a Run/chat carve-out (``GET /settings/providers``,
-    ``GET /workflows/published|starters``, the workflow launch). ``feature_audience`` is
-    lazy-imported inside the closure to avoid an import cycle (user_settings -> deps).
+    ``GET /workflows/published|starters``, the workflow launch). ``feature_audience`` +
+    ``resolve_feature_access`` are lazy-imported inside the closure to avoid an import cycle
+    (user_settings -> deps).
     """
-    async def _dep(current_user: dict = Depends(get_current_user)):
+    async def _dep(current_user: dict = Depends(get_current_user), request: Request = None):
         if await is_operator(current_user["id"]):
             return  # operator -> no-op
-        from app.models.user_settings import feature_audience
-        if feature_audience(feature) == "everyone":
+        from app.models.user_settings import feature_audience, resolve_feature_access
+        audience = feature_audience(feature)
+        if audience == "everyone":
             return  # Everyone-audience feature -> no-op (carve-out byte-identical)
+        if audience == "role":
+            caller_role, caller_groups = await resolve_caller_role(request, current_user)
+            if resolve_feature_access(feature, caller_role, caller_groups):
+                return  # greenlisted role/group -> pass
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This feature is available to administrators only.",
         )
     return _dep
+
+
+# CR-01 (Phase 181 review): the canvas gate needs its OWN auto_error=False bearer scheme for
+# the SAME reason /admin does (WR-02, ``_admin_bearer_scheme`` above) — the shared
+# ``bearer_scheme`` (auto_error=True) raises 403 on an ABSENT Authorization header, and
+# ``get_current_user`` raises 401 on an invalid/expired token, and BOTH fired BEFORE
+# ``require_canvas``'s off-flag check ever ran, leaking that a ``/canvas`` route exists (403/401
+# != the 404 an unbuilt route returns). auto_error=False hands us ``None`` for an absent header
+# so NO status can leak pre-flag. The shared ``get_current_user`` / ``bearer_scheme`` path is
+# untouched — other routes still depend on it.
+_canvas_bearer_scheme = HTTPBearer(auto_error=False)
+
+
+async def authenticate_canvas_request(
+    credentials: HTTPAuthorizationCredentials | None,
+    supabase: Client,
+) -> dict | None:
+    """Resolve the caller for the canvas surface — NEVER raises (folds every auth failure to None).
+
+    CR-01: this is the ON-path auth seam, mirroring ``authenticate_operator_request`` but
+    returning ``None`` instead of raising, so ``require_canvas`` can run the off-flag check FIRST
+    (an off canvas must 404 for EVERY caller BEFORE any token is validated — zero auth side
+    effects on the non-discoverable off path). Absent credentials / an invalid-or-expired token /
+    a banned user all resolve to ``None``; ``require_canvas`` folds ``None`` into the byte-
+    identical 404 once the flag is confirmed live. ``_is_banned`` fails OPEN (a transient DB blip
+    never locks everyone out — same posture as ``get_current_user`` / ``authenticate_operator_request``).
+
+    A dedicated helper (NOT a pre-body ``Depends`` on ``get_current_user``) keeps the shared auth
+    path untouched AND gives the ON-case tests a clean monkeypatch seam: they replace this to
+    inject a fake caller AFTER the flag check, while the CR-01 regression leaves it real to
+    exercise the genuine pre-auth 404 path.
+
+    WR-08 / D-v2.5-01 — the GoTrue read rides ``run_in_threadpool``. ``supabase-py`` is
+    SYNCHRONOUS, and this helper is awaited from an async dependency on a route the seam header
+    documents as firing "on every canvas edit". Called directly, that blocking round-trip owns the
+    event loop for its whole duration — and the SAME worker process serves the SSE chat streams,
+    so a keystroke-frequency canvas route would stall every concurrent stream on the box. Wrapping
+    it moves the wait onto the threadpool; nothing else about this helper changes (same
+    exceptions swallowed, same ``{"id", "email"}`` shape, same never-raises contract).
+
+    EXPLICIT NON-GOAL: the shared ``get_current_user`` (:254) still calls ``supabase.auth.get_user``
+    directly and is deliberately NOT changed here. That form is pre-existing, is depended on by
+    every other route in the app, and widening the fix to it is outside this phase's blast radius.
+    The asymmetry is a scoped decision, not a missed site — read WR-08 in ``182-REVIEW.md`` before
+    "finishing the job" on that one.
+    """
+    if credentials is None:
+        return None
+    try:
+        response = await run_in_threadpool(supabase.auth.get_user, credentials.credentials)
+        user = getattr(response, "user", None)
+    except Exception:
+        return None
+    if user is None or await _is_banned(user.id):
+        return None
+    return {"id": user.id, "email": user.email}
+
+
+def require_canvas():
+    """404-when-off gate for the v3.6 visual_workflow_canvas layer (REVERT-01 / D-181-02).
+
+    A dependency FACTORY (mirrors ``require_visible``'s shape) — but it MIRRORS
+    ``require_operator``'s byte-identical 404 (NOT ``require_visible``'s 403) so the off
+    state is indistinguishable from 'the route was never built'. A 403 would leak that a
+    canvas route exists-but-forbidden; a 404 does not (D-181-02).
+
+    The master switch resolves ``"off"`` BEFORE the operator no-op (D-181-01), so an
+    operator gets the SAME 404 as an end user while off — no phantom canvas for anyone.
+    Fail-closed: ``feature_audience`` never raises (cold cache / DB blip -> ``{}`` -> the
+    ``"off"`` cold default), so any settings blip resolves to 404, never a fail-open reveal.
+
+    CR-01 (Phase 181 review): the off-flag 404 must hold for EVERY caller BEFORE auth — an
+    absent header or a bad token must NOT leak the route's existence via a 403/401. So the
+    off-check runs FIRST against the untrusted (non-raising) ``_canvas_bearer_scheme`` credentials
+    — NOT ``Depends(get_current_user)`` (auto_error=True), which raised 403/401 AHEAD of the flag.
+    Only once the flag is live do we validate the token (``authenticate_canvas_request``); an
+    anonymous / invalid / banned caller is folded into the SAME byte-identical 404 (never a
+    403/401 leak), matching the ``authenticate_operator_request`` posture. The shared
+    ``get_current_user`` / ``bearer_scheme`` path is untouched.
+
+    WR-08 (round-2 review): the gate has ALREADY validated the bearer token by the time any canvas
+    handler runs, so it PUBLISHES the resulting identity on ``request.state.canvas_caller`` and the
+    handlers consume it through ``canvas_caller`` (below) instead of re-running
+    ``get_current_user``. Before this, both routes carried ``dependencies=[Depends(require_canvas())]``
+    AND ``current_user: dict = Depends(get_current_user)``, so the SAME token was validated twice:
+    **2 GoTrue round-trips + 2 ``auth.users`` ban queries per request**, on a route documented as
+    firing on every canvas edit. It is now 1 of each. The success branches also ``return caller``
+    — a value ``dependencies=[...]`` discards, which is exactly why the ``request.state`` hand-off
+    is the load-bearing half; returning it costs nothing and makes the identity available to a
+    future ``caller: dict = Depends(require_canvas())`` handler-parameter form without a second
+    change. Every ``raise _NOT_FOUND`` deny path is untouched.
+
+    ``feature_audience`` / ``resolve_feature_access`` are lazy-imported inside the closure to
+    avoid the user_settings -> dependencies import cycle (matches ``require_visible``). Attach
+    on canvas routes via ``dependencies=[Depends(require_canvas())]``.
+    """
+    async def _dep(
+        request: Request = None,
+        credentials: HTTPAuthorizationCredentials | None = Depends(_canvas_bearer_scheme),
+        supabase: Client = Depends(get_supabase),
+    ):
+        from app.models.user_settings import (
+            ensure_settings_fresh,
+            feature_audience,
+            resolve_feature_access,
+        )
+        # (0) T-184-UAT-02 — bound the flag's staleness on THIS worker before reading it.
+        #     ``feature_audience`` resolves through the SYNC settings reader, which has no
+        #     staleness check of its own, so a worker that did not service the operator's
+        #     write would otherwise keep enforcing the pre-flip audience unbounded. TTL-checked
+        #     and non-raising: no DB I/O on a warm cache, and a blip still lands in the
+        #     fail-closed "off" default below rather than fail-open.
+        await ensure_settings_fresh()
+        # (1) FLAG FIRST — 404 for ALL callers (authenticated or not, operators included) while
+        #     off, BEFORE any token is validated. CR-01: no auth-derived 403/401 can precede this.
+        audience = feature_audience("visual_workflow_canvas")
+        if audience == "off":
+            raise _NOT_FOUND  # 404 for ALL, incl. operators — resolved FIRST (D-181-01)
+        # (2) flag is live -> the route EXISTS; validate the caller (never raises). An anonymous /
+        #     invalid / banned caller is a 404 too (non-discoverable — never a 403/401 leak; the
+        #     REVERT byte-identity holds for EVERY caller). CR-01.
+        caller = await authenticate_canvas_request(credentials, supabase)
+        if caller is None:
+            raise _NOT_FOUND
+        # (3) WR-08 — PUBLISH the identity we just validated. The handler reads it back through
+        #     ``canvas_caller`` instead of re-validating the same token via ``get_current_user``
+        #     (which cost a 2nd GoTrue round-trip + a 2nd auth.users ban query per request).
+        #     Guarded on ``request`` because ``_dep`` declares it Optional for direct-call tests.
+        if request is not None:
+            request.state.canvas_caller = caller
+        if await is_operator(caller["id"]):
+            return caller  # operator -> no-op (only reached once the flag is NOT off)
+        if audience == "everyone":
+            return caller
+        if audience == "role":
+            caller_role, caller_groups = await resolve_caller_role(request, caller)
+            if resolve_feature_access("visual_workflow_canvas", caller_role, caller_groups):
+                return caller
+        raise _NOT_FOUND  # 404, never 403 — REVERT byte-identity (never leak route existence)
+    return _dep
+
+
+async def canvas_caller(request: Request) -> dict:
+    """The consumer half of the WR-08 hand-off — the identity ``require_canvas`` already validated.
+
+    Canvas handlers declare ``current_user: dict = Depends(canvas_caller)`` instead of
+    ``Depends(get_current_user)``. ``require_canvas`` runs first (it is in the route's
+    ``dependencies=[...]``, which FastAPI inserts at the FRONT of the dependant list) and stores
+    the validated ``{"id", "email"}`` on ``request.state.canvas_caller``; this simply hands it
+    over. The result is exactly ONE caller resolution per canvas request instead of two.
+
+    FAILS CLOSED, and the polarity matters. The ONLY way to reach a canvas handler is through
+    ``require_canvas``, which always publishes the caller before letting a request past — so an
+    absent value means the gate did not run. The honest answer to "the gate did not run" on a
+    canvas route is the SAME byte-identical ``_NOT_FOUND`` every deny path in the gate raises:
+
+      * NOT a 500 — an internal-error page is itself an existence signal on a route contracted to
+        be indistinguishable from one that was never built (REVERT-01 / D-181-02);
+      * NOT a 403 — D-182-05 forbids it outright, because 403 admits the route exists-but-forbidden
+        (the whole reason this surface uses ``require_canvas`` and never ``require_visible``);
+      * NOT a 401 — same leak, via the "you'd be allowed if you authenticated" channel (CR-01).
+
+    It can therefore never return a partially-trusted or defaulted identity (T-182-34).
+    """
+    caller = getattr(request.state, "canvas_caller", None)
+    if not caller:
+        raise _NOT_FOUND
+    return caller
+
+
+# ── Phase 166 (ADMIN-01/02/04) — org authz: active-org resolution + org:manage gate ──
+# The user-side mirror of require_operator, but gated on org PERMISSIONS (mig 104's
+# current_user_has_permission SECDEF helper) instead of operator membership. D-166-09: no
+# route called that helper before Phase 166 — this is the net-new enforcement layer.
+#
+# THE load-bearing security beat (D-166-06 / T-166-01): the X-Org-Id header is NEVER
+# trusted. get_active_org_id validates it against the caller's org_members on a user-JWT/RLS
+# connection (auth.uid() resolves to the caller) — a non-member org is a 403.
+# current_user_has_permission likewise MUST run AS THE CALLER (its body reads auth.uid(),
+# mig 104:197) — always on get_user_pg_connection, never the BYPASSRLS pool (T-166-04).
+
+
+def _to_uuid(value: str) -> uuid.UUID | None:
+    """Parse a client-supplied org id into a ``uuid.UUID`` (asyncpg-native), or None if malformed.
+
+    asyncpg binds a ``uuid.UUID`` natively to a uuid column; a malformed string would raise a
+    22P02 at the DB. Parsing here turns an invalid/untrusted X-Org-Id into a clean non-member
+    403 (never a 500) — the header is untrusted input (D-166-06).
+    """
+    try:
+        return uuid.UUID(str(value))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+async def _has_org_permission(
+    request: Request, current_user: dict, org_id: str, permission_key: str
+) -> bool:
+    """The single org-permission seam (mirrors is_operator as the one swappable boundary).
+
+    Runs mig 104's ``current_user_has_permission(p_org_id, p_permission_key)`` SECDEF helper
+    AS THE CALLER on a user-JWT connection — the helper body reads ``auth.uid()`` (mig
+    104:197), so a BYPASSRLS/service-role connection (no ``auth.uid()``) would evaluate
+    postgres's permissions, not the caller's (T-166-04). Parameterized ``$1/$2`` binds — never
+    f-string SQL. Used by ``require_org_manage`` AND the ``/org/audit`` org:audit_view branch
+    (D-166-09, ADMIN-04).
+    """
+    async with get_user_pg_connection(request, current_user) as conn:
+        allowed = await conn.fetchval(
+            "SELECT public.current_user_has_permission($1, $2)",
+            _to_uuid(org_id),
+            permission_key,
+        )
+    return bool(allowed)
+
+
+async def get_active_org_id(
+    request: Request, current_user: dict = Depends(get_current_user)
+) -> str:
+    """Resolve + validate the caller's active org (D-166-06 / T-166-01).
+
+    Reads the ``X-Org-Id`` request header and VALIDATES it against the caller's
+    ``org_members`` on a user-JWT/RLS connection (``auth.uid()`` resolves to the caller,
+    never the service-role/BYPASSRLS pool) — a spoofed/non-member org is a 403, NEVER
+    trusted. Header absent: resolve the caller's default org — exactly one membership uses it;
+    zero → 403; 2+ → 400 (the frontend always sends the header once the switcher exists).
+    Stashes ``request.state.active_org`` + ``request.state.org_role`` for the endpoints/band;
+    returns the validated org_id string. Every query is a ``$1`` bind (never f-string SQL).
+    """
+    header_org = request.headers.get("X-Org-Id")
+    async with get_user_pg_connection(request, current_user) as conn:
+        if header_org:
+            org_uuid = _to_uuid(header_org)
+            if org_uuid is None:
+                # A malformed header can never match a real membership — treat as non-member.
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+            if row is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            request.state.active_org = str(header_org)
+            request.state.org_role = row["role"]
+            return str(header_org)
+        rows = await conn.fetch(
+            "SELECT org_id, role FROM public.org_members "
+            "WHERE user_id = auth.uid() ORDER BY created_at"
+        )
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not belong to any organization.",
+        )
+    if len(rows) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="X-Org-Id header required.",
+        )
+    active = str(rows[0]["org_id"])
+    request.state.active_org = active
+    request.state.org_role = rows[0]["role"]
+    return active
+
+
+async def resolve_active_org_soft(
+    request: Request, current_user: dict = Depends(get_current_user)
+) -> str | None:
+    """Bootstrap-friendly active-org resolver for ``/org/me`` ONLY (WR-01).
+
+    ``/org/me`` is THE endpoint that seeds the client: it delivers ``memberships[]`` so a
+    fresh 2+-org session can populate the org switcher. But the strict ``get_active_org_id``
+    gate 400s when the ``X-Org-Id`` header is absent AND the caller has 2+ memberships — a
+    deadlock, because the one call that could seed the header is the one that 400s. This
+    resolver breaks that circular dependency for ``/org/me`` while keeping every hard
+    security invariant of ``get_active_org_id``:
+
+    - A PRESENT ``X-Org-Id`` is still validated against ``org_members`` on a user-JWT/RLS
+      connection — a spoofed/non-member (or malformed) org is STILL a 403 (T-166-01, HARD
+      invariant). The header is NEVER trusted.
+    - An ABSENT header does NOT 400: it resolves the caller's DEFAULT org (the first
+      membership by ``created_at``) so the probe always succeeds and returns the switcher's
+      data. Zero memberships → ``None`` (the handler returns an empty ``memberships[]``,
+      never an error — a member is never 400'd out of their own bootstrap probe).
+
+    Stashes ``request.state.active_org`` / ``request.state.org_role`` exactly like the strict
+    gate. Returns the resolved org id string (or ``None`` when the caller belongs to no org).
+    The manager-only reads (/org/members, /org/audit) KEEP the strict ``get_active_org_id`` +
+    ``require_org_manage`` gates — this soft resolver is NEVER wired to them (D-166-06).
+    """
+    header_org = request.headers.get("X-Org-Id")
+    async with get_user_pg_connection(request, current_user) as conn:
+        if header_org:
+            org_uuid = _to_uuid(header_org)
+            if org_uuid is None:
+                # A malformed header can never match a real membership — treat as non-member.
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            row = await conn.fetchrow(
+                "SELECT role FROM public.org_members WHERE org_id = $1 AND user_id = auth.uid()",
+                org_uuid,
+            )
+            if row is None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You are not a member of this organization.",
+                )
+            # Stash the CANONICAL uuid string (correct-by-construction here — the
+            # strict get_active_org_id gate is left byte-unchanged per the WR-01 invariant).
+            request.state.active_org = str(org_uuid)
+            request.state.org_role = row["role"]
+            return str(org_uuid)
+        rows = await conn.fetch(
+            "SELECT org_id, role FROM public.org_members "
+            "WHERE user_id = auth.uid() ORDER BY created_at"
+        )
+    if not rows:
+        # No membership: never 400 the bootstrap probe — the client renders no switcher.
+        request.state.active_org = None
+        request.state.org_role = None
+        return None
+    # Header absent: adopt the caller's default org (first membership) so the header
+    # self-heals on the next request (OrgProvider adopts perms.org_id — WR-01 client half).
+    active = str(rows[0]["org_id"])
+    request.state.active_org = active
+    request.state.org_role = rows[0]["role"]
+    return active
+
+
+async def require_org_manage(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict:
+    """org:manage gate for the manager-only /org reads (ADMIN-01 default-deny).
+
+    Calls ``_has_org_permission(active_org, 'org:manage')`` AS THE CALLER (D-166-09). On
+    False → 403 (a legitimate product feature, NOT the /admin byte-identical 404 — mirrors
+    require_visible:471-474). FastAPI dedupes the shared ``get_active_org_id`` resolution, so
+    an endpoint declaring both resolves + validates the active org exactly once.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "org:manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to manage this organization.",
+        )
+    return current_user
+
+
+async def require_org_invite(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict:
+    """org:invite gate for the invitation write/list routes (Phase 167, INV-01 / D-167-08).
+
+    A verbatim mirror of ``require_org_manage`` with the permission key swapped to
+    ``org:invite``: ``_has_org_permission(active_org, 'org:invite')`` runs mig-104's
+    ``current_user_has_permission`` SECDEF helper AS THE CALLER (org-admin + super-admin hold
+    ``org:invite``; ``member`` does not — role_permissions seed, mig 104:416-425). On False →
+    403 (a legitimate product feature an end user can understand, NOT the /admin byte-identical
+    404 — mirrors require_org_manage / require_visible:472-474).
+
+    Inherits the STRICT ``get_active_org_id`` (spoofed/non-member ``X-Org-Id`` → 403;
+    absent-header-with-2+-memberships → 400), so every invitation write is pinned to the
+    server-validated active org (Pitfall 6) — never ``resolve_active_org_soft``. FastAPI dedupes
+    the shared ``get_active_org_id`` resolution across the endpoint's dependencies.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "org:invite"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to invite members.",
+        )
+    return current_user
+
+
+async def require_sso_manage(
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+    active_org: str = Depends(get_active_org_id),
+) -> dict:
+    """sso:manage gate for the org SSO provider-CRUD routes (Phase 168, SSO-01 / D-168-01).
+
+    A VERBATIM mirror of ``require_org_invite`` with the permission key swapped to
+    ``sso:manage``: ``_has_org_permission(active_org, 'sso:manage')`` runs mig-104's
+    ``current_user_has_permission`` SECDEF helper AS THE CALLER on a user-JWT connection. On
+    False → 403 (a legitimate product feature an end user can understand, NOT the /admin
+    byte-identical 404 — mirrors require_org_invite / require_org_manage).
+
+    The ``sso:manage`` grant for org-admin (+ super-admin) is seeded by MIGRATION 113 (Plan
+    01) — that role_permissions row is what flips this gate LIVE over the mig-104
+    ``current_user_has_permission`` SECDEF helper; before it lands, no role holds ``sso:manage``
+    and every SSO write is 403 (fail-closed).
+
+    Inherits the STRICT ``get_active_org_id`` (spoofed/non-member ``X-Org-Id`` → 403;
+    absent-header-with-2+-memberships → 400) — NEVER ``resolve_active_org_soft`` — so every SSO
+    write is pinned to the server-validated active org. FastAPI dedupes the shared
+    ``get_active_org_id`` resolution across the endpoint's dependencies.
+    """
+    if not await _has_org_permission(request, current_user, active_org, "sso:manage"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to manage SSO for this organization.",
+        )
+    return current_user

@@ -156,12 +156,12 @@ async def _seed_user(pool, label):
 
 
 async def _seed_global_folder(pool, owner_id, *, name):
-    """A folder owned by `owner_id` with is_global=true → its docs are visible to EVERYONE
+    """A folder owned by `owner_id` with is_org_shared=true → its docs are visible to EVERYONE
     (the global-folder model, migration 014/015/019). The SUBJECT lives here so user B can
     read it even though A owns it."""
     folder_id = uuid4()
     await pool.execute(
-        "INSERT INTO public.folders (id, user_id, name, is_global) VALUES ($1, $2, $3, true)",
+        "INSERT INTO public.folders (id, user_id, name, is_org_shared) VALUES ($1, $2, $3, true)",
         folder_id, owner_id, name,
     )
     return folder_id
@@ -188,6 +188,34 @@ async def _seed_relationship(pool, owner_id, source_id, target_id, rel_type="ref
         rel_id, owner_id, source_id, target_id, rel_type,
     )
     return rel_id
+
+
+async def _colocate_in_owner_org(pool, owner_id, other_id):
+    """Phase 165 (SEED-124 / CR-01 co-org fix): make ``other_id`` a member of ``owner_id``'s
+    auto-provisioned personal org (mig-105 handle_new_user trigger) so an ``is_org_shared``
+    folder owned by ``owner_id`` (org_id auto-filled to that org by the mig-106 trigger) is
+    LEGITIMATELY visible to ``other_id`` WITHIN the org boundary.
+
+    Before Phase 165, an ``is_org_shared`` folder was visible to EVERYONE cross-org — the exact
+    leak CR-01 closed (folder_utils org-scopes service-role visibility to the caller's org set).
+    The two-viewer masking under test still requires BOTH callers to resolve the SHARED SUBJECT,
+    so they must share the org that owns it — mirrors test_v3_4_org_isolation's explicit
+    org_members seeding, CO-locating instead of disjoint. The PRIVATE target (folder_id=NULL,
+    NOT org-shared) stays unseeable to ``other_id`` — the masking assertion is preserved intact,
+    never weakened, and NO cross-org visibility is re-introduced."""
+    row = await pool.fetchrow(
+        "SELECT org_id FROM public.org_members WHERE user_id = $1 LIMIT 1", owner_id
+    )
+    assert row is not None, (
+        "owner has no auto-provisioned org (mig-105 handle_new_user trigger missing on :54322?)"
+    )
+    org_id = row["org_id"]
+    await pool.execute(
+        "INSERT INTO public.org_members (org_id, user_id, role) VALUES ($1, $2, 'member') "
+        "ON CONFLICT DO NOTHING",
+        org_id, other_id,
+    )
+    return org_id
 
 
 @pytest_asyncio.fixture
@@ -220,6 +248,9 @@ async def two_users_with_link(pg_pool):
 
     user_a = await _seed_user(pg_pool, "a")
     user_b = await _seed_user(pg_pool, "b")
+    # Phase 165 CR-01: co-locate B into A's org so A's is_org_shared folder subject is visible
+    # to B WITHIN the org boundary (cross-org shared-folder visibility is correctly closed).
+    await _colocate_in_owner_org(pg_pool, user_a, user_b)
 
     # SUBJECT — in A's GLOBAL folder, so BOTH A and B can read it.
     global_folder = await _seed_global_folder(pg_pool, user_a, name="A-shared")

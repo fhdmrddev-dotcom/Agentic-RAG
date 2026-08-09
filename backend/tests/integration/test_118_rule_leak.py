@@ -3,16 +3,16 @@
 THE mandatory live proof that the ingest rule-eval pass NEVER leaks across users. The
 ingest pass runs inside a BackgroundTask with NO request JWT — ``auth.uid()`` is NULL and
 the service-role client BYPASSES RLS. The SOLE owner-scoping gate is the in-app
-``.or_(f"user_id.eq.{uploader},is_global.eq.true")`` predicate (Pitfall 3). This file proves,
+``.or_(f"user_id.eq.{uploader},is_system_global.eq.true")`` predicate (Pitfall 3). This file proves,
 with two distinct users + a GLOBAL rule, the D-118-8 contract:
 
   * User B's PRIVATE rule NEVER evaluates against User A's upload (B's rule is not in A's
     own+global read set).
-  * A GLOBAL rule (is_global=true, owned by A) is visible to B's upload-read, but is
+  * A GLOBAL rule (is_system_global=true, owned by A) is visible to B's upload-read, but is
     evaluated against B's OWN upload metadata only — it never reads A's data.
 
 This mirrors test_116_tool_leak.py's per-user OWN-scoped fixtures (two distinct user
-fixtures + an is_global rule), NOT a B-queries-A's-private-rule shape that false-greens.
+fixtures + an is_system_global rule), NOT a B-queries-A's-private-rule shape that false-greens.
 secure-phase re-runs this NON-VACUOUS (the RLS/predicate label is NOT proof — the D-102 /
 D-110-5 "static would false-green" lesson; only two real callers driving the REAL read +
 matcher closes the threat).
@@ -132,11 +132,11 @@ async def two_users_with_rules(pg_pool):
     """Seed two distinct users; A owns a GLOBAL rule + a PRIVATE rule; B owns a PRIVATE rule.
 
     The leak vectors this scopes (D-118-8):
-      * B's PRIVATE rule (``user_id=B, is_global=false``) must NOT appear in A's
+      * B's PRIVATE rule (``user_id=B, is_system_global=false``) must NOT appear in A's
         own+global read set (so it never evaluates against A's upload).
-      * A's GLOBAL rule (``user_id=A, is_global=true``) DOES appear in B's read set, but is
+      * A's GLOBAL rule (``user_id=A, is_system_global=true``) DOES appear in B's read set, but is
         evaluated against B's OWN upload metadata only.
-      * A's PRIVATE rule (``user_id=A, is_global=false``) must NOT appear in B's read set.
+      * A's PRIVATE rule (``user_id=A, is_system_global=false``) must NOT appear in B's read set.
     """
     if not await _table_exists(pg_pool, "classification_rules"):
         pytest.skip("classification_rules table absent")
@@ -156,17 +156,17 @@ async def two_users_with_rules(pg_pool):
     secret_expr = {"op": "and", "conditions": [{"field": "document_type", "op": "eq", "value": "b-secret"}]}
 
     await pg_pool.execute(
-        "INSERT INTO classification_rules (id, user_id, name, match_expr, is_global, enabled) "
+        "INSERT INTO classification_rules (id, user_id, name, match_expr, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, true, true)",
         a_global, user_a, "A-GLOBAL-invoice", invoice_expr,
     )
     await pg_pool.execute(
-        "INSERT INTO classification_rules (id, user_id, name, match_expr, is_global, enabled) "
+        "INSERT INTO classification_rules (id, user_id, name, match_expr, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, false, true)",
         a_private, user_a, "A-PRIVATE-invoice", invoice_expr,
     )
     await pg_pool.execute(
-        "INSERT INTO classification_rules (id, user_id, name, match_expr, is_global, enabled) "
+        "INSERT INTO classification_rules (id, user_id, name, match_expr, is_system_global, enabled) "
         "VALUES ($1, $2, $3, $4, false, true)",
         b_private, user_b, "B-PRIVATE-secret", secret_expr,
     )
@@ -194,8 +194,8 @@ def _read_rules_for_uploader(sb, uploader_uid: str) -> list[dict]:
     """The EXACT leak-safe own+global rule read the ingest pass uses (Pitfall 3)."""
     return (
         sb.table("classification_rules").select("*")
-        .or_(f"user_id.eq.{uploader_uid},is_global.eq.true")
-        .eq("enabled", True).order("is_global").order("created_at").execute()
+        .or_(f"user_id.eq.{uploader_uid},is_system_global.eq.true")
+        .eq("enabled", True).order("is_system_global").order("created_at").execute()
     ).data or []
 
 

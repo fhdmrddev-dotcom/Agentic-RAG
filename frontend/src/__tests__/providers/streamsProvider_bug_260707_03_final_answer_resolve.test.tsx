@@ -151,3 +151,72 @@ describe("BUG-260707-03 — clean Deep terminal resolves the folded blob to the 
     })
   })
 })
+
+/**
+ * Phase 176 RENDER-02 (D-07) — the un-fold must ALSO happen on the mount/reconcile
+ * path, not only the send path. A backgrounded parallel-thread run reaches its clean
+ * terminal on the MOUNT-path onTerminal (StreamsProvider.tsx:1571-1663), which set
+ * runStatus + cleaned subscriptions but had NO content-reconcile — so on switch-back
+ * the folded blob only resolved on a full reload (the SC#10 parallel-thread residual
+ * of BUG-260707-03).
+ *
+ * Fix: mirror the applied send-path reconcile (:2004-2027) into the mount-path
+ * onTerminal, keyed on `run.run_id` (registeredRunId is undefined on this path —
+ * Pitfall 2). Content-only swap: runStatus / tool fields are preserved.
+ */
+describe("Phase 176 RENDER-02 (D-07) — clean terminal on the MOUNT/reconcile path un-folds by run.run_id (no reload)", () => {
+  it("swaps the backgrounded run's assistant blob for the persisted answer on the mount-path onTerminal, keyed on run.run_id, content-only (in place)", async () => {
+    // reconcile (fired by setViewingThread) discovers the run via the snapshot's
+    // active_runs, opens a subscription, the stream appends the narration+answer
+    // BLOB, then reaches a clean terminal on the MOUNT-path onTerminal — the
+    // send-path onTerminal (:2004-2027) never runs here (no sendMessage call).
+    mockGetSnapshot.mockResolvedValue({
+      messages: [],
+      active_runs: [{ run_id: RUN_ID, status: "streaming", started_at: "2026-07-07T00:00:00Z" }],
+      since_cursors: {},
+    })
+    // ISOLATION: the mock fires onDelta + onTerminal but NEVER resolves. The
+    // reconcile-path subscribeToRun has a `.finally()` loadMessages "floor"
+    // (StreamsProvider.tsx:1711-1714) that also fetches getMessages and does a
+    // full-replace merge — leaving the promise pending keeps that floor from
+    // firing so the ONLY thing that can un-fold the blob is the mount-path
+    // onTerminal content-reconcile under test (a full-replace would also swap the
+    // id to the persisted "persisted-assistant" row; we assert the id is
+    // PRESERVED to prove it was the content-only in-place swap, not the reload).
+    mockSubscribeToRun.mockImplementation(
+      async (_rid: string, _since: string, cb: StreamCallbacks, _signal?: AbortSignal) => {
+        cb.onDelta?.("Let me search the knowledge base. ")
+        cb.onDelta?.("Now I'll generate the chart. ")
+        cb.onDelta?.("Here is the blob answer tail.")
+        cb.onTerminal?.("done")
+        return new Promise<void>(() => {})
+      },
+    )
+
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread(THREAD_ID)
+    })
+
+    // The mount-path content-reconcile fires getMessages and swaps ONLY this run's
+    // assistant content to the persisted clean answer, keyed on run.run_id. Pre-fix
+    // (no content-reconcile + floor suppressed) the content stays BLOB → timeout.
+    expect(BLOB).not.toBe(CLEAN_ANSWER)
+    await waitFor(() => {
+      const bucket =
+        useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+      const asst = bucket.find((m) => m.role === "assistant" && m.runId === RUN_ID)
+      expect(asst?.content).toBe(CLEAN_ANSWER)
+    })
+    // getMessages was invoked by the reconcile (no full reload merged it — the
+    // floor is suppressed), and the swap was CONTENT-ONLY in place: the streaming
+    // placeholder keeps its temp id + terminal runStatus (tool fields preserved),
+    // rather than being replaced by the persisted "persisted-assistant" row.
+    expect(mockGetMessages).toHaveBeenCalledWith(THREAD_ID)
+    const bucket =
+      useStreamsStore.getState().bucketsBySurface.get("chat")?.get(THREAD_ID) ?? []
+    const asst = bucket.find((m) => m.role === "assistant" && m.runId === RUN_ID)
+    expect(asst?.id.startsWith("temp-")).toBe(true)
+    expect(asst?.runStatus).toBe("completed")
+  })
+})

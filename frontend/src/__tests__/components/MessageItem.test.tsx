@@ -218,3 +218,99 @@ describe("Phase 068.5 — pulse class gating on runStatus", () => {
     expect(botIcon.className).not.toContain("animate-brandPulse")
   })
 })
+
+// =============================================================================
+// Phase 174 Plan 02 — STATE-01a + STATE-02 terminal-state render invariants
+// (VERIFY, not rebuild — D-01/D-02).
+//
+// The cancelled-no-output affordance (MessageItem.tsx:632-649) and the
+// persistent "Response stopped" indicator (MessageItem.tsx:675-685) already
+// exist (Phase 147 / D-03). These cases LOCK them under test so the sibling
+// STATE-01b/03/04 edits in this phase — and any future MessageItem hot-file
+// churn — cannot silently regress them. No production render is rebuilt.
+//
+// Both conditions derive PURELY from `message.runStatus` (+ `!!message.content`
+// / `!isStreaming` gates). `runStatus` is the field the backend reload-derive
+// populates on every hydrate: threads.py:350-353 zips `runs.status → run_status`
+// keyed on the message's own `message_id` (so even the empty content_len=0
+// early-cancel row is populated), and api.ts:_mapMessageResponse (:198) maps
+// `run_status → runStatus` on every getMessages/getSnapshot. Asserting the
+// render fires from `runStatus` alone is therefore the component-level proof of
+// STATE-02's reload persistence: after a full cold reload the message carries
+// the same `runStatus`, so the same indicator renders — no live-only state
+// (`message.stopped`) required.
+// =============================================================================
+describe("Phase 174 — STATE-01a/02 terminal-state render (VERIFY, derives from runStatus)", () => {
+  it("STATE-01a — empty-content cancelled run renders 'cancelled — no output yet' (data-testid=cancelled-no-output)", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "", runStatus: "cancelled", tool_calls: [] })}
+        isStreaming={false}
+      />,
+    )
+    // The DeepSeek-early-cancel empty row (content_len=0) must render an honest
+    // affordance, never an avatar-only empty bubble (BUG-260710-02).
+    const affordance = screen.getByTestId("cancelled-no-output")
+    expect(affordance).toBeInTheDocument()
+    expect(affordance.textContent).toContain("cancelled — no output yet")
+  })
+
+  it("STATE-01a guard — the empty-content cancelled row does NOT also render 'Response stopped' (mutual exclusion via !!content)", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "", runStatus: "cancelled", tool_calls: [] })}
+        isStreaming={false}
+      />,
+    )
+    // The bottom indicator is gated on `runStatus === 'cancelled' && !!content`,
+    // so the empty row is handled ONLY by the "cancelled — no output yet"
+    // affordance above — never a double indicator.
+    expect(screen.queryByText("Response stopped")).toBeNull()
+  })
+
+  it("STATE-02 — a cancelled run WITH content renders the persistent 'Response stopped' indicator (reload-derived, not message.stopped)", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Here is a partial answer.", runStatus: "cancelled" })}
+        isStreaming={false}
+      />,
+    )
+    // `message.stopped` is LIVE-only and is NOT re-derived on reload; the
+    // indicator gates additionally on `runStatus === 'cancelled'` so it survives
+    // a full cold reload (BUG-260710-01 / Phase 147 D-03).
+    expect(screen.getByText("Response stopped")).toBeInTheDocument()
+  })
+
+  it("STATE-02 guard — a cancelled run WITH content does NOT render the empty 'cancelled — no output yet' affordance", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Here is a partial answer.", runStatus: "cancelled" })}
+        isStreaming={false}
+      />,
+    )
+    expect(screen.queryByTestId("cancelled-no-output")).toBeNull()
+  })
+
+  it("STATE-02 — a timed_out run renders 'Agent reached time limit' (and not 'Response stopped')", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Partial output before the deadline.", runStatus: "timed_out" })}
+        isStreaming={false}
+      />,
+    )
+    expect(screen.getByText("Agent reached time limit")).toBeInTheDocument()
+    expect(screen.queryByText("Response stopped")).toBeNull()
+  })
+
+  it("STATE-02 — the reload-derived indicator stays silent while the run is still streaming (gates on !isStreaming)", () => {
+    renderWithTooltip(
+      <MessageItem
+        message={makeMessage({ role: "assistant", content: "Streaming partial…", runStatus: "cancelled" })}
+        isStreaming={true}
+      />,
+    )
+    // The persistent indicator is a TERMINAL (reload) marker, never a live one —
+    // it must not fire on a still-streaming row.
+    expect(screen.queryByText("Response stopped")).toBeNull()
+  })
+})

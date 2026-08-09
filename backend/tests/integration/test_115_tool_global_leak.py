@@ -156,17 +156,17 @@ async def _seed_doc(pool, user_id, *, metadata, created_at, is_latest=True, vers
 
 
 async def _seed_global_view(pool, owner_id, *, name, field, value):
-    """Insert a document_views row with is_global=true directly (service-role).
+    """Insert a document_views row with is_system_global=true directly (service-role).
 
     A global view CANNOT be created through the router (create_view hard-sets
-    is_global=False). Globals are migration/service-role seeded only, exactly like
+    is_system_global=False). Globals are migration/service-role seeded only, exactly like
     global folders/skills. We seed it directly so the leak test can prove the TOOL
     HANDLER's resolve path is per-viewer for a genuinely shared view.
     """
     view_id = uuid4()
     filter_expr = {"op": "and", "conditions": [{"field": field, "op": "eq", "value": value}]}
     await pool.execute(
-        "INSERT INTO public.document_views (id, user_id, name, filter_expr, is_global) "
+        "INSERT INTO public.document_views (id, user_id, name, filter_expr, is_system_global) "
         "VALUES ($1, $2, $3, $4, true)",
         view_id, owner_id, name, filter_expr,
     )
@@ -183,7 +183,7 @@ async def two_users_global_view(pg_pool):
 
     user_a = await _seed_user(pg_pool, "a")
     user_b = await _seed_user(pg_pool, "b")
-    # The global view is OWNED by A but is_global=true → B can read it by name.
+    # The global view is OWNED by A but is_system_global=true → B can read it by name.
     view_id = await _seed_global_view(
         pg_pool, user_a, name="Global Invoices", field="document_type", value="invoice"
     )

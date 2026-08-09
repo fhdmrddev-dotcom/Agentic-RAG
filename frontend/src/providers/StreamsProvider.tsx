@@ -82,8 +82,17 @@ import {
   ApiError,
   type StreamCallbacks,
   type ThreadSnapshot,
+  // Phase 188 Plan 04 (D-188-22) — one durable workflow_phases row, as the wire
+  // sends it. The LIVE reconcile branch below joins these onto its positional
+  // skeleton by `phase_index` to recover the REAL step identity.
+  type WorkflowPhaseState,
 } from "@/lib/api"
 import { usePanelReconcile } from "@/hooks/usePanelReconcile"
+// Phase 166 (D-166-07/08): the org-context bridge. OrgProvider mounts ABOVE this
+// provider (App.tsx), so an org switch is observable here via the non-throwing
+// useOrgOptional — StreamsProvider stays renderable outside an OrgProvider (tests,
+// storybook) where it returns null and the teardown effect is inert.
+import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   useStreamsStore,
   type SurfaceId,
@@ -102,6 +111,11 @@ import {
   deriveWorkspacePanel,
   type DerivedPanelItem,
 } from "@/lib/workspacePanel"
+// Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the ONE phase-state derivation. The
+// `DB_PHASE_STATUS` map used to be declared in this file; it now lives in `lib/` with
+// the total function that owns its fallback, so the developer panel and the business
+// canvas cannot drift. This file consumes the derivation and re-derives nothing.
+import { phaseStatusFromDb } from "@/lib/phaseState"
 // BUG-260626-01 (+ sibling): collapse same-runId temp/persisted twins at the
 // bucket-read seam so useDerivedPanel's flat-map doesn't double-count a run.
 import { dedupMessagesByRunId } from "@/lib/dedupMessages"
@@ -805,13 +819,34 @@ export function makeStreamCallbacks(opts: {
       durationMs: number,
       outputFiles: OutputFile[],
       error?: string,
+      healed?: { stdout: string; stderr: string },
     ) => {
+      // WR-02 (176): a healed re-run streams NO code_stdout/code_stderr deltas, so the
+      // live outputLines still hold the FIRST run's pre-heal error text (e.g. a
+      // ModuleNotFoundError). When the completion carries the healed run of record,
+      // REPLACE outputLines with it — split into per-line entries to match the
+      // streamed/reload-reconstruct shape — so the card never shows stale error text
+      // under a success badge. Guarded on `healed` → the normal path leaves
+      // outputLines untouched (byte-identical, G-5 shared render path intact).
+      const healedLines: { kind: "stdout" | "stderr"; content: string }[] | undefined = healed
+        ? [
+            ...(healed.stdout || "").split("\n").filter(Boolean).map((content) => ({ kind: "stdout" as const, content })),
+            ...(healed.stderr || "").split("\n").filter(Boolean).map((content) => ({ kind: "stderr" as const, content })),
+          ]
+        : undefined
       setMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m
           const updated = (m.tool_calls ?? []).map((tc) =>
             tc.name === "execute_code" && tc.status === "running"
-              ? { ...tc, exitCode, executionDurationMs: durationMs, outputFiles, errorMessage: error }
+              ? {
+                  ...tc,
+                  exitCode,
+                  executionDurationMs: durationMs,
+                  outputFiles,
+                  errorMessage: error,
+                  ...(healedLines !== undefined ? { outputLines: healedLines } : {}),
+                }
               : tc,
           )
           return { ...m, tool_calls: updated }
@@ -972,6 +1007,21 @@ export function makeStreamCallbacks(opts: {
       useStreamsStore
         .getState()
         .actions.setPhaseStatusForThread(threadId, phase, "failed", { error: failure }),
+    // 189 review CR-02: a governed external-action phase RECORDED its intent and sent
+    // nothing. Flip the card to its OWN terminal, for the same reason onPhaseFailed
+    // above does: both sweeps (finalizeEarlierPhasesForThread from the NEXT phase's
+    // onPhaseStarted, finalizeAllPhasesForThread from onRunCompleted) act on exactly
+    // {running, retrying} and skip every terminal — so leaving this card `running` was
+    // not "unresolved until reconcile", it was "✓ Complete within milliseconds", mid-run,
+    // for any step that is not the last. `"recorded-not-sent"` is an existing
+    // Phase["status"] member with its STATUS_META row ("↛ Not sent"), its canvasReading
+    // arm ("Not sent — recorded") and its milestoneFor sentence already shipped; this
+    // handler is the only thing that was missing between the DB truth and the live view.
+    // Closure threadId (PANEL-09); phasesByThread only.
+    onPhaseRecordedNotSent: (phase) =>
+      useStreamsStore
+        .getState()
+        .actions.setPhaseStatusForThread(threadId, phase, "recorded-not-sent"),
     onPhaseTransition: (from, _to, via) => {
       // A skip_to_phase routing marks the FROM phase skipped (it was bypassed by
       // a gate's on_failure='skip_to_phase'). A normal advance is a no-op on
@@ -1145,6 +1195,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // per-thread. The reactive per-thread `streamingThreads` store Set (added/removed in
   // lockstep) still drives the composer's OWN-thread disable + Stop button.
   const sendingThreadsRef = useRef<Set<string>>(new Set())
+  // Phase 176-04 (RENDER-03 / D-10.1): a SIBLING to sendingThreadsRef marking threads
+  // whose send is INTENDED but not yet dispatched. ChatArea pre-marks a fresh thread
+  // here (via markThreadPendingSend) BEFORE setViewingThread fires its reconcile, so
+  // the preserve-guard (sendInFlightOnThisThread) preserves the optimistic temp across
+  // that nav reconcile even in the window before sendMessage adds to sendingThreadsRef.
+  // CRITICAL: this ref is intentionally NOT checked by sendMessage's duplicate-guard
+  // (:1807 checks ONLY sendingThreadsRef), so the pending flag does not false-early-
+  // return the real send. Cleared in lockstep with sendingThreadsRef (the send finally
+  // + the non-dispatch early-return).
+  const pendingSendThreadsRef = useRef<Set<string>>(new Set())
   // Phase 145-05 (D-145-05): per-thread last-stream-event epoch-ms. Stamped on
   // every streamingThreads add (send / reattach / reconcile-derive) and reset on
   // each stream event (onCursor); read by the inactivity watchdog (useEffect #3)
@@ -1391,6 +1451,16 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           }
         },
 
+        // Phase 176-04 (RENDER-03 / D-10.1): pre-mark a thread pending-send. ChatArea
+        // calls this BEFORE setViewingThread on a fresh thread so the nav reconcile's
+        // preserve-guard sees the in-flight intent and keeps the optimistic temp.
+        // Adds ONLY to pendingSendThreadsRef — never sendingThreadsRef — so
+        // sendMessage's duplicate-guard is untripped and the real send dispatches.
+        // Released alongside sendingThreadsRef (send finally + non-dispatch early-return).
+        markThreadPendingSend: (threadId) => {
+          pendingSendThreadsRef.current.add(threadId)
+        },
+
         // Phase 068 (L-068-02 + L-068-05): reconcile in-flight lock +
         // runId-match dedup. Source: useMessages.ts:948-1144.
         // Phase 075 D-075-02: atomic swap — the parallel
@@ -1432,7 +1502,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // `isSendingRef.current && streamingThreadIdRef.current === threadId`).
               // Each thread's optimistic temps are now preserved on its OWN send,
               // so a reconcile on thread A no longer wipes A's temps while B streams.
-              const sendInFlightOnThisThread = sendingThreadsRef.current.has(threadId)
+              // Phase 176-04 (RENDER-03 / D-10.1): honor the sibling pending-send ref
+              // too, so a reconcile fired between ChatArea's pre-mark and sendMessage's
+              // own sendingThreadsRef.add still preserves the fresh-thread optimistic
+              // temp. Composes with the 176-01 untyped-temp supersededByPersisted branch
+              // below (a temp with a persisted twin still drops; only the preserve
+              // WINDOW widens, never the drop rule).
+              const sendInFlightOnThisThread =
+                sendingThreadsRef.current.has(threadId) || pendingSendThreadsRef.current.has(threadId)
               const liveTempPlaceholders = prev.filter((m) => {
                 if (!m.id.startsWith("temp-")) return false
                 if (m.runId) {
@@ -1458,7 +1535,26 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                     (!dbRunIds.has(m.runId) && m.runStatus === "streaming")
                   )
                 }
-                return sendInFlightOnThisThread
+                // Phase 176 RENDER-01 (D-05 option b / D-06) + WR-01: a single send
+                // must render exactly ONE user bubble. Drop the untyped user temp ONLY
+                // once the snapshot holds its OWN persisted twin, matched by IDENTITY —
+                // the real message_id stamped as `registeredUserMsgId` when postMessage
+                // resolved (send path below). The PRIOR guard matched on CONTENT + a
+                // cross-clock `created_at >=` inequality, which was skew-fragile: the
+                // temp's created_at is the CLIENT clock while the persisted row's is the
+                // SERVER clock, so a client-ahead skew made the genuine twin compare
+                // "older" → the temp was NOT superseded → a duplicate user bubble that
+                // persisted to reload (WR-01). Identity is skew-free AND immune to any
+                // backend content trim/normalization. The 075.7 / D-06 preserve is
+                // intact: a still-in-flight temp with no registeredUserMsgId yet has no
+                // CONFIRMED twin → preserved (never stop preserving temps); its twin is
+                // deduped on the send path by the same message_id identity.
+                const supersededByPersisted =
+                  m.registeredUserMsgId !== undefined &&
+                  snapshot.messages.some(
+                    (s) => !s.id.startsWith("temp-") && s.id === m.registeredUserMsgId,
+                  )
+                return sendInFlightOnThisThread && !supersededByPersisted
               })
               return [...snapshot.messages, ...liveTempPlaceholders]
             })
@@ -1648,6 +1744,42 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                 // gate lives in the helper; not awaited (never blocks teardown);
                 // best-effort (.catch belt-and-suspenders — the helper swallows).
                 void _reconcileTodosOnTerminal(threadId, kind).catch(() => {})
+                // Phase 176 RENDER-02 (D-07): mirror the send-path onTerminal
+                // content-reconcile (:2004-2027) onto the mount/reconcile path so a
+                // BACKGROUNDED parallel-thread run un-folds its final answer LIVE on
+                // switch-back with no reload. message.content is the accumulated
+                // narration+answer blob (onDelta only APPENDS — the :358 invariant);
+                // the backend persists only the clean final answer. On a clean Deep
+                // terminal, swap JUST this run's assistant content to the persisted
+                // answer so StreamingNarration's fold gives way to a clean answer.
+                // Keyed on run.run_id (this path's runId — registeredRunId is
+                // undefined here; Pitfall 2). Content-ONLY (preserves tool_calls /
+                // suggestions / output-files / runStatus), far lighter than a full
+                // loadMessages replace; the .finally() loadMessages floor remains the
+                // reload-time backstop (D-v2.5-03). SEED-094 (backend stray last-line)
+                // stays OUT (D-09) — this faithfully renders whatever was persisted.
+                if (kind === "done" || kind === "reader_done") {
+                  const rid = run.run_id
+                  getMessages(threadId)
+                    .then((persisted) => {
+                      const answer = persisted.find(
+                        (m) => m.runId === rid && m.role === "assistant",
+                      )
+                      if (!answer) return
+                      useStreamsStore
+                        .getState()
+                        .actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                          prev.map((m) =>
+                            m.runId === rid &&
+                            m.role === "assistant" &&
+                            m.content !== answer.content
+                              ? { ...m, content: answer.content }
+                              : m,
+                          ),
+                        )
+                    })
+                    .catch(() => {})
+                }
                 if (errorPayload === "buffer_expired") {
                   useStreamsStore
                     .getState()
@@ -1745,7 +1877,34 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // `isSendingRef` boolean silently dropped it). Added synchronously here,
           // before the optimistic placeholders, so a fresh-thread reconcile's
           // preserve-guard sees it immediately.
-          if (sendingThreadsRef.current.has(threadId)) return
+          if (sendingThreadsRef.current.has(threadId)) {
+            // Phase 176-04 RENDER-03 (D-10.2 / D-11): the duplicate-guard non-dispatch
+            // path USED to return SILENTLY — so if a fresh-thread reconcile race ever
+            // routed the real send through here, the user's just-typed message vanished
+            // with no trace (BUG-260603-01, the intermittent silent send-drop). Honesty
+            // guarantee: stash the dropped draft + a quiet retry hint through the EXISTING
+            // 099-08 recovery seam (the SAME reconcileErrors + failedSendDrafts store
+            // shape as the ApiError rollback below). ChatArea's
+            // `prefillMessage={failedDraft ?? …}` restores the composer text and the
+            // per-thread banner surfaces the hint — the user never loses a message even
+            // if a race fires. The hint is an ApiError (400) so the existing banner
+            // renders its custom message (a plain Error would show the misleading
+            // "Couldn't load latest messages" copy) and hides the misleading reload-Retry
+            // (400 ∈ NON_RETRYABLE) — the composer prefill is the real retry affordance.
+            // No new toast/error channel (D-11). The successful-dispatch path and the
+            // ApiError rollback are untouched.
+            useStreamsStore.setState((s) => ({
+              reconcileErrors: new Map(s.reconcileErrors).set(
+                threadId,
+                new ApiError("Couldn't send — tap to retry", 400),
+              ),
+              failedSendDrafts: new Map(s.failedSendDrafts).set(threadId, content),
+            }))
+            // Phase 176-04 (RENDER-03 / D-10.1): release the pending flag — this send
+            // will not dispatch, so its pre-mark must not linger (mirrors the finally).
+            pendingSendThreadsRef.current.delete(threadId)
+            return
+          }
           sendingThreadsRef.current.add(threadId)
 
           // Optimistic user message.
@@ -1848,19 +2007,44 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // Phase 095.1-07 (GAP-2): also stamp the RESOLVED model/provider so the
             // RunCard run-sub shows `{provider} · {model}` LIVE. Coerce null →
             // undefined to match the Message type (string | undefined, not | null).
-            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
-              prev.map((m) => {
-                if (m.id === userMsg.id) return { ...m, id: message_id }
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => {
+              // Phase 176 WR-01: a reconcile can race AHEAD of this resolve and merge
+              // the persisted user twin (id === message_id) into the bucket while the
+              // temp is still untyped. Blindly swapping the temp id to message_id would
+              // then mint a SECOND row with the same id (duplicate user bubble +
+              // duplicate React key). If the twin is already present, DROP the temp
+              // instead of swapping; otherwise swap its id to the real message_id (the
+              // WR-04 contract) AND stamp registeredUserMsgId so any later reconcile
+              // dedups it by IDENTITY (skew-free), never the old created_at compare.
+              const persistedTwinPresent = prev.some(
+                (x) => x.role === "user" && !x.id.startsWith("temp-") && x.id === message_id,
+              )
+              return prev
+                .filter((m) => !(m.id === userMsg.id && persistedTwinPresent))
+                .map((m) => {
+                if (m.id === userMsg.id)
+                  return { ...m, id: message_id, registeredUserMsgId: message_id }
                 if (m.id === assistantId)
                   return {
                     ...m,
                     runId: run_id,
                     model: resolvedModel ?? undefined,
                     provider: resolvedProvider ?? undefined,
+                    // Phase 174-04 (STATE-04 / D-11): anchor the run-strip timer to a
+                    // stable wall-clock baseline so a nav-back remount keeps climbing
+                    // instead of reseeding elapsed from component mount (a multi-minute
+                    // workflow run reading "28s"). The kickoff POST response carries no
+                    // started_at (verified :1807-1818), so we use client send-time; the
+                    // persisted runs.started_at enrich (api.ts started_at→startedAt)
+                    // corrects any drift ≤ one RTT on the next hydrate. RunCard.tsx:122
+                    // (runStartMs = startedAt ?? created_at) is the already-correct 095.1
+                    // consumer — this stamps its SOURCE, no consumer edit, no backend
+                    // field (D-14: Deep byte-identical; the stamp is additive).
+                    startedAt: new Date().toISOString(),
                   }
                 return m
-              }),
-            )
+              })
+            })
 
             // Step 2: open the GET stream and dispatch SSE events to per-message-id callbacks.
             const callbacks: StreamCallbacks = makeStreamCallbacks({
@@ -2061,6 +2245,28 @@ export function StreamsProvider({ children }: PropsWithChildren) {
                   ),
                 ),
               }))
+            } else if (err instanceof ApiError && err.status === 403) {
+              // Phase 174 Plan 03 (STATE-01b / D-04 / D-05 / sketch 129-C amber tier):
+              // an administrative block — the workflows kill-switch (workflow_kickoff.py:200
+              // "Workflows are currently disabled by the administrator") or the app-layer ban,
+              // both raised as a 403 BEFORE any run/message is inserted. This is NOT a failure
+              // (red) and NOT the 400/409 rollback-banner path — it is 129-C's AMBER tier.
+              // DIVERGE from the 409/400 rollback shape: KEEP the user bubble, and REPLACE the
+              // empty assistant placeholder with an honest in-chat amber notice carrying the
+              // server's message verbatim (rendered as React text, never HTML — T-174-03-01).
+              // Keyed narrowly to status===403 and placed BEFORE the generic ApiError branch
+              // so the 400 disabled-skill + 409 workflow-lock rollback paths stay byte-identical
+              // (D-05). No run_id / runs query — the 403 fires before any INSERT (Pitfall 5).
+              useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, blockedNotice: { message: err.message } } : m,
+                ),
+              )
+              // D-04: guarantee the composer is never left locked. The kickoff lock is only
+              // seeded AFTER run_id (a 403 never gets there), so this is a defensive no-op in
+              // the common case — keyed by the OWNING threadId closure (A25 per-thread
+              // isolation), never a global flag, so a parallel Thread B is untouched.
+              useStreamsStore.getState().actions.clearWorkflowLockForThread(threadId)
             } else if (err instanceof ApiError) {
               // 099-08 (UAT L10): a non-409 kickoff/send refusal (e.g. the 400
               // disabled-skill gate). Mirror the 409 rollback shape — drop BOTH
@@ -2091,6 +2297,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             // SEED-055: release THIS thread's send slot (per-thread; other threads'
             // in-flight sends are unaffected).
             sendingThreadsRef.current.delete(threadId)
+            // Phase 176-04 (RENDER-03 / D-10.1): release the sibling pending flag in
+            // lockstep — the send has resolved/aborted, so the fresh-thread pre-mark
+            // is done. Deleting a non-present key is a no-op on the non-fresh path.
+            pendingSendThreadsRef.current.delete(threadId)
             // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads delete.
             // This is the AUTHORITATIVE streaming-end write — clearThreadBucket
             // no longer writes here (D-075.4-A1 invariant; see L:617).
@@ -2622,6 +2832,23 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // phase of a completed run IS completed). NEVER touch a phase that
         // legitimately ended failed/skipped — those are terminal truths, not
         // stragglers. Closure threadId only (PANEL-09); phasesByThread only.
+        //
+        // Phase 188 Plan 02 (RUNVIZ-02 / Req 3 / Req 4) — `pending` LEFT the predicate,
+        // and the sentence directly above is the argument for it. The 098-UAT reason
+        // for this sweep is a MISSED `phase_completed` for a phase that DID run, so the
+        // legitimate stragglers are exactly {running, retrying}; `pending` was never one
+        // of them, and it is REACHABLE. `skip_to_phase` marks ONLY the current phase
+        // (`harness_engine.py:1561-1563`) — every phase between it and the jump target
+        // keeps `status='pending'` in `workflow_phases` for the life of the run, and
+        // nothing ever revisits them. So on any skip-bearing workflow this sweep painted
+        // a step that NEVER RAN as Complete, while a reconcile rebuilt from those same
+        // rows restored "Not started": the live view and the reload disagreed about
+        // whether work happened, which is precisely what Req 4 forbids. A never-ran
+        // `pending` at run completion is a terminal truth by the same logic that already
+        // protects failed/skipped, not a straggler to be tidied. Falsified first, RED
+        // observed on unmodified source, in `panel/__tests__/PhaseReconcile.test.tsx`
+        // (D-188-09) — with positive controls that the running/retrying sweep survives,
+        // so this narrowing cannot be mistaken for disabling the sweep.
         finalizeAllPhasesForThread: (threadId) =>
           useStreamsStore.setState((s) => {
             const next = new Map(s.phasesByThread)
@@ -2629,7 +2856,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             if (!prev || prev.length === 0) return {}
             let changed = false
             const swept = prev.map((p) => {
-              if (p.status === "running" || p.status === "retrying" || p.status === "pending") {
+              if (p.status === "running" || p.status === "retrying") {
                 changed = true
                 return { ...p, status: "done" as const }
               }
@@ -2876,6 +3103,75 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     }
   }, [])
 
+  // ---- useEffect #5 (Phase 166 D-166-08): org-switch stream teardown ----
+  // OrgProvider mounts ABOVE this provider (App.tsx / D-166-07), so an org switch is
+  // observable here via useOrgOptional (null outside an OrgProvider → this effect is inert,
+  // so the standalone StreamsProvider tests are byte-unchanged). On a REAL org change (not
+  // the initial mount), tear down every in-flight subscription so no stale old-org SSE frame
+  // repopulates a bucket, then clear the viewed thread's bucket in each active surface
+  // THROUGH the existing 067.5-guarded `clearThreadBucket` action (its mid-stream-send
+  // predicate at :1340 is preserved verbatim — a thread with a send in flight is NEVER
+  // wiped). This is the SAME guarded action looped across surfaces; it is NOT a
+  // new bucket-wipe path (G-5: minimal surface-area change in this hot file). The new org's
+  // thread LIST is refetched by ChatLayout (Plan 05, keyed on the same activeOrgId); the
+  // `X-Org-Id` header is already the new org synchronously (OrgProvider → setActiveOrgId), so
+  // the isolation boundary is the server-validated fetch (D-v2.5-03: Realtime is best-effort,
+  // never the boundary). We deliberately do NOT re-reconcile the stale viewed thread here — a
+  // fetch of the OLD thread under the NEW header could re-populate old-org data; the user
+  // reconciles to the new org by navigating the refetched list.
+  const activeOrgId = useOrgOptional()?.activeOrgId ?? null
+  const prevOrgRef = useRef<string | null | undefined>(undefined)
+  useEffect(() => {
+    const prev = prevOrgRef.current
+    prevOrgRef.current = activeOrgId
+    // Skip the initial mount (undefined → first value) and any no-op re-render: only an
+    // actual SWITCH tears down.
+    if (prev === undefined || prev === activeOrgId) return
+    // 1) Tear down in-flight subscriptions AND their store mirrors IN LOCKSTEP (WR-02). A
+    //    caller-initiated abort is a SILENT return in subscribeToRun (api.ts — an AbortError
+    //    fires NO onTerminal), so the store mirrors that onTerminal would clean are never
+    //    cleaned by the abort alone. Exactly like the enforceStreamPool evictor (:1204-1208),
+    //    we must replicate the onTerminal remove pair ourselves: subscriptionsRef.delete +
+    //    _removeRunFromThread. The pre-WR-02 teardown copied the UNMOUNT-cleanup shape
+    //    (abort-all + subscriptionsRef.clear only) — fine on unmount (the whole store is
+    //    discarded) but on a LIVE switch it left subscriptionsByThread holding stale old-org
+    //    run ids AND streamingThreads holding the old-org thread, so the inactivity watchdog
+    //    kept probing getSnapshot(oldThread) under the NEW X-Org-Id — a permanent phantom
+    //    "streaming" state plus a wasted cross-org 404 every ~20s, forever.
+    const byThread = useStreamsStore.getState().subscriptionsByThread
+    for (const [ownerThreadId, runIds] of byThread) {
+      for (const runId of runIds) {
+        subscriptionsRef.current.get(runId)?.abort()
+        subscriptionsRef.current.delete(runId)
+        useStreamsStore.setState((s) => ({
+          subscriptionsByThread: _removeRunFromThread(
+            s.subscriptionsByThread,
+            ownerThreadId,
+            runId,
+          ),
+        }))
+      }
+    }
+    // Belt-and-suspenders: abort + drop any controller NOT tracked in the per-thread mirror
+    // so no in-flight subscription survives the switch (the unmount-cleanup guarantee).
+    for (const ctrl of subscriptionsRef.current.values()) ctrl.abort()
+    subscriptionsRef.current.clear()
+    // Clear streamingThreads for the torn-down threads so the watchdog stops probing the old
+    // org's threads. Guarded by sendingThreadsRef so a thread with a send IN FLIGHT is never
+    // finalized here — the send-path finally owns its own streamingThreads.delete (the 067.5
+    // per-thread contract; same guard predicate as clearThreadBucket at :1340).
+    useStreamsStore.setState((s) => {
+      const next = new Set(s.streamingThreads)
+      for (const t of s.streamingThreads) if (!sendingThreadsRef.current.has(t)) next.delete(t)
+      return { streamingThreads: next }
+    })
+    // 2) Clear each active surface's viewed-thread bucket THROUGH the existing guarded action.
+    const actions = useStreamsStore.getState().actions
+    for (const surface of useStreamsStore.getState().bucketsBySurface.keys()) {
+      actions.clearThreadBucket(surface)
+    }
+  }, [activeOrgId])
+
   return <>{children}</>
 }
 
@@ -3032,34 +3328,120 @@ export function useTasks(threadId: string | null): {
  * a no-op (returns []) when the thread is Deep / has no run, so the skeleton
  * only appears for an actual harness run.
  */
-// Phase 098-UAT run-honesty fix (B): map a DB-native workflow_phases.status to the
-// Phase status union the PhaseCard renders verbatim (active→running, completed→done).
-const DB_PHASE_STATUS: Record<string, Phase["status"]> = {
-  pending: "pending",
-  active: "running",
-  completed: "done",
-  failed: "failed",
-  skipped: "skipped",
-}
+// Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the Phase-098-UAT `DB_PHASE_STATUS` map
+// MOVED to `@/lib/phaseState` — verbatim, with its provenance comment — and this file
+// now imports `phaseStatusFromDb` instead. The map is unchanged; only its address is.
 
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
-  // Live/ACTIVE harness run → the existing forward-only skeleton floor (UNCHANGED):
-  // total_phases rows, the current one running. Slugs are unknown ahead of live
-  // phase_started (only current_phase_slug is known), so non-current rows carry
-  // positional placeholder slugs the live events replace.
+  // Live/ACTIVE harness run → the forward-only skeleton floor: total_phases rows, the
+  // current one running, with the REAL step identity overlaid from `wf.phases`.
+  //
+  // Phase 188 Plan 04 (RUNVIZ-01 / D-188-22) — BUG-260609-04 closed at its root. This
+  // comment used to read "slugs are unknown ahead of live phase_started, so non-current
+  // rows carry positional placeholders the live events replace". THAT PREMISE IS FALSE,
+  // and it is measured, not argued: `create_workflow_run`
+  // (`backend/app/db/workflows.py:206-214`) inserts EVERY `workflow_phases` row at run
+  // CREATION, all `pending`, inside one transaction — and it is the ONLY
+  // `INSERT INTO workflow_phases` anywhere in `backend/app`. `GET /threads/{id}/workflow`
+  // resolves `phases_source_run_id = active_workflow_run_id` FIRST, so `slug`,
+  // `phase_index`, `status` and `phase_type` arrive for every position of a LIVE run too.
+  // The real names were always on the wire; this branch was discarding them and painting
+  // `phase-0` at the operator (the exact render the bug report screenshotted).
+  //
+  // The overlay is therefore COMPLETE, not partial. D-188-22's hedge — "keep the
+  // total_phases floor for rows the harness has not inserted yet" — describes a case that
+  // cannot occur. `total_phases` stays the array length as defence in depth ONLY; it is
+  // not load-bearing (it equals `len(phases)` whenever the anchor is set,
+  // `threads.py:1100-1101`). The `?? placeholder` tails below are kept for the same
+  // reason, and are exercised by a positive control rather than assumed.
+  //
+  // THE JOIN KEY IS `phase_index`, NEVER the slug: the very value this branch can emit as
+  // a placeholder cannot also be the key that repairs it. Same reasoning as the
+  // BUG-260609-01 by-INDEX sweep above. (188-04 read `byIndex.get(i)` twice rather than
+  // hoisting it, specifically so the status line stayed byte-identical in that diff. CR-06
+  // changes the status line, so that reason has expired and the lookup is hoisted.)
+  //
+  // STATUS IS NOT OVERLAID WHOLESALE — the identity overlay carries `slug` and
+  // `phaseType`, and the positional derivation remains a FORWARD-ONLY floor. Overlaying
+  // status wholesale is the regression 188-04 refused: the derivation is in some cases
+  // MORE advanced than the rows, and a lagging row would drag `PhaseTimeline`'s shipped
+  // counter (`PhaseTimeline.tsx:115-127`) backward — strictly worse than the cosmetic
+  // defect being closed (T-188-04-01). The floor guard in
+  // `panel/__tests__/PhaseReconcile.test.tsx` fences that, with a fixture holding every DB
+  // row at `pending` while the counter has already advanced.
+  //
+  // ⚠ CR-06 (Phase 188 review) — BUT THE FLOOR MAY ONLY ADVANCE AN *UNRESOLVED* ROW.
+  // Plan 02 narrowed `finalizeAllPhasesForThread` because "on any skip-bearing workflow
+  // this sweep painted a step that NEVER RAN as Complete, while a reconcile rebuilt from
+  // those same rows restored 'Not started': the live view and the reload disagreed —
+  // precisely what Req 4 forbids." The identical fail-open survived one function away, in
+  // this branch's own `i < current ? "done"`.
+  //
+  // Measured, not argued: `harness_engine.py`'s skip branch calls `skip_phase(pool,
+  // phase_id)` (the row becomes `skipped`) and then `i = target_i; continue`, so every row
+  // between it and the target keeps `pending` and nothing revisits them. And
+  // `advance_current_phase` is called at ONE site, AFTER `complete_phase`/`fail_phase`,
+  // and NOT on the skip branch — so the cursor can be parked ON the skipped row (which
+  // painted it `running`: a jumped-over step reported as executing right now) or already
+  // past it (which painted it `done`). Both were wrong; a reload restored `Skipped` for
+  // both.
+  //
+  // THE RULE, stated once: a DB row the engine has already RESOLVED — `done`, `failed`,
+  // `skipped`, or a status this client cannot name — is a terminal truth the positional
+  // counter must not overwrite. Only an UNRESOLVED row (`pending` / `active`, i.e. the lag
+  // the floor exists for) takes the positional value. That keeps the floor forward-only
+  // (the guard fixture is all-`pending`, so it is untouched) while making the live view
+  // agree with the reload it will be replaced by. `unknown` is included for Req 3's
+  // reason one level up: a status we cannot name may never be upgraded to success.
   if (wf.mode === "harness" && !wf.lock_is_stale) {
     const total = wf.total_phases ?? 0
     if (total <= 0) return []
     const current = wf.current_phase_index ?? 0
-    return Array.from({ length: total }, (_, i): Phase => ({
-      slug: i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`,
-      phaseIndex: i,
-      phaseType: "unknown",
-      status: i < current ? "done" : i === current ? "running" : "pending",
-      subAgents: [],
-      pendingAsk: null,
-    }))
+    const byIndex = new Map<number, WorkflowPhaseState>(
+      (wf.phases ?? []).map((r) => [r.phase_index, r]),
+    )
+    return Array.from({ length: total }, (_, i): Phase => {
+      const row = byIndex.get(i)
+      const positional: Phase["status"] =
+        i < current ? "done" : i === current ? "running" : "pending"
+      const db = row ? phaseStatusFromDb(row.status) : undefined
+      // `pending` / `running` are the UNRESOLVED readings — those, and only those, defer
+      // to the floor. Everything else is a resolution the engine already wrote down.
+      const resolved = db != null && db !== "pending" && db !== "running"
+      // ⚠ F2 (UAT 2026-08-05) — AND THE FLOOR MAY NEVER UPGRADE AN EARLIER ROW TO `done`.
+      //
+      // CR-06 taught the floor to respect a RESOLVED row. It did not cover the rows a skip
+      // leaves BEHIND: `harness_engine.py` jumps `i = target_i` and every row in between
+      // keeps `pending` forever, unresolved, with the cursor now past it. Those took the
+      // positional value and read `done` — a step that never ran, reported Complete. That is
+      // SPEC failure #2, and Req 3's rule in one line: success may never be inferred from the
+      // ABSENCE of an event, and a `pending` row before the cursor is exactly that absence.
+      //
+      // It is also Req 4, measured: `reconcilePhases` picks between two derivations on
+      // `wf.lock_is_stale`, and that flag was observed `true` on a run still `active` (an
+      // `llm_human_input` phase ends its producer run while the workflow run continues). So
+      // the same rows read `done` early and `Not started` later — the reading changed with no
+      // state change behind it. The two branches now agree by construction.
+      //
+      // The floor keeps its actual job: advancing the CURRENT row to `running` ahead of the
+      // DB write. What it loses is the right to call an earlier unresolved row finished. The
+      // cost is a sub-second lag in the ordinary case (a row completed but not yet written
+      // reads `running` rather than `done`, and self-corrects on the next poll) — the correct
+      // trade against claiming a success that never happened. The Phase-094 counter guard is
+      // untouched: that floor is over `current_phase_index`, not over these statuses.
+      const floored: Phase["status"] = i < current && db != null ? db : positional
+      return {
+        slug:
+          row?.slug ??
+          (i === current ? (wf.current_phase_slug ?? `phase-${i}`) : `phase-${i}`),
+        phaseIndex: i,
+        phaseType: row?.phase_type ?? "unknown",
+        status: resolved ? db : floored,
+        subAgents: [],
+        pendingAsk: null,
+      }
+    })
   }
   // Phase 098-UAT run-honesty fix (B): NOT a live/active harness run. A COMPLETED
   // workflow run CLEARS the thread anchor (mode flips back to "deep"); a terminal
@@ -3079,7 +3461,22 @@ async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<
       slug: r.slug,
       phaseIndex: r.phase_index,
       phaseType: r.phase_type ?? "unknown",
-      status: DB_PHASE_STATUS[r.status] ?? "done",
+      // Phase 188 Plan 02 (RUNVIZ-02 / Req 3 / D-188-08): the fallback below WAS the
+      // literal `done` — an unrecognised server status READ AS SUCCESS. (Spelled that
+      // way here on purpose: a grep for the old fallback token must return zero over
+      // this file, and a comment quoting it would keep the guard vacuous — 187-24.)
+      // Every DB value is mapped
+      // today, which is exactly the argument under which the publish gauntlet shipped
+      // its `findIndex → -1` fail-open and painted an unknown `blocked_stage` as 8/8
+      // green. Third occurrence of the same lesson: fail CLOSED on a state we cannot
+      // name. Falsified first (`panel/__tests__/PhaseReconcile.test.tsx`, RED observed
+      // on unmodified source), with a positive control that `completed` still maps.
+      //
+      // Phase 188 Plan 05: the map lookup AND its fallback moved bodily into the total
+      // `phaseStatusFromDb` (`lib/phaseState.ts`). That is the point of the extraction
+      // — a fallback at each call site is a fallback that can be got wrong at each
+      // call site; there is now exactly one.
+      status: phaseStatusFromDb(r.status),
       subAgents: [],
       pendingAsk: null,
   }))

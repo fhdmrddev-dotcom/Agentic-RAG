@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sketch 132 — Org Entry & Failure Honesty</title>
+<link rel="stylesheet" href="../themes/default.css" />
+<style>
+  body { padding-top: 0; }
+
+  .state-strip {
+    position: sticky; top: 45px; z-index: 90;
+    display: flex; flex-wrap: wrap; gap: 14px; align-items: center;
+    background: hsl(220 40% 5% / 0.92);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--color-border);
+    padding: 9px 20px; font-size: var(--text-xs);
+  }
+  .state-group { display: flex; align-items: center; gap: 6px; }
+  .glabel { color: var(--color-text-dim); text-transform: uppercase; letter-spacing: 0.07em; font-size: 10px; margin-right: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--color-border); border-radius: var(--radius-full); overflow: hidden; }
+  .seg button { background: transparent; color: var(--color-text-muted); border: none; padding: 4px 11px; font-size: 11px; font-family: var(--font-sans); cursor: pointer; transition: all var(--dur-fast) var(--ease-out); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .seg button:hover:not(.on) { color: var(--color-text); }
+
+  .vnote { max-width: 900px; margin: 12px auto 0; padding: 8px 14px; font-size: 12px; color: var(--color-text-muted); border-left: 2px solid var(--color-primary); background: var(--color-primary-dim); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
+  .vnote b { color: var(--color-primary); }
+
+  /* branded auth stage */
+  .stage { position: relative; overflow: hidden; min-height: 620px; display: flex; align-items: center; justify-content: center; padding: 40px 20px 90px; }
+  .orb { position: absolute; width: 380px; height: 380px; border-radius: 50%; filter: blur(80px); pointer-events: none; }
+  .orb.a { top: 10%; left: -120px; background: hsl(239 100% 82% / 0.12); }
+  .orb.b { bottom: 10%; right: -120px; background: hsl(258 90% 66% / 0.12); }
+
+  .card {
+    position: relative; z-index: 2; width: 100%; max-width: 420px;
+    background: hsl(220 30% 7% / 0.82); backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border); border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-lg); padding: 30px 28px 26px; text-align: center;
+    animation: fadeSlideUp var(--dur-slow) var(--ease-out);
+  }
+  .brand-orb {
+    width: 56px; height: 56px; margin: 0 auto 16px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+    display: grid; place-items: center; color: #fff; box-shadow: 0 8px 24px hsl(239 84% 67% / 0.35);
+  }
+  .card h1 { font-family: var(--font-headline); font-size: var(--text-2xl); font-weight: 700; margin: 0 0 6px; }
+  .card .sub { font-size: var(--text-sm); color: var(--color-text-muted); margin: 0 0 20px; }
+
+  .field { text-align: left; margin-bottom: 14px; }
+  .field label { display: block; font-size: var(--text-sm); font-weight: 500; margin-bottom: 6px; color: var(--color-text); }
+  .field input {
+    width: 100%; background: var(--color-bg); border: 1px solid var(--color-border);
+    border-radius: var(--radius-md); padding: 10px 12px; color: var(--color-text);
+    font-family: var(--font-sans); font-size: var(--text-sm); transition: border var(--dur-fast) var(--ease-out);
+  }
+  .field input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-dim); }
+  .reveal { animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+
+  .btn {
+    width: 100%; border: none; border-radius: var(--radius-md); padding: 11px; font-size: var(--text-sm);
+    font-weight: 600; font-family: var(--font-sans); cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn.primary { background: var(--color-primary-strong); color: #fff; }
+  .btn.primary:hover { background: hsl(239 84% 60%); box-shadow: var(--shadow-glow-primary); }
+  .btn.outline { background: transparent; color: var(--color-text); border: 1px solid var(--color-border); }
+  .btn.outline:hover { background: var(--color-accent); }
+  .btn.sso { background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet)); color: #fff; }
+  .btn.sso:hover { box-shadow: var(--shadow-glow-primary); }
+
+  .link-btn { background: none; border: none; color: var(--color-primary); font-size: var(--text-sm); cursor: pointer; font-family: inherit; }
+  .link-btn:hover { text-decoration: underline; }
+  .muted-row { margin-top: 14px; font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  /* ── the shared honest-notice vocabulary (variant B/C thesis) ── */
+  .notice { display: flex; gap: 10px; text-align: left; border-radius: var(--radius-md); padding: 11px 13px; font-size: 12.5px; margin: 4px 0 14px; border: 1px solid; align-items: flex-start; }
+  .notice .nic { flex: none; margin-top: 1px; }
+  .notice .ntx b { display: block; margin-bottom: 2px; }
+  /* tone: calm (recoverable) = muted, info = indigo, good = success, error = weight */
+  .notice.calm { border-color: var(--color-border); background: var(--color-muted); color: var(--color-text-muted); }
+  .notice.calm .nic { color: var(--color-text-dim); }
+  .notice.calm b { color: var(--color-text); }
+  .notice.info { border-color: var(--color-primary-glow); background: var(--color-primary-dim); color: var(--color-text-muted); }
+  .notice.info .nic { color: var(--color-primary); }
+  .notice.info b { color: var(--color-primary); }
+  .notice.good { border-color: hsl(142 71% 45% / 0.4); background: var(--color-success-dim); color: var(--color-text-muted); }
+  .notice.good .nic { color: var(--color-success); }
+  .notice.good b { color: var(--color-success); }
+  .notice.error { border-color: hsl(0 72% 51% / 0.4); background: var(--color-danger-dim); color: var(--color-text-muted); }
+  .notice.error .nic { color: var(--color-danger); }
+  .notice.error b { color: var(--color-danger); }
+
+  /* faithful (variant A) failure = plain destructive text + generic alert icon */
+  .plain-alert { text-align: center; padding: 8px 0 4px; }
+  .plain-alert .pi { color: var(--color-text-dim); margin: 4px auto 12px; display: block; width: 32px; height: 32px; }
+  .plain-alert .pmsg { font-size: var(--text-sm); color: var(--color-text-muted); margin-bottom: 16px; }
+  .plain-good { text-align: center; padding: 8px 0; }
+  .plain-good .gi { color: var(--color-primary); margin: 6px auto 12px; display: block; width: 34px; height: 34px; }
+  .accepting { display: flex; align-items: center; justify-content: center; gap: 9px; padding: 22px 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* SSO detected chip on continue */
+  .sso-detected { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-primary); background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow); border-radius: var(--radius-full); padding: 2px 9px; margin-bottom: 12px; }
+
+  .variant { display: none; }
+  .variant.active { display: block; }
+  .hint { text-align: center; font-size: 11px; color: var(--color-text-dim); padding-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <span class="label">Sketch 132 · Org entry & failure honesty</span>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: As-shipped faithful</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: Unified card + one honest-notice <span class="star">★</span></button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Sign-in depth (fail-open)</button>
+</div>
+
+<div class="state-strip">
+  <div class="state-group">
+    <span class="glabel">Surface</span>
+    <div class="seg" id="seg-surface">
+      <button data-surface="signin" class="on" onclick="setState('surface','signin')">Sign in</button>
+      <button data-surface="invite" onclick="setState('surface','invite')">Accept invite</button>
+    </div>
+  </div>
+  <div class="state-group" id="grp-signin">
+    <span class="glabel">Sign-in scenario</span>
+    <div class="seg" id="seg-scn">
+      <button data-scn="start" class="on" onclick="setState('scn','start')">Email step</button>
+      <button data-scn="sso" onclick="setState('scn','sso')">SSO domain</button>
+      <button data-scn="pw" onclick="setState('scn','pw')">No SSO → password</button>
+      <button data-scn="failopen" onclick="setState('scn','failopen')">Route outage (fail-open)</button>
+    </div>
+  </div>
+  <div class="state-group" id="grp-invite" style="display:none;">
+    <span class="glabel">Invite state</span>
+    <div class="seg" id="seg-inv">
+      <button data-inv="auth" class="on" onclick="setState('inv','auth')">Auth</button>
+      <button data-inv="accepting" onclick="setState('inv','accepting')">Accepting</button>
+      <button data-inv="joined" onclick="setState('inv','joined')">Joined</button>
+      <button data-inv="already" onclick="setState('inv','already')">Already member</button>
+      <button data-inv="missing" onclick="setState('inv','missing')">Missing token</button>
+      <button data-inv="error" onclick="setState('inv','error')">Expired / revoked</button>
+    </div>
+  </div>
+</div>
+
+<div class="variant active" id="variant-a"></div>
+<div class="variant" id="variant-b"></div>
+<div class="variant" id="variant-c"></div>
+
+<div class="hint">A leaves each failure to its own ad-hoc copy · B routes <b>every</b> outcome through one calm notice vocabulary · C shows the three sign-in outcomes, all <b>fail-open</b> (a route outage never locks you out).</div>
+
+<div class="sketch-toolbar">
+  <span>theme</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script>
+const IC = {
+  sparkles:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 1.9 4.8L18.7 9l-4.8 1.9L12 15l-1.9-4.1L5.3 9l4.8-1.2z"/><path d="M19 15l.7 1.8L21.5 17.5l-1.8.7L19 20l-.7-1.8L16.5 17.5l1.8-.7z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  loader:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21 12a9 9 0 1 1-6.2-8.5" stroke-linecap="round"/></svg>',
+  info:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg>',
+  ok:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/></svg>',
+  warn:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>',
+  lock:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>',
+};
+
+const S = { active:'a', surface:'signin', scn:'start', inv:'auth' };
+
+const VCFG = {
+  a:{ unified:false, note:'<b>A — As-shipped faithful.</b> Both surfaces as built today: identifier-first sign-in + the /invite landing’s six states. Each failure keeps its own ad-hoc treatment (a generic alert glyph + plain grey copy). Baseline — reveals the inconsistency to fix.' },
+  b:{ unified:true, note:'<b>B — Unified card + one honest-notice.</b> Sign-in and /invite share ONE card shell, and <i>every</i> outcome routes through one notice vocabulary keyed by severity: calm-muted for recoverable (missing / expired → “ask for a fresh link”), indigo for in-progress, green for success, weight ONLY for a genuine system error. The cohesion + honesty synthesis.' },
+  c:{ unified:true, note:'<b>C — Sign-in depth (fail-open).</b> B’s language, focused on the three identifier-first outcomes: SSO domain → branded redirect; no SSO → password reveal; route outage → <b>fail-open</b> to password with a quiet note. A route outage must degrade to password login, never a lockout (T-168-07 / SC#3).' },
+};
+
+// ── Sign-in surface ──
+function signinCard(v){
+  const cfg=VCFG[v];
+  const showPw = (S.scn==='pw' || S.scn==='failopen');
+  const ssoDetected = S.scn==='sso';
+
+  let inner = `
+    <div class="field">
+      <label for="e">Email</label>
+      <input id="e" type="email" value="riley@acme.com" />
+    </div>`;
+
+  if (ssoDetected){
+    inner += `
+      <div style="text-align:left;"><span class="sso-detected">${IC.lock} SSO found for acme.com</span></div>
+      <button class="btn sso">${IC.lock} Continue with Acme SSO</button>
+      <div class="muted-row">Redirects to your identity provider. <button class="link-btn">Use a password instead</button></div>`;
+    // in unified variants add an info notice explaining the branded redirect
+    if (cfg.unified){
+      inner = `<div class="notice info"><span class="nic">${IC.info}</span><span class="ntx"><b>Single sign-on</b>acme.com uses SSO — we’ll hand you to your identity provider. Password sign-in stays available.</span></div>` + inner;
+    }
+  } else if (showPw){
+    inner += `
+      <div class="field reveal">
+        <label for="p">Password</label>
+        <input id="p" type="password" value="••••••••" />
+      </div>`;
+    if (S.scn==='failopen'){
+      inner += cfg.unified
+        ? `<div class="notice calm"><span class="nic">${IC.info}</span><span class="ntx"><b>Signing in with a password</b>We couldn’t reach single sign-on just now, so you can sign in with your password. Nothing’s wrong with your account.</span></div>`
+        : `<p style="text-align:left;font-size:12px;color:var(--color-text-muted);margin:0 0 12px;">We couldn't start SSO sign-in. Try again, or sign in with your password.</p>`;
+    }
+    inner += `<button class="btn primary">Sign In</button>`;
+    inner += `<div class="muted-row"><button class="link-btn">Sign in with SSO</button></div>`;
+  } else {
+    // resting email step
+    inner += `<button class="btn primary" onclick="setState('scn','sso')">Continue</button>
+      <div class="muted-row"><button class="link-btn" onclick="setState('scn','failopen')">Sign in with SSO</button></div>`;
+  }
+
+  inner += `<div class="muted-row" style="margin-top:16px;border-top:1px solid var(--color-border-soft);padding-top:14px;">Don't have an account? <button class="link-btn">Sign up</button></div>`;
+
+  return card('Welcome back','Sign in to your workspace.', inner);
+}
+
+// ── Accept-invite surface ──
+function inviteCard(v){
+  const cfg=VCFG[v];
+  let sub='', body='';
+  switch(S.inv){
+    case 'auth':
+      sub='Sign in or create an account to join the organization.';
+      body = `
+        <div class="field"><label>Email</label><input type="email" value="you@company.com" /></div>
+        <button class="btn primary">Continue</button>
+        <div class="muted-row" style="margin-top:16px;border-top:1px solid var(--color-border-soft);padding-top:14px;">Don't have an account? <button class="link-btn">Sign up</button></div>`;
+      break;
+    case 'accepting':
+      sub='Joining the organization…';
+      body = `<div class="accepting">${IC.loader}<span>Accepting your invitation…</span></div>`;
+      break;
+    case 'joined':
+      sub="You're in!";
+      body = cfg.unified
+        ? `<div class="notice good"><span class="nic">${IC.ok}</span><span class="ntx"><b>You've joined Acme Robotics</b>Taking you to the app…</span></div>`
+        : `<div class="plain-good"><span class="gi">${IC.check}</span><div class="pmsg">You've joined the organization. Taking you to the app…</div></div>`;
+      break;
+    case 'already':
+      sub="You're already a member";
+      body = cfg.unified
+        ? `<div class="notice info"><span class="nic">${IC.info}</span><span class="ntx"><b>You already belong to this organization</b>Taking you to the app…</span></div>`
+        : `<div class="plain-good"><span class="gi">${IC.check}</span><div class="pmsg">You already belong to this organization. Taking you to the app…</div></div>`;
+      break;
+    case 'missing':
+      sub='This invite link looks incomplete';
+      body = cfg.unified
+        ? `<div class="notice calm"><span class="nic">${IC.warn}</span><span class="ntx"><b>This link is missing its token</b>Ask whoever invited you to send a fresh link — this one can’t be used as-is.</span></div>
+           <button class="btn outline">Go to the app</button>`
+        : `<div class="plain-alert"><span class="pi">${IC.alert}</span><div class="pmsg">This invite link is missing its token. Please ask whoever invited you for a fresh link.</div><button class="btn outline">Go to the app</button></div>`;
+      break;
+    case 'error':
+      sub="We couldn't accept this invite";
+      body = cfg.unified
+        ? `<div class="notice calm"><span class="nic">${IC.warn}</span><span class="ntx"><b>This invitation has expired or been revoked</b>Ask whoever invited you to resend it — a fresh link will work.</span></div>
+           <button class="btn outline">Go to the app</button>`
+        : `<div class="plain-alert"><span class="pi">${IC.alert}</span><div class="pmsg">This invitation has expired or been revoked. Please ask whoever invited you to resend it.</div><button class="btn outline">Go to the app</button></div>`;
+      break;
+  }
+  return card("You've been invited", sub, body);
+}
+
+function card(title, sub, inner){
+  return `
+    <div class="card">
+      <div class="brand-orb">${IC.sparkles}</div>
+      <h1>${title}</h1>
+      <p class="sub">${sub}</p>
+      ${inner}
+    </div>`;
+}
+
+function frame(v){
+  const cfg=VCFG[v];
+  let cardHtml;
+  if (v==='c'){ // sign-in-depth variant always shows sign-in
+    cardHtml = signinCard(v);
+  } else {
+    cardHtml = S.surface==='signin' ? signinCard(v) : inviteCard(v);
+  }
+  return `
+    <div class="vnote">${cfg.note}</div>
+    <div class="stage">
+      <div class="orb a"></div><div class="orb b"></div>
+      ${cardHtml}
+    </div>`;
+}
+
+function render(){ document.getElementById('variant-'+S.active).innerHTML = frame(S.active); }
+function showVariant(v){
+  S.active=v;
+  document.querySelectorAll('.variant').forEach(x=>x.classList.remove('active'));
+  document.getElementById('variant-'+v).classList.add('active');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.toggle('active', t.dataset.v===v));
+  // C locks to sign-in scenarios; hide the surface toggle relevance
+  render();
+}
+function setState(k,val){
+  S[k]=val;
+  if(k==='surface'){
+    document.getElementById('grp-signin').style.display = val==='signin'?'':'none';
+    document.getElementById('grp-invite').style.display = val==='invite'?'':'none';
+  }
+  syncSeg(k,val);
+  render();
+}
+function syncSeg(k,val){
+  const map={surface:['seg-surface','surface'],scn:['seg-scn','scn'],inv:['seg-inv','inv']};
+  const e=map[k]; if(!e) return;
+  const seg=document.getElementById(e[0]); if(!seg) return;
+  seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset[e[1]]===val));
+}
+render();
+</script>
+</body>
+</html>

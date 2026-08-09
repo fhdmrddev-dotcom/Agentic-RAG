@@ -6,13 +6,13 @@
  *  - chip-strip condition row (field op value) with a +condition affordance (flat AND),
  *    reusing the 029/114 ViewCondition grammar (ConditionPopover).
  *  - the action selector offers 📁 folder ONLY — NO 🏷 tag radio (D-118-1).
- *  - the scope segmented control offers 👤 Only me / 🌐 Global (G); default = Only me.
+ *  - the scope segmented control offers 👤 Only me / 🌐 Built-in (G); default = Only me.
  *  - editing the condition triggers a "would match N of M" preview that calls
  *    resolveAdHoc(count_only:true) — NOT a new count fn.
  *  - the forward-only honesty line renders ("existing docs aren't moved — rules
  *    suggest on new uploads only").
  *  - Save calls createRule(name, match_expr, suggest_folder_id) with a body that
- *    OMITS is_global; editing an existing rule calls updateRule.
+ *    OMITS is_system_global; editing an existing rule calls updateRule.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
@@ -36,7 +36,7 @@ const folders: Folder[] = [
     user_id: "user-1",
     name: "Finance Inbox",
     parent_id: null,
-    is_global: false,
+    is_org_shared: false,
     created_at: "",
     updated_at: "",
   },
@@ -45,7 +45,7 @@ const folders: Folder[] = [
     user_id: "user-1",
     name: "Legal",
     parent_id: null,
-    is_global: false,
+    is_org_shared: false,
     created_at: "",
     updated_at: "",
   },
@@ -86,18 +86,18 @@ describe("RuleBuilderPanel", () => {
     expect(screen.queryByRole("radio", { name: /tag/i })).not.toBeInTheDocument()
   })
 
-  it("scope segmented control offers Only me / Global, default Only me", () => {
+  it("scope segmented control offers Only me / Built-in, default Only me", () => {
     render(<RuleBuilderPanel folders={folders} onSaved={vi.fn()} onCancel={vi.fn()} />)
     const onlyMe = screen.getByRole("radio", { name: /only me/i })
-    const global = screen.getByRole("radio", { name: /global/i })
+    const builtin = screen.getByRole("radio", { name: /built-in/i })
     expect(onlyMe).toBeInTheDocument()
-    expect(global).toBeInTheDocument()
+    expect(builtin).toBeInTheDocument()
     // Default selection = Only me.
     expect(onlyMe).toBeChecked()
-    expect(global).not.toBeChecked()
-    // AR-118-04: "Global" is disabled — there's no client path to create a global
+    expect(builtin).not.toBeChecked()
+    // AR-118-04: "Built-in" is disabled — there's no client path to create a built-in
     // rule, so it's shown-but-non-functional rather than silently ignored.
-    expect(global).toBeDisabled()
+    expect(builtin).toBeDisabled()
     expect(onlyMe).toBeEnabled()
   })
 
@@ -125,7 +125,7 @@ describe("RuleBuilderPanel", () => {
     ).toBeInTheDocument()
   })
 
-  it("Save calls createRule(name, match_expr, suggest_folder_id) and OMITS is_global", async () => {
+  it("Save calls createRule(name, match_expr, suggest_folder_id) and OMITS is_system_global", async () => {
     const onSaved = vi.fn()
     render(<RuleBuilderPanel folders={folders} onSaved={onSaved} onCancel={vi.fn()} />)
     addTitleIsInvoice()
@@ -135,13 +135,13 @@ describe("RuleBuilderPanel", () => {
     await waitFor(() => {
       expect(createRule).toHaveBeenCalledTimes(1)
     })
-    // Exactly (name, match_expr, suggest_folder_id) — the body never carries is_global.
+    // Exactly (name, match_expr, suggest_folder_id) — the body never carries is_system_global.
     expect(createRule).toHaveBeenCalledWith(
       "Acme Invoices",
       { op: "and", conditions: [{ field: "title", op: "eq", value: "invoice" }] },
       "folder-fin",
     )
-    // No 4th argument (no is_global piggy-backed onto the call).
+    // No 4th argument (no is_system_global piggy-backed onto the call).
     expect(createRule.mock.calls[0]).toHaveLength(3)
     await waitFor(() => expect(onSaved).toHaveBeenCalled())
   })
@@ -153,7 +153,7 @@ describe("RuleBuilderPanel", () => {
       name: "Old Name",
       match_expr: { op: "and", conditions: [{ field: "author", op: "contains", value: "Acme" }] },
       suggest_folder_id: "folder-legal",
-      is_global: false,
+      is_system_global: false,
       enabled: true,
     }
     const onSaved = vi.fn()

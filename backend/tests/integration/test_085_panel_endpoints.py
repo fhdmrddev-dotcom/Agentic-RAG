@@ -162,29 +162,56 @@ def test_get_todos_orders_by_order_index_then_created_at(client, mock_builder):
 
 
 def _make_mock_pool(rows):
-    """Build a mock asyncpg pool whose fetch() returns the given rows.
+    """Build a get_user_pg_connection-compatible mock pool (Phase 163 D-02).
 
-    Phase 096 (D-06): /ask_user/pending now runs a per-prompt liveness lookup
-    via ``pool.fetchrow`` (dual-namespace run-status check). Returning ``None``
-    here means "neither namespace resolves" → the filter FAILS OPEN, so these
-    seeds (whose run_ids like 'rid-1' are not real runs) stay visible and the
-    pre-096 expectations hold unchanged.
+    /ask_user/pending + /tasks now run their asyncpg reads under RLS via
+    ``get_user_pg_connection``: ``pool.acquire()`` → ``conn``; ``conn.transaction()``;
+    ``conn.execute(SET LOCAL ROLE …)``; then the handler calls ``conn.fetch`` /
+    ``conn.fetchrow`` (the data seam moved from the pool onto the acquired conn). So the
+    CONN carries ``.fetch``/``.fetchrow`` now; the pool only needs ``.acquire()``.
+
+    Phase 096 (D-06): the per-prompt liveness lookup (``conn.fetchrow``) returns ``None``
+    → "neither namespace resolves" → the filter FAILS OPEN, so these seeds (run_ids like
+    'rid-1' that are not real runs) stay visible and the pre-096 expectations hold.
     """
+    conn = MagicMock()
+    conn.fetch = AsyncMock(return_value=rows)
+    conn.fetchrow = AsyncMock(return_value=None)
+    conn.execute = AsyncMock(return_value=None)  # SET LOCAL ROLE + both set_config calls
+
+    class _Txn:
+        async def __aenter__(self_):
+            return self_
+
+        async def __aexit__(self_, *exc):
+            return False
+
+    conn.transaction = MagicMock(return_value=_Txn())
+
+    class _Acquire:
+        async def __aenter__(self_):
+            return conn
+
+        async def __aexit__(self_, *exc):
+            return False
+
     mock_pool = MagicMock()
-    mock_pool.fetch = AsyncMock(return_value=rows)
-    mock_pool.fetchrow = AsyncMock(return_value=None)
+    mock_pool.acquire = MagicMock(return_value=_Acquire())
+    mock_pool.conn = conn  # expose the acquired conn for the SQL-shape assertions
     return mock_pool
 
 
 def _patch_pg_pool(mock_pool):
-    """Patch app.api.panel.get_pg_pool to return ``mock_pool``. Use as a
-    context manager around the client call. get_pg_pool is invoked
-    directly inside the endpoint (NOT via Depends) so we monkey-patch the
-    panel-module-level symbol — same effect as a dependency override but
-    works for the direct-call site."""
+    """Patch app.dependencies.get_pg_pool to return ``mock_pool`` (Phase 163).
+
+    ``get_user_pg_connection`` (app.dependencies) resolves the pool via
+    ``app.dependencies.get_pg_pool`` — so the panel reads' RLS connection is fed by
+    patching THAT symbol (the panel module no longer imports get_pg_pool). The SET
+    LOCAL ROLE + both-GUC set_config calls run on ``mock_pool.conn`` (recorded no-ops).
+    """
     async def _async_pool():
         return mock_pool
-    return patch("app.api.panel.get_pg_pool", side_effect=_async_pool)
+    return patch("app.dependencies.get_pg_pool", side_effect=_async_pool)
 
 
 def test_get_pending_ask_user_returns_pending_prompt(
@@ -250,8 +277,8 @@ def test_get_pending_ask_user_orders_by_created_at_asc(client, mock_execute_resu
         resp = client.get(f"/threads/{THREAD_ID}/ask_user/pending")
 
     assert resp.status_code == 200
-    mock_pool.fetch.assert_awaited_once()
-    sql = mock_pool.fetch.await_args.args[0]
+    mock_pool.conn.fetch.assert_awaited_once()
+    sql = mock_pool.conn.fetch.await_args.args[0]
     assert "ORDER BY m.created_at ASC" in sql
     assert "tool_calls @>" in sql
     assert "ask_user_prompt" in sql
@@ -353,8 +380,8 @@ def test_get_tasks_orders_by_started_at_desc(client, mock_execute_result):
         resp = client.get(f"/threads/{THREAD_ID}/tasks")
 
     assert resp.status_code == 200
-    mock_pool.fetch.assert_awaited_once()
-    sql = mock_pool.fetch.await_args.args[0]
+    mock_pool.conn.fetch.assert_awaited_once()
+    sql = mock_pool.conn.fetch.await_args.args[0]
     assert "ORDER BY r.started_at DESC" in sql
     # And the cross-thread gate: parent_run_id IN (SELECT … WHERE thread_id = $1 AND user_id = $2)
     assert "parent_run_id IN" in sql

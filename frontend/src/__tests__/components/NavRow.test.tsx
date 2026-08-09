@@ -136,9 +136,9 @@ describe("NavRow", () => {
     expect(onCommitRename).toHaveBeenCalledWith("Renamed")
   })
 
-  it("shows the tooltip-labeled G pill when isGlobal is true", () => {
+  it("shows the tooltip-labeled G pill when isShared is true", () => {
     const { container } = renderWithTooltip(
-      <NavRow icon={FolderIcon} name="Shared" count={3} isGlobal />,
+      <NavRow icon={FolderIcon} name="Shared" count={3} isShared sharedLabel="Shared with org" />,
     )
     // The G pill renders...
     const pill = Array.from(container.querySelectorAll(".rounded-full")).find(
@@ -147,22 +147,22 @@ describe("NavRow", () => {
     expect(pill).toBeTruthy()
     // ...and it is wrapped in a Tooltip (a Radix TooltipTrigger stamps data-state on
     // the pill), so the bare letter is no longer opaque — hovering/focusing reveals
-    // the "Global — shared with everyone" label. cursor-help signals the affordance.
+    // the "Shared with org" label. cursor-help signals the affordance.
     expect(pill).toHaveAttribute("data-state")
     expect(pill?.className).toContain("cursor-help")
   })
 
   it("reveals the labeled G pill tooltip text on hover", async () => {
-    renderWithTooltip(<NavRow icon={FolderIcon} name="Shared" count={3} isGlobal />)
+    renderWithTooltip(<NavRow icon={FolderIcon} name="Shared" count={3} isShared sharedLabel="Shared with org" />)
     const pill = screen.getByText("G")
     fireEvent.mouseEnter(pill)
     fireEvent.focus(pill)
     // Radix renders the tooltip content (possibly multiple mirror nodes) once shown.
-    const labels = await screen.findAllByText("Global — shared with everyone")
+    const labels = await screen.findAllByText("Shared with org")
     expect(labels.length).toBeGreaterThan(0)
   })
 
-  it("does NOT show the G pill when isGlobal is false", () => {
+  it("does NOT show the G pill when isShared is false", () => {
     const { container } = renderWithTooltip(
       <NavRow icon={FolderIcon} name="Private" count={1} />,
     )

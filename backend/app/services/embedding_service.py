@@ -273,15 +273,15 @@ def read_enabled_field_defs(supabase, doc_owner_uid: str) -> list[dict]:
 
     A BackgroundTask carries no request JWT → ``auth.uid()`` is NULL → the service-role
     client BYPASSES RLS. So the app MUST scope by hand: an explicit
-    ``.or_(user_id.eq.{owner},is_global.eq.true)`` predicate pushed to the DB plus a
-    Python-side fail-closed filter ``(own or is_global)``. On a query exception return
+    ``.or_(user_id.eq.{owner},is_system_global.eq.true)`` predicate pushed to the DB plus a
+    Python-side fail-closed filter ``(own or is_system_global)``. On a query exception return
     ``[]`` (built-ins only) — NEVER a bare full-table read.
     """
     try:
         rows = (
             supabase.table("metadata_field_definitions")
-            .select("id,field_key,field_type,description,is_global,user_id,enabled,options")
-            .or_(f"user_id.eq.{doc_owner_uid},is_global.eq.true")
+            .select("id,field_key,field_type,description,is_system_global,user_id,enabled,options")
+            .or_(f"user_id.eq.{doc_owner_uid},is_system_global.eq.true")
             .execute()
             .data
         ) or []
@@ -292,7 +292,7 @@ def read_enabled_field_defs(supabase, doc_owner_uid: str) -> list[dict]:
         r
         for r in rows
         if r.get("enabled")
-        and (str(r.get("user_id")) == str(doc_owner_uid) or r.get("is_global"))
+        and (str(r.get("user_id")) == str(doc_owner_uid) or r.get("is_system_global"))
     ]
 
 

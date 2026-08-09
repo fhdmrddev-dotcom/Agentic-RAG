@@ -35,7 +35,7 @@ template AssetRef points at (``{user_id}/_library/risk-register-101uat.docx``) i
 ``seed_library_asset.py`` — this seeder reuses it (it does NOT re-upload bytes).
 
 Security (threats T-101.1-05-02/03): the DB DSN is read NAME-ONLY from backend/.env (never
-hard-coded, never printed). The definition is scoped to created_by=<test user> (is_global=false);
+hard-coded, never printed). The definition is scoped to created_by=<test user> (is_system_global=false);
 the bound AssetRef reuses the existing user-scoped ``{user_id}/_library/...`` object — LOCAL-dev
 fixture data, no PII. Never runs ``supabase db push``/``db reset`` (psycopg2 only; preserves dev data).
 
@@ -242,7 +242,7 @@ def reseed_definition(conn, target_def: str) -> None:
         cur.execute(
             """
             INSERT INTO public.workflow_definitions
-                (id, slug, version, name, status, definition, created_by, is_global)
+                (id, slug, version, name, status, definition, created_by, is_system_global)
             VALUES (%s, %s, %s, %s, 'published', %s::jsonb, %s, false)
             ON CONFLICT (id) DO NOTHING
             """,

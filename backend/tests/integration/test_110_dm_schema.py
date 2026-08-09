@@ -3,10 +3,10 @@
 Asserts (via pg_class/pg_constraint/information_schema):
   - all 4 tables exist with rowsecurity = true;
   - each org_id is nullable AND has NO FK (F7 forward-compat trap);
-  - the SELECT policy shape: user_id for all 4 tables, plus is_global for the
+  - the SELECT policy shape: user_id for all 4 tables, plus is_system_global for the
     3 library/config tables (document_views, classification_rules,
     metadata_field_definitions). document_relationships is USER-SCOPED ONLY (no
-    is_global column by design — see 110-RESEARCH.md §3.2 / ARCHITECTURE.md §2).
+    is_system_global column by design — see 110-RESEARCH.md §3.2 / ARCHITECTURE.md §2).
 Plus a LIVE 2-user RLS sample on >=2 of the 4 tables + the nullable-user_id
 global-field path on metadata_field_definitions.
 
@@ -181,12 +181,12 @@ async def test_dm_table_org_id_nullable_no_fk(pg_pool, table):
     assert fk_count == 0, f"{table}.org_id must NOT have a foreign key (found {fk_count})"
 
 
-# The 3 library/config tables carry is_global (user_id + is_global RLS). By
-# design, document_relationships does NOT have an is_global column — a
+# The 3 library/config tables carry is_system_global (user_id + is_system_global RLS). By
+# design, document_relationships does NOT have an is_system_global column — a
 # relationship is an inherently user-owned link between a user's own documents,
 # never a global/admin-seeded shareable object. Its SELECT policy is user-scoped
 # only. (Authoritative per-table DDL: 110-RESEARCH.md §3.2 / 110-PATTERNS.md §3.2,
-# both citing ARCHITECTURE.md §2.) Asserting is_global on it would embed the wrong
+# both citing ARCHITECTURE.md §2.) Asserting is_system_global on it would embed the wrong
 # uniform-template assumption and fail correctly — so we assert per-table shape.
 _IS_GLOBAL_TABLES = frozenset(
     {"document_views", "classification_rules", "metadata_field_definitions"}
@@ -197,7 +197,7 @@ _IS_GLOBAL_TABLES = frozenset(
 @pytest.mark.parametrize("table", _DM_TABLES)
 async def test_dm_table_select_policy_shape(pg_pool, table):
     """The SELECT policy USING clause carries user_id for every table, and
-    is_global ONLY for the 3 library tables (NOT document_relationships, which
+    is_system_global ONLY for the 3 library tables (NOT document_relationships, which
     is user-scoped by design)."""
     _migration_applied_skip(await _table_exists(pg_pool, table))
     quals = await pg_pool.fetch(
@@ -210,13 +210,13 @@ async def test_dm_table_select_policy_shape(pg_pool, table):
         f"{table} SELECT policy missing user_id: {joined!r}"
     )
     if table in _IS_GLOBAL_TABLES:
-        assert "is_global" in joined, (
-            f"{table} SELECT policy missing is_global (library table): {joined!r}"
+        assert "is_system_global" in joined, (
+            f"{table} SELECT policy missing is_system_global (library table): {joined!r}"
         )
     else:
-        # document_relationships: user-scoped only, NO is_global.
-        assert "is_global" not in joined, (
-            f"{table} SELECT policy must be user-scoped only (no is_global): {joined!r}"
+        # document_relationships: user-scoped only, NO is_system_global.
+        assert "is_system_global" not in joined, (
+            f"{table} SELECT policy must be user-scoped only (no is_system_global): {joined!r}"
         )
 
 
@@ -269,14 +269,14 @@ async def test_rls_cross_user_isolation_classification_rules(pg_pool, two_users)
 
 @pytest.mark.asyncio
 async def test_rls_global_metadata_field_visible_to_other_user(pg_pool, two_users):
-    """The nullable-user_id global-field path: a user_id=NULL is_global=true
+    """The nullable-user_id global-field path: a user_id=NULL is_system_global=true
     metadata_field_definitions row is visible to a second user (B)."""
     _migration_applied_skip(await _table_exists(pg_pool, "metadata_field_definitions"))
     _user_a, user_b = two_users
     row_id = uuid4()
-    # Global field: user_id NULL, is_global true (allowed by mfd_reachable CHECK).
+    # Global field: user_id NULL, is_system_global true (allowed by mfd_reachable CHECK).
     await pg_pool.execute(
-        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_global) "
+        "INSERT INTO public.metadata_field_definitions (id, user_id, field_key, is_system_global) "
         "VALUES ($1, NULL, $2, true)",
         row_id, "phase110_global_probe",
     )
@@ -284,7 +284,7 @@ async def test_rls_global_metadata_field_visible_to_other_user(pg_pool, two_user
         pg_pool, user_b,
         "SELECT count(*) FROM public.metadata_field_definitions WHERE id = $1", row_id,
     )
-    assert count_b == 1, "global metadata field not visible to user B via is_global path"
+    assert count_b == 1, "global metadata field not visible to user B via is_system_global path"
 
 
 # ---------------------------------------------------------------------------

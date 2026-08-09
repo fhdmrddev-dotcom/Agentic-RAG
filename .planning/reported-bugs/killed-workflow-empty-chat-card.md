@@ -4,9 +4,9 @@ title: Killed-workflow launch renders an empty chat card instead of the "disable
 reported: 2026-07-12
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/streaming, workflows, chat]
-folded_into: null
+folded_into: "174"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

@@ -109,6 +109,13 @@ Then edit `./.env` and fill in:
   ```
   Paste the output as the value. (Leaving it blank boots with a loud plaintext warning; a
   malformed key refuses to boot — see **Security** below.)
+- **SSO (SAML 2.0) — optional (Phase 168)** — only if org-admins will register a SAML IdP.
+  Leave `SUPABASE_SELF_HOSTED=false` (the Cloud default) and set `SUPABASE_PROJECT_REF` (Supabase
+  Dashboard → Project Settings → General → Reference ID — config, not a secret). The Cloud
+  Management/PAT token (`sbp_…`) is **not** an env var — seed it once into
+  `app_settings.supabase_management_token` (Step 3 below), where `SECRETS_ENCRYPTION_KEY` encrypts
+  it at rest. On **self-hosted** GoTrue set `SUPABASE_SELF_HOSTED=true` — it authenticates with
+  `SUPABASE_SERVICE_ROLE_KEY`, so no management token is needed.
 - **`VITE_*`** (bottom of the file) — the browser-facing Supabase URL + anon key. For a real
   deploy these equal `SUPABASE_URL` / `SUPABASE_ANON_KEY`. **These are baked at build time** —
   if you change one later you must rebuild the frontend (`--build`); a plain `up` won't pick
@@ -165,6 +172,20 @@ SQL editor, in order:
    ```
 
    If this returns 0, re-apply `087 → 088 → 089` in order.
+
+5. **(Optional — Cloud SAML SSO, Phase 168)** Skip unless org-admins will register SAML IdPs on
+   **Cloud** Supabase. Seed the Management/PAT token (`sbp_…`, from Supabase Dashboard → Account →
+   Access Tokens — the `service_role` key does **not** work against the Management API) into
+   `app_settings`:
+
+   ```sql
+   UPDATE app_settings SET supabase_management_token = '<sbp_...>' WHERE id = 'global';
+   ```
+
+   With `SECRETS_ENCRYPTION_KEY` set, the next backend boot's idempotent sweep encrypts this column
+   at rest (`enc:v1:` envelope) — the token is decrypted only at call time and never logged. Also
+   set `SUPABASE_PROJECT_REF` in `./.env` (see Step 2). On **self-hosted** GoTrue
+   (`SUPABASE_SELF_HOSTED=true`) skip this entirely — the `service_role` key is used instead.
 
 > Migrations currently run to 102 (migration 102 adds the `app_settings.setup_complete` flag
 > for the Phase-158 install wizard — schema, not a seed, so it is not in the table above).
@@ -251,6 +272,19 @@ A model that works on your laptop can **404 on a cloud key** — provider accoun
 which models they can serve. Pin the model IDs you know your key serves (e.g.
 `OPENAI_MODELS=...`) rather than relying on a default that may not exist for this account. A
 stale default silently degraded metadata extraction to NULL in production once.
+
+### Invitation email — optional; the default just logs the link (Phase 167)
+
+Org-admins invite teammates by a secure link. Delivery is env-switched and **off by default** —
+no email account needed to run:
+
+- **`EMAIL_PROVIDER=none`** (default) — the app **logs the invite link** (visible in
+  `docker compose logs backend`) and the org-admin copies + shares it. Works fully offline.
+- **`EMAIL_PROVIDER=resend`** — sends real email. Opt-in: `pip install resend` into the backend
+  venv (it is **not** a default requirement), then set `RESEND_API_KEY` (secret — env only) and
+  `INVITE_FROM_EMAIL` (your verified from-address).
+
+The invite-link base reuses `FRONTEND_URL` (above) — there is **no** separate base-URL var.
 
 ## Security
 

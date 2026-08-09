@@ -1,0 +1,2016 @@
+/**
+ * Phase 186-06 — the draft-persistence loop's proofs.
+ *
+ * SHAPE: `useLiveValidation.test.tsx`, copied deliberately — the co-located hook test whose
+ * module mock SPREADS the real `@/lib/api` and overrides only the exports under test. A
+ * hand-written replacement object is the shipped mock-completeness failure mode (every
+ * symbol the path reaches has to be re-listed, and a forgotten one fails far from its
+ * cause); spreading makes completeness automatic AND means the named refusals thrown in
+ * these suites are the REAL classes from `lib/api.ts`. A drift between the name a class
+ * assigns itself and the name the hook branches on becomes a failing test here rather than
+ * a silent mis-classification in front of a person.
+ *
+ * THE STORE IS REAL, NOT A STUB. The hook reads its payload through `store.getState()` at
+ * FIRE time (the shipped `onPersist` idiom), so a stubbed store would let a test assert a
+ * payload the production path could never produce. Driving a real `createBuilderStore` is
+ * what makes the "carries the LATEST definition" assertions mean something.
+ *
+ * F9 IS THE LOAD-BEARING ONE HERE. It is written so it can only pass on the single-flight
+ * queue: the first write is held open with a `deferred`, a second edit matures its own
+ * timer while that one is outstanding, and the call count must NOT move. Falsified before
+ * it was trusted — with the in-flight guard removed it reads "expected 1 times, but got 2
+ * times" (recorded in the plan SUMMARY).
+ */
+import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from "vitest"
+import { act, renderHook } from "@testing-library/react"
+
+import hookSource from "./useDraftPersistence?raw"
+import {
+  useDraftPersistence,
+  AUTOSAVE_DEBOUNCE_MS,
+  HOLD_PUBLISHING,
+  HOLD_PUBLISHING_MANUAL,
+  HOLD_ENDED_UNSAVED,
+  HOLD_UNREADABLE,
+  SAVE_FAILED_SENTENCE,
+  DRAFT_GONE_SENTENCE,
+  PUBLISHED_CONFLICT_MESSAGE,
+  RELOAD_FAILED_NOTE,
+  type PersistState,
+} from "./useDraftPersistence"
+import {
+  createWorkflowDraft,
+  listDraftWorkflows,
+  updateWorkflowDraft,
+  WorkflowConflictError,
+  WorkflowDraftUnreadableError,
+  WorkflowNotFoundError,
+  WorkflowStaleTokenError,
+  type WorkflowDraftRow,
+  type WorkflowDraftWriteResult,
+} from "@/lib/api"
+import { createBuilderStore, selectDefinition } from "@/components/workflows/builderStore"
+import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+import type { BuilderDefinition } from "@/pages/WorkflowBuilderPage"
+
+vi.mock("@/lib/api", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
+  return {
+    ...actual,
+    createWorkflowDraft: vi.fn(),
+    updateWorkflowDraft: vi.fn(),
+    listDraftWorkflows: vi.fn(),
+  }
+})
+
+const mockedCreate = vi.mocked(createWorkflowDraft)
+const mockedUpdate = vi.mocked(updateWorkflowDraft)
+const mockedList = vi.mocked(listDraftWorkflows)
+
+// ── Local infrastructure (the analog's three helpers) ─────────────────────────
+
+interface Deferred<T> {
+  promise: Promise<T>
+  resolve: (value: T) => void
+  reject: (reason: unknown) => void
+}
+
+/** A promise whose settlement is controlled from OUTSIDE the executor, so a test can hold
+ *  one write open and prove the next one is not issued while it is. */
+function deferred<T>(): Deferred<T> {
+  let resolve!: (value: T) => void
+  let reject!: (reason: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+/** Advance the fake clock inside `act`, so React flushes the state updates the timers
+ *  cause. The ASYNC form is required — the sync form does not flush the awaited
+ *  microtasks between a timer firing and its promise resolving. */
+async function advance(ms: number): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms)
+  })
+}
+
+/** Flush pending microtasks (a settled deferred, and the follow-up write it releases)
+ *  without moving the clock. Twice, because the queue drain is itself awaited. */
+async function flush(): Promise<void> {
+  await advance(0)
+  await advance(0)
+}
+
+// ── Fixtures, hand-authored inline (the shipped corpus stays untouched) ───────
+
+function phase(slug: string, index: number, type = "llm_single"): PhaseSpecJSON {
+  return { slug, phase_index: index, config: { phase_type: type } }
+}
+
+function draft(): BuilderDefinition {
+  return {
+    slug: "risk-register",
+    version: 1,
+    business_requirement: "Summarise the week's risks.",
+    project_folder_id: null,
+    phases: [phase("search", 0, "llm_agent"), phase("write", 1)],
+  }
+}
+
+const DRAFT_ID = "11111111-1111-1111-1111-111111111111"
+const TOKEN_0 = "2026-08-01 12:00:00.123456+00"
+
+function write(token: string): WorkflowDraftWriteResult {
+  return { id: DRAFT_ID, version: 1, token }
+}
+
+/** The internals a rejected shape-check carries. NONE of this may reach a rendered value. */
+const RAW_422_BODY = {
+  detail: [
+    {
+      loc: ["body", "phases", 0, "config", "grounding_zzz"],
+      msg: "PYDANTIC-INTERNAL-MARKER-DO-NOT-RENDER",
+      type: "extra_forbidden",
+    },
+  ],
+}
+
+/** Every string reachable from the state, so "the raw body is not shown" is checked over
+ *  the whole reachable graph rather than over the two fields we happened to think of. */
+function reachableStrings(value: unknown, out: string[] = []): string[] {
+  if (typeof value === "string") out.push(value)
+  else if (Array.isArray(value)) for (const v of value) reachableStrings(v, out)
+  else if (value && typeof value === "object")
+    for (const v of Object.values(value)) reachableStrings(v, out)
+  return out
+}
+
+// ── The mount harness ─────────────────────────────────────────────────────────
+
+interface Props {
+  definition: BuilderDefinition | null
+  enabled: boolean
+  publishInFlight: boolean
+  validationCause: "unreadable" | "unreachable" | null
+}
+
+function harness(
+  opts: {
+    draftId?: string | null
+    token?: string | null
+    /**
+     * F20's flag (186-13). Mounted, not flipped after the fact: the claim under test is
+     * about a session that runs with `visual_workflow_canvas` OFF from the first render,
+     * and a hook that starts enabled and is switched off later has already had one pass
+     * of every effect with the flag on. Defaulted to `true`, so every pre-existing call
+     * site of this harness is unchanged.
+     */
+    enabled?: boolean
+    /**
+     * F17's receipt recorder (186-09). Invoked AT THE INSTANT the receipt is filed and
+     * BEFORE the real action runs, so a test can record what the store held versus what
+     * had actually been sent. Optional and defaulted away, so every pre-existing call
+     * site of this harness is unchanged.
+     */
+    onReceipt?: (store: ReturnType<typeof createBuilderStore>) => void
+  } = {},
+) {
+  const store = createBuilderStore(draft())
+
+  // `markSaved` is replaced through `setState`, not through a property spy: zustand
+  // rebuilds the state object on every set, and only a value written INTO the state
+  // survives that. The real action still runs, so `dirty` behaves exactly as it ships.
+  const markSaved = vi.fn()
+  const realMarkSaved = store.getState().markSaved
+  store.setState({
+    markSaved: () => {
+      markSaved()
+      opts.onReceipt?.(store)
+      realMarkSaved()
+    },
+  })
+
+  const created = vi.fn()
+  const initialProps: Props = {
+    definition: selectDefinition(store.getState()),
+    enabled: opts.enabled ?? true,
+    publishInFlight: false,
+    validationCause: null,
+  }
+
+  const view = renderHook(
+    (p: Props) =>
+      useDraftPersistence({
+        definition: p.definition,
+        enabled: p.enabled,
+        initialDraftId: opts.draftId === undefined ? DRAFT_ID : opts.draftId,
+        initialToken: opts.token === undefined ? TOKEN_0 : opts.token,
+        store,
+        publishInFlight: p.publishInFlight,
+        validationCause: p.validationCause,
+        onDraftCreated: created,
+      }),
+    { initialProps },
+  )
+
+  let props = initialProps
+  const set = (patch: Partial<Props>) => {
+    props = { ...props, ...patch }
+    act(() => {
+      view.rerender(props)
+    })
+  }
+
+  /** One author edit: a structural change in the store (which arms `dirty` the way it
+   *  ships) followed by the new `definition` identity the page's memo would produce. */
+  const edit = () => {
+    act(() => {
+      store.getState().addPhaseOfType("llm_single")
+    })
+    set({ definition: selectDefinition(store.getState()) })
+  }
+
+  return { store, markSaved, created, view, set, edit }
+}
+
+function stateOf(view: ReturnType<typeof harness>["view"]): PersistState {
+  return view.result.current.state
+}
+
+function sentDefinition(callIndex: number): BuilderDefinition {
+  return mockedUpdate.mock.calls[callIndex][1] as unknown as BuilderDefinition
+}
+
+let warnSpy: MockInstance
+
+beforeEach(() => {
+  vi.useFakeTimers()
+  mockedCreate.mockReset()
+  mockedUpdate.mockReset()
+  mockedList.mockReset()
+  warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+})
+
+afterEach(() => {
+  warnSpy.mockRestore()
+  vi.useRealTimers()
+})
+
+// ── F9 — single flight, and the token chain ───────────────────────────────────
+
+describe("useDraftPersistence — F9: at most ONE PATCH is outstanding per draft", () => {
+  it("holds the second edit rather than issuing a second PATCH, then sends it with the token the first write returned", async () => {
+    const first = deferred<WorkflowDraftWriteResult>()
+    let outstanding = 0
+    let peak = 0
+    const tracked = (p: Promise<WorkflowDraftWriteResult>) => {
+      outstanding += 1
+      peak = Math.max(peak, outstanding)
+      return p.finally(() => {
+        outstanding -= 1
+      })
+    }
+    mockedUpdate
+      .mockImplementationOnce(() => tracked(first.promise))
+      .mockImplementationOnce(() => tracked(Promise.resolve(write("T2"))))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(mockedUpdate.mock.calls[0][2]).toBe(TOKEN_0)
+
+    // An edit lands while that write is still outstanding, and its OWN timer matures.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+
+    // THE INVARIANT: at every instant the number of outstanding writes for this draft is ≤ 1.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(peak).toBe(1)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    // The follow-up carries the token the immediately preceding successful write returned.
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T1")
+    // …and the LATEST definition, not the one current when the first timer matured.
+    expect(sentDefinition(1).phases).toHaveLength(4)
+    expect(peak).toBe(1)
+  })
+
+  it("files no receipt for a save a newer edit already superseded", async () => {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => Promise.resolve(write("T2")))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    first.resolve(write("T1"))
+    // Only the FINAL turn of the drain may clear `dirty` — a confirmed write whose payload
+    // is already stale is not a receipt for what is on screen.
+    await flush()
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+  })
+
+  it("creates the draft EXACTLY once, adopts its token, and names the new id to the caller", async () => {
+    const create = deferred<WorkflowDraftWriteResult>()
+    mockedCreate.mockImplementationOnce(() => create.promise)
+    mockedUpdate.mockResolvedValue(write("T-after"))
+
+    const h = harness({ draftId: null, token: null })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
+
+    // A second edit while the create is in flight must NOT re-create (the UNIQUE(slug,
+    // version) storm the shipped `creatingRef` collapses).
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
+
+    create.resolve({ id: "new-draft", version: 1, token: "T-created" })
+    await flush()
+
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
+    expect(h.created).toHaveBeenCalledWith("new-draft")
+    expect(h.view.result.current.draftId).toBe("new-draft")
+    // The queued follow-up PATCHes the row just created, guarded by ITS token.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(mockedUpdate.mock.calls[0][0]).toBe("new-draft")
+    expect(mockedUpdate.mock.calls[0][2]).toBe("T-created")
+  })
+
+  it("writes nothing at all on mount — only a real change is worth a request", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+    harness()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+  })
+})
+
+// ── F17 — a receipt names the payload it actually wrote (GAP-1 / CR-01) ───────
+
+/**
+ * Phase 186-09 — the interleaving F9 above does NOT cover, and the reason it does not.
+ *
+ * F9's second edit MATURES ITS OWN TIMER while the first write is held open. That branch
+ * works and always did: a matured timer that finds `inFlightRef.current` true sets
+ * `pendingRef`, and the drain reads that flag before deciding whether to file a receipt.
+ *
+ * F17 drives the branch that did not work. The second edit's timer is deliberately left
+ * IMMATURE when the first write resolves — only `AUTOSAVE_DEBOUNCE_MS / 2` is advanced. An
+ * edit rescheduling the debounce effect (deps `[definition, enabled]`) arms nothing; the
+ * re-check of `inFlightRef` happens at FIRE time, a full second later, and a PATCH round
+ * trip is normally far shorter than that. So the completed write found a clear
+ * `pendingRef`, filed `Saved ✓` for a payload that predated the edit, and cleared `dirty` —
+ * after which the orphaned timer read `if (!store.getState().dirty) return` and dropped the
+ * edit on the floor. This is the common shape (type, pause about a second, resume, stop),
+ * not an edge case, and it also disarms `beforeunload`, the in-app leave guard and the blur
+ * rescue, all of which key on `dirty`.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F17a — the recorded pair is { storePhases: 4, sentPhases: 3 }: `[3]` where `[4]` is
+ *          expected. The receipt named a payload the store had already moved past.
+ *   F17b — `updateWorkflowDraft` was called 1 time where 2 are expected, and
+ *          `mock.calls[1]` does not exist. The second edit never reached the server.
+ *   F17c — also 1 where 2 are expected, for the SAME upstream reason: the orphaned timer
+ *          found `dirty` already cleared and issued nothing at all. Its real job is the
+ *          other direction — once the count reaches 2 it guards against over-correcting
+ *          into a third, duplicate write when the stale timer finally matures.
+ *
+ * The lesson is T-185-04-01's, a second time: an invariant guard scoped to the wrong thing
+ * is green and worthless. The old guard was scoped to a QUEUE FLAG; the property that
+ * matters is WHAT WAS WRITTEN.
+ */
+describe("useDraftPersistence — F17: a receipt names the payload it actually wrote (CR-01)", () => {
+  interface Receipt {
+    storePhases: number
+    sentPhases: number | null
+  }
+
+  /**
+   * The interleaving, driven once per assertion so each property fails on its own terms.
+   * `draft()` starts at 2 phases, so edit #1 leaves 3 and edit #2 leaves 4.
+   */
+  async function driveMidFlightEdit(): Promise<{
+    h: ReturnType<typeof harness>
+    receipts: Receipt[]
+  }> {
+    const receipts: Receipt[] = []
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => Promise.resolve(write("T2")))
+
+    const h = harness({
+      onReceipt: (store) => {
+        const calls = mockedUpdate.mock.calls
+        const last = calls.length > 0 ? calls[calls.length - 1] : null
+        receipts.push({
+          storePhases: store.getState().phases.length,
+          sentPhases: last ? (last[1] as unknown as BuilderDefinition).phases.length : null,
+        })
+      },
+    })
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    // Write #1 is issued and HELD OPEN by the deferred, carrying the 3-phase definition.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(mockedUpdate.mock.calls[0][2]).toBe(TOKEN_0)
+    expect(sentDefinition(0).phases).toHaveLength(3)
+
+    // The author keeps typing. The store now holds 4 phases and is dirty, and the debounce
+    // effect has re-armed with a FRESH timer.
+    h.edit()
+
+    // ★ THE LOAD-BEARING LINE OF THIS WHOLE SUITE, AND IT IS STILL THE POINT. HALF the
+    //   debounce, deliberately: the second edit's own timer has NOT matured, so nothing
+    //   anywhere arms `pendingRef`. Advancing a full AUTOSAVE_DEBOUNCE_MS here would turn
+    //   this back into F9.
+    await advance(AUTOSAVE_DEBOUNCE_MS / 2)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    // 186-17 (WR-08) — THE NEW PROPERTY, STATED AT THE EXACT POINT THE OLD CODE VIOLATED IT.
+    // The confirmed write is superseded and `pendingRef` is clear, so the drain BREAKS: no
+    // beat was consumed, and the edit's own live timer owes the follow-up. Until then
+    // nothing is outstanding, so the reading must not claim one is.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).not.toBe("saving")
+
+    // The follow-up now arrives on the DEBOUNCE rather than instantly, which is WR-08's
+    // whole finding. Everything F17 claims about it — that it happens, what it carries, and
+    // which token guards it — is unchanged.
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    return { h, receipts }
+  }
+
+  it("F17a — at the instant the receipt is filed, the sent payload IS the store's payload", async () => {
+    const { receipts } = await driveMidFlightEdit()
+
+    expect(receipts).toHaveLength(1)
+    // Compared as lists so the failure output prints the pair: RED reads [3] vs [4].
+    expect(receipts.map((r) => r.sentPhases)).toEqual(receipts.map((r) => r.storePhases))
+  })
+
+  it("F17b — an edit made mid-flight, before its own timer matures, is written not discarded", async () => {
+    const { h } = await driveMidFlightEdit()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(sentDefinition(1).phases).toHaveLength(4)
+    // Stated over the STORE rather than over the literal 4: whatever the author has, the
+    // server was told about.
+    expect(sentDefinition(1).phases).toHaveLength(h.store.getState().phases.length)
+    // …and the follow-up is guarded by the token the first write returned, not the stale one.
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T1")
+  })
+
+  it("F17c — the orphaned timer maturing later issues NO extra write", async () => {
+    await driveMidFlightEdit()
+
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ── F22 — the drain owes the same quiet period the first write did (WR-08) ────
+
+/**
+ * Phase 186-17 (WR-08) — the write RATE, which is a concurrency property and not a
+ * performance one.
+ *
+ * THE MECHANISM, not the symptom. `PhaseFormPanel`'s fields call `onChange` into the store
+ * on EVERY KEYSTROKE, and 186-09 (CR-01) correctly widened the drain's supersede test from a
+ * queue flag to a payload-identity compare. Those two facts together turned the drain's
+ * `continue` into an unthrottled loop: while an author types, ANY store change during an
+ * outstanding request supersedes it, so every completed PATCH re-entered the loop
+ * IMMEDIATELY with no timer in between. The sustained write rate became one per ROUND TRIP
+ * instead of one per `AUTOSAVE_DEBOUNCE_MS` — a rate set by network latency, which is to say
+ * the faster the server the harder this hook hits it.
+ *
+ * TWO KNOCK-ONS, both real and neither cosmetic:
+ *   • every extra write mints a NEW `updated_at` token, and every minted token invalidates
+ *     the optimistic guard every other open tab holds. The loop was manufacturing exactly
+ *     the conflicts this phase exists to prevent.
+ *   • it widens WR-10's window (a publish racing an outstanding write) substantially, and
+ *     186-16's publish refusal is the guard that window sits behind.
+ *
+ * It also made two of the module's own docblocks false — `"Any change to the definition
+ * schedules ONE write"` and `AUTOSAVE_DEBOUNCE_MS`'s `"it also halves the write rate against
+ * a row that carries the golden-run history"`. The drain gave both back.
+ *
+ * THE FIX SPLITS TWO QUESTIONS THAT WERE BEING ANSWERED BY ONE TEST: whether a RECEIPT may
+ * be filed (payload identity alone — CR-01's property, unchanged), and whether the loop may
+ * issue ANOTHER request immediately (`pendingRef` alone, which is armed only where a MATURED
+ * timer, `saveNow` or the hold release met an in-flight write and therefore left no live
+ * timer behind). Everything else breaks, and the ordinary autosave beat writes it.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix — recorded
+ * in `186-17-SUMMARY.md` verbatim:
+ *   F22a — `expected 11 to be less than or equal to 4`. Eleven PATCHes across 3000 ms of
+ *          simulated time, against a bound of four: one per round trip, exactly as the
+ *          finding predicted.
+ *   F22b — `expected 11 to be 12`. Pre-fix the storm had ALREADY sent everything by the time
+ *          the debounce beat came round, so the beat issued nothing — the same defect read
+ *          from the other side.
+ *   F22c — `updateWorkflowDraft` called 2 times where 1 is expected, and the state reads
+ *          `saving` where `idle` is expected.
+ *   F22d — 2 calls where 1 is expected: a Save press with NOTHING changed minted a second
+ *          PATCH purely because the queue flag was armed, bumping the token for no reason.
+ */
+describe("useDraftPersistence — F22: the drain owes the same quiet period the first write did (WR-08)", () => {
+  /**
+   * A FAST server, which is the WORST case for this defect rather than the kindest one: the
+   * shorter the round trip the tighter the unthrottled loop spins. 200 ms is a fifth of the
+   * debounce, so a bug that ties the rate to latency shows up as ~5 writes per quiet period.
+   */
+  const SERVER_LATENCY_MS = AUTOSAVE_DEBOUNCE_MS / 5
+
+  /**
+   * An author typing faster than the debounce — the shape that makes the timer reschedule
+   * rather than mature, so every write in the run has to come from the drain.
+   *
+   * DELIBERATELY SHORTER THAN THE ROUND TRIP. At 125 ms an edit lands inside EVERY request,
+   * so under the unthrottled `continue` the loop never runs out of supersessions and the
+   * storm is SUSTAINED. A cadence longer than the latency (e.g. 250 ms against a 200 ms
+   * server) lets the drain drift ahead of the typist and self-terminate after four or five
+   * writes — a real but muted measurement, which would understate the defect. Measured both
+   * ways before this constant was chosen (5 calls at 250 ms, 11 at 125 ms; both recorded in
+   * `186-17-SUMMARY.md`).
+   */
+  const EDIT_INTERVAL_MS = AUTOSAVE_DEBOUNCE_MS / 8
+  const ITERATIONS = 16
+
+  /** Every PATCH resolves on the clock, after `SERVER_LATENCY_MS`, carrying a token named
+   *  for its own call index — so a follow-up's guard can be checked against the value the
+   *  IMMEDIATELY preceding write returned. */
+  function fastServer(): void {
+    mockedUpdate.mockImplementation(() => {
+      const n = mockedUpdate.mock.calls.length // includes the call being made
+      return new Promise<WorkflowDraftWriteResult>((resolve) => {
+        setTimeout(() => resolve(write(`T${n}`)), SERVER_LATENCY_MS)
+      })
+    })
+  }
+
+  /** Put write #1 in flight, then type across it. Returns the elapsed clock time the test
+   *  actually advanced, so the bound is computed from the run rather than hardcoded. */
+  async function typeAcrossAFastServer(h: ReturnType<typeof harness>): Promise<number> {
+    let elapsedMs = 0
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    elapsedMs += AUTOSAVE_DEBOUNCE_MS
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    for (let i = 0; i < ITERATIONS; i += 1) {
+      h.edit()
+      await advance(EDIT_INTERVAL_MS)
+      elapsedMs += EDIT_INTERVAL_MS
+    }
+    return elapsedMs
+  }
+
+  it("F22a — a typing author gets writes on the clock, not on the round trip", async () => {
+    fastServer()
+
+    const h = harness()
+    const elapsedMs = await typeAcrossAFastServer(h)
+
+    // THE BOUND IS OVER TIME, NOT OVER EDITS. `+ 1` because the run opens with a write that
+    // was already in flight before the first quiet period of the measured window elapsed.
+    const allowed = Math.ceil(elapsedMs / AUTOSAVE_DEBOUNCE_MS) + 1
+    expect(mockedUpdate.mock.calls.length).toBeLessThanOrEqual(allowed)
+  })
+
+  it("F22b — nothing is lost by the bound: the follow-up arrives on the ordinary beat", async () => {
+    fastServer()
+
+    const h = harness()
+    await typeAcrossAFastServer(h)
+    const duringTheRun = mockedUpdate.mock.calls.length
+
+    // The debounce timer the last edit re-armed is still live — that is the whole reason the
+    // drain is allowed to break.
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(mockedUpdate.mock.calls.length).toBe(duringTheRun + 1)
+
+    // …and it is a real round trip, so the receipt waits for the server the same way the
+    // first write did.
+    await advance(SERVER_LATENCY_MS)
+    await flush()
+
+    expect(mockedUpdate.mock.calls.length).toBe(duringTheRun + 1)
+    const last = mockedUpdate.mock.calls.length - 1
+    // Stated over the STORE rather than over a literal: whatever the author has, the server
+    // was told about.
+    expect(sentDefinition(last).phases).toHaveLength(h.store.getState().phases.length)
+    // …guarded by the token the IMMEDIATELY preceding write returned, not the session's.
+    expect(mockedUpdate.mock.calls[last][2]).toBe(`T${last}`)
+    expect(h.store.getState().dirty).toBe(false)
+  })
+
+  it("F22c — a break never leaves the surface claiming a save is in progress", async () => {
+    // ⚠ THIS TEST GUARDS THE FIX'S OWN HAZARD, so its RED is not the defect's RED. Before the
+    // break existed the drain issued a second request here, and the `saving` reading was
+    // TRUE — a request really was outstanding. It becomes a false claim only once a break is
+    // introduced, which is why the state assertion is written with the break rather than
+    // after it. The call-count assertion beside it IS the defect's RED (2 where 1 is owed).
+    const first = deferred<WorkflowDraftWriteResult>()
+    const second = deferred<WorkflowDraftWriteResult>() // deliberately never resolved
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise)
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    // The author keeps typing; the second edit's OWN timer is left immature, so nothing
+    // anywhere arms `pendingRef` — the exact interleaving F17 drives.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS / 2)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).not.toBe("saving")
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+    // Nothing was lost by the break: the work is still unsent AND still claimed as unsent.
+    expect(h.store.getState().dirty).toBe(true)
+  })
+
+  it("F22d — an explicit Save with nothing changed mints no extra PATCH", async () => {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementation(() => Promise.resolve(write("T-REDUNDANT")))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // The press arms `pendingRef` through the writer's single-flight guard (186-12) and
+    // changes NOTHING about the payload.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+
+    first.resolve(write("T1"))
+    await flush()
+
+    // A queue flag is not evidence that the payload moved. The receipt the outstanding write
+    // earned is filed, and no second PATCH is minted to bump the token for nothing.
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+    expect(h.store.getState().dirty).toBe(false)
+  })
+})
+
+// ── F15 — the token is opaque: this module cannot parse it ────────────────────
+
+const PARSES_A_DATE = /new Date\(|Date\.parse\(/
+
+describe("useDraftPersistence — F15: the source fence (the `?raw` house idiom)", () => {
+  it("names no date-parsing call form anywhere in the module", () => {
+    expect(hookSource).not.toMatch(PARSES_A_DATE)
+  })
+
+  it("the fence is a REAL control — it FINDS a planted parse and LEAVES prose alone", () => {
+    // Positive control.
+    expect(PARSES_A_DATE.test("const d = new Date(token)")).toBe(true)
+    expect(PARSES_A_DATE.test("const t = Date.parse(token)")).toBe(true)
+    // NEGATIVE control (the `useGroundingBundle.test.ts:294-316` warning): a blanket grep
+    // would forbid this module's own docblock from naming the hazard it exists to describe.
+    expect(
+      PARSES_A_DATE.test("// NEVER parse this into a JS Date — microseconds are lost"),
+    ).toBe(false)
+  })
+
+  it("cancels no write — the abort belt `useLiveValidation` uses is deliberately absent", () => {
+    expect(hookSource).not.toMatch(/AbortController/)
+  })
+})
+
+// ── F8 — never a false receipt ────────────────────────────────────────────────
+
+describe("useDraftPersistence — F8: a refusal never files a receipt", () => {
+  it("a 422 leaves the draft dirty, calls no receipt action, and shows none of the raw body", async () => {
+    mockedUpdate.mockRejectedValue(new WorkflowDraftUnreadableError(RAW_422_BODY))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: HOLD_UNREADABLE })
+    expect(stateOf(h.view).kind).not.toBe("saved")
+    // The receipt action itself was never reached — not merely "the state is not saved".
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+
+    const shown = reachableStrings(stateOf(h.view)).join("   ")
+    expect(shown).toContain(HOLD_UNREADABLE)
+    for (const internal of reachableStrings(RAW_422_BODY)) {
+      expect(shown).not.toContain(internal)
+    }
+  })
+
+  it("a 404 gets its OWN sentence — a missing row is not an unreadable shape, and not a dead network either", async () => {
+    // RETARGETED by 186-13 (WR-05), not replaced: the claim its name makes is the one it
+    // always made, and the SECOND inequality below is the whole finding. This test used to
+    // assert `SAVE_FAILED_SENTENCE` and therefore certified the defect — the cause-neutral
+    // line invites a retry, and there is no retry that can help here.
+    mockedUpdate.mockRejectedValue(new WorkflowNotFoundError())
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
+    expect(DRAFT_GONE_SENTENCE).not.toBe(HOLD_UNREADABLE)
+    expect(DRAFT_GONE_SENTENCE).not.toBe(SAVE_FAILED_SENTENCE)
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("a 404 HALTS the loop — three further edits issue nothing at all (WR-05)", async () => {
+    // Written in F10's shape ON PURPOSE. The halt property is the same one, reached by a
+    // different cause, and saying it the same way is what makes that visible: a refusal the
+    // loop cannot recover from stops the loop, whichever refusal it was.
+    mockedUpdate.mockRejectedValueOnce(new WorkflowNotFoundError())
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const atRefusal = mockedUpdate.mock.calls.length
+    expect(atRefusal).toBe(1)
+
+    for (let i = 0; i < 3; i += 1) {
+      h.edit()
+      await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+      await flush()
+    }
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(atRefusal)
+    expect(h.markSaved).not.toHaveBeenCalled()
+    // The work is not lost, it is unsendable: dirty stays true, so every leave guard fires.
+    expect(h.store.getState().dirty).toBe(true)
+    // …and it is NOT a conflict. There is no row to reload and none to overwrite, so the
+    // banner's two exits would both be dead affordances.
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
+  })
+
+  it("a PUBLISHED row keeps the sentence that names the way out (186-07 closes 186-06's debt)", async () => {
+    // The 184-11 / D-184-16-debt-3 line. It lived on the page until 186-07 moved the write
+    // seam here; if this branch were missing, a published-row save would fall into the
+    // cause-neutral arm and a person on a frozen row would be told nothing they could act
+    // on. Falsifiable by deleting the `WorkflowConflictError` branch in `refusalOf`.
+    mockedUpdate.mockRejectedValue(new WorkflowConflictError())
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE })
+    // …and it is NOT the generic line, which is the whole point of the branch.
+    expect(PUBLISHED_CONFLICT_MESSAGE).not.toBe(SAVE_FAILED_SENTENCE)
+    // A refusal is still a refusal: no receipt, still dirty.
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+
+    // 186-14 (WR-07) — the enabled Save button's behaviour RECORDED rather than assumed.
+    // It resolves false, and the sentence naming the way out (Tweak) is already on screen
+    // and stays there, so the press is answered rather than silently ignored. That is the
+    // material difference from GAP-4, where the standing sentence was a retry invitation
+    // and the exits had vanished — which is why this halt needs no banner and no
+    // re-assertion machinery.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE })
+  })
+
+  it("a PUBLISHED row HALTS the loop — three further edits issue nothing at all (WR-07)", async () => {
+    // WR-05's OWN ARGUMENT APPLIED TO THE OTHER TERMINAL CAUSE, and written in the 404
+    // test's shape on purpose. A published row is frozen by the DB trigger
+    // `workflow_definitions_block_published_update` (056_workflow_definitions.sql) and can
+    // never become a draft again, so NO PATCH against this id can ever succeed. Before
+    // 186-14, `isTerminalRefusal` named only `WorkflowNotFoundError`, so every subsequent
+    // keystroke burst re-issued a doomed PATCH for the life of the session.
+    //
+    // RED: `expected "spy" to be called 1 times, but got 4 times` — the refusal plus one
+    // doomed PATCH per edit.
+    mockedUpdate.mockRejectedValueOnce(new WorkflowConflictError())
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const atRefusal = mockedUpdate.mock.calls.length
+    expect(atRefusal).toBe(1)
+
+    for (let i = 0; i < 3; i += 1) {
+      h.edit()
+      await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+      await flush()
+    }
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(atRefusal)
+    expect(h.markSaved).not.toHaveBeenCalled()
+    // The work is not lost, it is unsendable: dirty stays true, so every leave guard fires.
+    expect(h.store.getState().dirty).toBe(true)
+    // …and it is NOT a conflict, which is the clause that distinguishes this from a stale
+    // token. A frozen row has no exits: Reload would replace the author's work with the
+    // published copy they cannot edit, and Overwrite would PATCH a row the database itself
+    // refuses. The sentence names the real way out (Tweak) instead.
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: PUBLISHED_CONFLICT_MESSAGE })
+    expect(stateOf(h.view).kind).not.toBe("conflict")
+  })
+
+  it("a dropped connection gets the generic sentence too", async () => {
+    mockedUpdate.mockRejectedValue(new TypeError("Failed to fetch"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    expect(h.store.getState().dirty).toBe(true)
+  })
+})
+
+// ── F11 — one hold mechanism, two sentences ───────────────────────────────────
+
+describe("useDraftPersistence — F11: writes hold while a publish runs, and flush on release", () => {
+  it("issues nothing while publishing, says why, then flushes EXACTLY ONE write carrying the latest definition", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ publishInFlight: true })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+
+    // A second edit accumulates as dirty while held — no timer is burned for it.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    h.set({ publishInFlight: false })
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    // BOTH edits, not the one that was current when the first timer matured.
+    expect(sentDefinition(0).phases).toHaveLength(4)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("holds on an `unreadable` verdict with the OTHER sentence — one mechanism, two words", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ validationCause: "unreadable" })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_UNREADABLE })
+
+    h.set({ validationCause: null })
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("does NOT hold on `unreachable` — an unreachable check must not stall autosave", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ validationCause: "unreachable" })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("publishing outranks unreadable — one reason is shown, and it is the publish one", async () => {
+    const h = harness()
+    h.set({ publishInFlight: true, validationCause: "unreadable" })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+  })
+})
+
+// ── F20 — with the canvas flag OFF the loop writes NOTHING automatically ──────
+
+/**
+ * Phase 186-13 (GAP-3 / WR-03) — the flag-off write leak, and why it is not theoretical.
+ *
+ * D-181-01 is this milestone's HARD gate #1: with `visual_workflow_canvas` OFF the product
+ * is byte-identical to the one that shipped before the canvas existed. Autosave is net-new
+ * behaviour, so `enabled` carries the flag (`WorkflowBuilderPage.tsx:812` —
+ * `canvasEnabled && builderPhase === "drafted"`) and the debounce effect bails on it.
+ *
+ * THE HOLD-RELEASE EFFECT DID NOT READ IT, and the hold is reachable with the flag off:
+ *
+ *   • `renderPublish` — and therefore `setPublishInFlight`, which is the sole input to the
+ *     publish half of `holdReason` — is mounted UNCONDITIONALLY at
+ *     `WorkflowBuilderPage.tsx:1700-1702`. Publish is a pre-186 door and correctly is not
+ *     behind the canvas flag.
+ *   • `BuilderSaveRegion`'s Save-draft button is likewise unconditional, and `saveNow`
+ *     is not gated on `enabled` either (that is D-186-03 + D-186-08, and it is deliberate).
+ *     Only the quiet status LINE is hidden by the flag.
+ *
+ * So a flag-off session that edits and then publishes reaches `{kind:"held"}`, and when the
+ * gauntlet resolves the release fired `performWrite()` — an AUTOMATIC PATCH, in a session
+ * where the person had switched the whole feature off. That is a write past the revert
+ * switch, which is the one thing the revert switch exists to make impossible.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F20a — `updateWorkflowDraft` called 1 time where 0 are expected.
+ *   F20a (create variant) — `createWorkflowDraft` called 1 time where 0 are expected. The
+ *          claim is ZERO NETWORK CALLS, not zero PATCHes, and the create branch is reachable
+ *          whenever the session started without a draft row.
+ *   F20b — 1 where 0 are expected. Pressing Save while held arms `heldPendingRef`, which is
+ *          the OTHER trigger of the release flush, so it has to be driven separately.
+ *
+ * F20c is the contrast control, and it is the reason this describe cannot pass by simply
+ * breaking the flush: with the flag ON the identical drive must still produce exactly one
+ * write carrying both edits.
+ */
+describe("useDraftPersistence — F20: with the canvas flag OFF the loop writes nothing automatically (D-181-01)", () => {
+  /** The flag-off reachability drive: edit, publish, release. Verbatim the F11 arrangement,
+   *  so the only difference between this describe and that one is `enabled`. */
+  async function editThroughAPublish(h: ReturnType<typeof harness>): Promise<void> {
+    h.set({ publishInFlight: true })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+
+    // A second edit accumulates while the gauntlet runs — the common shape.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+
+    h.set({ publishInFlight: false })
+    await flush()
+    // Well past every timer the release could have armed.
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+  }
+
+  it("F20a — flag off: edit, publish, release ⇒ ZERO network calls", async () => {
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    const h = harness({ enabled: false })
+    await editThroughAPublish(h)
+
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+    // The work is not lost, it is simply not SENT: the draft stays dirty, so the leave
+    // guard still fires and the explicit Save button still has something to do.
+    expect(h.store.getState().dirty).toBe(true)
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("F20a — the same claim on a session with no draft row yet: no CREATE either", async () => {
+    // `createWorkflowDraft` is the other half of "zero network calls", and it is reachable
+    // exactly when the session started without a row (three of the Builder's four entry
+    // routes create). Asserting only on PATCHes would leave this path unmeasured.
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    const h = harness({ enabled: false, draftId: null, token: null })
+    await editThroughAPublish(h)
+
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(h.created).not.toHaveBeenCalled()
+  })
+
+  it("F20b — flag off: Save pressed WHILE held, then release ⇒ still nothing automatic", async () => {
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    const h = harness({ enabled: false })
+    h.set({ publishInFlight: true })
+    h.edit()
+
+    // The press is the OTHER way `heldPendingRef` gets armed, and the release reads it as
+    // "there is unsent work" — so this path has to be driven separately from F20a's.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+
+    h.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+
+    // A press the person made is honoured; a flush nobody asked for is not. The release
+    // must not turn the earlier press into a write the person did not authorise NOW.
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+
+    // ── 186-17 (WR-09) — AND WHAT THE SURFACE SAYS ONCE THE HOLD HAS ENDED ──────────
+    //
+    // The four assertions above are the write suppression, and they are unchanged: that
+    // half must not move. What this case never asked was what the header READS afterwards.
+    // 186-13 gated the release on `enabled` by returning early, and the early return came
+    // BEFORE anything resolved `{kind:"held"}` — so on the flag-off surface the sentence
+    // *"Publishing — not saved; press Save draft again when it finishes"* stayed on screen
+    // after the gauntlet had ended, and cleared only if the author happened to press Save
+    // again. Nothing was written, and the surface still made a false statement about system
+    // state. The gates below the transition test are reasons not to WRITE; none of them is a
+    // reason to keep claiming a publish is running.
+    //
+    // ── 186-19 (WR-12) — RETARGETED, NOT WEAKENED ───────────────────────────────────
+    //
+    // This row used to assert `after.kind !== "held"`, and that assertion was PATCH-SHAPED:
+    // it described the shape 186-17's edit happened to produce rather than the property
+    // anyone cares about (the Phase 185 lesson — verify the PROPERTY, not the patch). Going
+    // silent satisfied it, and going silent is WR-12's defect: the instruction to press Save
+    // draft was erased at the instant it became actionable. So the kind assertion is replaced
+    // by a POSITIVE one naming the reading, and the two `not.toContain` assertions — which
+    // are the real property, that a finished publish stops being described as a running one —
+    // are kept verbatim. The row's assertion count does not drop and its claim gets stronger.
+    const after = stateOf(h.view)
+    expect(after).toEqual({ kind: "held", sentence: HOLD_ENDED_UNSAVED })
+    expect(reachableStrings(after)).not.toContain(HOLD_PUBLISHING_MANUAL)
+    expect(reachableStrings(after)).not.toContain(HOLD_PUBLISHING)
+  })
+
+  it("F20i — the flag-off release SAYS what happened; silence is kept for when nothing is unsent (WR-12)", async () => {
+    // 186-19 (WR-12). Two constants holding the same string would pass every equality below
+    // and prove nothing, so the inequality control comes first — the F20e / F8 idiom.
+    expect(HOLD_ENDED_UNSAVED).not.toBe(HOLD_PUBLISHING)
+    expect(HOLD_ENDED_UNSAVED).not.toBe(HOLD_PUBLISHING_MANUAL)
+    expect(HOLD_ENDED_UNSAVED).not.toBe(SAVE_FAILED_SENTENCE)
+
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+    mockedCreate.mockResolvedValue(write("T-SHOULD-NEVER-BE-CREATED"))
+
+    // (a) THERE IS UNSENT WORK. RED: `{kind:"idle"}` — the header went blank and the author
+    //     was holding work this surface will never send on its own, with nothing on screen
+    //     saying so until the leave guard fired on navigate-away.
+    const withWork = harness({ enabled: false })
+    withWork.set({ publishInFlight: true })
+    withWork.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    withWork.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+
+    expect(stateOf(withWork.view)).toEqual({ kind: "held", sentence: HOLD_ENDED_UNSAVED })
+    // NOTHING WAS WRITTEN TO BUY THAT SENTENCE (D-181-01, restated from F20a) — and it is not
+    // a receipt: no receipt action ran and the draft is still dirty.
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+    expect(withWork.markSaved).not.toHaveBeenCalled()
+    expect(withWork.store.getState().dirty).toBe(true)
+
+    // (b) THE STORE IS CLEAN. Silence is correct exactly when there is nothing unsent — a
+    //     sentence here would be an instruction to save work that does not exist.
+    const clean = harness({ enabled: false })
+    clean.set({ publishInFlight: true })
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    clean.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 5)
+    await flush()
+
+    expect(clean.store.getState().dirty).toBe(false)
+    expect(stateOf(clean.view)).toEqual({ kind: "idle" })
+    const said = reachableStrings(stateOf(clean.view))
+    expect(said).not.toContain(HOLD_ENDED_UNSAVED)
+    expect(said).not.toContain(HOLD_PUBLISHING_MANUAL)
+    expect(said).not.toContain(HOLD_PUBLISHING)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(mockedCreate).not.toHaveBeenCalled()
+  })
+
+  it("F20f — the flag-off release leaves the pending flag AGREEING with the store", async () => {
+    // 186-17 (WR-09), the second half. 186-13 deliberately did NOT clear `heldPendingRef` on
+    // the flag-off path, so work accumulated with the flag off would still be found if the
+    // flag came on later. The other half of that choice is the hazard: left armed, the flag
+    // can flush a write on the strength of a press made minutes earlier, bypassing the
+    // `dirty` gate the debounce timer carries precisely to stop "merely opening a draft"
+    // from PATCHing it. Setting it to the store's own `dirty` satisfies both — it claims
+    // unsent work exactly when there is unsent work.
+    //
+    // DRIVEN THROUGH BEHAVIOUR, NOT THROUGH THE REF. The question "did a stale arming
+    // survive?" is asked by turning the flag on, driving a second hold to its release, and
+    // COUNTING WRITES — which is the only form of the question a person could ever notice.
+    async function flagOffHoldThenAnEnabledRelease(opts: {
+      unsentWork: boolean
+    }): Promise<ReturnType<typeof harness>> {
+      const h = harness({ enabled: false })
+      h.set({ publishInFlight: true })
+      if (opts.unsentWork) h.edit()
+
+      // The press is the flag-off surface's only way to arm the pending flag (F20b).
+      await act(async () => {
+        await h.view.result.current.saveNow()
+      })
+      h.set({ publishInFlight: false })
+      await flush()
+      expect(mockedUpdate).not.toHaveBeenCalled()
+
+      // A later session turns the canvas back on. No clock is advanced past the debounce
+      // here, so any write that appears came from the RELEASE and not from a timer.
+      h.set({ enabled: true })
+      h.set({ publishInFlight: true })
+      h.set({ publishInFlight: false })
+      await flush()
+      return h
+    }
+
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    // (a) There WAS unsent work: the flag-off session accumulated it, and the enabled
+    //     release still finds it. This is the half 186-13 protected, guarded here so the
+    //     fix cannot buy honesty by losing work.
+    const withWork = await flagOffHoldThenAnEnabledRelease({ unsentWork: true })
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(withWork.store.getState().dirty).toBe(false)
+
+    mockedUpdate.mockClear()
+
+    // (b) There was NO unsent work — only a press against a clean store. RED: the stale
+    //     arming survived the flag-off release and flushed a PATCH against a draft nobody
+    //     had edited, bumping the token (and every other tab's guard) for nothing.
+    const withoutWork = await flagOffHoldThenAnEnabledRelease({ unsentWork: false })
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(withoutWork.store.getState().dirty).toBe(false)
+  })
+
+  it("F20g — the flag-ON release is unchanged: the reading resolves AND the single flush still happens", async () => {
+    // F20c's claim, restated AFTER the resolution was added, so a regression in either half
+    // is visible: resolving the hold reading must not cost the flush, and flushing must not
+    // leave the hold sentence on screen. It passes before the fix too — that is the point of
+    // a contrast control.
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    await editThroughAPublish(h)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(sentDefinition(0).phases).toHaveLength(4)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).not.toBe("held")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+  })
+
+  it("F20h — the resolution sits above the OTHER two gates, and is a no-op for every other reading", async () => {
+    // The `!enabled` arm is one of THREE reasons this effect returns without writing; the
+    // halt is another. Patching only the arm the review named would leave the property
+    // untrue in the other two, which is why the resolution went above all of them.
+    //
+    // AND IT FALSIFIES THE WRONG SHAPE OF THE SAME FIX. A bare `setState({kind:"idle"})`
+    // here would erase a CONFLICT — the only reading that carries Reload and Overwrite —
+    // reintroducing GAP-4 by another door. The functional form makes it a no-op for
+    // everything that is not `held`, and this case is what says so.
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+    const atRefusal = mockedUpdate.mock.calls.length
+
+    // A publish begins and ends while the loop is halted.
+    h.set({ publishInFlight: true })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    h.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    expect(stateOf(h.view).kind).not.toBe("held")
+    expect(stateOf(h.view).kind).toBe("conflict")
+    expect(mockedUpdate.mock.calls.length).toBe(atRefusal)
+  })
+
+  it("F20c — the flag-ON behaviour is UNCHANGED: one write, carrying both edits", async () => {
+    // The contrast control. Without it, deleting the flush outright would pass F20a/F20b.
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    await editThroughAPublish(h)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(sentDefinition(0).phases).toHaveLength(4)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("F20e — the hold SENTENCE promises a flush only where one will happen (WR-04)", async () => {
+    // The two spellings take the SAME input as the flush itself, which is the only way they
+    // can agree. Asserted as an INEQUALITY as well as two equalities, the way F8's published
+    // branch asserts `PUBLISHED_CONFLICT_MESSAGE !== SAVE_FAILED_SENTENCE`: two constants
+    // that happened to hold the same string would pass both equalities and prove nothing.
+    expect(HOLD_PUBLISHING_MANUAL).not.toBe(HOLD_PUBLISHING)
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const on = harness()
+    on.set({ publishInFlight: true })
+    on.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    // Flag ON, the loop WILL flush on release — so a promise is the truth.
+    expect(stateOf(on.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+
+    const off = harness({ enabled: false })
+    off.set({ publishInFlight: true })
+    let ok = true
+    await act(async () => {
+      ok = await off.view.result.current.saveNow()
+    })
+    // Flag OFF, the loop will NOT flush (F20a/F20b) — so the same promise would be a false
+    // receipt in the future tense, and the sentence instructs instead.
+    expect(ok).toBe(false)
+    expect(stateOf(off.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING_MANUAL })
+  })
+
+  it("F20d — the hold READING is still reachable flag-off: Save reports it rather than saving", async () => {
+    // The half that must NOT be gated. `saveNow` is user-initiated, so it keeps working on
+    // the flag-off surface (D-186-03) — and when it cannot write, it says so. WR-04 is that
+    // this sentence never reached the DOM there; `BuilderSaveRegion.test.tsx` owns that half.
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness({ enabled: false })
+    h.set({ publishInFlight: true })
+
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+
+    expect(ok).toBe(false)
+    expect(stateOf(h.view).kind).toBe("held")
+    expect(mockedUpdate).not.toHaveBeenCalled()
+  })
+})
+
+// ── F10 — a conflict halts the loop, and both exits exist ─────────────────────
+
+describe("useDraftPersistence — F10: a stale token halts the loop dead", () => {
+  it("issues nothing across three further edits after the refusal", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "conflict", currentToken: "T-SERVER" })
+    const atConflict = mockedUpdate.mock.calls.length
+
+    for (let i = 0; i < 3; i += 1) {
+      h.edit()
+      await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+      await flush()
+    }
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(atConflict)
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("overwrite is ONE deliberate PATCH carrying the token the refusal returned", async () => {
+    mockedUpdate
+      .mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+      .mockResolvedValueOnce(write("T-NEXT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    await act(async () => {
+      await h.view.result.current.overwrite()
+    })
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T-SERVER")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("an overwrite that loses a SECOND race stays in conflict, with the NEWER token", async () => {
+    mockedUpdate
+      .mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+      .mockRejectedValueOnce(new WorkflowStaleTokenError("T-NEWER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    await act(async () => {
+      await h.view.result.current.overwrite()
+    })
+
+    expect(stateOf(h.view)).toEqual({ kind: "conflict", currentToken: "T-NEWER" })
+    expect(h.markSaved).not.toHaveBeenCalled()
+  })
+
+  it("the hook never decides to overwrite by itself", async () => {
+    mockedUpdate.mockRejectedValue(new WorkflowStaleTokenError("T-SERVER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    // Everything a person could do EXCEPT choosing an exit: more edits, more time.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 20)
+    await flush()
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view).kind).toBe("conflict")
+  })
+
+  it("reload adopts the server's row AND its token; the next autosave carries the reloaded one", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-AFTER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    const serverRow: WorkflowDraftRow = {
+      id: DRAFT_ID,
+      slug: "risk-register",
+      version: 1,
+      name: "Risk register",
+      definition: { ...draft(), phases: [phase("server-side", 0)] },
+      token: "T-RELOADED",
+    }
+    mockedList.mockResolvedValue([serverRow])
+
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(mockedList).toHaveBeenCalledTimes(1)
+    expect(h.store.getState().phases).toHaveLength(1)
+    expect(h.store.getState().dirty).toBe(false)
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+
+    // The loop resumes, guarded by the token the reload adopted — not the pre-conflict one.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const calls = mockedUpdate.mock.calls
+    expect(calls).toHaveLength(2)
+    expect(calls[1][2]).toBe("T-RELOADED")
+  })
+
+  it("a reload whose row is gone lands in an honest error, never silently", async () => {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    mockedList.mockResolvedValue([])
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(stateOf(h.view).kind).toBe("error")
+    // 186-13 — and it reads the SAME WAY as a gone row discovered by a PATCH. One situation,
+    // one sentence, whichever path found it: the rule the two hold sentences already follow.
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: DRAFT_GONE_SENTENCE })
+    // 186-14 (GAP-4) — THE NEGATIVE CONTROL FOR F21, extended here rather than copied into a
+    // second arrangement. F21 makes a FAILED read restore the conflict; a read that SUCCEEDED
+    // and found nothing must not, because Reload would find nothing a second time and
+    // Overwrite would PATCH a row that is not there — two dead affordances on a banner whose
+    // whole promise is a way out. This clause passes before and after that fix, which is what
+    // makes it a control rather than a restatement.
+    expect(stateOf(h.view).kind).not.toBe("conflict")
+  })
+})
+
+// ── F19 — single flight is a property of the WRITER (GAP-2 / WR-01) ───────────
+
+/**
+ * Phase 186-12 — the difference between a PATCH test and a PROPERTY test.
+ *
+ * F9 above pins "at most one PATCH is outstanding" for exactly ONE caller: the debounce
+ * timer. That is a patch test. It passes because the timer happens to carry its own
+ * `inFlightRef` check, and it says nothing whatsoever about the other callers — which is
+ * how `overwrite()` and `reload()` shipped without one. F19 pins the same invariant for the
+ * whole caller SET, so the property survives a caller F9 never imagined.
+ *
+ * THE TWO CALLERS F9 NEVER EXERCISED ARE THE ESCAPE HATCHES. `overwrite` and `reload` are
+ * the mechanism built specifically to RESOLVE a concurrency conflict, and before 186-12
+ * neither of them was concurrency-safe: an ordinary double-click on Overwrite issued two
+ * concurrent PATCHes carrying the SAME token, the server refused the loser `stale_token`,
+ * and the loop raised a conflict banner for a conflict that had never happened. The
+ * conflict resolver manufacturing conflicts is the T-185-04-01 lesson met a third time —
+ * an invariant that each caller has to remember is not an invariant.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F19a — three rows (the debounce timer, `saveNow`, the hold release) are GREEN before the
+ *          fix, because those callers carry their own check. The `overwrite()` row reports
+ *          a peak of 2.
+ *   F19b — `updateWorkflowDraft` is called 2 times after the conflict where 1 is expected,
+ *          and the surface reads `conflict` while the resolution is still in flight.
+ *   F19c — `listDraftWorkflows` is called 2 times where 1 is expected.
+ *   F19d — the next request carries `T-STALE-RACE`, the token minted by the racing second
+ *          overwrite that completed LAST, rather than `T-FRESH` from the write the person
+ *          actually authorised.
+ *
+ * The tracking idiom below (`outstanding` / `peak` / `tracked`) is F9's, reused rather than
+ * reinvented: one counter pair incremented at CALL time and decremented in a `.finally`, so
+ * `peak` records the true simultaneous maximum rather than a count of requests.
+ */
+describe("useDraftPersistence — F19: single flight is a property of the WRITER (WR-01)", () => {
+  let outstanding = 0
+  let peak = 0
+
+  beforeEach(() => {
+    outstanding = 0
+    peak = 0
+  })
+
+  function tracked(p: Promise<WorkflowDraftWriteResult>): Promise<WorkflowDraftWriteResult> {
+    outstanding += 1
+    peak = Math.max(peak, outstanding)
+    return p.finally(() => {
+      outstanding -= 1
+    })
+  }
+
+  type Held = { h: ReturnType<typeof harness>; first: Deferred<WorkflowDraftWriteResult> }
+
+  /** The shared arrangement: one autosave write issued and HELD OPEN by a deferred. */
+  async function holdFirstWriteOpen(): Promise<Held> {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => tracked(Promise.resolve(write("T-EXTRA"))))
+    mockedUpdate.mockImplementationOnce(() => tracked(first.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(outstanding).toBe(1)
+    return { h, first }
+  }
+
+  /**
+   * The `overwrite` row needs its OWN arrangement, and the reason is structural rather than
+   * incidental: `overwrite` is only reachable from a `conflict`, and a conflict is only
+   * reachable from a REFUSED write. So this row spends its first request reaching the
+   * conflict, takes the exit once to put a write in flight, and only then double-clicks.
+   */
+  async function conflictThenHoldTheOverwriteOpen(): Promise<Held> {
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => tracked(Promise.resolve(write("T-EXTRA"))))
+    mockedUpdate
+      .mockImplementationOnce(() =>
+        tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER"))),
+      )
+      .mockImplementationOnce(() => tracked(first.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    await act(async () => {
+      void h.view.result.current.overwrite()
+      await Promise.resolve()
+    })
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(outstanding).toBe(1)
+    return { h, first }
+  }
+
+  const ROWS: {
+    name: string
+    arrange: () => Promise<Held>
+    drive: (h: ReturnType<typeof harness>) => Promise<void>
+  }[] = [
+    {
+      name: "the debounce timer",
+      arrange: holdFirstWriteOpen,
+      drive: async (h) => {
+        h.edit()
+        await advance(AUTOSAVE_DEBOUNCE_MS)
+      },
+    },
+    {
+      name: "saveNow()",
+      arrange: holdFirstWriteOpen,
+      drive: async (h) => {
+        await act(async () => {
+          await h.view.result.current.saveNow()
+        })
+      },
+    },
+    {
+      name: "the hold release",
+      arrange: holdFirstWriteOpen,
+      drive: async (h) => {
+        h.set({ publishInFlight: true })
+        h.set({ publishInFlight: false })
+        await flush()
+      },
+    },
+    {
+      name: "overwrite()",
+      arrange: conflictThenHoldTheOverwriteOpen,
+      drive: async (h) => {
+        await act(async () => {
+          void h.view.result.current.overwrite()
+          await Promise.resolve()
+        })
+      },
+    },
+  ]
+
+  for (const row of ROWS) {
+    it(`F19a — ${row.name} adds no concurrent request while a write is outstanding`, async () => {
+      const { h } = await row.arrange()
+
+      await row.drive(h)
+      // Time passes and the first write is deliberately NEVER resolved, so anything a
+      // second entry point issued is still outstanding when the peak is read.
+      await advance(AUTOSAVE_DEBOUNCE_MS * 2)
+
+      expect(peak).toBe(1)
+    })
+  }
+
+  it("F19b — a double-click on Overwrite is ONE PATCH, so no stale_token conflict is manufactured", async () => {
+    const held = deferred<WorkflowDraftWriteResult>()
+    // What the SERVER does to the loser of a same-token race. If a second PATCH is ever
+    // issued, this is the refusal the loop turns back into a conflict banner.
+    mockedUpdate.mockImplementation(() =>
+      tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER-2"))),
+    )
+    mockedUpdate
+      .mockImplementationOnce(() =>
+        tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER"))),
+      )
+      .mockImplementationOnce(() => tracked(held.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+    // Counted as a DELTA: reaching a conflict costs one refused write, and that one is not
+    // the subject here.
+    const atConflict = mockedUpdate.mock.calls.length
+
+    // The double-click: two presses inside one tick, before React can re-render anything.
+    await act(async () => {
+      void h.view.result.current.overwrite()
+      void h.view.result.current.overwrite()
+      await Promise.resolve()
+    })
+    await advance(0)
+
+    // Before ANYTHING resolves, the surface is saving. In RED the racing second PATCH has
+    // already been refused and the banner is back up for a conflict that never happened.
+    expect(stateOf(h.view).kind).toBe("saving")
+
+    held.resolve(write("T-NEXT"))
+    await flush()
+
+    expect(mockedUpdate.mock.calls.length - atConflict).toBe(1)
+    expect(mockedUpdate.mock.calls[atConflict][2]).toBe("T-SERVER")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+  })
+
+  it("F19c — a double-click on Reload is ONE read and ONE setDrafted", async () => {
+    mockedUpdate.mockImplementationOnce(() =>
+      tracked(Promise.reject(new WorkflowStaleTokenError("T-SERVER"))),
+    )
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    // Counted the way the harness counts `markSaved` — through `setState`, because zustand
+    // rebuilds the state object and only a value written INTO it survives.
+    const setDrafted = vi.fn()
+    const realSetDrafted = h.store.getState().setDrafted
+    h.store.setState({
+      setDrafted: (d: BuilderDefinition) => {
+        setDrafted(d)
+        realSetDrafted(d)
+      },
+    })
+
+    const rows: WorkflowDraftRow[] = [
+      {
+        id: DRAFT_ID,
+        slug: "risk-register",
+        version: 1,
+        name: "Risk register",
+        definition: { ...draft(), phases: [phase("server-side", 0)] },
+        token: "T-RELOADED",
+      },
+    ]
+    const listHeld = deferred<WorkflowDraftRow[]>()
+    mockedList.mockImplementation(() => Promise.resolve(rows))
+    mockedList.mockImplementationOnce(() => listHeld.promise)
+
+    await act(async () => {
+      void h.view.result.current.reload()
+      void h.view.result.current.reload()
+      await Promise.resolve()
+    })
+
+    listHeld.resolve(rows)
+    await flush()
+
+    expect(mockedList).toHaveBeenCalledTimes(1)
+    expect(setDrafted).toHaveBeenCalledTimes(1)
+    expect(h.store.getState().phases).toHaveLength(1)
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+  })
+
+  it("F19d — an exit taken while a write is outstanding adopts no token", async () => {
+    // Two deferreds, resolved in the order the race would really settle: the write the
+    // person authorised lands FIRST, and the racing one the loop should never have issued
+    // lands LAST — which is precisely why a late loser can clobber `tokenRef`.
+    const authorised = deferred<WorkflowDraftWriteResult>()
+    const racing = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => tracked(Promise.resolve(write("T-EXTRA"))))
+    mockedUpdate
+      .mockImplementationOnce(() =>
+        tracked(Promise.reject(new WorkflowStaleTokenError("T-CONFLICT"))),
+      )
+      .mockImplementationOnce(() => tracked(authorised.promise))
+      .mockImplementationOnce(() => tracked(racing.promise))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    await act(async () => {
+      void h.view.result.current.overwrite()
+      void h.view.result.current.overwrite()
+      await Promise.resolve()
+    })
+
+    authorised.resolve(write("T-FRESH"))
+    await flush()
+    // Harmless in GREEN — the second exit never issued a request, so nothing awaits this.
+    racing.resolve(write("T-STALE-RACE"))
+    await flush()
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const last = mockedUpdate.mock.calls[mockedUpdate.mock.calls.length - 1]
+    expect(last[2]).toBe("T-FRESH")
+  })
+})
+
+// ── F21 — a FAILED exit is not a lost exit (GAP-4 / CR-02) ────────────────────
+
+/**
+ * Phase 186-14 — the failure path of the exit the banner recommends FIRST.
+ *
+ * ── WHY THIS IS ORDINARY RATHER THAN EXOTIC ───────────────────────────────────────
+ *
+ * `listDraftWorkflows` (`lib/api.ts:3408-3413`) throws a plain `Error` on ANY non-2xx AND
+ * on a dropped connection, and it carries no name this hook branches on — so every one of
+ * those lands in `reload`'s catch. `BuilderSaveRegion` is the ONLY consumer of
+ * `onReload`/`onOverwrite` in non-test source, and its conflict banner is the ONLY surface
+ * that carries them. The banner renders on `state.kind === "conflict" || resolving`.
+ *
+ * Put those three facts together and the defect reads itself: the catch replaced the
+ * conflict with `{kind:"error"}`, so in the SAME commit that `resolving` went false BOTH
+ * controls left the DOM — while `haltedRef` stayed set forever. From there `saveNow()`
+ * returns at the halt check with no state change, the debounce effect schedules nothing,
+ * `dirty` stays true so every leave guard fires, and the sentence on screen
+ * (`SAVE_FAILED_SENTENCE`, which this module's own docblock identifies as a RETRY
+ * INVITATION) invited a retry that had become structurally impossible. The trigger is one
+ * dropped connection during one click on the RECOMMENDED DEFAULT exit.
+ *
+ * THE RED NUMBERS, so a future reader can re-observe them by reverting the fix:
+ *   F21a — the state reads `{ kind: "error", sentence: "Not saved — we couldn't complete
+ *          the save" }`; `expected 'error' to be 'conflict'`.
+ *   F21c — the second `reload()` never runs as a resumption, because the loop it was meant
+ *          to resume had already been replaced: `expected 'error' to be 'idle'`.
+ *   F21d — `RELOAD_FAILED_NOTE` is `undefined`, so there is nothing for the banner to say.
+ *
+ * THE NEGATIVE CONTROL IS NOT HERE, DELIBERATELY. "A gone row is still not a conflict" is
+ * F10's `"a reload whose row is gone lands in an honest error, never silently"` above,
+ * extended by this plan with the not-a-conflict clause rather than copied: Reload would find
+ * nothing and Overwrite would PATCH a row that is not there, so that branch must keep
+ * `DRAFT_GONE_SENTENCE` and must NOT gain the two exits. It passes unchanged by this fix,
+ * which is exactly what makes it a control.
+ */
+describe("useDraftPersistence — F21: a FAILED exit is not a lost exit (GAP-4 / CR-02)", () => {
+  /** The server row a successful reload adopts. */
+  const SERVER_ROW: WorkflowDraftRow = {
+    id: DRAFT_ID,
+    slug: "risk-register",
+    version: 1,
+    name: "Risk register",
+    definition: { ...draft(), phases: [phase("server-side", 0)] },
+    token: "T-RELOADED",
+  }
+
+  /** What `listDraftWorkflows` really throws: a plain, nameless `Error`. Constructed the
+   *  way the client constructs it, so this test cannot pass on a class the hook happens to
+   *  branch on. */
+  function transportFailure(): Error {
+    return new Error("Failed to list draft workflows (status 503)")
+  }
+
+  /** Reach the conflict the product's own way — one refused write, not a hand-set state. */
+  async function conflicted(): Promise<ReturnType<typeof harness>> {
+    mockedUpdate.mockRejectedValueOnce(new WorkflowStaleTokenError("T-SERVER"))
+    mockedUpdate.mockResolvedValue(write("T-SHOULD-NEVER-BE-SENT"))
+
+    const h = harness()
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    expect(stateOf(h.view)).toEqual({ kind: "conflict", currentToken: "T-SERVER" })
+    return h
+  }
+
+  /** Take the exit while the read is going to fail. */
+  async function reloadThatFails(h: ReturnType<typeof harness>): Promise<void> {
+    mockedList.mockRejectedValueOnce(transportFailure())
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+  }
+
+  it("F21a — a rejecting listDraftWorkflows leaves the CONFLICT intact, with the server's token", async () => {
+    const h = await conflicted()
+    await reloadThatFails(h)
+
+    const after = stateOf(h.view)
+    // The state the banner renders on. A failed EXIT is not a failed WRITE: the row still
+    // moved, so the reading that describes the world is still the conflict.
+    expect(after.kind).toBe("conflict")
+    expect(after).toMatchObject({ kind: "conflict", currentToken: "T-SERVER" })
+    // …and the resolution is over, so the controls are pressable again rather than merely
+    // present-and-disabled.
+    expect(h.view.result.current.resolving).toBe(false)
+  })
+
+  it("F21b — the halt is still intact: a further edit issues nothing", async () => {
+    const h = await conflicted()
+    const atConflict = mockedUpdate.mock.calls.length
+    await reloadThatFails(h)
+
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    // D-186-08 literally. Clearing `haltedRef` in the catch would "recover" the loop into
+    // the silent clobber this phase exists to prevent — the row genuinely moved.
+    expect(mockedUpdate).toHaveBeenCalledTimes(atConflict)
+    expect(h.markSaved).not.toHaveBeenCalled()
+    expect(h.store.getState().dirty).toBe(true)
+  })
+
+  it("F21c — a SECOND Reload is accepted, adopts the server row and its token, and lands idle", async () => {
+    const h = await conflicted()
+    await reloadThatFails(h)
+
+    mockedList.mockResolvedValue([SERVER_ROW])
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(h.store.getState().phases).toHaveLength(1)
+    expect(h.store.getState().dirty).toBe(false)
+    expect(stateOf(h.view)).toEqual({ kind: "idle" })
+
+    // The token is proved by the one the NEXT write carries, never by reading a ref: the
+    // loop resumed guarded by what the server holds now.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+
+    const calls = mockedUpdate.mock.calls
+    expect(calls[calls.length - 1][2]).toBe("T-RELOADED")
+  })
+
+  it("F21d — the failed exit SAYS why, WITHOUT replacing the sentence that offers the exits", async () => {
+    const h = await conflicted()
+    await reloadThatFails(h)
+
+    expect(stateOf(h.view)).toEqual({
+      kind: "conflict",
+      currentToken: "T-SERVER",
+      note: RELOAD_FAILED_NOTE,
+    })
+    // Asserted as INEQUALITIES the way F8's sentence tests are: two constants that happened
+    // to hold the same string would satisfy the equality above and prove nothing. The note
+    // is an EXTRA line on the banner, not a swap for either refusal sentence.
+    expect(RELOAD_FAILED_NOTE).not.toBe(SAVE_FAILED_SENTENCE)
+    expect(RELOAD_FAILED_NOTE).not.toBe(DRAFT_GONE_SENTENCE)
+  })
+
+  it("F21f — a reload that fails while the loop is NOT halted keeps the cause-neutral line", async () => {
+    // THE GUARD ON THE FIX, and it is the falsification of the obvious over-reach. Without
+    // the `haltedRef` condition in the catch, this arrangement would raise a conflict banner
+    // for a conflict that never happened — telling a person their draft moved under them
+    // when nothing moved at all. That is the same class of lie in the other direction.
+    const h = harness()
+
+    mockedList.mockRejectedValueOnce(transportFailure())
+    await act(async () => {
+      await h.view.result.current.reload()
+    })
+
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+    expect(stateOf(h.view).kind).not.toBe("conflict")
+  })
+})
+
+// ── F23 — an exit leaves no arming behind (186-19, WR-13) ─────────────────────
+
+/**
+ * `heldPendingRef` IS A MEMORY, AND A MEMORY THAT OUTLIVES ITS SITUATION IS A BUG.
+ *
+ * `saveNow` arms it whenever a hold is running, and the hold release is the only thing that
+ * ordinarily disarms it. A CONFLICT interrupts that: the release hits `if (haltedRef.current)
+ * return` above every other gate, so the arming survives the halt untouched. `reload()`'s
+ * success path already clears it beside `haltedRef`; `overwrite()` did not — and that
+ * asymmetry is the whole of WR-13.
+ *
+ * WHY IT MATTERS RATHER THAN BEING TIDY: the surviving flag is read by the NEXT hold release
+ * as "there is unsent work", which is exactly the `dirty` gate the debounce timer carries to
+ * stop merely opening a draft from PATCHing it. So a publish that begins and ends against a
+ * perfectly clean store issues a PATCH nobody asked for — and every PATCH mints a fresh
+ * token, invalidating the optimistic guard every other open tab holds. The mechanism built to
+ * resolve a concurrency conflict manufactures one.
+ *
+ * COUNTED, NOT ARGUED: the claim is a call count over the whole drive, which is the only form
+ * of the question a person could ever notice.
+ */
+describe("useDraftPersistence — F23: a chosen exit clears the pending arming (WR-13)", () => {
+  it("F23 — a chosen exit clears the pending arming, so a later clean hold writes nothing (WR-13)", async () => {
+    // Call 1 is held open by a deferred so a hold can begin WHILE it is outstanding; it is
+    // then refused with a stale token, which is what halts the loop. Calls 2+ resolve.
+    const first = deferred<WorkflowDraftWriteResult>()
+    mockedUpdate.mockImplementation(() => Promise.resolve(write("T-LATER")))
+    mockedUpdate.mockImplementationOnce(() => first.promise)
+
+    const h = harness()
+
+    // (1) A write is outstanding.
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // (2) A publish hold begins while it is still in flight.
+    h.set({ publishInFlight: true })
+
+    // (3) The author presses Save draft. This is the arming: `saveNow` reports the hold and
+    //     sets `heldPendingRef`, and it writes nothing.
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+    expect(ok).toBe(false)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // (4) The outstanding write is refused: the row moved, so the loop halts into `conflict`.
+    await act(async () => {
+      first.reject(new WorkflowStaleTokenError("T-SERVER"))
+      await Promise.resolve()
+    })
+    await flush()
+    expect(stateOf(h.view).kind).toBe("conflict")
+
+    // (5) The publish ends. The release hits the halted early return, so nothing is written
+    //     and — in RED — nothing disarms the flag either.
+    h.set({ publishInFlight: false })
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+
+    // (6) The author picks an exit: Overwrite. Exactly one PATCH, carrying the server's token.
+    await act(async () => {
+      await h.view.result.current.overwrite()
+    })
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(mockedUpdate.mock.calls[1][2]).toBe("T-SERVER")
+
+    // THE POSITIVE CONTROL. The conflict is resolved and the receipt was filed, so there is
+    // genuinely nothing unsent — which is what makes any further PATCH a no-op rather than a
+    // legitimate flush.
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+    expect(h.store.getState().dirty).toBe(false)
+
+    // (7) A LATER publish hold begins and ends against that clean store.
+    h.set({ publishInFlight: true })
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    h.set({ publishInFlight: false })
+    await flush()
+    await advance(AUTOSAVE_DEBOUNCE_MS * 3)
+    await flush()
+
+    // GREEN: two calls over the whole drive — the refused write and the Overwrite the person
+    // chose. RED: three, the third a PATCH carrying a definition nobody changed, minting a
+    // fresh token and invalidating every other open tab's guard.
+    expect(mockedUpdate).toHaveBeenCalledTimes(2)
+    expect(h.store.getState().dirty).toBe(false)
+  })
+})
+
+// ── The explicit Save-draft affordance (D-186-03) ─────────────────────────────
+
+describe("useDraftPersistence — saveNow, the deliberate commit-now", () => {
+  it("writes immediately without waiting for the debounce", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    let ok = false
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+
+    expect(ok).toBe(true)
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+  })
+
+  it("refuses to pretend while held — it reports the hold instead of a save", async () => {
+    mockedUpdate.mockResolvedValue(write("T1"))
+
+    const h = harness()
+    h.set({ publishInFlight: true })
+    let ok = true
+    await act(async () => {
+      ok = await h.view.result.current.saveNow()
+    })
+
+    expect(ok).toBe(false)
+    expect(mockedUpdate).not.toHaveBeenCalled()
+    expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+  })
+})

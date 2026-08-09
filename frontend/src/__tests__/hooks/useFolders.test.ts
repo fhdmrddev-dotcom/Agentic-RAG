@@ -56,7 +56,7 @@ function makeFolder(overrides: Partial<Folder> & { id: string; name: string }): 
   return {
     user_id: "user-1",
     parent_id: null,
-    is_global: false,
+    is_org_shared: false,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,

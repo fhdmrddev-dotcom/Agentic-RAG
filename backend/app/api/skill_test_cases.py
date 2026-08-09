@@ -10,13 +10,14 @@ Plan 01 built:
   DELETE /test-cases/{case_id}           delete a case
   GET    /skills/{skill_id}/versions     list version history (version_number DESC, READ-ONLY)
 
-OWNER-SCOPING IS THE SOLE RUNTIME GATE (T-132-06/07/08): ``get_supabase()`` is the
-SERVICE-ROLE client, which BYPASSES RLS — so the app-code ``.eq("user_id", current_user["id"])``
-on EVERY query is the only thing standing between user A and user B's cases/versions. A missing
-filter is a silent full-table leak. A non-matching id returns 404 (never 403 — don't leak
-existence). For POST, ``user_id``/``skill_id`` are sourced from the authenticated caller + the
-path, NEVER the request body (a forged body id is ignored, T-132-07), and the parent skill must
-be owned by the caller before a case is inserted.
+OWNER-SCOPING IS BELT-AND-SUSPENDERS BEHIND RLS (T-132-06/07/08): Phase 163 swapped these
+handlers to the per-request user-JWT client, so RLS (the authenticated owner-scoped policies on
+``skill_test_cases`` / ``skill_versions``, mig 108) is now the PRIMARY runtime gate; the
+app-code ``.eq("user_id", current_user["id"])`` on EVERY query is kept as the D-14 second layer.
+A non-matching id returns 404 (never 403 — don't leak existence). For POST, ``user_id``/
+``skill_id`` are sourced from the authenticated caller + the path, NEVER the request body (a
+forged body id is ignored, T-132-07), and the parent skill must be owned by the caller before a
+case is inserted.
 
 Version history is the AUTHOR'S PRIVATE artifact (D-12 / T-132-08): the versions GET filters on
 ``user_id`` so a consumer of a global skill (who is not the author) gets an empty list, never the
@@ -35,7 +36,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from supabase import Client
 
-from app.dependencies import get_current_user, get_supabase, require_visible
+# Phase 163 (TEN-02 / D-03): the eval test-case CRUD + version-history reads run on the
+# per-request user-JWT client (RLS-ENFORCED). skill_test_cases has authenticated owner-scoped
+# CRUD policies (mig 108) + a BEFORE-INSERT autofill_org_id trigger; skill_versions has an
+# authenticated own SELECT policy (its rows are written by the SECURITY DEFINER capture trigger).
+# The owner gate that was the SOLE runtime guard under service-role is now belt-and-suspenders
+# behind RLS. KEEP .eq("user_id") (D-14).
+from app.dependencies import get_current_user, get_user_supabase_client, require_visible
 from app.models.skill_test_case import TestCaseCreate, TestCaseResponse, TestCaseUpdate
 from app.models.skill_version import SkillVersionResponse
 
@@ -57,8 +64,9 @@ def _verify_owned_skill(supabase: Client, skill_id: str, user_id: str) -> None:
     """Raise 404 unless ``skill_id`` exists AND is owned by ``user_id``.
 
     The owner gate for the create path: a user can only author eval cases against a skill they
-    OWN. ``get_supabase`` is service-role (RLS bypassed), so this ``.eq("user_id", …)`` is the
-    real gate. 404 (never 403) on a miss so a cross-user skill's existence is not leaked."""
+    OWN. Under the Phase-163 user-JWT client RLS scopes ``skills`` to own+global; this
+    ``.eq("user_id", …)`` narrows to OWNED (not merely global) and stays the D-14 belt-and-
+    suspenders gate. 404 (never 403) on a miss so a cross-user skill's existence is not leaked."""
     result = (
         supabase.table("skills")
         .select("id")
@@ -74,7 +82,7 @@ def _verify_owned_skill(supabase: Client, skill_id: str, user_id: str) -> None:
 async def list_test_cases(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List a skill's test cases (owner-scoped, ordered by ``order_index`` ascending)."""
     result = (
@@ -97,7 +105,7 @@ async def create_test_case(
     skill_id: str,
     body: TestCaseCreate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Create a test case bound to ``skill_id``. ``user_id``/``skill_id`` come from the caller +
     path (NEVER the body, T-132-07); the parent skill must be owned (404 otherwise)."""
@@ -129,7 +137,7 @@ async def update_test_case(
     case_id: str,
     body: TestCaseUpdate,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Edit a test case (only the supplied fields). Owner-scoped: a non-owned/unknown id → 404."""
     update_data = body.model_dump(exclude_none=True)
@@ -152,7 +160,7 @@ async def update_test_case(
 async def delete_test_case(
     case_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """Delete a test case. Owner-scoped: a non-owned/unknown id → 404 (the delete matches
     nothing under the ``.eq("user_id", …)`` filter)."""
@@ -171,7 +179,7 @@ async def delete_test_case(
 async def list_skill_versions(
     skill_id: str,
     current_user: dict = Depends(get_current_user),
-    supabase: Client = Depends(get_supabase),
+    supabase: Client = Depends(get_user_supabase_client),
 ):
     """List a skill's immutable version history (newest first), owner-scoped (READ-ONLY).
 

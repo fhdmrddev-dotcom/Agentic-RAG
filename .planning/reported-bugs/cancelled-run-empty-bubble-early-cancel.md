@@ -4,9 +4,9 @@ title: Cancelling a run before its first visible token persists an empty assista
 reported: 2026-07-10
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/chat-display, backend/streaming, provider/deepseek]
-folded_into: null
+folded_into: "174"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

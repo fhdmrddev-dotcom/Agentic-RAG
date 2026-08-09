@@ -1,3 +1,21 @@
+"""asyncpg-backed workspace_files / workspace_file_versions CRUD helpers.
+
+Phase 163 (D-02/D-05) — dual-caller "pool" contract. Every helper here takes a
+first positional arg named ``pool`` but only ever calls ``.fetchrow`` / ``.fetch`` /
+``.fetchval`` / ``.execute`` (never ``.acquire()``), so it is DUCK-TYPED over both
+an asyncpg ``Pool`` and an asyncpg ``Connection``. That is the seam the Wave-4 swap
+uses WITHOUT changing this module:
+
+  * REQUEST path (the ``backend/app/api/workspace.py`` REST handlers): the caller
+    passes an RLS-ENFORCED connection from ``get_user_pg_connection`` (SET LOCAL ROLE
+    authenticated + both JWT-claim GUC forms) — so these reads/writes run under the
+    caller's org-membership RLS, and multiple calls inside one ``async with`` block
+    share ONE transaction (atomic + consistent).
+  * AGENT/producer path (the workspace_* tools via ``tool_dispatcher`` → ``ctx.pool``):
+    keeps passing the service-role pool (no auth.uid() off-request) — byte-identical.
+
+No signature change is needed for the swap; the RLS context is applied by the CALLER.
+"""
 from __future__ import annotations
 
 from datetime import datetime

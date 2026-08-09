@@ -7,7 +7,10 @@ interface UseThreads {
   selectedThread: Thread | null
   loading: boolean
   loadThreads: () => Promise<void>
-  selectThread: (thread: Thread) => void
+  /** Select a thread — or pass `null` to DESELECT (IN-01: clear the stale old-org
+   *  selection on an org switch). Widening to `Thread | null` is backward-compatible:
+   *  every existing caller still passes a `Thread`. */
+  selectThread: (thread: Thread | null) => void
   newThread: (folderId?: string | null) => Promise<Thread>
   deleteThread: (id: string) => Promise<void>
   renameThread: (id: string, title: string) => Promise<void>
@@ -29,7 +32,7 @@ export function useThreads(): UseThreads {
     }
   }, [])
 
-  const selectThread = useCallback((thread: Thread) => {
+  const selectThread = useCallback((thread: Thread | null) => {
     setSelectedThread(thread)
   }, [])
 

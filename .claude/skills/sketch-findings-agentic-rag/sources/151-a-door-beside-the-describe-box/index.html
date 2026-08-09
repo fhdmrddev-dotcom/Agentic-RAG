@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 151 — A door beside the describe box (Phase 187 / VOCAB-03)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+/* ══════════════════════════════════════════════════════════════════════════════
+   SKETCH 151 — how does "start from a template" sit beside the describe box
+   without breaking the calm first screen?
+
+   THE LOCKED DECISIONS THIS MUST NOT BREAK (MANIFEST #11, #12, #13):
+     #11 "describe-box-only first screen" — grounding, dial and confirms are all
+         POST-DRAFT, revealed by the draft, never collected up front.
+     #12 the "3-second read at rest" acceptance test — the first screen must read
+         in 3 seconds with no clutter; depth is always one tap away.
+     #13 modals are reserved for must-decide moments; first-time teaching on a calm
+         screen uses an inline ⓘ affordance, never a space-occupying banner.
+
+   MEASURED FACTS (audited 2026-08-01) that shape the answer:
+     · There are exactly THREE curated starters — `list_starter_workflows`
+       (db/workflows.py:291) reads `definition->>'category' = 'starter'`, and
+       migration 094 seeds three: Risk Register, Weekly Status Report,
+       Compliance Gap Report. A gallery is over-built for three.
+     · "Fork a starter" is ALREADY one of the four routes into the Builder
+       (WorkflowBuilderPage.tsx:459). What is missing is a door ON the first
+       screen — today you must already know to come from the Workflows page.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+html, body { height: 100%; }
+body {
+  margin: 0; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--color-bg); color: var(--color-text); font-family: var(--font-sans);
+}
+.variant-nav, .lead, .bar { flex-shrink: 0; }
+.variant-nav {
+  display: flex; gap: 6px; align-items: center; padding: 10px 24px;
+  background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+}
+.variant-tab {
+  border: 1px solid transparent; background: transparent; color: var(--color-text-dim);
+  font-size: 12.5px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  transition: all .15s ease; font-family: var(--font-sans);
+}
+.variant-tab:hover { color: var(--color-text); background: var(--color-muted); }
+.variant-tab.active {
+  background: var(--color-surface-hi); color: var(--color-text);
+  border-color: var(--color-border); box-shadow: var(--shadow-sm);
+}
+.lead {
+  padding: 12px 24px; font-size: 12.5px; color: var(--color-text-muted); line-height: 1.65;
+  border-bottom: 1px solid var(--color-border); background: var(--color-bg-elev1);
+}
+.lead b { color: var(--color-text); font-weight: 600; }
+.lead code { font-family: var(--font-mono); font-size: 11px; color: var(--color-primary); }
+.lead .warn { color: hsl(0 72% 70%); font-weight: 600; }
+.lead .good { color: hsl(142 71% 62%); font-weight: 600; }
+
+.bar {
+  display: flex; align-items: center; gap: 12px; padding: 10px 24px;
+  border-bottom: 1px solid var(--color-border); flex-wrap: wrap;
+}
+.bar .lbl {
+  font-family: var(--font-mono); font-size: 10px; color: var(--color-text-dim);
+  text-transform: uppercase; letter-spacing: .09em;
+}
+.btn {
+  border: 1px solid var(--color-border); background: var(--color-muted);
+  color: var(--color-text); font-size: 12px; padding: 6px 13px;
+  border-radius: 8px; cursor: pointer; transition: all .15s ease;
+}
+.btn:hover { background: var(--color-accent); border-color: var(--color-text-dim); }
+.btn.on { background: hsl(38 92% 60% / .18); border-color: hsl(38 92% 60% / .5); color: hsl(38 92% 72%); }
+.spacer { flex: 1; }
+
+.stage { position: relative; flex: 1; min-height: 0; overflow: auto; }
+.amb { position: absolute; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+.amb::before {
+  content: ''; position: absolute; width: 520px; height: 520px; left: 12%; top: -16%;
+  border-radius: 50%; filter: blur(90px); opacity: .4; background: hsl(239 84% 45% / .2);
+}
+
+/* ── the first screen ────────────────────────────────────────────────────── */
+.screen {
+  position: relative; z-index: 1; max-width: 660px; margin: 0 auto; padding: 84px 24px 60px;
+}
+.screen h2 {
+  font-family: var(--font-headline); font-size: 22px; font-weight: 600;
+  margin: 0 0 8px; color: var(--color-text); letter-spacing: -.01em;
+}
+.screen .hint { font-size: 12.5px; color: var(--color-text-muted); margin: 0 0 22px; }
+.screen textarea {
+  width: 100%; box-sizing: border-box; min-height: 118px; resize: vertical;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); padding: 15px 17px; color: var(--color-text);
+  font-family: var(--font-sans); font-size: 13.5px; line-height: 1.6;
+}
+.screen textarea::placeholder { color: var(--color-text-dim); }
+.screen textarea:focus { outline: none; border-color: hsl(239 100% 82% / .5); }
+.cta {
+  margin-top: 16px; display: flex; align-items: center; gap: 12px;
+}
+.cta button {
+  background: linear-gradient(135deg, hsl(239 84% 67% / .95), hsl(258 90% 66% / .95));
+  border: 0; color: #fff; font-size: 13px; font-weight: 500; padding: 10px 22px;
+  border-radius: 10px; cursor: pointer; transition: all .15s ease;
+}
+.cta button:hover { filter: brightness(1.12); }
+.cta button:disabled { opacity: .4; cursor: default; filter: none; }
+
+/* ── A · the quiet text link ─────────────────────────────────────────────── */
+.quietline {
+  margin-top: 18px; font-size: 12.5px; color: var(--color-text-muted); text-align: center;
+}
+.quietline a {
+  color: var(--color-primary); text-decoration: none; border-bottom: 1px dotted hsl(239 100% 82% / .45);
+  cursor: pointer;
+}
+.quietline a:hover { border-bottom-style: solid; }
+
+/* ── B · inline starter chips ────────────────────────────────────────────── */
+.chiprow { margin-top: 20px; }
+.chiprow .cap {
+  font-size: 11.5px; color: var(--color-text-dim); margin-bottom: 9px;
+}
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: 999px; padding: 7px 14px 7px 10px; font-size: 12.5px;
+  color: var(--color-text-muted); transition: all .15s ease;
+}
+.chip:hover { border-color: hsl(239 100% 82% / .5); color: var(--color-text); transform: translateY(-1px); }
+/* A starter is identified by its PHASE SPINE (decision #36), never by one borrowed
+   phase-type glyph — there is no category-icon vocabulary in this system. */
+.chip .spine.sm { display: inline-flex; gap: 3px; align-items: center; }
+.chip .spine.sm svg { width: 16px; height: 16px; }
+.chip .spine.sm i { width: 5px; height: 1px; background: var(--color-text-dim); display: block; }
+
+/* ── C · the picker sheet (A's destination) ──────────────────────────────── */
+.sheet {
+  position: fixed; inset: 0; z-index: 400; display: none;
+  background: rgba(0,0,0,.55); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center;
+}
+.sheet.open { display: flex; }
+.sheetbox {
+  width: min(560px, 92vw); background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: var(--radius-xl);
+  padding: 22px; box-shadow: 0 40px 80px -30px rgba(0,0,0,1);
+}
+.sheetbox h3 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+.sheetbox p { margin: 0 0 16px; font-size: 12px; color: var(--color-text-muted); }
+.tpl {
+  display: flex; gap: 13px; align-items: flex-start; padding: 13px; border-radius: 12px;
+  border: 1px solid var(--color-border-soft); cursor: pointer; margin-bottom: 9px;
+  transition: all .15s ease;
+}
+.tpl:hover { border-color: hsl(239 100% 82% / .5); background: hsl(239 84% 67% / .06); }
+.tpl .g { flex-shrink: 0; width: 34px; height: 34px; display: grid; place-items: center; }
+.tpl b { display: block; font-size: 13px; color: var(--color-text); margin-bottom: 3px; }
+.tpl span { font-size: 11.5px; color: var(--color-text-muted); line-height: 1.5; }
+.tpl .spine {
+  margin-top: 7px; display: flex; gap: 4px; align-items: center; opacity: .75;
+}
+.tpl .spine svg { width: 15px; height: 15px; }
+.tpl .spine i {
+  width: 7px; height: 1px; background: var(--color-text-dim); display: block;
+}
+.sheetbox .cancel {
+  margin-top: 6px; width: 100%; background: none; border: 1px solid var(--color-border);
+  color: var(--color-text-muted); padding: 9px; border-radius: 9px; cursor: pointer; font-size: 12.5px;
+}
+.sheetbox .cancel:hover { color: var(--color-text); border-color: var(--color-text-dim); }
+
+/* ── the 3-second read ruler ─────────────────────────────────────────────── */
+body.ruler .screen { outline: 1px dashed hsl(38 92% 60% / .35); outline-offset: 14px; }
+.rulertag {
+  display: none; position: absolute; z-index: 5; font-family: var(--font-mono);
+  font-size: 9.5px; color: hsl(38 92% 72%); background: hsl(38 92% 60% / .12);
+  border: 1px solid hsl(38 92% 60% / .35); border-radius: 5px; padding: 2px 7px;
+}
+body.ruler .rulertag { display: block; }
+
+.countnote {
+  margin-top: 26px; padding: 12px 14px; border-radius: 10px; font-size: 12px; line-height: 1.6;
+  background: hsl(220 30% 100% / .03); border: 1px solid var(--color-border-soft);
+  color: var(--color-text-muted);
+}
+.countnote b { color: var(--color-text); }
+.countnote .n { font-family: var(--font-mono); color: hsl(38 92% 72%); }
+
+/* ── the rail ────────────────────────────────────────────────────────────── */
+.rail {
+  position: sticky; bottom: 0; z-index: 20; background: var(--color-bg-elev1);
+  border-top: 1px solid var(--color-border); padding: 13px 24px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+}
+.rail .col { font-size: 11.5px; line-height: 1.55; color: var(--color-text-muted); }
+.rail .col h5 { margin: 0 0 5px; font-size: 11.5px; font-weight: 600; color: var(--color-text-dim); }
+.rail .col.on h5 { color: var(--color-primary); }
+.rail .col b { color: var(--color-text); }
+.rail .ans { color: hsl(142 71% 62%); }
+.rail .no { color: hsl(0 72% 70%); }
+
+#sketch-tools {
+  position: fixed; bottom: 92px; right: 12px; z-index: 9999; font-family: system-ui;
+  font-size: 11px; background: rgba(0,0,0,.78); color: #fff; padding: 8px 10px;
+  border-radius: 8px; opacity: .35; transition: opacity .2s; display: flex; gap: 8px;
+}
+#sketch-tools:hover { opacity: 1; }
+#sketch-tools select, #sketch-tools button {
+  background: #222; color: #fff; border: 1px solid #444; border-radius: 5px;
+  font-size: 11px; padding: 3px 7px; cursor: pointer;
+}
+.variant { display: none; }
+.variant.active { display: block; }
+</style>
+</head>
+<body>
+
+<div class="variant-nav">
+  <button class="variant-tab active" onclick="showVariant('a', this)">A: Quiet link</button>
+  <button class="variant-tab" onclick="showVariant('b', this)">B: Inline chips</button>
+  <button class="variant-tab" onclick="showVariant('c', this)">C: Template seeds the box ★ Selected</button>
+</div>
+
+<div class="lead" id="lead"></div>
+
+<div class="bar">
+  <button class="btn" id="rulerbtn" onclick="toggleRuler()">◱ 3-second read ruler</button>
+  <span class="spacer"></span>
+  <span class="lbl" style="text-transform:none;letter-spacing:0">
+    3 real starters from migration 094 · Risk Register · Weekly Status Report · Compliance Gap Report
+  </span>
+</div>
+
+<div class="stage">
+  <div class="amb"></div>
+  <div id="variant-a" class="variant active"></div>
+  <div id="variant-b" class="variant"></div>
+  <div id="variant-c" class="variant"></div>
+</div>
+
+<div class="sheet" id="sheet" onclick="if(event.target===this)closeSheet()">
+  <div class="sheetbox">
+    <h3>Start from a template</h3>
+    <p>Each one is a complete workflow you can change however you like.</p>
+    <div id="tpls"></div>
+    <button class="cancel" onclick="closeSheet()">I’ll describe my own instead</button>
+  </div>
+</div>
+
+<div class="rail" id="rail"></div>
+
+<div id="sketch-tools">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Default</option>
+  </select>
+  <button onclick="setW(375)">P</button>
+  <button onclick="setW(768)">T</button>
+  <button onclick="setW(0)">Full</button>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* The three REAL curated starters — migration 094. Not invented, and not more than
+   three, because three is how many exist.
+
+   ICON CONVENTION (design decision #43 / #36 — corrected after operator review).
+   An earlier draft of this sketch gave each starter ONE phase-type glyph as if it
+   were a category icon. That is a misuse of the shared map: `icon3d('llm_agent')`
+   means "this STEP is an AI agent step", not "this WORKFLOW is about risk". There is
+   no category-icon vocabulary in this system and this sketch must not invent one.
+   Decision #36 already settled what represents a whole workflow — the glyph-dot
+   PHASE SPINE — so every starter is identified by its spine, at every size. The
+   `icon` field is gone rather than left unused. */
+const STARTERS = [
+  { name:'Risk Register',
+    blurb:'Finds risks across your documents and keeps a register up to date.',
+    spine:['programmatic','llm_agent','llm_emit'],
+    describe:'Review my documents for risks, score each one, and keep a risk register up to date.' },
+  { name:'Weekly Status Report',
+    blurb:'Pulls the week’s activity together into a report you can send.',
+    spine:['programmatic','llm_single','llm_emit'],
+    describe:'Pull together what happened this week across my documents and write a status report I can send.' },
+  { name:'Compliance Gap Report',
+    blurb:'Checks your documents against a policy and lists what’s missing.',
+    spine:['programmatic','llm_batch_agents','llm_human_input','llm_emit'],
+    describe:'Check my documents against our compliance policy and list every gap, then let me sign it off.' },
+];
+
+const LEADS = {
+  a: 'One <b>quiet line under the CTA</b> — “or start from a template”. The calm screen is untouched: <span class="good">nothing is added above the fold</span>, and the first screen still reads as one describe box. The cost is <b>discoverability</b>: a text link at the bottom is the easiest thing on the page to miss, and a first-time user is exactly the person who most needs the template.',
+  b: 'The three starters are shown <b>inline as chips</b>, right under the box. Most discoverable — a first-timer sees immediately that they don’t have to start from nothing. The cost lands on decision <b>#12</b>: turn on the <b>◱ ruler</b> and count what the eye has to process before it can act. <span class="warn">Three named options compete with the box for the first glance.</span>',
+  c: 'Picking a template <b>fills the describe box</b> with its plain-language description rather than jumping straight to a canvas. <span class="good">There is only ever ONE path forward</span> — describe → draft — and the template becomes a starting sentence you can edit before anything is generated. The cost: it discards the starter’s <i>real definition</i> (a curated, already-shaped workflow) and re-derives one from a sentence, which may come back different.',
+};
+
+let current = 'a';
+
+function spineHTML(types, size) {
+  return types.map(t => icon3d(t, size ?? 15)).join('<i></i>');
+}
+
+function screenHTML(variant) {
+  const cta = '<div class="cta"><button>Draft my workflow</button>'
+            + '<span style="font-size:11.5px;color:var(--color-text-dim)">You can change everything afterwards.</span></div>';
+
+  let extra = '';
+  if (variant === 'a') {
+    extra = '<div class="quietline" style="position:relative">'
+          + '<span class="rulertag" style="right:-6px;top:-20px">1 extra element</span>'
+          + 'or <a onclick="openSheet()">start from a template</a></div>';
+  }
+  if (variant === 'b') {
+    extra = '<div class="chiprow" style="position:relative">'
+          + '<span class="rulertag" style="right:-6px;top:-20px">4 extra elements</span>'
+          + '<div class="cap">Or start from one of these:</div><div class="chips">'
+          + STARTERS.map((s,i) => '<span class="chip" onclick="pick('+i+')">'
+              + '<span class="spine sm">'+spineHTML(s.spine,16)+'</span>'+s.name+'</span>').join('')
+          + '</div></div>';
+  }
+  if (variant === 'c') {
+    extra = '<div class="quietline" style="position:relative">'
+          + '<span class="rulertag" style="right:-6px;top:-20px">1 extra element</span>'
+          + 'or <a onclick="openSheet()">start from a template</a> — it fills the box above</div>';
+  }
+
+  return '<div class="screen" style="position:relative">'
+    + '<span class="rulertag" style="left:0;top:56px">the 3-second read starts here</span>'
+    + '<h2>What do you need done?</h2>'
+    + '<p class="hint">Describe it the way you would to a colleague.</p>'
+    + '<textarea id="ta-'+variant+'" placeholder="e.g. Every quarter, review the supplier contracts coming up for renewal…"></textarea>'
+    + cta + extra
+    + '<div class="countnote" id="note-'+variant+'"></div>'
+    + '</div>';
+}
+
+const NOTES = {
+  a: 'Elements above the fold: <span class="n">4</span> — heading, hint, box, CTA — <b>plus one quiet line</b>. '
+   + 'Decision #11’s “describe-box-only first screen” survives intact. The open risk is that a first-time user '
+   + 'never notices the templates exist.',
+  b: 'Elements above the fold: <span class="n">8</span> — the four, plus a caption and three named chips. '
+   + 'Each chip is a decision the reader must at least dismiss. <b>Decision #12’s 3-second read is the thing '
+   + 'under pressure here</b>, not the screen’s beauty.',
+  c: 'Elements above the fold: <span class="n">4</span> + one quiet line, exactly as A — the difference is entirely '
+   + 'in <b>where the link goes</b>. C keeps a single forward path (describe → draft) instead of introducing a '
+   + 'second one (template → canvas, skipping generation).',
+};
+
+function render() {
+  ['a','b','c'].forEach(v => {
+    document.getElementById('variant-'+v).innerHTML = screenHTML(v);
+    document.getElementById('note-'+v).innerHTML = NOTES[v];
+  });
+  document.getElementById('tpls').innerHTML = STARTERS.map((s,i) =>
+      '<div class="tpl" onclick="pick('+i+')">'
+    + '<div><b>'+s.name+'</b><span>'+s.blurb+'</span>'
+    + '<div class="spine">'+spineHTML(s.spine,22)+'</div></div></div>').join('');
+  document.getElementById('lead').innerHTML = LEADS[current];
+  renderRail();
+}
+
+function renderRail() {
+  const cols = [
+    { k:'a', h:'A · Quiet link', rows:[
+      ['Calm screen preserved?', 'ans','yes — 1 extra line'],
+      ['A first-timer finds it?', 'no','easy to miss'],
+      ['One forward path?',       'no','template → canvas skips drafting'] ] },
+    { k:'b', h:'B · Inline chips', rows:[
+      ['Calm screen preserved?', 'no','8 elements before acting'],
+      ['A first-timer finds it?', 'ans','unmissable'],
+      ['One forward path?',       'no','template → canvas skips drafting'] ] },
+    { k:'c', h:'C · Seeds the box', rows:[
+      ['Calm screen preserved?', 'ans','yes — 1 extra line'],
+      ['A first-timer finds it?', 'no','same link as A'],
+      ['One forward path?',       'ans','always describe → draft'] ] },
+  ];
+  document.getElementById('rail').innerHTML = cols.map(c =>
+      '<div class="col'+(c.k===current?' on':'')+'"><h5>'+c.h+'</h5>'
+    + c.rows.map(r => '<div><b>'+r[0]+'</b> <span class="'+r[1]+'">'+r[2]+'</span></div>').join('')
+    + '</div>').join('');
+}
+
+function openSheet()  { document.getElementById('sheet').classList.add('open'); }
+function closeSheet() { document.getElementById('sheet').classList.remove('open'); }
+
+function pick(i) {
+  closeSheet();
+  const s = STARTERS[i];
+  if (current === 'c') {
+    /* C · the template becomes a sentence you can still edit */
+    const ta = document.getElementById('ta-c');
+    ta.value = s.describe;
+    ta.focus();
+    document.getElementById('note-c').innerHTML =
+      '<b style="color:hsl(142 71% 68%)">“'+s.name+'” filled the box.</b> Nothing has been generated yet — '
+      + 'edit the sentence, then draft. <b>What this gives up:</b> the curated definition behind '
+      + '“'+s.name+'” is discarded; the draft is re-derived from this sentence and may come back with '
+      + 'different steps than the starter a human shaped.';
+  } else {
+    document.getElementById('note-'+current).innerHTML =
+      '<b style="color:hsl(239 100% 86%)">“'+s.name+'” would open on the canvas now</b> — its real curated '
+      + 'definition, forked as your own copy, skipping generation entirely. That is the second forward path: '
+      + 'this user never passes through describe → draft.';
+  }
+}
+
+function toggleRuler() {
+  document.body.classList.toggle('ruler');
+  document.getElementById('rulerbtn').classList.toggle('on', document.body.classList.contains('ruler'));
+}
+
+function showVariant(id, btn) {
+  current = id;
+  document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.variant-nav .variant-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('variant-'+id).classList.add('active');
+  btn.classList.add('active');
+  document.getElementById('lead').innerHTML = LEADS[id];
+  renderRail();
+}
+function setW(w) { document.querySelectorAll('.screen').forEach(s => s.style.maxWidth = w ? w+'px' : ''); }
+
+render();
+</script>
+</body>
+</html>

@@ -34,6 +34,34 @@ class LintError(NamedTuple):
     message: str
 
 
+# ── the CANONICAL set of codes this module can emit (Phase 182 / VALID-01 / WR-05) ──
+#
+# Declared beside the type that CARRIES them. Published so downstream classifiers DERIVE
+# the vocabulary instead of re-declaring the literals: ``api/workflows.py``'s
+# ``POST /workflows/validate`` severity classifier composes its known-code set from THIS
+# frozenset plus the grounding module's, so a code can never exist here and be unknown
+# there by accident. Before the WR-05 gap closure that route held its own hardcoded copy
+# of these strings and silently mis-classified anything it did not recognise.
+#
+# ADDING A CODE: a new ``LintError(...)`` code MUST be added to this set in the SAME
+# commit. ``tests/unit/test_182_severity_codes.py`` scans this file's ``LintError(`` emit
+# sites and fails when the two fall out of sync — the pairing is ENFORCED, not a
+# convention, because a failures-only test differential cannot see a code that was added
+# but never classified.
+#
+# A plain set of strings: this module stays PURE (no I/O, no engine import), which is
+# exactly what lets ``/validate`` import ``lint_workflow`` import-light (Pitfall 1).
+LINT_CODES: frozenset[str] = frozenset(
+    {
+        "bad_index",
+        "input_unsatisfied",
+        "no_terminal",
+        "orphan_phase",
+        "unsatisfiable_skip",
+    }
+)
+
+
 # D-10 (093): keys create_workflow_run stores on workflow_runs.inputs (threads.py:1233
 # wf_ctx.inputs={"kickoff_prompt": ...}; the legacy seed key "topic" stays accepted).
 _KNOWN_RUN_INPUT_KEYS = frozenset({"kickoff_prompt", "topic"})

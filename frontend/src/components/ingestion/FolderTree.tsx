@@ -16,10 +16,10 @@ interface FolderTreeProps {
    *  to every FolderNode so counts render on every row, not just Root. */
   folderDocumentCounts?: Record<string, number>
   onSelectFolder: (id: string | null) => void
-  onCreateFolder: (name: string, parentId: string | null, isGlobal?: boolean) => Promise<Folder>
+  onCreateFolder: (name: string, parentId: string | null, isOrgShared?: boolean) => Promise<Folder>
   onRenameFolder: (id: string, name: string) => Promise<void>
   onDeleteFolder: (id: string) => Promise<void>
-  onToggleGlobal: (id: string) => Promise<void>
+  onToggleOrgShared: (id: string) => Promise<void>
 }
 
 export function FolderTree({
@@ -32,7 +32,7 @@ export function FolderTree({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
-  onToggleGlobal,
+  onToggleOrgShared,
 }: FolderTreeProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -100,12 +100,12 @@ export function FolderTree({
     setCreatingInParentId(parentId)
   }
 
-  const handleCreateCommit = async (name: string, isGlobal: boolean) => {
+  const handleCreateCommit = async (name: string, isOrgShared: boolean) => {
     const parentId =
       creatingInParentId === "root" ? null : creatingInParentId ?? null
     setCreatingInParentId(null)
     try {
-      await onCreateFolder(name, parentId, isGlobal)
+      await onCreateFolder(name, parentId, isOrgShared)
     } catch (err) {
       console.error("Could not create folder:", err)
     }
@@ -193,7 +193,7 @@ export function FolderTree({
             onCreateSubfolder={handleCreateSubfolder}
             onCreateCommit={handleCreateCommit}
             onCreateCancel={handleCreateCancel}
-            onToggleGlobal={onToggleGlobal}
+            onToggleOrgShared={onToggleOrgShared}
           />
         ))
       )}

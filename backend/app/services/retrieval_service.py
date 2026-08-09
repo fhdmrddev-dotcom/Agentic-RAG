@@ -8,6 +8,7 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 from app.config import settings
+from app.dependencies import get_user_pg_connection
 from app.services.openai_service import embed_texts
 from app.services.rerank_service import rerank
 from app.utils.db import aexec
@@ -21,6 +22,35 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 # Private helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
+def _vector_literal(embedding: list[float]) -> str:
+    """Format a float embedding as a pgvector literal (Phase 164 / RESEARCH Pitfall 3).
+
+    The asyncpg pool registers ONLY a jsonb codec (dependencies.py:74) — there is NO
+    vector codec, so a raw ``list[float]`` cannot be bound to a ``vector`` param the way
+    PostgREST/``supabase.rpc`` did implicitly. Build the ``'[...]'`` literal and cast it
+    at the call site (``$1::public.vector``) instead.
+    """
+    return "[" + ",".join(repr(float(x)) for x in embedding) + "]"
+
+
+async def _call_as_user(user_id: str, fn_sql: str, *args) -> list[dict]:
+    """Run a retrieval RPC (or any SELECT) over the Phase-163 asyncpg user-context (D-164-02).
+
+    Opens ``get_user_pg_connection(None, {"id": user_id})`` — the uid-synthesized
+    ``request.jwt.claims`` context (``SET LOCAL ROLE authenticated`` + both GUC forms, NO
+    token → no mid-run expiry, the 163 red line) — so the DEFINER bodies' nested
+    ``current_user_org_ids()`` / ``auth.uid()`` resolve the CALLER's org and a spoofed
+    ``match_user_id`` cannot cross orgs. Returns plain dicts so the shape is parity with the
+    old ``supabase.rpc(...).data`` (uuid columns are cast ``::text`` at the call site so ids
+    stay str-keyed exactly like the PostgREST JSON, keeping ``_rrf_fuse`` / enrich lookups
+    byte-compatible). Fail-closed: on a service-role/owner connection ``auth.uid()`` is NULL
+    → empty org set → 0 rows.
+    """
+    async with get_user_pg_connection(None, {"id": user_id}) as conn:
+        rows = await conn.fetch(fn_sql, *args)
+    return [dict(r) for r in rows]
+
 
 async def _vector_search(
     query: str,
@@ -48,22 +78,23 @@ async def _vector_search(
     # NOT a cross-vector-space comparison. The migration-073 backfill tagged pre-existing
     # chunks text-embedding-3-small, so default to that when no model is configured.
     current_model = (getattr(user_settings, "embedding_model", "") or "text-embedding-3-small")
-    params: dict = {
-        "query_embedding": query_embedding,
-        "match_user_id": user_id,
-        "match_count": top_n,
-        "match_threshold": match_threshold,
-        # p_embedding_model is the LAST, NULL-defaulted RPC param (migration 073); additive
-        # and defaulted, so the call stays valid even before the migration is applied (Plan 04).
-        "p_embedding_model": current_model,
-    }
-    if metadata_filter:
-        params["metadata_filter"] = metadata_filter
-    if folder_ids:
-        params["p_folder_ids"] = folder_ids
-
-    result = await aexec(supabase.rpc("match_document_chunks", params))
-    return result.data or []
+    # Phase 164 (D-164-02): run the DEFINER RPC over the asyncpg user-context (NOT the
+    # passed-in service-role `supabase` client — the org predicate resolves auth.uid()=caller
+    # only there). Positional args map the migration-073 signature order; the embedding is a
+    # pgvector literal cast `$1::public.vector` (Pitfall 3); id/document_id cast ::text so the
+    # dict shape matches the old PostgREST JSON (str ids for _rrf_fuse / enrich lookups).
+    return await _call_as_user(
+        user_id,
+        """SELECT id::text AS id, document_id::text AS document_id, content, chunk_index, similarity
+           FROM public.match_document_chunks($1::public.vector, $2, $3, $4, $5, $6, $7)""",
+        _vector_literal(query_embedding),
+        user_id,
+        top_n,
+        match_threshold,
+        metadata_filter if metadata_filter else None,
+        folder_ids if folder_ids else None,
+        current_model,
+    )
 
 
 async def _keyword_search(
@@ -74,18 +105,20 @@ async def _keyword_search(
     top_n: int,
     folder_ids: list[str] | None = None,
 ) -> list[dict]:
-    params: dict = {
-        "search_query": query,
-        "match_user_id": user_id,
-        "match_count": top_n,
-    }
-    if metadata_filter:
-        params["metadata_filter"] = metadata_filter
-    if folder_ids:
-        params["p_folder_ids"] = folder_ids
-
-    result = await aexec(supabase.rpc("keyword_search_chunks", params))
-    return result.data or []
+    # Phase 164 (D-164-02): same user-context swap as `_vector_search` — keyword_search_chunks
+    # is DEFINER, so its in-body org gate only scopes the caller when auth.uid() resolves.
+    # Positional args map the migration-025 signature; @@/plainto_tsquery/ts_rank_cd resolve
+    # under search_path='' (pg_catalog). Returns (id, document_id, content, chunk_index, rank).
+    return await _call_as_user(
+        user_id,
+        """SELECT id::text AS id, document_id::text AS document_id, content, chunk_index, rank
+           FROM public.keyword_search_chunks($1, $2, $3, $4, $5)""",
+        query,
+        user_id,
+        top_n,
+        metadata_filter if metadata_filter else None,
+        folder_ids if folder_ids else None,
+    )
 
 
 def _rrf_fuse(

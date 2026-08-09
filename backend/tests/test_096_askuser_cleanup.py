@@ -183,6 +183,7 @@ def _resume_stubs(monkeypatch, harness_engine, run_id, thread_id, *, redrive):
         return [{
             "run_id": run_id, "thread_id": thread_id,
             "current_phase_id": None, "user_id": uuid.uuid4(), "inputs": {},
+            "org_id": uuid.uuid4(),  # Phase 163 — resume ctx builds an org-scoped service-role client
         }]
 
     async def _claim(pool, rid, lease_seconds):

@@ -4,6 +4,18 @@ Settings resolution: DB app_settings row > .env defaults.
 Phase 081.1 Plan 03: file-based settings_override.json eliminated.
 All settings reads go through a 30s TTL in-process DB cache (D-06).
 Writes go through save_app_settings() via asyncpg (D-20).
+
+Phase 163 (TEN-02): the ``get_pg_pool()`` raw-pool calls in this module
+(``_load_settings_from_db`` / ``save_app_settings`` / ``_load_model_overrides`` /
+``load_all_model_overrides`` / ``set_feature_visibility``) STAY service-role — they are
+NOT per-request user data and so are NOT converted to ``get_user_pg_connection``. They
+operate on GLOBAL / operator config: ``app_settings`` (a singleton config table with RLS
+DISABLED, verified live on :54322), ``model_capabilities_overrides`` (a global registry —
+authenticated SELECT-only, operator writes land in admin.py), and the feature-visibility
+map — none of which have a per-user ``org_id``/``user_id`` scope a ``SET LOCAL ROLE
+authenticated`` context would narrow. Forcing a per-user RLS connection here would be
+semantically wrong (there is no per-user row to scope) and these helpers are called from
+BOTH request handlers AND the agent loop / background paths.
 """
 
 from __future__ import annotations
@@ -287,16 +299,121 @@ async def _load_settings_from_db() -> dict[str, Any]:
 
 
 def invalidate_settings_cache() -> None:
-    """Zero out settings cache timestamp so next read hits DB (D-07)."""
+    """Zero out settings cache timestamp so next read hits DB (D-07).
+
+    NOTE (Phase 184 UAT): this is only half a contract. It expires the timestamp the ASYNC
+    reader checks; it deliberately does NOT clear ``_settings_cache``, because the SYNC
+    reader ``load_app_settings()`` falls back to ``_build_settings_from_row({})`` — i.e.
+    env/Pydantic DEFAULTS for EVERY column — when the cache is empty. Blanking it would
+    trade one stale value for a window in which the whole app reads default model, default
+    thresholds and no keys. Callers that need their write to be observable to a SYNC reader
+    must use ``refresh_settings_cache()`` below, not this.
+    """
     global _settings_cache_time
     _settings_cache_time = 0.0
+
+
+async def refresh_settings_cache() -> None:
+    """Expire AND re-warm the settings cache, so a just-completed write is observable.
+
+    THE PROBLEM THIS SOLVES (found in the Phase 184 live UAT). ``invalidate_settings_cache()``
+    zeroes ``_settings_cache_time``, which is enough for ``_load_settings_from_db()`` (it
+    checks the timestamp) but is a NO-OP for ``load_app_settings()``, which reads
+    ``_settings_cache`` directly with no staleness check. ``GET /features`` resolves through
+    the sync path (``feature_audience`` -> ``_feature_record`` -> ``load_app_settings``), so
+    an operator flipping ``visual_workflow_canvas`` off wrote the DB and was then never
+    observed: the endpoint kept answering ``true`` until some unrelated request happened to
+    await the async loader and re-warm the cache.
+
+    So the write seams expire the timestamp and then IMMEDIATELY re-read, leaving
+    ``_settings_cache`` holding what was just written. This is the idiom Phase 149 already
+    used at admin.py's disable-path guard (``invalidate_settings_cache()`` +
+    ``await _load_settings_from_db()``), promoted from a local workaround to the contract of
+    the write seams.
+
+    NEVER RAISES. The write is the contract; the re-warm is an optimization on top of it. A
+    failed refresh must not turn a successful write into an error — the zeroed timestamp
+    means the next async read repairs the cache anyway.
+
+    NOT a cross-process fix. Under the ``WORKER_COUNT=2`` production default each worker
+    still holds its own cache, so a sibling worker keeps serving its copy until its own 30s
+    TTL lapses (the hazard admin.py:1263 already notes). This makes the WRITING worker
+    correct immediately, which is what the operator's own next request hits.
+
+    STRICTLY ADDITIVE TO D-07. The timestamp is zeroed again at the end, so D-07's existing
+    guarantee — "after a write the cache is expired, and the next read hits the DB" — stays
+    literally true and its pinned assertion (test_147_flag_failure_semantics) is untouched.
+    The ONLY thing this adds is that ``_settings_cache`` now holds the just-written row for
+    the SYNC reader in the meantime. The cost is one redundant re-read on the next async
+    call, which is the right trade for a settings write.
+    """
+    invalidate_settings_cache()
+    try:
+        await _load_settings_from_db()
+    except Exception:  # noqa: BLE001 — a refresh blip must never fail the write
+        logger.warning(
+            "refresh_settings_cache: re-read after write failed; cache left expired "
+            "(the next async read will refresh it)",
+            exc_info=True,
+        )
+    finally:
+        # Re-expire: the re-read above set the timestamp to now. Zeroing it again preserves
+        # D-07 unchanged while leaving the freshly-read row in place for sync callers.
+        invalidate_settings_cache()
+
+
+async def ensure_settings_fresh() -> None:
+    """Bound the SYNC reader's staleness to ``_SETTINGS_CACHE_TTL`` on THIS worker.
+
+    THE PROBLEM THIS SOLVES (T-184-UAT-02, Phase 184 security audit). ``refresh_settings_cache``
+    above fixes the WRITING worker: the operator flips a flag and their own next request sees
+    it. It is explicitly "NOT a cross-process fix" — and the gap it leaves is wider than a TTL.
+    ``load_app_settings()`` reads ``_settings_cache`` with **no staleness check at all**
+    (:892); the 30s TTL at :280 is checked only by the ASYNC ``_load_settings_from_db``. So on
+    a NON-writing worker nothing expires the sync reader's view — it keeps serving the
+    pre-flip audience until some *unrelated* request on that worker happens to await the async
+    loader. Under the ``WORKER_COUNT=2`` default that is ~30s in a busy app but has **no
+    code-level bound**, and ``visual_workflow_canvas`` is a kill switch: the master off-switch
+    for a whole surface, read by ``CanvasGateMiddleware`` and ``require_canvas``.
+
+    Awaiting this before a *gated* read gives that bound. ``_load_settings_from_db`` is
+    already TTL-checked, so a fresh cache costs one comparison and NO DB I/O — the DB is
+    touched at most once per TTL per worker.
+
+    WHY NOT PUT THE TTL CHECK IN ``load_app_settings()`` ITSELF — the obvious one-line fix,
+    deliberately rejected. That reader is sync and cannot refresh, so an expired cache could
+    only DEGRADE to ``env_settings``/Pydantic defaults. Every setting in the app resolves
+    through it (models, token ceilings, extraction knobs), so a worker that merely went quiet
+    for 30s would silently serve defaults for ALL of them. Bounding the flag is worth a
+    per-TTL query; reverting the platform's configuration to defaults is not.
+
+    CALL IT ONLY ON GATED PATHS, never on the hot path — that keeps D-v2.5-01's "no
+    per-request DB call" property where it was actually claimed (``_read_canvas_is_off``'s
+    docblock) and pays the bounded cost only where a stale answer has a security consequence.
+
+    NEVER RAISES. ``_load_settings_from_db`` already swallows its own failures and falls back
+    to the stale/empty cache; this wrapper adds a second net so a settings blip can never turn
+    a gate check into a 500. A failed refresh leaves the previous cache in place, and every
+    caller downstream is fail-closed (``feature_audience`` -> hardcoded default -> "off" for
+    the canvas), so the degraded direction is HIDE, never REVEAL.
+    """
+    try:
+        await _load_settings_from_db()
+    except Exception:  # noqa: BLE001 — defensive: a blip must never fail the gate check
+        logger.warning(
+            "ensure_settings_fresh: refresh failed; gate will read the previous cache "
+            "(fail-closed downstream)",
+            exc_info=True,
+        )
 
 
 async def save_app_settings(updates: dict[str, Any]) -> bool:
     """Write settings to app_settings DB row via asyncpg.
 
     Ports the _is_valid_api_key sentinel guard (D-14).
-    Calls invalidate_settings_cache() on success (D-07).
+    Calls refresh_settings_cache() on success (D-07 + the Phase 184 UAT re-warm): the cache
+    is expired AND re-read, so the SYNC load_app_settings() reader observes this write
+    immediately instead of serving the pre-write row.
 
     Returns:
         True  — the UPDATE persisted, OR there was nothing to write (the
@@ -381,7 +498,11 @@ async def save_app_settings(updates: dict[str, Any]) -> bool:
             f"WHERE id = ${len(vals)}",
             *vals,
         )
-        invalidate_settings_cache()
+        # Phase 184 UAT: re-warm rather than merely expire — load_app_settings() (the SYNC
+        # reader used by tool_dispatcher / documents / extraction_service / feature_audience)
+        # never checks the timestamp, so an invalidate-only call leaves it serving the
+        # pre-write row until an unrelated async read happens along.
+        await refresh_settings_cache()
         return True
     except Exception:
         logger.warning(
@@ -850,6 +971,98 @@ def load_user_settings(user_id: str, supabase=None) -> UserEffectiveSettings:
     return load_app_settings()
 
 
+# ── Phase 167 VIS-02 (D-167-04) — the SEED-116 two-layer per-user model default ──
+# The FIRST concrete per-user preference: a user picks a default AI model WITHIN the
+# operator/org-allowed ENABLED set, honoring an operator LOCK. This REVIVES the dead
+# ``user_settings.preferences`` column (mig 011) — ZERO migration.
+#
+# INVERSE of this module's service-role header rule (:8-18): ``load_user_model_default``
+# reads PER-USER data, explicitly scoped to the passed ``user_id`` (the belt-and-suspenders
+# ``WHERE user_id = $1`` filter the v3.4 milestone keeps), NOT the global app_settings path.
+# Every helper here FAILS SAFE so the chat send path stays byte-identical when unset (D-14):
+# a read blip / cold cache / unset preference all resolve to "no overlay".
+
+async def load_user_model_default(user_id: str) -> str | None:
+    """Return the caller's own ``user_settings.preferences->>'default_model'`` (VIS-02).
+
+    Reads the singleton asyncpg pool with an EXPLICIT ``WHERE user_id = $1`` per-user
+    filter. Returns ``None`` when unset / no row / any read error — FAIL-OPEN so an absent
+    or unreadable preference produces NO overlay and the send path stays byte-identical
+    (D-14). asyncpg is already async (D-v2.5-01 — no blocking supabase-py call). Never raises.
+    """
+    if not user_id:
+        return None
+    try:
+        from app.dependencies import get_pg_pool
+        pool = await get_pg_pool()
+        val = await pool.fetchval(
+            "SELECT preferences->>'default_model' FROM public.user_settings WHERE user_id = $1",
+            user_id,
+        )
+        return val or None
+    except Exception:  # noqa: BLE001 — a per-user read blip must never break a send (T-167-16)
+        logger.warning("load_user_model_default: read failed; no overlay", exc_info=True)
+        return None
+
+
+async def enabled_model_allowed_set() -> set[str]:
+    """The operator/org ENABLED allowed-set a per-user default may pick from (VIS-02).
+
+    A model is offerable iff its ``model_capabilities_overrides`` row is enabled (the Phase
+    149 registry ``enabled`` flag = shows-in-picker = offerable). A row with ``enabled=False``
+    is EXCLUDED (defense-in-depth: a later-disabled model falls back to the operator default,
+    T-167-13). Cross-provider by construction (the registry spans providers — D-167-09), so
+    the composed default routes through the SAME resolve_run_model provider resolution with no
+    per-provider fork. ``load_all_model_overrides`` swallows a DB blip -> empty set -> no valid
+    preference -> byte-identical. Never raises.
+    """
+    overrides = await load_all_model_overrides()
+    return {mid for mid, row in overrides.items() if (row or {}).get("enabled") is not False}
+
+
+async def operator_model_default_locked() -> bool:
+    """Is the operator/org default model LOCKED? (VIS-02 SEED-116 lock, honored SERVER-SIDE).
+
+    Reads the EXISTING ``app_settings.llm_model_locked`` flag (Phase 149 MODEL-02 — the single
+    org-default lock; ZERO migration). When True, a per-user default is IGNORED and the operator
+    default wins (T-167-14). FAIL-CLOSED to True on any read error: a lock-read blip is treated
+    as locked so a governance lock can never be bypassed by a transient failure — and because a
+    locked compose returns the operator default, ``apply_user_model_default`` then returns the
+    settings object UNCHANGED (still byte-identical, D-14). Never raises.
+    """
+    try:
+        row = await _load_settings_from_db()
+        return bool(row.get("llm_model_locked"))
+    except Exception:  # noqa: BLE001 — fail CLOSED (locked) so a blip can't bypass the lock
+        logger.warning(
+            "operator_model_default_locked: read failed; treating as LOCKED (fail-closed)",
+            exc_info=True,
+        )
+        return True
+
+
+def compose_effective_model_default(
+    user_pref: str | None,
+    effective: UserEffectiveSettings,
+    enabled_models: set[str],
+    locked: bool,
+) -> str:
+    """The SEED-116 two-layer compose (VIS-02 / D-167-04) — the pure decision.
+
+    Returns the operator/org default (``effective.llm_model``) UNLESS the user set a
+    preference that is (a) non-empty, (b) in the operator/org ENABLED allowed-set, AND
+    (c) NOT operator-locked — in which case returns the user's preference. The lock +
+    allowed-set are re-checked SERVER-SIDE here (defense-in-depth, T-167-13/14): a user
+    can never pick outside the enabled set, and a locked org default always wins. Pure;
+    never raises.
+    """
+    if locked:
+        return effective.llm_model
+    if user_pref and user_pref in enabled_models:
+        return user_pref
+    return effective.llm_model
+
+
 # ── Phase 075.10 -- tool_args_progress boundary helper ─────────────────────────
 
 # Hardcoded pre-075.10 fallback. Used by `tool_args_progress_emit_boundary_bytes()`
@@ -899,8 +1112,10 @@ def document_management_enabled() -> bool:
 
 
 # ── Phase 147 (FLAG-01) — operator control-plane flag reads ────────────────────
-# All three read through the per-worker 30s TTL settings cache (load_app_settings),
-# so a flip propagates within the TTL window with NO server restart, and a transient
+# All three read through the per-worker settings cache (load_app_settings). A flip
+# propagates within the 30s TTL window with NO server restart *on any worker that awaits
+# the async loader* — the sync reader itself checks no timestamp, so a caller that needs a
+# bounded read awaits ``ensure_settings_fresh()`` first (T-184-UAT-02). A transient
 # DB blip returns LAST-KNOWN-GOOD (the cache is not reset on a read failure — see
 # _load_settings_from_db:233-241), never "unknown". A truly-cold cache / a
 # load_app_settings() exception falls back to the D-Q4 polarity below.
@@ -979,50 +1194,139 @@ _GOVERNED_FEATURES: dict[str, str] = {
     "model_management": "operators",
     "workflow_authoring": "everyone",
     "governance_health": "everyone",
+    # Phase 181 (REVERT-01 / D-181-01,05): the v3.6 visual_workflow_canvas layer ships
+    # behind a governed flag whose cold default is the 5th audience enum member "off" —
+    # hidden from EVERYONE, operators included. This is the ONE authoritative cold default
+    # (an unseeded feature_visibility key falls through to it), which is why NO migration is
+    # needed: the app_settings.feature_visibility JSONB gains the key only on an operator
+    # flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and back).
+    "visual_workflow_canvas": "off",
+    # Phase 190 (CONN-03 / D-26): live outbound sending ships behind a governed flag whose
+    # cold default is the same 5th audience enum member "off" — hidden from EVERYONE,
+    # operators included. NO migration is needed for exactly the reason stated above: this
+    # dict is the ONE authoritative cold default (an unseeded feature_visibility key falls
+    # through to it), and the app_settings.feature_visibility JSONB gains the key only on an
+    # operator flip via set_feature_visibility's atomic `||` merge ("off" -> "everyone" and
+    # back). With it off an external_action step behaves exactly as it does today: it
+    # records, it does not send, and it reads "Not sent — recorded" — an already-tested
+    # state, which is what makes this off-switch cheap and honest rather than a second code
+    # path (UI-SPEC §9).
+    "live_connectors": "off",
 }
 
 
-def feature_audience(feature: str) -> str:
-    """Resolve a feature's audience -> 'everyone' | 'operators' (VIS-01).
+def _feature_record(feature: str) -> dict:
+    """The ONE dict-or-str-guarded read of a feature's stored visibility record (Pitfall 5).
 
-    Reads the stored enum record from the per-worker 30s TTL settings cache
-    (load_app_settings().feature_visibility). Returns the stored ``audience`` ONLY
-    when it is a recognized enum value; a cold cache / DB blip / missing key /
-    malformed record / unknown feature falls back to the per-feature hardcoded
-    default (_GOVERNED_FEATURES; unknown -> safe-deny "operators"). NEVER reads or
-    returns a boolean, and NEVER raises (mirrors maintenance_mode's no-raise posture).
+    Shared by ``feature_audience`` AND ``resolve_feature_access`` so there is exactly ONE
+    parse path (no second serialization branch — D-167-06 "extend, never fork"). Reads the
+    per-worker settings cache (load_app_settings().feature_visibility) — note that the SYNC
+    reader applies NO staleness check, so the 30s TTL binds only where a caller has awaited
+    ``ensure_settings_fresh()`` first (the canvas gate, ``require_canvas``, ``/features``;
+    T-184-UAT-02). Returns the
+    stored ``{"audience": ..., "roles": [...], "groups": [...]}`` dict when present + well-
+    formed; a cold cache / DB blip / missing key / non-dict record yields ``{}``. NEVER
+    raises (mirrors maintenance_mode's no-raise posture).
     """
     try:
         fv = load_app_settings().feature_visibility or {}
-        rec = fv.get(feature) or {}
-        aud = rec.get("audience") if isinstance(rec, dict) else None
-        if aud in ("everyone", "operators"):
-            return aud
-    except Exception:  # noqa: BLE001 — defensive: fall back to the hardcoded default
+        rec = fv.get(feature)
+        if isinstance(rec, dict):
+            return rec
+    except Exception:  # noqa: BLE001 — defensive: cold cache / DB blip -> empty record
         pass
+    return {}
+
+
+def feature_audience(feature: str) -> str:
+    """Resolve a feature's audience -> 'everyone' | 'operators' | 'role' (VIS-01, D-167-06).
+
+    Returns the stored ``audience`` ONLY when it is a recognized enum value — now including
+    ``"role"`` (the v3.4 greenlist shape; the ``roles``/``groups`` lists are read by
+    ``resolve_feature_access``, NOT here — this returns only the enum). A cold cache / DB
+    blip / missing key / malformed record / unknown feature falls back to the per-feature
+    hardcoded default (_GOVERNED_FEATURES; unknown -> safe-deny "operators"). NEVER reads or
+    returns a boolean, and NEVER raises. Extended in place (D-167-06) — not forked.
+    """
+    aud = _feature_record(feature).get("audience")
+    # Phase 181 (D-181-01): "off" joins the accepted-enum tuple so a stored
+    # {"audience": "off"} record is HONORED rather than ignored and re-defaulted (a future
+    # re-flip to off via the DB must not silently no-op).
+    if aud in ("everyone", "operators", "role", "off"):
+        return aud
     return _GOVERNED_FEATURES.get(feature, "operators")
 
 
-async def set_feature_visibility(feature: str, audience: str) -> bool:
-    """Atomically set ONE feature's audience via a JSONB ``||`` merge (VIS-01).
+def resolve_feature_access(feature: str, caller_role: str, caller_groups: set[str]) -> bool:
+    """Glean precedence-merge — the pure in-memory greenlist decision (VIS-01, D-167-06).
 
-    Merges only ``{feature: {"audience": audience}}`` into app_settings.feature_visibility
-    so a concurrent toggle of a DIFFERENT feature can't be clobbered (Pitfall 4 — the
-    lost-update a whole-column ``SET`` would cause). Deliberately does NOT route through
-    save_app_settings (which does a whole-column ``SET``). The caller validates
-    feature/audience against code allowlists before calling — this function still only
-    ever serializes the single validated record (SQLi-safe: asyncpg ``$1`` + JSONB codec).
-    Invalidates the settings cache so the next read reflects the change within the TTL.
+    The ONE swappable audience boundary, extended (never forked) to role greenlists:
+      - ``everyone`` -> True;
+      - ``operators`` -> False (the operator carve-out is handled UPSTREAM by is_operator —
+        this function is only reached for a non-operator);
+      - ``role`` -> True iff the caller's (highest) role is in the greenlisted ``roles``
+        (highest-role-wins for the primary tier) OR any of the caller's groups intersects
+        the greenlisted ``groups`` (UNION for the secondary grants);
+      - anything else (unknown/malformed/missing record) -> safe-deny False (matches the
+        cold default). FAIL-CLOSED — a user must NEVER see a feature they aren't greenlisted
+        for. NEVER raises.
+    """
+    rec = _feature_record(feature)
+    aud = rec.get("audience")
+    if aud == "everyone":
+        return True
+    if aud == "operators":
+        return False
+    # Phase 181 (D-181-02): explicit off-deny — belt-and-suspenders (the trailing
+    # `return False` already denies) that matches the operators short-circuit style and
+    # documents the master-switch intent.
+    if aud == "off":
+        return False
+    if aud == "role":
+        try:
+            roles = set(rec.get("roles") or [])
+            groups = set(rec.get("groups") or [])
+            return caller_role in roles or bool(set(caller_groups or set()) & groups)
+        except Exception:  # noqa: BLE001 — any malformed list -> fail-closed deny
+            return False
+    return False
+
+
+async def set_feature_visibility(
+    feature: str, audience: str, roles: list[str] | None = None, groups: list[str] | None = None
+) -> bool:
+    """Atomically set ONE feature's audience via a JSONB ``||`` merge (VIS-01, D-167-06).
+
+    Merges only ``{feature: {"audience": audience, "roles": [...], "groups": [...]}}`` into
+    app_settings.feature_visibility so a concurrent toggle of a DIFFERENT feature can't be
+    clobbered (Pitfall 4 — the lost-update a whole-column ``SET`` would cause). Extended in
+    place to carry the ``role`` greenlist lists (empty for the everyone/operators shapes).
+    Deliberately does NOT route through save_app_settings (which does a whole-column
+    ``SET``). The caller (admin.py) validates feature/audience/roles against code allowlists
+    BEFORE calling — this function still only ever serializes the single validated record
+    (SQLi-safe: asyncpg ``$1`` + JSONB codec). This is a GLOBAL feature-visibility writer
+    (no per-user scope) so it STAYS on the service-role pool (user_settings.py header rule;
+    contrast the VIS-02 per-user writer).
+
+    RE-WARMS the cache (not merely invalidates it) so the next read — including the SYNC
+    ``load_app_settings()`` path that ``GET /features`` uses — reflects this write. An
+    invalidate-only call never reaches that reader; see ``refresh_settings_cache``.
     """
     from app.dependencies import get_pg_pool
     pool = await get_pg_pool()
+    record = {"audience": audience, "roles": roles or [], "groups": groups or []}
     await pool.execute(
         "UPDATE app_settings SET feature_visibility = "
         "coalesce(feature_visibility, '{}'::jsonb) || $1::jsonb, updated_at = now() "
         "WHERE id = 'global'",
-        {feature: {"audience": audience}},  # JSONB codec serializes the dict
+        {feature: record},  # JSONB codec serializes the validated dict
     )
-    invalidate_settings_cache()
+    # Phase 184 UAT: the operator kill-switch defect. GET /features resolves through
+    # feature_audience -> _feature_record -> load_app_settings() (SYNC), which an
+    # invalidate-only call never reaches — so the flip landed in the DB and was never
+    # observed. Re-warm so the audience this call just persisted is the one the very next
+    # read reports.
+    await refresh_settings_cache()
     return True
 
 

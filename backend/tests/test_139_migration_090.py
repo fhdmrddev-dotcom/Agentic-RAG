@@ -113,7 +113,7 @@ async def _seed_proposal_parents(conn):
         uid, f"phase-139-{uid}@test.local",
     )
     await conn.execute(
-        "INSERT INTO public.skills (id, user_id, name, description, instructions, is_global) "
+        "INSERT INTO public.skills (id, user_id, name, description, instructions, is_org_shared) "
         "VALUES ($1, $2, $3, $4, $5, false)",
         sid, uid, "si-02 probe", "old description", "live instructions",
     )

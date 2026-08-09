@@ -160,6 +160,13 @@ export interface Message {
   stopped?: boolean
   /** Phase 063 (D-063-04 / RESEARCH Open Question 2): the Redis Stream run_id this assistant message is/was streamed from. Set by reconcile and sendMessage paths; absent for DB-only loaded messages until backfilled. Used by Stop semantics (DELETE /runs/{runId}) and Resume button visibility logic. */
   runId?: string
+  /** Phase 176 WR-01: the REAL persisted message_id a user optimistic temp was
+   * registered as when postMessage resolved. Lets the reconcile MERGE dedup an
+   * in-flight user temp against its OWN persisted twin by IDENTITY (skew-free),
+   * replacing the old cross-clock `created_at >=` content compare that rendered a
+   * duplicate user bubble under client-ahead clock skew. Absent until postMessage
+   * resolves (a still-in-flight temp has no confirmed twin → preserved, D-06). */
+  registeredUserMsgId?: string
   /** Phase 063 (D-063-04) + Phase 066 (D-066-04, 09): lifecycle status of the underlying run. Mirrors public.runs.status enum values post-migration 038 (5 values). Resume button surfaces when runStatus === 'failed' || runStatus === 'timed_out' (D-066-09 — no auto-retry for paid LLM calls per D-v2.5-05). The 'timed_out' value (NEW in 066) renders an "Agent reached time limit" banner; 'cancelled' renders "Response stopped"; 'failed' renders the Resume button without a banner. */
   runStatus?: "streaming" | "completed" | "failed" | "cancelled" | "timed_out"
   /** Phase 095.1-03 (D-04 model attribution): the REAL resolved model/provider
@@ -203,6 +210,14 @@ export interface Message {
    * names BOTH models (rendered as an inline notice in MessageItem). Absent on the common
    * enabled path — the swap is never silent (never a dropped event). */
   modelFallbackNotice?: { disabledModel: string; fallbackModel: string; message: string }
+  /** Phase 174 Plan 03 (STATE-01b / D-04): honest administrative-block notice. Stamped by
+   * StreamsProvider's `sendMessage` catch on an `ApiError.status === 403` (the workflows
+   * kill-switch / app-layer ban), which fires BEFORE any run/message is inserted. Replaces
+   * the empty assistant placeholder with an amber in-chat bubble carrying the server's
+   * `ApiError.message` verbatim (e.g. "Workflows are currently disabled by the administrator").
+   * Render-only, no persistence, no migration — the 403 authz stays server-side; this only
+   * makes the refusal honest instead of a blank workflow card. Sibling of `modelFallbackNotice`. */
+  blockedNotice?: { message: string }
 }
 
 export interface DocumentMetadata {
@@ -245,7 +260,9 @@ export interface MetadataFieldDef {
   field_type: "string" | "date" | "number" | "boolean" | "enum"
   description?: string | null
   options?: string[] | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
+   *  badge (write-locked server-side; users cannot set it). */
+  is_system_global: boolean
   enabled: boolean
 }
 
@@ -308,15 +325,17 @@ export interface ViewFilter {
 export const EMPTY_FILTER: ViewFilter = { op: "and", conditions: [] }
 
 /** A saved view (mirrors the backend `ViewResponse`). Selecting one loads its
- *  `filter_expr` back into the same filter bar (D-114-1); seeded global views
- *  carry `is_global` (the tooltip-labeled `G` pill in the Views sidebar). */
+ *  `filter_expr` back into the same filter bar (D-114-1); seeded platform views
+ *  carry `is_system_global` (the tooltip-labeled `G` pill in the Views sidebar). */
 export interface SavedView {
   id: string
   user_id?: string | null
   name: string
   filter_expr: ViewFilter
   folder_scope?: string | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
+   *  badge (write-locked server-side; the create body never supplies it). */
+  is_system_global: boolean
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -396,8 +415,8 @@ export interface Relationship {
 //   - `ClassificationRule` mirrors the rule CRUD response (`RuleResponse`,
 //     models/classification_rule.py) — a `SavedView` clone with `filter_expr`
 //     renamed to `match_expr` plus `suggest_folder_id`/`enabled`. The backend
-//     OWNS the `is_global` scope (hard-set false on create); the create body
-//     NEVER supplies it (mirrors `createView`).
+//     OWNS the `is_system_global` scope (hard-set false on create); the create
+//     body NEVER supplies it (mirrors `createView`).
 //   - `ClassificationSuggestion` mirrors the on-upload `_classification` object
 //     the ingest rule-eval pass stamps onto a doc's metadata (D-118-5) — the
 //     matched rule's provenance, the suggested folder (resolved fresh; nullable
@@ -415,15 +434,17 @@ export interface Relationship {
  *  `match_expr` (the SAME `ViewFilter` AST, evaluated in-Python at upload by the
  *  net-new matcher), plus `suggest_folder_id` (the folder a match suggests; the
  *  FK is `ON DELETE SET NULL` so it may be null) and `enabled` (the toggle rides
- *  the UPDATE path — no separate endpoint). `is_global` is server-owned; the
- *  create body never supplies it (the server hard-sets it false). */
+ *  the UPDATE path — no separate endpoint). `is_system_global` is server-owned;
+ *  the create body never supplies it (the server hard-sets it false). */
 export interface ClassificationRule {
   id: string
   user_id?: string | null
   name: string
   match_expr: ViewFilter
   suggest_folder_id: string | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_system_global — DISPLAY-ONLY platform-seed
+   *  badge (write-locked server-side; the create body never supplies it). */
+  is_system_global: boolean
   enabled: boolean
 }
 
@@ -451,7 +472,9 @@ export interface Folder {
   user_id: string
   name: string
   parent_id: string | null
-  is_global: boolean
+  /** Phase 165 (MIG-02): is_global→is_org_shared — FUNCTIONAL org-share toggle
+   *  (the "Shared with org" control; D-165-07 relabel-not-unshare). */
+  is_org_shared: boolean
   created_at: string
   updated_at: string
 }
@@ -497,8 +520,10 @@ export interface Skill {
   description: string
   instructions: string
   is_enabled: boolean
-  is_global: boolean
-  is_system: boolean // Phase 137.2 / CREATE-01 — "Built-in" pill (output-only; the client reads it, never sends it)
+  /** Phase 165 (MIG-02): is_global→is_org_shared — FUNCTIONAL org-share toggle
+   *  (the "Shared with org" control; D-165-07 relabel-not-unshare). */
+  is_org_shared: boolean
+  is_system: boolean // Phase 137.2 / CREATE-01 — "Built-in" pill (output-only; the client reads it, never sends it). D-165-02: NOT renamed — is_system stays the physical allow-list marker.
   created_at: string
   updated_at: string
   /** Phase 123-06 (TRIG-03) — the optional save-time lint warnings the
@@ -515,7 +540,8 @@ export interface SkillCreate {
   name: string
   description?: string
   instructions?: string
-  is_global?: boolean
+  /** Phase 165 (MIG-02): is_global→is_org_shared — FUNCTIONAL org-share toggle. */
+  is_org_shared?: boolean
 }
 
 export interface SkillUpdate {
@@ -900,7 +926,13 @@ export interface PendingAsk {
   tool_call_id: string
   prompt: string
   options: string[]
-  timeout_seconds: number
+  /** Phase 185 (GOVERN-03): `null` means **no deadline — the run is waiting for
+   *  you**, the armed action-risk checkpoint's disposition (SPEC Req 9: with the
+   *  checkpoint set, no answer must mean the run never proceeds, so there is no
+   *  expiry that could quietly read as "yes"). Additive — every other prompt still
+   *  sends a number, and PendingAskCard renders the null case as an open-ended
+   *  wait rather than counting it down to expired (L-15). */
+  timeout_seconds: number | null
   message_id?: string
   run_id?: string
   created_at?: string
@@ -979,7 +1011,36 @@ export interface Phase {
   slug: string
   phaseIndex: number
   phaseType: string
-  status: "pending" | "running" | "done" | "failed" | "retrying" | "skipped"
+  /** Phase 188 Plan 02 (RUNVIZ-02 / D-188-08) — `"unknown"` is ADDITIVE: the honest
+   *  fallback for a `workflow_phases.status` absent from the client's map. Success is
+   *  never inferred from an unrecognised value (`reconcilePhases` resolved it to `done`
+   *  until this member existed). Widening this union is the MECHANISM, not a side
+   *  effect: `STATUS_META` is `Record<Phase["status"], StatusMeta>`, so the compiler
+   *  forces every reader to state the honest unknown too.
+   *
+   *  Phase 189 Plan 08 (CONN-01 / D-07 / D-17) — `"recorded-not-sent"` is ADDITIVE by the
+   *  same mechanism and for the same reason. The governed external-action step reaches a
+   *  terminal the six members above cannot state: it is not `done` (nothing was sent), not
+   *  `failed` (nothing went wrong) and not `skipped` (the step DID run and a person DID
+   *  approve it). Giving it its own member is what stops it being absorbed by one of those
+   *  three, and widening the union is again the MECHANISM — the exhaustive
+   *  `Record<Phase["status"], …>` in the developer panel becomes a typecheck error until
+   *  the panel states the new terminal in its own words.
+   *
+   *  ⚠ D-17 — THE SPELLING HERE IS THE CLIENT'S, NOT THE DATABASE'S. Postgres stores the
+   *  snake_case SLUG (migration 115 widened `workflow_phases_status_check`); this union
+   *  carries the kebab-case client member, exactly as `active`/`completed` already map to
+   *  `running`/`done`. The rendered sentence a person reads is a third spelling again and
+   *  lives in the vocabulary layers, never here. */
+  status:
+    | "pending"
+    | "running"
+    | "done"
+    | "failed"
+    | "retrying"
+    | "skipped"
+    | "recorded-not-sent"
+    | "unknown"
   attempt?: number
   error?: string
   subAgents: TaskRunIndexItem[]

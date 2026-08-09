@@ -75,7 +75,7 @@ function useIsWide(): boolean {
 export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) => void } = {}) {
   const { user } = useAuth()
   const { documents, uploading, uploadingCount, upload, deleteDoc, loadDocuments } = useDocuments()
-  const { folders, createFolder, renameFolder, deleteFolder, toggleGlobal } = useFolders()
+  const { folders, createFolder, renameFolder, deleteFolder, toggleOrgShared } = useFolders()
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
   // Phase 114 (UX-01): a saved-view selection, MUTUALLY EXCLUSIVE with the folder
   // selection (state-based nav, NO react-router). Selecting a view clears the
@@ -312,7 +312,7 @@ export function IngestionPage({ onNavigate }: { onNavigate?: (view: ActiveView) 
         onCreateFolder={createFolder}
         onRenameFolder={renameFolder}
         onDeleteFolder={deleteFolder}
-        onToggleGlobal={toggleGlobal}
+        onToggleOrgShared={toggleOrgShared}
       />
       <ViewsGroup
         views={views}

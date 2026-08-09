@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { NavPanel } from "./NavPanel"
 import { ChatHistoryColumn } from "./ChatHistoryColumn"
 import { ThreadCommandPalette } from "./ThreadCommandPalette"
@@ -16,6 +16,16 @@ import { SkillStudioPage, type StudioTab } from "@/pages/SkillStudioPage"
 // Phase 146 (ADMIN-01): the Control Room mounts here as a full-surface branch
 // (governance/skill-studio precedent), reachable only via the probe-gated shield.
 import { ControlRoomPage } from "@/components/admin/ControlRoomPage"
+// Phase 166 Plan 05 (ADMIN-01): the org-admin shell mounts here as a full-surface
+// branch (the ControlRoomPage precedent), reachable via the indigo canManage-gated
+// Shield-mirror. useOrgOptional supplies canManage (the mobile-drawer shield gate) +
+// activeOrgId (the D-166-08 thread-list refetch key).
+import { OrgAdminShell } from "@/components/org/OrgAdminShell"
+// Phase 188 Plan 09 (RUNVIZ-03): the run's own room mounts here as a full-surface
+// branch (the SkillStudioPage precedent — entered WITH an id, returned via callbacks).
+import { WorkflowRunPage } from "@/pages/WorkflowRunPage"
+import { useOrgOptional } from "@/providers/OrgProvider"
+import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { useThreads } from "@/hooks/useThreads"
 import { useFolders } from "@/hooks/useFolders"
 import { useTheme } from "@/hooks/useTheme"
@@ -40,11 +50,15 @@ import type { NavItem } from "@/lib/nav-items"
 // /workflows/{id}/run route (D-103-CONF-1; threads.py byte-identical).
 // WR-04: the raw deleteThread api client, aliased to avoid shadowing the useThreads()
 // binding (:77) — used for best-effort orphan cleanup on a failed launch.
+// Phase 188 Plan 09 (RUNVIZ-03 / D-188-11): getThreadWorkflow is how the launch
+// resolves the id the run surface is addressed by. See doRun's tail for why this
+// extra client read exists rather than an additive key on the message POST response.
 import {
   createThread,
   postMessage,
   uploadWorkspaceTemplate,
   deleteThread as deleteLaunchThread,
+  getThreadWorkflow,
   type PublishedWorkflow,
 } from "@/lib/api"
 
@@ -96,6 +110,12 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
   const { folders } = useFolders()
   const { theme, toggleTheme } = useTheme()
 
+  // Phase 166 Plan 05 (ADMIN-01 / D-166-08): the org context (render-only). canManage
+  // gates the mobile-drawer indigo shield; activeOrgId keys the thread-list refetch.
+  const org = useOrgOptional()
+  const canManage = org?.canManage ?? false
+  const activeOrgId = org?.activeOrgId ?? null
+
   // Phase 156 (POLISH-01, Wave 1 / RESEARCH Pitfall 1): the single app-wide thread
   // bootstrap. Lifted UP from the old NavPanel (which only mounted on the chat view)
   // so the whole app shares one loaded thread list — the Wave-2 global ⌘K palette is
@@ -106,6 +126,25 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       setTimeout(() => loadThreads().catch(console.error), 2000)
     })
   }, [loadThreads])
+
+  // Phase 166 Plan 05 (ADMIN-02 / D-166-08 second half): reconcile the sidebar thread
+  // list to the newly-active org after a switchOrg(). OrgProvider.switchOrg syncs the
+  // X-Org-Id header SYNCHRONOUSLY (Plan 02) BEFORE this effect runs, so loadThreads()
+  // fetches the NEW org's threads. This is ORTHOGONAL to the StreamsProvider bucket
+  // teardown (also Plan 02) — the two are independent 067.5 state, so no cross-effect
+  // ordering coupling is needed (reconcile-via-fetch, D-v2.5-03). A ref-guard skips the
+  // initial mount (the one-shot effect above already loaded the current org) so this
+  // fires ONLY on an actual org change — never a duplicate mount fetch.
+  const lastOrgRef = useRef(activeOrgId)
+  useEffect(() => {
+    if (lastOrgRef.current === activeOrgId) return
+    lastOrgRef.current = activeOrgId
+    // IN-01: drop the old-org selected thread before the refetch so the chat view doesn't
+    // briefly show a stale thread (and reconcile it via a cross-org getSnapshot 404) that is
+    // absent from the new org's list. The user re-picks from the refetched new-org threads.
+    selectThread(null)
+    loadThreads().catch(console.error)
+  }, [activeOrgId, loadThreads, selectThread])
 
   // Title cross-wiring fix (parallel chats): apply a generated title to the run's
   // OWNING threadId (threaded through from StreamsProvider via makeStreamCallbacks)
@@ -182,6 +221,34 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
     onNavigate("chat")
   }, [onSetPrefillMessage, onNavigate])
 
+  // ── Phase 188 Plan 09 (RUNVIZ-03 / D-188-11): the run surface's per-view id, held
+  //    LOCALLY in exactly the style of the other per-view state above (`panelState`,
+  //    `drawerOpen`) — ChatLayout already owns `doRun`, `onNavigate` and the panel, so
+  //    it is the right owner. `studioSkillId` is the App-held precedent for the same
+  //    shape; this one stays local because only doRun and the branch below read it.
+  //    ⚠ This is a `workflow_runs.id`, NEVER a producer `runs.run_id`. Set by doRun
+  //    from the thread's run anchor — see the tail of doRun for the id trap. ──
+  const [activeRunId, setActiveRunId] = useState<string | null>(null)
+
+  // ── CR-05 (Phase 188 review): the run home is CANVAS-ERA SURFACE, so the operator's
+  //    kill switch owns it exactly as it owns the Builder's canvas
+  //    (`WorkflowBuilderPage` gates on the identical expression).
+  //
+  //    ⚠ The backend gate is NOT sufficient on its own here, and that is the whole
+  //    finding: `getThreadWorkflow` is not canvas-gated, so the run anchor resolves fine
+  //    while the flag is off and the launch happily navigated to a home that then 404'd
+  //    on its own read — reporting the operator's kill switch as "deleted, or belongs to
+  //    another account". REVERT-01 promises the flag-off product is indistinguishable
+  //    from one where the canvas was never built; a fourth home is distinguishable.
+  //
+  //    STRICT `=== true`, never truthy, and a NULL context (no provider — an isolated
+  //    render) reads exactly like an empty map: HIDDEN. That is the Phase-148 vanish
+  //    convention, and reading null as "unknown, so show it" is the one hole this
+  //    plumbing could open. The fallback is the SHIPPED pre-canvas behaviour, so failing
+  //    closed here costs the user nothing. ──
+  const featuresCtx = useEffectiveFeaturesOptional()
+  const canvasEnabled = featuresCtx?.features.visual_workflow_canvas === true
+
   // ── Phase 103-06 (REQ-7 / D-103-CONF-1): doRun — the Run-from-page launch.
   //    Workflows are a MODE of a thread, never page-resident: Run creates a NEW
   //    thread, kicks off a REAL server-side run by REUSING the existing kickoff
@@ -231,10 +298,77 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
       }
       // Only reached on a successful launch — never runs after a thrown/cleaned failure.
       await loadThreads()
+      // ── Phase 188 Plan 09 (RUNVIZ-03 / SPEC Req 6 / D-188-11 / D-188-12): a running
+      //    workflow gets its OWN room. This tail used to select the created thread and
+      //    switch straight to the chat view, dropping the user into a message list — the
+      //    operator report this phase exists to answer. (The two replaced calls are
+      //    described by ROLE, not quoted: the acceptance fence counts navigation calls in
+      //    this file, and quoted prose would inflate a code measurement — the 187-24
+      //    lesson.) Everything ABOVE this comment is
+      //    unchanged: the thread is still created, the template still uploads before the
+      //    send, the kickoff still carries the definition id, and the WR-04 orphan cleanup
+      //    still owns the failure path. The thread still anchors the run and stays
+      //    reachable (D-14 keeps the run thread-backed); only where the user STANDS moved.
+      //
+      //    ⚠ THE ID TRAP. Two differently-typed ids share the name `run_id` in this
+      //    codebase, and both are bare uuids, so the compiler cannot catch a swap. The id
+      //    the message POST hands back is the PRODUCER row that `GET /runs/{id}/stream`
+      //    consumes — a different table. The run surface is addressed by the
+      //    `workflow_runs` row, which is exactly what the thread's `active_workflow_run_id`
+      //    anchor holds. Navigating with the other one yields a surface that resolves
+      //    nothing. (The literals for the wrong id are deliberately left unspelled here —
+      //    the acceptance fence greps this file for them, and prose that names them would
+      //    make a code measurement satisfiable by a comment: the 187-24 lesson.)
+      //
+      //    THERE IS NO RACE, measured: `create_workflow_run` writes the thread anchor in
+      //    the same transaction as the `workflow_runs` INSERT (`threads.py:930-948`),
+      //    before the producer spawns and before the POST's response is built (`:1011`).
+      //    So this read is deterministic and needs no retry loop and no thread-id fallback.
+      //
+      //    WHY AN EXTRA CLIENT READ rather than one additive key on the POST response:
+      //    `backend/app/api/threads.py` is a G-5-firing file (9+ plans) and an additive key
+      //    there would change the response bytes for EVERY workflow kickoff. Keeping this
+      //    phase out of that file is the reason this shape was chosen, not an oversight.
+      //
+      //    The null/failed read falls back to the SHIPPED behaviour — a deliberate
+      //    degradation, not a race workaround. A run surface that cannot resolve its run is
+      //    worse than the chat view we came from, and this read happens AFTER a launch that
+      //    already succeeded, so a network blip here must never be reported as a failed
+      //    launch (the RunModal would render an error for a run that is genuinely under
+      //    way). ──
+      //    CR-05: the kill switch is consulted BEFORE the extra read, not after. The read
+      //    is itself canvas-era plumbing — it exists only to address a home the flag has
+      //    turned off — so issuing it while off would be a request the pre-canvas product
+      //    never made. Failing this way lands on the SHIPPED path below, which is the
+      //    definition of byte-identical rather than a degradation.
+      const workflowRunId = canvasEnabled
+        ? await getThreadWorkflow(thread.id)
+            .then((wf) => wf.active_workflow_run_id)
+            .catch(() => null)
+        : null
+      if (workflowRunId) {
+        setActiveRunId(workflowRunId)
+        onNavigate("workflow-run")
+        return
+      }
       selectThread(thread)
       onNavigate("chat")
     },
-    [loadThreads, selectThread, onNavigate],
+    [loadThreads, selectThread, onNavigate, canvasEnabled],
+  )
+
+  // ── Phase 188 Plan 10 (RUNVIZ-03 / D-188-13): the thread → run direction of the
+  //    bidirectional seam. The workspace panel resolves the run id from the thread's own
+  //    anchor and hands it here; this sets the same state doRun sets and opens the same
+  //    home. Memoised on purpose — the panel keys its anchor read on the callback's
+  //    PRESENCE, and a stable identity keeps that true for any future consumer that
+  //    keys on the callback itself. ──
+  const openRunSurface = useCallback(
+    (runId: string) => {
+      setActiveRunId(runId)
+      onNavigate("workflow-run")
+    },
+    [onNavigate],
   )
 
   // ── Plan 06: lifted panel state machine (panel-shell.md D1). The chat|panel
@@ -464,6 +598,26 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
                 </button>
               )
             })}
+            {/* Phase 166 Plan 05 (ADMIN-01 / D-166-05): the indigo org-admin Shield-mirror
+                on mobile — parallel to the amber operator shield, gated on canManage,
+                honestly ABSENT for a member, so the org-admin shell is reachable on mobile
+                too (the reachability triad reaches the drawer). Indigo, never amber. */}
+            {canManage && (
+              <button
+                aria-label="Organization admin"
+                aria-current={activeView === "org-admin" ? "page" : undefined}
+                onClick={() => { onNavigate("org-admin"); setDrawerOpen(false) }}
+                className={cn(
+                  "flex items-center justify-center w-10 h-10 rounded-xl transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30",
+                  activeView === "org-admin"
+                    ? "bg-indigo-500/15 text-indigo-400"
+                    : "text-indigo-400/80 hover:text-indigo-400 hover:bg-indigo-500/10",
+                )}
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Phase 146 (ADMIN-01 / D-07): the probe-gated operator shield —
                 rendered OUTSIDE NAV_ITEMS (a SEPARATE element, never in the shared
                 array) so a non-operator's drawer is byte-identical. Amber Shield,
@@ -521,6 +675,11 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             state={panelState}
             onToggle={togglePanel}
             onExpand={expand}
+            // CR-05: the receipt is the OTHER door into the run home, so the kill switch
+            // owns it too. The panel renders NOTHING without this callback (its own suite
+            // fences that), so withholding it removes the affordance entirely rather than
+            // leaving a control that opens the positional fallback.
+            onOpenRun={canvasEnabled ? openRunSurface : undefined}
           />
         </div>
       ) : (
@@ -581,6 +740,62 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // + this mount + the shield action) is owned in-phase (the built-but-
             // unreachable lesson).
             <ControlRoomPage identity={operatorIdentity} onBack={() => onNavigate("chat")} />
+          ) : activeView === "org-admin" ? (
+            // Phase 166 Plan 05 (ADMIN-01 / D-166-05): the org-admin shell full-surface
+            // mounts here (additive branch BEFORE the trailing KnowledgeHealthPage else —
+            // the ControlRoomPage precedent). Reached ONLY via the indigo canManage-gated
+            // Shield-mirror (NavPanel footer + the mobile drawer); the shell self-sources
+            // everything from useOrg()/useTechnicalNames() — its only prop is onBack. This
+            // closes the reachability triad (App union [Plan 02] + this mount + the NavPanel
+            // entry — all owned in-phase; the Phase-118 built-but-unreachable lesson).
+            <OrgAdminShell onBack={() => onNavigate("chat")} />
+          ) : activeView === "workflow-run" && canvasEnabled ? (
+            // Phase 188 Plan 09 (RUNVIZ-03 / SPEC Req 6 / D-188-10): the run's own room
+            // mounts here as the FOURTH home — additive branch placed IMMEDIATELY BEFORE
+            // the trailing KnowledgeHealthPage (the governance/skill-studio/control-room
+            // precedent). ⚠ That trailing element is a POSITIONAL FALLBACK, not a
+            // `default:` that throws: an ActiveView member with no branch of its own
+            // silently renders Knowledge Health, so the branch MUST precede it (the
+            // Phase-118 built-but-unreachable lesson). The reachability triad — the
+            // App.tsx union member + this mount + doRun's navigation — is owned in-phase.
+            //
+            // Entered WITH a `workflow_runs.id` (never a producer `runs.run_id`), set by
+            // doRun below. `onBack` returns to the Workflows library; `onOpenThread` is
+            // D-188-13's bidirectional seam back into the run's chat thread, resolved off
+            // the already-loaded app-wide `threads` list (Phase 156's Wave-1 bootstrap)
+            // because `selectThread` takes a Thread, not an id.
+            //
+            // ⚠ CR-05: the branch condition carries `&& canvasEnabled`, so a STALE
+            // activeView cannot resurrect this home after the operator flips the switch —
+            // it falls through to the positional fallback, which is how every other
+            // unclaimed member behaves and is therefore the byte-identical answer. This
+            // closes the render-guard assertion Phase 181 deferred to "the first canvas
+            // ActiveView render branch". Gating the render alone would strand a launch on
+            // the fallback, which is why doRun is gated too.
+            //
+            // NO nav-rail item claims this view: while activeView === "workflow-run" no
+            // rail item carries aria-current (188-UI-SPEC § Copywriting Contract). This
+            // home is reached by launching or by the thread's run receipt, never from the
+            // rail — so `nav-items.ts` is deliberately untouched.
+            //
+            // The message list, the composer and the workspace panel all live inside the
+            // `activeView === "chat" ?` branch above, so a view on THIS side renders none
+            // of them. That is what makes SPEC Req 6's "no message list and no composer" a
+            // structural property of the layout rather than a discipline — and the reason
+            // the run surface renders its own deliverable list (Plan 10).
+            // ⚠ Those two components are named in WORDS, never as JSX tags: the source
+            // fence in ChatLayout.launch.test.tsx measures that their tags appear ONLY
+            // before the split point, and prose spelling a tag would break a real
+            // measurement (the 187-24 lesson, met three times in this phase alone).
+            <WorkflowRunPage
+              runId={activeRunId}
+              onBack={() => onNavigate("workflows")}
+              onOpenThread={(tid) => {
+                const t = threads.find((x) => x.id === tid)
+                if (t) selectThread(t)
+                onNavigate("chat")
+              }}
+            />
           ) : (
             <KnowledgeHealthPage />
           )}

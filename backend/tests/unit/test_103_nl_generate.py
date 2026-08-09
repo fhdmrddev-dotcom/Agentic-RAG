@@ -210,11 +210,25 @@ async def test_generate_route_delegates_and_does_not_persist(monkeypatch):
     """POST /workflows/generate delegates to the service and returns a draft object
     WITHOUT persisting it; an ok=False service result returns 200 with the structured
     error (persistence is REQ-1's explicit POST /workflows create)."""
+    from unittest.mock import AsyncMock
+
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
     from app.api import workflows as wf_api
+    import app.dependencies as deps
     import app.services.workflow_authoring as wa
+
+    # Phase 182 ROT FIX (test-only): Phase 167 (VIS-01) attached
+    # ``require_visible("workflow_authoring")`` to POST /workflows/generate AFTER this
+    # Phase-103 test was written. This bare ``FastAPI()`` app carries none of conftest's
+    # seams, so the gate reached the LIVE asyncpg pool with the non-UUID id "u1" and the
+    # test died in ``is_operator`` with ``DataError: invalid UUID 'u1'`` — before the route
+    # body (the thing under test) ever ran. ``is_operator`` is the ONE swappable boundary
+    # (SEED-115); patch it on the dependencies module exactly as test_148_require_visible
+    # does so the gate no-ops and the delegation/non-persistence assertions below are
+    # actually exercised. Assertions and test COUNT unchanged.
+    monkeypatch.setattr(deps, "is_operator", AsyncMock(return_value=True))
 
     # The route imports workflow_authoring as a MODULE → patch the service fn on it.
     async def _fake_generate(**kwargs):

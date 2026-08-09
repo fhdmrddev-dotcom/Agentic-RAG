@@ -6,7 +6,7 @@ so the live-DB integration tests can drive create / delete / resolve directly ag
 :54322 without a FastAPI TestClient + JWT.
 
 A relationship is a typed link between two documents — never a copy. It is inherently
-user-owned (the ``document_relationships`` RLS is user-scoped ONLY, no ``is_global`` —
+user-owned (the ``document_relationships`` RLS is user-scoped ONLY, no shared/org-global visibility —
 ``migration 071:142-150``), so every read/write here is owner-scoped.
 
 THE SHARED CORE — ``_resolve_readable_latest`` (RESEARCH Open Question 2, the 115

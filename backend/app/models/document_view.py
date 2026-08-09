@@ -88,7 +88,7 @@ class ViewResponse(BaseModel):
     name: str
     filter_expr: dict
     folder_scope: UUID | None = None
-    is_global: bool = False
+    is_system_global: bool = False
 
 
 # ── stateless ad-hoc resolve (114 CR-01) ───────────────────────────────────────

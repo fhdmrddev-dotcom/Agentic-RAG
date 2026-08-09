@@ -58,6 +58,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from app.middleware.canvas_gate import CanvasGateMiddleware, build_canvas_aware_openapi
 from app.middleware.maintenance import MaintenanceMiddleware
 from app.middleware.setup import SetupMiddleware
 
@@ -591,6 +592,49 @@ async def lifespan(app_instance):
 
 app = FastAPI(title="Agentic RAG API", version="1.0.0", lifespan=lifespan)
 
+# Phase 182 (VALID-01 / D-182-R2-02) — the SCHEMA half of the canvas off-switch. `/openapi.json`
+# is anonymous + unconditional on every finalized deploy; while the canvas was off it still
+# published both gated paths and every canvas-only model, i.e. a complete map of the surface the
+# 404 hides (CR-02). This hook filters that document per request while off, and returns the app's
+# own full document untouched while on. FastAPI resolves the app's schema callable at REQUEST time
+# (applications.py:1009), so replacing the instance attribute here is honored on every request.
+#
+# Two deliberate boundaries, recorded so a future verifier does not re-raise them as leaks:
+#   * `include_in_schema=False` was REJECTED — it would hide both routes from /docs permanently,
+#     including while the canvas is ON, degrading the API docs for the whole remainder of v3.6
+#     (phases 183-189 all build on this seam). The dynamic hook tracks the live flag instead.
+#   * `GET /docs` deliberately keeps returning 200 in BOTH flag states. It is a static Swagger UI
+#     shell carrying no route information of its own — it renders whatever the filtered document
+#     says. App-wide `docs_url` gating has never been a convention in this codebase and is not
+#     introduced here.
+app.openapi = build_canvas_aware_openapi(app)
+
+# Phase 182 (VALID-01 / D-182-R2-01) — the canvas off-switch's request-path gate. Decides
+# ``visual_workflow_canvas`` BEFORE Starlette routing and before FastAPI decodes any body,
+# so a malformed body can no longer 422 ahead of the gate's 404 and a wrong-method probe can
+# no longer 405 (both leaked that the route exists while off — CR-01).
+#
+# REGISTRATION ORDER IS LOAD-BEARING. Starlette applies add_middleware in REVERSE
+# registration order (the LAST-registered wraps the rest), so registering FIRST makes this
+# the INNERMOST middleware: it runs AFTER SetupMiddleware and MaintenanceMiddleware and
+# immediately BEFORE the router. That is exactly right for byte-identity — on an unfinalized
+# box an unbuilt path returns the setup 503, and under maintenance a mutating request to an
+# unbuilt path returns the maintenance 503; if the canvas gate ran OUTSIDE those, a gated
+# path would answer 404 where an unbuilt path answers 503, which is itself a distinguishing
+# signal. CORS stays outermost, so this 404 still carries CORS headers exactly as the
+# router's own 404 does.
+#
+# Pure-ASGI (NOT BaseHTTPMiddleware) so it never buffers the SSE stream; it reads the flag
+# from the in-memory settings cache and fails CLOSED on a cold/blip read (D-181-02 — the
+# deliberate opposite of Maintenance's fail-OPEN). D-v2.5-01's "no per-request DB call" holds
+# for every request EXCEPT the gated paths themselves, which await a TTL-checked refresh
+# first so the kill switch cannot be enforced from an unboundedly stale cache
+# (T-184-UAT-02) — at most one query per 30s per worker, and none on the hot path.
+# ``Depends(require_canvas())`` REMAINS on both canvas routes as defense in depth (D-182-05):
+# this seam owns only the master off-switch, the dependency still owns caller resolution and
+# the operator/everyone/role audience.
+app.add_middleware(CanvasGateMiddleware)
+
 # Phase 147 (FLAG-01 / D-06) — maintenance/read-only write-block seam. Registered
 # BEFORE CORS so CORS ends up OUTERMOST (Starlette applies add_middleware in reverse
 # registration order — the LAST-registered wraps the rest). CORS-outermost means:
@@ -654,7 +698,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, admin, panel, workflows, workflow_runs, metadata_fields, document_views, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors  # noqa: E402
 
 app.include_router(threads.router)
 app.include_router(runs.router)
@@ -671,10 +715,11 @@ app.include_router(workspace.router)
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
+app.include_router(workflow_runs.router)  # Phase 188 RUNVIZ-03 — GET /workflow-runs/{id}: the one net-new read that gives a RUN an address (run + the definition version that RAN + the durable phase spine, D-188-14); ownership-gated 404 + require_canvas ALONE, path template registered in CANVAS_GATED_PATHS (D-188-15/16)
 app.include_router(metadata_fields.router)  # Phase 111 META-01 — custom metadata field-definition CRUD
 app.include_router(document_views.router)  # Phase 113 VIEW-01/02 — virtual-folder views CRUD + per-viewer resolve
 app.include_router(document_relationships.router)  # Phase 116 REL-01/03 — typed document-relationship CRUD (visible-both gate + audit)
-app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_global hard-false, match_expr validation + audit)
+app.include_router(classification_rules.router)  # Phase 118 CLASS-01 — classification-rule CRUD (leak-safe own+global, is_system_global hard-false, match_expr validation + audit)
 app.include_router(document_governance.router)  # Phase 119 DGOV-01/02 — read-only governance aggregation (broken-rel / unclassified / low-conf; owner-scoped reads, no write path)
 app.include_router(skill_tuner.router)  # Phase 123 TRIG-01 — owner-scoped Skill Trigger Tuner (bounded background run over the run-buffer + tuner_* SSE + held-out scoreboard)
 app.include_router(skill_test_cases.router)  # Phase 132 EVAL-01/VER-01 — owner-scoped eval test-case CRUD + read-only skill version history
@@ -683,6 +728,14 @@ app.include_router(evals.router_evals)  # Phase 137.1 EVAL-05 — skill-LESS eva
 app.include_router(features.router)  # Phase 148 VIS-01 — authenticated per-user GET /features effective-map (NOT operator-gated; top-level, not under /admin — non-operators must reach it to learn their own map)
 app.include_router(setup_api.router)  # Phase 158 DEPLOY-02 — pre-auth token-gated /setup/* wizard API + open GET /setup/status (SetupMiddleware-allowlisted)
 app.include_router(setup_api.public_router)  # Phase 158 D-07 — open top-level GET /public-config (browser Supabase creds so login works without a frontend rebuild)
+app.include_router(org.router)  # Phase 166 ADMIN-01/02/04 — org-admin surface (server-validated X-Org-Id + org:manage gate; /org/me probe, read-only members roster, org-scoped audit degrade)
+app.include_router(connectors.router)  # Phase 190 CONN-02/CONN-03 — connector-connection CRUD (Settings → Connections, D-25). Org-WIDE reads (U-02: read + bind), org-admin writes API-ENFORCED via require_org_manage, per-endpoint require_visible("live_connectors") on the writes ONLY (never router-level), 404-not-403 on every cross-org miss
+app.include_router(me_preferences.router)  # Phase 167 VIS-02 — per-user model-default preference (SEED-116 two-layer: operator allowed-set + lock; per-user RLS write, NOT the service-role settings writer)
+# Phase 182 (D-182-04): the TEMPORARY Phase-181 "/canvas/ping" canary router was RETIRED here.
+# The real require_canvas-gated routes (POST /workflows/validate + GET /workflows/grounding-bundle,
+# mounted on workflows.router above) now carry the byte-identical 404-when-off gate, so the
+# throwaway probe is redundant. Do not re-add it — add the 404-when-off assertion to the REAL
+# route instead (backend/tests/test_revert_byte_identical.py).
 
 
 # Phase 063 Plan 05 — test-only fixture endpoints (e2e harness support).

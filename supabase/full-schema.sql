@@ -48,6 +48,79 @@ CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA public;
 
 
 --
+-- Name: autofill_org_id_by_owner(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.autofill_org_id_by_owner() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+DECLARE
+  v_owner_col text := TG_ARGV[0];      -- 'user_id' (GROUP 1) or 'created_by' (GROUP 2)
+  v_owner_id  uuid;
+  v_org_id    uuid;
+BEGIN
+  -- Forward-compat NO-OP: org_id already provided (e.g. Phase 163) -> keep it verbatim.
+  IF NEW.org_id IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+
+  -- Dynamic owner-column read (one shared fn for all owner-based targets). to_jsonb / ->> / ::uuid
+  -- all live in pg_catalog, which is implicitly first on the path even with search_path=''.
+  v_owner_id := (to_jsonb(NEW) ->> v_owner_col)::uuid;
+  IF v_owner_id IS NULL THEN
+    RETURN NEW;                          -- fail-safe: no owner -> org_id stays NULL -> NOT NULL rejects
+  END IF;
+
+  -- One membership per user at 162 time (verified) -> LIMIT 1 is unambiguous pre-167.
+  SELECT om.org_id INTO v_org_id
+  FROM public.org_members om
+  WHERE om.user_id = v_owner_id
+  LIMIT 1;
+
+  NEW.org_id := v_org_id;                -- may stay NULL (owner has no membership) -> fail-safe reject
+  RETURN NEW;
+END;
+$$;
+
+
+--
+-- Name: autofill_org_id_from_parent(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.autofill_org_id_from_parent() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $_$
+DECLARE
+  v_fk_col     text := TG_ARGV[0];               -- FK column on NEW (e.g. 'thread_id')
+  v_parent_tbl text := TG_ARGV[1];               -- parent table in public (e.g. 'threads')
+  v_parent_pk  text := COALESCE(TG_ARGV[2], 'id');-- parent PK column (all 4 parents use 'id')
+  v_fk_val     uuid;
+  v_org_id     uuid;
+BEGIN
+  IF NEW.org_id IS NOT NULL THEN
+    RETURN NEW;                          -- forward-compat no-op
+  END IF;
+
+  v_fk_val := (to_jsonb(NEW) ->> v_fk_col)::uuid;
+  IF v_fk_val IS NULL THEN
+    RETURN NEW;                          -- fail-safe: no parent ref -> NOT NULL rejects
+  END IF;
+
+  -- Resolve the parent row's org_id. public.%I is schema-qualified (pinned empty search_path); %I quotes
+  -- the identifiers; the args are migration-authored constants (never user input) -> injection-safe.
+  EXECUTE format('SELECT org_id FROM public.%I WHERE %I = $1 LIMIT 1', v_parent_tbl, v_parent_pk)
+    INTO v_org_id
+    USING v_fk_val;
+
+  NEW.org_id := v_org_id;                -- may stay NULL (parent missing / parent.org_id NULL) -> reject
+  RETURN NEW;
+END;
+$_$;
+
+
+--
 -- Name: capture_skill_version(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -59,7 +132,7 @@ DECLARE
   next_num integer;
 BEGIN
   -- D-02: on UPDATE, capture a version ONLY when the content trifecta changes. A
-  -- toggle-only flip (is_enabled / is_global) MUST NOT version.
+  -- toggle-only flip (is_enabled / is_org_shared) MUST NOT version.
   IF TG_OP = 'UPDATE' THEN
     IF NOT (
          NEW.name         IS DISTINCT FROM OLD.name
@@ -91,25 +164,79 @@ $$;
 
 
 --
--- Name: folder_is_globally_visible(uuid); Type: FUNCTION; Schema: public; Owner: -
+-- Name: create_org_with_default_dept(text, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.folder_is_globally_visible(p_folder_id uuid) RETURNS boolean
+CREATE FUNCTION public.create_org_with_default_dept(p_name text, p_subscription_tier text DEFAULT NULL::text, p_default_dept_name text DEFAULT 'General'::text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  INSERT INTO public.organizations (name, subscription_tier)
+  VALUES (p_name, p_subscription_tier)
+  RETURNING id INTO v_org_id;
+
+  INSERT INTO public.departments (org_id, name, is_default)
+  VALUES (v_org_id, p_default_dept_name, true);
+
+  RETURN v_org_id;
+END;
+$$;
+
+
+--
+-- Name: current_user_has_permission(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.current_user_has_permission(p_org_id uuid, p_permission_key text) RETURNS boolean
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.org_members m
+    JOIN public.role_permissions rp ON rp.role = m.role
+    WHERE m.org_id = p_org_id
+      AND m.user_id = auth.uid()
+      AND rp.permission_key = p_permission_key
+  );
+$$;
+
+
+--
+-- Name: current_user_org_ids(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.current_user_org_ids() RETURNS SETOF uuid
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  SELECT org_id FROM public.org_members WHERE user_id = auth.uid();
+$$;
+
+
+--
+-- Name: folder_is_org_shared(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.folder_is_org_shared(p_folder_id uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
   WITH RECURSIVE ancestors AS (
-    SELECT id, parent_id, is_global
+    SELECT id, parent_id, is_org_shared
     FROM public.folders
     WHERE id = p_folder_id
 
     UNION ALL
 
-    SELECT f.id, f.parent_id, f.is_global
+    SELECT f.id, f.parent_id, f.is_org_shared
     FROM public.folders f
     INNER JOIN ancestors a ON f.id = a.parent_id
   )
-  SELECT COALESCE(bool_or(is_global), false) FROM ancestors;
+  SELECT COALESCE(bool_or(is_org_shared), false) FROM ancestors;
 $$;
 
 
@@ -121,11 +248,31 @@ CREATE FUNCTION public.handle_new_user() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-begin
-  insert into public.profiles (id, display_name)
-  values (new.id, new.raw_user_meta_data->>'display_name');
-  return new;
-end;
+DECLARE
+  v_org_id uuid;
+BEGIN
+  -- Existing behavior, hardened with ON CONFLICT so a re-fire can't duplicate the profile row
+  -- (profiles PK = id — verified live).
+  INSERT INTO public.profiles (id, display_name)
+  VALUES (new.id, new.raw_user_meta_data->>'display_name')
+  ON CONFLICT (id) DO NOTHING;
+
+  -- NEW: defensive personal-org provisioning — identical logic to §A, wrapped in a swallow so a
+  -- failure logs a WARNING and returns normally instead of aborting the signup INSERT.
+  BEGIN
+    IF NOT EXISTS (SELECT 1 FROM public.org_members m WHERE m.user_id = new.id) THEN
+      v_org_id := public.create_org_with_default_dept(
+                    COALESCE(new.email, new.id::text) || '''s Organization', NULL, 'General');
+      INSERT INTO public.org_members (org_id, user_id, role)
+      VALUES (v_org_id, new.id, 'org-admin')
+      ON CONFLICT (org_id, user_id) DO NOTHING;
+    END IF;
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'handle_new_user: personal-org creation failed for %: %', new.id, SQLERRM;
+  END;
+
+  RETURN new;
+END;
 $$;
 
 
@@ -135,6 +282,7 @@ $$;
 
 CREATE FUNCTION public.keyword_search_chunks(search_query text, match_user_id uuid, match_count integer DEFAULT 20, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[]) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, rank double precision)
     LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
     AS $$
 DECLARE
   tsq tsquery;
@@ -145,7 +293,11 @@ BEGIN
          ts_rank_cd(dc.search_vector, tsq)::float AS rank
   FROM public.document_chunks dc
   JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id
+  WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
+    AND (                                                               -- PRAG-01 within-org visibility
+      dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
+      OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+    )
     AND dc.search_vector @@ tsq
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
@@ -162,20 +314,25 @@ $$;
 
 CREATE FUNCTION public.match_document_chunks(query_embedding public.vector, match_user_id uuid, match_count integer DEFAULT 5, match_threshold double precision DEFAULT 0.3, metadata_filter jsonb DEFAULT NULL::jsonb, p_folder_ids uuid[] DEFAULT NULL::uuid[], p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, document_id uuid, content text, chunk_index integer, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
     AS $$
 BEGIN
   RETURN QUERY
   SELECT dc.id, dc.document_id, dc.content, dc.chunk_index,
-         1 - (dc.embedding <=> query_embedding) AS similarity
+         1 - (dc.embedding OPERATOR(public.<=>) query_embedding) AS similarity
   FROM public.document_chunks dc
   JOIN public.documents d ON d.id = dc.document_id
-  WHERE dc.user_id = match_user_id          -- RLS scope (V4 — keep)
-    AND 1 - (dc.embedding <=> query_embedding) > match_threshold
+  WHERE dc.org_id = ANY (SELECT public.current_user_org_ids())          -- D-164-01 org gate (indexed, mig 107)
+    AND (                                                               -- PRAG-01 within-org visibility
+      dc.user_id = auth.uid()                                          --   owner (session-derived, NOT match_user_id)
+      OR (d.folder_id IS NOT NULL AND public.folder_is_org_shared(d.folder_id))
+    )
+    AND 1 - (dc.embedding OPERATOR(public.<=>) query_embedding) > match_threshold
     AND d.is_latest = true
     AND (metadata_filter IS NULL OR d.metadata @> metadata_filter)
     AND (p_folder_ids IS NULL OR d.folder_id = ANY(p_folder_ids))
     AND (p_embedding_model IS NULL OR dc.embedding_model = p_embedding_model)  -- D-10 stale-model filter
-  ORDER BY dc.embedding <=> query_embedding
+  ORDER BY dc.embedding OPERATOR(public.<=>) query_embedding
   LIMIT match_count;
 END;
 $$;
@@ -187,18 +344,22 @@ $$;
 
 CREATE FUNCTION public.match_skills(query_embedding public.vector, match_user_id uuid, p_embedding_model text DEFAULT NULL::text) RETURNS TABLE(id uuid, name text, description text, similarity double precision)
     LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public', 'pg_temp'
+    SET search_path TO ''
     AS $$
 BEGIN
   RETURN QUERY
   SELECT s.id, s.name, s.description,
          CASE WHEN se.embedding IS NULL THEN NULL
-              ELSE 1 - (se.embedding <=> query_embedding) END AS similarity
+              ELSE 1 - (se.embedding OPERATOR(public.<=>) query_embedding) END AS similarity
   FROM public.skills s
   LEFT JOIN public.skill_embeddings se
          ON se.skill_id = s.id
         AND (p_embedding_model IS NULL OR se.embedding_model = p_embedding_model)  -- D-10 stale-model filter
-  WHERE (s.user_id = match_user_id OR s.is_global = true)   -- BYTE-EXACT clone of today's catalog scope (V4)
+  -- FIX-A (mig 109): is_system = true is a UNIVERSAL escape OUTSIDE the org gate; the
+  -- owner OR user-is_org_shared branch stays INSIDE the org gate (owner keys on auth.uid()).
+  WHERE ( (s.is_system = true)
+          OR (s.org_id = ANY (SELECT public.current_user_org_ids())
+              AND (s.user_id = auth.uid() OR s.is_org_shared = true)) )
     AND s.is_enabled = true
   ORDER BY similarity DESC NULLS LAST, s.name;   -- NULL sim (no vector) = fail-open, ranked last-but-kept
 END;
@@ -377,15 +538,15 @@ CREATE FUNCTION public.workflow_definitions_block_published_update() RETURNS tri
     AS $$
 BEGIN
   IF OLD.status = 'published' AND (
-        NEW.slug        IS DISTINCT FROM OLD.slug
-     OR NEW.version     IS DISTINCT FROM OLD.version
-     OR NEW.name        IS DISTINCT FROM OLD.name
-     OR NEW.description  IS DISTINCT FROM OLD.description
-     OR NEW.status      IS DISTINCT FROM OLD.status
-     OR NEW.definition  IS DISTINCT FROM OLD.definition
-     OR NEW.created_by  IS DISTINCT FROM OLD.created_by
-     OR NEW.is_global   IS DISTINCT FROM OLD.is_global
-     OR NEW.org_id      IS DISTINCT FROM OLD.org_id
+        NEW.slug             IS DISTINCT FROM OLD.slug
+     OR NEW.version          IS DISTINCT FROM OLD.version
+     OR NEW.name             IS DISTINCT FROM OLD.name
+     OR NEW.description       IS DISTINCT FROM OLD.description
+     OR NEW.status           IS DISTINCT FROM OLD.status
+     OR NEW.definition       IS DISTINCT FROM OLD.definition
+     OR NEW.created_by       IS DISTINCT FROM OLD.created_by
+     OR NEW.is_system_global IS DISTINCT FROM OLD.is_system_global
+     OR NEW.org_id           IS DISTINCT FROM OLD.org_id
   ) THEN
     RAISE EXCEPTION
       'workflow_definitions row % is published and immutable; create a new version instead',
@@ -479,6 +640,7 @@ CREATE TABLE public.app_settings (
     tavily_api_key text,
     setup_complete boolean DEFAULT false NOT NULL,
     model_discovery_filter_enabled boolean DEFAULT true NOT NULL,
+    supabase_management_token text,
     CONSTRAINT app_settings_extraction_table_engine_pdf_check CHECK ((extraction_table_engine_pdf = ANY (ARRAY['camelot'::text, 'pdfplumber'::text])))
 );
 
@@ -514,8 +676,16 @@ CREATE TABLE public.audit_log (
     action_type text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT audit_log_action_type_check CHECK ((action_type = ANY (ARRAY['document.upload'::text, 'document.delete'::text, 'search.query'::text, 'code.execute'::text, 'skill.load'::text, 'thread.create'::text, 'thread.delete'::text, 'settings.update'::text, 'memory.remember'::text, 'memory.recall'::text, 'feedback.submit'::text, 'view.create'::text, 'view.delete'::text, 'relationship.create'::text, 'relationship.delete'::text, 'classification.apply'::text, 'classification.rule.create'::text, 'metadata.update'::text, 'metadata.field.create'::text])))
 );
+
+
+--
+-- Name: COLUMN audit_log.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.audit_log.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -525,11 +695,11 @@ CREATE TABLE public.audit_log (
 CREATE TABLE public.classification_rules (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     name text NOT NULL,
     match_expr jsonb NOT NULL,
     suggest_folder_id uuid,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -553,7 +723,90 @@ CREATE TABLE public.code_executions (
     code text NOT NULL,
     exit_code integer,
     duration_ms integer,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
+);
+
+
+--
+-- Name: COLUMN code_executions.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.code_executions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
+-- Name: connector_connections; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.connector_connections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    created_by uuid NOT NULL,
+    capability text NOT NULL,
+    name text NOT NULL,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    secret_ciphertext text,
+    is_enabled boolean DEFAULT true NOT NULL,
+    last_checked_at timestamp with time zone,
+    last_check_verdict text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
+    CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text])))
+);
+
+
+--
+-- Name: COLUMN connector_connections.config; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.config IS 'D-13 / CONN-03 SC#4: NON-SECRET facts ONLY — host, port, base_url, from_address, default_channel, project_key. No token, no password, no API key ever lands here. The workflow definition JSONB stores a connection_id REFERENCE, so no secret and no host reaches the client or the definition.';
+
+
+--
+-- Name: COLUMN connector_connections.secret_ciphertext; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.secret_ciphertext IS 'D-11: the connector secret as an `enc:v1:` envelope produced by the SHIPPED cipher (backend/app/security/secret_cipher.py) — no new crypto, no new key (SECRETS_ENCRYPTION_KEY). Nullable because a row may exist before its secret is set. ⚠ POLARITY INVERSION, stated so it is not read as a bug: get_cipher() returns None when unkeyed, a deliberate fail-OPEN plaintext path for app_settings provider keys (D-150-01). For an org-scoped TENANT credential 190 is fail-CLOSED — it REFUSES to store a connector secret when no cipher is available. Also: this column is NOT in SECRET_COLUMNS, which drives the app_settings boot sweep and does not fit a per-org, per-row table (encrypt at write, decrypt at call time). ⚠ CR-01 / migration 118: this column is WRITE-ONLY for the `authenticated` role — it carries INSERT and UPDATE but NOT SELECT, so it cannot appear in any PostgREST projection a browser client can request, including `select=*`. Only `service_role` (the harness resolver, which has no user JWT) may read it. Re-granting SELECT here re-opens CR-01.';
+
+
+--
+-- Name: COLUMN connector_connections.last_check_verdict; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.last_check_verdict IS '190-UI-SPEC §5a: a QUALITY HINT, never an authorization boundary. It feeds the Credential column (§2c) and the client-side picker filter (Gate 1); the SERVER bind gate (Gate 2) validates org + is_enabled ONLY and deliberately does NOT read this column (U-07a, door (b)) — because check is admin-only while bind is org-wide, so a stale `failed` would hard-block a member who cannot clear it. NULL means never checked.';
+
+
+--
+-- Name: departments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.departments (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    name text NOT NULL,
+    parent_id uuid,
+    is_default boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT departments_no_self_parent CHECK (((parent_id IS NULL) OR (parent_id <> id)))
+);
+
+
+--
+-- Name: dept_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.dept_members (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    dept_id uuid NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT dept_members_role_check CHECK ((role = ANY (ARRAY['super-admin'::text, 'org-admin'::text, 'dept-admin'::text, 'member'::text])))
 );
 
 
@@ -571,8 +824,16 @@ CREATE TABLE public.document_chunks (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     search_vector tsvector,
     embedding_model text,
-    embedding_dimensions integer
+    embedding_dimensions integer,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN document_chunks.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_chunks.org_id IS 'TEN-04 (Phase 163): denormalized from documents.org_id via document_id. NOT NULL. RLS (mig 108) + Phase-164 SECDEF filter this directly — never a per-row join to documents (CONCUR-01).';
 
 
 --
@@ -587,8 +848,16 @@ CREATE TABLE public.document_images (
     image_index integer NOT NULL,
     description text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    bbox jsonb
+    bbox jsonb,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN document_images.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_images.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -598,7 +867,7 @@ CREATE TABLE public.document_images (
 CREATE TABLE public.document_relationships (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     source_doc_id uuid NOT NULL,
     target_doc_id uuid NOT NULL,
     rel_type text NOT NULL,
@@ -629,8 +898,16 @@ CREATE TABLE public.document_tables (
     rows jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     bbox jsonb,
-    extractor text
+    extractor text,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN document_tables.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.document_tables.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -640,11 +917,11 @@ CREATE TABLE public.document_tables (
 CREATE TABLE public.document_views (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     name text NOT NULL,
     filter_expr jsonb DEFAULT '{}'::jsonb NOT NULL,
     folder_scope uuid,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -682,7 +959,7 @@ CREATE TABLE public.documents (
     extractor text,
     document_type_norm text GENERATED ALWAYS AS (lower((metadata ->> 'document_type'::text))) STORED,
     date_typed date GENERATED ALWAYS AS (public.view_iso_to_date((metadata ->> 'date'::text))) STORED,
-    org_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT documents_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))
 );
 
@@ -705,6 +982,7 @@ CREATE TABLE public.eval_ratings (
     rating text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT eval_ratings_rating_check CHECK ((rating = ANY (ARRAY['up'::text, 'down'::text])))
 );
 
@@ -714,6 +992,13 @@ CREATE TABLE public.eval_ratings (
 --
 
 COMMENT ON TABLE public.eval_ratings IS 'Owner-scoped human-preference thumbs (EVAL-04, D-08/D-09). One thumbs up/down per (user, answer = an eval_results row), re-ratable (clear = DELETE the row). Minimal shape (id, eval_result_id, user_id, rating, created_at, updated_at) so Phase 135 can join verdict <-> rating for human-judge disagreement (D-09). Written via the service-role ratings endpoint (Plan 03) with an .eq("user_id") IDOR gate; owner-only RLS SELECT is defense-in-depth (T-134-01). NO client write policies (T-134-04). Both FKs ON DELETE CASCADE — no orphaned rating survives its parent (T-134-05).';
+
+
+--
+-- Name: COLUMN eval_ratings.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_ratings.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -741,6 +1026,7 @@ CREATE TABLE public.eval_results (
     judge_model text,
     duration_ms integer,
     case_feedback text,
+    org_id uuid NOT NULL,
     CONSTRAINT eval_results_status_check CHECK ((status = ANY (ARRAY['completed'::text, 'failed'::text, 'timed_out'::text, 'cancelled'::text]))),
     CONSTRAINT eval_results_variant_check CHECK ((variant = ANY (ARRAY['with_skill'::text, 'without_skill'::text]))),
     CONSTRAINT eval_results_verdict_state_check CHECK ((verdict_state = ANY (ARRAY['graded'::text, 'not_measured'::text, 'judge_error'::text])))
@@ -776,6 +1062,13 @@ COMMENT ON COLUMN public.eval_results.case_feedback IS 'EVAL-05d advisory judge 
 
 
 --
+-- Name: COLUMN eval_results.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_results.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
 -- Name: eval_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -796,6 +1089,7 @@ CREATE TABLE public.eval_runs (
     verdict_summary text,
     matrix_group_id uuid,
     feeds_gate boolean DEFAULT false NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT eval_runs_status_check CHECK ((status = ANY (ARRAY['running'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'interrupted'::text])))
 );
 
@@ -829,6 +1123,13 @@ COMMENT ON COLUMN public.eval_runs.feeds_gate IS 'D-05 gate-feeder flag. Exactly
 
 
 --
+-- Name: COLUMN eval_runs.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.eval_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
 -- Name: folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -837,10 +1138,10 @@ CREATE TABLE public.folders (
     user_id uuid NOT NULL,
     name text NOT NULL,
     parent_id uuid,
-    is_global boolean DEFAULT false NOT NULL,
+    is_org_shared boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -861,9 +1162,9 @@ CREATE TABLE public.harness_audit (
     run_id uuid,
     event_type text NOT NULL,
     metadata jsonb DEFAULT '{}'::jsonb NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text])))
+    CONSTRAINT harness_audit_event_type_check CHECK ((event_type = ANY (ARRAY['phase_started'::text, 'phase_completed'::text, 'phase_transition'::text, 'gate_passed'::text, 'gate_failed'::text, 'tool_refused'::text, 'run_started'::text, 'run_completed'::text, 'run_failed'::text, 'emit_forced'::text, 'emit_recovered'::text, 'emit_validated'::text, 'emit_rejected'::text, 'emit_rendered'::text, 'emit_integrity_failed'::text, 'emit_failed'::text, 'judge_verdict'::text, 'publish_attempted'::text, 'publish_blocked'::text, 'publish_succeeded'::text, 'policy_applied'::text, 'validator_ask_user_approved'::text, 'action_risk_pending'::text, 'external_action_sent'::text])))
 );
 
 
@@ -885,9 +1186,17 @@ CREATE TABLE public.message_feedback (
     rating character varying(16) NOT NULL,
     reason character varying(32),
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT message_feedback_rating_check CHECK (((rating)::text = ANY ((ARRAY['positive'::character varying, 'negative'::character varying])::text[]))),
     CONSTRAINT message_feedback_reason_check CHECK (((reason)::text = ANY ((ARRAY['wrong_answer'::character varying, 'not_from_documents'::character varying, 'incomplete'::character varying, 'other'::character varying])::text[])))
 );
+
+
+--
+-- Name: COLUMN message_feedback.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.message_feedback.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -909,6 +1218,7 @@ CREATE TABLE public.messages (
     confidence_disclaimer text,
     reasoning_content text,
     origin text DEFAULT 'deep'::text NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT messages_origin_check CHECK ((origin = ANY (ARRAY['deep'::text, 'harness'::text]))),
     CONSTRAINT messages_role_check CHECK ((role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])))
 );
@@ -924,21 +1234,28 @@ COMMENT ON COLUMN public.messages.tool_calls IS 'JSONB array. For role=system ro
 
 
 --
+-- Name: COLUMN messages.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.messages.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
 -- Name: metadata_field_definitions; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.metadata_field_definitions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid,
-    org_id uuid,
+    org_id uuid NOT NULL,
     field_key text NOT NULL,
     field_type text DEFAULT 'string'::text NOT NULL,
     description text,
-    is_global boolean DEFAULT false NOT NULL,
+    is_system_global boolean DEFAULT false NOT NULL,
     enabled boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     options jsonb,
-    CONSTRAINT mfd_reachable CHECK (((user_id IS NOT NULL) OR (is_global = true)))
+    CONSTRAINT mfd_reachable CHECK (((user_id IS NOT NULL) OR (is_system_global = true)))
 );
 
 
@@ -1006,6 +1323,71 @@ CREATE TABLE public.operator_users (
 
 
 --
+-- Name: org_invitations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.org_invitations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    email text NOT NULL,
+    role text NOT NULL,
+    token_hash text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    invited_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT org_invitations_role_check CHECK ((role = ANY (ARRAY['super-admin'::text, 'org-admin'::text, 'dept-admin'::text, 'member'::text]))),
+    CONSTRAINT org_invitations_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'accepted'::text, 'expired'::text, 'revoked'::text])))
+);
+
+
+--
+-- Name: org_members; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.org_members (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    role text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT org_members_role_check CHECK ((role = ANY (ARRAY['super-admin'::text, 'org-admin'::text, 'dept-admin'::text, 'member'::text])))
+);
+
+
+--
+-- Name: organizations; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.organizations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    slug text,
+    subscription_tier text,
+    add_ons jsonb DEFAULT '{}'::jsonb NOT NULL,
+    settings jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: COLUMN organizations.add_ons; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.add_ons IS 'D-01 / ENT-01 entitlements + feature-flags (STRETCH 170). SEPARATE from settings.';
+
+
+--
+-- Name: COLUMN organizations.settings; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.settings IS 'D-01 / SEED-120 forward-compat home: per-org provider config / BYO keys / model selection land here as keys in v3.5 with NO schema rewrite (BYO values reuse the SEC-01 enc:v1: envelope). SEPARATE from add_ons.';
+
+
+--
 -- Name: pdf_extraction_runs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1019,8 +1401,16 @@ CREATE TABLE public.pdf_extraction_runs (
     duration_ms integer,
     table_count integer,
     image_count integer,
-    error text
+    error text,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN pdf_extraction_runs.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pdf_extraction_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1033,6 +1423,28 @@ CREATE TABLE public.profiles (
     avatar_url text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: role_permissions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.role_permissions (
+    role text NOT NULL,
+    permission_key text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: roles; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.roles (
+    role text NOT NULL,
+    description text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1056,6 +1468,7 @@ CREATE TABLE public.runs (
     spawned_by_worker text,
     parent_run_id uuid,
     continues_used integer DEFAULT 0 NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT runs_status_check CHECK ((status = ANY (ARRAY['streaming'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text, 'timed_out'::text])))
 );
 
@@ -1075,6 +1488,13 @@ COMMENT ON COLUMN public.runs.continues_used IS 'D-06: Continue cap counter, max
 
 
 --
+-- Name: COLUMN runs.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
 -- Name: sandbox_files; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1085,8 +1505,16 @@ CREATE TABLE public.sandbox_files (
     filename text NOT NULL,
     storage_path text NOT NULL,
     file_size bigint DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN sandbox_files.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sandbox_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1100,7 +1528,8 @@ CREATE TABLE public.skill_embeddings (
     embedding_model text,
     embedding_dimensions integer,
     source_text_hash text NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
 
 
@@ -1109,6 +1538,13 @@ CREATE TABLE public.skill_embeddings (
 --
 
 COMMENT ON TABLE public.skill_embeddings IS 'One embedding row per skill (TRIG-02, Phase 140). Sibling to skills, mirroring documents→document_chunks (mig 002) but with NO ANN index (skills are tens–hundreds of rows). Ships EMPTY (SQL cannot call the embedding API) — the skill_embedding_service backfill job (Plan 02) populates it; absence of a row == D-05 fail-open. Owner-only RLS (defense-in-depth); the service-role backfill writer bypasses RLS and hand-scopes .eq("user_id", …) (V4). embedding_model is the D-10 stale-model tag; source_text_hash is a non-crypto staleness fingerprint.';
+
+
+--
+-- Name: COLUMN skill_embeddings.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_embeddings.org_id IS 'TEN-04 (Phase 163): denormalized from skills.org_id via skill_id. NOT NULL. RLS (mig 108) filters this directly.';
 
 
 --
@@ -1123,8 +1559,16 @@ CREATE TABLE public.skill_files (
     file_path text NOT NULL,
     file_size bigint DEFAULT 0 NOT NULL,
     mime_type text DEFAULT ''::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN skill_files.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1150,6 +1594,7 @@ CREATE TABLE public.skill_proposals (
     proposed_description text,
     scoreboard_snapshot jsonb,
     source_tuner_run_id uuid,
+    org_id uuid NOT NULL,
     CONSTRAINT skill_proposals_kind_check CHECK ((kind = ANY (ARRAY['instruction'::text, 'description'::text]))),
     CONSTRAINT skill_proposals_kind_fields CHECK ((((kind = 'instruction'::text) AND (proposed_instructions IS NOT NULL) AND (proposed_description IS NULL)) OR ((kind = 'description'::text) AND (proposed_description IS NOT NULL) AND (proposed_instructions IS NULL)))),
     CONSTRAINT skill_proposals_status_check CHECK ((status = ANY (ARRAY['proposed'::text, 'rejected'::text, 'approved'::text, 're_evaling'::text, 'promoted'::text, 'not_promoted'::text, 'interrupted'::text])))
@@ -1192,6 +1637,13 @@ COMMENT ON COLUMN public.skill_proposals.source_tuner_run_id IS 'PROVENANCE-ONLY
 
 
 --
+-- Name: COLUMN skill_proposals.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_proposals.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
+
+
+--
 -- Name: CONSTRAINT skill_proposals_kind_fields ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
 --
 
@@ -1209,7 +1661,8 @@ CREATE TABLE public.skill_publish_overrides (
     user_id uuid NOT NULL,
     gate_state text NOT NULL,
     gate_snapshot jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
 
 
@@ -1218,6 +1671,13 @@ CREATE TABLE public.skill_publish_overrides (
 --
 
 COMMENT ON TABLE public.skill_publish_overrides IS 'One APPEND-ONLY row per skill force-publish past an unmet publish gate (GATE-01, D-01/D-02). gate_state = what the gate read at the moment of override (never_evaled/latest_failed/passed_on_older_version); gate_snapshot = the honest counts jsonb; created_at = the when. skill_version_id (nullable, SET NULL) pins which version was live when overridden. The gate compute reads the most-recent row per skill as PublishGate.last_override so the eval surface shows an honest "published without passing eval" status (D-02/D-06). Owner-only RLS SELECT is defense-in-depth; the service-role toggle handler writes (bypasses RLS) and the app-code .eq("user_id") filter is the real gate (T-136-04). NO write policies — clients can never forge, mutate, or delete an override record (035/079/080/081/083 precedent).';
+
+
+--
+-- Name: COLUMN skill_publish_overrides.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_publish_overrides.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1233,7 +1693,8 @@ CREATE TABLE public.skill_test_cases (
     order_index integer DEFAULT 0 NOT NULL,
     name text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
 
 
@@ -1242,6 +1703,13 @@ CREATE TABLE public.skill_test_cases (
 --
 
 COMMENT ON TABLE public.skill_test_cases IS 'Editable eval test cases (EVAL-01, D-05). Bind to the SKILL via skill_id (NOT a version) so cases stay freely editable/deletable before any run (D-07). expected_behavior is free text, NOT an assertion (D-06); NO provider/model columns (D-08). Owner-only RLS (D-12). Stable id is the Phase 133 results FK target (D-10).';
+
+
+--
+-- Name: COLUMN skill_test_cases.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_test_cases.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1258,6 +1726,7 @@ CREATE TABLE public.skill_versions (
     instructions text DEFAULT ''::text NOT NULL,
     source text DEFAULT 'manual'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT skill_versions_source_check CHECK ((source = ANY (ARRAY['manual'::text, 'import'::text, 'tuner'::text, 'self_improve'::text, 'backfill'::text])))
 );
 
@@ -1266,7 +1735,14 @@ CREATE TABLE public.skill_versions (
 -- Name: TABLE skill_versions; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.skill_versions IS 'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save (name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills — toggles (is_enabled/is_global) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
+COMMENT ON TABLE public.skill_versions IS 'Per-skill APPEND-ONLY version history (VER-01, D-01/D-03). One row captured per skill content save (name/description/instructions) by the AFTER INSERT OR UPDATE trigger on public.skills; toggles (is_enabled/is_org_shared) capture NO version (D-02). Immutable (BEFORE UPDATE block trigger, 23514) but cascades on skill delete (D-03-R2). user_id sourced from NEW.user_id, NEVER auth.uid() (NULL under service-role, T-132-03). RLS is owner-only defense-in-depth (D-12); the app-code owner filter is the real runtime gate (service-role bypasses RLS). Distinct from the workflow-scoped skill_snapshots table (D-04). Stable id is the Phase 133 FK target (D-10).';
+
+
+--
+-- Name: COLUMN skill_versions.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.skill_versions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1280,11 +1756,11 @@ CREATE TABLE public.skills (
     description text DEFAULT ''::text NOT NULL,
     instructions text DEFAULT ''::text NOT NULL,
     is_enabled boolean DEFAULT true NOT NULL,
-    is_global boolean DEFAULT false NOT NULL,
+    is_org_shared boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     is_system boolean DEFAULT false NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1293,6 +1769,32 @@ CREATE TABLE public.skills (
 --
 
 COMMENT ON COLUMN public.skills.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.3; no FK until org schema exists.';
+
+
+--
+-- Name: sso_configs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sso_configs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    org_id uuid NOT NULL,
+    email_domain text,
+    provider_id text,
+    attribute_mapping jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    status text DEFAULT 'pending_approval'::text NOT NULL,
+    approved_by uuid,
+    approved_at timestamp with time zone,
+    CONSTRAINT sso_configs_status_check CHECK ((status = ANY (ARRAY['pending_approval'::text, 'active'::text, 'disabled'::text])))
+);
+
+
+--
+-- Name: COLUMN sso_configs.provider_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.sso_configs.provider_id IS 'D-07: nullable pointer to the Supabase-owned SSO provider id (auth.sso_providers). NO FK into the Supabase auth schema.';
 
 
 --
@@ -1308,7 +1810,7 @@ CREATE TABLE public.threads (
     folder_id uuid,
     active_workflow_run_id uuid,
     is_eval boolean DEFAULT false NOT NULL,
-    org_id uuid
+    org_id uuid NOT NULL
 );
 
 
@@ -1333,8 +1835,16 @@ CREATE TABLE public.todos (
     order_index integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL,
     CONSTRAINT todos_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'in_progress'::text, 'completed'::text])))
 );
+
+
+--
+-- Name: COLUMN todos.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.todos.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1351,7 +1861,8 @@ CREATE TABLE public.tuner_runs (
     target_count integer DEFAULT 0 NOT NULL,
     case_count integer DEFAULT 0 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
 
 
@@ -1360,6 +1871,13 @@ CREATE TABLE public.tuner_runs (
 --
 
 COMMENT ON TABLE public.tuner_runs IS 'Durable latest-per-skill Skill Trigger Tuner result (D-07). Exactly one row per skill (UNIQUE(skill_id) — upsert on_conflict=skill_id overwrites latest-wins). user_id = whoever last ran it; for a GLOBAL skill the SELECT-by-skill is identical for all global viewers (user_id is the last-runner attribution, NOT an access gate — T-123.1-05). Companion to the ephemeral Redis tuner_result:{run_id} stash — survives a Redis flush.';
+
+
+--
+-- Name: COLUMN tuner_runs.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.tuner_runs.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1372,8 +1890,16 @@ CREATE TABLE public.user_memory (
     key text NOT NULL,
     value text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN user_memory.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.user_memory.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1384,8 +1910,16 @@ CREATE TABLE public.user_settings (
     user_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-    preferences jsonb DEFAULT '{}'::jsonb
+    preferences jsonb DEFAULT '{}'::jsonb,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN user_settings.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.user_settings.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1401,8 +1935,8 @@ CREATE TABLE public.workflow_definitions (
     status text DEFAULT 'draft'::text NOT NULL,
     definition jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_by uuid NOT NULL,
-    is_global boolean DEFAULT false NOT NULL,
-    org_id uuid,
+    is_system_global boolean DEFAULT false NOT NULL,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     skill_snapshots jsonb,
@@ -1435,10 +1969,10 @@ CREATE TABLE public.workflow_phases (
     slug text NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
     output jsonb DEFAULT '{}'::jsonb NOT NULL,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text])))
+    CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text, 'recorded_not_sent'::text])))
 );
 
 
@@ -1459,7 +1993,7 @@ CREATE TABLE public.workflow_runs (
     definition_id uuid NOT NULL,
     status text DEFAULT 'active'::text NOT NULL,
     current_phase_id uuid,
-    org_id uuid,
+    org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     claimed_at timestamp with time zone,
@@ -1534,8 +2068,16 @@ CREATE TABLE public.workspace_file_versions (
     content_storage_path text,
     size_bytes bigint DEFAULT 0 NOT NULL,
     delta_from_prev jsonb,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    org_id uuid NOT NULL
 );
+
+
+--
+-- Name: COLUMN workspace_file_versions.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_file_versions.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1556,6 +2098,7 @@ CREATE TABLE public.workspace_files (
     kind text,
     expires_at timestamp with time zone,
     run_claim text,
+    org_id uuid NOT NULL,
     CONSTRAINT workspace_files_kind_check CHECK (((kind IS NULL) OR (kind = ANY (ARRAY['template_input'::text, 'agent'::text])))),
     CONSTRAINT workspace_files_path_length CHECK ((char_length(path) <= 500)),
     CONSTRAINT workspace_files_size_limit CHECK ((size_bytes <= 10485760))
@@ -1581,6 +2124,13 @@ COMMENT ON COLUMN public.workspace_files.expires_at IS 'Phase 100 TMPL-01. NULL 
 --
 
 COMMENT ON COLUMN public.workspace_files.run_claim IS 'Phase 141 (COLL-02). Run-context claim lineage for kind=''template_input'' rows: str(workflow_run_id) for a workflow phase, the ''deep'' sentinel for a Deep turn, NULL = unclaimed. Server-set on first resolve; the ''deep'' sentinel makes the cross-context block symmetric. Nullable, no default, no backfill (D-141-02/04).';
+
+
+--
+-- Name: COLUMN workspace_files.org_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workspace_files.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v3.4; no FK until backfill/RLS (Phase 162/163).';
 
 
 --
@@ -1613,6 +2163,38 @@ ALTER TABLE ONLY public.classification_rules
 
 ALTER TABLE ONLY public.code_executions
     ADD CONSTRAINT code_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: connector_connections connector_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_connections
+    ADD CONSTRAINT connector_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: departments departments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.departments
+    ADD CONSTRAINT departments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: dept_members dept_members_dept_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dept_members
+    ADD CONSTRAINT dept_members_dept_user_unique UNIQUE (dept_id, user_id);
+
+
+--
+-- Name: dept_members dept_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dept_members
+    ADD CONSTRAINT dept_members_pkey PRIMARY KEY (id);
 
 
 --
@@ -1768,6 +2350,46 @@ ALTER TABLE ONLY public.operator_users
 
 
 --
+-- Name: org_invitations org_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.org_invitations
+    ADD CONSTRAINT org_invitations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: org_members org_members_org_user_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.org_members
+    ADD CONSTRAINT org_members_org_user_unique UNIQUE (org_id, user_id);
+
+
+--
+-- Name: org_members org_members_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.org_members
+    ADD CONSTRAINT org_members_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: organizations organizations_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_slug_key UNIQUE (slug);
+
+
+--
 -- Name: pdf_extraction_runs pdf_extraction_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1781,6 +2403,22 @@ ALTER TABLE ONLY public.pdf_extraction_runs
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: role_permissions role_permissions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_permissions
+    ADD CONSTRAINT role_permissions_pkey PRIMARY KEY (role, permission_key);
+
+
+--
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (role);
 
 
 --
@@ -1861,6 +2499,14 @@ ALTER TABLE ONLY public.skill_versions
 
 ALTER TABLE ONLY public.skills
     ADD CONSTRAINT skills_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sso_configs sso_configs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_configs
+    ADD CONSTRAINT sso_configs_pkey PRIMARY KEY (id);
 
 
 --
@@ -1999,6 +2645,13 @@ CREATE INDEX audit_log_user_created_idx ON public.audit_log USING btree (user_id
 
 
 --
+-- Name: departments_one_default_per_org_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX departments_one_default_per_org_idx ON public.departments USING btree (org_id) WHERE (is_default = true);
+
+
+--
 -- Name: document_chunks_embedding_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2097,6 +2750,13 @@ CREATE INDEX folders_user_id_idx ON public.folders USING btree (user_id);
 
 
 --
+-- Name: idx_audit_log_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_log_org_id ON public.audit_log USING btree (org_id);
+
+
+--
 -- Name: idx_classification_rules_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2108,6 +2768,83 @@ CREATE INDEX idx_classification_rules_org_id ON public.classification_rules USIN
 --
 
 CREATE INDEX idx_classification_rules_user_id ON public.classification_rules USING btree (user_id);
+
+
+--
+-- Name: idx_code_executions_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_code_executions_org_id ON public.code_executions USING btree (org_id);
+
+
+--
+-- Name: idx_connector_connections_created_by; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_created_by ON public.connector_connections USING btree (created_by);
+
+
+--
+-- Name: idx_connector_connections_org_capability; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_org_capability ON public.connector_connections USING btree (org_id, capability);
+
+
+--
+-- Name: idx_connector_connections_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_connector_connections_org_id ON public.connector_connections USING btree (org_id);
+
+
+--
+-- Name: idx_departments_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_departments_org_id ON public.departments USING btree (org_id);
+
+
+--
+-- Name: idx_departments_parent_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_departments_parent_id ON public.departments USING btree (parent_id);
+
+
+--
+-- Name: idx_dept_members_dept_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dept_members_dept_id ON public.dept_members USING btree (dept_id);
+
+
+--
+-- Name: idx_dept_members_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dept_members_org_id ON public.dept_members USING btree (org_id);
+
+
+--
+-- Name: idx_dept_members_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_dept_members_user_id ON public.dept_members USING btree (user_id);
+
+
+--
+-- Name: idx_document_chunks_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_chunks_org_id ON public.document_chunks USING btree (org_id);
+
+
+--
+-- Name: idx_document_images_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_images_org_id ON public.document_images USING btree (org_id);
 
 
 --
@@ -2139,6 +2876,13 @@ CREATE INDEX idx_document_relationships_user_id ON public.document_relationships
 
 
 --
+-- Name: idx_document_tables_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_document_tables_org_id ON public.document_tables USING btree (org_id);
+
+
+--
 -- Name: idx_document_views_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2167,6 +2911,13 @@ CREATE INDEX idx_documents_document_type_norm ON public.documents USING btree (d
 
 
 --
+-- Name: idx_eval_ratings_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_ratings_org_id ON public.eval_ratings USING btree (org_id);
+
+
+--
 -- Name: idx_eval_ratings_result_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2188,6 +2939,13 @@ CREATE INDEX idx_eval_results_case_id ON public.eval_results USING btree (test_c
 
 
 --
+-- Name: idx_eval_results_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_results_org_id ON public.eval_results USING btree (org_id);
+
+
+--
 -- Name: idx_eval_results_run_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2206,6 +2964,13 @@ CREATE INDEX idx_eval_results_user_id ON public.eval_results USING btree (user_i
 --
 
 CREATE INDEX idx_eval_runs_matrix_group_id ON public.eval_runs USING btree (matrix_group_id);
+
+
+--
+-- Name: idx_eval_runs_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_eval_runs_org_id ON public.eval_runs USING btree (org_id);
 
 
 --
@@ -2244,6 +3009,20 @@ CREATE INDEX idx_harness_audit_user_created ON public.harness_audit USING btree 
 
 
 --
+-- Name: idx_message_feedback_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_feedback_org_id ON public.message_feedback USING btree (org_id);
+
+
+--
+-- Name: idx_messages_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_messages_org_id ON public.messages USING btree (org_id);
+
+
+--
 -- Name: idx_metadata_field_definitions_org_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2265,10 +3044,38 @@ CREATE INDEX idx_operator_audit_created ON public.operator_audit_log USING btree
 
 
 --
+-- Name: idx_org_invitations_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_org_invitations_org_id ON public.org_invitations USING btree (org_id);
+
+
+--
+-- Name: idx_org_members_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_org_members_org_id ON public.org_members USING btree (org_id);
+
+
+--
+-- Name: idx_org_members_user_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_org_members_user_id ON public.org_members USING btree (user_id);
+
+
+--
 -- Name: idx_pdf_extraction_runs_document_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_pdf_extraction_runs_document_id ON public.pdf_extraction_runs USING btree (document_id);
+
+
+--
+-- Name: idx_pdf_extraction_runs_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_pdf_extraction_runs_org_id ON public.pdf_extraction_runs USING btree (org_id);
 
 
 --
@@ -2293,6 +3100,13 @@ CREATE INDEX idx_runs_history ON public.runs USING btree (user_id, thread_id, st
 
 
 --
+-- Name: idx_runs_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_runs_org_id ON public.runs USING btree (org_id);
+
+
+--
 -- Name: idx_runs_parent; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2300,10 +3114,38 @@ CREATE INDEX idx_runs_parent ON public.runs USING btree (parent_run_id) WHERE (p
 
 
 --
+-- Name: idx_sandbox_files_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sandbox_files_org_id ON public.sandbox_files USING btree (org_id);
+
+
+--
+-- Name: idx_skill_embeddings_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_embeddings_org_id ON public.skill_embeddings USING btree (org_id);
+
+
+--
 -- Name: idx_skill_embeddings_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_skill_embeddings_user_id ON public.skill_embeddings USING btree (user_id);
+
+
+--
+-- Name: idx_skill_files_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_files_org_id ON public.skill_files USING btree (org_id);
+
+
+--
+-- Name: idx_skill_proposals_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_proposals_org_id ON public.skill_proposals USING btree (org_id);
 
 
 --
@@ -2321,6 +3163,13 @@ CREATE INDEX idx_skill_proposals_user_id ON public.skill_proposals USING btree (
 
 
 --
+-- Name: idx_skill_publish_overrides_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_publish_overrides_org_id ON public.skill_publish_overrides USING btree (org_id);
+
+
+--
 -- Name: idx_skill_publish_overrides_skill_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2332,6 +3181,13 @@ CREATE INDEX idx_skill_publish_overrides_skill_id ON public.skill_publish_overri
 --
 
 CREATE INDEX idx_skill_publish_overrides_user_id ON public.skill_publish_overrides USING btree (user_id);
+
+
+--
+-- Name: idx_skill_test_cases_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_test_cases_org_id ON public.skill_test_cases USING btree (org_id);
 
 
 --
@@ -2349,6 +3205,13 @@ CREATE INDEX idx_skill_test_cases_user_id ON public.skill_test_cases USING btree
 
 
 --
+-- Name: idx_skill_versions_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_skill_versions_org_id ON public.skill_versions USING btree (org_id);
+
+
+--
 -- Name: idx_skill_versions_skill_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2360,6 +3223,13 @@ CREATE INDEX idx_skill_versions_skill_id ON public.skill_versions USING btree (s
 --
 
 CREATE INDEX idx_skill_versions_user_id ON public.skill_versions USING btree (user_id);
+
+
+--
+-- Name: idx_sso_configs_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sso_configs_org_id ON public.sso_configs USING btree (org_id);
 
 
 --
@@ -2377,6 +3247,13 @@ CREATE INDEX idx_threads_user_visible ON public.threads USING btree (user_id, up
 
 
 --
+-- Name: idx_todos_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_todos_org_id ON public.todos USING btree (org_id);
+
+
+--
 -- Name: idx_todos_thread; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2384,10 +3261,31 @@ CREATE INDEX idx_todos_thread ON public.todos USING btree (thread_id, order_inde
 
 
 --
+-- Name: idx_tuner_runs_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tuner_runs_org_id ON public.tuner_runs USING btree (org_id);
+
+
+--
 -- Name: idx_tuner_runs_user_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_tuner_runs_user_id ON public.tuner_runs USING btree (user_id);
+
+
+--
+-- Name: idx_user_memory_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_memory_org_id ON public.user_memory USING btree (org_id);
+
+
+--
+-- Name: idx_user_settings_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_user_settings_org_id ON public.user_settings USING btree (org_id);
 
 
 --
@@ -2426,10 +3324,24 @@ CREATE INDEX idx_workflow_runs_user_id ON public.workflow_runs USING btree (user
 
 
 --
+-- Name: idx_workspace_file_versions_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_file_versions_org_id ON public.workspace_file_versions USING btree (org_id);
+
+
+--
 -- Name: idx_workspace_files_expires_at; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workspace_files_expires_at ON public.workspace_files USING btree (expires_at) WHERE (expires_at IS NOT NULL);
+
+
+--
+-- Name: idx_workspace_files_org_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workspace_files_org_id ON public.workspace_files USING btree (org_id);
 
 
 --
@@ -2482,6 +3394,13 @@ CREATE INDEX skills_user_id_idx ON public.skills USING btree (user_id);
 
 
 --
+-- Name: sso_configs_email_domain_lower_unique; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX sso_configs_email_domain_lower_unique ON public.sso_configs USING btree (lower(email_domain)) WHERE (email_domain IS NOT NULL);
+
+
+--
 -- Name: threads_folder_id_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2496,6 +3415,90 @@ CREATE INDEX user_memory_user_updated_idx ON public.user_memory USING btree (use
 
 
 --
+-- Name: audit_log audit_log_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER audit_log_autofill_org_id BEFORE INSERT ON public.audit_log FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: classification_rules classification_rules_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER classification_rules_autofill_org_id BEFORE INSERT ON public.classification_rules FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: code_executions code_executions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER code_executions_autofill_org_id BEFORE INSERT ON public.code_executions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: connector_connections connector_connections_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_connections_autofill_org_id BEFORE INSERT ON public.connector_connections FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
+
+
+--
+-- Name: connector_connections connector_connections_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER connector_connections_set_updated_at BEFORE UPDATE ON public.connector_connections FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: document_chunks document_chunks_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_chunks_autofill_org_id BEFORE INSERT ON public.document_chunks FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('document_id', 'documents', 'id');
+
+
+--
+-- Name: document_images document_images_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_images_autofill_org_id BEFORE INSERT ON public.document_images FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_relationships document_relationships_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_relationships_autofill_org_id BEFORE INSERT ON public.document_relationships FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_tables document_tables_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_tables_autofill_org_id BEFORE INSERT ON public.document_tables FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: document_views document_views_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER document_views_autofill_org_id BEFORE INSERT ON public.document_views FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: documents documents_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER documents_autofill_org_id BEFORE INSERT ON public.documents FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: eval_ratings eval_ratings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_ratings_autofill_org_id BEFORE INSERT ON public.eval_ratings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: eval_ratings eval_ratings_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2503,10 +3506,80 @@ CREATE TRIGGER eval_ratings_set_updated_at BEFORE UPDATE ON public.eval_ratings 
 
 
 --
+-- Name: eval_results eval_results_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_results_autofill_org_id BEFORE INSERT ON public.eval_results FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: eval_runs eval_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER eval_runs_autofill_org_id BEFORE INSERT ON public.eval_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: folders folders_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER folders_autofill_org_id BEFORE INSERT ON public.folders FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: folders folders_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER folders_set_updated_at BEFORE UPDATE ON public.folders FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: harness_audit harness_audit_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER harness_audit_autofill_org_id BEFORE INSERT ON public.harness_audit FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: message_feedback message_feedback_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER message_feedback_autofill_org_id BEFORE INSERT ON public.message_feedback FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: messages messages_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER messages_autofill_org_id BEFORE INSERT ON public.messages FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: metadata_field_definitions metadata_field_definitions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER metadata_field_definitions_autofill_org_id BEFORE INSERT ON public.metadata_field_definitions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: pdf_extraction_runs pdf_extraction_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER pdf_extraction_runs_autofill_org_id BEFORE INSERT ON public.pdf_extraction_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: runs runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER runs_autofill_org_id BEFORE INSERT ON public.runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: sandbox_files sandbox_files_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER sandbox_files_autofill_org_id BEFORE INSERT ON public.sandbox_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
 
 
 --
@@ -2531,10 +3604,45 @@ CREATE TRIGGER set_threads_updated_at BEFORE UPDATE ON public.threads FOR EACH R
 
 
 --
+-- Name: skill_embeddings skill_embeddings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_embeddings_autofill_org_id BEFORE INSERT ON public.skill_embeddings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('skill_id', 'skills', 'id');
+
+
+--
+-- Name: skill_files skill_files_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_files_autofill_org_id BEFORE INSERT ON public.skill_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: skill_proposals skill_proposals_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_proposals_autofill_org_id BEFORE INSERT ON public.skill_proposals FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: skill_proposals skill_proposals_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER skill_proposals_set_updated_at BEFORE UPDATE ON public.skill_proposals FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: skill_publish_overrides skill_publish_overrides_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_publish_overrides_autofill_org_id BEFORE INSERT ON public.skill_publish_overrides FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: skill_test_cases skill_test_cases_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_test_cases_autofill_org_id BEFORE INSERT ON public.skill_test_cases FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
 
 
 --
@@ -2545,10 +3653,24 @@ CREATE TRIGGER skill_test_cases_set_updated_at BEFORE UPDATE ON public.skill_tes
 
 
 --
+-- Name: skill_versions skill_versions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skill_versions_autofill_org_id BEFORE INSERT ON public.skill_versions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: skill_versions skill_versions_no_update; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER skill_versions_no_update BEFORE UPDATE ON public.skill_versions FOR EACH ROW EXECUTE FUNCTION public.skill_versions_block_mutation();
+
+
+--
+-- Name: skills skills_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER skills_autofill_org_id BEFORE INSERT ON public.skills FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
 
 
 --
@@ -2580,6 +3702,20 @@ CREATE TRIGGER stale_skill_embedding_from_case AFTER INSERT OR DELETE OR UPDATE 
 
 
 --
+-- Name: threads threads_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER threads_autofill_org_id BEFORE INSERT ON public.threads FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: todos todos_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER todos_autofill_org_id BEFORE INSERT ON public.todos FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('thread_id', 'threads', 'id');
+
+
+--
 -- Name: document_chunks trg_update_search_vector; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2587,10 +3723,38 @@ CREATE TRIGGER trg_update_search_vector BEFORE INSERT OR UPDATE OF content ON pu
 
 
 --
+-- Name: tuner_runs tuner_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER tuner_runs_autofill_org_id BEFORE INSERT ON public.tuner_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: user_memory user_memory_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER user_memory_autofill_org_id BEFORE INSERT ON public.user_memory FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
 -- Name: user_memory user_memory_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER user_memory_updated_at BEFORE UPDATE ON public.user_memory FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: user_settings user_settings_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER user_settings_autofill_org_id BEFORE INSERT ON public.user_settings FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('user_id');
+
+
+--
+-- Name: workflow_definitions workflow_definitions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_definitions_autofill_org_id BEFORE INSERT ON public.workflow_definitions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
 
 
 --
@@ -2608,6 +3772,13 @@ CREATE TRIGGER workflow_definitions_set_updated_at BEFORE UPDATE ON public.workf
 
 
 --
+-- Name: workflow_phases workflow_phases_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_phases_autofill_org_id BEFORE INSERT ON public.workflow_phases FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('workflow_run_id', 'workflow_runs', 'id');
+
+
+--
 -- Name: workflow_phases workflow_phases_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -2615,10 +3786,31 @@ CREATE TRIGGER workflow_phases_set_updated_at BEFORE UPDATE ON public.workflow_p
 
 
 --
+-- Name: workflow_runs workflow_runs_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workflow_runs_autofill_org_id BEFORE INSERT ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('thread_id', 'threads', 'id');
+
+
+--
 -- Name: workflow_runs workflow_runs_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER workflow_runs_set_updated_at BEFORE UPDATE ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: workspace_file_versions workspace_file_versions_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workspace_file_versions_autofill_org_id BEFORE INSERT ON public.workspace_file_versions FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_from_parent('workspace_file_id', 'workspace_files', 'id');
+
+
+--
+-- Name: workspace_files workspace_files_autofill_org_id; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER workspace_files_autofill_org_id BEFORE INSERT ON public.workspace_files FOR EACH ROW EXECUTE FUNCTION public.autofill_org_id_by_owner('created_by');
 
 
 --
@@ -2659,6 +3851,62 @@ ALTER TABLE ONLY public.code_executions
 
 ALTER TABLE ONLY public.code_executions
     ADD CONSTRAINT code_executions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_connections connector_connections_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_connections
+    ADD CONSTRAINT connector_connections_created_by_fkey FOREIGN KEY (created_by) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: connector_connections connector_connections_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.connector_connections
+    ADD CONSTRAINT connector_connections_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: departments departments_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.departments
+    ADD CONSTRAINT departments_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: departments departments_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.departments
+    ADD CONSTRAINT departments_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES public.departments(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dept_members dept_members_dept_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dept_members
+    ADD CONSTRAINT dept_members_dept_id_fkey FOREIGN KEY (dept_id) REFERENCES public.departments(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dept_members dept_members_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dept_members
+    ADD CONSTRAINT dept_members_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: dept_members dept_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.dept_members
+    ADD CONSTRAINT dept_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
 
 
 --
@@ -2902,6 +4150,30 @@ ALTER TABLE ONLY public.operator_users
 
 
 --
+-- Name: org_invitations org_invitations_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.org_invitations
+    ADD CONSTRAINT org_invitations_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: org_members org_members_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.org_members
+    ADD CONSTRAINT org_members_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: org_members org_members_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.org_members
+    ADD CONSTRAINT org_members_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: pdf_extraction_runs pdf_extraction_runs_document_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2923,6 +4195,14 @@ ALTER TABLE ONLY public.pdf_extraction_runs
 
 ALTER TABLE ONLY public.profiles
     ADD CONSTRAINT profiles_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: role_permissions role_permissions_role_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.role_permissions
+    ADD CONSTRAINT role_permissions_role_fkey FOREIGN KEY (role) REFERENCES public.roles(role) ON DELETE CASCADE;
 
 
 --
@@ -3126,6 +4406,14 @@ ALTER TABLE ONLY public.skills
 
 
 --
+-- Name: sso_configs sso_configs_org_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sso_configs
+    ADD CONSTRAINT sso_configs_org_id_fkey FOREIGN KEY (org_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: threads threads_active_workflow_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3241,592 +4529,549 @@ ALTER TABLE ONLY public.workspace_files
 -- Name: classification_rules Users can delete own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own classification_rules" ON public.classification_rules FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own classification_rules" ON public.classification_rules FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_relationships Users can delete own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own document_relationships" ON public.document_relationships FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own document_relationships" ON public.document_relationships FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_views Users can delete own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own document_views" ON public.document_views FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own document_views" ON public.document_views FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: folders Users can delete own folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own folders" ON public.folders FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own folders" ON public.folders FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can delete own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own memory" ON public.user_memory FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own memory" ON public.user_memory FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: metadata_field_definitions Users can delete own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own metadata_field_definitions" ON public.metadata_field_definitions FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own metadata_field_definitions" ON public.metadata_field_definitions FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_files Users can delete own skill files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own skill files" ON public.skill_files FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_test_cases Users can delete own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own skill test cases" ON public.skill_test_cases FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skills Users can delete own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own skills" ON public.skills FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete own skills" ON public.skills FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: workflow_definitions Users can delete own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete own workflow definitions" ON public.workflow_definitions FOR DELETE USING ((auth.uid() = created_by));
+CREATE POLICY "Users can delete own workflow definitions" ON public.workflow_definitions FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by)));
 
 
 --
 -- Name: document_chunks Users can delete their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own chunks" ON public.document_chunks FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own chunks" ON public.document_chunks FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can delete their own documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own documents" ON public.documents FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own documents" ON public.documents FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can delete their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own messages" ON public.messages FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own messages" ON public.messages FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: threads Users can delete their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can delete their own threads" ON public.threads FOR DELETE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can delete their own threads" ON public.threads FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: audit_log Users can insert own audit entries; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSERT WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "Users can insert own audit entries" ON public.audit_log FOR INSERT TO authenticated WITH CHECK (((user_id = auth.uid()) AND ((org_id IS NULL) OR (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)))));
 
 
 --
 -- Name: classification_rules Users can insert own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own classification_rules" ON public.classification_rules FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
 -- Name: document_relationships Users can insert own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own document_relationships" ON public.document_relationships FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own document_relationships" ON public.document_relationships FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_views Users can insert own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own document_views" ON public.document_views FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
 -- Name: code_executions Users can insert own executions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own executions" ON public.code_executions FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own executions" ON public.code_executions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: message_feedback Users can insert own feedback; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own feedback" ON public.message_feedback FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own feedback" ON public.message_feedback FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: folders Users can insert own folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own folders" ON public.folders FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own folders" ON public.folders FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: harness_audit Users can insert own harness audit; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own harness audit" ON public.harness_audit FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can insert own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own memory" ON public.user_memory FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own memory" ON public.user_memory FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: metadata_field_definitions Users can insert own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can insert own metadata_field_definitions" ON public.metadata_field_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
 -- Name: sandbox_files Users can insert own sandbox files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own sandbox files" ON public.sandbox_files FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own sandbox files" ON public.sandbox_files FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_files Users can insert own skill files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own skill files" ON public.skill_files FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_test_cases Users can insert own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own skill test cases" ON public.skill_test_cases FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skills Users can insert own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert own skills" ON public.skills FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system = false)));
 
 
 --
 -- Name: workflow_definitions Users can insert own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
+CREATE POLICY "Users can insert own workflow definitions" ON public.workflow_definitions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_system_global = false)));
 
 
 --
 -- Name: document_chunks Users can insert their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own chunks" ON public.document_chunks FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own chunks" ON public.document_chunks FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can insert their own documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own documents" ON public.documents FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own documents" ON public.documents FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can insert their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own messages" ON public.messages FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own messages" ON public.messages FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: profiles Users can insert their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT WITH CHECK ((auth.uid() = id));
+CREATE POLICY "Users can insert their own profile" ON public.profiles FOR INSERT TO authenticated WITH CHECK ((auth.uid() = id));
 
 
 --
 -- Name: threads Users can insert their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can insert their own threads" ON public.threads FOR INSERT WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can insert their own threads" ON public.threads FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_images Users can manage own document images; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can manage own document images" ON public.document_images USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "Users can manage own document images" ON public.document_images TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid()))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid())));
 
 
 --
 -- Name: document_tables Users can manage own document tables; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can manage own document tables" ON public.document_tables USING ((user_id = auth.uid())) WITH CHECK ((user_id = auth.uid()));
+CREATE POLICY "Users can manage own document tables" ON public.document_tables TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid()))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (user_id = auth.uid())));
 
 
 --
 -- Name: message_feedback Users can select own feedback; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can select own feedback" ON public.message_feedback FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can select own feedback" ON public.message_feedback FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can select own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can select own memory" ON public.user_memory FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can select own memory" ON public.user_memory FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: classification_rules Users can update own classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own classification_rules" ON public.classification_rules FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
 -- Name: document_relationships Users can update own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own document_relationships" ON public.document_relationships FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK ((auth.uid() = user_id));
+CREATE POLICY "Users can update own document_relationships" ON public.document_relationships FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_views Users can update own document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own document_views" ON public.document_views FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
 -- Name: folders Users can update own folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own folders" ON public.folders FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own folders" ON public.folders FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: user_memory Users can update own memory; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own memory" ON public.user_memory FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: metadata_field_definitions Users can update own metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE USING ((auth.uid() = user_id)) WITH CHECK (((auth.uid() = user_id) AND (is_global = false)));
+CREATE POLICY "Users can update own metadata_field_definitions" ON public.metadata_field_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system_global = false)));
 
 
 --
 -- Name: skill_test_cases Users can update own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own skill test cases" ON public.skill_test_cases FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skills Users can update own skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update own skills" ON public.skills FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id) AND (is_system = false)));
 
 
 --
 -- Name: workflow_definitions Users can update own workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE USING ((auth.uid() = created_by)) WITH CHECK (((auth.uid() = created_by) AND (is_global = false)));
+CREATE POLICY "Users can update own workflow definitions" ON public.workflow_definitions FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by) AND (is_system_global = false)));
 
 
 --
 -- Name: document_chunks Users can update their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own chunks" ON public.document_chunks FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own chunks" ON public.document_chunks FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can update their own documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own documents" ON public.documents FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own documents" ON public.documents FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: messages Users can update their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own messages" ON public.messages FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own messages" ON public.messages FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: profiles Users can update their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE USING ((auth.uid() = id));
+CREATE POLICY "Users can update their own profile" ON public.profiles FOR UPDATE TO authenticated USING ((auth.uid() = id));
 
 
 --
 -- Name: threads Users can update their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can update their own threads" ON public.threads FOR UPDATE USING ((auth.uid() = user_id));
+CREATE POLICY "Users can update their own threads" ON public.threads FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_files Users can view files on own or global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT USING (((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can view files on own or global skills" ON public.skill_files FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_global = true))))));
+  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_system = true)))) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.skills
+  WHERE ((skills.id = skill_files.skill_id) AND (skills.is_org_shared = true))))))));
 
 
 --
 -- Name: classification_rules Users can view own and global classification_rules; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global classification_rules" ON public.classification_rules FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: document_views Users can view own and global document_views; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global document_views" ON public.document_views FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: folders Users can view own and global folders; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT USING (((auth.uid() = user_id) OR public.folder_is_globally_visible(id)));
+CREATE POLICY "Users can view own and global folders" ON public.folders FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR public.folder_is_org_shared(id))));
 
 
 --
 -- Name: metadata_field_definitions Users can view own and global metadata_field_definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global metadata_field_definitions" ON public.metadata_field_definitions FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id))));
 
 
 --
 -- Name: skills Users can view own and global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT USING (((auth.uid() = user_id) OR (is_global = true)));
+CREATE POLICY "Users can view own and global skills" ON public.skills FOR SELECT TO authenticated USING (((is_system = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (is_org_shared = true)))));
 
 
 --
 -- Name: workflow_definitions Users can view own and global workflow definitions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT USING (((auth.uid() = created_by) OR (is_global = true)));
+CREATE POLICY "Users can view own and global workflow definitions" ON public.workflow_definitions FOR SELECT TO authenticated USING (((is_system_global = true) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = created_by))));
 
 
 --
 -- Name: document_relationships Users can view own document_relationships; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own document_relationships" ON public.document_relationships FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own document_relationships" ON public.document_relationships FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: eval_ratings Users can view own eval ratings; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own eval ratings" ON eval_ratings; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own eval ratings" ON public.eval_ratings IS 'Owner-only (D-08). Defense-in-depth: the service-role ratings endpoint bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080 precedent, T-134-01).';
+CREATE POLICY "Users can view own eval ratings" ON public.eval_ratings FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: eval_results Users can view own eval results; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own eval results" ON eval_results; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own eval results" ON public.eval_results IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+CREATE POLICY "Users can view own eval results" ON public.eval_results FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: eval_runs Users can view own eval runs; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own eval runs" ON eval_runs; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own eval runs" ON public.eval_runs IS 'Owner-only (D-08). Defense-in-depth: the service-role eval task bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079 precedent, T-133-01).';
+CREATE POLICY "Users can view own eval runs" ON public.eval_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: code_executions Users can view own executions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own executions" ON public.code_executions FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own executions" ON public.code_executions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: harness_audit Users can view own harness audit; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own harness audit" ON public.harness_audit FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: documents Users can view own or global-folder documents; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT USING (((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_globally_visible(folder_id))));
+CREATE POLICY "Users can view own or global-folder documents" ON public.documents FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR ((folder_id IS NOT NULL) AND public.folder_is_org_shared(folder_id)))));
 
 
 --
 -- Name: skill_publish_overrides Users can view own publish overrides; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own publish overrides" ON skill_publish_overrides; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own publish overrides" ON public.skill_publish_overrides IS 'Owner-only (D-02). Defense-in-depth: the service-role toggle handler bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081/083 precedent, T-136-04).';
+CREATE POLICY "Users can view own publish overrides" ON public.skill_publish_overrides FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: sandbox_files Users can view own sandbox files; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own sandbox files" ON public.sandbox_files FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_embeddings Users can view own skill embeddings; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own skill embeddings" ON skill_embeddings; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own skill embeddings" ON public.skill_embeddings IS 'Owner-only SELECT. Defense-in-depth: the backfill writer runs as service-role (bypasses RLS) and hand-scopes .eq("user_id", …); the match_skills RPC WHERE clause is the real cross-user gate (V4).';
+CREATE POLICY "Users can view own skill embeddings" ON public.skill_embeddings FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_proposals Users can view own skill proposals; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own skill proposals" ON skill_proposals; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own skill proposals" ON public.skill_proposals IS 'Owner-only (D-07). Defense-in-depth: the service-role SI-01 router bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (035/079/080/081 precedent, T-135-07).';
+CREATE POLICY "Users can view own skill proposals" ON public.skill_proposals FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_test_cases Users can view own skill test cases; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view own skill test cases" ON public.skill_test_cases FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: skill_versions Users can view own skill versions; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT USING ((auth.uid() = user_id));
-
-
---
--- Name: POLICY "Users can view own skill versions" ON skill_versions; Type: COMMENT; Schema: public; Owner: -
---
-
-COMMENT ON POLICY "Users can view own skill versions" ON public.skill_versions IS 'Owner-only (NO is_global branch, D-12). Defense-in-depth: the service-role writer bypasses RLS and the app-code .eq("user_id", …) filter is the real runtime gate (077 precedent, D-03-R3).';
+CREATE POLICY "Users can view own skill versions" ON public.skill_versions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: document_chunks Users can view their own chunks; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view their own chunks" ON public.document_chunks FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.documents d
+  WHERE ((d.id = document_chunks.document_id) AND (d.folder_id IS NOT NULL) AND public.folder_is_org_shared(d.folder_id)))))));
 
 
 --
 -- Name: messages Users can view their own messages; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own messages" ON public.messages FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view their own messages" ON public.messages FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: profiles Users can view their own profile; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT USING ((auth.uid() = id));
+CREATE POLICY "Users can view their own profile" ON public.profiles FOR SELECT TO authenticated USING ((auth.uid() = id));
 
 
 --
 -- Name: threads Users can view their own threads; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY "Users can view their own threads" ON public.threads FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
 -- Name: tuner_runs Users can view tuner runs on own or global skills; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT USING (((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+CREATE POLICY "Users can view tuner runs on own or global skills" ON public.tuner_runs FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
    FROM public.skills
-  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_global = true))))));
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_system = true)))) OR ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND ((auth.uid() = user_id) OR (EXISTS ( SELECT 1
+   FROM public.skills
+  WHERE ((skills.id = tuner_runs.skill_id) AND (skills.is_org_shared = true))))))));
 
 
 --
@@ -3846,6 +5091,108 @@ ALTER TABLE public.classification_rules ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.code_executions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_connections; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.connector_connections ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: connector_connections connector_connections_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_delete ON public.connector_connections FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: connector_connections connector_connections_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_insert ON public.connector_connections FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: connector_connections connector_connections_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_select ON public.connector_connections FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: connector_connections connector_connections_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY connector_connections_update ON public.connector_connections FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: departments; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.departments ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: departments departments_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY departments_delete ON public.departments FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: departments departments_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY departments_insert ON public.departments FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: departments departments_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY departments_select ON public.departments FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: departments departments_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY departments_update ON public.departments FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: dept_members; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.dept_members ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: dept_members dept_members_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY dept_members_delete ON public.dept_members FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: dept_members dept_members_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY dept_members_insert ON public.dept_members FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
+
+
+--
+-- Name: dept_members dept_members_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY dept_members_select ON public.dept_members FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: dept_members dept_members_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY dept_members_update ON public.dept_members FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
+
 
 --
 -- Name: document_chunks; Type: ROW SECURITY; Schema: public; Owner: -
@@ -3957,6 +5304,101 @@ ALTER TABLE public.operator_audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.operator_users ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: org_invitations; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.org_invitations ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: org_invitations org_invitations_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_invitations_delete ON public.org_invitations FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:invite'::text));
+
+
+--
+-- Name: org_invitations org_invitations_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_invitations_insert ON public.org_invitations FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:invite'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: org_invitations org_invitations_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_invitations_select ON public.org_invitations FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: org_invitations org_invitations_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_invitations_update ON public.org_invitations FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:invite'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:invite'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: org_members; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.org_members ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: org_members org_members_admin_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_members_admin_select ON public.org_members FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: org_members org_members_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_members_delete ON public.org_members FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text));
+
+
+--
+-- Name: org_members org_members_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_members_insert ON public.org_members FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
+
+
+--
+-- Name: org_members org_members_self_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_members_self_select ON public.org_members FOR SELECT TO authenticated USING ((user_id = auth.uid()));
+
+
+--
+-- Name: org_members org_members_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY org_members_update ON public.org_members FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'org:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (role <> 'super-admin'::text)));
+
+
+--
+-- Name: organizations; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: organizations organizations_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organizations_select ON public.organizations FOR SELECT TO authenticated USING ((id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: organizations organizations_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organizations_update ON public.organizations FOR UPDATE TO authenticated USING (public.current_user_has_permission(id, 'org:manage'::text)) WITH CHECK ((public.current_user_has_permission(id, 'org:manage'::text) AND (id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
 -- Name: pdf_extraction_runs; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -3966,7 +5408,7 @@ ALTER TABLE public.pdf_extraction_runs ENABLE ROW LEVEL SECURITY;
 -- Name: pdf_extraction_runs pdf_extraction_runs_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
@@ -3974,6 +5416,32 @@ CREATE POLICY pdf_extraction_runs_select_own ON public.pdf_extraction_runs FOR S
 --
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: role_permissions; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.role_permissions ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: role_permissions role_permissions_read_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY role_permissions_read_all ON public.role_permissions FOR SELECT TO authenticated USING (true);
+
+
+--
+-- Name: roles; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: roles roles_read_all; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY roles_read_all ON public.roles FOR SELECT TO authenticated USING (true);
+
 
 --
 -- Name: runs; Type: ROW SECURITY; Schema: public; Owner: -
@@ -3985,7 +5453,7 @@ ALTER TABLE public.runs ENABLE ROW LEVEL SECURITY;
 -- Name: runs runs_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY runs_select_own ON public.runs FOR SELECT USING ((auth.uid() = user_id));
+CREATE POLICY runs_select_own ON public.runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = user_id)));
 
 
 --
@@ -4037,6 +5505,40 @@ ALTER TABLE public.skill_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.skills ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: sso_configs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.sso_configs ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: sso_configs sso_configs_delete; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY sso_configs_delete ON public.sso_configs FOR DELETE TO authenticated USING (public.current_user_has_permission(org_id, 'sso:manage'::text));
+
+
+--
+-- Name: sso_configs sso_configs_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY sso_configs_insert ON public.sso_configs FOR INSERT TO authenticated WITH CHECK ((public.current_user_has_permission(org_id, 'sso:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
+-- Name: sso_configs sso_configs_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY sso_configs_select ON public.sso_configs FOR SELECT TO authenticated USING ((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)));
+
+
+--
+-- Name: sso_configs sso_configs_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY sso_configs_update ON public.sso_configs FOR UPDATE TO authenticated USING (public.current_user_has_permission(org_id, 'sso:manage'::text)) WITH CHECK ((public.current_user_has_permission(org_id, 'sso:manage'::text) AND (org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids))));
+
+
+--
 -- Name: threads; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -4052,36 +5554,36 @@ ALTER TABLE public.todos ENABLE ROW LEVEL SECURITY;
 -- Name: todos todos_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_delete_own ON public.todos FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_delete_own ON public.todos FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
 -- Name: todos todos_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_insert_own ON public.todos FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_insert_own ON public.todos FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
 -- Name: todos todos_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_select_own ON public.todos FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_select_own ON public.todos FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
 -- Name: todos todos_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY todos_update_own ON public.todos FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = todos.thread_id))));
+  WHERE (threads.id = todos.thread_id)))));
 
 
 --
@@ -4112,43 +5614,43 @@ ALTER TABLE public.workflow_phases ENABLE ROW LEVEL SECURITY;
 -- Name: workflow_phases workflow_phases_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_delete_own ON public.workflow_phases FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_delete_own ON public.workflow_phases FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
 -- Name: workflow_phases workflow_phases_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_insert_own ON public.workflow_phases FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_insert_own ON public.workflow_phases FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
 -- Name: workflow_phases workflow_phases_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_select_own ON public.workflow_phases FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
 -- Name: workflow_phases workflow_phases_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workflow_phases_update_own ON public.workflow_phases FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id)))) WITH CHECK ((auth.uid() = ( SELECT t.user_id
+  WHERE (wr.id = workflow_phases.workflow_run_id))))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workflow_runs wr ON ((wr.thread_id = t.id)))
-  WHERE (wr.id = workflow_phases.workflow_run_id))));
+  WHERE (wr.id = workflow_phases.workflow_run_id)))));
 
 
 --
@@ -4161,38 +5663,38 @@ ALTER TABLE public.workflow_runs ENABLE ROW LEVEL SECURITY;
 -- Name: workflow_runs workflow_runs_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_delete_own ON public.workflow_runs FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_delete_own ON public.workflow_runs FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
 -- Name: workflow_runs workflow_runs_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_insert_own ON public.workflow_runs FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_insert_own ON public.workflow_runs FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
 -- Name: workflow_runs workflow_runs_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_select_own ON public.workflow_runs FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
 -- Name: workflow_runs workflow_runs_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workflow_runs_update_own ON public.workflow_runs FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id)))) WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+  WHERE (threads.id = workflow_runs.thread_id))))) WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workflow_runs.thread_id))));
+  WHERE (threads.id = workflow_runs.thread_id)))));
 
 
 --
@@ -4211,56 +5713,56 @@ ALTER TABLE public.workspace_files ENABLE ROW LEVEL SECURITY;
 -- Name: workspace_files workspace_files_delete_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_delete_own ON public.workspace_files FOR DELETE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_delete_own ON public.workspace_files FOR DELETE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_files workspace_files_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_insert_own ON public.workspace_files FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_insert_own ON public.workspace_files FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_files workspace_files_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_select_own ON public.workspace_files FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_select_own ON public.workspace_files FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_files workspace_files_update_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_files_update_own ON public.workspace_files FOR UPDATE TO authenticated USING ((auth.uid() = ( SELECT threads.user_id
+CREATE POLICY workspace_files_update_own ON public.workspace_files FOR UPDATE TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT threads.user_id
    FROM public.threads
-  WHERE (threads.id = workspace_files.thread_id))));
+  WHERE (threads.id = workspace_files.thread_id)))));
 
 
 --
 -- Name: workspace_file_versions workspace_versions_insert_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_versions_insert_own ON public.workspace_file_versions FOR INSERT TO authenticated WITH CHECK ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workspace_versions_insert_own ON public.workspace_file_versions FOR INSERT TO authenticated WITH CHECK (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
-  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+  WHERE (wf.id = workspace_file_versions.workspace_file_id)))));
 
 
 --
 -- Name: workspace_file_versions workspace_versions_select_own; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FOR SELECT TO authenticated USING ((auth.uid() = ( SELECT t.user_id
+CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FOR SELECT TO authenticated USING (((org_id IN ( SELECT public.current_user_org_ids() AS current_user_org_ids)) AND (auth.uid() = ( SELECT t.user_id
    FROM (public.threads t
      JOIN public.workspace_files wf ON ((wf.thread_id = t.id)))
-  WHERE (wf.id = workspace_file_versions.workspace_file_id))));
+  WHERE (wf.id = workspace_file_versions.workspace_file_id)))));
 
 
 --
@@ -4297,9 +5799,15 @@ CREATE POLICY workspace_versions_select_own ON public.workspace_file_versions FO
 -- MAINTENANCE: when a NEW migration adds a storage bucket, an auth.users
 -- trigger, or a realtime table, mirror it here (idempotently). Sources:
 --   storage  -> migrations 017 (skill-files), 029 (documents, sandbox-outputs),
---               054 (workspace-files)
+--               054 (workspace-files), 111 (skill-files read policy: legacy global
+--               flag retired -> s.is_system OR s.is_org_shared, D-165-01), 112 (skill-files
+--               read policy: shared branch ORG-GATED to current_user_org_ids(), SEED-125 CR-02)
 --   auth     -> migration 001 (on_auth_user_created)
 --   realtime -> migrations 002 (documents), 014 (folders), 032 (messages)
+--   ACLs     -> migration 118 (connector_connections.secret_ciphertext column grant,
+--               CR-01). pg_dump runs with --no-privileges, so ANY migration that
+--               narrows a table privilege must be mirrored here or it is absent from
+--               every greenfield bootstrap.
 -- ============================================================
 
 
@@ -4353,7 +5861,13 @@ DROP POLICY IF EXISTS "Users can delete own sandbox outputs" ON storage.objects;
 CREATE POLICY "Users can delete own sandbox outputs" ON storage.objects FOR DELETE TO authenticated
   USING (bucket_id = 'sandbox-outputs' AND (storage.foldername(name))[1] = (select auth.uid()::text));
 
--- skill-files policies (read allows owner OR files belonging to a global skill)
+-- skill-files policies (read allows owner OR files belonging to a system built-in
+-- OR an org-shared skill WITHIN the caller's org — mig 112 SEED-125 CR-02: the shared
+-- branch is ORG-GATED to genuinely match the mig-109 skill_files TABLE-RLS shape
+-- [is_system universal OUTSIDE the org gate; owner/is_org_shared INSIDE
+-- org_id ∈ current_user_org_ids()]. mig 111's earlier "reconciled" comment was inaccurate —
+-- its branch was s.is_system OR s.is_org_shared with NO org predicate, a cross-org read leak;
+-- 112 closes it. Storage RLS runs under the user JWT so auth.uid()/current_user_org_ids() resolve.)
 DROP POLICY IF EXISTS "Users can read own skill files" ON storage.objects;
 CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO authenticated
   USING (
@@ -4363,7 +5877,14 @@ CREATE POLICY "Users can read own skill files" ON storage.objects FOR SELECT TO 
       OR EXISTS (
         SELECT 1 FROM public.skill_files sf
         JOIN public.skills s ON s.id = sf.skill_id
-        WHERE sf.file_path = name AND s.is_global = true
+        WHERE sf.file_path = name
+          AND (
+            s.is_system = true
+            OR (
+              s.org_id IN (SELECT public.current_user_org_ids())
+              AND (s.user_id = (select auth.uid()) OR s.is_org_shared = true)
+            )
+          )
       )
     )
   );
@@ -4389,14 +5910,39 @@ CREATE POLICY "workspace_storage_delete_own" ON storage.objects FOR DELETE TO au
 -- ============================================================
 -- 3. Auth: auto-create a profile row on signup (trigger on auth.users)
 -- ============================================================
+-- NOTE: keep this body in sync with migration 105 §D (public.handle_new_user). pg_dump emits
+-- handle_new_user in the public dump ABOVE, but this supplement copy is appended LAST, so this is
+-- the definition a greenfield paste actually keeps. It must therefore carry the SAME mig-105
+-- extension: provision a personal org for every new signup (identical logic to mig 105 §A), wrapped
+-- in an inner EXCEPTION-WHEN-OTHERS swallow so org-creation failure can NEVER abort the auth.users
+-- INSERT / break signup (T-162-05). KEEP security definer + pinned search_path (T-162-06). If a future
+-- migration changes handle_new_user, update this copy in the SAME commit or greenfield deploys drift.
 create or replace function public.handle_new_user()
-returns trigger
-language plpgsql
-security definer set search_path = public
-as $$
+  returns trigger
+  language plpgsql
+  security definer set search_path = public
+  as $$
+declare
+  v_org_id uuid;
 begin
   insert into public.profiles (id, display_name)
-  values (new.id, new.raw_user_meta_data->>'display_name');
+  values (new.id, new.raw_user_meta_data->>'display_name')
+  on conflict (id) do nothing;
+
+  -- defensive personal-org provisioning — identical logic to mig 105 §A, swallowed so a failure
+  -- logs a WARNING and returns normally instead of aborting the signup INSERT.
+  begin
+    if not exists (select 1 from public.org_members m where m.user_id = new.id) then
+      v_org_id := public.create_org_with_default_dept(
+                    coalesce(new.email, new.id::text) || '''s Organization', null, 'General');
+      insert into public.org_members (org_id, user_id, role)
+      values (v_org_id, new.id, 'org-admin')
+      on conflict (org_id, user_id) do nothing;
+    end if;
+  exception when others then
+    raise warning 'handle_new_user: personal-org creation failed for %: %', new.id, sqlerrm;
+  end;
+
   return new;
 end;
 $$;
@@ -4419,3 +5965,53 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.messages;
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ============================================================
+-- 5. Column-level privilege: connector_connections.secret_ciphertext
+--    (migration 118 / Phase 190 code-review finding CR-01)
+-- ============================================================
+-- ⚠ WHY THIS LIVES HERE RATHER THAN IN THE DUMP: regenerate-full-schema.sh runs
+--    `pg_dump --no-privileges`, so full-schema.sql carries NO ACLs AT ALL
+--    (`grep -c '^GRANT\|^REVOKE' supabase/full-schema.sql` -> 0, measured
+--    2026-08-09). Migration 118 is therefore INVISIBLE to the generated dump —
+--    its COMMENT survives, its GRANT does not. A greenfield project bootstrapped
+--    from full-schema.sql alone would ship with `secret_ciphertext` readable over
+--    PostgREST by every authenticated org member, which is exactly the defect 118
+--    exists to close.
+--
+--    The rest of this file's ACL story is unchanged: Supabase's stock
+--    `GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role`
+--    default privileges are what give every other table its grants, and that is
+--    still the right posture for every table that holds no secret. This one holds
+--    a tenant credential, so it opts out — and the opt-out has to be re-stated in
+--    a place the bootstrap can see.
+--
+--    Idempotent, like everything else in this file: REVOKE and GRANT are.
+--
+--    ⚠ ORDER MATTERS AGAINST THE DEFAULT PRIVILEGES. This block must run AFTER
+--    the table exists and after any blanket grant, which it does: the supplement
+--    is appended at the END of full-schema.sql.
+REVOKE ALL ON public.connector_connections FROM anon;
+REVOKE ALL ON public.connector_connections FROM authenticated;
+
+-- One column per line so the OMISSION is visible in a diff. The column that is not
+-- here is `secret_ciphertext`.
+GRANT SELECT (
+    id,
+    org_id,
+    created_by,
+    capability,
+    name,
+    config,
+    is_enabled,
+    last_checked_at,
+    last_check_verdict,
+    created_at,
+    updated_at
+) ON public.connector_connections TO authenticated;
+
+-- Writes stay at TABLE level, INCLUDING the secret column: the org-admin create/edit
+-- path runs on the user-JWT client and must be able to store an `enc:v1:` envelope.
+-- A role may INSERT into and UPDATE a column it can never SELECT.
+GRANT INSERT, UPDATE, DELETE ON public.connector_connections TO authenticated;

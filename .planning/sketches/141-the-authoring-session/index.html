@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 141 — The authoring session (Phase 184)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link rel="stylesheet" href="../themes/canvas-184.css">
+<style>
+  /* ── A: one session strip ─────────────────────────────────────────────── */
+  .strip {
+    flex-shrink: 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 10px 200px 10px var(--space-5); border-top: 1px solid var(--color-border);
+    background: var(--color-bg-elev1); font-size: var(--text-sm);
+  }
+  .strip .grp { display: flex; align-items: center; gap: 6px; }
+  .strip .sep { width: 1px; height: 20px; background: var(--color-border); }
+
+  /* ── B: floating canvas toolbar ───────────────────────────────────────── */
+  .cbar {
+    position: absolute; left: 14px; top: 14px; z-index: 30; display: flex; align-items: center; gap: 3px;
+    padding: 4px; background: hsl(220 30% 8% / .93); backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border); border-radius: 13px; box-shadow: var(--shadow-md);
+  }
+  .cbar button {
+    width: 30px; height: 30px; border: 0; border-radius: 9px; background: transparent;
+    color: var(--color-text-muted); cursor: pointer; font-size: 13px; line-height: 1;
+    display: grid; place-items: center; transition: all var(--dur-fast) var(--ease-out);
+  }
+  .cbar button:hover:not(:disabled) { background: var(--color-accent); color: var(--color-text); }
+  .cbar button:disabled { opacity: .28; cursor: not-allowed; }
+  .cbar .sv { padding: 0 10px; font-size: 11px; color: var(--color-text-dim); white-space: nowrap; }
+
+  .topright {
+    display: flex; align-items: center; gap: 9px; margin-left: auto;
+  }
+
+  /* ── C: status where it happens ───────────────────────────────────────── */
+  .spot {
+    position: absolute; z-index: 40; font-size: 11px; padding: 3px 9px; border-radius: 999px;
+    background: hsl(142 71% 45% / .16); border: 1px solid hsl(142 71% 45% / .4); color: hsl(142 71% 70%);
+    pointer-events: none; opacity: 0; transform: translateY(4px);
+    transition: all var(--dur-base) var(--ease-out);
+  }
+  .spot.show { opacity: 1; transform: translateY(0); }
+  .terminal {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 9px; margin-left: 22px;
+    padding: 16px 18px; border-radius: 18px; flex-shrink: 0; max-width: 264px;
+    border: 1px dashed var(--color-border); background: hsl(220 30% 100% / .03);
+  }
+  .terminal .hd { font-family: var(--font-headline); font-weight: 600; font-size: 13.5px; }
+  .terminal .wy { font-size: 11px; color: var(--color-text-muted); line-height: 1.6; }
+
+  /* ── save state vocabulary ────────────────────────────────────────────── */
+  .sv-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sv-dot.saved { background: var(--color-success); }
+  .sv-dot.saving { background: var(--color-warning); animation: brandPulse 700ms ease-in-out infinite; }
+  .sv-dot.dirty { background: var(--color-text-dim); }
+
+  .history {
+    flex-shrink: 0; width: 268px; border-left: 1px solid var(--color-border);
+    background: var(--color-bg-elev1); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .history header { flex-shrink: 0; padding: 11px 14px; border-bottom: 1px solid var(--color-border); font-size: var(--text-sm); }
+  .history .scroll { flex: 1; min-height: 0; overflow: auto; padding: 10px 12px 18px; }
+  .hrow {
+    display: flex; gap: 8px; align-items: baseline; font-size: 11.5px; padding: 6px 8px;
+    border-radius: 8px; color: var(--color-text-muted); line-height: 1.5;
+  }
+  .hrow.now { background: var(--color-primary-dim); color: var(--color-text); }
+  .hrow.undone { opacity: .35; text-decoration: line-through; }
+  .hrow .t { font-family: var(--font-mono); font-size: 9.5px; color: var(--color-text-dim); flex-shrink: 0; }
+  .hrow .cos { font-size: 9.5px; color: var(--color-text-dim); font-style: italic; }
+  body:not(.showhist) .history { display: none; }
+
+  .picker {
+    position: fixed; z-index: 60; width: 272px; padding: 7px;
+    background: var(--color-surface-hi); border: 1px solid var(--color-border);
+    border-radius: 14px; box-shadow: var(--shadow-lg); display: none;
+  }
+  .picker.show { display: block; animation: fadeSlideUp var(--dur-base) var(--ease-out); }
+  .picker .phdr { font-size: 10px; font-family: var(--font-mono); text-transform: uppercase;
+                  letter-spacing: .09em; color: var(--color-text-dim); padding: 5px 8px 7px; }
+  .picker button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 7px 8px; border-radius: 9px; cursor: pointer; border: 0; background: transparent;
+    color: var(--color-text); font-family: inherit; font-size: 12.5px;
+  }
+  .picker button:hover { background: var(--color-accent); }
+  .picker button small { display: block; color: var(--color-text-dim); font-size: 10.5px; }
+
+  /* viewport constraint */
+  body.narrow .stage { max-width: 900px; margin: 0 auto; width: 100%; border-left: 1px solid var(--color-border);
+                       border-right: 1px solid var(--color-border); }
+  body.narrow .history { display: none; }
+  body.narrow .strip { max-width: 900px; width: 100%; margin: 0 auto; padding-right: var(--space-5); }
+
+  .kbd {
+    font-family: var(--font-mono); font-size: 10px; padding: 1px 5px; border-radius: 4px;
+    border: 1px solid var(--color-border); background: var(--color-muted); color: var(--color-text-dim);
+  }
+</style>
+</head>
+<body class="alive card-b va showhist">
+
+<nav class="variant-nav">
+  <span class="label">Sketch 141</span>
+  <button class="variant-tab" data-v="a" type="button">A: One session strip</button>
+  <button class="variant-tab active" data-v="b" type="button">B: Canvas toolbar + header <span class="star">★</span></button>
+  <button class="variant-tab" data-v="c" type="button">C: Status where it happens</button>
+</nav>
+
+<p class="lead" id="lead"></p>
+
+<div class="bar">
+  <span class="lbl">Start from</span>
+  <div class="seg" id="startseg">
+    <button type="button" data-start="empty" class="on">Empty draft</button>
+    <button type="button" data-start="two">Risk Register · 2 steps</button>
+  </div>
+  <div class="spacer"></div>
+  <span class="lbl">Card</span>
+  <div class="seg" id="cardseg">
+    <button type="button" data-card="b" class="on">137-B floating icon</button>
+    <button type="button" data-card="d">137-D left icon</button>
+  </div>
+  <span class="lbl">Width</span>
+  <div class="seg" id="vpseg">
+    <button type="button" data-vp="wide" class="on">Desktop</button>
+    <button type="button" data-vp="narrow">900px</button>
+  </div>
+  <div class="seg" id="histseg">
+    <button type="button" data-hist="on" class="on">Show history</button>
+    <button type="button" data-hist="off">Hide</button>
+  </div>
+  <div class="seg" id="techseg">
+    <button type="button" data-tech="off" class="on">Plain language</button>
+    <button type="button" data-tech="on">⌥ Technical names</button>
+  </div>
+</div>
+
+<div class="stage" id="stage">
+  <div class="plane scrollbar-thin" id="plane">
+    <div class="amb"></div>
+    <div class="cbar" id="cbar" style="display:none"></div>
+    <div class="flow" id="flow"></div>
+    <div class="spot" id="spot"></div>
+  </div>
+
+  <aside class="history">
+    <header><b style="font-family:var(--font-headline)">What you did</b>
+      <span style="float:right;font-size:10px;color:var(--color-text-dim)" class="techline" style="margin:0">zundo</span>
+    </header>
+    <div class="scroll" id="histout"></div>
+  </aside>
+</div>
+
+<div class="strip" id="strip"></div>
+
+<div class="picker" id="picker" role="menu" aria-label="Add a step"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<div class="sketch-toolbar">
+  <span>141</span>
+  <select id="themesel" aria-label="Theme">
+    <option value="default">Deep Midnight</option>
+  </select>
+</div>
+
+<script src="../themes/phase-icons-3d.js"></script>
+<script>
+/* ══════════════════════════════════════════════════════════════════════════
+   Sketch 141 — Does the whole authoring session hold together?
+
+   This is the consistency sketch: 138 (editing), 139 (validation) and 140
+   (inspector + rails) each answer one question well, and this one asks whether
+   they compose into a session a person can sit inside — empty draft → first
+   step → a mistake → undo → autosave → publish.
+
+   Three honesty beats it is really testing, all of which outlive this phase:
+
+   · SAVED ≠ PUBLISHED. Autosave updates the draft row IN PLACE. It does not
+     mint a definition version and it does not re-arm the publish gauntlet —
+     that is Phase 186's CONCUR-01, but the words are chosen here, and words
+     that imply "shipped" would be a lie shown a hundred times a session.
+
+   · A COSMETIC MOVE IS NOT A CHANGE TO WHAT RUNS. If 138 lands on the spine,
+     there are no cosmetic moves at all — every move renumbers. If it lands on
+     free placement, the history has to distinguish them, or an undo will
+     silently revert something the person did not think they had changed.
+
+   · PUBLISH IS THE TEST (v2.9 nav contract, adopted 2026-06-14). A draft
+     cannot be run directly; the gauntlet's golden run IS the trial run. So the
+     end of an authoring session is a handoff, not a "run it and see".
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var TYPES = [
+  { t: 'llm_agent',        icon: 'llm_agent_compass',    plain: 'Search the knowledge base',  sub: 'Finds what it can support with a source' },
+  { t: 'llm_single',       icon: 'llm_single',           plain: 'Write it up',                sub: 'Writes one piece in one pass' },
+  { t: 'llm_human_input',  icon: 'llm_human_input',      plain: 'Check with you',             sub: 'Pauses here until you answer' },
+  { t: 'llm_emit',         icon: 'llm_emit',             plain: 'Produce the deliverable',    sub: 'Fills your template and produces the file' },
+  { t: 'programmatic',     icon: 'programmatic',         plain: 'Prepare the inputs',         sub: 'A fixed step the server runs' },
+  { t: 'llm_batch_agents', icon: 'llm_batch_agents_alt', plain: 'Work on the parts together', sub: 'Several assistants work in parallel' }
+];
+var TYPE_LABEL = {
+  llm_agent: 'AI agent step', llm_single: 'AI write step', llm_human_input: 'Needs you',
+  llm_emit: 'Deliverable', programmatic: 'Server step', llm_batch_agents: 'Parallel agents'
+};
+
+var SEED_TWO = [
+  { slug: 'retrieve', t: 'llm_agent', plain: 'Search the knowledge base',
+    sub: 'Finds every risk it can support with a source', badges: [['cited', '⛨ Must cite its sources']] },
+  { slug: 'emit', t: 'llm_emit', plain: 'Produce the risk register',
+    sub: 'Fills your Word template, one row per risk',
+    badges: [['cited', '⛨ Every cell cited'], ['file', '▤ risk-register.docx']] }
+];
+
+var LEAD = {
+  a: '<b>A — One strip carries the session.</b> Everything about “where am I” lives on one line under the canvas: ' +
+     'how many steps, whether it is saved, undo/redo, whether it could publish and why not. One place to look, and the ' +
+     'canvas above stays completely clean. The risk is a strip that becomes a junk drawer as later phases add to it.',
+  b: '<b>B — Split by function.</b> Editing controls (undo/redo, save state) float on the canvas where the editing ' +
+     'happens; publishing sits in the page header where leaving happens. Each control is near what it acts on — and it ' +
+     'is two places to look, with a floating bar that sits on top of the flow.',
+  c: '<b>C — Status where it happens.</b> No standing chrome at all: “Saved” appears briefly next to the step you just ' +
+     'changed and fades, undo is <span class="kbd">⌘Z</span> with a spoken confirmation, and publishing is a card at the ' +
+     'end of the flow — you reach it by finishing. The calmest at rest, and the one that most depends on the person ' +
+     'noticing something that has already gone.'
+};
+
+var variant = 'b';
+var steps = [];
+var past = [], future = [], log = [];
+var saveState = 'saved';   /* saved | saving | dirty */
+var saveT = null, toastT = null, spotT = null, pickAt = -1;
+var t0 = Date.now();
+
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;'); }
+function clone(a) { return JSON.parse(JSON.stringify(a)); }
+function stamp() {
+  var d = Math.floor((Date.now() - t0) / 1000);
+  return String(Math.floor(d / 60)).padStart(2, '0') + ':' + String(d % 60).padStart(2, '0');
+}
+
+function toast(m) {
+  var el = document.getElementById('toast'); el.innerHTML = m; el.classList.add('show');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { el.classList.remove('show'); }, 4400);
+}
+
+/* ── the undo stack (zundo's shape: snapshots of the definition slice) ───── */
+function commit(label, cosmetic) {
+  past.push({ steps: clone(steps), label: label, cosmetic: !!cosmetic, at: stamp() });
+  if (past.length > 60) past.shift();
+  future = [];
+  log.push({ label: label, cosmetic: !!cosmetic, at: stamp(), undone: false });
+  markDirty();
+}
+
+function undo() {
+  if (past.length < 2) return;
+  var cur = past.pop();
+  future.push(cur);
+  steps = clone(past[past.length - 1].steps);
+  for (var i = log.length - 1; i >= 0; i--) { if (!log[i].undone) { log[i].undone = true; break; } }
+  markDirty();
+  render();
+  toast('Undid <b>' + esc(cur.label) + '</b>.' +
+    (cur.cosmetic ? ' That one only changed the picture — nothing about what runs.' : ''));
+}
+
+function redo() {
+  if (!future.length) return;
+  var nx = future.pop();
+  past.push(nx);
+  steps = clone(nx.steps);
+  for (var i = 0; i < log.length; i++) { if (log[i].undone) { log[i].undone = false; break; } }
+  markDirty(); render();
+  toast('Redid <b>' + esc(nx.label) + '</b>.');
+}
+
+/* ── autosave: in place, never a version ────────────────────────────────── */
+function markDirty() {
+  saveState = 'dirty';
+  if (saveT) clearTimeout(saveT);
+  saveT = setTimeout(function () {
+    saveState = 'saving'; render();
+    setTimeout(function () {
+      saveState = 'saved'; render();
+      if (variant === 'c') showSpot('Saved');
+    }, 420);
+  }, 600);
+  render();
+}
+
+function showSpot(text) {
+  var el = document.getElementById('spot');
+  var n = document.querySelector('.node:last-of-type') || document.querySelector('.node');
+  if (!n) return;
+  var pr = document.getElementById('plane').getBoundingClientRect();
+  var nr = n.getBoundingClientRect();
+  el.textContent = '✓ ' + text;
+  el.style.left = (nr.left - pr.left + document.getElementById('plane').scrollLeft + 46) + 'px';
+  el.style.top = (nr.bottom - pr.top - 4) + 'px';
+  el.classList.add('show');
+  if (spotT) clearTimeout(spotT);
+  spotT = setTimeout(function () { el.classList.remove('show'); }, 2100);
+}
+
+/* ── edits ──────────────────────────────────────────────────────────────── */
+function uniqueSlug(base) {
+  var taken = {}; steps.forEach(function (s) { taken[s.slug] = 1; });
+  var n = 1, c = base; while (taken[c]) { n++; c = base + '_' + n; } return c;
+}
+function addStep(t, at) {
+  var d = TYPES.filter(function (x) { return x.t === t; })[0];
+  var s = { slug: uniqueSlug(t.replace('llm_', '')), t: t, plain: d.plain, sub: d.sub, badges: [] };
+  if (t === 'llm_human_input') s.badges = [['you', '✋ Waits for you']];
+  if (t === 'llm_emit') s.badges = [['cited', '⛨ Must cite its sources']];
+  steps.splice(at, 0, s);
+  commit('added “' + d.plain + '”');
+  render();
+}
+function removeStep(i) {
+  var g = steps[i];
+  steps.splice(i, 1);
+  commit('removed “' + g.plain + '”');
+  render();
+  toast('Removed. <b>Nothing is gone for good</b> — <span class="kbd">⌘Z</span> puts it back, and the draft has not ' +
+        'published anything either way.');
+}
+function moveStep(i, dir) {
+  var j = i + dir; if (j < 0 || j >= steps.length) return;
+  var tmp = steps[i]; steps[i] = steps[j]; steps[j] = tmp;
+  commit('moved “' + steps[j].plain + '” to step ' + (j + 1));
+  render();
+}
+
+/* ── validity (the same shape 139 renders) ──────────────────────────────── */
+function verdicts() {
+  var out = [];
+  if (!steps.length) {
+    out.push({ code: 'no_terminal', severity: 'error', plain: 'There are no steps yet.' });
+    return out;
+  }
+  out.push({ code: 'business_requirement', severity: 'incomplete',
+    plain: 'It still needs a one-line description of what it is for.' });
+  if (steps.some(function (s) { return s.t === 'llm_human_input'; })) {
+    out.push({ code: 'interactive_phase', severity: 'incomplete',
+      plain: 'A step here pauses for a person, so it cannot run unattended.' });
+  }
+  if (!steps.some(function (s) { return s.t === 'llm_emit'; })) {
+    out.push({ code: 'input_unsatisfied', severity: 'incomplete',
+      plain: 'Nothing produces a deliverable yet.' });
+  }
+  return out;
+}
+function canPublish() { return verdicts().length === 0; }
+
+/* ── render ─────────────────────────────────────────────────────────────── */
+function nodeHTML(s, i) {
+  var d = TYPES.filter(function (x) { return x.t === s.t; })[0] || TYPES[0];
+  var badges = (s.badges || []).map(function (b) {
+    return '<span class="badge ' + b[0] + '">' + esc(b[1]) + '</span>';
+  }).join('');
+  return '<div class="node" data-i="' + i + '" data-type="' + s.t + '" tabindex="0" role="button"' +
+      ' aria-label="Step ' + (i + 1) + ': ' + esc(s.plain) + ' (' + s.t + ')">' +
+    '<span class="stepn">' + (i + 1) + '</span>' +
+    '<div class="acts">' +
+      '<button type="button" data-move="' + i + '" data-dir="-1" aria-label="Move earlier" title="Move earlier">◀</button>' +
+      '<button type="button" data-move="' + i + '" data-dir="1" aria-label="Move later" title="Move later">▶</button>' +
+      '<button type="button" class="danger" data-del="' + i + '" aria-label="Remove this step" title="Remove this step">✕</button>' +
+    '</div>' +
+    '<div class="icowrap">' + icon3d(d.icon, 52) + '</div>' +
+    '<div class="body">' +
+      '<div class="ttl">' + esc(s.plain) + '</div>' +
+      '<div class="sub">' + esc(s.sub) + '</div>' +
+      (badges ? '<div class="badges">' + badges + '</div>' : '') +
+      '<div class="techline">' + esc(TYPE_LABEL[s.t] || s.t) + ' · ' + esc(s.slug) + ' · phase_index ' + i + '</div>' +
+    '</div>' +
+  '</div>';
+}
+
+function renderFlow() {
+  var flow = document.getElementById('flow');
+  if (!steps.length) {
+    flow.innerHTML =
+      '<div class="empty">' +
+        '<h3>A blank workflow</h3>' +
+        '<p>The most common state there is — <b>40 of the 95</b> saved workflows have no steps at all. ' +
+        'Nothing has been published, nothing can break; this draft is yours until you say otherwise.</p>' +
+        '<button class="btn primary" id="firstadd" type="button">＋ Add the first step</button>' +
+        '<p style="margin-top:16px;font-size:11px;color:var(--color-text-dim)">or describe it in words and let the AI ' +
+        'draft it — that door arrives in a later phase</p>' +
+      '</div>';
+    return;
+  }
+  var html = '<div class="conn"><div class="ins" role="button" tabindex="0" data-ins="0" aria-label="Insert a step at the beginning">＋</div></div>';
+  steps.forEach(function (s, i) {
+    html += nodeHTML(s, i);
+    html += '<div class="conn"><div class="line"></div><div class="tip"></div>' +
+            '<div class="ins" role="button" tabindex="0" data-ins="' + (i + 1) + '" aria-label="Insert a step after step ' + (i + 1) + '">＋</div></div>';
+  });
+  html += '<div class="endpin"><span class="dot"></span> ends here</div>';
+  if (variant === 'c') {
+    var ok = canPublish();
+    html += '<div class="terminal">' +
+      '<div class="hd">' + (ok ? 'Ready to publish' : 'Not ready yet') + '</div>' +
+      '<div class="wy">' + (ok
+        ? 'Publishing runs it once on your knowledge base and grades the result. That run <i>is</i> the test — there is no separate try-it button.'
+        : esc(verdicts()[0].plain) + (verdicts().length > 1 ? ' (and ' + (verdicts().length - 1) + ' more)' : '')) +
+      '</div>' +
+      '<button class="btn ' + (ok ? 'primary' : '') + '" type="button" data-pub="1"' + (ok ? '' : ' disabled') + '>Publish</button>' +
+      '</div>';
+  }
+  flow.innerHTML = html;
+}
+
+function saveWords() {
+  if (saveState === 'saving') return { dot: 'saving', t: 'Saving…' };
+  if (saveState === 'dirty') return { dot: 'dirty', t: 'Not saved yet' };
+  return { dot: 'saved', t: 'Saved · still a draft' };
+}
+
+function pubBtn(big) {
+  var ok = canPublish();
+  var vs = verdicts();
+  return '<button class="btn ' + (ok ? 'primary' : '') + '" type="button" data-pub="1"' + (ok ? '' : ' disabled') + '>' +
+    (big ? 'Publish this workflow' : 'Publish') + '</button>' +
+    (ok ? '' : '<span style="font-size:11px;color:var(--color-text-muted)">' +
+      esc(vs[0].plain) + (vs.length > 1 ? ' <span style="color:var(--color-text-dim)">· and ' + (vs.length - 1) + ' more</span>' : '') +
+      '</span>');
+}
+
+function renderStrip() {
+  var st = document.getElementById('strip');
+  var cbar = document.getElementById('cbar');
+  var w = saveWords();
+
+  if (variant === 'a') {
+    st.style.display = '';
+    cbar.style.display = 'none';
+    st.innerHTML =
+      '<span class="pill">' + steps.length + ' step' + (steps.length === 1 ? '' : 's') + '</span>' +
+      '<span class="sep"></span>' +
+      '<span class="grp"><span class="sv-dot ' + w.dot + '"></span>' + w.t + '</span>' +
+      '<span class="sep"></span>' +
+      '<span class="grp">' +
+        '<button class="btn" type="button" id="u" style="padding:4px 10px"' + (past.length < 2 ? ' disabled' : '') + '>↶ Undo</button>' +
+        '<button class="btn" type="button" id="r" style="padding:4px 10px"' + (!future.length ? ' disabled' : '') + '>↷ Redo</button>' +
+      '</span>' +
+      '<span class="spacer" style="flex:1"></span>' + pubBtn(true);
+    return;
+  }
+
+  if (variant === 'b') {
+    st.style.display = '';
+    cbar.style.display = '';
+    cbar.innerHTML =
+      '<button type="button" id="u" aria-label="Undo" title="Undo (⌘Z)"' + (past.length < 2 ? ' disabled' : '') + '>↶</button>' +
+      '<button type="button" id="r" aria-label="Redo" title="Redo (⇧⌘Z)"' + (!future.length ? ' disabled' : '') + '>↷</button>' +
+      '<span class="sv"><span class="sv-dot ' + w.dot + '" style="display:inline-block;margin-right:5px"></span>' + w.t + '</span>';
+    st.innerHTML =
+      '<span style="font-family:var(--font-headline);font-weight:600">Risk Register</span>' +
+      '<span class="pill">draft</span>' +
+      '<span class="topright">' + pubBtn(false) + '</span>';
+    return;
+  }
+
+  /* C — nothing standing */
+  st.style.display = 'none';
+  cbar.style.display = 'none';
+}
+
+function renderHist() {
+  var out = document.getElementById('histout');
+  if (!log.length) {
+    out.innerHTML = '<p style="font-size:11.5px;color:var(--color-text-dim);line-height:1.6;margin:0">' +
+      'Nothing yet. Every change lands here, and every one of them can be walked back.</p>';
+    return;
+  }
+  var rev = log.slice().reverse();
+  var nowAt = -1;
+  for (var q = 0; q < rev.length; q++) { if (!rev[q].undone) { nowAt = q; break; } }
+  out.innerHTML = rev.map(function (h, i) {
+    return '<div class="hrow ' + (h.undone ? 'undone' : (i === nowAt ? 'now' : '')) + '">' +
+      '<span class="t">' + h.at + '</span>' +
+      '<span style="flex:1">' + esc(h.label) +
+        (h.cosmetic ? '<span class="cos"> · only the picture</span>' : '') + '</span></div>';
+  }).join('') +
+  '<p style="font-size:10.5px;color:var(--color-text-dim);line-height:1.6;margin:12px 0 0;padding-top:10px;border-top:1px dashed var(--color-border)">' +
+  'None of this has published anything. A published version is minted only by the publish gauntlet, ' +
+  'and a second person editing the same shared workflow is Phase 186\'s problem, not this list\'s.</p>';
+}
+
+function render() {
+  document.body.classList.remove('va', 'vb', 'vc');
+  document.body.classList.add('v' + variant);
+  document.getElementById('lead').innerHTML = LEAD[variant];
+  renderFlow(); renderStrip(); renderHist();
+}
+
+/* ── picker ─────────────────────────────────────────────────────────────── */
+function openPicker(anchorEl, at) {
+  pickAt = at;
+  var p = document.getElementById('picker');
+  p.innerHTML = '<div class="phdr">Add a step ' + (at >= steps.length ? 'at the end' : 'before step ' + (at + 1)) + '</div>' +
+    TYPES.map(function (d) {
+      return '<button type="button" data-t="' + d.t + '">' + icon3d(d.icon, 26) +
+        '<span>' + esc(d.plain) + '<small>' + esc(d.sub) + '</small></span></button>';
+    }).join('');
+  var r = anchorEl.getBoundingClientRect();
+  p.classList.add('show');
+  p.style.top = Math.max(8, Math.min(r.bottom + 8, window.innerHeight - p.offsetHeight - 12)) + 'px';
+  p.style.left = Math.max(8, Math.min(r.left - 118, window.innerWidth - 292)) + 'px';
+}
+function closePicker() { document.getElementById('picker').classList.remove('show'); pickAt = -1; }
+
+/* ── events ─────────────────────────────────────────────────────────────── */
+document.querySelector('.variant-nav').addEventListener('click', function (e) {
+  var b = e.target.closest('.variant-tab'); if (!b) return;
+  document.querySelectorAll('.variant-tab').forEach(function (t) { t.classList.remove('active'); });
+  b.classList.add('active'); variant = b.getAttribute('data-v'); closePicker(); render();
+});
+
+document.querySelector('.bar').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  var seg = b.closest('.seg'); if (!seg) return;
+  seg.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); });
+  b.classList.add('on');
+  if (b.hasAttribute('data-start')) reset(b.getAttribute('data-start'));
+  if (b.hasAttribute('data-vp')) document.body.classList.toggle('narrow', b.getAttribute('data-vp') === 'narrow');
+  if (b.hasAttribute('data-hist')) document.body.classList.toggle('showhist', b.getAttribute('data-hist') === 'on');
+  if (b.hasAttribute('data-card')) document.body.classList.toggle('card-b', b.getAttribute('data-card') === 'b');
+  if (b.hasAttribute('data-tech')) document.body.classList.toggle('tech', b.getAttribute('data-tech') === 'on');
+  render();
+});
+
+function onAction(e) {
+  if (e.target.id === 'u') { undo(); return true; }
+  if (e.target.id === 'r') { redo(); return true; }
+  var pub = e.target.closest('button[data-pub]');
+  if (pub && !pub.disabled) {
+    toast('Hands off to the publish gauntlet: lint → a <b>real run on your knowledge base</b> → the judge. ' +
+      'That run is the test — a draft is never run directly, and a judge failure is a hard wall, not a warning.');
+    return true;
+  }
+  return false;
+}
+document.getElementById('strip').addEventListener('click', onAction);
+document.getElementById('cbar').addEventListener('click', onAction);
+
+document.getElementById('stage').addEventListener('click', function (e) {
+  if (onAction(e)) return;
+  var ins = e.target.closest('.ins');
+  if (ins) { openPicker(ins, parseInt(ins.getAttribute('data-ins'), 10)); return; }
+  if (e.target.id === 'firstadd') { openPicker(e.target, 0); return; }
+  var del = e.target.closest('button[data-del]');
+  if (del) { e.stopPropagation(); removeStep(parseInt(del.getAttribute('data-del'), 10)); return; }
+  var mv = e.target.closest('button[data-move]');
+  if (mv) { e.stopPropagation(); moveStep(parseInt(mv.getAttribute('data-move'), 10), parseInt(mv.getAttribute('data-dir'), 10)); return; }
+});
+
+document.getElementById('stage').addEventListener('keydown', function (e) {
+  if (e.repeat) return;
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  var ins = e.target.closest('.ins');
+  if (ins) { e.preventDefault(); openPicker(ins, parseInt(ins.getAttribute('data-ins'), 10)); }
+});
+
+document.getElementById('picker').addEventListener('click', function (e) {
+  var b = e.target.closest('button[data-t]'); if (!b) return;
+  var at = pickAt; closePicker(); addStep(b.getAttribute('data-t'), at);
+});
+document.addEventListener('click', function (e) {
+  if (!e.target.closest('#picker') && !e.target.closest('.ins') && e.target.id !== 'firstadd') closePicker();
+});
+
+document.addEventListener('keydown', function (e) {
+  if (e.repeat) return;
+  var mod = e.metaKey || e.ctrlKey;
+  if (!mod || e.key.toLowerCase() !== 'z') return;
+  e.preventDefault();
+  if (e.shiftKey) redo(); else undo();
+});
+
+function reset(which) {
+  steps = which === 'two' ? clone(SEED_TWO) : [];
+  past = [{ steps: clone(steps), label: 'opened the draft', cosmetic: false, at: stamp() }];
+  future = []; log = []; saveState = 'saved';
+  if (saveT) clearTimeout(saveT);
+  render();
+}
+
+document.getElementById('themesel').addEventListener('change', function () {
+  document.querySelector('link[href*="themes/default"]').href = '../themes/' + this.value + '.css';
+});
+
+reset('empty');
+</script>
+</body>
+</html>

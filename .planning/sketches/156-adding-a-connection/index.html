@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 156 — Adding a connection</title>
+<link rel="stylesheet" href="../themes/default.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--color-bg); color: var(--color-text);
+  font-family: var(--font-sans); font-size: var(--text-base);
+  padding-top: 46px; -webkit-font-smoothing: antialiased;
+}
+
+#variant-nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+  background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+  padding: 7px 14px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+}
+#variant-nav .brand {
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  color: var(--color-text-dim); margin-right: 10px; letter-spacing: .04em;
+}
+.variant-tab {
+  background: transparent; border: 1px solid var(--color-border);
+  color: var(--color-text-muted); font-family: inherit; font-size: var(--text-xs);
+  padding: 5px 11px; border-radius: var(--radius-full); cursor: pointer; transition: all .15s var(--ease-out);
+}
+.variant-tab:hover { color: var(--color-text); border-color: var(--color-primary-glow); }
+.variant-tab.active { background: var(--color-primary-dim); border-color: var(--color-primary); color: var(--color-primary); }
+.nav-spacer { flex: 1; }
+.ctl { display: flex; align-items: center; gap: 5px; }
+.ctl-label {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .06em;
+  color: var(--color-text-dim); text-transform: uppercase;
+}
+#state-select {
+  background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text);
+  font-family: var(--font-mono); font-size: 11px; padding: 4px 7px; border-radius: var(--radius-sm); outline: none;
+}
+#state-select:focus { border-color: var(--color-primary); }
+
+.app { display: grid; grid-template-columns: 58px minmax(0, 1fr); min-height: calc(100vh - 46px); }
+.rail {
+  background: var(--color-bg-elev1); border-right: 1px solid var(--color-border);
+  display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 12px 0;
+}
+.rail .logo {
+  width: 30px; height: 30px; border-radius: 9px; margin-bottom: 10px;
+  background: linear-gradient(140deg, var(--color-primary-strong), var(--color-accent-violet));
+  display: grid; place-items: center; font-family: var(--font-headline); font-weight: 800; font-size: 13px; color: #fff;
+}
+.rail-item { width: 34px; height: 34px; border-radius: var(--radius-sm); display: grid; place-items: center; color: var(--color-text-dim); font-size: 15px; }
+.rail-item.on { background: var(--color-primary-dim); color: var(--color-primary); }
+.rail .grow { flex: 1; }
+.grow { flex: 1; }
+
+/* ── page + list ───────────────────────────────────────── */
+.page-h { font-family: var(--font-headline); font-weight: 800; font-size: var(--text-2xl); letter-spacing: -0.015em; }
+.page-sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: 3px 0 20px; }
+.mono { font-family: var(--font-mono); }
+.dim { color: var(--color-text-dim); }
+.muted { color: var(--color-text-muted); }
+
+.card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); }
+.card-h { padding: 15px 18px; border-bottom: 1px solid var(--color-border-soft); display: flex; align-items: center; gap: 10px; }
+.card-h h3 { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); }
+
+.conn-row { display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-bottom: 1px solid var(--color-border-soft); }
+.conn-row:last-child { border-bottom: 0; }
+.conn-row.sel { background: var(--color-primary-dim); box-shadow: inset 2px 0 0 var(--color-primary); }
+.cap { width: 29px; height: 29px; border-radius: 9px; display: grid; place-items: center; font-size: 13px; flex: none; border: 1px solid var(--color-border); }
+.cap.email { background: hsl(239 100% 82% / .12); color: var(--color-primary); }
+.cap.ticket { background: hsl(258 90% 66% / .13); color: var(--color-accent-violet); }
+.cap.msg { background: hsl(142 71% 45% / .12); color: var(--color-success); }
+.conn-name { font-size: var(--text-sm); }
+.state { font-size: var(--text-xs); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.state.ok { color: var(--color-success); }
+.state.warnst { color: var(--color-warning); }
+.state.off { color: var(--color-text-dim); }
+
+.btn {
+  background: var(--color-accent); border: 1px solid var(--color-border); color: var(--color-text);
+  font-family: inherit; font-size: var(--text-xs); padding: 7px 13px; border-radius: var(--radius-sm);
+  cursor: pointer; transition: all .14s var(--ease-out); display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover:not(:disabled) { border-color: var(--color-primary-glow); background: var(--color-muted); }
+.btn.primary {
+  background: linear-gradient(135deg, var(--color-primary-strong), var(--color-accent-violet));
+  border-color: transparent; color: #fff; font-weight: 600; box-shadow: 0 2px 10px hsl(239 84% 67% / .22);
+}
+.btn.primary:hover:not(:disabled) { opacity: .92; }
+.btn:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+.btn.tiny { padding: 4px 9px; font-size: 11px; }
+.btn.ghost { background: transparent; }
+
+/* ── the form itself (shared by all 3 containers) ──────── */
+.form-h { padding: 16px 18px; border-bottom: 1px solid var(--color-border-soft); display: flex; align-items: flex-start; gap: 10px; }
+.form-h h3 { font-family: var(--font-headline); font-weight: 700; font-size: var(--text-md); }
+.form-h p { color: var(--color-text-muted); font-size: var(--text-xs); margin-top: 3px; line-height: 1.5; }
+.form-b { padding: 16px 18px; }
+.form-f { padding: 14px 18px; border-top: 1px solid var(--color-border-soft); display: flex; align-items: center; gap: 9px; }
+
+.fld { margin-bottom: 14px; }
+.fld > label {
+  display: block; font-size: var(--text-xs); color: var(--color-text-muted);
+  margin-bottom: 5px; font-weight: 500;
+}
+.fld input[type=text], .fld input[type=password], .fld select {
+  width: 100%; background: var(--color-bg-elev1); border: 1px solid var(--color-border);
+  color: var(--color-text); font-family: inherit; font-size: var(--text-sm);
+  padding: 8px 11px; border-radius: var(--radius-sm); outline: none; transition: border-color .12s;
+}
+.fld input:focus, .fld select:focus { border-color: var(--color-primary); }
+.fld input.mono, .fld input[type=password] { font-family: var(--font-mono); font-size: var(--text-xs); }
+.fld .help { font-size: 11px; color: var(--color-text-dim); margin-top: 5px; line-height: 1.5; }
+.two { display: grid; grid-template-columns: 1fr 92px; gap: 9px; }
+
+/* capability chooser */
+.capchoice { display: grid; gap: 8px; }
+.capopt {
+  display: flex; align-items: center; gap: 11px; padding: 11px 13px;
+  border: 1px solid var(--color-border); border-radius: var(--radius-md);
+  cursor: pointer; transition: all .14s var(--ease-out); background: var(--color-bg-elev1);
+}
+.capopt:hover { border-color: var(--color-primary-glow); }
+.capopt.on { border-color: var(--color-primary); background: var(--color-primary-dim); }
+.capopt .t { font-size: var(--text-sm); font-weight: 500; }
+.capopt .d { font-size: 11px; color: var(--color-text-dim); margin-top: 2px; }
+
+/* THE always-on destination footer — 024-A's 🔒 endpoint footer, applied to a destination */
+.destfoot {
+  background: var(--color-muted); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: 9px 11px; font-family: var(--font-mono);
+  font-size: var(--text-xs); color: var(--color-text-muted);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.destfoot .lock { color: var(--color-text-dim); }
+.destfoot .val { color: var(--color-text); }
+.destfoot .tag {
+  font-size: 9px; letter-spacing: .05em; text-transform: uppercase; border-radius: 3px; padding: 1px 5px;
+}
+.destfoot .tag.fixed { background: var(--color-success-dim); color: var(--color-success); }
+.destfoot .tag.tls { background: var(--color-primary-dim); color: var(--color-primary); }
+.destfoot .tag.bad { background: var(--color-danger-dim); color: var(--color-danger); }
+
+/* stored-secret row (edit mode) — write-only, never rendered back */
+.stored {
+  display: flex; align-items: center; gap: 10px; background: var(--color-bg-elev1);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 11px;
+}
+.stored .dots { font-family: var(--font-mono); letter-spacing: .1em; color: var(--color-text-dim); }
+
+/* notices — graded by what they are */
+.notice { border-radius: var(--radius-md); padding: 12px 14px; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start; }
+.notice .g { font-size: 14px; line-height: 1.3; flex: none; }
+.notice h4 { font-size: var(--text-sm); font-weight: 600; margin-bottom: 4px; }
+.notice p { font-size: var(--text-xs); line-height: 1.6; color: var(--color-text-muted); }
+.notice p + p { margin-top: 6px; }
+.notice code { font-family: var(--font-mono); font-size: 11px; background: var(--color-muted); padding: 1px 5px; border-radius: 3px; color: var(--color-text); }
+.notice.refuse { border: 1px solid hsl(0 72% 51% / .45); background: var(--color-danger-dim); }
+.notice.refuse .g, .notice.refuse h4 { color: var(--color-danger); }
+.notice.warn { border: 1px solid hsl(38 92% 60% / .38); background: var(--color-warning-dim); }
+.notice.warn .g, .notice.warn h4 { color: var(--color-warning); }
+.notice.good { border: 1px solid hsl(142 71% 45% / .38); background: var(--color-success-dim); }
+.notice.good .g, .notice.good h4 { color: var(--color-success); }
+.notice.info { border: 1px solid var(--color-border); background: var(--color-bg-elev1); }
+.notice.info .g { color: var(--color-text-dim); }
+
+.verbatim {
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-text);
+  background: var(--color-bg); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); padding: 8px 10px; margin-top: 7px;
+  white-space: pre-wrap; word-break: break-all;
+}
+.verbatim-lbl { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-dim); font-family: var(--font-mono); }
+
+/* org-shared line */
+.scope-line {
+  font-size: 11px; color: var(--color-text-dim); display: flex; align-items: center; gap: 6px;
+  padding-top: 11px; margin-top: 3px; border-top: 1px solid var(--color-border-soft);
+}
+
+/* spinner */
+.spin { display: inline-block; width: 11px; height: 11px; border: 2px solid var(--color-border); border-top-color: var(--color-primary); border-radius: 50%; animation: sp .7s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* ── VARIANT A: push/split panel ───────────────────────── */
+#variant-a .split { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 0; align-items: start; }
+#variant-a .split.closed { grid-template-columns: minmax(0, 1fr) 0px; }
+#variant-a .panel {
+  border-left: 1px solid var(--color-border); background: var(--color-surface);
+  min-height: calc(100vh - 46px); position: sticky; top: 46px; overflow: hidden;
+}
+#variant-a .listcol { padding: 26px 26px 60px; }
+
+/* ── VARIANT B: dialog ─────────────────────────────────── */
+#variant-b .scrim {
+  position: fixed; inset: 46px 0 0 0; background: rgba(2,4,10,.62);
+  backdrop-filter: blur(2px); z-index: 40; display: grid; place-items: center; padding: 24px;
+}
+#variant-b .dialog {
+  width: 100%; max-width: 520px; max-height: calc(100vh - 120px); overflow: auto;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+#variant-b .main { padding: 26px 30px 60px; max-width: 1120px; }
+
+/* ── VARIANT C: inline expand ──────────────────────────── */
+#variant-c .main { padding: 26px 30px 60px; max-width: 860px; }
+#variant-c .inline-host { border-top: 1px solid var(--color-border-soft); background: var(--color-bg-elev1); }
+
+.variant { display: none; }
+.variant.active { display: block; }
+
+#sketch-tools {
+  position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui; font-size: 12px;
+  background: rgba(0,0,0,.78); color: #fff; padding: 8px 12px; border-radius: 8px;
+  opacity: .4; transition: opacity .2s; display: flex; gap: 8px; align-items: center;
+}
+#sketch-tools select, #sketch-tools button {
+  background: #222; color: #fff; border: 1px solid #444; border-radius: 4px; font-size: 11px; padding: 3px 6px; cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">156 · adding-a-connection</span>
+  <button class="variant-tab active" data-v="a" onclick="showVariant('a')">A: Push/split panel ★ Selected</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: Dialog</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Inline expand</button>
+  <span class="nav-spacer"></span>
+  <div class="ctl">
+    <span class="ctl-label">moment</span>
+    <select id="state-select" onchange="setState(this.value)">
+      <option value="new">1 · choose a capability</option>
+      <option value="slack">2 · Slack — nothing to type</option>
+      <option value="smtp" selected>3 · SMTP — a host you supply</option>
+      <option value="checking">4 · saved · checking credential…</option>
+      <option value="checked">5 · check passed · nothing sent</option>
+      <option value="checkfail">6 · check FAILED · verbatim error</option>
+      <option value="edit">7 · editing · secret is write-only</option>
+      <option value="blocked">8 · ⛔ egress refused · private address</option>
+      <option value="nokey">9 · ⛔ no encryption key · refuses to store</option>
+      <option value="killed">10 · live sending off · saves, won't send</option>
+    </select>
+  </div>
+</div>
+
+<!-- ══════════════════════ VARIANT A ══════════════════════ -->
+<div id="variant-a" class="variant active">
+  <div class="app">
+    <div class="rail">
+      <div class="logo">A</div>
+      <div class="rail-item">◧</div><div class="rail-item">▤</div>
+      <div class="rail-item">⛓</div><div class="rail-item">✦</div>
+      <div class="grow"></div><div class="rail-item on">⚙</div>
+    </div>
+    <div class="split">
+      <div class="listcol">
+        <div class="page-h">Connections</div>
+        <div class="page-sub">Real destinations a workflow step can send to.</div>
+        <div class="card" data-list></div>
+      </div>
+      <aside class="panel"><div data-form></div></aside>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ VARIANT B ══════════════════════ -->
+<div id="variant-b" class="variant">
+  <div class="app">
+    <div class="rail">
+      <div class="logo">A</div>
+      <div class="rail-item">◧</div><div class="rail-item">▤</div>
+      <div class="rail-item">⛓</div><div class="rail-item">✦</div>
+      <div class="grow"></div><div class="rail-item on">⚙</div>
+    </div>
+    <div class="main">
+      <div class="page-h">Connections</div>
+      <div class="page-sub">Real destinations a workflow step can send to.</div>
+      <div class="card" data-list></div>
+    </div>
+  </div>
+  <div class="scrim"><div class="dialog" data-form></div></div>
+</div>
+
+<!-- ══════════════════════ VARIANT C ══════════════════════ -->
+<div id="variant-c" class="variant">
+  <div class="app">
+    <div class="rail">
+      <div class="logo">A</div>
+      <div class="rail-item">◧</div><div class="rail-item">▤</div>
+      <div class="rail-item">⛓</div><div class="rail-item">✦</div>
+      <div class="grow"></div><div class="rail-item on">⚙</div>
+    </div>
+    <div class="main">
+      <div class="page-h">Connections</div>
+      <div class="page-sub">Real destinations a workflow step can send to.</div>
+      <div class="card" data-list-c></div>
+    </div>
+  </div>
+</div>
+
+<div id="sketch-tools" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0.4'">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Default</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+  <button onclick="setVp(375)">375</button>
+  <button onclick="setVp(768)">768</button>
+  <button onclick="setVp(0)">full</button>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   ONE form renderer, three containers. The containers are the
+   fork under test; the honesty content is identical in all
+   three ON PURPOSE — so the comparison is about placement, not
+   about which variant happens to tell the truth.
+   ═══════════════════════════════════════════════════════════ */
+
+var state = 'smtp';
+
+var EXISTING = [
+  { n: 'Ops mailbox',   cap: 'email',  g: '✉', dest: 'smtp.fastmail.com:465',   st: 'ok' },
+  { n: 'Northwind Jira',cap: 'ticket', g: '▣', dest: 'northwind.atlassian.net', st: 'ok' },
+  { n: '#ops-alerts',   cap: 'msg',    g: '＃', dest: 'slack.com/api',           st: 'ok' }
+];
+
+function listHTML(selIdx) {
+  var h = '<div class="card-h"><h3>Connections</h3><span class="grow"></span>' +
+          '<button class="btn primary tiny">＋ Add</button></div>';
+  EXISTING.forEach(function (r, i) {
+    h += '<div class="conn-row' + (i === selIdx ? ' sel' : '') + '">' +
+      '<span class="cap ' + r.cap + '">' + r.g + '</span>' +
+      '<div class="grow"><div class="conn-name">' + r.n + '</div>' +
+        '<div class="mono dim" style="font-size:11px">🔒 ' + r.dest + '</div></div>' +
+      '<span class="state ok">✓ Ready</span></div>';
+  });
+  return h;
+}
+
+/* ── the destination footer — ALWAYS rendered, never behind Advanced ── */
+function destFootHTML() {
+  if (state === 'slack') {
+    return '<div class="destfoot"><span class="lock">🔒</span> sends to ' +
+      '<span class="val">https://slack.com/api/chat.postMessage</span>' +
+      '<span class="tag fixed">fixed in code</span><span class="tag tls">TLS</span></div>';
+  }
+  if (state === 'blocked') {
+    return '<div class="destfoot" style="border-color:hsl(0 72% 51% / .5)"><span class="lock">🔒</span> sends to ' +
+      '<span class="val" style="color:var(--color-danger)">smtp.internal.northwind.co:587</span>' +
+      '<span class="tag bad">refused</span></div>';
+  }
+  return '<div class="destfoot"><span class="lock">🔒</span> sends to ' +
+    '<span class="val">smtp.fastmail.com:465</span>' +
+    '<span class="tag tls">implicit TLS</span>' +
+    '<span class="dim">· from ops@northwind.co</span></div>';
+}
+
+function capChooserHTML(sel) {
+  var opts = [
+    ['email',  '✉', 'Send an email',    'Your own SMTP host — you supply where it sends.'],
+    ['ticket', '▣', 'Create a ticket',  'A Jira Cloud site and project you own.'],
+    ['msg',    '＃', 'Post a message',   'Slack. The address is fixed in our code — nothing to type.']
+  ];
+  var h = '<div class="capchoice">';
+  opts.forEach(function (o) {
+    h += '<div class="capopt' + (o[0] === sel ? ' on' : '') + '">' +
+      '<span class="cap ' + o[0] + '">' + o[1] + '</span>' +
+      '<div><div class="t">' + o[2] + '</div><div class="d">' + o[3] + '</div></div></div>';
+  });
+  return h + '</div>';
+}
+
+/* ── the secret field — write-only, in both its shapes ─────── */
+function secretHTML() {
+  if (state === 'edit') {
+    return '<div class="fld"><label>App password</label>' +
+      '<div class="stored"><span class="dots">••••••••••••••••</span>' +
+      '<span class="grow"></span><span class="mono dim" style="font-size:10px">stored 3 Aug</span>' +
+      '<button class="btn tiny">Replace</button></div>' +
+      '<div class="help">The stored value is never sent back to this browser — not to you, not to an admin, ' +
+      'not to the workflow author who picks this connection. It can be replaced, never read.</div></div>';
+  }
+  var label = state === 'slack' ? 'Bot token' : 'App password';
+  var ph    = state === 'slack' ? 'xoxb-…'    : '';
+  return '<div class="fld"><label>' + label + '</label>' +
+    '<input type="password" value="' + (state === 'slack' ? 'xoxb-4821-9930-Kd8s' : 'hunter2-app-pw-9931') + '" placeholder="' + ph + '">' +
+    '<div class="help">Encrypted before it touches the database, and never rendered back to any browser once saved.</div></div>';
+}
+
+/* ── the moment-specific notice above the fields ───────────── */
+function noticeHTML() {
+  if (state === 'nokey') {
+    return '<div class="notice refuse"><span class="g">⛔</span><div>' +
+      '<h4>This platform cannot store a credential safely yet</h4>' +
+      '<p>No encryption key is configured, so a token saved now would sit in the database as readable text — ' +
+      'and it would be <em>your organisation\'s</em> token, not ours.</p>' +
+      '<p><strong>What this costs you:</strong> no connection can be created until it is set, so every ' +
+      '<span class="mono">external_action</span> step keeps reading <em>“Not sent — recorded”</em>.</p>' +
+      '<p><strong>To lift it:</strong> an operator sets <code>SECRETS_ENCRYPTION_KEY</code> and restarts the backend. ' +
+      'Nothing you have typed here is sent anywhere in the meantime.</p></div></div>';
+  }
+  if (state === 'blocked') {
+    return '<div class="notice refuse"><span class="g">⛔</span><div>' +
+      '<h4>That address was refused before anything was sent</h4>' +
+      '<p><span class="mono">smtp.internal.northwind.co</span> resolves to <span class="mono">10.4.2.19</span> — ' +
+      'a private address inside the network this platform runs on. Connections may only reach the public internet.</p>' +
+      '<p>The refusal happened <strong>before</strong> your password was read, so it was never used and never left this form.</p>' +
+      '<p class="dim">Recorded as a refusal: capability, host and reason — never the credential.</p></div></div>';
+  }
+  if (state === 'killed') {
+    return '<div class="notice warn"><span class="g">⛨</span><div>' +
+      '<h4>Live sending is off for this platform</h4>' +
+      '<p>You can save this connection and workflow authors can bind it to a step. Nothing will leave: ' +
+      'steps record what they would have done and read <em>“Not sent — recorded”</em>. ' +
+      'An operator turns <code>live_connectors</code> on in the Control Room.</p></div></div>';
+  }
+  if (state === 'checking') {
+    return '<div class="notice info"><span class="g"><span class="spin"></span></span><div>' +
+      '<h4>Checking the credential…</h4>' +
+      '<p>Asking the host who this token belongs to. No email, ticket or message is sent by this check.</p></div></div>';
+  }
+  if (state === 'checked') {
+    return '<div class="notice good"><span class="g">✓</span><div>' +
+      '<h4>Credential works — and nothing was sent</h4>' +
+      '<p>Authenticated as <span class="mono">ops@northwind.co</span> at <span class="mono">smtp.fastmail.com:465</span>. ' +
+      'The check connected, authenticated and disconnected. No mail was delivered to anyone.</p>' +
+      '<p class="dim">Checked just now · re-checking is always safe.</p></div></div>';
+  }
+  if (state === 'checkfail') {
+    return '<div class="notice refuse"><span class="g">✕</span><div>' +
+      '<h4>The host rejected this credential</h4>' +
+      '<p>Reached <span class="mono">smtp.fastmail.com:465</span> and it answered — the address is fine, the password is not. ' +
+      'The connection is saved but no step will be allowed to use it until this passes.</p>' +
+      '<div class="verbatim-lbl" style="margin-top:8px">what the host said, verbatim</div>' +
+      '<div class="verbatim">535 5.7.8 Authentication credentials invalid</div></div></div>';
+  }
+  return '';
+}
+
+function formHTML() {
+  var isNew = (state === 'new');
+  var isSlack = (state === 'slack');
+  var refused = (state === 'nokey' || state === 'blocked');
+
+  var title = state === 'edit' ? 'Ops mailbox' : 'Add a connection';
+  var sub = state === 'edit'
+    ? 'Everyone in your organisation can bind this to a workflow step.'
+    : 'A real destination a workflow step can send to. It sends nothing until a person approves it in a run.';
+
+  var h = '<div class="form-h"><div style="flex:1"><h3>' + title + '</h3><p>' + sub + '</p></div>' +
+          '<button class="btn ghost tiny" title="Close">✕</button></div><div class="form-b">';
+
+  h += noticeHTML();
+
+  if (isNew) {
+    h += '<div class="fld"><label>What should this step do?</label>' + capChooserHTML(null) + '</div>';
+    h += '<div class="notice info" style="margin-top:16px"><span class="g">ⓘ</span><div>' +
+         '<p>Pick one and the rest of the form appears — every capability needs different facts, ' +
+         'and Slack needs almost none.</p></div></div>';
+  } else {
+    h += '<div class="fld"><label>Name</label><input type="text" value="' +
+      (isSlack ? '#ops-alerts' : 'Ops mailbox') + '"></div>';
+
+    if (isSlack) {
+      h += '<div class="fld"><label>Channel</label><input type="text" class="mono" value="#ops-alerts">' +
+        '<div class="help">The only thing you supply. The address this posts to is a constant in our source — ' +
+        'it cannot be pointed anywhere else, by you or by a workflow.</div></div>';
+    } else {
+      h += '<div class="fld"><label>SMTP host and port</label><div class="two">' +
+        '<input type="text" class="mono" value="' +
+        (state === 'blocked' ? 'smtp.internal.northwind.co' : 'smtp.fastmail.com') + '">' +
+        '<input type="text" class="mono" value="' + (state === 'blocked' ? '587' : '465') + '"></div>' +
+        '<div class="help">Must be reachable on the public internet over TLS. Plain <span class="mono">smtp://</span> ' +
+        'is refused, including for addresses inside this network.</div></div>';
+      h += '<div class="fld"><label>Send from</label><input type="text" class="mono" value="ops@northwind.co"></div>';
+    }
+
+    h += destFootHTML();
+    h += secretHTML();
+
+    h += '<div class="scope-line"><span>⚭</span> Shared with everyone in <strong style="color:var(--color-text-muted)">Northwind</strong> ' +
+         '— a connection exists so colleagues\' workflows can use it. It is never visible to another organisation.</div>';
+  }
+
+  h += '</div>';
+
+  /* footer — the actions, graded */
+  h += '<div class="form-f">';
+  if (state === 'nokey') {
+    h += '<button class="btn primary" disabled aria-describedby="why-refused">Save connection</button>' +
+         '<span id="why-refused" class="dim" style="font-size:11px;line-height:1.45">' +
+         'Disabled because no encryption key is configured.</span>';
+  } else if (state === 'checking') {
+    h += '<button class="btn" disabled><span class="spin"></span> Checking…</button>' +
+         '<span class="dim" style="font-size:11px">Saved. Nothing is sent by a check.</span>';
+  } else if (state === 'checked' || state === 'checkfail' || state === 'edit') {
+    h += '<button class="btn primary">Save changes</button>' +
+         '<button class="btn" onclick="setState(\'checking\')">Check credential</button>' +
+         '<span class="grow"></span><button class="btn ghost tiny" style="color:var(--color-danger)">Delete</button>';
+  } else if (state === 'new') {
+    h += '<button class="btn primary" disabled>Continue</button>' +
+         '<span class="dim" style="font-size:11px">Pick a capability first.</span>';
+  } else {
+    h += '<button class="btn primary" onclick="setState(\'checking\')">Save connection</button>' +
+         '<button class="btn ghost">Cancel</button>';
+    /* A refusal you CAN fix leaves the door open — unlike `nokey`, where nothing
+       you type will ever make it saveable, so the button closes. */
+    if (state === 'blocked') {
+      h += '<span class="dim" style="font-size:11px;line-height:1.45">Correct the host and try again.</span>';
+    }
+    if (state === 'killed') {
+      h += '<span class="grow"></span><span class="mono" style="font-size:11px;color:var(--color-warning)">will save · will not send</span>';
+    }
+  }
+  h += '</div>';
+  return h;
+}
+
+/* ── render into the three containers ─────────────────────── */
+function renderAll() {
+  var selIdx = (state === 'edit') ? 0 : -1;
+
+  var lists = document.querySelectorAll('[data-list]');
+  for (var i = 0; i < lists.length; i++) lists[i].innerHTML = listHTML(selIdx);
+
+  var forms = document.querySelectorAll('[data-form]');
+  for (var j = 0; j < forms.length; j++) forms[j].innerHTML = formHTML();
+
+  /* variant C weaves the form INTO the list, in place */
+  var cList = document.querySelector('[data-list-c]');
+  if (cList) {
+    var h = '<div class="card-h"><h3>Connections</h3><span class="grow"></span>' +
+            '<button class="btn primary tiny">＋ Add</button></div>';
+    EXISTING.forEach(function (r, i) {
+      h += '<div class="conn-row' + (i === selIdx ? ' sel' : '') + '">' +
+        '<span class="cap ' + r.cap + '">' + r.g + '</span>' +
+        '<div class="grow"><div class="conn-name">' + r.n + '</div>' +
+          '<div class="mono dim" style="font-size:11px">🔒 ' + r.dest + '</div></div>' +
+        '<span class="state ok">✓ Ready</span></div>';
+      if (i === 0 && selIdx === 0) h += '<div class="inline-host">' + formHTML() + '</div>';
+    });
+    if (selIdx !== 0) h += '<div class="inline-host">' + formHTML() + '</div>';
+    cList.innerHTML = h;
+  }
+}
+
+function setState(s) {
+  state = s;
+  var sel = document.getElementById('state-select');
+  if (sel && sel.value !== s) sel.value = s;
+  renderAll();
+}
+
+function showVariant(id) {
+  var vs = document.querySelectorAll('.variant');
+  for (var i = 0; i < vs.length; i++) vs[i].className = 'variant';
+  document.getElementById('variant-' + id).className = 'variant active';
+  var ts = document.querySelectorAll('.variant-tab');
+  for (var k = 0; k < ts.length; k++) {
+    ts[k].className = 'variant-tab' + (ts[k].getAttribute('data-v') === id ? ' active' : '');
+  }
+  renderAll();
+}
+
+function setVp(w) {
+  var mains = document.querySelectorAll('.main, .listcol');
+  for (var i = 0; i < mains.length; i++) {
+    mains[i].style.maxWidth = w ? (w - 58) + 'px' : '';
+  }
+}
+
+renderAll();
+</script>
+</body>
+</html>

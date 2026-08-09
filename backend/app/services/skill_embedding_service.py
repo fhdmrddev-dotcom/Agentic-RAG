@@ -79,6 +79,34 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+async def _resolve_skill_org_id(supabase, user_id: str):
+    """Resolve the org that owns this user's skills (Phase 163 / D-05).
+
+    Reads one ``skills.org_id`` (backfilled post-162) for ``user_id`` via the injected
+    service-role client so the batch skill-vector writer can route through
+    ``get_service_role_supabase(org_id)`` and widen its ownership read to org-aware.
+    Best-effort: any failure — or a user with no skills / a NULL org_id (or the unit-test
+    mock, whose skill rows omit org_id) — returns None, and the job stays byte-identical to
+    pre-163 (the ``.eq("user_id")`` owner scope is unchanged). The raw value is returned
+    unconverted so it binds on any client surface. Blocking supabase-py wrapped (D-v2.5-01)."""
+    def _q():
+        return (
+            supabase.table("skills")
+            .select("org_id")
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+
+    try:
+        resp = await run_in_threadpool(_q)
+        rows = resp.data or []
+        return rows[0].get("org_id") if rows else None
+    except Exception:  # noqa: BLE001 — org resolution is best-effort; None => byte-identical
+        logger.debug("skill org_id resolve failed for user_id=%s", user_id, exc_info=True)
+        return None
+
+
 # ── D-01 embed-source builder + staleness fingerprint (pure) ──────────────────
 
 
@@ -141,6 +169,7 @@ async def skill_reembed_job(
     batch_size: int | None = None,
     max_batches: int | None = None,
     only_skill_ids: list[str] | None = None,
+    org_id=None,
 ) -> dict:
     """Backfill/refresh this owner's stale skill vectors (reembed_service shape).
 
@@ -154,10 +183,23 @@ async def skill_reembed_job(
     ``run_in_threadpool`` — ``embed_texts`` AND the supabase ``.select`` read AND each
     ``.upsert`` write — never on the event loop. A failure logs a warning and returns an
     honest partial/resumable snapshot; it never crashes the caller (fail-open, D-05).
+
+    Phase 163 (D-05 / T-163-05b / D-14): resolve the owner's org and route this detached
+    service-role writer through ``get_service_role_supabase(org_id)`` (REFUSES a missing
+    org — no bare, org-less service-role client survives), then WIDEN the owner ``.eq(
+    "user_id")`` read with an ``.eq("org_id")`` predicate. ``org_id=None`` (a corpus with
+    no skills, or the unit-test mock) keeps the job byte-identical to pre-163. The
+    ``skill_embeddings`` upsert omits org_id → the TEN-04 autofill trigger stamps it.
     """
     limit = batch_size if batch_size is not None else BATCH
     current = _current_model(app_settings)
     dims = getattr(app_settings, "embedding_dimensions", None)
+    if org_id is None:
+        org_id = await _resolve_skill_org_id(supabase, user_id)
+    if org_id:
+        from app.dependencies import get_service_role_supabase  # function-local (avoid import cycle)
+
+        supabase = get_service_role_supabase(org_id)
     embedded = 0
     skipped = 0
 
@@ -173,6 +215,8 @@ async def skill_reembed_job(
                 .eq("user_id", user_id)  # V4 owner hand-scope on the READ
                 .eq("is_enabled", True)
             )
+            if org_id is not None:
+                q = q.eq("org_id", org_id)  # Phase 163 (D-05) — org-aware read scope
             if only_skill_ids:
                 q = q.in_("id", list(only_skill_ids))
             return q.execute()

@@ -60,14 +60,14 @@ const sampleViews: SavedView[] = [
     user_id: "user-1",
     name: "Invoices",
     filter_expr: { op: "and", conditions: [{ field: "document_type", op: "eq", value: "invoice" }] },
-    is_global: false,
+    is_system_global: false,
   },
   {
     id: "v2",
     user_id: null,
     name: "Expiring soon",
     filter_expr: { op: "and", conditions: [{ field: "date", op: "within_next", value: 90, unit: "days" }] },
-    is_global: true,
+    is_system_global: true,
   },
 ]
 

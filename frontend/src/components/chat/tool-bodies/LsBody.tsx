@@ -47,8 +47,8 @@ export default function LsBody({ parsed }: LsBodyProps) {
         <div key={i} className="flex items-center gap-2 text-xs font-mono text-foreground/80 min-w-0 py-0.5">
           <Folder className="w-3.5 h-3.5 text-amber-400/70 flex-shrink-0" />
           <span className="truncate">{f.name}</span>
-          {f.is_global && (
-            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">global</span>
+          {f.is_org_shared && (
+            <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">shared</span>
           )}
         </div>
       ))}

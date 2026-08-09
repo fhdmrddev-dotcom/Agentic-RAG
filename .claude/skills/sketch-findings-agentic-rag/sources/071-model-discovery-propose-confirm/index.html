@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sketch 071 — Model Discovery: Propose → Confirm</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  body { padding-top: 96px; }
+  .stage { max-width: 1020px; margin: 0 auto; padding: 0 22px 90px; }
+
+  /* band (static context, same as 070) */
+  .op-band { position: fixed; top:0; left:0; right:0; z-index:90;
+    background: linear-gradient(180deg, hsl(38 92% 60% / 0.07), transparent), var(--color-bg-elev1);
+    border-bottom: 1px solid hsl(38 92% 60% / 0.25); padding: 12px 22px 0; }
+  .band-top { display:flex; align-items:center; gap:12px; font-size:var(--text-sm); }
+  .band-title { font-family:var(--font-headline); font-weight:700; display:flex; gap:7px; align-items:center; }
+  .op-chip { font-family:var(--font-mono); font-size:10px; font-weight:600; letter-spacing:.12em; color:var(--color-warning);
+    background:var(--color-warning-dim); border:1px solid hsl(38 92% 60% / .3); border-radius:var(--radius-sm); padding:2px 7px; }
+  .band-identity { color:var(--color-text-dim); } .spacer { flex:1; }
+  .rec-marker { display:inline-flex; align-items:center; gap:6px; font-size:var(--text-xs); color:var(--color-text-dim); border-radius:var(--radius-full); padding:3px 10px; transition:all var(--dur-base) var(--ease-out); }
+  .rec-dot { width:6px; height:6px; border-radius:50%; background:var(--color-success); box-shadow:0 0 6px hsl(142 71% 45% / .6); }
+  .rec-marker.flash { background:var(--color-warning-dim); color:var(--color-warning); } .rec-marker.flash .rec-dot { background:var(--color-warning); animation:brandPulse .5s var(--ease-out) 2; }
+  .back-link { color:var(--color-text-dim); }
+  .band-tabs { display:flex; gap:4px; margin-top:10px; }
+  .band-tab { padding:8px 13px; color:var(--color-text-muted); border-bottom:2px solid transparent; font-size:var(--text-sm); cursor:default; }
+  .band-tab.active { color:var(--color-primary); border-bottom-color:var(--color-primary); font-weight:600; }
+
+  .page-head h1 { font-family:var(--font-headline); font-size:var(--text-2xl); margin:22px 0 4px; }
+  .page-sub { color:var(--color-text-muted); font-size:var(--text-sm); margin:0 0 18px; max-width:74ch; }
+  .btn { font-family:inherit; font-size:var(--text-sm); border-radius:var(--radius-md); padding:9px 15px; cursor:pointer;
+    border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); display:inline-flex; gap:7px; align-items:center; transition:all var(--dur-fast); }
+  .btn:hover { background:var(--color-accent); }
+  .btn.primary { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+  .btn.primary:hover { background:hsl(239 100% 82% / .22); }
+  .btn.confirm { background:var(--color-success-dim); color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+
+  /* propose-only banner */
+  .propose-banner { display:flex; gap:10px; align-items:flex-start; background:var(--color-bg-elev1);
+    border:1px solid var(--color-primary-glow); border-left:3px solid var(--color-primary); border-radius:var(--radius-md);
+    padding:12px 15px; font-size:var(--text-sm); margin-bottom:20px; }
+  .propose-banner b { color:var(--color-primary); }
+
+  /* per-provider discovery run cards */
+  .run-strip { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; margin-bottom:22px; }
+  .run-card { border:1px solid var(--color-border-soft); border-radius:var(--radius-md); padding:9px 11px; background:var(--color-surface); font-size:var(--text-xs); }
+  .run-card .rc-top { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+  .run-logo { width:18px; height:18px; border-radius:4px; display:grid; place-items:center; font-size:9px; font-family:var(--font-mono); font-weight:700; }
+  .run-card .rc-state { color:var(--color-text-dim); font-family:var(--font-mono); }
+  .run-card.done .rc-state { color:var(--color-success); }
+  .run-card.err { border-color:hsl(0 72% 51% / .4); } .run-card.err .rc-state { color:var(--color-danger); }
+  .run-card.rich { border-color:hsl(142 71% 45% / .3); }
+  .cap-badge { font-size:9px; padding:1px 5px; border-radius:4px; margin-top:4px; display:inline-block; }
+  .cap-badge.full { color:var(--color-success); background:var(--color-success-dim); }
+  .cap-badge.ids  { color:var(--color-warning); background:var(--color-warning-dim); }
+
+  /* diff groups */
+  .diff-group { margin-bottom:22px; }
+  .dg-head { display:flex; align-items:center; gap:9px; margin-bottom:9px; font-weight:600; }
+  .dg-count { font-size:var(--text-xs); color:var(--color-text-dim); font-weight:400; }
+  .dg-new .glyph { color:var(--color-success); } .dg-chg .glyph { color:var(--color-primary); } .dg-van .glyph { color:var(--color-warning); }
+
+  .prop-row { border:1px solid var(--color-border-soft); border-radius:var(--radius-md); background:var(--color-surface); padding:12px 14px; margin-bottom:9px; }
+  .prop-row.accepted { border-color:hsl(142 71% 45% / .4); background:linear-gradient(90deg,var(--color-success-dim),transparent 40%); }
+  .pr-top { display:flex; align-items:center; gap:10px; }
+  .pr-check { width:18px; height:18px; border-radius:5px; border:1px solid var(--color-border); cursor:pointer; display:grid; place-items:center; font-size:11px; color:transparent; }
+  .pr-check.on { background:var(--color-success-dim); border-color:var(--color-success); color:var(--color-success); }
+  .pr-id { font-family:var(--font-mono); font-size:var(--text-sm); }
+  .pr-prov { font-size:var(--text-xs); color:var(--color-text-dim); }
+  .pr-caps { display:flex; flex-wrap:wrap; gap:8px; margin:11px 0 0 28px; }
+  .cap { font-size:var(--text-xs); display:inline-flex; align-items:center; gap:6px; background:var(--color-bg-elev1); border:1px solid var(--color-border-soft);
+    border-radius:var(--radius-sm); padding:5px 9px; }
+  .cap .k { color:var(--color-text-dim); }
+  .cap .v { font-family:var(--font-mono); }
+  .cap.returned .v { color:var(--color-success); }
+  .cap.unknown { border-color:hsl(38 92% 60% / .4); background:var(--color-warning-dim); }
+  .cap.unknown .k { color:var(--color-warning); }
+  .cap.unknown input { width:74px; background:var(--color-bg); border:1px solid hsl(38 92% 60% / .5); border-radius:4px;
+    color:var(--color-text); font-family:var(--font-mono); font-size:var(--text-xs); padding:2px 5px; }
+  .cap.changed { border-color:var(--color-primary-glow); }
+  .cap.changed .old { color:var(--color-text-dim); text-decoration:line-through; margin-right:5px; }
+  .cap.changed .new { color:var(--color-primary); font-family:var(--font-mono); }
+  .unknown-note { font-size:var(--text-xs); color:var(--color-warning); margin:9px 0 0 28px; }
+
+  .van-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border:1px dashed hsl(38 92% 60% / .35);
+    border-radius:var(--radius-md); background:var(--color-surface); margin-bottom:9px; }
+  .van-row .pr-id { color:var(--color-text-muted); }
+  .van-actions { margin-left:auto; display:flex; gap:7px; }
+  .mini { font-size:11px; padding:4px 9px; border-radius:5px; border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); cursor:pointer; }
+  .mini:hover { background:var(--color-accent); color:var(--color-text); }
+  .mini.warn { color:var(--color-warning); border-color:hsl(38 92% 60% / .35); }
+
+  /* sticky confirm bar */
+  .confirm-bar { position:sticky; bottom:0; margin-top:24px; background:hsl(220 40% 5% / .96); backdrop-filter:blur(12px);
+    border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:13px 18px; display:flex; align-items:center; gap:14px; }
+  .confirm-bar .summary { font-size:var(--text-sm); } .confirm-bar .summary b { color:var(--color-text); }
+
+  /* Variant B: compare table */
+  table.cmp { width:100%; border-collapse:collapse; font-size:var(--text-sm); }
+  .cmp th { text-align:left; font-size:var(--text-xs); color:var(--color-text-dim); text-transform:uppercase; letter-spacing:.05em; padding:8px 10px; border-bottom:1px solid var(--color-border); }
+  .cmp td { padding:9px 10px; border-bottom:1px solid var(--color-border-soft); font-family:var(--font-mono); font-size:var(--text-xs); }
+  .cmp .now { color:var(--color-text-dim); } .cmp .prop { color:var(--color-text); }
+  .cmp .prop.chg { color:var(--color-primary); } .cmp .prop.unk { color:var(--color-warning); }
+  .cmp tr.newrow td:first-child::before { content:'✚ '; color:var(--color-success); }
+
+  /* Variant C: stepper */
+  .stepper { display:flex; gap:6px; margin-bottom:20px; }
+  .step { flex:1; text-align:center; font-size:var(--text-xs); padding:9px; border-radius:var(--radius-sm); background:var(--color-surface); border:1px solid var(--color-border-soft); color:var(--color-text-dim); }
+  .step.active { color:var(--color-primary); border-color:var(--color-primary-glow); background:var(--color-primary-dim); font-weight:600; }
+  .step.done { color:var(--color-success); }
+  .tech-name { display:none; font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim); }
+  body.tech .tech-name { display:inline; }
+  .variant { display:none; } .variant.active { display:block; }
+</style>
+</head>
+<body>
+
+<div class="op-band">
+  <div class="band-top">
+    <span class="band-title">🛡 Control Room</span><span class="op-chip">OPERATOR</span>
+    <span class="band-identity">fhdmrd@gmail.com</span><span class="spacer"></span>
+    <span class="rec-marker" id="rec"><span class="rec-dot"></span> every action recorded</span>
+    <span class="back-link">‹ Back to app</span>
+  </div>
+  <div class="band-tabs">
+    <span class="band-tab">Control Plane</span><span class="band-tab">Users &amp; Access</span>
+    <span class="band-tab active">Model Registry</span><span class="band-tab">Secrets 🔒</span><span class="band-tab">Audit log</span>
+  </div>
+</div>
+
+<div class="variant-nav">
+  <span class="label">Sketch 071 · discovery propose→confirm</span>
+  <button class="variant-tab active" onclick="showVariant('a',event)">A · Grouped diff list (propose-only hero) <span class="star">★</span></button>
+  <button class="variant-tab" onclick="showVariant('b',event)">B · Compare table</button>
+  <button class="variant-tab" onclick="showVariant('c',event)">C · Guided stepper</button>
+</div>
+
+<!-- ═══════ VARIANT A ═══════ -->
+<div id="variant-a" class="variant active">
+<div class="stage">
+  <div class="page-head"><h1>Discover models</h1></div>
+  <p class="page-sub">Query each provider's <span class="mono">/models</span> and propose what changed. <b>Nothing is
+    applied until you confirm</b> — and a capability the provider didn't return is <b>never guessed</b>.</p>
+
+  <div id="preRun"><button class="btn primary" onclick="runDiscovery()">⟳ Run discovery across 8 providers</button></div>
+
+  <div id="results" style="display:none;">
+    <div class="propose-banner">
+      <span>🛡</span>
+      <div><b>Propose-only.</b> Discovery found model IDs from every provider, and auto-filled capabilities <b>only where the
+      provider returned them</b> (Google &amp; OpenRouter). For providers that return IDs only (OpenAI, Anthropic, DeepSeek…),
+      un-returned fields are marked <span style="color:var(--color-warning)">unknown — you set them</span>, never filled from a guess.</div>
+    </div>
+
+    <!-- per-provider run cards -->
+    <div class="run-strip" id="runStrip"></div>
+
+    <!-- NEW -->
+    <div class="diff-group dg-new">
+      <div class="dg-head"><span class="glyph">✚</span> New models <span class="dg-count">— not in the registry yet</span></div>
+
+      <div class="prop-row" data-accept="1">
+        <div class="pr-top">
+          <span class="pr-check on" onclick="toggleAccept(this)">✓</span>
+          <span class="pr-id">gemini-3-pro</span><span class="pr-prov">· Google · returned full capabilities ✓</span>
+        </div>
+        <div class="pr-caps">
+          <span class="cap returned"><span class="k">context</span><span class="v">2,000k</span></span>
+          <span class="cap returned"><span class="k">max out</span><span class="v">64k</span></span>
+          <span class="cap returned"><span class="k">tools</span><span class="v">✓ native</span></span>
+          <span class="cap unknown"><span class="k">timeout <span class="tech-name">llm_call_timeout_seconds</span></span><input type="number" placeholder="set…" value="600"></span>
+        </div>
+      </div>
+
+      <div class="prop-row" data-accept="1">
+        <div class="pr-top">
+          <span class="pr-check on" onclick="toggleAccept(this)">✓</span>
+          <span class="pr-id">gpt-5.6-nova</span><span class="pr-prov">· OpenAI · returned IDs only</span>
+        </div>
+        <div class="pr-caps">
+          <span class="cap unknown"><span class="k">context</span><input type="number" placeholder="set…"></span>
+          <span class="cap unknown"><span class="k">max out</span><input type="number" placeholder="set…"></span>
+          <span class="cap unknown"><span class="k">tools</span>
+            <select style="background:var(--color-bg);border:1px solid hsl(38 92% 60% / .5);border-radius:4px;color:var(--color-text);font-size:var(--text-xs);padding:2px 4px;"><option>unknown</option><option>native ✓</option><option>none</option></select></span>
+          <span class="cap unknown"><span class="k">timeout</span><input type="number" placeholder="set…" value="300"></span>
+        </div>
+        <div class="unknown-note">⚠ OpenAI's <span class="mono">/models</span> returns no capabilities — set these before this model can be enabled. It will NOT be auto-enabled.</div>
+      </div>
+    </div>
+
+    <!-- CHANGED -->
+    <div class="diff-group dg-chg">
+      <div class="dg-head"><span class="glyph">±</span> Changed <span class="dg-count">— capability differs from the registry</span></div>
+      <div class="prop-row" data-accept="1">
+        <div class="pr-top">
+          <span class="pr-check on" onclick="toggleAccept(this)">✓</span>
+          <span class="pr-id">z-ai/glm-5.1</span><span class="pr-prov">· OpenRouter · returned full capabilities ✓</span>
+        </div>
+        <div class="pr-caps">
+          <span class="cap changed"><span class="k">max out</span> <span class="old">32k</span><span class="new">64k</span></span>
+          <span class="cap changed"><span class="k">context</span> <span class="old">128k</span><span class="new">200k</span></span>
+          <span class="cap returned"><span class="k">tools</span><span class="v">✓ native (unchanged)</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- VANISHED -->
+    <div class="diff-group dg-van">
+      <div class="dg-head"><span class="glyph">⊘</span> No longer offered <span class="dg-count">— in the registry, not returned by /models</span></div>
+      <div class="van-row">
+        <span class="pr-id">gpt-4-turbo</span><span class="pr-prov">· OpenAI · last seen 41 days ago</span>
+        <span class="van-actions">
+          <button class="mini warn" onclick="recFlash();this.textContent='marked deprecated'">Mark deprecated</button>
+          <button class="mini" onclick="recFlash();this.textContent='disabled'">Disable</button>
+          <button class="mini" onclick="this.closest('.van-row').style.opacity=.4">Keep as-is</button>
+        </span>
+      </div>
+      <div class="unknown-note" style="margin-left:0;">Vanished models are <b>never auto-deleted</b> — you decide. (A model can vanish because the provider paused an endpoint, not because it's gone.)</div>
+    </div>
+
+    <!-- sticky confirm -->
+    <div class="confirm-bar">
+      <span class="summary">Confirm <b id="acceptN">3</b> changes — <span class="text-muted">2 new · 1 changed · 1 flagged vanished</span></span>
+      <span class="spacer" style="flex:1"></span>
+      <button class="btn" onclick="document.getElementById('results').style.display='none';document.getElementById('preRun').style.display='block'">Discard</button>
+      <button class="btn confirm" onclick="doConfirm()">Apply confirmed changes</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════ VARIANT B ═══════ -->
+<div id="variant-b" class="variant">
+<div class="stage">
+  <div class="page-head"><h1>Discover models</h1></div>
+  <p class="page-sub">Side-by-side: what the registry has now vs what <span class="mono">/models</span> returned. Denser — good for a large diff; the "you set it" beat is subtler in a cell.</p>
+  <div class="propose-banner"><span>🛡</span><div><b>Propose-only.</b> Amber cells = the provider returned nothing; you set them. Nothing applies until Apply.</div></div>
+  <table class="cmp">
+    <thead><tr><th>Model · provider</th><th>Context (now→proposed)</th><th>Max out</th><th>Tools</th><th>Timeout</th><th>Accept</th></tr></thead>
+    <tbody>
+      <tr class="newrow"><td>gemini-3-pro · Google</td><td class="prop chg">— → 2,000k</td><td class="prop chg">— → 64k</td><td class="prop chg">— → ✓</td><td class="prop unk">— → you set</td><td><span class="pr-check on" onclick="toggleAccept(this)">✓</span></td></tr>
+      <tr class="newrow"><td>gpt-5.6-nova · OpenAI</td><td class="prop unk">— → you set</td><td class="prop unk">— → you set</td><td class="prop unk">— → you set</td><td class="prop unk">— → you set</td><td><span class="pr-check on" onclick="toggleAccept(this)">✓</span></td></tr>
+      <tr><td>z-ai/glm-5.1 · OpenRouter</td><td class="prop chg">128k → 200k</td><td class="prop chg">32k → 64k</td><td class="now">✓ (same)</td><td class="now">300s (same)</td><td><span class="pr-check on" onclick="toggleAccept(this)">✓</span></td></tr>
+      <tr><td>gpt-4-turbo · OpenAI <span style="color:var(--color-warning)">⊘ vanished</span></td><td class="now" colspan="4">not returned by /models — flag deprecated / disable / keep</td><td><span class="pr-check" onclick="toggleAccept(this)"></span></td></tr>
+    </tbody>
+  </table>
+  <div class="confirm-bar"><span class="summary">Confirm <b>3</b> changes</span><span style="flex:1"></span><button class="btn confirm" onclick="doConfirm()">Apply confirmed changes</button></div>
+</div>
+</div>
+
+<!-- ═══════ VARIANT C ═══════ -->
+<div id="variant-c" class="variant">
+<div class="stage">
+  <div class="page-head"><h1>Discover models</h1></div>
+  <p class="page-sub">A guided walk: run → review new → review changed → review vanished → confirm. Most hand-holding; heavier chrome for what's often a small diff.</p>
+  <div class="stepper">
+    <div class="step done">✓ Run</div><div class="step active">2 · New (2)</div><div class="step">3 · Changed (1)</div><div class="step">4 · Vanished (1)</div><div class="step">5 · Confirm</div>
+  </div>
+  <div class="propose-banner"><span>🛡</span><div><b>Step 2 of 5 — New models.</b> Provider returned IDs; capabilities auto-filled only where published. Set any <span style="color:var(--color-warning)">unknown</span> fields; nothing is enabled without them.</div></div>
+  <div class="prop-row" data-accept="1">
+    <div class="pr-top"><span class="pr-check on" onclick="toggleAccept(this)">✓</span><span class="pr-id">gpt-5.6-nova</span><span class="pr-prov">· OpenAI · IDs only</span></div>
+    <div class="pr-caps">
+      <span class="cap unknown"><span class="k">context</span><input type="number" placeholder="set…"></span>
+      <span class="cap unknown"><span class="k">max out</span><input type="number" placeholder="set…"></span>
+      <span class="cap unknown"><span class="k">tools</span><input type="text" placeholder="unknown"></span>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:16px;"><button class="btn">‹ Back</button><button class="btn primary">Next · Changed ›</button></div>
+</div>
+</div>
+
+<div class="sketch-toolbar"><span>071</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'"><option value="default">Deep Midnight</option></select>
+  <button onclick="document.querySelectorAll('.stage').forEach(s=>s.style.maxWidth='375px')">▯</button>
+  <button onclick="document.querySelectorAll('.stage').forEach(s=>s.style.maxWidth='1020px')">▭</button>
+</div>
+
+<script>
+const PROVIDERS = [
+  {n:'OpenAI', g:'AI', c:'hsl(160 70% 60%)', bg:'hsl(160 60% 40% / .18)', cap:'ids'},
+  {n:'Anthropic', g:'◈', c:'hsl(18 80% 62%)', bg:'hsl(18 70% 45% / .18)', cap:'ids'},
+  {n:'Google', g:'✦', c:'hsl(210 90% 66%)', bg:'hsl(210 80% 50% / .18)', cap:'full'},
+  {n:'DeepSeek', g:'DS', c:'hsl(230 80% 70%)', bg:'hsl(230 70% 50% / .18)', cap:'ids'},
+  {n:'Kimi', g:'K', c:'hsl(280 70% 70%)', bg:'hsl(280 60% 50% / .18)', cap:'ids'},
+  {n:'GLM', g:'GL', c:'hsl(45 80% 60%)', bg:'hsl(45 70% 45% / .18)', cap:'ids'},
+  {n:'MiniMax', g:'M', c:'hsl(0 70% 65%)', bg:'hsl(0 60% 45% / .18)', cap:'err'},
+  {n:'OpenRouter', g:'⇄', c:'var(--color-primary)', bg:'hsl(239 60% 55% / .2)', cap:'full'},
+];
+function recFlash(){ const m=document.getElementById('rec'); m.classList.remove('flash'); void m.offsetWidth; m.classList.add('flash'); setTimeout(()=>m.classList.remove('flash'),1600); }
+function showVariant(id,e){ document.querySelectorAll('.variant').forEach(v=>v.classList.remove('active')); document.getElementById('variant-'+id).classList.add('active');
+  document.querySelectorAll('.variant-tab').forEach(t=>t.classList.remove('active')); e.target.classList.add('active'); }
+function toggleAccept(el){ el.classList.toggle('on'); el.textContent = el.classList.contains('on')?'✓':''; const row=el.closest('.prop-row'); if(row) row.classList.toggle('accepted', el.classList.contains('on')); updateCount(); }
+function updateCount(){ const n=document.querySelectorAll('#variant-a .pr-check.on').length; const el=document.getElementById('acceptN'); if(el) el.textContent=n; }
+function doConfirm(){ recFlash(); alert('✓ Applied. Each confirmed change writes a ✎ model.capability.set row to the audit ledger; the discovery run itself logged ✎ model.discover. New models with unknown capabilities stay DISABLED until you fill them — never auto-enabled (SC#3).'); }
+
+function runDiscovery(){
+  document.getElementById('preRun').style.display='none';
+  const res=document.getElementById('results'); res.style.display='block'; recFlash();
+  const strip=document.getElementById('runStrip'); strip.innerHTML='';
+  PROVIDERS.forEach((p,i)=>{
+    const c=document.createElement('div'); c.className='run-card';
+    c.innerHTML=`<div class="rc-top"><span class="run-logo" style="background:${p.bg};color:${p.c}">${p.g}</span><b>${p.n}</b></div><div class="rc-state">querying…</div>`;
+    strip.appendChild(c);
+    // fake staggered completion with a stable-start-ts feel
+    setTimeout(()=>{
+      if(p.cap==='err'){ c.classList.add('err'); c.querySelector('.rc-state').textContent='HTTP 429 — rate limited'; c.innerHTML+=`<div class="cap-badge ids" style="color:var(--color-danger);background:var(--color-danger-dim)">verbatim error · excluded</div>`; }
+      else { c.classList.add('done'); if(p.cap==='full') c.classList.add('rich'); c.querySelector('.rc-state').textContent = (2+i)+' models · '+(0.4+i*0.1).toFixed(1)+'s';
+        c.innerHTML+=`<div class="cap-badge ${p.cap==='full'?'full':'ids'}">${p.cap==='full'?'capabilities ✓':'IDs only'}</div>`; }
+    }, 350 + i*280);
+  });
+}
+</script>
+</body>
+</html>

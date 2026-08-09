@@ -145,7 +145,7 @@ def _skill_row(skill_id, owner_id=OWNER["id"]):
         "description": "Fill a risk register.",
         "instructions": "",
         "is_enabled": True,
-        "is_global": False,
+        "is_org_shared": False,
         "created_at": _now(),
         "updated_at": _now(),
     }

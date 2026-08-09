@@ -1,0 +1,1132 @@
+"""Phase 182 gap closure round 2 (VALID-01, plan 182-11) — an unresolvable registry says
+"we could not CHECK", never "your definition is wrong".
+
+THE SHARED DEFECT, three costumes. WR-01, WR-02 and WR-07 in `182-REVIEW.md` are one bug:
+a transient INFRASTRUCTURE failure is rendered to the author as a FALSE, specific,
+actionable-looking accusation against a definition that is actually correct.
+
+  * **WR-01** — `grounding._skill_registry`'s fail-closed `except Exception: return []` sat
+    INSIDE `assemble_grounding_bundle`, so a PostgREST 5xx / timeout / reset on the skills
+    read produced `skills = []`, `skill_ids = set()` and a bundle that returned
+    SUCCESSFULLY. Publish stage 2.6's `try` never saw a failure, so `_unregistered_skill_ref`
+    reported EVERY phase skill reference as unregistered. PRE-FIX OUTCOME: publish blocked at
+    `grounding_fidelity` with `unregistered_skill` naming the author's VALID id, and
+    `/validate` painted that node red with the same message — actively directing the author
+    to "fix" a correct reference.
+  * **WR-02** — `postgrest.exceptions.APIError` is NOT a `ValueError`, so it escaped the ⊆
+    rule's catch and reached FastAPI. PRE-FIX OUTCOME: HTTP 500 from a route whose own
+    docstring promises "ALWAYS HTTP 200", on the route Phase 184 calls on every canvas edit.
+  * **WR-07** — the unbounded full-table `folders` read is capped by PostgREST at `max-rows`
+    and silently returns a PREFIX. The resolved project subtree then shrinks. PRE-FIX
+    OUTCOME: a FALSE `folder_scope` violation against a correct definition — and since
+    182-06 that false violation BLOCKS publish.
+
+THE ONE MECHANISM. All three are closed by a single signal: `GroundingBundle.degraded`
+names the registries that could not be resolved, and BOTH consumers of the shared collector
+(`POST /workflows/validate` and publish stage 2.6) branch on it identically, emitting the
+ONE shared `grounding.grounding_unavailable_finding`. There is no second copy of the
+degradation decision and no second message.
+
+EVERY TEST HERE FAILS AGAINST THE PRE-FIX CODE — the pre-fix outcome is named in each
+docstring, and the three falsification recipes are recorded in the plan's SUMMARY.
+
+CONVENTION (Phase 102 posture): imports INSIDE the test bodies; the route handler is called
+DIRECTLY (the `test_182_validate.py` precedent) so the whole matrix runs OFFLINE — no live
+DB, no provider, no network.
+"""
+
+from __future__ import annotations
+
+from types import SimpleNamespace
+
+import pytest
+
+# conftest's canonical mock identity — `coerce_uid` needs a parseable UUID.
+_CALLER = "00000000-0000-0000-0000-000000000001"
+_ORG = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+
+_PROJECT = "11111111-1111-1111-1111-111111111111"
+_OUTSIDE_FOLDER = "22222222-2222-2222-2222-222222222222"
+_REAL_SKILL = "33333333-3333-3333-3333-333333333333"
+_BR = "Deliver a cited answer to the requester."
+
+# Distinguishes "the response carried no count header at all" from "the count was None".
+_NO_COUNT = object()
+
+
+# ── the offline fakes ─────────────────────────────────────────────────────────
+
+
+class _FakeQuery:
+    """A fluent supabase-py query stand-in that RECORDS whether a count was requested.
+
+    `count_arg` is the load-bearing recording: the WR-07 fix must request an exact count
+    ONLY on the two grounding gate call sites (`strict=True`) and NEVER on the default path,
+    which is also the chat agent-loop path and four `/folders` routes.
+    """
+
+    def __init__(self, rows, count=_NO_COUNT):
+        self._rows = list(rows)
+        self._count = count
+        self.selected = None
+        self._ranged = None
+        self.range_calls = []
+        self.select_counts = []
+
+    def select(self, *cols, count=None, **_kwargs):
+        self.selected = cols[0] if cols else "*"
+        self.select_counts.append(count)
+        return self
+
+    @property
+    def count_arg(self):
+        """The count arg of the FIRST select — the one that decides whether the read is
+        truncation-aware.
+
+        Recorded per-select rather than overwritten because a real supabase-py `.table()`
+        hands back a FRESH builder per call while this double reuses one recorder: without
+        the list, CR-03's pagination follow-up would erase the very evidence these tests
+        assert on. The follow-ups correctly pass no count — re-asking would add a COUNT(*)
+        per page.
+        """
+        return self.select_counts[0] if self.select_counts else None
+
+    def eq(self, *_a, **_k):
+        return self
+
+    def or_(self, *_a, **_k):
+        return self
+
+    def range(self, start, end):
+        # Round-3 CR-03: the strict read now PAGINATES past a `max-rows` cap before giving
+        # up. This base double owns a single fixed prefix and nothing beyond it, so a ranged
+        # read past its end yields NOTHING — which models a server that will not serve more
+        # and keeps the fail-closed raise reachable.
+        self.range_calls.append((start, end))
+        self._ranged = (start, end)
+        return self
+
+    def execute(self):
+        if self._ranged is not None:
+            start, end = self._ranged
+            self._ranged = None
+            return SimpleNamespace(data=self._rows[start:end + 1])
+        resp = SimpleNamespace(data=list(self._rows))
+        if self._count is not _NO_COUNT:
+            resp.count = self._count
+        return resp
+
+
+class _PagedFolders(_FakeQuery):
+    """A `folders` table that behaves like PostgREST under a real `max-rows` cap.
+
+    An unbounded select returns only the first `cap` rows but reports the TRUE total as an
+    exact count; `.range(a, b)` serves the requested slice (itself capped). This is the double
+    that distinguishes "we detected a truncation" from "we survived one" — the `_FakeQuery`
+    above can only ever prove the raise.
+    """
+
+    def __init__(self, rows, cap):
+        super().__init__(rows, count=len(rows))
+        self._all = list(rows)
+        self._cap = cap
+
+    def execute(self):
+        if self._ranged is not None:
+            start, end = self._ranged
+            self._ranged = None
+            return SimpleNamespace(data=self._all[start:end + 1][: self._cap])
+        return SimpleNamespace(data=self._all[: self._cap], count=len(self._all))
+
+
+class _FakeSupabase:
+    """Per-table fake: `.table(name)` returns that table's recorder (created on demand)."""
+
+    def __init__(self, **tables):
+        self.tables = {
+            name: (q if isinstance(q, _FakeQuery) else _FakeQuery(q))
+            for name, q in tables.items()
+        }
+
+    def table(self, name):
+        return self.tables.setdefault(name, _FakeQuery([]))
+
+
+def _folder_rows(n: int) -> list[dict]:
+    return [
+        {
+            "id": f"{i:08d}-0000-0000-0000-00000000000f",
+            "user_id": _CALLER,
+            "name": f"folder-{i}",
+            "parent_id": None,
+            "is_org_shared": False,
+            "org_id": _ORG,
+        }
+        for i in range(n)
+    ]
+
+
+def _skill_rows() -> list[dict]:
+    return [
+        {
+            "id": _REAL_SKILL,
+            "name": "A Real Registered Skill",
+            "user_id": _CALLER,
+            "is_org_shared": False,
+            "is_system": False,
+            "org_id": _ORG,
+            "is_enabled": True,
+        }
+    ]
+
+
+def _healthy_client(*, folder_count: int = 2) -> _FakeSupabase:
+    """A fake whose three grounding reads all succeed — the control for every degraded case."""
+    return _FakeSupabase(
+        folders=_FakeQuery(_folder_rows(folder_count)),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+
+# ── definition builders (shape-valid; mirrors test_182_validate.py) ───────────
+
+
+def _definition(phases: list[dict], **extra) -> dict:
+    base = {
+        "slug": "degradation-wf",
+        "version": 1,
+        "name": "Degradation Workflow",
+        "status": "draft",
+        "business_requirement": _BR,
+        "phases": phases,
+    }
+    base.update(extra)
+    return base
+
+
+def _llm_single(slug: str = "answer", index: int = 0, **config_extra) -> dict:
+    cfg = {"phase_type": "llm_single", "prompt": "Answer the question."}
+    cfg.update(config_extra)
+    return {"slug": slug, "phase_index": index, "config": cfg, "validators": []}
+
+
+# ── the consumer seams ────────────────────────────────────────────────────────
+
+
+def _patch_degraded_bundle(monkeypatch, *degraded: str, skill_ids=(), tool_names=()):
+    """Swap the ONE registry read for a bundle that reports itself DEGRADED.
+
+    Patches the MODULE attribute (`app.services.harness.grounding`) — the seam both
+    consumers resolve at call time (the `test_182_validate.py` posture).
+    """
+    from app.services.harness import grounding as g
+
+    async def _fake_assemble(**_kwargs):
+        return g.GroundingBundle(
+            tools=sorted(tool_names),
+            tool_names=set(tool_names),
+            folders=[],
+            skills=[],
+            skill_ids=set(skill_ids),
+            placeholders=[],
+            degraded=frozenset(degraded),
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _fake_assemble)
+
+
+async def _validate(definition: dict, supabase=None):
+    """Call the `/validate` handler DIRECTLY and return the ValidateResponse."""
+    from app.api import workflows as wf
+    from app.models.harness import WorkflowDefinition
+
+    return await wf.validate_workflow(
+        body=WorkflowDefinition.model_validate(definition),
+        current_user={"id": _CALLER},
+        supabase=object() if supabase is None else supabase,
+    )
+
+
+def _codes(response) -> set[str]:
+    return {v.code for v in response.verdicts}
+
+
+def _by_code(response, code: str):
+    matches = [v for v in response.verdicts if v.code == code]
+    assert matches, f"expected a {code!r} verdict, got {sorted(_codes(response))}"
+    return matches[0]
+
+
+# ═══ (A) WR-07 — the truncation-aware read, at the read itself ════════════════
+
+
+def test_the_truncation_error_is_not_a_value_error():
+    """`FolderReadTruncatedError` is a `RuntimeError`, DELIBERATELY not a `ValueError`.
+
+    The ⊆ rule catches bare `ValueError` (`grounding._folder_scope_violations`). If a
+    truncation were a `ValueError` it would be caught there and rendered as a `folder_scope`
+    verdict — re-creating the exact false accusation this plan exists to close, one layer
+    down (T-182-47). It must reach the caller that knows how to say "we could not check".
+    """
+    from app.utils.folder_utils import FolderReadTruncatedError
+
+    assert issubclass(FolderReadTruncatedError, RuntimeError)
+    assert not issubclass(FolderReadTruncatedError, ValueError), (
+        "FolderReadTruncatedError became a ValueError subclass — the ⊆ rule's broad "
+        "`except ValueError` would now swallow an infrastructure truncation and render it "
+        "as a false folder_scope verdict (T-182-47)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_strict_read_raises_when_the_rows_are_short_of_the_reported_total():
+    """A PostgREST `max-rows` truncation is DETECTED instead of silently returning a prefix.
+
+    PRE-FIX OUTCOME: `fetch_all_folders` had no count and no limit, so a capped read returned
+    a prefix indistinguishable from a complete answer — `folder_map` lost ancestors, the
+    resolved project subtree shrank, and `assert_folder_scopes_subset` accused a correct
+    definition of a `folder_scope` violation that (post-182-06) BLOCKS publish.
+
+    Round-3 CR-03: the raise is now the LAST resort, reached only after pagination fails to
+    assemble the reported total. This double owns nothing past its prefix, so the ranged
+    follow-up comes back empty and the fail-closed posture still holds.
+    """
+    from app.utils.folder_utils import FolderReadTruncatedError, fetch_all_folders
+
+    sb = _FakeSupabase(folders=_FakeQuery(_folder_rows(3), count=7))
+
+    with pytest.raises(FolderReadTruncatedError):
+        await fetch_all_folders(sb, fields="*", strict=True)
+
+    assert sb.tables["folders"].count_arg == "exact", (
+        "the strict read must ask PostgREST for an exact count — without it there is nothing "
+        "to compare the returned row count against"
+    )
+    assert sb.tables["folders"].range_calls, (
+        "the strict read raised WITHOUT attempting pagination — that is the detect-only form "
+        "that turns a max-rows cap into a permanent deployment-wide outage (CR-03)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_strict_read_returns_normally_on_a_complete_or_uncountable_response():
+    """The negative controls: only a SHORT read is a truncation.
+
+    A count equal to the row count is a complete read. A missing count (a mock, or a server
+    that did not honour the header) and a non-integer count are UNUSABLE, never a truncation
+    — the `isinstance` guard is required, not defensive noise: conftest's supabase is a
+    `MagicMock`, so an unguarded truthiness check on `resp.count` would raise on every test.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    rows = _folder_rows(3)
+
+    complete = _FakeSupabase(folders=_FakeQuery(rows, count=3))
+    assert await fetch_all_folders(complete, fields="*", strict=True) == rows
+
+    no_count = _FakeSupabase(folders=_FakeQuery(rows))  # no `count` attribute at all
+    assert await fetch_all_folders(no_count, fields="*", strict=True) == rows
+
+    none_count = _FakeSupabase(folders=_FakeQuery(rows, count=None))
+    assert await fetch_all_folders(none_count, fields="*", strict=True) == rows
+
+    text_count = _FakeSupabase(folders=_FakeQuery(rows, count="7"))  # not an int
+    assert await fetch_all_folders(text_count, fields="*", strict=True) == rows
+
+
+@pytest.mark.asyncio
+async def test_the_default_read_requests_no_count_and_never_raises():
+    """THE BYTE-IDENTITY CONTROL. Every existing caller is unaffected BY CONSTRUCTION.
+
+    `fetch_all_folders` is on the chat agent-loop path (`agent_loop.py`) and on four
+    `/folders` routes. An unconditional `count="exact"` would add a COUNT(*) to every one of
+    them (T-182-48). Driven against the SAME truncating response the strict test raises on:
+    the default caller gets its rows, raises nothing, and asks for no count.
+    """
+    from app.utils.folder_utils import fetch_all_folders, fetch_visible_folders
+
+    rows = _folder_rows(3)
+    sb = _FakeSupabase(folders=_FakeQuery(rows, count=7), org_members=_FakeQuery([]))
+
+    assert await fetch_all_folders(sb, fields="*") == rows
+    assert sb.tables["folders"].count_arg is None, (
+        "the DEFAULT folders read asked PostgREST for a count — that is a COUNT(*) added to "
+        "the chat agent-loop path and four /folders routes (T-182-48)"
+    )
+
+    # ... and the same holds one layer up, through the visibility filter.
+    sb2 = _FakeSupabase(folders=_FakeQuery(rows, count=7), org_members=_FakeQuery([]))
+    assert await fetch_visible_folders(sb2, _CALLER) == rows
+    assert sb2.tables["folders"].count_arg is None
+
+
+# ═══ (B) the ONE degradation signal on the bundle ═════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_a_healthy_bundle_is_not_degraded():
+    """The control for every case below: all three reads succeed -> `degraded` is EMPTY.
+
+    Without this, a fix that marked every bundle degraded would pass the whole file while
+    destroying the product (nothing would ever be grounded again).
+    """
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    bundle = await assemble_grounding_bundle(supabase=_healthy_client(), user_id=_CALLER)
+
+    assert bundle.degraded == frozenset()
+    assert bundle.skill_ids == {_REAL_SKILL}
+    assert len(bundle.folders) == 2
+    assert bundle.tool_names  # the in-process registry is never degraded
+
+
+@pytest.mark.asyncio
+async def test_a_raising_skills_read_degrades_the_bundle_instead_of_emptying_it(monkeypatch):
+    """WR-01 AT THE BUNDLE. A skills-read failure is RECORDED, not swallowed.
+
+    PRE-FIX OUTCOME: `_skill_registry` swallowed the exception and returned `[]`, so the
+    bundle came back SUCCESSFULLY with an empty registry and no trace of the failure — and
+    every downstream membership test became vacuously false. This asserts the failure now
+    travels on the bundle, while the fail-closed OUTCOME (no skill grounding) is unchanged.
+    """
+    from app.services.harness import grounding as g
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("postgrest 503 on the org-gated skills read")
+
+    monkeypatch.setattr(g, "_skill_registry", _boom)
+
+    bundle = await g.assemble_grounding_bundle(supabase=_healthy_client(), user_id=_CALLER)
+
+    assert bundle.degraded == frozenset({"skills"}), (
+        "WR-01: a raising skills read produced a bundle that looks HEALTHY. Every skill "
+        "reference in the author's definition would now be reported unregistered."
+    )
+    assert bundle.skills == []  # still fail-closed — the decision MOVED, it did not vanish
+    assert bundle.skill_ids == set()
+    # the folders half is untouched: one degraded read must not degrade the other registry
+    assert bundle.folders, "a skills failure emptied the folder palette too"
+
+
+@pytest.mark.asyncio
+async def test_a_raising_skills_table_degrades_the_bundle_through_the_real_registry_read():
+    """THE LITERAL WR-01 REPRODUCTION — the REAL `_skill_registry` against a real failure.
+
+    The sibling above patches the registry function out. This one does not: it drives the
+    genuine `_skill_registry` body against a client whose `skills` table raises, which is
+    exactly the PostgREST 5xx / timeout / reset the review describes.
+
+    PRE-FIX OUTCOME: `_skill_registry`'s own `except Exception: return []` absorbed it and
+    the bundle came back looking healthy — no exception, no signal, an empty registry. This
+    test is therefore the direct guard on the removed swallow: restore it and this fails.
+    """
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    class _SkillsBoom(_FakeSupabase):
+        def table(self, name):
+            if name == "skills":
+                raise RuntimeError("postgrest is down")
+            return super().table(name)
+
+    sb = _SkillsBoom(
+        folders=_FakeQuery(_folder_rows(2)),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+    )
+
+    bundle = await assemble_grounding_bundle(supabase=sb, user_id=_CALLER)
+
+    assert bundle.degraded == frozenset({"skills"}), (
+        "WR-01: the skills read failed and the bundle reports itself HEALTHY. Both consumers "
+        "would now report every phase skill reference as unregistered — a factual accusation "
+        "against a correct definition, sourced from an outage."
+    )
+    assert bundle.skill_ids == set()
+
+
+@pytest.mark.asyncio
+async def test_a_raising_folders_read_degrades_only_the_folders_registry(monkeypatch):
+    """The folders half of the same signal — and the skills read still runs.
+
+    PRE-FIX OUTCOME: the folders read had NO guard at any level, so a PostgREST error
+    propagated straight out of `assemble_grounding_bundle` to the caller (WR-02's path 1).
+    """
+    from app.services.harness import grounding as g
+    from app.utils import folder_utils as fu
+
+    async def _boom(*_a, **_k):
+        raise RuntimeError("postgrest 503 on the visible-folders read")
+
+    monkeypatch.setattr(fu, "fetch_visible_folders", _boom)
+
+    bundle = await g.assemble_grounding_bundle(supabase=_healthy_client(), user_id=_CALLER)
+
+    assert bundle.degraded == frozenset({"folders"})
+    assert bundle.folders == []
+    assert bundle.skill_ids == {_REAL_SKILL}, (
+        "the skills read was skipped because the folders read failed — one unreachable "
+        "registry must not cost the author the other one"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_truncated_folders_read_degrades_the_bundle_end_to_end():
+    """WR-07 END TO END: a `max-rows` prefix reaches the bundle as a DEGRADATION.
+
+    PRE-FIX OUTCOME: the prefix was accepted as the complete folder tree, so the palette
+    silently lost org-shared folders and the ⊆ walk resolved a shrunken subtree — producing
+    a FALSE `folder_scope` accusation rather than an honest "we could not check".
+
+    The strict read on THIS call site covers the later ⊆ walk too: `assemble_grounding_bundle`
+    runs FIRST on both consumers and reads the SAME table under the SAME cap, so a truncation
+    is detected before `resolve_project_subtree` is ever reached.
+    """
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    sb = _FakeSupabase(
+        folders=_FakeQuery(_folder_rows(3), count=1000),  # PostgREST's default max-rows
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+    bundle = await assemble_grounding_bundle(supabase=sb, user_id=_CALLER)
+
+    assert "folders" in bundle.degraded
+    assert bundle.folders == []
+    assert sb.tables["folders"].count_arg == "exact"
+
+
+@pytest.mark.asyncio
+async def test_the_bundle_never_raises_to_its_caller_on_either_degradation(monkeypatch):
+    """Both degradations are RETURNED, never raised — the property both consumers rely on.
+
+    `/validate` is documented ALWAYS-HTTP-200 and publish's orchestration is sealed against
+    raises, so a bundle that raised would defeat both. This drives the two failures together.
+    """
+    from app.services.harness import grounding as g
+    from app.utils import folder_utils as fu
+
+    async def _folders_boom(*_a, **_k):
+        raise RuntimeError("folders read down")
+
+    def _skills_boom(*_a, **_k):
+        raise RuntimeError("skills read down")
+
+    monkeypatch.setattr(fu, "fetch_visible_folders", _folders_boom)
+    monkeypatch.setattr(g, "_skill_registry", _skills_boom)
+
+    bundle = await g.assemble_grounding_bundle(supabase=_healthy_client(), user_id=_CALLER)
+
+    assert bundle.degraded == frozenset({"folders", "skills"})
+    assert bundle.folders == []
+    assert bundle.skill_ids == set()
+    assert bundle.tool_names, "the in-process tool registry cannot fail and must survive"
+
+
+# ═══ (C) WR-01 at BOTH consumers — "could not check", never a false accusation ══
+
+
+@pytest.mark.asyncio
+async def test_validate_reports_grounding_unavailable_not_a_false_unregistered_skill(monkeypatch):
+    """WR-01 AT `/validate`. A degraded registry must not accuse a valid skill reference.
+
+    PRE-FIX OUTCOME: the bundle came back with `skill_ids = set()` and no signal, so rule 3
+    reported `unregistered_skill` for the author's REAL id and the canvas painted that node
+    red — telling the author to "fix" a reference that is perfectly correct.
+    """
+    _patch_degraded_bundle(monkeypatch, "skills")
+
+    resp = await _validate(_definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)]))
+
+    codes = _codes(resp)
+    assert "unregistered_skill" not in codes, (
+        "WR-01 REGRESSION: an unreachable skill registry was reported as the author's "
+        f"skill reference {_REAL_SKILL} being unregistered. That is a factual accusation "
+        "against a correct definition, manufactured out of an outage."
+    )
+    assert "unregistered_tool" not in codes and "folder_scope" not in codes
+    verdict = _by_code(resp, "grounding_unavailable")
+    assert verdict.phase is None  # an unreachable registry is not attributable to a node
+    assert verdict.severity == "error"  # never the soft "incomplete" (the WR-05 posture)
+    assert resp.ok is False
+    assert "skills" in verdict.message  # names WHICH registry could not be resolved
+
+
+@pytest.mark.asyncio
+async def test_publish_blocks_with_grounding_unavailable_not_a_false_unregistered_skill():
+    """WR-01 AT PUBLISH. Same bundle, same honest answer, on the ENFORCING side.
+
+    PRE-FIX OUTCOME: publish blocked at `grounding_fidelity` with an `unregistered_skill`
+    named failure quoting the author's valid id — and the stage's own docstring claimed it
+    shared `_skill_registry`'s fail-closed posture, which was exactly the thing that was not
+    true (the swallow was INVISIBLE to this wrapper).
+    """
+    from contextlib import ExitStack
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID, uuid4
+
+    from app.services.harness import grounding as g
+    from app.services.harness import publish_service
+
+    definition = _definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)])
+    definition_id = uuid4()
+    row = {
+        "id": definition_id,
+        "slug": definition["slug"],
+        "version": definition["version"],
+        "name": definition["name"],
+        "status": definition["status"],
+        "definition": definition,
+        "created_by": UUID(_CALLER),
+    }
+
+    drive = AsyncMock(return_value=(uuid4(), {"text": "x"}, "completed"))
+    flip = AsyncMock(return_value=2)
+
+    async def _degraded_assemble(**_kwargs):
+        return g.GroundingBundle(degraded=frozenset({"skills"}))
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("app.db.workflows.get_definition", AsyncMock(return_value=row)))
+        stack.enter_context(patch("app.db.workflows.write_audit", AsyncMock()))
+        stack.enter_context(patch("app.db.workflows.publish_definition", flip))
+        stack.enter_context(patch.object(publish_service, "_drive_golden_run", drive))
+        stack.enter_context(patch.object(publish_service, "_judge_golden_output", AsyncMock()))
+        stack.enter_context(
+            patch.object(
+                publish_service,
+                "_resolve_publish_supabase",
+                # `(client, org_id)` since plan 182-12 (WR-05) — the org that scopes the
+                # BYPASSRLS client also scopes the grounding gate.
+                AsyncMock(return_value=(object(), _ORG)),
+            )
+        )
+        stack.enter_context(patch.object(g, "assemble_grounding_bundle", _degraded_assemble))
+        result = await publish_service.publish(
+            definition_id=definition_id,
+            golden_input="a representative kickoff prompt",
+            user={"id": _CALLER},
+            pool=AsyncMock(),
+            redis=AsyncMock(),
+        )
+
+    assert result["published"] is False
+    assert result["blocked_stage"] == "grounding_fidelity"
+    codes = [f.get("code") for f in result["named_failures"] if isinstance(f, dict)]
+    assert codes == ["grounding_unavailable"], (
+        "WR-01 REGRESSION on the publish side: an unreachable registry produced "
+        f"{codes} instead of exactly one honest grounding_unavailable."
+    )
+    assert "unregistered_skill" not in codes
+    drive.assert_not_called()  # never burn a real provider run on an unverifiable definition
+    flip.assert_not_called()  # and certainly never mint a version
+
+
+class _SkillsBoom(_FakeSupabase):
+    """Healthy folders + org_members, a SKILLS read that raises — the WR-01 outage, exactly."""
+
+    def table(self, name):
+        if name == "skills":
+            raise RuntimeError("postgrest 503 on the org-gated skills read")
+        return super().table(name)
+
+
+def _skills_boom_client() -> _SkillsBoom:
+    return _SkillsBoom(
+        folders=_FakeQuery(_folder_rows(2)),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+    )
+
+
+@pytest.mark.asyncio
+async def test_validate_end_to_end_over_a_raising_skills_read_never_accuses_the_reference():
+    """WR-01 AT `/validate`, END TO END — nothing mocked between the read and the verdict.
+
+    The two tests above inject a synthetic degraded bundle, which isolates the consumer
+    branch but cannot see the swallow that CAUSED the defect. This one drives the REAL
+    `assemble_grounding_bundle` and the REAL `_skill_registry` against a client whose skills
+    read raises, so restoring the swallow re-opens WR-01 and this test fails.
+
+    PRE-FIX OUTCOME (observed by exactly that mutation):
+    `{'code': 'unregistered_skill', 'phase': 'answer', 'message': "phase 'answer' references
+    a non-registered skill_ref '33333333-3333-3333-3333-333333333333'"}` — the author's real,
+    valid id, called non-existent because a read returned 503.
+    """
+    resp = await _validate(
+        _definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)]),
+        supabase=_skills_boom_client(),
+    )
+
+    codes = _codes(resp)
+    assert "unregistered_skill" not in codes, (
+        "WR-01 REGRESSION (end to end): the skills read failed and the author was told their "
+        f"valid skill reference {_REAL_SKILL} does not exist."
+    )
+    assert "grounding_unavailable" in codes
+    assert _by_code(resp, "grounding_unavailable").severity == "error"
+    assert resp.ok is False
+
+
+@pytest.mark.asyncio
+async def test_publish_end_to_end_over_a_raising_skills_read_never_accuses_the_reference():
+    """WR-01 AT PUBLISH, END TO END — the real assembler, the real registry read.
+
+    Same shape as the sibling above, on the ENFORCING side: `_resolve_publish_supabase` hands
+    stage 2.6 a client whose skills read raises, and nothing else is faked between that read
+    and the block. PRE-FIX OUTCOME: `blocked_stage="grounding_fidelity"` with a named failure
+    accusing the author's valid reference — and no way for them to tell it from a real one.
+    """
+    from contextlib import ExitStack
+    from unittest.mock import AsyncMock, patch
+    from uuid import UUID, uuid4
+
+    from app.services.harness import publish_service
+
+    definition = _definition([_llm_single("answer", 0, skill_ref=_REAL_SKILL)])
+    definition_id = uuid4()
+    row = {
+        "id": definition_id,
+        "slug": definition["slug"],
+        "version": definition["version"],
+        "name": definition["name"],
+        "status": definition["status"],
+        "definition": definition,
+        "created_by": UUID(_CALLER),
+    }
+    drive = AsyncMock(return_value=(uuid4(), {"text": "x"}, "completed"))
+    flip = AsyncMock(return_value=2)
+
+    with ExitStack() as stack:
+        stack.enter_context(patch("app.db.workflows.get_definition", AsyncMock(return_value=row)))
+        stack.enter_context(patch("app.db.workflows.write_audit", AsyncMock()))
+        stack.enter_context(patch("app.db.workflows.publish_definition", flip))
+        stack.enter_context(patch.object(publish_service, "_drive_golden_run", drive))
+        stack.enter_context(patch.object(publish_service, "_judge_golden_output", AsyncMock()))
+        stack.enter_context(
+            patch.object(
+                publish_service,
+                "_resolve_publish_supabase",
+                # `(client, org_id)` since plan 182-12 (WR-05).
+                AsyncMock(return_value=(_skills_boom_client(), _ORG)),
+            )
+        )
+        result = await publish_service.publish(
+            definition_id=definition_id,
+            golden_input="a representative kickoff prompt",
+            user={"id": _CALLER},
+            pool=AsyncMock(),
+            redis=AsyncMock(),
+        )
+
+    assert result["blocked_stage"] == "grounding_fidelity"
+    codes = [f.get("code") for f in result["named_failures"] if isinstance(f, dict)]
+    assert "unregistered_skill" not in codes, (
+        f"WR-01 REGRESSION (end to end, publish side): got {codes}"
+    )
+    assert codes == ["grounding_unavailable"]
+    drive.assert_not_called()
+    flip.assert_not_called()
+
+
+# ═══ (D) WR-07 end to end — a truncation is not a scope violation ═════════════
+
+
+@pytest.mark.asyncio
+async def test_validate_reports_grounding_unavailable_not_a_false_folder_scope():
+    """WR-07 END TO END, through the REAL assembler and the REAL ⊆ rule.
+
+    The folders read is TRUNCATED (1 row returned, 1000 reported). The definition is bound
+    to a project and declares a per-phase `folder_scope` that is NOT in the returned prefix.
+
+    PRE-FIX OUTCOME: the prefix was accepted as the whole tree, `resolve_project_subtree`
+    resolved a shrunken subtree, and the author was told their phase's `folder_scope` is not
+    a subset of the project — a fabricated governance violation that (post-182-06) BLOCKS
+    publish. Nothing about the definition is wrong; the read was short.
+    """
+    sb = _FakeSupabase(
+        folders=_FakeQuery(
+            [
+                {
+                    "id": _PROJECT,
+                    "user_id": _CALLER,
+                    "name": "project-root",
+                    "parent_id": None,
+                    "is_org_shared": False,
+                    "org_id": _ORG,
+                }
+            ],
+            count=1000,  # PostgREST's default max-rows: 1000 exist, 1 came back
+        ),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+    resp = await _validate(
+        _definition(
+            [_llm_single("answer", 0, folder_scope=[_OUTSIDE_FOLDER])],
+            project_folder_id=_PROJECT,
+        ),
+        supabase=sb,
+    )
+
+    codes = _codes(resp)
+    assert "folder_scope" not in codes, (
+        "WR-07 REGRESSION: a truncated folders read was rendered as a folder_scope "
+        "violation. The definition is correct; the read was short — and since 182-06 that "
+        "false violation blocks publish."
+    )
+    assert "grounding_unavailable" in codes
+    assert "folders" in _by_code(resp, "grounding_unavailable").message
+    assert resp.ok is False
+
+
+# ═══ (E) WR-02 — the route cannot 500 on a grounding read ════════════════════
+
+
+class _ApiErrorLike(Exception):
+    """Mirrors `postgrest.exceptions.APIError`'s shape: a plain `Exception` subclass.
+
+    NOT a `ValueError` — which is precisely why the ⊆ rule's `except ValueError` never saw
+    the real thing and it escaped `validate_workflow` as an HTTP 500.
+    """
+
+
+@pytest.mark.asyncio
+async def test_a_postgrest_style_error_from_the_collector_is_a_200_not_a_500(monkeypatch):
+    """WR-02, THE DIRECT REPRODUCTION. A non-`ValueError` off the ⊆ walk must not escape.
+
+    PRE-FIX OUTCOME: `postgrest.exceptions.APIError` propagated out of the handler and
+    FastAPI turned it into an HTTP 500 — on a route whose docstring promises ALWAYS 200 and
+    which Phase 184 calls on every canvas edit. One transient blip became a 500 storm
+    mid-authoring, with no verdict payload and nothing for the canvas to render.
+    """
+    from app.services.harness import grounding as g
+
+    # The premise, PINNED rather than assumed — the whole finding rests on it.
+    assert not issubclass(_ApiErrorLike, ValueError), (
+        "the injected exception is a ValueError, so this test would prove nothing about the "
+        "class of error that actually escapes (postgrest's APIError is not a ValueError)"
+    )
+
+    _patch_degraded_bundle(monkeypatch, tool_names={"search_documents"})  # healthy bundle
+
+    async def _boom(*_a, **_k):
+        raise _ApiErrorLike({"message": "JWT expired", "code": "PGRST301"})
+
+    monkeypatch.setattr(g, "grounding_verdicts", _boom)
+
+    resp = await _validate(_definition([_llm_single("answer", 0)]))  # must NOT raise
+
+    assert "grounding_unavailable" in _codes(resp)
+    assert _by_code(resp, "grounding_unavailable").severity == "error"
+    assert resp.ok is False
+
+
+@pytest.mark.asyncio
+async def test_a_raise_from_the_registry_read_itself_is_a_200_not_a_500(monkeypatch):
+    """The sibling escape path: `assemble_grounding_bundle` raising (WR-02's path 1).
+
+    PRE-FIX OUTCOME: the same HTTP 500, one stage earlier — `fetch_visible_folders` had no
+    guard at any level and it is the FIRST thing the handler touches.
+    """
+    from app.services.harness import grounding as g
+
+    async def _boom(**_kwargs):
+        raise _ApiErrorLike("connection reset by peer")
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _boom)
+
+    resp = await _validate(_definition([_llm_single("answer", 0)]))  # must NOT raise
+
+    assert "grounding_unavailable" in _codes(resp)
+    assert resp.ok is False
+
+
+# ═══ (F) the seal is SCOPED — the pure checks keep running ═══════════════════
+
+
+@pytest.mark.asyncio
+async def test_structural_verdicts_survive_a_degraded_grounding_read(monkeypatch):
+    """A registry blip costs the author the THREE grounding rules, not the whole validation.
+
+    `lint_workflow`, the D-13 business-requirement check and the interactive-phase check are
+    PURE — no registry, nothing to fail — so they must run outside the seal and still
+    contribute. A blanket `try` around the handler body would have discarded them, and a
+    blanket `except` returning `ok: True` would have been WORSE than the 500 it replaced
+    (SEED-131: it paints a possibly-broken workflow green).
+    """
+    _patch_degraded_bundle(monkeypatch, "folders", "skills")
+
+    # non-contiguous indices [0, 2] -> bad_index + orphan_phase + no_terminal, and no
+    # business_requirement -> the D-13 verdict.
+    resp = await _validate(
+        _definition(
+            [_llm_single("first", 0), _llm_single("second", 2)],
+            business_requirement=None,
+        )
+    )
+
+    codes = _codes(resp)
+    assert {"bad_index", "orphan_phase", "no_terminal"} <= codes, (
+        "the structural lint verdicts vanished when grounding degraded — the seal is too "
+        f"wide. Got {sorted(codes)}."
+    )
+    assert "business_requirement" in codes, "the pure D-13 check was swallowed by the seal"
+    assert "grounding_unavailable" in codes
+    assert resp.ok is False
+    # the degraded message names BOTH unresolved registries, in sorted order
+    assert "folders, skills" in _by_code(resp, "grounding_unavailable").message
+
+
+# ═══ (G) the code is COMPOSED into the taxonomy, not hardcoded ═══════════════
+
+
+def test_grounding_unavailable_is_known_to_the_classifier_and_classifies_error():
+    """The constant-to-classifier link, pinned HERE by an explicit assertion.
+
+    `test_182_severity_codes.py`'s drift scanner matches the token sequence `"code": "<name>"`
+    in `grounding.py`'s source. This code is built from `GROUNDING_UNAVAILABLE_CODE`, never a
+    quoted literal (deliberately — a literal would make the scanner demand it join
+    `GROUNDING_VERDICT_CODES`, which `grounding_verdicts` does not emit). The scanner is
+    therefore BLIND to it, so the link is asserted here rather than left as a loophole.
+
+    Classification is `error` in BOTH `phases_empty` states: "we could not verify" must never
+    paint the soft `incomplete`. An author shown "still building" would hit a hard publish
+    block they were never warned about (the WR-05 posture 182-07 established).
+    """
+    from app.api import workflows
+    from app.services.harness import grounding
+
+    code = grounding.GROUNDING_UNAVAILABLE_CODE
+
+    assert code in workflows._KNOWN_CODES, (
+        "the degraded code is not composed into _KNOWN_CODES, so it reaches _severity as an "
+        "UNKNOWN and logs a fail-loud warning on every degraded request"
+    )
+    assert code not in workflows._INCOMPLETE_CODES
+    assert code in workflows._ERROR_CODES  # derived, not listed
+    assert workflows._severity(code, phases_empty=False) == "error"
+    assert workflows._severity(code, phases_empty=True) == "error"
+
+    # ... and it is minted from ONE builder, whose dict is the finding shape both sides use.
+    finding = grounding.grounding_unavailable_finding(frozenset({"skills"}))
+    assert set(finding) == {"code", "phase", "message"}
+    assert finding["code"] == code
+    assert finding["phase"] is None
+
+
+# ═══ (E) Round-3 CR-02 — the PALETTE route is the third consumer ══════════════
+#
+# Verification Truth 8 / review CR-02: `GET /workflows/grounding-bundle` read the bundle's
+# DATA fields and ignored its HONESTY field, so a registry outage rendered as an empty
+# palette at HTTP 200 — indistinguishable from an author who owns nothing. This is the one
+# regression plan 182-11 INTRODUCED: before it, the same failure was a loud 500.
+#
+# EVERY TEST BELOW FAILS AGAINST THE ROUND-3 CODE (pre-fix outcome named per docstring).
+
+
+async def _palette(supabase=None, *, template_asset_id=None):
+    """Call the `/workflows/grounding-bundle` handler DIRECTLY (the `_validate` posture)."""
+    from app.api import workflows as wf
+
+    return await wf.get_grounding_bundle(
+        current_user={"id": _CALLER},
+        supabase=object() if supabase is None else supabase,
+        template_asset_id=template_asset_id,
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_healthy_palette_reports_no_degradation():
+    """The control. A complete read must leave `degraded` EMPTY.
+
+    Without this, a test asserting the degraded case could pass against a handler that
+    hardcodes `degraded=["folders", "skills"]` on every request.
+    """
+    response = await _palette(_healthy_client(folder_count=2))
+
+    assert response.degraded == []
+    assert len(response.folders) == 2
+    assert response.skills, "the healthy control must actually carry skills"
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_skills_read_is_named_on_the_palette_not_served_as_empty(monkeypatch):
+    """A skills-read failure says "we could not check", never "you have no skills".
+
+    PRE-FIX OUTCOME: `{"skills": [], "degraded" absent}` at HTTP 200 — the canvas draws an
+    empty skill dropdown and the author concludes their skills were deleted.
+    """
+    _patch_degraded_bundle(monkeypatch, "skills")
+
+    response = await _palette()
+
+    assert response.degraded == ["skills"], (
+        "the palette must NAME the registry it could not resolve — an empty `degraded` on a "
+        "degraded bundle is the exact lie this field exists to prevent"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_degraded_folders_read_is_named_on_the_palette(monkeypatch):
+    """Same contract for the other registry — the signal is per-registry, not a boolean."""
+    _patch_degraded_bundle(monkeypatch, "folders")
+
+    response = await _palette()
+
+    assert response.degraded == ["folders"]
+
+
+@pytest.mark.asyncio
+async def test_both_degraded_registries_are_reported_sorted(monkeypatch):
+    """Both names travel, in a STABLE order (the field is a wire payload, not a set dump)."""
+    _patch_degraded_bundle(monkeypatch, "skills", "folders")
+
+    response = await _palette()
+
+    assert response.degraded == ["folders", "skills"]
+
+
+@pytest.mark.asyncio
+async def test_a_partial_degradation_still_serves_what_did_resolve(monkeypatch):
+    """Degrading must not BLANK the half that worked.
+
+    A skills outage must not cost the author their folder tree — the failure is per-registry
+    and the palette serves whatever resolved alongside the honest marker. A handler that
+    "fails safe" by returning an empty payload would pass the degraded assertions above and
+    still be wrong.
+    """
+    from app.services.harness import grounding as g
+
+    async def _half_degraded(**_kwargs):
+        return g.GroundingBundle(
+            tools=["search_documents"],
+            tool_names={"search_documents"},
+            folders=[{"id": _PROJECT, "name": "Project"}],
+            skills=[],
+            skill_ids=set(),
+            placeholders=[],
+            degraded=frozenset({"skills"}),
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _half_degraded)
+
+    response = await _palette()
+
+    assert response.degraded == ["skills"]
+    assert [f.name for f in response.folders] == ["Project"], (
+        "the folders that DID resolve must still be served — degrading one registry must not "
+        "blank another"
+    )
+    assert response.tools == ["search_documents"]
+
+
+def test_the_palette_response_model_can_carry_the_degradation():
+    """Structural: the field exists, defaults EMPTY, and empty means complete.
+
+    Pins the default explicitly — a `degraded` that defaulted to anything but `[]` would make
+    every healthy palette look broken.
+    """
+    from app.api.workflows import GroundingBundleResponse
+
+    assert GroundingBundleResponse().degraded == []
+
+
+# ═══ (F) Round-3 CR-03 — SURVIVING a max-rows cap, not merely detecting it ════
+#
+# Verification Truth 8 / review CR-03: 182-11's strict read detected a truncation and raised.
+# Because the only strict callers are the two grounding GATES, that made every /validate
+# return a lone `grounding_unavailable` and every publish block at `grounding_fidelity` —
+# permanently, deployment-wide, with no operator remedy — the moment `folders` crossed
+# PostgREST's cap. At the scale folder_utils' own docstring calls ordinary.
+#
+# "We could not check" is only honest when it is also RARE.
+
+
+@pytest.mark.asyncio
+async def test_the_strict_read_paginates_past_the_cap_and_returns_every_row():
+    """The whole point. A capped server yields the COMPLETE tree, not an exception.
+
+    PRE-FIX OUTCOME: `FolderReadTruncatedError` on every call, forever, for any deployment
+    with more folders than the cap — /validate and publish both dead.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    all_rows = _folder_rows(7)
+    sb = _FakeSupabase(folders=_PagedFolders(all_rows, cap=3))
+
+    got = await fetch_all_folders(sb, fields="*", strict=True)
+
+    assert got == all_rows, (
+        f"expected all {len(all_rows)} rows assembled by pagination, got {len(got)}"
+    )
+    assert sb.tables["folders"].range_calls == [(3, 5), (6, 8)], (
+        "pages must walk forward from the prefix in cap-sized, inclusive-bound ranges "
+        f"(PostgREST .range semantics); got {sb.tables['folders'].range_calls}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_pagination_survives_a_cap_that_divides_the_total_exactly():
+    """The off-by-one case: the last page lands exactly on the total.
+
+    A loop that asked for one page too many would either raise or spin; a loop that stopped
+    one page short would raise with an almost-complete set. Both are caught here.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    all_rows = _folder_rows(6)
+    sb = _FakeSupabase(folders=_PagedFolders(all_rows, cap=3))
+
+    assert await fetch_all_folders(sb, fields="*", strict=True) == all_rows
+
+
+@pytest.mark.asyncio
+async def test_a_paginated_gate_read_produces_a_bundle_that_is_not_degraded():
+    """End to end: the cap no longer reaches the author as `grounding_unavailable`.
+
+    This is the test that would have caught CR-03 — it drives the real
+    `assemble_grounding_bundle` (the actual gate consumer) against a capped server and
+    asserts the bundle is CLEAN. Pre-fix this bundle came back `degraded={"folders"}`, which
+    /validate and publish then rendered as "we could not check your workflow" on every
+    request.
+    """
+    from app.services.harness import grounding as g
+
+    sb = _FakeSupabase(
+        folders=_PagedFolders(_folder_rows(7), cap=3),
+        org_members=_FakeQuery([{"org_id": _ORG}]),
+        skills=_FakeQuery(_skill_rows()),
+    )
+
+    bundle = await g.assemble_grounding_bundle(supabase=sb, user_id=_CALLER)
+
+    assert bundle.degraded == frozenset(), (
+        "a survivable max-rows cap still degraded the bundle — every /validate and every "
+        "publish on this deployment would report grounding_unavailable (CR-03)"
+    )
+    assert len(bundle.folders) == 7, (
+        "the gate must see the WHOLE folder tree — a short tree is what manufactures a false "
+        "folder_scope violation in the first place (WR-07)"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_default_read_never_paginates():
+    """The byte-identity control, extended. Pagination is strict-only.
+
+    The default path is the chat agent-loop path and four /folders routes; it must issue the
+    SAME single unbounded query it always has — no count, and now also no `.range()` follow-up.
+    """
+    from app.utils.folder_utils import fetch_all_folders
+
+    sb = _FakeSupabase(folders=_PagedFolders(_folder_rows(7), cap=3))
+
+    rows = await fetch_all_folders(sb, fields="*")
+
+    assert len(rows) == 3, "the default read must return the server's prefix, unexamined"
+    assert sb.tables["folders"].count_arg is None
+    assert sb.tables["folders"].range_calls == [], (
+        "the DEFAULT read paginated — that is an extra round trip added to the chat "
+        "agent-loop path and four /folders routes (T-182-48)"
+    )
