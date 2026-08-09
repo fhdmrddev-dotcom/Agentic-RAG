@@ -284,11 +284,24 @@ Settings tab landed there). The chosen half, and why:
 | **What moved, in ONE commit** | `190-UI-SPEC.md` §2h's second sentence · `connectionsCopy.ts`'s `CONNECTIONS_BANNER_BODY` (the rendered string, asserted by character-identity in `ConnectionsTab.test.tsx`) · and the STRUCTURAL half: while the switch is off, every write affordance is **REMOVED, not disabled** (`＋ Add a connection` and the row `⋯`), per the shipped 185 rule. |
 | **Reversal cost** | Delete the three `dependencies=[Depends(require_visible("live_connectors"))]` entries in `backend/app/api/connectors.py`; re-point `test_190_connectors_api.py` case 9; restore §2h + `CONNECTIONS_BANNER_BODY` to 155-C's wording; drop the OFF-state affordance removal in `ConnectionsTab.tsx`. **All four in the same commit** — a gate without the copy under-claims, and the copy without the gate is the D-31 defect. |
 
-⚠ **ONE HALF IS STILL OWED, and it is named rather than closed:** UI-SPEC **§9's panel notice**
+⚠ ~~**ONE HALF IS STILL OWED, and it is named rather than closed:** UI-SPEC **§9's panel notice**
 carries the same false sentence (*"You can save this connection and workflow authors can bind it
 to a step"*) and is out of 190-16's surface. **Plan 190-17 must amend it in the commit that
 builds the panel**, and must remove the panel's write affordances under the same OFF state. A
-recorded note in §2h points at it so it cannot be lost.
+recorded note in §2h points at it so it cannot be lost.~~
+
+### ✅ THE OWED HALF IS PAID — plan **190-17**, 2026-08-09. Same branch **(b)**, extended, not re-decided.
+
+| | |
+|---|---|
+| **What was false** | §9's panel notice (*"**You can save this connection** and workflow authors can bind it to a step"*) **and its footer** (`will save · will not send`). 190-16 named the notice; the FOOTER was not named and carried the identical promise one line below it. Both are corrected. |
+| **What moved, in ONE commit** | `190-UI-SPEC.md` §9's notice block **and** its `font-mono` footer line, with the branch, the structural half and the reversal cost written beside them · `connectionFormCopy.ts`'s `PANEL_OFF_BODY` + `PANEL_OFF_FOOTER` (the rendered strings, asserted by character-identity in `ConnectionFormPanel.test.tsx`) · and the STRUCTURAL half: while the switch is off the panel renders **no Save, no `Replace`, and static text instead of inputs** — REMOVED, not disabled. |
+| **Why removed and not disabled** | 190-16 MEASURED it: its plant C rendered the Add button `disabled` instead of removed and `toBeDisabled()` **passed on the defect**. Only an absence assertion sees it, so the panel's suite asserts absence for all three affordances. |
+| **Reversal cost — now SIX edits, and they may never be separated** | The four above, PLUS: restore §9's notice + footer to 156-A's wording (and `PANEL_OFF_BODY` / `PANEL_OFF_FOOTER` with them), and drop the panel's OFF-state affordance removal in `ConnectionFormPanel.tsx`. |
+
+**D-190-DEF-07 is now CLOSED in full** — both surfaces that carried the false sentence say the
+same true thing, and both write surfaces remove rather than disable. Nothing about branch (b) was
+re-litigated here; 190-16's four reasons were extended to the surface that was out of its reach.
 
 ---
 

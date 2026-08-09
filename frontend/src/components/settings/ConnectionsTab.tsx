@@ -70,10 +70,16 @@ import {
   listConnectorConnections,
   listPublishedWorkflows,
   checkConnectorConnection,
+  createConnectorConnection,
   deleteConnectorConnection,
   updateConnectorConnection,
 } from "@/lib/api"
-import type { ConnectorConnection } from "@/lib/api"
+import type {
+  ConnectorConnection,
+  ConnectorConnectionCreate,
+  ConnectorConnectionUpdate,
+} from "@/lib/api"
+import { ConnectionFormPanel } from "@/components/settings/ConnectionFormPanel"
 import { useOrgOptional } from "@/providers/OrgProvider"
 import {
   Sheet,
@@ -155,6 +161,26 @@ function capabilityMark(capability: string | undefined): PhaseMark | null {
   return CAPABILITY_MARKS[capability]
 }
 
+const MOBILE_BREAKPOINT = 768
+
+/** Inline mobile hook — the project convention, declared per-file rather than shared
+ *  (`DocumentDetailPanel.tsx:44-54` and `ClassificationRulesPage.tsx:34-44` each carry
+ *  their own copy, both citing `WorkspacePanel.tsx:59-71`). It exists here for ONE
+ *  decision: below 768px the panel is a bottom sheet and is out of flow, so a 400px grid
+ *  track would leave an empty column beside the list. */
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.innerWidth < MOBILE_BREAKPOINT,
+  )
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    onResize()
+    window.addEventListener("resize", onResize)
+    return () => window.removeEventListener("resize", onResize)
+  }, [])
+  return isMobile
+}
+
 /** The state chip's tone. Colour is REINFORCEMENT — the word beside it is the carrier. */
 const STATE_TONE: Record<ConnectionStateKind, string> = {
   ready: "text-success",
@@ -192,6 +218,11 @@ export interface ConnectionsTabViewProps {
   onOpen?: (connection: ConnectorConnection) => void
   /** Injected by the suite so relative times are deterministic. */
   now?: number
+  /** Plan 190-17 — the add/edit panel, rendered BESIDE the list in a 400px push/split
+   *  grid track (D-27, sketch 156-A). Present ⇒ the track opens; absent ⇒ one column.
+   *  Passed as a NODE rather than built here so this view stays presentational and the
+   *  suite can drive list-plus-panel in one render. */
+  panel?: React.ReactNode
 }
 
 export function ConnectionsTabView({
@@ -206,10 +237,12 @@ export function ConnectionsTabView({
   onAdd,
   onOpen,
   now,
+  panel,
 }: ConnectionsTabViewProps) {
   const [query, setQuery] = useState("")
   const [capability, setCapability] = useState<string | null>(null)
   const searchId = useId()
+  const isMobile = useIsMobile()
 
   /** WRITES are possible only for an org admin on a platform whose switch is on. Both
    *  halves are render-only mirrors of a server gate, and BOTH gates are real. */
@@ -228,7 +261,20 @@ export function ConnectionsTabView({
   const isFiltering = query.trim() !== "" || capability !== null
 
   return (
-    <section aria-label="Connections" data-testid="connections-tab">
+    // ── The 400px right-side PUSH/SPLIT track (D-27, sketch 156-A — locked; the shipped
+    //    shape is `WorkflowBuilderPage.tsx:1833-1836` and `ClassificationRulesPage:139-144`).
+    //    THE LIST STAYS VISIBLE AND IS NEVER COVERED — that is the whole reason A won over a
+    //    dialog: when a check fails the honest next action is to look at the list, and a
+    //    dialog scrims it away. Below 768px the panel becomes a bottom sheet, so the track
+    //    collapses to one column rather than leaving a 400px hole. ──
+    <div
+      data-testid="connections-split"
+      className="grid min-h-0 min-w-0 gap-4 motion-safe:transition-[grid-template-columns] motion-safe:duration-300"
+      style={{
+        gridTemplateColumns: panel && !isMobile ? "minmax(0,1fr) 400px" : "minmax(0,1fr)",
+      }}
+    >
+    <section aria-label="Connections" data-testid="connections-tab" className="min-w-0">
       {/* ── The platform-wide truth, told ONCE, above the card and never on a row (D-26).
              At 24 rows a per-row notice is 24 identical amber lines — sketch 155's own
              `tell it` control produced exactly that finding. ── */}
@@ -441,6 +487,8 @@ export function ConnectionsTabView({
         {CONNECTIONS_USED_BY_SCOPE_NOTE}
       </p>
     </section>
+      {panel}
+    </div>
   )
 }
 
@@ -850,17 +898,66 @@ export function ConnectionsTab() {
     [reload],
   )
 
+  /** Plan 190-17 — the add/edit panel's open/close seam. `null` is CLOSED; the panel is
+   *  passed as a node only while open, so the 400px grid track opens with it. */
+  const [panelState, setPanelState] = useState<
+    { mode: "create"; connection: null } | { mode: "edit"; connection: ConnectorConnection } | null
+  >(null)
+
+  const handleCreate = useCallback(
+    async (body: ConnectorConnectionCreate) => {
+      await createConnectorConnection(body)
+      reload()
+    },
+    [reload],
+  )
+
+  const handleUpdate = useCallback(
+    async (id: string, body: ConnectorConnectionUpdate) => {
+      await updateConnectorConnection(id, body)
+      reload()
+    },
+    [reload],
+  )
+
+  const isOrgAdmin = org?.canManage === true
+
+  /** The active org's own name, for §3e's org-shared line. Read off the SHIPPED
+   *  `OrgValue.orgs` membership list (`OrgProvider.tsx:46`) rather than fetched — the
+   *  provider already holds it. Unresolved ⇒ `null`, and the panel falls back to a
+   *  name-free wording of the SAME sentence rather than rendering a blank. */
+  const orgName = org?.orgs.find((m) => m.org_id === org.activeOrgId)?.name ?? null
+
   return (
     <ConnectionsTabView
       connections={read.kind === "ready" ? read.rows : read.kind === "error" ? [] : null}
       readFailed={read.kind === "error"}
       usageCounts={usageCounts}
-      isOrgAdmin={org?.canManage === true}
+      isOrgAdmin={isOrgAdmin}
       liveConnectorsOn={liveConnectorsOn}
       onDelete={handleDelete}
       onSetEnabled={handleSetEnabled}
       onCheck={handleCheck}
-      // `onAdd` / `onOpen` → plan 190-17 (the add/edit push-split panel).
+      // The Add button opens the panel in CREATE mode; a row's name opens it in EDIT mode.
+      // For a non-admin `onOpen` still fires — the panel opens READ-ONLY (U-02), because
+      // a member may legitimately want to see WHERE a connection they can bind sends.
+      onAdd={() => setPanelState({ mode: "create", connection: null })}
+      onOpen={(connection) => setPanelState({ mode: "edit", connection })}
+      panel={
+        panelState ? (
+          <ConnectionFormPanel
+            open
+            mode={panelState.mode}
+            connection={panelState.connection}
+            isOrgAdmin={isOrgAdmin}
+            liveConnectorsOn={liveConnectorsOn}
+            orgName={orgName}
+            onClose={() => setPanelState(null)}
+            onCreate={handleCreate}
+            onUpdate={handleUpdate}
+          />
+        ) : undefined
+      }
     />
   )
 }

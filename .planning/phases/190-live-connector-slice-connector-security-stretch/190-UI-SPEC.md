@@ -294,9 +294,12 @@ rendered button the API refuses is the other, and this surface ships neither.
 `backend/app/api/connectors.py`, re-point `test_190_connectors_api.py` case 9, restore this
 sentence to 155-C's wording, and drop the OFF-state affordance removal in `ConnectionsTab.tsx`.
 
-⚠ **§9's panel notice inherits the same problem and is OWED BY PLAN 190-17.** Its sentence
-(*"You can save this connection and workflow authors can bind it to a step"*) is false under
-branch (b) for the same reason, and must be amended in the commit that builds the panel.
+⚠ **§9's panel notice inherited the same problem and was OWED BY PLAN 190-17 — ✅ PAID,
+2026-08-09.** Its sentence (*"You can save this connection and workflow authors can bind it
+to a step"*) and its `will save · will not send` footer were false under branch (b) for the
+same reason. Both are amended in §9, in the commit that builds the panel, together with the
+structural half (the panel's Save / `Replace` / editable inputs are REMOVED while the switch
+is off). The full reversal cost — now six edits, not four — is restated at the foot of §9.
 
 ---
 
@@ -363,6 +366,25 @@ not to the workflow author who picks this connection. It can be replaced, never 
 
 Both verbatim from 156-A. The dots are a `font-mono` `<span>`, **never an `<input type=password>`
 carrying a fake value** — a fake value is a value the DOM holds.
+
+⚠ **`stored 3 Aug` IS NOT SHIPPED, AND THE SUBSTITUTION IS A MEASUREMENT — plan 190-17,
+2026-08-09.** Measured against the shape that actually reaches this panel:
+`ConnectorConnection` carries `created_at` and `updated_at` and **no secret timestamp at
+all** (`api.ts:5562-5573`), and `updated_at` moves on a RENAME as much as on a secret
+replace — so rendering it beside the dots would date the credential from a field that is not
+about the credential. That is precisely the fabricated-timestamp error
+`connectionsCopy.credentialLabel` refuses one column away (*"NEVER a fabricated timestamp"*,
+the 068-A honest-last-active rule), and refusing it there while committing it here would be
+the same lie with better manners.
+
+What IS knowable: a connection cannot exist without a secret (`secret` is REQUIRED on
+create, `api.ts:5584`), so one has been stored since the row was created. **The shipped row
+reads `•••••••••••••••• stored since 3 Aug [ Replace ]`**, with one added line stating what
+is not known: *"That is when this connection was created. The date a credential was last
+replaced is not sent to this browser either."* The §3d note above is unchanged and still
+verbatim. Reversal is one function (`connectionFormCopy.secretStoredLabel`) plus that line —
+and it should only be reversed by a change that gives the response a real secret timestamp,
+which is a schema decision, not a copy one.
 
 ### 3e · The org-shared line
 
@@ -828,17 +850,50 @@ omission:** the author-facing surfaces would have to render a *platform-wide* fa
 already told at the two places a person can act on it (Settings) and at the one place it becomes
 observable (the run); and a canvas notice would spend a badge slot that does not exist (§7b).
 
-The panel notice, verbatim (156-A):
+The panel notice:
 
 ```
 ⛨  Live sending is off for this platform
 
-    You can save this connection and workflow authors can bind it to a step. Nothing
-    will leave: steps record what they would have done and read “Not sent — recorded”.
+    This connection is read-only until an operator turns it on — it cannot be added or
+    changed here, and nothing will leave: steps record what they would have done and
+    read “Not sent — recorded”.
     An operator turns live_connectors on in the Control Room.
 ```
 
-Footer, in `font-mono`, `--warning`: `will save · will not send`
+Footer, in `font-mono`, `--warning`: `read-only · will not send`
+
+⚠ **BOTH BLOCKS ABOVE ARE AMENDED, AND THIS IS THE SECOND HALF OF THE D-190-DEF-07
+RESOLUTION — plan 190-17, 2026-08-09.** 156-A's operator-approved wording was *"**You can
+save this connection** and workflow authors can bind it to a step…"* with a
+`will save · will not send` footer. Measured against the surface plan 190-09 shipped, both
+are **FALSE** for exactly the reason §2h's second sentence was: `api/connectors.py` carries
+`require_visible("live_connectors")` on all three WRITE endpoints, so while the switch is
+off an org admin's create / edit / delete is refused 403 — this notice promised a save the
+API declines, at the very moment a person is typing the thing that would be saved. §2h
+recorded the owed half explicitly (*"§9's panel notice inherits the same problem and is
+OWED BY PLAN 190-17… must be amended in the commit that builds the panel"*) and it is paid
+in that commit.
+
+**Branch taken: (b), unchanged from §2h — the GATE is right, the COPY moves.** The four
+reasons §2h states apply here word for word; nothing new is decided, the same resolution is
+simply extended to the surface that was out of 190-16's reach.
+
+**The structural half rides with it (same commit), and it is the part a copy-only fix would
+have missed:** while the switch is off the panel's WRITE affordances are **REMOVED, not
+disabled** — no Save, no `Replace`, and the fields render as static text rather than as
+`disabled` inputs. This is the shipped 185 rule, and 190-16 MEASURED why the distinction is
+not stylistic: its plant C rendered the table's Add button `disabled` instead of removed and
+`toBeDisabled()` **passed on the defect**. Only an absence assertion sees it, so the panel's
+suite asserts absence.
+
+**Reversal cost — 190-16's four edits plus two:** delete the three
+`dependencies=[Depends(require_visible("live_connectors"))]` entries in
+`backend/app/api/connectors.py`, re-point `test_190_connectors_api.py` case 9, restore §2h +
+`CONNECTIONS_BANNER_BODY`, restore **this section + `connectionFormCopy.PANEL_OFF_BODY` /
+`PANEL_OFF_FOOTER`** to 156-A's wording, and drop **both** affordance removals —
+`ConnectionsTab.tsx`'s and `ConnectionFormPanel.tsx`'s. A gate without the copy under-claims;
+the copy without the gate is the D-31 defect this phase exists to avoid.
 
 ---
 
