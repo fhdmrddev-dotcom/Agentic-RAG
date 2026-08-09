@@ -5,6 +5,7 @@ reported: 2026-08-09
 surface: Agentic-RAG
 severity: major
 status: open
+h1_refuted: 2026-08-09    # cloud provider keys are ALL present (has_key=true ×8) — not config drift
 affected_areas: [skills/eval-engine, settings/engine-health, cloud-config, observability/error-honesty]
 folded_into: null
 verified_closed_by: null
@@ -65,15 +66,51 @@ Two distinct problems are stacked here, and they should not be conflated:
 
 ## Hypothesized cause
 
-*Hypotheses, not findings — none of this is verified.*
+> ## ⚠ H1 WAS MEASURED AND IS **REFUTED** — 2026-08-09, against the live cloud API
+>
+> H1 (missing cloud provider keys) was the leading hypothesis and it is **wrong**. Measured by
+> calling `GET /settings` on `https://api.superrag.cloud` from the operator's authenticated
+> browser session. **Every one of the eight sweep providers reports `has_key=true`:**
+>
+> ```
+> openai has_key=true      anthropic has_key=true    google has_key=true
+> openrouter has_key=true  deepseek has_key=true     moonshot has_key=true
+> minimax has_key=true     zhipu has_key=true
+> (ollama has_key=false, lmstudio has_key=false — neither is in the sweep)
+> ```
+>
+> `GET /health` → `{"status":"ok","redis":"ok","maintenance":false}`. The backend is up and the
+> DB answers. **This is not cloud-config drift, and the pending deploy will not fix it.**
+>
+> **The sharper reading, which the refutation opens up.** `GET /settings` also shows
+> `active_provider: "deepseek"`, `llm_model: "deepseek-v4-flash"` — **the same provider and the
+> exact same model id that the sweep reports as `provider_error`** — and the operator has chat
+> threads from the previous day, so that pairing demonstrably serves live traffic. A provider
+> whose key works, whose model works for chat, and which still fails the sweep, indicts **the
+> sweep's own request**, not the provider.
+>
+> **(H6 — now the leading hypothesis) The sweep sends a request shape providers reject.**
+> OpenRouter's error is the tell, and it should be read literally: *"No endpoints found that can
+> handle the requested **parameters**"* — that is OpenRouter's answer when no upstream endpoint
+> supports the **parameters sent**, which is a different failure from an unknown model id. If the
+> sweep attaches something like a structured-output/JSON-schema or tool configuration that most
+> engines refuse, one cause explains six opaque failures *and* the OpenRouter message at once.
+> Anthropic's billing error is then simply an independent second problem that happens to mask
+> whether it would have failed the same way.
+>
+> **This makes the bug almost certainly reproducible LOCALLY**, which is now the cheapest next
+> step — see Routing. Related: SEED-127 records that reasoning-first STRUCTURED routing does not
+> cover the forced-emission path; worth checking whether the sweep rides that path.
 
-- **(H1, most likely) Cloud provider-key drift.** Production is pinned at **v3.3 / commit
+*Original hypotheses, preserved. H1 is struck; H2/H3 stand as independent real issues.*
+
+- ~~**(H1, most likely) Cloud provider-key drift.** Production is pinned at **v3.3 / commit
   `4c9b487a` (2026-07-18)** and has drifted from local for three milestones. The two engines with a
   real message prove their keys *exist and authenticate* (Anthropic reached billing; OpenRouter
   reached routing). The six opaque ones plausibly have **no key set in Coolify at all**, or a key
   that fails before any provider-specific error can be parsed. This is the exact failure class
   `DEPLOYMENT-WORKFLOW.md` §5 names — *"the cloud provider key must serve the chosen model … a
-  model that works locally can 404 on cloud"*.
+  model that works locally can 404 on cloud"*.~~ **REFUTED — all eight keys are present.**
 - **(H2) Anthropic — out of credit.** Verified by its own error text. Not a code bug. Fix in the
   Anthropic console.
 - **(H3) OpenRouter — the pinned model no longer routes.** `nvidia/nemotron-3-ultra-550b-a55b`
@@ -81,7 +118,7 @@ Two distinct problems are stacked here, and they should not be conflated:
   answer when no upstream provider serves that model **with the parameters sent**. Could be a dead
   model id **or** a parameter the sweep sends that no endpoint accepts. Worth distinguishing —
   they have different fixes. Note the standing project position that OpenRouter is experimental.
-- **(H4) Stale model ids across the board.** Every model in the table is a *newest-generation* id.
+- **(H4 — weakened by the H1 refutation) Stale model ids across the board.** Every model in the table is a *newest-generation* id.
   If cloud's registry rows or keys predate them, several engines would fail for the same reason
   OpenRouter does. **SEED-040 is directly implicated** — model capabilities still live hardcoded in
   `config.py`, the DB-override tier omits them, and the routing seams bypass the DB, so cloud has
