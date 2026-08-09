@@ -6,7 +6,7 @@ surface: Agentic-RAG
 severity: blocking
 status: open
 affected_areas: [workflows/canvas-builder, workflows/publish-gauntlet, frontend/workflow-authoring]
-folded_into: null
+folded_into: quick-260809-klo
 verified_closed_by: null
 related_seeds: [SEED-123]
 re_open_trigger: null
@@ -99,6 +99,41 @@ The stuck draft was unblocked by `PATCH /workflows/6acc280f-…` sending the **c
 definition** back with the one field added (the endpoint takes a full `WorkflowDefinition` with
 `phases` required, so a partial patch cannot silently truncate). Verified after: 3 phases unchanged,
 `POST /workflows/validate` → **200 with 0 findings**. This is a per-draft rescue, not a fix.
+
+## Fix landed 2026-08-09 — quick task `260809-klo` (status stays `open`)
+
+A `business_requirement` text input now ships on the Builder header's identity group, gated on
+`canvasEnabled` and rendered in both the Spine and Canvas views:
+`WorkflowBuilderPage.tsx:1849` (the control) → `:1899` (the render site) →
+`builderStore.ts:596` (`setBusinessRequirement`, which writes `meta` and arms `dirty` in one
+`set()`). No write-path change was needed — `selectDefinition` is `{ ...meta, phases }`
+(`builderStore.ts:293`) and `useDraftPersistence.ts:619` PATCHes exactly that, so the full-definition
+requirement is satisfied by construction. Commits `da668c96`, `1c58a3fb`. Diff: 4 files,
+410 insertions, **0 deletions**. `tsc -p tsconfig.app.json` unmoved at 33; the scoped 4-suite vitest
+went 242 → 253 passing (+11 = exactly the tests added), 0 failing across 4 consecutive runs.
+
+⚠ **Status remains `open`, deliberately.** The tests prove the typed sentence reaches the recorded
+`updateWorkflowDraft` argument. They do **not** prove the live gauntlet accepts it — the reload +
+publish row was not driven (no browser automation in the executor session). Flip to `closed` only
+after that row runs against a real draft.
+
+**Two corrections to this report, on measurement:**
+- The report's own §"Fix sketch" guessed placement *"alongside name/slug"*. There is no name/slug
+  input on that surface; the shipped placement is the identity group beside the KB affordance,
+  which is the seam D-186-15 already used for the identical bug shape.
+- `WorkflowCanvas.composition.test.tsx:83`'s `missing_business_requirement` is an invented fixture
+  string the backend never emits. The real verdict code is `business_requirement`
+  (`workflows.py:712-721`), and the authoring-time warning **already shipped end to end** through
+  `verdictModel.ts:268` → `ProblemsTray`. Only the input was missing.
+
+**Deferred, with triggers** (`260809-klo-deferred-items.md`):
+`D-klo-DEF-01` the blocking copy — it is authored backend-side at `workflows.py:718` /
+`publish_service.py:166-168`, and `blockedReason` relays it verbatim by design (D-182-06 forbids a
+client-side message map), so it is not a frontend one-liner.
+`D-klo-DEF-02` reachability of `inputs` / `assets` / `category` — unmeasured, re-derive don't inherit
+(`project_folder_id` **is** reachable).
+`D-klo-DEF-03` two shipped tests flake ~1-in-6 on a 1 s `waitFor`; pre-existing rate could not be
+excluded, and no pinned test was edited to manufacture green.
 
 ## Routing note
 
