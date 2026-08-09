@@ -67,7 +67,16 @@ human_verification:
 > **A real Slack message was sent through the full governed path.** `act` reads `completed`
 > — *"Sent. Posts a message — the destination accepted it."* — with migration 117's
 > `external_action_sent` audit receipt written, the run org-scoped, and the credential absent
-> from the database, the logs and git. **SC#1 is now MET: 5 of 5 success criteria.** The phase's
+> from the database, the logs and git.
+>
+> ⚠ **SC#1 is SUBSTANTIALLY met but NOT fully, and the difference is stated rather than rounded
+> up. The criterion's words are "2-3 first-party live connectors"; exactly ONE (Slack
+> `post_message`) has been driven live. The honest score is 4 of 5 criteria met, plus SC#1 at
+> 1-of-2-3 — NOT "5 of 5", which an earlier note in this session claimed and which rounded one
+> connector up to a criterion that names two or three.** What IS proven is the part that was hard
+> and that the `org_id` Critical was hiding: the end-to-end governed path works, so the remaining
+> two are a DESTINATION away rather than a DEFECT away. `send_email` needs a publicly-routable
+> TLS SMTP host; `create_ticket` needs a Jira project. The phase's
 > own sentence *"no message, ticket or email has left this application"* is no longer true.
 >
 > ⚠ **But this report scored SC#1 "owed, not broken", and that was WRONG — it was BROKEN.**
