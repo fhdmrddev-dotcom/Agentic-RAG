@@ -581,13 +581,32 @@ that describes a picker behaviour which no longer exists.
 ✓  Credential works — and nothing was sent
 
     Authenticated as {identity} at {host}:{port}. The check connected, authenticated
-    and disconnected. No mail was delivered to anyone.
+    and disconnected. No email was sent.
     Checked just now · re-checking is always safe.
 ```
 
 The closing negation is picked from the **same closed table 189 §9d already ships**, never
-improvised: `send_email` → `No mail was delivered to anyone.` · `create_ticket` → `No ticket was
+improvised: `send_email` → `No email was sent.` · `create_ticket` → `No ticket was
 created.` · `post_message` → `No message was posted.`
+
+⚠ **CORRECTED 2026-08-09 (plan 190-15), by measurement, and the correction is the point of
+the rule.** Both places above previously read `No mail was delivered to anyone.` for the
+`send_email` row — **in the sentence that forbids improvising it.** The table 189 actually
+ships says `No email was sent.`, and that is not a matter of interpretation: it is
+`phase_types._EXTERNAL_ACTION_NEGATION["send_email"]` in production source, it is
+`189-UI-SPEC.md:761`, and it is the string read straight out of `workflow_phases.output` in
+`189-UAT.md:104` / `189-SECURITY.md:92`. Shipping this section's version would have given a
+**three-row closed table a fourth sentence** — the exact drift the "never improvised" clause
+exists to prevent, arriving through the clause itself.
+
+The two other rows were already correct and are unchanged. `test_190_connector_check.py::
+test_the_closing_negation_comes_from_the_CLOSED_table_189_already_ships` now pins all three
+against production source, so the next divergence is a RED test rather than a re-reading.
+
+⚠ **Plan `190-18` quotes the same wrong string** (its task text repeats
+`No mail was delivered to anyone.`). It must take the value from
+`_EXTERNAL_ACTION_NEGATION`, not from its own plan text. Changing the shipped sentence
+instead would be a 189-surface change and would invalidate 189's recorded UAT evidence.
 
 - **In-flight:** `Checking the credential…` / `Asking the host who this token belongs to. No
   email, ticket or message is sent by this check.` Footer button reads

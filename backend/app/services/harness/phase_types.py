@@ -2110,7 +2110,11 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
       5. **D-13 / D-17 · no connection bound, or a disabled one.** Skip the send and record →
          ``recorded_not_sent``, *"Not sent — recorded"*. This is NOT a failure and must never
          read as one; it is the permanent, shipping terminal migration 115 was spent on, and
-         the half of the demo sentence competitors do not have.
+         the half of the demo sentence competitors do not have. **This is also UI-SPEC §5a's
+         GATE 2, server half, and its reach is exactly two things: the row's ORG and its
+         ``is_enabled`` flag.** It reads no stored check verdict, deliberately — see the
+         block on the ``ConnectorDisabled`` branch for the two reasons, the second of which
+         (check is admin-only, bind is org-wide) is the one that decided it.
       6. **D-14 · resolve, scoped by the RUN's ORG — never by the id alone.** The definition is
          authored data; the org is not. An ``id``-only lookup passes every ordinary test and
          hands org A's workflow org B's decrypted credential — REPRODUCED at plan 190-06
@@ -2207,7 +2211,37 @@ async def _exec_external_action(phase, accumulated_outputs: dict, ctx) -> dict:
     try:
         connection = await resolve_connection(str(connection_id), org_id=str(org_id))
     except ConnectorDisabled:
-        return _record("the bound connection is disabled")
+        # ── ⭐ UI-SPEC §5a GATE 2, SERVER HALF — AND ITS EXACT REACH ─────────────────────
+        # Gate 2 validates a bound connection against TWO things and only two: the row's ORG
+        # (the `org_id=` argument one line above — D-14) and its `is_enabled` flag, which
+        # arrives here as this refusal. `resolve_connection` is the single reader of that
+        # flag and it refuses BEFORE any decryption, so a switched-off connection never
+        # materializes a credential at all.
+        #
+        # A DISABLED connection is therefore treated as UNBOUND at run time — same terminal,
+        # same composer, same sentence as the no-connection branch above (D-17: zero new
+        # statuses, no `workflow_phases` migration). It is NOT a failure and must never read
+        # as one: an operator who switched a connection off got what they asked for.
+        #
+        # ⚠ WHAT GATE 2 DELIBERATELY DOES NOT READ, AND WHY IT MUST STAY THAT WAY (door (b),
+        # U-07a). The stored credential-check verdict is a QUALITY HINT, never an
+        # authorization boundary — migration 116 says so in the column's own COMMENT — and
+        # the column's NAME is asserted to appear ZERO times in this whole file, which is why
+        # it is not spelled even here. (A fence that greps for a literal cannot be described
+        # using that literal; 190-13 met the same shape and recorded the same choice.) Two
+        # reasons, and the second is the decisive one:
+        #
+        #   1. a verdict from two days ago deciding a LIVE run is the settings-sync-staleness
+        #      class this codebase has already been bitten by — a credential rotated since the
+        #      check would be refused while working perfectly. At run time the executor
+        #      attempts the send and reports the TRUE outcome;
+        #   2. checking is admin-only (U-02) while binding is org-wide, so a server gate on a
+        #      stale `failed` would dead-end a plain member who cannot clear it themselves.
+        #
+        # Blocking a bind prevents no send: a bound-but-failing connection fails honestly on
+        # the next run with the host's verbatim words. Adding that gate here is a two-half
+        # change — the gate AND UI-SPEC §5b's sentence, in ONE commit — never this line alone.
+        return _record("the bound connection is disabled (is_enabled is false — Gate 2)")
 
     if getattr(connection, "capability", capability) != capability:
         # A connection bound for another capability would send a bot token to a mail host.
