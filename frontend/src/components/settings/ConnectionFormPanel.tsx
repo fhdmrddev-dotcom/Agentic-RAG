@@ -53,17 +53,49 @@
  * ── THE COPY AND THE DERIVATIONS LIVE IN `connectionFormCopy.ts` ──
  * That module's header states the measured `react-refresh/only-export-components` reason.
  * THIS file exports components and nothing else.
+ *
+ * ═════════════════════════════════════════════════════════════════════════════════════
+ * PHASE 190-18 (UI-SPEC §4a–§4d, §5b, §5c, §2g) — the refusals, the check moments and the
+ * graded destructive guards. Four rules bind everything added below:
+ *
+ * 1. ⚠ **NO SENTENCE IS WRITTEN HERE.** Every user-facing string comes from
+ *    `connectionRefusalCopy.ts` (the §4c/§4d/§5b/§5c copy) or `connectionsCopy.ts` (the §2g
+ *    guard copy, reused rather than re-authored so the panel and the row are unable to drift). The
+ *    `REFUSAL_` / `CHECK_` / `CIPHER_UNAVAILABLE` greps are what prove it.
+ *
+ * 2. ⚠ **THE §4b ASYMMETRY IS THE CONTRACT, NOT A PREFERENCE.** An egress refusal leaves Save
+ *    ENABLED (a refusal you can fix); a `no_encryption_key` refusal DISABLES Save with
+ *    `aria-describedby` pointing at real DOM text (a refusal nothing you type helps). THIS IS
+ *    THE ONE PLACE ON THIS SURFACE WHERE `disabled` IS RIGHT — everywhere else a write
+ *    affordance that is unable to act is REMOVED (the shipped 185 rule; 190-16's plant C
+ *    proved `toBeDisabled()` passes on that defect). Here the control is meaningful and its
+ *    refusal IS the message, so removing it would hide the thing the message is about.
+ *
+ * 3. ⚠ **§4d's THREE STATES NEVER FLATTEN.** refused / unreachable / rejected keep three
+ *    glyphs, three headings and three next steps. A refusal may never render the word
+ *    "failed" and an unreachable host may never render the word "refused" — those two swaps
+ *    make a security decision read as a bug and a bug read as a policy (§14).
+ *
+ * 4. ⚠ **THE GUARDS ARE GRADED BY CONSEQUENCE (§2g / 146–148, locked)**, and they reuse the
+ *    row's shipped sheet copy verbatim: Delete → victim-naming sheet ALWAYS; Disable → sheet
+ *    when `Used by > 0`, direct flip otherwise; Enable → direct (restorative); Replace →
+ *    direct, and it SAYS it clears the check verdict because the server does exactly that.
+ *    Every write lands as `✎ {verb} · recorded` — a receipt, never a transient pop-up.
+ * ═════════════════════════════════════════════════════════════════════════════════════
  */
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
-import { Loader2, X } from "lucide-react"
+import { Check, Loader2, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { ConnectorApiError } from "@/lib/api"
 import type {
   ConnectorCapability,
+  ConnectorCheckResult,
   ConnectorConnection,
   ConnectorConnectionCreate,
   ConnectorConnectionUpdate,
 } from "@/lib/api"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import {
   CAPABILITY_CHOICES,
   CAPABILITY_HELP,
@@ -131,7 +163,56 @@ import {
   secretStoredLabel,
   type ConnectionDraft,
 } from "@/components/settings/connectionFormCopy"
-import { CONNECTIONS_BANNER_OPERATOR_FLAG } from "@/components/settings/connectionsCopy"
+import {
+  CONNECTIONS_ACTION_CHECK,
+  CONNECTIONS_ACTION_DELETE,
+  CONNECTIONS_ACTION_DISABLE,
+  CONNECTIONS_ACTION_ENABLE,
+  CONNECTIONS_BANNER_OPERATOR_FLAG,
+  CONNECTIONS_WRITE_FAILED,
+  DELETE_CANCEL_LABEL,
+  DISABLE_CANCEL_LABEL,
+  RECEIPT_CHECKED,
+  RECEIPT_DELETED,
+  RECEIPT_DISABLED,
+  RECEIPT_ENABLED,
+  deleteConfirmLabel,
+  deleteSheetBody,
+  deleteSheetTitle,
+  disableConfirmLabel,
+  disableSheetBody,
+  disableSheetTitle,
+} from "@/components/settings/connectionsCopy"
+import {
+  CHECK_FAILURE_SENTENCE,
+  CHECK_INFLIGHT_BODY,
+  CHECK_INFLIGHT_BUTTON,
+  CHECK_INFLIGHT_FOOTER,
+  CHECK_INFLIGHT_HEADING,
+  CHECK_NOT_RUN_GLYPH,
+  CHECK_NOT_RUN_HEADING,
+  CHECK_SUCCESS_FOOTER,
+  CHECK_SUCCESS_GLYPH,
+  CHECK_SUCCESS_HEADLINE,
+  CHECK_UNAVAILABLE_DISABLED,
+  CHECK_VERBATIM_LABEL,
+  CIPHER_UNAVAILABLE_BLOCK,
+  CIPHER_UNAVAILABLE_GLYPH,
+  CIPHER_UNAVAILABLE_HEADING,
+  CIPHER_UNAVAILABLE_REASON,
+  CIPHER_UNAVAILABLE_SAVE_DISABLED_REASON,
+  REFUSAL_AUDIT_LINE,
+  REFUSAL_HEADINGS,
+  REFUSAL_ORDERING_LINE,
+  capabilityWordOf,
+  checkPlatformBody,
+  checkRejectedReachedLine,
+  checkSuccessBody,
+  isEgressRefusalReason,
+  refusalBodyFor,
+  refusalHeadingFor,
+  vendorOf,
+} from "@/components/settings/connectionRefusalCopy"
 
 const MOBILE_BREAKPOINT = 768
 
@@ -211,7 +292,7 @@ function Field({
 /** One editable text input, or — when the panel is read-only — the same value as static
  *  text. NOT a `disabled` input: a control that could never do anything is REMOVED, which
  *  is the shipped 185 rule and the one 190-16's plant C proved a `toBeDisabled()` assertion
- *  cannot see. */
+ *  is unable to see. */
 function TextControl({
   id,
   value,
@@ -257,6 +338,71 @@ function TextControl({
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════════════
+// 190-18 · One notice block — the shared frame every refusal, every unfixable refusal and
+// check outcome renders through, so none of them can grow its own shape
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** `warning` = the platform is off (§9). `destructive` = a refusal or a failure.
+ *  `positive` = the one green moment on this surface. `neutral` = work in flight. */
+type NoticeTone = "destructive" | "positive" | "neutral"
+
+const NOTICE_TONE: Record<NoticeTone, { box: string; glyph: string }> = {
+  destructive: { box: "border-destructive/40 bg-destructive/10", glyph: "text-destructive" },
+  positive: { box: "border-success/40 bg-success/10", glyph: "text-success" },
+  neutral: { box: "border-border bg-muted/30", glyph: "text-muted-foreground" },
+}
+
+function NoticeBlock({
+  tone,
+  glyph,
+  heading,
+  testId,
+  role,
+  children,
+}: {
+  tone: NoticeTone
+  glyph: string
+  heading: string
+  testId: string
+  role?: "status"
+  children?: React.ReactNode
+}) {
+  const t = NOTICE_TONE[tone]
+  return (
+    <div
+      data-testid={testId}
+      role={role}
+      className={cn("mb-3 flex items-start gap-2.5 rounded-[10px] border px-3 py-2.5", t.box)}
+    >
+      {/* The glyph is decorative: §12 requires the state to read in greyscale, which the
+          HEADING already does. A screen reader hearing "⛔" adds nothing the words do not. */}
+      <span aria-hidden="true" className={cn("mt-px text-[13px] leading-none", t.glyph)}>
+        {glyph}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div data-testid={`${testId}-heading`} className="text-[13px] font-medium text-foreground">
+          {heading}
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+/** One paragraph inside a notice. Kept as a component so every notice paragraph carries the
+ *  same type, and so a future edit adds a STRING rather than a class. */
+function NoticeLine({ children, testId }: { children: React.ReactNode; testId?: string }) {
+  return (
+    <p
+      data-testid={testId}
+      className="mt-1 text-[13px] leading-relaxed text-muted-foreground"
+    >
+      {children}
+    </p>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
 // The panel
 // ═══════════════════════════════════════════════════════════════════════════════════════
 
@@ -278,6 +424,58 @@ export interface ConnectionFormPanelProps {
   /** Absent ⇒ NO save affordance (removed, never inert). */
   onCreate?: (body: ConnectorConnectionCreate) => Promise<void>
   onUpdate?: (id: string, body: ConnectorConnectionUpdate) => Promise<void>
+  /** 190-18 · §5c. Absent ⇒ NO check affordance. Runs on the STORED connection and returns a
+   *  VERDICT — never a credential (`ConnectorCheckResult` declares none, and the Pydantic
+   *  `ConnectorCheckResponse` behind it is `extra='forbid'`). */
+  onCheck?: (connection: ConnectorConnection) => Promise<ConnectorCheckResult>
+  /** 190-18 · §2g. Absent ⇒ NO delete affordance. Guarded by the victim-naming sheet, always. */
+  onDelete?: (connection: ConnectorConnection) => Promise<void>
+  /** 190-18 · §2g. Absent ⇒ NO disable/enable affordance. Graded by `usedBy`. */
+  onSetEnabled?: (connection: ConnectorConnection, next: boolean) => Promise<void>
+  /** §2g's victim count — the same caller-scoped FLOOR the table row renders
+   *  (`connectionsCopy.usageCountsFrom`). It GRADES the disable guard; it never blocks. */
+  usedBy?: number
+}
+
+/** §2g's two sheets, and `null` for "no confirm open". Mirrors `ConnectionsTab`'s own
+ *  `ConfirmKind` so the two surfaces grade identically. */
+type PanelConfirmKind = "delete" | "disable" | null
+
+/**
+ * What the SAVE path refused with (§4b).
+ *
+ * ⚠ THE TWO BRANCHES ARE NOT SYMMETRIC AND THAT IS THE CONTRACT: `cipher` DISABLES Save,
+ * `egress` leaves it enabled. `generic` is the shape `readConnectorReasonCode` returning
+ * `null` lands in — it names no cause it is unable to read, which is why 190-17 shipped one
+ * generic sentence rather than guessing.
+ */
+type SaveRefusal =
+  | { kind: "cipher" }
+  | { kind: "egress"; reasonCode: string }
+  | { kind: "generic" }
+
+/** The three §5c moments, plus the platform shape §4d deliberately does not own. */
+type CheckState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "done"; result: ConnectorCheckResult }
+  | { kind: "platform"; reasonCode: string | null }
+
+/**
+ * Classify a save failure into §4b's two refusals, or into neither.
+ *
+ * Keyed off the SERVER'S OWN `reason_code`, surfaced verbatim by `ConnectorApiError` and
+ * NEVER translated (`api.ts:5597-5632`). A client that invents its own wording produces a
+ * seventh sentence nobody ratified — which is the whole reason §4c is a closed table.
+ */
+function saveRefusalFrom(error: unknown): SaveRefusal {
+  if (error instanceof ConnectorApiError) {
+    if (error.reasonCode === CIPHER_UNAVAILABLE_REASON) return { kind: "cipher" }
+    if (isEgressRefusalReason(error.reasonCode)) {
+      return { kind: "egress", reasonCode: error.reasonCode }
+    }
+  }
+  return { kind: "generic" }
 }
 
 export function ConnectionFormPanel({
@@ -290,6 +488,10 @@ export function ConnectionFormPanel({
   onClose,
   onCreate,
   onUpdate,
+  onCheck,
+  onDelete,
+  onSetEnabled,
+  usedBy = 0,
 }: ConnectionFormPanelProps) {
   const isMobile = useIsMobile()
   const rootRef = useRef<HTMLElement | null>(null)
@@ -300,7 +502,12 @@ export function ConnectionFormPanel({
   const [draft, setDraft] = useState<ConnectionDraft>(EMPTY_DRAFT)
   const [replacing, setReplacing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [saveFailed, setSaveFailed] = useState(false)
+  const [saveRefusal, setSaveRefusal] = useState<SaveRefusal | null>(null)
+  const [check, setCheck] = useState<CheckState>({ kind: "idle" })
+  const [confirm, setConfirm] = useState<PanelConfirmKind>(null)
+  const [busy, setBusy] = useState(false)
+  const [writeFailed, setWriteFailed] = useState(false)
+  const [receipt, setReceipt] = useState<string | null>(null)
 
   /** WRITES are possible only for an org admin on a platform whose switch is on — both
    *  halves mirror a REAL server gate, and neither is the gate itself. */
@@ -308,13 +515,32 @@ export function ConnectionFormPanel({
   const readOnly = !canWrite
 
   // ── Seed the draft when the panel opens (or the row behind it changes). ──
-  // ⚠ `secret` is seeded to `""` BY CONSTRUCTION — `draftFromConnection` cannot do
+  // ⚠ `secret` is seeded to `""` BY CONSTRUCTION — `draftFromConnection` is unable to do
   // otherwise, because `ConnectorConnection` declares no credential field to copy from.
+  //
+  // ⚠ 190-18 — IT RE-SEEDS ON A DIFFERENT **ROW**, NOT ON A DIFFERENT **OBJECT**, and that
+  // is a fix rather than a tidy-up. This plan gives the panel a Check button whose container
+  // handler RE-FETCHES the list (the 068-A rule: a chip comes from the server's new truth,
+  // never from an optimistic flip). A re-fetch hands back a NEW object for the SAME row, so
+  // re-seeding on object identity would discard whatever the person had typed — at the exact
+  // moment they were checking a credential before saving it. The guard below is written as a
+  // seeded-key ref rather than as a narrowed dependency array so the dependency stays honest
+  // (`connection` IS read here) and the rule stays on.
+  const seededKeyRef = useRef<string | null>(null)
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      seededKeyRef.current = null
+      return
+    }
+    const key = `${mode}:${connection?.id ?? ""}`
+    if (seededKeyRef.current === key) return
+    seededKeyRef.current = key
     setDraft(mode === "edit" && connection ? draftFromConnection(connection) : EMPTY_DRAFT)
     setReplacing(false)
-    setSaveFailed(false)
+    setSaveRefusal(null)
+    setCheck({ kind: "idle" })
+    setReceipt(null)
+    setWriteFailed(false)
   }, [open, mode, connection])
 
   // ── FOCUS RESTORE (§12 — net-new; `Dialog` would have given it free). ──
@@ -389,10 +615,70 @@ export function ConnectionFormPanel({
   const canSubmit = mode === "create" ? onCreate !== undefined : onUpdate !== undefined
   const showSave = canWrite && canSubmit
 
+  /**
+   * ⭐ §4b's ASYMMETRY, as one boolean.
+   *
+   * TRUE only for the cipher refusal — the one thing on this surface nothing the person types
+   * can fix. An egress refusal deliberately leaves this FALSE so Save stays live over a
+   * corrected host: *"a refusal you can fix leaves the door open."*
+   */
+  const saveBlocked = saveRefusal?.kind === "cipher"
+  const saveDisabledReasonId = `${fieldId}-save-disabled-reason`
+
+  /** One write, its receipt, and a retry on failure — `ConnectionsTab.tsx:533`'s idiom,
+   *  reused rather than re-invented so the panel and the row report a write identically.
+   *  The RECEIPT is transient (062-A: a receipt, never a transient pop-up); a connection's own state
+   *  chip in the table is the CONSEQUENCE, and the two are deliberately separate. */
+  async function runWrite(fn: () => Promise<void>, recorded: string) {
+    if (busy) return
+    setBusy(true)
+    setWriteFailed(false)
+    setConfirm(null)
+    try {
+      await fn()
+      setReceipt(recorded)
+      window.setTimeout(() => setReceipt(null), 4000)
+    } catch {
+      setWriteFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * §5c — the check, in its three moments.
+   *
+   * ⚠ IT POSTS NO BODY. The check runs on the connection ALREADY STORED, so no plaintext
+   * secret crosses the wire for a non-storage purpose, and it exercises the same org-scoped
+   * resolver a RUN uses (plan 190-15 asserted the no-body property three ways: signature,
+   * OpenAPI, and over the wire).
+   */
+  async function handleCheck() {
+    if (!connection || !onCheck || check.kind === "checking") return
+    setCheck({ kind: "checking" })
+    setWriteFailed(false)
+    try {
+      const result = await onCheck(connection)
+      setCheck({ kind: "done", result })
+      // A check that could not even READ the credential is §4b moment 9 wearing a 503 —
+      // same refusal, same disabled Save, told once.
+      setReceipt(RECEIPT_CHECKED)
+      window.setTimeout(() => setReceipt(null), 4000)
+    } catch (error) {
+      const reasonCode = error instanceof ConnectorApiError ? error.reasonCode : null
+      if (reasonCode === CIPHER_UNAVAILABLE_REASON) {
+        setSaveRefusal({ kind: "cipher" })
+        setCheck({ kind: "idle" })
+        return
+      }
+      setCheck({ kind: "platform", reasonCode })
+    }
+  }
+
   async function handleSave() {
     if (saving) return
     setSaving(true)
-    setSaveFailed(false)
+    setSaveRefusal(null)
     try {
       if (mode === "create") {
         await onCreate?.({
@@ -413,8 +699,9 @@ export function ConnectionFormPanel({
         await onUpdate?.(connection.id, body)
       }
       onClose()
-    } catch {
-      setSaveFailed(true)
+    } catch (error) {
+      // §4b — keyed off the SERVER's own reason code, never off a status or a message.
+      setSaveRefusal(saveRefusalFrom(error))
     } finally {
       setSaving(false)
     }
@@ -425,6 +712,23 @@ export function ConnectionFormPanel({
   const capability: ConnectorCapability = mode === "edit" && connection
     ? connection.capability
     : draft.capability
+
+  /**
+   * The host a SAVE-path refusal is about — the thing the person typed.
+   *
+   * ⚠ The CHECK path never uses this: its refusal names `result.host`, which is the host the
+   * SERVER resolved from the STORED row. Naming the typed value there would report a refusal
+   * about a string the guard never saw.
+   *
+   * Slack has no typed host by construction (D-02: its endpoint is a constant in our source),
+   * so it degrades to the destination the footer already renders rather than to a blank.
+   */
+  const typedHost =
+    capability === "post_message"
+      ? footer.destination
+      : capability === "create_ticket"
+        ? draft.baseUrl.trim()
+        : draft.host.trim()
 
   const secretLabel =
     capability === "send_email"
@@ -801,6 +1105,203 @@ export function ConnectionFormPanel({
              never hover-revealed, never behind an “advanced” disclosure — it lives in the
              footer region so it stays on screen while the body scrolls. ── */}
       <div className="border-t border-border px-[18px] py-4">
+        {/* ═══════════════════════════════════════════════════════════════════════════
+            190-18 · THE REFUSALS AND THE CHECK MOMENTS.
+            They live in the FOOTER region, beside the controls they are about, so a
+            reason never scrolls away from the button it explains. All of it is real DOM
+            text — never a `title` (§4a-4 / §12 / 142-B, the 184-07 lesson).
+            ═══════════════════════════════════════════════════════════════════════════ */}
+
+        {/* ── §4b MOMENT 9 — the refusal you are unable to fix. Save goes DISABLED. ── */}
+        {saveRefusal?.kind === "cipher" && (
+          <NoticeBlock
+            tone="destructive"
+            glyph={CIPHER_UNAVAILABLE_GLYPH}
+            heading={CIPHER_UNAVAILABLE_HEADING}
+            testId="connection-cipher-refusal"
+          >
+            {CIPHER_UNAVAILABLE_BLOCK.map((paragraph) => (
+              <NoticeLine key={paragraph}>{paragraph}</NoticeLine>
+            ))}
+            {/* ⚠ The `aria-describedby` TARGET. Real DOM text, wired to the disabled Save —
+                this is the one control on this surface that is disabled rather than
+                removed, and this is the sentence that makes that legible. */}
+            <p
+              id={saveDisabledReasonId}
+              data-testid="connection-save-disabled-reason"
+              className="mt-1.5 text-[11px] leading-snug text-destructive"
+            >
+              {CIPHER_UNAVAILABLE_SAVE_DISABLED_REASON}
+            </p>
+          </NoticeBlock>
+        )}
+
+        {/* ── §4b MOMENT 8 — an egress refusal on the SAVE path. Save stays ENABLED. ── */}
+        {saveRefusal?.kind === "egress" && (
+          <NoticeBlock
+            tone="destructive"
+            glyph={REFUSAL_HEADINGS.refused.glyph}
+            heading={refusalHeadingFor(saveRefusal.reasonCode)}
+            testId="connection-save-refusal"
+          >
+            <NoticeLine testId="connection-save-refusal-body">
+              {refusalBodyFor(saveRefusal.reasonCode, {
+                host: typedHost,
+                vendor: vendorOf(capability),
+                capabilityWord: capabilityWordOf(capability),
+              })}
+            </NoticeLine>
+            {/* ⚠ D-06 IN USER-FACING WORDS, AND IT IS NOT OPTIONAL PROSE. The rendered
+                sentence reads "The refusal happened before your password was read, so it
+                was never used and never left this form." — the n8n CVE inversion made
+                visible to a human, and the ONLY place a person can see the ordering
+                property `test_190_egress_ordering.py` proves. Asserted by character
+                identity so it is unable to be trimmed as filler (T-190-18-D06). */}
+            <NoticeLine>{REFUSAL_ORDERING_LINE}</NoticeLine>
+            <NoticeLine>{REFUSAL_HEADINGS.refused.nextStep}</NoticeLine>
+            <NoticeLine>{REFUSAL_AUDIT_LINE}</NoticeLine>
+          </NoticeBlock>
+        )}
+
+        {/* ── §5c MOMENT 1 — in flight. Says, before it runs, that nothing leaves. ── */}
+        {check.kind === "checking" && (
+          <NoticeBlock
+            tone="neutral"
+            glyph="⟳"
+            heading={CHECK_INFLIGHT_HEADING}
+            testId="connection-check-inflight"
+            role="status"
+          >
+            <NoticeLine>{CHECK_INFLIGHT_BODY}</NoticeLine>
+          </NoticeBlock>
+        )}
+
+        {/* ── §5c MOMENT 2 — the one green moment, and its second clause is load-bearing. ── */}
+        {check.kind === "done" && check.result.ok && (
+          <NoticeBlock
+            tone="positive"
+            glyph={CHECK_SUCCESS_GLYPH}
+            heading={CHECK_SUCCESS_HEADLINE}
+            testId="connection-check-success"
+            role="status"
+          >
+            <NoticeLine testId="connection-check-success-body">
+              {checkSuccessBody({
+                identity: check.result.identity,
+                host: check.result.host,
+                port: check.result.port,
+                capability,
+              })}
+            </NoticeLine>
+            <NoticeLine>{CHECK_SUCCESS_FOOTER}</NoticeLine>
+          </NoticeBlock>
+        )}
+
+        {/* ── §4d — THREE STATES, NEVER FLATTENED. ──
+               A refusal (we declined to open the socket) is not a failure (we tried and
+               nothing answered) is not a rejection (we reached it and IT said no). Each
+               arrives in its own `bucket` on the wire and renders its own heading, its own
+               glyph and its own next step. §14 names the two forbidden swaps directly. */}
+        {check.kind === "done" && !check.result.ok && (
+          <NoticeBlock
+            tone="destructive"
+            glyph={
+              check.result.bucket
+                ? REFUSAL_HEADINGS[check.result.bucket].glyph
+                : CHECK_NOT_RUN_GLYPH
+            }
+            heading={
+              check.result.bucket === "refused"
+                ? refusalHeadingFor(check.result.reason_code)
+                : check.result.bucket
+                  ? REFUSAL_HEADINGS[check.result.bucket].heading
+                  : CHECK_NOT_RUN_HEADING
+            }
+            testId="connection-check-outcome"
+            role="status"
+          >
+            {/* REFUSED — §4c's sentence for the guard's own code, D-06's ordering line, the
+                next step, and the audit line. It renders no vendor words: on this bucket
+                there is no vendor to quote, because no socket was opened. */}
+            {check.result.bucket === "refused" && (
+              <>
+                <NoticeLine testId="connection-check-outcome-body">
+                  {refusalBodyFor(check.result.reason_code, {
+                    host: check.result.host,
+                    vendor: vendorOf(capability),
+                    capabilityWord: capabilityWordOf(capability),
+                  })}
+                </NoticeLine>
+                <NoticeLine>{REFUSAL_ORDERING_LINE}</NoticeLine>
+                <NoticeLine>{REFUSAL_HEADINGS.refused.nextStep}</NoticeLine>
+                <NoticeLine>{REFUSAL_AUDIT_LINE}</NoticeLine>
+              </>
+            )}
+
+            {/* UNREACHABLE — the address was ALLOWED. The next step is the network, not the
+                token, and the sentence says so without borrowing the word "refused". */}
+            {check.result.bucket === "unreachable" && (
+              <NoticeLine testId="connection-check-outcome-body">
+                {REFUSAL_HEADINGS.unreachable.nextStep}
+              </NoticeLine>
+            )}
+
+            {/* REJECTED — §5b. The address is fine, the password is not; the middle
+                paragraph claims exactly Gate 1's reach and no more (U-07a); and the host's
+                own words go under a label that says they are verbatim (071-A). */}
+            {check.result.bucket === "rejected" && (
+              <>
+                <NoticeLine testId="connection-check-outcome-body">
+                  {checkRejectedReachedLine(check.result.host, check.result.port)}
+                </NoticeLine>
+                <NoticeLine testId="connection-check-failure-sentence">
+                  {CHECK_FAILURE_SENTENCE}
+                </NoticeLine>
+                {check.result.provider_message !== "" && (
+                  <>
+                    <div className="mt-2 text-[11px] text-muted-foreground">
+                      {CHECK_VERBATIM_LABEL}
+                    </div>
+                    {/* NEVER paraphrased and NEVER truncated — `break-all`, not `truncate`. */}
+                    <div
+                      data-testid="connection-check-verbatim"
+                      className="mt-1 break-all rounded-md border border-border bg-card px-2 py-1.5 font-mono text-[11px] text-foreground"
+                    >
+                      {check.result.provider_message}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+
+            {/* An `ok:false` with NO bucket is a shape the wire should never carry. It gets
+                an honest sentence rather than an empty block — the 186 lesson that an
+                unrecognised status must never render as a confident one. */}
+            {check.result.bucket === null && (
+              <NoticeLine testId="connection-check-outcome-body">
+                {checkPlatformBody(check.result.reason_code)}
+              </NoticeLine>
+            )}
+          </NoticeBlock>
+        )}
+
+        {/* ── The check that did not run. A PLATFORM condition, deliberately outside §4d's
+               three: telling someone to "correct the host" about a switched-off connection
+               sends them to fix something that is not broken. ── */}
+        {check.kind === "platform" && (
+          <NoticeBlock
+            tone="destructive"
+            glyph={CHECK_NOT_RUN_GLYPH}
+            heading={CHECK_NOT_RUN_HEADING}
+            testId="connection-check-not-run"
+            role="status"
+          >
+            <NoticeLine testId="connection-check-not-run-body">
+              {checkPlatformBody(check.reasonCode)}
+            </NoticeLine>
+          </NoticeBlock>
+        )}
+
         <div
           data-testid="connection-destination-footer"
           data-refused={footer.refusedReason ? "true" : "false"}
@@ -858,10 +1359,105 @@ export function ConnectionFormPanel({
         )}
         <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{FOOTER_SERVER_NOTE}</p>
 
+        {/* ── 190-18 · §2g — THE GRADED DESTRUCTIVE GUARDS, on the row the panel is editing.
+               Present only when a write is genuinely possible: an org admin, a live
+               platform, a stored row and a handler. Otherwise REMOVED, never inert. ── */}
+        {canWrite && mode === "edit" && connection && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
+            {/* §5c's check. Its own footer sentence sits beside it while it runs, because
+                that is the moment a person wants to be told nothing is being sent. */}
+            {onCheck &&
+              (connection.is_enabled ? (
+                <button
+                  type="button"
+                  disabled={check.kind === "checking"}
+                  onClick={() => void handleCheck()}
+                  data-testid="connection-check-button"
+                  className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+                >
+                  {check.kind === "checking" ? CHECK_INFLIGHT_BUTTON : CONNECTIONS_ACTION_CHECK}
+                </button>
+              ) : (
+                <p
+                  data-testid="connection-check-unavailable"
+                  className="text-[11px] text-muted-foreground"
+                >
+                  {CHECK_UNAVAILABLE_DISABLED}
+                </p>
+              ))}
+            {check.kind === "checking" && (
+              <span className="text-[11px] text-muted-foreground">{CHECK_INFLIGHT_FOOTER}</span>
+            )}
+
+            {/* Disable is GRADED HONESTLY by whether a victim exists (§2g). Enable is
+                RESTORATIVE and flips DIRECT — the deliberate asymmetry 068-A ships. */}
+            {onSetEnabled &&
+              (connection.is_enabled ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  data-testid="connection-panel-disable"
+                  onClick={() => {
+                    if (usedBy > 0) setConfirm("disable")
+                    else void runWrite(() => onSetEnabled(connection, false), RECEIPT_DISABLED)
+                  }}
+                  className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+                >
+                  {CONNECTIONS_ACTION_DISABLE}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={busy}
+                  data-testid="connection-panel-enable"
+                  onClick={() => void runWrite(() => onSetEnabled(connection, true), RECEIPT_ENABLED)}
+                  className="inline-flex items-center rounded-md border border-border px-2.5 py-1 text-[11px] text-foreground transition-colors hover:bg-accent disabled:opacity-60"
+                >
+                  {CONNECTIONS_ACTION_ENABLE}
+                </button>
+              ))}
+
+            {/* Delete: ALWAYS the victim-naming sheet. Irreversible, and the credential it
+                destroys is unrecoverable whatever the count says. */}
+            {onDelete && (
+              <button
+                type="button"
+                disabled={busy}
+                data-testid="connection-panel-delete"
+                onClick={() => setConfirm("delete")}
+                className="inline-flex items-center rounded-md border border-destructive/40 px-2.5 py-1 text-[11px] text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60"
+              >
+                {CONNECTIONS_ACTION_DELETE}
+              </button>
+            )}
+
+            {/* ✎ {verb} · recorded — a RECEIPT, never a transient pop-up (062-A). The row's persistent
+                state chip is the CONSEQUENCE, and the two stay separate. */}
+            {receipt && (
+              <span
+                role="status"
+                data-testid="connection-panel-receipt"
+                className="ml-auto inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-foreground"
+              >
+                <Check className="h-3 w-3 flex-none text-success" aria-hidden="true" />
+                {receipt}
+              </span>
+            )}
+          </div>
+        )}
+
+        {writeFailed && (
+          <p role="status" data-testid="connection-panel-write-failed" className="mt-2 text-[11px] text-destructive">
+            {CONNECTIONS_WRITE_FAILED}
+          </p>
+        )}
+
         {/* The actions. REMOVED, not disabled, whenever a write is impossible — for a
-            non-admin (U-02) and while the kill-switch is off (D-26 / §9). */}
+            non-admin (U-02) and while the kill-switch is off (D-26 / §9). The ONE exception
+            is §4b moment 9, immediately below: there the control is meaningful and its
+            refusal IS the message, so it is DISABLED with its reason in real DOM text. */}
         <div className="mt-3 flex items-center justify-end gap-2">
-          {saveFailed && (
+          {saveRefusal?.kind === "generic" && (
             <span
               role="status"
               data-testid="connection-save-failed"
@@ -881,7 +1477,8 @@ export function ConnectionFormPanel({
           {showSave && (
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || saveBlocked}
+              aria-describedby={saveBlocked ? saveDisabledReasonId : undefined}
               onClick={() => void handleSave()}
               data-testid="connection-form-save"
               className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
@@ -892,6 +1489,92 @@ export function ConnectionFormPanel({
           )}
         </div>
       </div>
+
+      {/* ── §2g's two sheets. The SAME copy the table row renders (`connectionsCopy`), so
+             the guard reads identically wherever a person meets it — and the victim is named
+             in the BUTTON LABEL, not only in the prose above it (the 064-B shape).
+             Radix portals these to `document.body`, i.e. OUTSIDE this panel's subtree, so
+             the panel's own Tab/Escape listener never competes with the sheet's — the two
+             traps the 156-A decision refused to stack are still not stacked. ── */}
+      {connection && (
+        <>
+          <Sheet open={confirm === "delete"} onOpenChange={(o) => !o && setConfirm(null)}>
+            <SheetContent side="bottom" className="mx-auto max-w-lg">
+              <SheetHeader>
+                <SheetTitle>{deleteSheetTitle(connection.name)}</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 pb-4">
+                <p data-testid="connection-panel-delete-body" className="text-[13px] leading-relaxed text-foreground">
+                  {deleteSheetBody(usedBy)}
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirm(null)}
+                    className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {DELETE_CANCEL_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="connection-panel-confirm-delete"
+                    onClick={() =>
+                      void runWrite(async () => {
+                        await onDelete?.(connection)
+                        // The row this panel is editing no longer exists — staying open on
+                        // it would be a form over nothing.
+                        onClose()
+                      }, RECEIPT_DELETED)
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                  >
+                    {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    {deleteConfirmLabel(connection.name)}
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          <Sheet open={confirm === "disable"} onOpenChange={(o) => !o && setConfirm(null)}>
+            <SheetContent side="bottom" className="mx-auto max-w-lg">
+              <SheetHeader>
+                <SheetTitle>{disableSheetTitle(connection.name)}</SheetTitle>
+              </SheetHeader>
+              <div className="px-4 pb-4">
+                <p data-testid="connection-panel-disable-body" className="text-[13px] leading-relaxed text-foreground">
+                  {disableSheetBody(usedBy)}
+                </p>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirm(null)}
+                    className="inline-flex items-center rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    {DISABLE_CANCEL_LABEL}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    data-testid="connection-panel-confirm-disable"
+                    onClick={() =>
+                      void runWrite(
+                        () => onSetEnabled?.(connection, false) ?? Promise.resolve(),
+                        RECEIPT_DISABLED,
+                      )
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+                  >
+                    {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+                    {disableConfirmLabel(connection.name)}
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        </>
+      )}
     </aside>
   )
 }

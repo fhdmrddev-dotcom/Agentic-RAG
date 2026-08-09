@@ -898,6 +898,24 @@ export function ConnectionsTab() {
     [reload],
   )
 
+  /**
+   * Plan 190-18 — the PANEL's check. Same endpoint, same re-fetch, but the RESULT is handed
+   * back rather than discarded: §5c's headline and §4d's three outcome shapes are the panel's
+   * surface, and they are keyed off `bucket` + `reason_code` on this very object.
+   *
+   * ⚠ The re-fetch that follows hands the panel a NEW object for the SAME row. The panel's
+   * seed effect keys on `connection?.id` for exactly that reason — see its own note — so a
+   * check never discards what the person has typed.
+   */
+  const handlePanelCheck = useCallback(
+    async (connection: ConnectorConnection) => {
+      const result = await checkConnectorConnection(connection.id)
+      reload()
+      return result
+    },
+    [reload],
+  )
+
   /** Plan 190-17 — the add/edit panel's open/close seam. `null` is CLOSED; the panel is
    *  passed as a node only while open, so the 400px grid track opens with it. */
   const [panelState, setPanelState] = useState<
@@ -955,6 +973,14 @@ export function ConnectionsTab() {
             onClose={() => setPanelState(null)}
             onCreate={handleCreate}
             onUpdate={handleUpdate}
+            // Plan 190-18 — §5c's check and §2g's graded guards, on the row being edited.
+            // The panel REMOVES each of these unless a write is genuinely possible; passing
+            // them unconditionally keeps that decision in ONE place (the panel) rather than
+            // splitting it across two files, which is how the two halves drift.
+            onCheck={handlePanelCheck}
+            onDelete={handleDelete}
+            onSetEnabled={handleSetEnabled}
+            usedBy={panelState.connection ? (usageCounts[panelState.connection.id] ?? 0) : 0}
           />
         ) : undefined
       }
