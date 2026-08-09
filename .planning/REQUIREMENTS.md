@@ -119,9 +119,53 @@ Which phases cover which requirements. Filled at roadmap creation 2026-07-24, re
 | RUNVIZ-02 | Phase 188 | Pending |
 | RUNVIZ-03 | Phase 188 | Pending |
 | CONN-01 | Phase 189 | Complete |
-| CONN-02 (STRETCH) | Phase 190 | Pending |
-| CONN-03 (STRETCH) | Phase 190 | Pending |
+| CONN-02 (STRETCH) | Phase 190 | **Pending — MECHANISM SHIPPED, LIVE PROOF OWED** (settled at 190-19, 2026-08-09 — see below) |
+| CONN-03 (STRETCH) | Phase 190 | **Pending — EVERY SECURITY CLAUSE SHIPPED AND DRIVEN; the requirement's OWN mandatory gate has not run** (settled at 190-19, 2026-08-09 — see below) |
 | SCALE-01 (STRETCH) | Phase 191 | Pending |
+
+### CONN-02 / CONN-03 — settled at Phase 190's close, and settled as NOT complete
+
+Phase 190 executed 19 of 19 plans. Both requirements were left `Pending` by every plan **by the
+phase convention `D-190-DEF-02` set at 190-01** (they are marked together at close, never
+mid-phase), so this is the place they are decided. **Neither is marked complete, and the reason
+is stated rather than left implicit — leaving a box silently unticked is as dishonest as ticking
+it wrongly.**
+
+**CONN-03 — why not complete.** Every substantive clause is shipped **and driven**, not merely
+written: the unconditional egress guard runs **before and independently of** any credential
+(D-06, driven RED by moving the guard below the resolver in production source — an unbound step
+aimed at `169.254.169.254` then raised *nothing at all*); expression/template evaluation is
+sandboxed and no arbitrary-code node exists (SC#3 — and 190-14 states honestly that this was
+**PROVED, not BUILT**: 190 added no evaluator, so the deliverable is a fence over an existing
+property); credentials are org-scoped, Fernet `enc:v1:`-encrypted and resolved server-side by
+reference, fail-CLOSED at both ends; and the dedicated cross-org leak test exists **and the leak
+was reproduced before it was closed** (org A held org B's decrypted bot token, verbatim).
+**What is missing is named in the requirement's own text:** *"mandatory `/gsd:secure-phase`
+(`threats_open: 0`)"*. **That gate has not run.** Marking CONN-03 complete would assert a gate
+that has not happened, in the one phase whose entire discipline is not over-claiming (D-31).
+→ **Closing condition: `/gsd:secure-phase 190` returning `threats_open: 0`.** The register it must
+disposition — including two surfaces no plan's threat model covers — is collected in
+`190-VALIDATION.md` § Residuals.
+
+**CONN-02 — why not complete.** All three adapters exist behind one MCP-shaped seam, the executor
+sends behind six ordered gates, the author can bind a connection on the canvas, Settings →
+Connections ships whole, and the credential check runs on the stored connection and provably
+sends nothing. **But the requirement's word is *run*, and the phase's own demo sentence is the
+acceptance bar: it is half built and zero demonstrated.** Measured at close against the live
+database: **0** `connector_connections` rows, **0** workflow definitions of *any* status containing
+an `external_action` phase, and `live_connectors` absent from `feature_visibility` (⇒ cold default
+`off`). **No message, ticket or email has left this application.**
+→ **Closing condition: the three live-send rows in `190-VALIDATION.md` § Manual-Only
+Verifications**, which need operator-provided destinations (D-30) plus the artefact chain
+`BLOCK-190-UAT-01` names. **First row to run: Slack `post_message`** — it falsifies T13 (the
+likeliest shipped defect) and retires assumption A3 in the same run.
+
+⚠ **A measured enlargement of D-30, recorded here so it is not rediscovered:** the `send_email`
+row needs a **publicly-routable SMTP host with TLS**, not merely "a throwaway mailbox". The local
+`supabase_inbucket` catch-all was investigated and **refuted twice** — no reachable SMTP listener,
+and `egress.py` refuses a loopback plaintext destination by design (`scheme_not_tls` /
+`address_not_public` / `host_not_allowed`, all four variants driven). That refusal is the guard
+working, not a defect.
 
 **Coverage:**
 - CORE requirements: 21 total (REVERT ×2, VALID ×3, CANVAS ×4, GOVERN ×3, CONCUR ×2, VOCAB ×3, RUNVIZ ×3, CONN-01 ×1) → Phases 181-189
