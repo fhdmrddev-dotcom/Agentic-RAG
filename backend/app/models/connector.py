@@ -190,6 +190,66 @@ class ConnectorConnectionUpdate(_StrictBase):
     is_enabled: bool | None = None
 
 
+class ConnectorCheckResponse(_StrictBase):
+    """The result of ONE credential check (Phase 190 plan 190-15 — UI-SPEC §5c).
+
+    ⚠ **A CHECK RETURNS A VERDICT. IT NEVER RETURNS THE CREDENTIAL, IN ANY FORM.** The same
+    T7 rule the response model above enforces applies here and is enforced the same way:
+    there is no ``secret`` field, no ``secret_ciphertext`` field, and ``extra='forbid'``
+    means an attempt to construct one carrying either RAISES rather than leaking. The check
+    runs on the STORED connection precisely so that no plaintext secret ever crosses the
+    wire for a non-storage purpose; a response model that could carry one back would undo
+    that in the other direction.
+
+    ``ok`` / ``verdict``
+        The adapter's OWN verdict, and the value persisted to
+        ``connector_connections.last_check_verdict``. Two spellings of one fact because the
+        column is a three-member enum (``not_checked`` is only ever written by the create
+        and by a secret REPLACE) while the wire wants a boolean the panel can branch on.
+    ``identity``
+        WHO we authenticated as, as the vendor names it. It is what UI-SPEC §5c renders in
+        *"Authenticated as {identity}"*, and it is the half that makes a green check mean
+        something: a credential that works for the WRONG account is a distinct failure from
+        one that does not work at all. ``None`` on every failure.
+    ``host`` / ``port``
+        The destination that was contacted, derived from the STORED connection row — never
+        from a request body. §5c renders *"at {host}:{port}"*.
+    ``bucket``
+        ⚠ **UI-SPEC §4d's THREE STATES, kept apart on the wire.** ``refused`` (WE declined
+        to open the socket, for a security property) · ``unreachable`` (the address is
+        allowed; nothing answered) · ``rejected`` (we reached it and IT said no). ``None``
+        on success. §4d names flattening these into one *"could not connect"* as the single
+        most likely copy defect on this surface, and a client can only keep them apart if
+        the server keeps them apart first.
+    ``provider_message``
+        The vendor's words VERBATIM — unparaphrased, untranslated, untruncated (071-A, the
+        rule UI-SPEC §5b's ``what the host said, verbatim`` block binds). ``""`` when the
+        vendor said nothing, never a sentence we invented on its behalf. It is EMPTY for a
+        ``refused`` bucket, because on that path nothing was ever contacted and there is no
+        vendor to quote.
+    ``reason_code``
+        The guard's OWN refusal code (``egress.REFUSAL_REASONS``) on a ``refused`` bucket,
+        else ``None``. It is the key into UI-SPEC §4c's CLOSED six-row sentence table; a
+        client that re-words a refusal instead of keying on this produces a seventh
+        sentence nobody ratified.
+
+    **No user-facing sentence is authored here or anywhere below the component layer.** The
+    panel composes §5c / §4c / §4d from exported identifiers (plan 190-18), so the copy can
+    be asserted by character-identity — a string in a model or an API client is a string
+    nobody tests for drift.
+    """
+
+    ok: bool
+    verdict: Literal["ok", "failed"]
+    identity: str | None = None
+    host: str = ""
+    port: int | None = None
+    checked_at: str | None = None
+    bucket: Literal["refused", "unreachable", "rejected"] | None = None
+    provider_message: str = ""
+    reason_code: str | None = None
+
+
 class ConnectorConnectionResponse(_StrictBase):
     """What a client is allowed to learn about a connection. NO secret, in any form.
 
@@ -222,4 +282,5 @@ __all__ = [
     "ConnectorConnectionCreate",
     "ConnectorConnectionUpdate",
     "ConnectorConnectionResponse",
+    "ConnectorCheckResponse",
 ]

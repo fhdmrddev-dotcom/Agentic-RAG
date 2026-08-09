@@ -447,9 +447,27 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
                      'app.services.connectors.registry' (most likely due to a circular import)
 
     It is unreachable in production for exactly one reason, measured rather than assumed:
-    ``phase_types.py:94`` is the **only** importer of the registry anywhere under
+    ``phase_types.py:94`` is the **only** MODULE-SCOPE importer of the registry anywhere under
     ``backend/app``, so the registry is never the module that opens the cycle. The day a second
-    module imports it first, the app stops booting.
+    module imports it AT MODULE SCOPE first, the app stops booting.
+
+    ⚠ **AMENDED 2026-08-09 (plan 190-15) — the tripwire now checks WHERE an import sits, not
+    merely HOW MANY exist, and that is strictly stronger rather than a relaxation.** The
+    credential-check action (``api/connectors.py``) has to dispatch through
+    ``registry.get_adapter``, and the original assertion — an exact-equality pin on a
+    one-element list — could not tell the two shapes apart:
+
+      * a **module-scope** import runs while the importing module's body executes, so it CAN
+        be the module that opens the cycle. Exactly one is permitted, and it is pinned by
+        file AND line, as before.
+      * a **function-body** import runs at CALL time, by which point every module is already
+        in ``sys.modules``. It joins no cycle, and no arrangement of them can reintroduce
+        one. These are permitted, but the FILES that hold them are pinned too — so a new one
+        is still a visible line in a diff a reviewer reads, rather than a silent addition.
+
+    The plant that proves the amended fence still bites is inline below: a module-scope
+    import synthesised into the walk's own input makes the module-scope assertion fail, which
+    is the failure the original pin existed to produce.
 
     This plan is test-only (D-32), and the cycle was created by 190-08 + 190-13 rather than by
     anything here, so it is logged in ``190-DEFERRED``/``deferred-items.md`` rather than fixed.
@@ -497,9 +515,8 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
     # The tripwire on the latent cycle — see the docstring. Measured at plan time with
     # `grep -rn "connectors.registry" backend/app --include=*.py` -> one import, one docstring
     # mention.
-    importers = []
     import_line = re.compile(
-        r"^\s*(?:from\s+app\.services\.connectors\.registry\s+import|"
+        r"^(?P<indent>\s*)(?:from\s+app\.services\.connectors\.registry\s+import|"
         r"import\s+app\.services\.connectors\.registry)"
     )
     assert import_line.search("from app.services.connectors.registry import get_adapter"), (
@@ -509,19 +526,62 @@ def test_no_vendor_module_enters_the_import_graph_until_a_send_happens():
         "      7. **Dispatch** through ``connectors.registry.get_adapter(capability)``"
     ), "the sole-importer matcher fires on prose, so the tripwire would read as tripped forever"
 
+    def _classify(lines, label):
+        """Split registry imports into module-scope (column 0) and function-local (indented)."""
+        at_module_scope, function_local = [], []
+        for lineno, line in enumerate(lines, start=1):
+            match = import_line.search(line)
+            if match is None:
+                continue
+            site = f"{label}:{lineno}"
+            (at_module_scope if match.group("indent") == "" else function_local).append(site)
+        return at_module_scope, function_local
+
+    # ⚠ The indent test is the whole amendment, so it is falsified on synthetic input BEFORE
+    # it is trusted on the tree — a classifier that called everything "function-local" would
+    # pass the walk below forever while the fence reported nothing.
+    _control_module, _control_local = _classify(
+        [
+            "from app.services.connectors.registry import get_adapter",
+            "    from app.services.connectors.registry import get_adapter",
+        ],
+        "control",
+    )
+    assert _control_module == ["control:1"] and _control_local == ["control:2"], (
+        "the module-scope/function-local classifier does not separate the two shapes "
+        f"({_control_module!r} / {_control_local!r}) — the amended tripwire would be blind to "
+        "the very import that opens the cycle"
+    )
+
+    module_scope_importers, function_local_importers = [], []
     for path in (_BACKEND_ROOT / "app").rglob("*.py"):
         if "__pycache__" in path.parts:
             continue
-        for lineno, line in enumerate(
-            path.read_text(encoding="utf-8", errors="replace").splitlines(), start=1
-        ):
-            if import_line.search(line):
-                importers.append(f"{path.relative_to(_BACKEND_ROOT).as_posix()}:{lineno}")
+        label = path.relative_to(_BACKEND_ROOT).as_posix()
+        found_module, found_local = _classify(
+            path.read_text(encoding="utf-8", errors="replace").splitlines(), label
+        )
+        module_scope_importers += found_module
+        function_local_importers += found_local
 
-    assert importers == ["app/services/harness/phase_types.py:94"], (
-        f"the connector registry now has these importers: {importers!r}. It had exactly one, "
-        "and that is the ONLY reason the measured import cycle "
-        "(registry -> harness.grounding -> harness/__init__ -> phase_types -> registry) stays "
-        "unreachable. A second importer that runs first turns a latent cycle into an app that "
-        "does not boot. Break the cycle before adding one — see this test's docstring."
+    assert module_scope_importers == ["app/services/harness/phase_types.py:94"], (
+        f"the connector registry now has these MODULE-SCOPE importers: "
+        f"{module_scope_importers!r}. It had exactly one, and that is the ONLY reason the "
+        "measured import cycle (registry -> harness.grounding -> harness/__init__ -> "
+        "phase_types -> registry) stays unreachable. A second module-scope importer that runs "
+        "first turns a latent cycle into an app that does not boot. Import it inside the "
+        "function instead — that runs after every module is loaded and joins no cycle — or "
+        "break the cycle before adding one. See this test's docstring."
+    )
+
+    # Function-local importers cannot open the cycle, but the FILES holding them are still
+    # pinned: a deferred import is cheap enough that "just add one" is a real temptation, and
+    # every one is a module reaching across a seam it was not given.
+    assert sorted({site.rsplit(":", 1)[0] for site in function_local_importers}) == [
+        "app/api/connectors.py",
+    ], (
+        f"the connector registry now has function-local importers in unexpected files: "
+        f"{function_local_importers!r}. These do NOT open the import cycle (they run at call "
+        "time, after every module is loaded), so this is a scope question rather than a boot "
+        "question — but pin the new file here deliberately rather than letting the set drift."
     )

@@ -73,6 +73,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Awaitable, Callable
 
 from cryptography.fernet import InvalidToken
@@ -98,6 +99,12 @@ _RESPONSE_KEYS: tuple[str, ...] = tuple(ConnectorConnectionResponse.model_fields
 
 # The two field names a response must never carry. Asserted rather than trusted, because
 # "the model has no such field" is the whole of T7 and a future edit could quietly undo it.
+# The three values migration 116's CHECK constraint admits for `last_check_verdict`.
+# `not_checked` is written by exactly two paths — a create, and a secret REPLACE — and is
+# NOT a verdict `record_check_verdict` may be asked for: a check that ran produced one of the
+# other two, and "un-checking" a connection is not an action any surface offers.
+_CHECK_VERDICTS: frozenset[str] = frozenset({"ok", "failed"})
+
 assert "secret_ciphertext" not in _RESPONSE_KEYS and "secret" not in _RESPONSE_KEYS, (
     "T7: ConnectorConnectionResponse grew a secret-bearing field — the response projection "
     f"would now carry it to every client. Fields: {_RESPONSE_KEYS}"
@@ -573,6 +580,70 @@ async def update_connection(
     return _to_response(updated)
 
 
+async def record_check_verdict(
+    connection_id: str,
+    org_id: str,
+    verdict: str,
+    supabase: Client | None = None,
+) -> ConnectorConnectionResponse:
+    """Persist ONE credential-check verdict, org-scoped. Written by the check action alone.
+
+    The whole reason UI-SPEC §5c's check is a DEDICATED action rather than a query
+    parameter on the read: it has a SIDE EFFECT. This is that side effect, in one place.
+
+    ── WHAT IT WRITES, AND WHAT IT DELIBERATELY DOES NOT ──
+    Two columns, both in ONE update: ``last_check_verdict`` and ``last_checked_at``. It
+    never touches ``is_enabled`` — a failing check does not disable a connection, because
+    disabling is a person's decision with a victim-naming confirm behind it (UI-SPEC §2g)
+    and a background verdict must not make it silently.
+
+    ── THE VERDICT IS A QUALITY HINT, NOT AN AUTHORIZATION BOUNDARY (U-07a, door (b)) ──
+    Migration 116 says so in the column's own ``COMMENT``, and it is worth repeating at the
+    only site that writes it: the server's bind gate (Gate 2) validates the row's ORG and
+    its ``is_enabled`` flag and reads THIS COLUMN NOWHERE. Checking is admin-only while
+    binding is org-wide, so a server bind-gate here would hard-block a plain member holding
+    a stale ``failed`` on a credential that has since been fixed — and they could not clear
+    it themselves, because they cannot run the check. Writing this value is therefore an act
+    of INFORMING, never of gating.
+
+    Org-scoped on the write itself (D-14), never by id alone: this is a row mutation, and an
+    unscoped predicate would let one tenant's check stamp another tenant's row. Returns the
+    settled row so the caller reports the timestamp the DATABASE recorded rather than the one
+    it hoped for. Raises ``ConnectorNotFound`` for both absent and another org's — one
+    absence, as everywhere else in this module.
+
+    Off the event loop via ``aexec`` (D-v2.5-01).
+    """
+    if verdict not in _CHECK_VERDICTS:
+        # Enforced at the write, not merely declared: migration 116's CHECK constraint would
+        # also refuse it, but a ValueError names the offending value at the call site instead
+        # of surfacing as an opaque database error three layers away.
+        raise ValueError(
+            f"check verdict {verdict!r} is not one of {sorted(_CHECK_VERDICTS)} "
+            "(migration 116's CHECK constraint on last_check_verdict)"
+        )
+
+    changes = {
+        "last_check_verdict": verdict,
+        "last_checked_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = await aexec(
+        _client(supabase)
+        .table(_TABLE)
+        .update(changes)
+        .eq("id", str(connection_id))
+        .eq("org_id", str(org_id))  # D-14 — scoped. A verdict is a WRITE, so it is scoped too.
+    )
+    updated = (result.data or [None])[0]
+    if updated is None:
+        raise ConnectorNotFound(f"no connection {connection_id}")
+    logger.info(
+        "connector_service: recorded a check verdict for connection %s (columns changed=%s)",
+        connection_id, sorted(changes),
+    )
+    return _to_response(updated)
+
+
 async def delete_connection(
     connection_id: str,
     org_id: str,
@@ -627,4 +698,5 @@ __all__ = [
     "get_connection",
     "update_connection",
     "delete_connection",
+    "record_check_verdict",
 ]
