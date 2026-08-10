@@ -20,6 +20,72 @@
 - ✅ **v3.4 Multi-Tenancy & Org Access** — Phases 160-168 CORE (shipped 2026-07-22); STRETCH 169-173 deferred → carry-forward guide `.planning/v3.4-STRETCH-CARRYFORWARD.md`. The load-bearing **one-way RLS door**: membership-based tenancy (Tenancy ADR → org/dept/role schema → personal-org backfill → the atomic RLS + user-JWT-client-swap crux → SECDEF audit + two-org isolation suite → `is_global` retirement → org-admin shell/switcher → invitations/roles/greenlists → SAML SSO). Migrations 104-113.
 - ✅ **v3.5 UX Consolidation & Chat Polish** — Phases 174-177 CORE (shipped 2026-07-23); STRETCH 178-180 deferred → carry-forward guide `.planning/v3.5-STRETCH-CARRYFORWARD.md`. Cleared the load-bearing chat-surface bug backlog + consolidated the accumulated UI/UX (incl. the new v3.4 org surfaces) into one coherent, honest experience: run-state & lifecycle honesty (174) · cross-provider streaming fidelity (175) · chat render correctness + exec reliability (176) · v3.4 org-surface family-cohesion polish (177). 14/14 CORE requirements delivered; no migration. Full detail archived: `.planning/milestones/v3.5-ROADMAP.md`.
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
+- 🚧 **v3.7 Workflow Product Completion** — Phases **192-198** (opened 2026-08-10). Makes the workflow product built across v2.8→v3.6 usable end to end. **Not new capability — completion.** Ten of the fourteen findings behind it were seeds the operator planted during earlier UAT and that were never scheduled; this milestone schedules them. Ingestion (SEED-149/150) → v3.8; connections (SEED-146, CONN-02) → after, deliberately, because safe outbound writes need RUN-01's stop control and NODE-02's human step.
+
+---
+
+## 🚧 Active: v3.7 Workflow Product Completion
+
+**Goal:** an author can find a workflow, understand the door they are walking through, build it with
+the right vocabulary, stop it, and see what it produced.
+
+⚠ **Numbering starts at 192 — `191` is RESERVED** for the deferred canvas-scale phase
+(`.planning/v3.6-STRETCH-CARRYFORWARD.md`). Do not reuse it.
+
+| # | Phase | Goal | Requirements | SC |
+|---|-------|------|--------------|-----|
+| 192 | Workflow Library IA | The Workflows page can be searched, filtered and read at a glance, and its card actions are predictable | LIB-01…04 | 4 |
+| 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
+| 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
+| 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
+| 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
+| 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
+| 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
+
+**Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
+most independent first — 194 in particular is mostly UI over an endpoint that already exists. 196 and
+197 improve authoring quality once the surface is usable. **198 is last and is research-first by
+construction** — SEED-141 requires proving the need before shipping a primitive, and `execute_code`
+is the incumbent any proposal must beat.
+
+### Phase details
+
+**Phase 192: Workflow Library IA** — LIB-01…04 · *G-2 fires (visual)*
+1. A user can find a named workflow by typing part of its name.
+2. A user can narrow the list without reading every card.
+3. A user can state what a card's actions will do before clicking one; "Tweak" no longer surprises.
+4. The create affordance is reachable without scrolling past the existing shelves.
+
+**Phase 193: Authoring Doors + Template Placement** — AUTH-01, AUTH-03 · *G-2 fires*
+1. A person who has not seen the Builder can predict what each door does before clicking.
+2. The number of perceived choices does not increase (the 187 template-door lesson — seed the existing path, do not add a third).
+3. A user with a template to fill can find where to supply it.
+
+**Phase 194: Stop a Running Workflow** — RUN-01
+1. A user can stop a run mid-execution from the run surface.
+2. The stopped run reports `cancelled` honestly — not failed, not silently complete.
+3. Stopping is safe mid-phase: no partial write is presented as finished. *(reuses the owned cancel endpoint + `run_lifecycle` internals — this is not a new runtime path)*
+
+**Phase 195: Show the Deliverable** — RUN-02, RUN-03
+1. A completed workflow that produced a file shows that file from the run surface.
+2. The presentation reuses `OutputFileCard` / `FilesSection` / `fileIcon` — no second file UI.
+3. Multiple produced files are handled with the shipped hero/working split, not a new pattern.
+   ⚠ **First task is measurement:** establish whether a workflow run emits output files onto the wire at all (SEED-148 records this as explicitly unmeasured). Backend-vs-frontend scope depends on the answer.
+
+**Phase 196: Registry-Backed Model Picker (canvas)** — AUTH-04
+1. A step's model is chosen from a list sourced from the live registry.
+2. An unregistered model cannot be silently selected — the pick-time honesty SEED-135 asks for.
+3. The app-wide sweep is NOT attempted; the canvas surface only. *(scope fence, deliberate)*
+
+**Phase 197: Guided Authoring** — AUTH-02 · *G-2 fires*
+1. A user drafting from a description is asked the decisions that change the result, rather than receiving a finished draft in one shot.
+2. The fast door stays fast — guidance must not turn "Describe & run" into the strict door (D-05).
+3. A user can still get a one-shot draft if they want one.
+
+**Phase 198: Node Vocabulary (research-first)** — NODE-01, NODE-02
+1. **Research output first:** count how many prompts in real workflows exist only to reshape data between two real steps. If the number is low, NODE-01 ships nothing and says so.
+2. Any primitive proposed answers three constraints explicitly: the spine is LINEAR, governance vocabulary assumes an AI step, and a node's face is computed from its config.
+3. Structured mid-run input is covered — starting from what `llm_human_input` already does, not from a blank form node.
 
 ---
 

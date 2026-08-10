@@ -1,11 +1,11 @@
 ---
 gsd_state_version: 1.0
-milestone: null
-milestone_name: "none — v3.6 closed 2026-08-09; next milestone not yet scoped"
-status: milestone_complete
-last_updated: 2026-08-09T15:20:00.000Z
-last_activity: "2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "Milestone closed cleanly. Nothing is mid-flight. Quick task 260809-klo landed the canvas `business_requirement` control (`da668c96`, `1c58a3fb`) — BUG-260809-02 stays `open` pending one live publish row. NEXT = `/gsd:new-milestone` — the sequenced slot is the connections / integrations milestone (read SEED-146 first)."
+milestone: "v3.7"
+milestone_name: "Workflow Product Completion"
+status: planning
+last_updated: 2026-08-10T14:30:00.000Z
+last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
+stopped_at: "v3.7 Workflow Product Completion OPENED 2026-08-10 — requirements + roadmap written, no phase started. Nothing is mid-flight. Since the v3.6 close: BUG-260809-02 CLOSED (owed reload+publish UAT row driven against local via Chrome DevTools MCP — publish 200, `blocked_stage: null`); D-klo-DEF-01 closed (the block copy now has one home in `grounding.py` and says what to do); v3.6 phase dirs archived to `.planning/milestones/v3.6-phases/`; the missing v2.9 STRETCH carry-forward guide written (105-108); SEED-147..150 planted. Production is at `7dc53ffa` — the canvas `business_requirement` control and the copy fix are LIVE. NEXT = `/gsd:discuss-phase 192`."
 resume_file: null
 ---
 
@@ -31,6 +31,21 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
+**Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
+**Phase:** Not started (requirements + roadmap written)
+**Plan:** —
+**Status:** Planning
+**Next action:** `/gsd:discuss-phase 192` (Workflow Library IA)
+**Last activity:** 2026-08-10 — v3.7 opened; v3.6 phases archived; SEED-147..150 planted; v2.9 STRETCH carry-forward guide written
+
+> Phase numbering continues from 190 and **starts at 192** — **191 is reserved** for the deferred
+> canvas-scale phase (`.planning/v3.6-STRETCH-CARRYFORWARD.md`). Do not reuse it.
+
+---
+
+<details>
+<summary>Previous milestone — v3.6, shipped 2026-08-09</summary>
+
 **v3.6 Visual / No-Code Workflow Studio — ✅ SHIPPED 2026-08-09, git tag `v3.6`.**
 
 | | |
@@ -48,6 +63,8 @@ the existing governed harness engine. **The differentiator is graded per-node go
 when KB-grounded, flexible when open, enforced at RUN time so it is not author-loosenable-away; the
 Beam / Glean / n8n deep crawl found none of them grade strictness by grounding. **The D-14 red line
 held across all 13 phases: 7 harness executors at close, exactly as at open.**
+
+</details>
 
 ## ⚠ Open at close — read before starting anything
 
