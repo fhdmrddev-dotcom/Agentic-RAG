@@ -1377,9 +1377,9 @@ Tiers are `STRICT 🔒 / MIDDLE ◐ / LOOSE ○` (`deriveTier.ts`), derived, nev
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 157 | the-library-at-scale | What organizes 50-200 workflows, and where do *find* and *create* live in the frame? | — | phase-192, lib-01, lib-04, workflows-page, information-architecture, scale, shelves, taxonomy, g2-sketch-gate |
-| 158 | finding-and-narrowing | What is the find instrument, and does it live on the page, in ⌘K, or both? | — | phase-192, lib-01, lib-02, search, filter, command-palette, g2-sketch-gate |
-| 159 | what-a-card-promises | At scale, what does a card show — and what do its actions promise before you click? | — | phase-192, lib-02, lib-03, card, actions, tweak, consequence, a11y, g2-sketch-gate |
+| 157 | the-library-at-scale | What organizes 50-200 workflows, and where do *find* and *create* live in the frame? | **B — one list, shelves are filters** ★ | phase-192, lib-01, lib-04, workflows-page, information-architecture, scale, shelves, taxonomy, g2-sketch-gate |
+| 158 | finding-and-narrowing | What is the find instrument, and does it live on the page, in ⌘K, or both? | **A — always-on page search** ★ (B deferred, trigger recorded) | phase-192, lib-01, lib-02, search, filter, command-palette, g2-sketch-gate |
+| 159 | what-a-card-promises | At scale, what does a card show — and what do its actions promise before you click? | **C — one verb, consequence inline** ★ | phase-192, lib-02, lib-03, card, actions, tweak, consequence, a11y, g2-sketch-gate |
 
 **Couplings to decide at pick-time, not after:**
 
@@ -1394,3 +1394,44 @@ Tiers are `STRICT 🔒 / MIDDLE ◐ / LOOSE ○` (`deriveTier.ts`), derived, nev
   the hit, so `clause` / `assessments` / `sign-off` find workflows whose titles lack those words. But it
   is substring matching, **not meaning** — the paraphrase *"the thing that checks vendors"* returns **0**,
   and the sketch says so on screen. SC#1's literal bar is only *"part of its name"*.
+
+### Winners (operator, 2026-08-10)
+
+| # | Winner | Why it won |
+|---|---|---|
+| 157 | **B — one list, shelves are filters** | SEED-136's complaint is not that the shelves are ugly, it is that *the page's own commissioner cannot say what the three categories are for*. **A renames that question; B removes it.** A's ownership axis (Yours / Team / Starters) is the conservative fix and only wins if "is this mine?" is genuinely the question a person arrives with — at org scale, arriving to *run a known thing* is more common, and ownership is then just a third wall to scroll past. B makes every shelf a **filter with an honest live count**, which is the same move 155-C won on three months earlier: a category that is a chip survives a fourth category; a category that is a place needs a fourth shelf. It also fixes SC#4 **structurally** rather than by promotion — create leads the toolbar because authoring is the close-second job, so it can never drift back down a grid. C was not wrong, it was **premature**: it spends the purpose sentence for density, and 159-C keeps the card, so C here would have contradicted the card decision. |
+| 158 | **A — always-on page search** | Decided on a use-count argument, not taste: at 200 workflows the field is opened **every visit**, so C's calm-at-rest saving is imaginary and its tap is pure recurring cost — *a control you always open should always be open*. A is also the path of least resistance for the stack (`ui/input.tsx` exists, no new dependency, page-local blast radius) and it discharges **both** SC#1 and SC#2 by itself. **B is deferred, not rejected**, with a three-condition re-open trigger in the sketch README — the Phase-156 precedent (078-D) says a page filter and a global jump box are different instruments and both can be true; 192 simply does not pay for a global-component change to get there. |
+| 159 | **C — one verb, consequence inline** | A and C agree on the thing that actually matters — **the consequence is real DOM text, never a `title=`** — and differ only on how much of it to print. A repeats a two-line block on every card; at 200 cards that is the same clutter LIB-02 is trying to cure. C keeps A's *rule* and spends it once, on the only action whose result is not obvious from its name. B lost for a reason worth recording: it buys density by clipping the purpose sentence, which is exactly the atom the 046-A soul makes the hero — **and picking B would have forced 157-C**, so the card decision and the frame decision stay coherent by construction. |
+
+**Obligations the winners inherit** — carry these into `/gsd:discuss-phase 192` and `/gsd:plan-phase 192` rather than rediscovering them:
+
+- **G-5 FIRST, before the feature.** `WorkflowsPage.tsx` is now on the hot-file ledger at **21 commits /
+  10 phases / 1407 L**, and 157-B is a structural rewrite of its library view. Per G-5 the discuss-phase
+  **must produce a refactor recommendation as the first option**. The named seam: three card components
+  → `components/workflows/library/`, `RunModal` and the WFIN-03 delete Sheet → their own modules,
+  leaving the page as composition — the shape the 188.2 card cut used.
+- **157-B commits the chips to being the RIGHT chips.** A flat list is only navigable if the filter set
+  is. The sketch ships six (*Ready to run · Yours · Still building · Starters · Makes a file · 🔒 Strict*)
+  and every one recounts against the live search so a chip can never promise results it cannot deliver.
+  Which six ship is a **decision owed at plan time**, not a detail.
+- **157-B deletes a place, so the three shelf names must be re-homed, not just dropped.** "Starters" is
+  provenance, "Published" is state, "Drafts & seeds" is two things — each becomes a chip with a
+  *plain-language* label (the 146 LANG-01 pattern), and the `GET /workflows/published` chip that
+  currently renders a literal endpoint string to end users goes with it.
+- **158-A must decide its search SCOPE deliberately.** Name-only is SC#1's literal bar; name + purpose
+  is what the sketch demonstrates and is measurably more useful (`clause` / `assessments` / `sign-off`
+  each find workflows whose titles lack the word). Whichever ships, it is **substring matching, not
+  meaning** — do not let copy, placeholder text or a later summary imply semantic search.
+- **159-C's consequence line is an a11y contract, not a caption.** It is real DOM text wired with
+  `aria-describedby` — the Phase-185 rule — because **touch has no hover**. The two shipped `title=`
+  explanations (`:857` Tweak, `:155` region Use this) are removed *by being replaced*, never by being
+  deleted and left unexplained.
+- **159-C inherits the naming collapse.** `⑂ Tweak` and `Use this →` are the same action in different
+  words (`onTweak` `:220`, `onUseStarter` `:259`, and the shipped comment at `:250` says so); a draft
+  card's `✎ Open` and `Publish…` call **one handler** (`:723` / `:731`). Seven verbs should not survive
+  this phase intact — but note that collapsing them touches behaviour, so it is a **scope call for
+  discuss-phase**, not a silent rename during execution.
+- **⚠ Carried, unfixed, inherited by all four tabs:** the phase-type word is still a `title` on every
+  chain glyph — the shipped glyph vocabulary's own hover-only problem. Not introduced by these sketches
+  and not in LIB-01…04's scope; record it rather than let a later reviewer discover it and assume 192
+  added it.

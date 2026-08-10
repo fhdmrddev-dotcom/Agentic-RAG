@@ -2,9 +2,15 @@
 sketch: 158
 name: finding-and-narrowing
 question: "What is the find instrument, and does it live on the page, in ⌘K, or both?"
-winner: null
+winner: "A"
 tags: [phase-192, lib-01, lib-02, search, filter, command-palette, workflows-page]
 ---
+
+> **Winner: A — always-on page search** (operator, 2026-08-10).
+> At 200 workflows the search field is used every visit, so C's tap buys nothing and costs one every
+> time — a control you always open should always be open. **B is DEFERRED, not rejected** (see the
+> deferral below); it answers a different question than A does, and the Phase-156 precedent says both
+> can be true. See the MANIFEST Winners table for the full rationale.
 
 # Sketch 158: Finding and narrowing
 
@@ -58,13 +64,27 @@ moves between 12 / 54 / 200.
 5. **Do the filter chips carry honest counts?** They recount against the current search, so a chip never
    promises results it can't deliver.
 
-## Open question this sketch deliberately does not settle
+## Deferred: B (⌘K indexes workflows) — with a re-open trigger
 
-A and B are **not necessarily rivals.** ⌘K is a *jump-anywhere* instrument; an on-page field is a
+**A winning does NOT reject B.** ⌘K is a *jump-anywhere* instrument; an on-page field is a
 *narrow-what-I'm-looking-at* instrument — exactly the split Phase 156 already settled for chat
-(sketch 078-D: "the column filters what you see; ⌘K jumps anywhere"). If that precedent holds, the
-answer is **both**, and the real decision is only whether 192 pays for the global-palette change now or
-defers it. Say so explicitly at pick-time rather than letting a winner imply the other is rejected.
+(sketch 078-D: *"the column filters what you see; ⌘K jumps anywhere"*). Both being true is the
+precedent, not a compromise. 192 ships A because it is page-local, cheap, and discharges SC#1 and SC#2
+on its own; B is deferred purely on **blast radius** — it changes a global component (`ThreadCommandPalette.tsx`)
+and its one shared match engine, which is a different phase's risk profile.
+
+**Re-open B when ANY of these is true:**
+
+1. A second surface asks to be findable from ⌘K (Skills, Documents, Views) — at two consumers the
+   global palette stops being a workflows-only cost and the shared engine earns its change.
+2. A user is observed pressing ⌘K on the Workflows page expecting workflows and getting only chats —
+   the palette existing while not knowing about the page is its own honesty problem.
+3. Any phase touches `ThreadCommandPalette.tsx` or `lib/threadGroups.ts` for another reason — fold B in
+   rather than paying the blast radius twice.
+
+**What B is owed when it does land:** `matchesTitle` currently matches a thread title only; workflows
+need name **and** the purpose sentence to be worth indexing (see the scope note below), so the shared
+engine grows a field list rather than a second copy — *share, don't fork*.
 
 ## Verification
 

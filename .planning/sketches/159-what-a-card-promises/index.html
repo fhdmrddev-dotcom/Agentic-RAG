@@ -120,14 +120,14 @@ button { font-family:inherit; }
 
 <div id="variant-nav">
   <span class="brand">159 · WHAT A CARD PROMISES</span>
-  <button class="variant-tab active" data-v="a">A: Rich card, worded actions</button>
+  <button class="variant-tab" data-v="a">A: Rich card, worded actions</button>
   <button class="variant-tab" data-v="b">B: Dense row, one primary + menu</button>
-  <button class="variant-tab" data-v="c">C: Hybrid — one verb, consequence inline</button>
+  <button class="variant-tab active" data-v="c">C: Hybrid — one verb, consequence inline ★ Selected</button>
   <button class="variant-tab today" data-v="today">Today (shipped)</button>
 </div>
 
 <!-- ══════════ A ══════════ -->
-<div id="variant-a" class="variant">
+<div id="variant-a" class="variant" style="display:none">
   <div class="wrap">
     <div class="lede">
       <b>The claim:</b> the seven verbs stay, but every one of them says what it will do — in text that is
@@ -161,7 +161,7 @@ button { font-family:inherit; }
 </div>
 
 <!-- ══════════ C ══════════ -->
-<div id="variant-c" class="variant" style="display:none">
+<div id="variant-c" class="variant">
   <div class="wrap">
     <div class="lede">
       <b>The claim:</b> a card should offer <b>one</b> obvious verb. The others are real but quiet.

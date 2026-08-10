@@ -2,9 +2,16 @@
 sketch: 159
 name: what-a-card-promises
 question: "At scale, what does a card show — and what do its actions promise before you click?"
-winner: null
+winner: "C"
 tags: [phase-192, lib-02, lib-03, workflows-page, card, actions, tweak, consequence, a11y]
 ---
+
+> **Winner: C — hybrid, one verb with the consequence inline** (operator, 2026-08-10).
+> C holds the ~3-on-screen-actions discipline while still printing the one sentence that stops the
+> surprise. A was right in spirit — every verb worded, nothing hidden in a tooltip — but it repeats a
+> two-line consequence block on all 200 cards; C keeps A's *rule* (consequence is real DOM text) and
+> spends it once. **C is coherent with 157-B**: both keep the rich soul card, so the purpose sentence
+> survives and LIB-02 is not traded away for density. See the MANIFEST Winners table.
 
 # Sketch 159: What a card promises
 

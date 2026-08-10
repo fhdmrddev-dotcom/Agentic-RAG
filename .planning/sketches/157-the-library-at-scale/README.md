@@ -2,9 +2,17 @@
 sketch: 157
 name: the-library-at-scale
 question: "What organizes 50-200 workflows, and where do *find* and *create* live in the frame?"
-winner: null
+winner: "B"
 tags: [phase-192, lib-01, lib-04, workflows-page, information-architecture, scale, shelves, taxonomy]
 ---
+
+> **Winner: B — one list, shelves become filters** (operator, 2026-08-10).
+> SEED-136's complaint is that the three categories don't mean anything to the person reading them.
+> The honest answer to *"I don't know what these categories are for"* is to **stop making them places**.
+> A was the conservative option and it only wins if *ownership* genuinely reads as the axis; B removes
+> the question instead of renaming it. Create leads the toolbar — authoring is the close-second job, so
+> "start something" sits left of "find something", and SC#4 is satisfied structurally rather than by
+> moving a card up a grid. See the MANIFEST Winners table for the full rationale and inherited obligations.
 
 # Sketch 157: The library at scale
 

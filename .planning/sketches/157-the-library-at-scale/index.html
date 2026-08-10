@@ -160,14 +160,14 @@ button { font-family: inherit; }
 
 <div id="variant-nav">
   <span class="brand">157 · LIBRARY AT SCALE</span>
-  <button class="variant-tab active" data-v="a">A: Taxonomy shelves</button>
-  <button class="variant-tab" data-v="b">B: One list, shelves are filters</button>
+  <button class="variant-tab" data-v="a">A: Taxonomy shelves</button>
+  <button class="variant-tab active" data-v="b">B: One list, shelves are filters ★ Selected</button>
   <button class="variant-tab" data-v="c">C: Facet rail + dense list</button>
   <button class="variant-tab today" data-v="today">Today (shipped)</button>
 </div>
 
 <!-- ══════════ VARIANT A ══════════ -->
-<div id="variant-a" class="variant">
+<div id="variant-a" class="variant" style="display:none">
   <div class="app">
     <div class="rail">
       <div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div>
@@ -193,7 +193,7 @@ button { font-family: inherit; }
 </div>
 
 <!-- ══════════ VARIANT B ══════════ -->
-<div id="variant-b" class="variant" style="display:none">
+<div id="variant-b" class="variant">
   <div class="app">
     <div class="rail">
       <div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div>
