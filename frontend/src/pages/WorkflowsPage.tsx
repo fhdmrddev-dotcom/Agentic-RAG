@@ -38,7 +38,13 @@
 // property the one-direction row at the foot of `PublishedCardDelete.test.tsx` greps for, so
 // their identifiers are described here rather than spelled. `MoreHorizontal` and `Trash2`
 // STAY — the ⋯-menu and its Delete item are card chrome and did not move.
-import { useCallback, useEffect, useRef, useState } from "react"
+// Phase 192-10 (D-16): `useMemo` COMES BACK on this line, and it is worth one sentence why.
+// 192-06 removed it with the Run modal — read out of `tsc`, not predicted. It returns because
+// the merge is a DERIVATION over three pieces of state rather than a fourth piece of state:
+// re-deriving `mergeLibrary(published, starters, drafts)` on every keystroke of a search field
+// at 200 rows is the 045 real-scale lesson's cost, and a fourth `useState` holding the merged
+// list is the drift where two sources of truth disagree about what the library contains.
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MoreHorizontal, Trash2 } from "lucide-react"
 import {
   DropdownMenu,
@@ -89,10 +95,27 @@ import {
   WorkflowDeleteSheet,
   type WorkflowDeleteSheetHandle,
 } from "@/components/workflows/library/WorkflowDeleteSheet"
+// Phase 192-10 (D-16 / D-17) — the merge and the narrow, IMPORTED as pure functions rather
+// than written here. The page owns fetching, state and composition; it computes no predicate
+// of its own, because a second copy of a predicate is a second answer to one question.
+//
+// ⚠ `UNBOUND` IS IMPORTED, AND THE PAGE'S OWN COPY IS DELETED IN THIS COMMIT. `192-05`
+// re-homed the sentinel into `libraryFilter.ts` with a byte-identical value because fence F4
+// forbids any module under `library/` from naming a `WorkflowsPage` specifier in any import
+// form — so the sentinel had to live at or below the leaves. That left TWO identical
+// declarations as a deliberate transient, recorded as such by both `192-05` and `192-07`, and
+// closing it is this plan's job: one home, reached from here.
+import {
+  UNBOUND,
+  filterLibrary,
+  mergeLibrary,
+} from "@/components/workflows/library/libraryFilter"
+import type { Provenance } from "@/components/workflows/library/libraryRow"
+import {
+  LIBRARY_STATES,
+  sourceFailedMessage,
+} from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
-
-/** Sentinel for the "Unbound (no project)" filter (IR-04 — module-scope, not per-render). */
-const UNBOUND = "__unbound__"
 
 /** Phase 143 (WF-01 / D-143-1) — a 6-char base36 fork-slug suffix for the fresh-copy
  *  fork (`<starter-slug>-<hash>`). Robustly 6 chars of [a-z0-9] even if a single
@@ -180,9 +203,41 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // live symptom: "All projects" showed 7, a specific project showed 16, but the
   // rendered list lagged the selection). Each fetch takes a monotonic ticket; only
   // the most-recently-issued ticket is allowed to commit its result to state.
+  //
+  // ⚠ 192-10 (D-16/D-17): THREE TICKETS, NOT ONE, AND THE ASYMMETRY IS THE POINT. Only
+  // `published` re-queries when the project changes (`refetchPublished` is the one callback
+  // with `selectedProjectId` in its deps); starters and drafts are fetched once. A single
+  // shared ticket across the merge would therefore either invalidate two settled sources on
+  // every project click, or fail to invalidate the one that actually raced.
   const publishedSeqRef = useRef(0)
   const startersSeqRef = useRef(0)
   const draftsSeqRef = useRef(0)
+
+  /**
+   * 192-10 (D-16, T-192-26) — THE FOUR STATES, HELD APART, AND THE FAILURE STATE IS PER SOURCE.
+   *
+   * *There are none* and *we could not ask* are DIFFERENT FACTS (the shipped `DescribeKbPicker`
+   * rule), and a page-wide `error` collapses them into one. It also collapses something worse:
+   * `/workflows/drafts` is GATED (`require_visible("workflow_authoring")`) while `/published`
+   * and `/starters` are the documented RUN CARVE-OUT, so one shared error path turns a 403 on
+   * drafts into an empty LIBRARY — the gate re-introduced client-side on exactly the two feeds
+   * the carve-out exists to protect. Per-source state is what makes that unavailable.
+   */
+  const [sourceFailed, setSourceFailed] = useState<Record<Provenance, boolean>>({
+    published: false,
+    starter: false,
+    draft: false,
+  })
+  /** True until the first settle of all three feeds. NO COUNT IS RENDERED WHILE IT IS TRUE — a
+   *  count of 0 during a load is a lie, not a conservative default. */
+  const [loading, setLoading] = useState(true)
+  /** A published re-query is in flight (D-17's companion rule). The previously-committed rows
+   *  stay rendered with their correct counts under a quiet marker; nothing is zeroed. */
+  const [publishedUpdating, setPublishedUpdating] = useState(false)
+
+  const markSource = useCallback((source: Provenance, failed: boolean) => {
+    setSourceFailed((prev) => (prev[source] === failed ? prev : { ...prev, [source]: failed }))
+  }, [])
 
   const refetchPublished = useCallback(async () => {
     // "All projects" → no filter; "Unbound" → filter is not server-expressible as a
@@ -194,45 +249,90 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     // scope:"mine" so the curated Starters + the mig-061 dev scaffolds (both is_system_global)
     // stop double-rendering here; they live in the Starters shelf. Only THIS call site
     // opts in — the composer picker + WorkspacePanel keep the default global feed.
-    const rows = await listPublishedWorkflows(projectArg, undefined, { scope: "mine" })
-    // Latest-wins: a stale (superseded) response NEVER paints over a newer selection.
-    if (seq !== publishedSeqRef.current) return
-    if (selectedProjectId === UNBOUND) {
-      setPublished(rows.filter((r) => !(r.definition as DefShape | undefined)?.project_folder_id))
-    } else {
-      setPublished(rows)
+    setPublishedUpdating(true)
+    try {
+      const rows = await listPublishedWorkflows(projectArg, undefined, { scope: "mine" })
+      // Latest-wins: a stale (superseded) response NEVER paints over a newer selection.
+      if (seq !== publishedSeqRef.current) return
+      if (selectedProjectId === UNBOUND) {
+        setPublished(rows.filter((r) => !(r.definition as DefShape | undefined)?.project_folder_id))
+      } else {
+        setPublished(rows)
+      }
+      markSource("published", false)
+    } catch (err) {
+      // A superseded failure is as stale as a superseded success — it must not paint a
+      // failure notice over a selection that has already moved on.
+      if (seq !== publishedSeqRef.current) return
+      markSource("published", true)
+      throw err
+    } finally {
+      if (seq === publishedSeqRef.current) setPublishedUpdating(false)
     }
-  }, [selectedProjectId])
+  }, [selectedProjectId, markSource])
 
   // Phase 143 (WF-01): the curated Starters feed — a single unscoped global fetch on
   // mount. Same latest-wins guard as the others (cheap insurance though a single
   // unscoped fetch rarely races).
   const refetchStarters = useCallback(async () => {
     const seq = ++startersSeqRef.current
-    const rows = await listStarterWorkflows()
-    if (seq !== startersSeqRef.current) return
-    setStarters(rows)
-  }, [])
+    try {
+      const rows = await listStarterWorkflows()
+      if (seq !== startersSeqRef.current) return
+      setStarters(rows)
+      markSource("starter", false)
+    } catch (err) {
+      if (seq !== startersSeqRef.current) return
+      markSource("starter", true)
+      throw err
+    }
+  }, [markSource])
 
   const refetchDrafts = useCallback(async () => {
     const seq = ++draftsSeqRef.current
-    const rows = await listDraftWorkflows()
-    // Same latest-wins guard (drafts are re-fetched on mount + after publish/tweak).
-    if (seq !== draftsSeqRef.current) return
-    setDrafts(rows)
-  }, [])
+    try {
+      const rows = await listDraftWorkflows()
+      // Same latest-wins guard (drafts are re-fetched on mount + after publish/tweak).
+      if (seq !== draftsSeqRef.current) return
+      setDrafts(rows)
+      markSource("draft", false)
+    } catch (err) {
+      if (seq !== draftsSeqRef.current) return
+      // ⚠ THE ONE GATED FEED. A refusal here is a NORMAL outcome for a user without
+      // `workflow_authoring` visibility, not an exception — it degrades to zero drafts and
+      // says so, and it must NEVER be able to remove a published row or a starter from view.
+      markSource("draft", true)
+      throw err
+    }
+  }, [markSource])
 
+  /**
+   * ⚠ `Promise.allSettled`, NEVER `Promise.all` — this is the single highest-risk defect the
+   * D-16 merge can ship, and the shape of the call is the whole mitigation.
+   *
+   * `GET /workflows/drafts` carries `require_visible("workflow_authoring")`; `GET
+   * /workflows/published` and `GET /workflows/starters` carry NO dependency at all, because
+   * they are the Phase-148 RUN CARVE-OUT — the feeds that keep Run working for every user.
+   * `Promise.all` rejects on the FIRST rejection, so one 403 on the gated feed would abandon
+   * the composition and leave a user staring at an EMPTY LIBRARY whose two visible feeds had
+   * both answered successfully. `allSettled` waits for every outcome, each source commits
+   * behind its own ticket, and a refused feed subtracts only itself.
+   *
+   * THE ASYMMETRY IS PRESERVED: the first run settles all three; every later run is a project
+   * change, and only `published` re-queries (`refetchStarters` / `refetchDrafts` are `[]`-stable
+   * so they can never re-trigger this effect). That is D-17's cause, kept rather than collapsed.
+   */
+  const didInitialLoadRef = useRef(false)
   useEffect(() => {
+    if (!didInitialLoadRef.current) {
+      didInitialLoadRef.current = true
+      void Promise.allSettled([refetchPublished(), refetchStarters(), refetchDrafts()]).then(
+        () => setLoading(false),
+      )
+      return
+    }
     refetchPublished().catch(console.error)
-  }, [refetchPublished])
-
-  useEffect(() => {
-    refetchStarters().catch(console.error)
-  }, [refetchStarters])
-
-  useEffect(() => {
-    refetchDrafts().catch(console.error)
-  }, [refetchDrafts])
+  }, [refetchPublished, refetchStarters, refetchDrafts])
 
   const folderName = useCallback(
     (id: string | null | undefined): string | null => {
@@ -240,6 +340,36 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       return folders.find((f) => f.id === id)?.name ?? null
     },
     [folders],
+  )
+
+  // ── 192-10 (D-16 / D-17) — THE ONE LIST ──────────────────────────────────────────────
+  //
+  // Three feeds → one flat `LibraryRow[]`, deduped by `id` with `provenance` assigned from
+  // FEED ORIGIN, then narrowed. The page calls the pure functions and writes no predicate:
+  // the dedupe key, the union semantics of the chips, the search scope and the three
+  // per-provenance project rules all live in `libraryFilter.ts` and are unit-proved there
+  // without a DOM.
+  const rows = useMemo(
+    () => mergeLibrary(published, starters, drafts),
+    [published, starters, drafts],
+  )
+
+  // D-17's three rules, applied by `matchesProject` and NOT re-stated here: published rows
+  // were already narrowed SERVER-side by the `?project_folder_id=` re-query above (the one
+  // case the server cannot express — "no project" — is the `UNBOUND` narrow in
+  // `refetchPublished`); drafts narrow CLIENT-side on `definition.project_folder_id`; and
+  // starters are held OUT of the project filter entirely and stay visible, with the toolbar
+  // stating that fact in words rather than leaving it to be inferred from a filter that looks
+  // broken.
+  const visibleRows = useMemo(
+    () => filterLibrary(rows, { query: "", chips: [], projectId: selectedProjectId }),
+    [rows, selectedProjectId],
+  )
+
+  /** The sources that answered with a refusal, NAMED — never folded into one page-wide error. */
+  const failedSources = useMemo(
+    () => (Object.keys(sourceFailed) as Provenance[]).filter((source) => sourceFailed[source]),
+    [sourceFailed],
   )
 
   // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row —
@@ -498,6 +628,16 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   }
 
   // ── LIBRARY view ──
+  // 192-10 Task 1 — TRANSITIONAL: the three shelves still render, but they now render the
+  // MERGED, NARROWED list partitioned by provenance rather than three independent pieces of
+  // fetch state. That is deliberate sequencing: it proves the merge, the `allSettled`
+  // isolation and D-17's project rules against the twenty-three tests that already exist,
+  // BEFORE Task 2 replaces the frame around them. Task 2 deletes this partition with the
+  // shelves it feeds.
+  const starterRows = visibleRows.filter((row) => row.provenance === "starter")
+  const publishedRows = visibleRows.filter((row) => row.provenance === "published")
+  const draftRows = visibleRows.filter((row) => row.provenance === "draft")
+
   const runCtaWf =
     runCta && published.find((w) => w.slug === runCta.slug)
 
@@ -543,6 +683,36 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         </div>
       )}
 
+      {/* ── 192-10 (D-16, T-192-26): THE HONEST STATES, HELD APART ───────────────────
+          `loading` renders NO COUNT AT ALL, because a count of 0 during a load is a lie.
+          A refused source is NAMED — "we couldn't load your drafts" — and the rows that
+          did arrive stay on screen beneath it, because presenting a partial library as a
+          complete one is the spoofing-of-completeness this section exists to prevent. */}
+      {loading && (
+        <p data-testid="library-loading" className="px-6 py-2 text-[12.5px] text-muted-foreground">
+          {LIBRARY_STATES.loading}
+        </p>
+      )}
+      {failedSources.map((source) => (
+        <p
+          key={source}
+          data-testid={`library-source-failed-${source}`}
+          className="border-b border-warning/30 bg-warning/5 px-6 py-2 text-[12.5px] text-muted-foreground"
+        >
+          {sourceFailedMessage(source)}
+        </p>
+      ))}
+      {publishedUpdating && !loading && (
+        <p
+          data-testid="library-updating"
+          data-state="updating"
+          aria-live="polite"
+          className="px-6 pb-1 text-[11.5px] text-muted-foreground"
+        >
+          updating…
+        </p>
+      )}
+
       <div className="grid min-h-0 flex-1 grid-cols-[200px_1fr] gap-6 overflow-y-auto px-6 py-5">
         {/* ── Project filter rail (live ?project_folder_id= re-query) ── */}
         <nav aria-label="Project filter" className="flex flex-col gap-1">
@@ -572,7 +742,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           <section data-testid="starters-shelf">
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Starters · {starters.length}
+                Starters · {starterRows.length}
               </h2>
               <span
                 title="Curated, official starter workflows — fork one into your own editable copy"
@@ -581,13 +751,14 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 curated
               </span>
             </div>
-            {starters.length === 0 ? (
+            {starterRows.length === 0 ? (
               <p className="text-[13px] italic text-muted-foreground">No starters available yet.</p>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {starters.map((wf) => (
-                  <StarterCard key={wf.id} wf={wf} onUse={() => onUseStarter(wf)} />
-                ))}
+                {starterRows.map((row) => {
+                  const wf = row.source as PublishedWorkflow
+                  return <StarterCard key={row.id} wf={wf} onUse={() => onUseStarter(wf)} />
+                })}
               </div>
             )}
           </section>
@@ -596,7 +767,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           <section data-testid="published-shelf">
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Published · {published.length}
+                Published · {publishedRows.length}
               </h2>
               <span
                 title="The live, owner-scoped endpoint (mine-only via ?scope=mine)"
@@ -605,13 +776,15 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 GET /workflows/published
               </span>
             </div>
-            {published.length === 0 ? (
+            {publishedRows.length === 0 ? (
               <p className="text-[13px] italic text-muted-foreground">
                 No published workflows{selectedProjectId ? " for this project" : ""} yet.
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {published.map((wf) => (
+                {publishedRows.map((row) => {
+                  const wf = row.source as PublishedWorkflow
+                  return (
                   <PublishedCard
                     key={wf.id}
                     wf={wf}
@@ -623,7 +796,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                     // (D-LOCK-04 — no optimistic vanish; the list never filters locally).
                     onDeleted={() => { refetchPublished().catch(console.error) }}
                   />
-                ))}
+                  )
+                })}
               </div>
             )}
           </section>
@@ -632,7 +806,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           <section data-testid="drafts-shelf">
             <div className="mb-3 flex items-center gap-2">
               <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Drafts &amp; seeds · {drafts.length}
+                Drafts &amp; seeds · {draftRows.length}
               </h2>
               <NetNewFlag label="net-new list" />
             </div>
@@ -653,9 +827,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 </span>
               </button>
 
-              {drafts.map((d) => (
-                <DraftCard key={d.id} draft={d} onOpen={() => onOpenDraft(d)} />
-              ))}
+              {draftRows.map((row) => {
+                const d = row.source as WorkflowDraftRow
+                return <DraftCard key={row.id} draft={d} onOpen={() => onOpenDraft(d)} />
+              })}
             </div>
           </section>
         </div>
