@@ -1330,3 +1330,67 @@ against absent behaviour:
 - **156-A:** must survive **375px** (mobile → bottom sheet, per the shipped shell rule). Unlike the
   rejected B, the panel gets **no free focus trap or focus restore** from `Dialog` — both are net-new,
   and the a11y 035-A got for free here has to be built. Name it in the plan, not in review.
+
+---
+
+### Phase 192 session — Workflow Library IA (LIB-01…04) (2026-08-10)
+
+G-2 sketch, BEFORE discuss/spec-phase. First sketch batch of **v3.7 Workflow Product Completion**.
+Grounded by **auditing the shipped `WorkflowsPage.tsx` at HEAD** (1407 L) rather than reasoning from
+the 012/021 sketch-era CSS — SEED-136's read still holds exactly: header has **no create button, no
+search, no sort, no view toggle** (`:479-486`); the body is **one scroll container** (`:518`); shelves
+run Starters → Published → Drafts (`:544`/`:568`/`:604`); the dashed build-card is the **first cell of
+the third grid** (`:613`); and the only two `placeholder` hits in the file are the RunModal kickoff
+textarea and a comment.
+
+**Two operator answers set the whole frame** (intake, 2026-08-10): the page has **two first-class jobs**
+(find-and-run, with authoring a close second), and it must read well at **org scale, 50-200+ workflows**.
+That combination kills the flat 2-column card grid regardless of card quality, and it moves the create
+affordance out of the third grid. Every sketch ships a **12 / 54 / 200 scale selector** so density is
+felt at the real number, not at demo scale (the 045 lesson).
+
+**Three findings the audit produced that no planning document named:**
+
+- **Seven action verbs across three card types** — `Use this →` · `⑂ Tweak` · `▶ Run` ·
+  `⋯ Delete workflow…` · `✎ Open` · `Publish…`. LIB-03 is not one confusing button; it is three card
+  types teaching three vocabularies. **Two of them are the same action in different words** —
+  `onTweak` (`:220`) and `onUseStarter` (`:259`) both fork a draft into the Builder, and the shipped
+  comment at `:250` calls the latter *"a sibling of onTweak"*. **And a draft card's two buttons call the
+  same handler** — `✎ Open` (`:723`) and `Publish…` (`:731`) are both `onClick={onOpen}`.
+- **The explanations that would stop the surprise are `title=` tooltips** (`:857` for Tweak, `:155`
+  region for Use this). **Touch has no hover**, and Phase 185's own graded-governance rule already says
+  a reason must be real DOM text via `aria-describedby`, *never* a `title`. The page breaks a rule the
+  codebase holds elsewhere. Measured across sketch 159: variants A/B/C carry **0** action-level `title=`;
+  the shipped reference tab carries **4**. ⚠ Inherited and unfixed in all four: the phase-type word is
+  still hover-only on every chain glyph.
+- **G-5 FIRES and had been invisible.** `WorkflowsPage.tsx` measures **21 commits across 10 phases**
+  (103/124/143/152/155/165/184/184.1/186/188) at **1407 lines**, and was **absent from the CLAUDE.md
+  hot-file ledger** — so ten phases touched it and not one produced the refactor recommendation G-5
+  requires, because the audit step scans against that table and a file missing from it is invisible to
+  its own guardrail. The row was added 2026-08-10. **Discuss-phase 192 must put the refactor question
+  first**, since 192 is a structural rewrite of this file's library view, not a mount point.
+
+**Vocabulary correction carried into the sketches:** the shipped `PHASE_GLYPHS` (`soulData.ts`) is
+`gear · memo · compass · handshake · raised-hand · package · outbox-tray` (7 types incl. Phase 189's
+`external_action`) — **not** the flat `⚙✎🤖⛓☺◆` set this MANIFEST's older prose still describes.
+Tiers are `STRICT 🔒 / MIDDLE ◐ / LOOSE ○` (`deriveTier.ts`), derived, never stored.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 157 | the-library-at-scale | What organizes 50-200 workflows, and where do *find* and *create* live in the frame? | — | phase-192, lib-01, lib-04, workflows-page, information-architecture, scale, shelves, taxonomy, g2-sketch-gate |
+| 158 | finding-and-narrowing | What is the find instrument, and does it live on the page, in ⌘K, or both? | — | phase-192, lib-01, lib-02, search, filter, command-palette, g2-sketch-gate |
+| 159 | what-a-card-promises | At scale, what does a card show — and what do its actions promise before you click? | — | phase-192, lib-02, lib-03, card, actions, tweak, consequence, a11y, g2-sketch-gate |
+
+**Couplings to decide at pick-time, not after:**
+
+- **159-B implies 157-C.** Both spend the purpose sentence to buy density. Picking the dense row in one
+  and the rich card in the other is not a coherent page.
+- **158-A and 158-B may not be rivals at all.** Phase 156 already settled this split for chat
+  (sketch 078-D: *the column filters what you see; ⌘K jumps anywhere*). If that precedent holds the
+  answer is **both**, and the only real question is whether 192 pays for the global-palette change now.
+  ⌘K reuse is **not free**: `ThreadCommandPalette.tsx` indexes threads only and is hand-rolled on Radix
+  Dialog, **not `cmdk`** — teaching it workflows changes a global component and its shared engine.
+- **Search scope is a decision, not a default.** 158-A matches name **+ purpose sentence** and highlights
+  the hit, so `clause` / `assessments` / `sign-off` find workflows whose titles lack those words. But it
+  is substring matching, **not meaning** — the paraphrase *"the thing that checks vendors"* returns **0**,
+  and the sketch says so on screen. SC#1's literal bar is only *"part of its name"*.

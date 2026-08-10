@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 157 — The library at scale</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family: var(--font-sans); color: var(--color-text); background: var(--color-bg); padding-top: 46px; margin:0; }
+h1,h2,h3 { font-family: var(--font-headline); margin:0; }
+button { font-family: inherit; }
+
+/* ── variant tabs ───────────────────────────────────────── */
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+
+/* ── page frame ─────────────────────────────────────────── */
+.app { height: calc(100vh - 46px); display:grid; grid-template-columns: 58px 1fr; overflow:hidden; }
+.rail { background:var(--color-bg-elev1); border-right:1px solid var(--color-border); display:flex; flex-direction:column;
+  align-items:center; padding:var(--space-3) 0; gap:var(--space-2); }
+.rail .ri { width:36px; height:36px; display:grid; place-items:center; border-radius:var(--radius-md); font-size:15px;
+  color:var(--color-text-dim); cursor:pointer; transition:all var(--dur-fast); }
+.rail .ri:hover { background:var(--color-accent); color:var(--color-text); }
+.rail .ri.on { background:var(--color-primary-dim); color:var(--color-primary); }
+
+.page { display:flex; flex-direction:column; min-width:0; overflow:hidden; }
+.phead { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-4) var(--space-6);
+  border-bottom:1px solid var(--color-border); flex:none; }
+.phead h1 { font-size:var(--text-xl); font-weight:650; }
+.phead .sub { font-size:12.5px; color:var(--color-text-muted); }
+.spacer { flex:1; }
+
+.btn-primary { display:inline-flex; align-items:center; gap:6px; font-size:13px; font-weight:600; padding:8px 14px;
+  border-radius:var(--radius-md); background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer;
+  transition:all var(--dur-fast) var(--ease-out); }
+.btn-primary:hover { filter:brightness(1.08); box-shadow:var(--shadow-glow-primary); }
+.btn-ghost { font-size:12.5px; padding:7px 12px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; transition:all var(--dur-fast); }
+.btn-ghost:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+
+/* ── search + chips ─────────────────────────────────────── */
+.searchbox { display:flex; align-items:center; gap:8px; background:var(--color-surface); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:7px var(--space-3); min-width:240px; transition:all var(--dur-fast); }
+.searchbox:focus-within { border-color:var(--color-primary-glow); box-shadow:0 0 0 3px var(--color-primary-dim); }
+.searchbox input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text); font-size:13px; }
+.searchbox input::placeholder { color:var(--color-text-dim); }
+.searchbox .kbd { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim);
+  border:1px solid var(--color-border); border-radius:4px; padding:1px 4px; }
+
+.chip { font-size:11.5px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); white-space:nowrap; }
+.chip:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.chip.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.chip .c { font-family:var(--font-mono); font-size:9.5px; opacity:.7; margin-left:4px; }
+.chiprow { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+
+.countline { font-size:12px; color:var(--color-text-muted); font-family:var(--font-mono); }
+.countline b { color:var(--color-text); }
+
+/* ── cards ──────────────────────────────────────────────── */
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:var(--space-3); }
+.card { border:1px solid var(--color-border); border-radius:var(--radius-lg); background:var(--color-surface);
+  padding:var(--space-4); display:flex; flex-direction:column; gap:var(--space-2);
+  transition:all var(--dur-fast) var(--ease-out); }
+.card:hover { border-color:var(--color-primary-glow); box-shadow:var(--shadow-md); transform:translateY(-1px); }
+.card.is-draft { border-style:dashed; }
+.card-top { display:flex; align-items:flex-start; gap:var(--space-2); }
+.card-name { font-size:13.5px; font-weight:600; color:var(--color-text); line-height:1.3; }
+.card-ver { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+.purpose { font-size:12.5px; color:var(--color-text-muted); line-height:1.45;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.meta { font-size:11px; color:var(--color-text-dim); font-family:var(--font-mono); }
+
+.chain { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.chain .ph { display:inline-flex; align-items:center; gap:4px; padding:3px 7px; border-radius:var(--radius-sm);
+  background:var(--color-muted); border:1px solid var(--color-border-soft); font-size:11px; }
+.chain .ph .pt { font-size:10px; color:var(--color-text-dim); }
+.chain .arrow { color:var(--color-text-dim); font-size:10px; }
+
+.tier { display:inline-flex; align-items:center; gap:4px; font-size:9.5px; font-weight:700; font-family:var(--font-mono);
+  text-transform:uppercase; letter-spacing:.05em; padding:2px 7px; border-radius:var(--radius-full);
+  border:1px solid var(--color-border); color:var(--color-text); }
+.state-pill { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; padding:2px 7px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.state-pill.published { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.state-pill.draft { color:var(--color-warning); border-color:hsl(38 92% 60% / .4); }
+.state-pill.starter { color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+
+.cfoot { display:flex; align-items:center; gap:6px; margin-top:auto; padding-top:var(--space-2);
+  border-top:1px solid var(--color-border-soft); }
+
+/* ── shelves / groups ───────────────────────────────────── */
+.shelf { margin-bottom:var(--space-6); }
+.shelf-head { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); cursor:pointer;
+  user-select:none; padding:2px 0; }
+.shelf-head h2 { font-size:12.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--color-text-muted); }
+.shelf-head .caret { color:var(--color-text-dim); font-size:10px; transition:transform var(--dur-fast); }
+.shelf.collapsed .caret { transform:rotate(-90deg); }
+.shelf.collapsed .grid, .shelf.collapsed .rows { display:none; }
+.shelf-head .why { font-size:11px; color:var(--color-text-dim); font-style:italic; }
+
+/* ── dense rows (variant C) ─────────────────────────────── */
+.rows { display:flex; flex-direction:column; }
+.row { display:grid; grid-template-columns: 1fr 150px 90px 96px 120px; align-items:center; gap:var(--space-3);
+  padding:9px var(--space-3); border-bottom:1px solid var(--color-border-soft); cursor:pointer;
+  transition:background var(--dur-fast); }
+.row:hover { background:var(--color-accent); }
+.row .rname { font-size:13px; font-weight:550; color:var(--color-text); display:flex; align-items:center; gap:8px; min-width:0; }
+.row .rname span.t { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.row .rmeta { font-size:11px; color:var(--color-text-dim); font-family:var(--font-mono); }
+.row-head { display:grid; grid-template-columns: 1fr 150px 90px 96px 120px; gap:var(--space-3); padding:6px var(--space-3);
+  font-size:10px; text-transform:uppercase; letter-spacing:.07em; color:var(--color-text-dim);
+  border-bottom:1px solid var(--color-border); font-family:var(--font-mono); }
+
+/* ── facet rail (variant C) ─────────────────────────────── */
+.facets { display:flex; flex-direction:column; gap:var(--space-4); overflow-y:auto; padding-right:var(--space-2); }
+.fgroup .flabel { font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--color-text-dim); margin-bottom:6px; padding-left:2px; }
+.fitem { display:flex; align-items:center; gap:8px; padding:5px 9px; border-radius:var(--radius-md); cursor:pointer;
+  font-size:12px; color:var(--color-text-muted); border:1px solid transparent; transition:all var(--dur-fast); }
+.fitem:hover { background:var(--color-accent); color:var(--color-text); }
+.fitem.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.fitem .fc { margin-left:auto; font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); }
+
+.body { flex:1; min-height:0; overflow:hidden; display:grid; }
+.scroll { overflow-y:auto; padding:var(--space-5) var(--space-6); min-height:0; }
+.sticky { position:sticky; top:0; z-index:20; background:var(--color-bg);
+  padding:var(--space-3) var(--space-6); border-bottom:1px solid var(--color-border);
+  display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; }
+
+.empty { padding:var(--space-8); text-align:center; color:var(--color-text-muted); font-size:13px; }
+.empty .big { font-size:26px; margin-bottom:var(--space-2); opacity:.5; }
+
+.note { font-size:11.5px; color:var(--color-text-dim); background:var(--color-muted); border:1px solid var(--color-border-soft);
+  border-left:2px solid var(--color-primary); padding:8px var(--space-3); border-radius:var(--radius-sm); line-height:1.5; }
+
+/* ── today (shipped) reference ──────────────────────────── */
+.todo-banner { background:hsl(258 90% 66% / .08); border:1px solid hsl(258 90% 66% / .3); color:var(--color-text-muted);
+  padding:8px var(--space-4); font-size:12px; }
+
+/* ── toolbar ────────────────────────────────────────────── */
+#sketch-tools { position:fixed; bottom:12px; right:12px; z-index:9999; font-family:system-ui; font-size:11px;
+  background:rgba(0,0,0,.8); color:#fff; padding:8px 10px; border-radius:8px; opacity:.42;
+  transition:opacity var(--dur-base); display:flex; gap:8px; align-items:center; }
+#sketch-tools:hover { opacity:1; }
+#sketch-tools select, #sketch-tools button { font-size:11px; background:#1b1b22; color:#fff; border:1px solid #3a3a44;
+  border-radius:5px; padding:3px 6px; cursor:pointer; }
+#sketch-tools .lbl { color:#8a8a96; font-size:10px; }
+.annot { outline:1px dashed hsl(38 92% 60% / .8) !important; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">157 · LIBRARY AT SCALE</span>
+  <button class="variant-tab active" data-v="a">A: Taxonomy shelves</button>
+  <button class="variant-tab" data-v="b">B: One list, shelves are filters</button>
+  <button class="variant-tab" data-v="c">C: Facet rail + dense list</button>
+  <button class="variant-tab today" data-v="today">Today (shipped)</button>
+</div>
+
+<!-- ══════════ VARIANT A ══════════ -->
+<div id="variant-a" class="variant">
+  <div class="app">
+    <div class="rail">
+      <div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div>
+    </div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1>
+        <span class="sub">Run one, or build your own.</span>
+        <div class="spacer"></div>
+        <button class="btn-primary" onclick="toast('→ Builder (describe box)')">＋ New workflow</button>
+      </div>
+      <div class="sticky">
+        <div class="searchbox">
+          <span>🔎</span><input id="qa" placeholder="Search workflows…" oninput="renderA()">
+        </div>
+        <div class="chiprow" id="chips-a"></div>
+        <div class="spacer"></div>
+        <span class="countline" id="count-a"></span>
+      </div>
+      <div class="body"><div class="scroll" id="shelves-a"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VARIANT B ══════════ -->
+<div id="variant-b" class="variant" style="display:none">
+  <div class="app">
+    <div class="rail">
+      <div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div>
+    </div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1>
+        <span class="sub">One library. The shelves became filters.</span>
+        <div class="spacer"></div>
+      </div>
+      <div class="sticky">
+        <button class="btn-primary" onclick="toast('→ Builder (describe box)')">＋ New</button>
+        <div class="searchbox" style="flex:1;max-width:420px">
+          <span>🔎</span><input id="qb" placeholder="Search workflows…" oninput="renderB()">
+        </div>
+        <div class="chiprow" id="chips-b"></div>
+        <div class="spacer"></div>
+        <span class="countline" id="count-b"></span>
+      </div>
+      <div class="body"><div class="scroll" id="list-b"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VARIANT C ══════════ -->
+<div id="variant-c" class="variant" style="display:none">
+  <div class="app">
+    <div class="rail">
+      <div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div>
+    </div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1>
+        <span class="sub">Narrow on the left, scan on the right.</span>
+        <div class="spacer"></div>
+        <div class="searchbox">
+          <span>🔎</span><input id="qc" placeholder="Search…" oninput="renderC()"><span class="kbd">⌘K</span>
+        </div>
+      </div>
+      <div class="body" style="grid-template-columns:214px 1fr">
+        <div class="scroll" style="border-right:1px solid var(--color-border);padding:var(--space-4)">
+          <button class="btn-primary" style="width:100%;justify-content:center;margin-bottom:var(--space-4)"
+            onclick="toast('→ Builder (describe box)')">＋ New workflow</button>
+          <div class="facets" id="facets-c"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;min-height:0">
+          <div class="sticky" style="padding:var(--space-3) var(--space-5)">
+            <span class="countline" id="count-c"></span>
+            <div class="spacer"></div>
+            <span class="lbl" style="font-size:11px;color:var(--color-text-dim)">Group by</span>
+            <div class="chiprow" id="groupby-c"></div>
+          </div>
+          <div class="scroll" id="list-c" style="padding:var(--space-3) var(--space-5)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ TODAY (SHIPPED) ══════════ -->
+<div id="variant-today" class="variant" style="display:none">
+  <div class="app">
+    <div class="rail">
+      <div class="ri">💬</div><div class="ri on">▤</div><div class="ri">📄</div><div class="ri">✦</div>
+    </div>
+    <div class="page">
+      <div class="phead">
+        <h1>Workflows</h1>
+        <span class="sub">Repeatable, locked automations — author, publish, and Run into a thread.</span>
+      </div>
+      <div class="todo-banner">
+        Drafts are yours to shape; <b style="color:var(--color-text)">Published</b> is live
+        (<span style="font-family:var(--font-mono);font-size:11px;color:var(--color-success)">GET /workflows/published</span>).
+        Draft create/list/update/delete are <span style="font-family:var(--font-mono);font-size:9px;color:var(--color-accent-violet);border:1px solid hsl(258 90% 66% / .35);padding:1px 5px;border-radius:99px">net-new</span>.
+      </div>
+      <div class="body" style="grid-template-columns:200px 1fr;gap:var(--space-6);padding:var(--space-5) var(--space-6);overflow-y:auto">
+        <nav class="facets">
+          <div class="fgroup">
+            <div class="flabel">Project</div>
+            <div class="fitem on">All projects</div>
+            <div class="fitem">Legal &amp; Contracts</div>
+            <div class="fitem">People Ops</div>
+            <div class="fitem">Finance</div>
+            <div class="fitem">Risk &amp; Compliance</div>
+            <div class="fitem">Customer Success</div>
+            <div class="fitem">Unbound (no project)</div>
+          </div>
+        </nav>
+        <div id="today-shelves"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="sketch-tools">
+  <span class="lbl">theme</span>
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+    <option value="canvas-184">Canvas 184</option>
+  </select>
+  <span class="lbl">scale</span>
+  <select id="scale" onchange="setScale(this.value)">
+    <option value="12">12 workflows</option>
+    <option value="54" selected>54 workflows</option>
+    <option value="200">200 workflows</option>
+  </select>
+  <button onclick="toggleAnnot()">annotate</button>
+</div>
+
+<div id="toast" style="position:fixed;top:60px;left:50%;transform:translateX(-50%);z-index:9500;
+  background:var(--color-success-dim);border:1px solid hsl(142 71% 45% / .4);color:var(--color-success);
+  padding:8px 16px;border-radius:99px;display:none;font-size:13px;"></div>
+
+<script src="data.js"></script>
+<script>
+/* ───────── state ───────── */
+var SCALE = 54;
+var WF = buildWorkflows(SCALE);
+
+var stateA = { filter: "all" };
+var stateB = { filters: new Set() };
+var stateC = { project: null, state: null, owner: null, groupBy: "project" };
+
+function setScale(v) {
+  SCALE = parseInt(v, 10);
+  WF = buildWorkflows(SCALE);
+  renderAll();
+}
+
+function toast(msg) {
+  var t = document.getElementById("toast");
+  t.textContent = msg; t.style.display = "block";
+  clearTimeout(t._h); t._h = setTimeout(function () { t.style.display = "none"; }, 1600);
+}
+
+function matches(w, q) {
+  if (!q) return true;
+  q = q.toLowerCase();
+  return w.name.toLowerCase().indexOf(q) >= 0 || w.purpose.toLowerCase().indexOf(q) >= 0;
+}
+
+/* ───────── shared card ───────── */
+function cardHtml(w) {
+  return '<div class="card ' + (w.state === "draft" ? "is-draft" : "") + '">' +
+    '<div class="card-top">' +
+      '<div style="flex:1;min-width:0">' +
+        '<div class="card-name">' + w.name + ' <span class="card-ver">v' + w.version + '</span></div>' +
+      '</div>' +
+      '<span class="state-pill ' + w.state + '">' + w.state + '</span>' +
+    '</div>' +
+    '<div class="purpose">' + w.purpose + '</div>' +
+    '<div class="chain">' + chainHtml(w.phases, true) + '</div>' +
+    '<div class="meta">needs ' + w.needs.join(", ") + ' · ' +
+      (w.produces ? "produces " + w.produces : "answer in chat") + '</div>' +
+    '<div class="cfoot">' +
+      '<span class="tier">' + TIER_GLYPH[w.tier] + ' ' + w.tier + '</span>' +
+      '<span class="meta" style="margin-left:auto">' + w.owner + ' · ' + w.lastRun + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ───────── VARIANT A — taxonomy shelves ───────── */
+/* The shelves become a REAL taxonomy: by OWNERSHIP (a question a user can answer
+   about themselves), with state as a filter chip rather than a place. */
+var A_SHELVES = [
+  { key: "mine",    title: "Yours",           why: "you own these — you can change them" },
+  { key: "shared",  title: "From your team",  why: "someone else owns them; you can run them" },
+  { key: "starter", title: "Starters",        why: "curated by us — fork one to make it yours" },
+];
+function shelfOf(w) {
+  if (w.state === "starter") return "starter";
+  return w.owner === "You" ? "mine" : "shared";
+}
+
+function renderA() {
+  var q = document.getElementById("qa").value;
+  var pool = WF.filter(function (w) { return matches(w, q); });
+  if (stateA.filter !== "all") pool = pool.filter(function (w) { return w.state === stateA.filter; });
+
+  var counts = { all: WF.filter(function(w){return matches(w,q);}).length };
+  ["published", "draft", "starter"].forEach(function (s) {
+    counts[s] = WF.filter(function (w) { return matches(w, q) && w.state === s; }).length;
+  });
+  document.getElementById("chips-a").innerHTML =
+    [["all","All"],["published","Ready to run"],["draft","Still building"],["starter","Starters"]]
+    .map(function (p) {
+      return '<button class="chip ' + (stateA.filter === p[0] ? "on" : "") + '" onclick="stateA.filter=\'' + p[0] + '\';renderA()">' +
+        p[1] + '<span class="c">' + counts[p[0]] + '</span></button>';
+    }).join("");
+
+  document.getElementById("count-a").innerHTML = "<b>" + pool.length + "</b> of " + WF.length;
+
+  var host = document.getElementById("shelves-a");
+  if (pool.length === 0) {
+    host.innerHTML = '<div class="empty"><div class="big">🔎</div>Nothing matches “' + q + '”.<br>' +
+      '<span style="font-size:12px;color:var(--color-text-dim)">Try a shorter word, or clear the filter.</span></div>';
+    return;
+  }
+  host.innerHTML = A_SHELVES.map(function (s) {
+    var items = pool.filter(function (w) { return shelfOf(w) === s.key; });
+    if (items.length === 0) return "";
+    return '<section class="shelf" id="shelf-' + s.key + '">' +
+      '<div class="shelf-head" onclick="document.getElementById(\'shelf-' + s.key + '\').classList.toggle(\'collapsed\')">' +
+        '<span class="caret">▾</span><h2>' + s.title + ' · ' + items.length + '</h2>' +
+        '<span class="why">' + s.why + '</span>' +
+      '</div>' +
+      '<div class="grid">' + items.map(cardHtml).join("") + '</div>' +
+    '</section>';
+  }).join("");
+}
+
+/* ───────── VARIANT B — one list, shelves are filters ───────── */
+var B_FILTERS = [
+  { k: "ready",   label: "Ready to run", test: function (w) { return w.state !== "draft"; } },
+  { k: "mine",    label: "Yours",        test: function (w) { return w.owner === "You"; } },
+  { k: "draft",   label: "Still building", test: function (w) { return w.state === "draft"; } },
+  { k: "starter", label: "Starters",     test: function (w) { return w.state === "starter"; } },
+  { k: "file",    label: "Makes a file", test: function (w) { return !!w.produces; } },
+  { k: "strict",  label: "🔒 Strict",     test: function (w) { return w.tier === "STRICT"; } },
+];
+
+function renderB() {
+  var q = document.getElementById("qb").value;
+  var pool = WF.filter(function (w) { return matches(w, q); });
+  stateB.filters.forEach(function (k) {
+    var f = B_FILTERS.find(function (x) { return x.k === k; });
+    pool = pool.filter(f.test);
+  });
+
+  document.getElementById("chips-b").innerHTML = B_FILTERS.map(function (f) {
+    var n = WF.filter(function (w) { return matches(w, q) && f.test(w); }).length;
+    return '<button class="chip ' + (stateB.filters.has(f.k) ? "on" : "") + '" onclick="toggleB(\'' + f.k + '\')">' +
+      f.label + '<span class="c">' + n + '</span></button>';
+  }).join("");
+
+  document.getElementById("count-b").innerHTML = "<b>" + pool.length + "</b> of " + WF.length;
+
+  var host = document.getElementById("list-b");
+  if (pool.length === 0) {
+    host.innerHTML = '<div class="empty"><div class="big">🔎</div>No workflow matches that.<br>' +
+      '<button class="btn-ghost" style="margin-top:12px" onclick="stateB.filters.clear();document.getElementById(\'qb\').value=\'\';renderB()">Clear everything</button></div>';
+    return;
+  }
+  host.innerHTML =
+    '<div class="note" style="margin-bottom:var(--space-4)">One list. “Starters”, “Published” and “Drafts” are ' +
+    'chips above — a shelf is a <b>filter</b>, not a place you have to scroll past.</div>' +
+    '<div class="grid">' + pool.map(cardHtml).join("") + '</div>';
+}
+function toggleB(k) {
+  if (stateB.filters.has(k)) stateB.filters.delete(k); else stateB.filters.add(k);
+  renderB();
+}
+
+/* ───────── VARIANT C — facet rail + dense rows ───────── */
+function renderC() {
+  var q = document.getElementById("qc").value;
+  var pool = WF.filter(function (w) { return matches(w, q); });
+  if (stateC.project) pool = pool.filter(function (w) { return w.project === stateC.project; });
+  if (stateC.state) pool = pool.filter(function (w) { return w.state === stateC.state; });
+  if (stateC.owner) pool = pool.filter(function (w) { return w.owner === stateC.owner; });
+
+  /* facets — counts computed against the SEARCH pool so they never lie */
+  var searchPool = WF.filter(function (w) { return matches(w, q); });
+  function facet(label, groupKey, values, current) {
+    return '<div class="fgroup"><div class="flabel">' + label + '</div>' +
+      '<div class="fitem ' + (current === null ? "on" : "") + '" onclick="stateC.' + groupKey + '=null;renderC()">' +
+        'Any<span class="fc">' + searchPool.length + '</span></div>' +
+      values.map(function (v) {
+        var n = searchPool.filter(function (w) { return w[groupKey === "state" ? "state" : groupKey] === v; }).length;
+        if (n === 0) return "";
+        return '<div class="fitem ' + (current === v ? "on" : "") + '" onclick="stateC.' + groupKey + '=' + JSON.stringify(v) + ';renderC()">' +
+          v + '<span class="fc">' + n + '</span></div>';
+      }).join("") + '</div>';
+  }
+  document.getElementById("facets-c").innerHTML =
+    facet("Project", "project", PROJECTS, stateC.project) +
+    facet("State", "state", ["published", "draft", "starter"], stateC.state) +
+    facet("Owner", "owner", OWNERS, stateC.owner);
+
+  document.getElementById("groupby-c").innerHTML = [["project","Project"],["state","State"],["owner","Owner"],["none","Nothing"]]
+    .map(function (g) {
+      return '<button class="chip ' + (stateC.groupBy === g[0] ? "on" : "") + '" onclick="stateC.groupBy=\'' + g[0] + '\';renderC()">' + g[1] + '</button>';
+    }).join("");
+
+  document.getElementById("count-c").innerHTML = "<b>" + pool.length + "</b> of " + WF.length;
+
+  var host = document.getElementById("list-c");
+  if (pool.length === 0) {
+    host.innerHTML = '<div class="empty"><div class="big">🔎</div>Nothing here.<br>' +
+      '<button class="btn-ghost" style="margin-top:12px" onclick="stateC={project:null,state:null,owner:null,groupBy:stateC.groupBy};document.getElementById(\'qc\').value=\'\';renderC()">Clear filters</button></div>';
+    return;
+  }
+
+  var head = '<div class="row-head"><span>Workflow</span><span>Project</span><span>Tier</span><span>Runs</span><span>Last run</span></div>';
+  function rowHtml(w) {
+    return '<div class="row" onclick="toast(\'→ ' + w.name.replace(/'/g, "") + '\')">' +
+      '<span class="rname"><span>' + chainHtml(w.phases.slice(0, 4), true) + '</span><span class="t">' + w.name + '</span>' +
+        (w.state === "draft" ? ' <span class="state-pill draft">draft</span>' : "") + '</span>' +
+      '<span class="rmeta">' + w.project + '</span>' +
+      '<span class="rmeta">' + TIER_GLYPH[w.tier] + " " + w.tier + '</span>' +
+      '<span class="rmeta">' + w.runs + '</span>' +
+      '<span class="rmeta">' + w.lastRun + '</span>' +
+    '</div>';
+  }
+
+  if (stateC.groupBy === "none") {
+    host.innerHTML = head + '<div class="rows">' + pool.map(rowHtml).join("") + '</div>';
+    return;
+  }
+  var key = stateC.groupBy;
+  var groups = {};
+  pool.forEach(function (w) { (groups[w[key]] = groups[w[key]] || []).push(w); });
+  host.innerHTML = Object.keys(groups).sort().map(function (g, i) {
+    return '<section class="shelf" id="cg-' + i + '" style="margin-bottom:var(--space-4)">' +
+      '<div class="shelf-head" onclick="document.getElementById(\'cg-' + i + '\').classList.toggle(\'collapsed\')">' +
+        '<span class="caret">▾</span><h2>' + g + ' · ' + groups[g].length + '</h2></div>' +
+      head + '<div class="rows">' + groups[g].map(rowHtml).join("") + '</div>' +
+    '</section>';
+  }).join("");
+}
+
+/* ───────── TODAY (shipped) ───────── */
+function renderToday() {
+  var starters = WF.filter(function (w) { return w.state === "starter"; });
+  var published = WF.filter(function (w) { return w.state === "published"; });
+  var drafts = WF.filter(function (w) { return w.state === "draft"; });
+  function shelf(title, chip, chipCls, items, buildCard) {
+    return '<section class="shelf">' +
+      '<div class="shelf-head" style="cursor:default"><h2>' + title + ' · ' + items.length + '</h2>' +
+      '<span class="state-pill ' + chipCls + '">' + chip + '</span></div>' +
+      '<div class="grid" style="grid-template-columns:repeat(2,1fr)">' +
+        (buildCard ? '<div class="card" style="border-style:dashed;align-items:center;justify-content:center;min-height:150px;text-align:center">' +
+          '<div style="font-size:22px;color:var(--color-text-dim)">＋</div>' +
+          '<div style="font-size:14px;font-weight:500">Build a workflow</div>' +
+          '<div style="font-size:12px;color:var(--color-text-muted)">Describe it in plain English → AI drafts it</div></div>' : "") +
+        items.map(cardHtml).join("") +
+      '</div></section>';
+  }
+  document.getElementById("today-shelves").innerHTML =
+    '<div class="note" style="margin-bottom:var(--space-4);border-left-color:var(--color-warning)">' +
+    '<b>This is the shipped page</b> (WorkflowsPage.tsx, read at HEAD). No search input exists. ' +
+    'The create affordance is the <b>first cell of the third grid</b> — scroll down. ' +
+    'Three shelf names that are not one taxonomy: “Starters” is provenance, “Published” is state, “Drafts &amp; seeds” is two things.</div>' +
+    shelf("Starters", "curated", "starter", starters, false) +
+    shelf("Published", "GET /workflows/published", "published", published, false) +
+    shelf("Drafts &amp; seeds", "net-new list", "draft", drafts, true);
+}
+
+/* ───────── wiring ───────── */
+function renderAll() { renderA(); renderB(); renderC(); renderToday(); }
+
+document.querySelectorAll(".variant-tab").forEach(function (btn) {
+  btn.addEventListener("click", function () {
+    document.querySelectorAll(".variant").forEach(function (v) { v.style.display = "none"; });
+    document.querySelectorAll(".variant-tab").forEach(function (t) { t.classList.remove("active"); });
+    document.getElementById("variant-" + btn.dataset.v).style.display = "block";
+    btn.classList.add("active");
+  });
+});
+
+var annotOn = false;
+function toggleAnnot() {
+  annotOn = !annotOn;
+  document.querySelectorAll(".card,.row,.chip,.fitem,.searchbox,.btn-primary").forEach(function (el) {
+    el.classList.toggle("annot", annotOn);
+  });
+}
+
+renderAll();
+</script>
+</body>
+</html>
