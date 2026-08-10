@@ -81,8 +81,8 @@ is the incumbent any proposal must beat.
 
 **Plans**: 12 plans across 8 waves — `/gsd:execute-phase 192`
 
-- [ ] `192-01-PLAN.md` (wave 1) — count-gate adoption: the five suites covering this page were in NEITHER knob (74 of 123 tests invisible). Must be commit 1.
-- [ ] `192-02-PLAN.md` (wave 1) — D-04 backend: `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, never a raw `created_by`; the widened wire type.
+- [x] `192-01-PLAN.md` (wave 1) — count-gate adoption: the five suites covering this page were in NEITHER knob (74 of 123 tests invisible). Must be commit 1.
+- [x] `192-02-PLAN.md` (wave 1) — D-04 backend: `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, never a raw `created_by`; the widened wire type.
 - [ ] `192-03-PLAN.md` (wave 2) — `RunModal` characterization baseline, 6 states, captured while `library/RunModal.tsx` provably does not exist.
 - [ ] `192-04-PLAN.md` (wave 2) — delete-Sheet characterization baseline, 7 states + the two graded-guard invariants; the real ≈169 L extent recorded.
 - [ ] `192-05-PLAN.md` (wave 2) — the pure leaves: `libraryRow` · `libraryVocabulary` · `libraryFilter` (merge/dedupe-by-id/chips/substring search) + the F1/F4/F5 subtree fences.
