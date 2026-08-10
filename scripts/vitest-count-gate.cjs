@@ -822,6 +822,44 @@ const BASELINE = {
   "WorkflowCanvas.composition.test.tsx": 20,
   "CanvasToolbar.test.tsx": 14,
   "BuilderSaveRegion.test.tsx": 11,
+  // ── 192-01 (Phase 192 Wave 0, the FIRST commit of the phase) ───────────────────────
+  // Four suites that render the LIVE `WorkflowsPage` and were pinned by NOTHING. Each also
+  // required a `TARGETS` line in this same commit — the two-knob rule, eighth occurrence and
+  // the second entry in this map (after `ConnectionsTab.test.tsx` at 190-16) that needed BOTH
+  // knobs. WHICH EXISTING ENTRY FAILED TO COVER THEM, measured from the gate's own printed
+  // `running:` line on an unmodified tree: the directory entries reach only
+  // `src/components/workflows`; `src/pages` is reached by five NAMED files and
+  // `WorkflowsPage.test.tsx` is not among them; `src/pages/__tests__` is reached by nothing
+  // at all. See the TARGETS block below for the full argument.
+  //
+  // ALL FOUR NUMBERS WERE READ FROM THIS SCRIPT'S OWN PRINTED `actual` COLUMN — the run that
+  // first put these files inside TARGETS printed them as `new` rows at 23 / 11 / 8 / 7, and
+  // two further runs after the pins landed printed `delta 0` on every one. NEVER hand-counted
+  // from `it(` literals, never copied from a planning document: 192-RESEARCH.md predicted
+  // exactly these four figures, and the pin is the MEASUREMENT, not the prediction it happens
+  // to agree with.
+  //
+  // ADOPTING IMPORTS NO ROT: `failed 0` on the unmodified tree and `failed 0` on every run
+  // after adoption.
+  //
+  // ⚠ `WorkflowsPage.test.tsx`'s pin WILL be LOWERED later in Phase 192, when D-01's
+  // restructure deletes the shelf-order cases. That lowering must ride in the SAME COMMIT as
+  // the deletion, at a number read from this column — never to make a red gate go quiet.
+  "WorkflowsPage.test.tsx": 23,
+  "RunModal.test.tsx": 11,
+  "RunModal.a11y.test.tsx": 8,
+  "PublishedCardDelete.test.tsx": 7,
+  // 192-01 Task 2: the FIFTH covering suite. `WorkflowBuilderPage.session.test.tsx` renders
+  // the LIVE `WorkflowsPage` three times (`:482`, `:510`, `:768`) and was pinned by nothing —
+  // an unpinned covering suite is an UNGUARDED one, not a lightly-guarded one. It needed BOTH
+  // knobs, same as the four above.
+  // ⚠ RESEARCH ASSUMPTION A6 IS RECORDED IN THE TARGETS BLOCK BELOW, BEFORE THIS PIN: the
+  // "pane click" case was measured at 5060 ms against a 5000 ms limit under `--maxWorkers=4`
+  // in a mixed run and passed on re-run — a parallel-load flake, not latent rot. Confirmed
+  // before pinning by two standalone runs, both `23 passed (23)` / 0 failing. Read from this
+  // script's own `actual` column: it reported `— 23 new` on the run that first put the file
+  // inside TARGETS, and `delta 0` on the two runs after this pin landed.
+  "WorkflowBuilderPage.session.test.tsx": 23,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -986,7 +1024,36 @@ const BASELINE = {
 // re-fetching), one case each, file restored md5-identical. The +13 gap above is STILL
 // unchanged and still owed as its own edit — 190-15 re-pins neither of those two files, for
 // the same reason 190-12 and 190-16 did not.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2775 (190-15)
+// ⚠ AND BY 192-01 (Phase 192 Wave 0): the pinned FILE count 51 → 55, adopting the four suites
+// that render the LIVE `WorkflowsPage` — `WorkflowsPage.test.tsx` (23), `RunModal.test.tsx`
+// (11), `RunModal.a11y.test.tsx` (8), `PublishedCardDelete.test.tsx` (7). All four also
+// required a `TARGETS` line in this same commit (the two-knob rule; see the map entries and
+// the TARGETS block below).
+//   ⚠ IT WAS STALE AGAIN, AND BY THE LARGEST MARGIN YET — the trailing marker below read
+//   `2775` while the reduce computed **2838** on an UNMODIFIED tree, a 63-test gap accrued
+//   since 190-15. That correction rides here rather than being smoothed over, and it is now
+//   the NINTH time this note has gone stale by being computed rather than read. The new
+//   figure `2887` was READ FROM THIS SCRIPT'S OWN PRINTED `pinned total` across two agreeing
+//   runs after the four map entries landed — never by adding 49 to a figure in this comment.
+//   The +24 gap the run still prints is PRE-EXISTING drift this plan did not cause and
+//   deliberately does not re-pin: `ExternalActionSection.test.tsx` (25 pinned / 34 actual,
+//   +9) and `PhaseTimeline.test.tsx` (17 / 21, +4) — the same two owed since 190-12 — plus
+//   `WorkflowBuilderPage.canvas.test.tsx` (128 / 133, +5) and `builderStore.test.ts`
+//   (52 / 58, +6), both newly observed here and both outside Phase 192's blast radius.
+//   Folding an unrelated drift into a commit that did not cause it is the thing this whole
+//   header argues against.
+// ⚠ AND AGAIN BY 192-01 TASK 2, in the very next commit: the pinned FILE count 55 → 56,
+// `WorkflowBuilderPage.session.test.tsx` (23) — the fifth `WorkflowsPage`-covering suite, and
+// the one whose adoption needed assumption A6 measured first (see the map entry and the
+// TARGETS block). The figure `2910` was CHECKED AGAINST this script's own printed
+// `pinned total` across two agreeing runs after the map entry landed, and the honest sequence
+// is recorded rather than implied: it was written as an EXPECTATION (2887 + 23) and then
+// falsified against the printed column — it agreed. Had the two disagreed, the printed value
+// is what stays; an expectation that survives a measurement is still only worth the
+// measurement. That is the whole difference between this note and the previous NINE times it
+// went stale by being computed and never checked. The pre-existing +24 drift named in the
+// paragraph above is UNCHANGED and still deliberately not re-pinned here.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2910 (192-01)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -1164,6 +1231,87 @@ const TARGETS = [
   // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
   // the file — never before, never after.
   "src/components/settings/__tests__/ConnectionFormPanel.test.tsx",
+  // ── Added in 192-01 (Phase 192 Wave 0, the FIRST commit of the phase) ──────────────
+  // The EIGHTH occurrence of the two-knob trap, and the first one that lands on the very
+  // file the phase exists to rewrite. Stated as the rule rather than as an incident, for a
+  // reader who skips every block above: TARGETS decides what RUNS, BASELINE decides what is
+  // PINNED, and a file can sit outside BOTH by default.
+  //
+  // WHICH EXISTING ENTRY FAILED TO COVER THESE FILES — measured, not assumed, from the
+  // gate's own printed `running: npx vitest run …` line on an unmodified tree (2026-08-10):
+  //   · the DIRECTORY entries above reach `src/components/workflows` only;
+  //   · `src/pages/` is reached by FIVE NAMED FILES (`WorkflowBuilderPage.test.tsx`,
+  //     `.canvas.test.tsx`, `.header.test.tsx`, `.describe.test.tsx`,
+  //     `WorkflowRunPage.test.tsx`) — `WorkflowsPage.test.tsx` is not one of them;
+  //   · `src/pages/__tests__/` is reached by NOTHING AT ALL — no entry above names that
+  //     directory or any file inside it.
+  // So all four suites below were absent from the gate's printed file list, and the gate had
+  // never EXECUTED one of them.
+  //
+  // CONSEQUENCE, stated plainly (192-RESEARCH.md § "THE eighth two-knob trap"): 74 of the 123
+  // tests covering the surface Phase 192 rewrites were invisible to this gate, 49 of them
+  // covering the library view directly. Phase 192's D-01 is a structural restructure of
+  // `WorkflowsPage.tsx` (1407 L, 21 commits, 10 phases) that deletes card components and
+  // rewrites testids — exactly the shape of change that drops an `it()` unnoticed. Without
+  // these entries that deletion leaves the gate green, which is verbatim the Phase-177 lesson
+  // this script exists for and the round-5 "verification truth 14" failure Phase 187 had to
+  // fix afterwards.
+  //
+  // ⚠ TIMING: all four files EXIST at this commit (confirmed with `ls` before the entries
+  // were written), so they are adopted here rather than in a later commit. An entry pointing
+  // at a path that does not exist makes the gate ERROR (exit 2), not fail — so any NEW suite
+  // Phase 192 creates must get its entry in the commit that creates the file.
+  //
+  // ⚠ ADOPTING IMPORTS NO ROT: measured before these lines were written — the gate ran green
+  // with 0 failing on the unmodified tree, and re-ran green with 0 failing once these four
+  // were inside TARGETS.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/pages/__tests__` — the same
+  // reasoning this script already records for `src/components/panel/__tests__`, `src/lib`,
+  // `src/pages`, `src/components/layout` and `src/components/settings`: the directory holds
+  // suites this phase does not read, and adopting them would make this phase the owner of
+  // their future rot. A later phase that wants them should adopt them deliberately, with its
+  // own measured number.
+  //
+  // ⚠ Phase 192 WILL LOWER `WorkflowsPage.test.tsx`'s pin when D-01 deletes the shelf-order
+  // tests. That lowering rides in the SAME COMMIT as the deletion, at a number read from this
+  // script's own `actual` column — never to make a red gate go quiet.
+  "src/pages/WorkflowsPage.test.tsx",
+  "src/pages/__tests__/RunModal.test.tsx",
+  "src/pages/__tests__/RunModal.a11y.test.tsx",
+  "src/pages/__tests__/PublishedCardDelete.test.tsx",
+  // ── Also 192-01 (Task 2), the FIFTH covering suite — and the one adoption in this ──────
+  // ── phase that required a measurement of its own before it could be trusted. ──────────
+  //
+  // `WorkflowBuilderPage.session.test.tsx` renders the LIVE `WorkflowsPage` THREE times
+  // (`:482`, `:510`, `:768`) and was pinned by nothing: `src/pages` is reached only by named
+  // files above, and this one was not among them. An unpinned covering suite is an UNGUARDED
+  // one, not a lightly-guarded one — the 188-12 statement, applied here.
+  //
+  // ⚠ RESEARCH ASSUMPTION A6, RECORDED BEFORE THE PIN RATHER THAN AFTER IT
+  // (192-RESEARCH.md § "Assumptions Log" A6 / Pitfall 7): this suite's "pane click" case was
+  // measured timing out at **5060 ms against a 5000 ms limit** under `--maxWorkers=4` in a
+  // mixed eight-file run, and PASSING on re-run of the same set. That is a parallel-load
+  // flake, NOT latent rot, so the adoption is expected to import ZERO rot.
+  // CONFIRMED BEFORE PINNING, per the plan: the suite was run standalone TWICE with
+  // `GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4`, and both runs reported
+  // `1 passed (1) / 23 passed (23)` — zero failures, the flake did not reproduce.
+  // THE STANDING INSTRUCTION FOR THE REST OF PHASE 192: if "pane click" reds, RE-RUN before
+  // declaring red. A consistent red is a PRE-EXISTING flake to re-run, not a regression this
+  // phase introduced and not a defect to chase.
+  //
+  // ── DECLINED, with its reason, so a decline can never read as an oversight ────────────
+  // `src/components/layout/__tests__/ChatLayoutLaunch.test.tsx` (2 tests) is DELIBERATELY NOT
+  // adopted — into neither TARGETS nor BASELINE. It reaches `WorkflowsPage` only transitively
+  // through `ChatLayout`, its two cases are owned by the LAYOUT concern rather than the
+  // library one, and `ChatLayout`'s own launch contract is already pinned by
+  // `ChatLayout.launch.test.tsx` (17, adopted at 188-09). Adopting it would make Phase 192
+  // the owner of the layout directory's future rot for two tests that assert nothing about
+  // the library IA. This script's own adoption rule requires a stated reason either way: a
+  // decline with no recorded reason is indistinguishable from an oversight, which is exactly
+  // the failure mode the rule exists to prevent. A later phase touching the layout launch
+  // seam should adopt it deliberately, with its own measured number.
+  "src/pages/WorkflowBuilderPage.session.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
