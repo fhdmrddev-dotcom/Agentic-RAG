@@ -91,7 +91,7 @@ is the incumbent any proposal must beat.
 - [x] `192-08-PLAN.md` (wave 4) — D-01 move 2: `WorkflowDeleteSheet` out of `PublishedCard`, state + JSX as one unit, proved on the original render path.
 - [x] `192-09-PLAN.md` (wave 5) — `WorkflowCard` (159-C): one verb + `⋯`, the fork consequence as an `aria-describedby` contract, no `Publish…`, the D-18 draft delete.
 - [x] `192-10-PLAN.md` (wave 6) — the page becomes composition: `allSettled` merge, one flat list, shelves/rail/cards/banner deleted, four tests rewritten and two deleted with the one authorized pin lowering.
-- [ ] `192-11-PLAN.md` (wave 7) — LIB-01…04 behaviour at 200 workflows: search, chip honesty, the carve-out, D-17, the D-04 cross-check, F2/F3 and create-first DOM order.
+- [x] `192-11-PLAN.md` (wave 7) — LIB-01…04 behaviour at 200 workflows: search, chip honesty, the carve-out, D-17, the D-04 cross-check, F2/F3 and create-first DOM order.
 - [ ] `192-12-PLAN.md` (wave 8) — every fence driven RED against a real plant and restored md5-identical, the subtree delta MEASURED, all suites pinned, G-5 recorded satisfied, and the eleven G-4 UAT rows.
 
 #### Phase 193: Authoring Doors + Template Placement
