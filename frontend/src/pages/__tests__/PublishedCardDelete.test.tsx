@@ -487,3 +487,154 @@ describe("delete Sheet — what the captures must CONTAIN (read off the committe
     expect(DELETE_SHEET_HTML_BASELINE.deleted).toContain("Recorded with your name in the audit log.")
   })
 })
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * Phase 192 Plan 04 Task 2 (D-01 / T-192-11) — THE TWO GRADED-GUARD INVARIANTS.
+ *
+ * ⚠ THESE ARE INVARIANTS, NOT CAPTURES, and they must never be re-derived from the
+ * seven `innerHTML` literals above. The captures answer "does it still RENDER the
+ * same?"; these answer "does it still REFUSE the same?" — a different question, and
+ * the one that actually matters. A guard proved only on its happy path is not proved:
+ * every byte of every capture could stay identical while `onOpenChange` quietly stopped
+ * refusing mid-delete, or while the card started vanishing optimistically.
+ *
+ * WHY THIS IS LOAD-BEARING BEYOND THIS FILE. The recorded 146-148 rule grades an action
+ * guard BY CONSEQUENCE — victim-naming sheet / arm-to-confirm / direct flip — and this
+ * Sheet is the HEAVIEST of the three shipped grades (`192-PATTERNS.md` § S-5). Two other
+ * live decisions are argued against it and are false the moment it weakens:
+ *   · D-15  the fork ships NO confirm sheet, because a heavy guard on a harmless action
+ *           spends the vocabulary THIS one relies on;
+ *   · D-18  the draft delete must be DEMONSTRABLY LIGHTER than this Sheet, never the
+ *           reverse — "lighter than X" is meaningless if X drifts.
+ *
+ * BOTH INVARIANTS WERE OBSERVED RED BEFORE THEY WERE TRUSTED — against real plants in
+ * real shipped source, not against synthetic fixtures:
+ *
+ *   PLANT A — deleted the line `if (!o && deletePhase === "deleting") return`
+ *             (`WorkflowsPage.tsx:882`). Result: 2 failed / 24 passed. Exactly the two
+ *             refusal cases reddened; all FOUR positive controls stayed green, which is
+ *             what distinguishes "refuses correctly" from "never closes".
+ *   PLANT B — moved `onDeleted()` to BEFORE `await deleteWorkflowCascade(wf.id)`
+ *             (`WorkflowsPage.tsx:788-799`), i.e. an optimistic vanish. Result:
+ *             2 failed / 24 passed — exactly the two invariant-2 cases, including the
+ *             rejected-cascade one, which is the half a happy-path test would miss.
+ *
+ * Both plants were reverted (`git checkout -- src/pages/WorkflowsPage.tsx`) and the
+ * suite returned to 26/26. NO source file is modified by Phase 192 Plan 04.
+ * ══════════════════════════════════════════════════════════════════════════════ */
+describe("delete Sheet — invariant 1: it NEVER dismisses mid-delete", () => {
+  /** Drive the sheet to `deleting` with a cascade that is deliberately never resolved. */
+  async function intoDeleting() {
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    mockDelete.mockReturnValue(new Promise<void>(() => {}))
+    const { user, dialog } = await openDeleteSheet()
+    await within(dialog).findByText("Permanently removed")
+    await user.click(within(dialog).getByTestId("delete-forever"))
+    await within(dialog).findByText(/Deleting/)
+    return { user, dialog }
+  }
+
+  it("Escape does NOT close the sheet while the delete is in flight", async () => {
+    const { user, dialog } = await intoDeleting()
+    await user.keyboard("{Escape}")
+    // The action is in flight; the surface that named the victim must stay on screen.
+    expect(dialog).toBeInTheDocument()
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    expect(dialog).toHaveTextContent("Deleting")
+  })
+
+  it("the grip/close affordances do NOT close it mid-delete either — the refusal is on onOpenChange, so EVERY path funnels through it", async () => {
+    const { user, dialog } = await intoDeleting()
+    // The grip row is a Radix Close (`ui/sheet.tsx:76-81`), as is the ✕ — both request
+    // onOpenChange(false), which is exactly where the mid-delete refusal lives.
+    await user.click(within(dialog).getByRole("button", { name: /dismiss/i }))
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    await user.click(within(dialog).getByRole("button", { name: /^close$/i }))
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    expect(dialog).toHaveTextContent("Deleting")
+  })
+
+  it("POSITIVE CONTROL — Escape DOES close the sheet when no delete is in flight", async () => {
+    // Without this, both assertions above are satisfied by a sheet that never closes at
+    // all, which would be a different (and worse) defect wearing the same green tick.
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    const { user, dialog } = await openDeleteSheet()
+    await within(dialog).findByText("Permanently removed")
+    await user.keyboard("{Escape}")
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+  })
+
+  it("POSITIVE CONTROL — Escape closes it again once the delete reaches its TERMINAL state", async () => {
+    // The refusal is scoped to `deletePhase === "deleting"` only. A confirmed delete is
+    // no longer in flight, so the user regains control of the surface.
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    mockDelete.mockResolvedValue(undefined)
+    const { user, dialog } = await openDeleteSheet()
+    await within(dialog).findByText("Permanently removed")
+    await user.click(within(dialog).getByTestId("delete-forever"))
+    await waitFor(() => expect(dialog).toHaveTextContent("Deleted · recorded"))
+    await user.keyboard("{Escape}")
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+  })
+
+  it("the title round trip — aria-labelledby resolves to a real heading (the linkage the useId normalization does NOT cover)", async () => {
+    // The capture normalizes the generated id's VALUE; this asserts the LINK, on the
+    // live DOM. A dangling aria-labelledby passes a naive attribute assertion.
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    const { dialog } = await openDeleteSheet()
+    const labelledBy = dialog.getAttribute("aria-labelledby")
+    expect(labelledBy).toBeTruthy()
+    const heading = document.getElementById(labelledBy as string)
+    expect(heading).not.toBeNull()
+    expect(heading?.textContent).toBe("Delete this workflow?")
+    // …and the describedby half, whose id is derived from the row id (never generated).
+    expect(dialog.getAttribute("aria-describedby")).toBe("wf-delete-pub-1")
+    expect(document.getElementById("wf-delete-pub-1")).not.toBeNull()
+  })
+})
+
+describe("delete Sheet — invariant 2: NO optimistic vanish (D-LOCK-04)", () => {
+  it("the card leaves the list ONLY after the server confirms, and only via the re-fetch", async () => {
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    let resolveDelete!: () => void
+    mockDelete.mockReturnValue(new Promise<void>((r) => { resolveDelete = () => r() }))
+
+    const { user, dialog } = await openDeleteSheet()
+    await within(dialog).findByText("Permanently removed")
+
+    // The feed is emptied BEFORE the click. If the list were filtered locally, or if any
+    // stray re-fetch ran ahead of confirmation, the card would vanish on its own.
+    mockListPublished.mockResolvedValue([])
+    const fetchesBeforeClick = mockListPublished.mock.calls.length
+
+    await user.click(within(dialog).getByTestId("delete-forever"))
+    await within(dialog).findByText(/Deleting/)
+
+    // In flight: the row is still on screen and NOTHING has been re-fetched.
+    expect(screen.getByTestId("published-card")).toBeInTheDocument()
+    expect(mockListPublished.mock.calls.length).toBe(fetchesBeforeClick)
+
+    // Server confirms → onDeleted() re-fetches → the (now empty) feed removes the card.
+    resolveDelete()
+    await waitFor(() => expect(screen.queryByTestId("published-card")).toBeNull())
+    expect(mockListPublished.mock.calls.length).toBeGreaterThan(fetchesBeforeClick)
+  })
+
+  it("a REJECTED cascade leaves the card present and surfaces the error — a failed delete never vanishes a row", async () => {
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    mockDelete.mockRejectedValue(new Error("boom"))
+
+    const { user, dialog } = await openDeleteSheet()
+    await within(dialog).findByText("Permanently removed")
+    // Same trap as above: an empty feed is armed, so a stray re-fetch would be visible.
+    mockListPublished.mockResolvedValue([])
+    const fetchesBeforeClick = mockListPublished.mock.calls.length
+
+    await user.click(within(dialog).getByTestId("delete-forever"))
+    await within(dialog).findByTestId("delete-retry")
+
+    expect(screen.getByTestId("published-card")).toBeInTheDocument()
+    expect(dialog).toHaveTextContent("Couldn’t delete the workflow")
+    expect(mockListPublished.mock.calls.length).toBe(fetchesBeforeClick)
+  })
+})
