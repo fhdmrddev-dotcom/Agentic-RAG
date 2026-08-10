@@ -43,8 +43,23 @@
  *     important row in this file. See its own comment.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within, waitFor, fireEvent } from "@testing-library/react"
+import { render, screen, within, waitFor, fireEvent, configure } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+
+/**
+ * ⚠ 192-11 — MEASURED, THEN HARDENED. `waitFor`'s 1 s default is not enough for this file any
+ * more: the 200-row cases below re-render two hundred cards on every keystroke and chip click,
+ * and the FIRST wide run of `src/pages src/components/workflows/library` (22 files, four
+ * workers) produced ONE `waitFor` timeout that four consecutive re-runs did not reproduce.
+ *
+ * A test that fails once in five is worse than no test, so the patience is raised rather than
+ * the flake tolerated. This changes NOTHING about what any assertion checks: a genuinely
+ * broken expectation still fails, it just reports after 15 s instead of 1 s, and a passing run
+ * is not slowed at all because `waitFor` returns as soon as its callback succeeds. It is the
+ * project's `GSD_VITEST_MAX_WORKERS=4` lesson one layer up — oversubscription surfaces as bare
+ * timeouts in code nobody touched.
+ */
+configure({ asyncUtilTimeout: 15000 })
 
 const {
   mockListPublished,
@@ -57,6 +72,8 @@ const {
   mockListSkills,
   mockListStarters,
   mockDeleteDraft,
+  mockDeletePreview,
+  mockDeleteCascade,
 } = vi.hoisted(() => ({
   mockListPublished: vi.fn(),
   mockListDrafts: vi.fn(),
@@ -68,6 +85,8 @@ const {
   mockListSkills: vi.fn(),
   mockListStarters: vi.fn(),
   mockDeleteDraft: vi.fn(),
+  mockDeletePreview: vi.fn(),
+  mockDeleteCascade: vi.fn(),
 }))
 
 // Mock the api seam. The page consumes listPublishedWorkflows + listDraftWorkflows
@@ -92,6 +111,14 @@ vi.mock("@/lib/api", () => ({
   listSkills: mockListSkills,
   listStarterWorkflows: mockListStarters,
   deleteWorkflowDraft: mockDeleteDraft,
+  // ⚠ 192-11 (D-18): the CASCADE PAIR is listed for the opposite reason to everything else in
+  // this factory — not because something reaches it, but so that "the draft path never reaches
+  // it" is an ASSERTION rather than an absence nobody can observe. A `vi.fn()` that was never
+  // registered cannot be checked with `not.toHaveBeenCalled`; it can only throw somewhere else.
+  // The published row's heavier grade DOES reach both, which is how the two grades are proved
+  // distinct here rather than merely described as distinct.
+  getWorkflowDeletePreview: mockDeletePreview,
+  deleteWorkflowCascade: mockDeleteCascade,
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"
@@ -880,7 +907,7 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
 describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 scope)", () => {
   it("SC#1 — three characters of ONE workflow's name narrow 200 rendered rows to that one row", async () => {
     mountBulk()
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
     // The scale is REAL: 200 rows through the real merge, the real filter and the real DOM.
     expect(BULK_INDICES).toHaveLength(BULK_TOTAL)
 
@@ -895,7 +922,7 @@ describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 sc
 
   it("D-07 — a word that appears ONLY in the purpose sentence finds the row too (wider than SC#1's literal bar)", async () => {
     mountBulk()
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
 
     setSearch(PURPOSE_ONLY_WORD)
     await waitFor(() => expect(renderedCards()).toHaveLength(1))
@@ -917,7 +944,7 @@ describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 sc
     // all"). Wiring it is a SOURCE change across two files this plan is not allowed to touch —
     // it is recorded as owed rather than quietly asserted as present.
     mountBulk()
-    await waitFor(() => expect(renderedCards().length).toBeGreaterThan(0), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards().length).toBeGreaterThan(0))
     setSearch(pad3(PURPOSE_ONLY_INDEX))
     await waitFor(() => expect(renderedCards()).toHaveLength(1))
 
@@ -937,7 +964,7 @@ describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 sc
     // later phase quietly upgrades the engine, this test is what fails first and asks whether
     // the copy, the placeholder and this decision were all revisited together.
     mountBulk()
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
 
     setSearch("the thing that checks vendors")
     await waitFor(() => expect(renderedCards()).toHaveLength(0))
@@ -947,7 +974,7 @@ describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 sc
     expect(screen.queryByTestId("library-empty")).toBeNull()
     // …and the way out is one click, and it really works.
     fireEvent.click(screen.getByTestId("library-clear-all"))
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
   })
 })
 
@@ -958,7 +985,7 @@ describe("WorkflowsPage — LIB-02 / SC#2: every chip's number is the number it 
     // the test agrees with itself. The rule asserted here is the mechanical form of D-03's
     // promise: the number on the chip is the number clicking it gives you.
     mountBulk()
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
 
     // A seventh chip would be unaudited by a fixed loop, so the chip COUNT is pinned too.
     expect(within(screen.getByTestId("library-chips")).getAllByRole("button")).toHaveLength(
@@ -985,7 +1012,7 @@ describe("WorkflowsPage — LIB-02 / SC#2: every chip's number is the number it 
 
   it("a chip whose count is ZERO still renders — the question stays askable (the honest-empty-state rule)", async () => {
     mountBulk()
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
     // A name search that can only match ONE published row leaves three chips at zero.
     setSearch(pad3(PURPOSE_ONLY_INDEX))
     await waitFor(() => expect(renderedCards()).toHaveLength(1))
@@ -1015,10 +1042,7 @@ describe("WorkflowsPage — the RUN CARVE-OUT at scale (D-16, T-192-03)", () => 
     mockListDrafts.mockRejectedValue(new Error("403 Forbidden"))
 
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    await waitFor(
-      () => expect(renderedCards()).toHaveLength(BULK_PUBLISHED + BULK_STARTERS),
-      { timeout: 8000 },
-    )
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_PUBLISHED + BULK_STARTERS))
 
     // Exactly the refused feed is missing — and it is missing ENTIRELY, not partially.
     expect(renderedOfKind("draft")).toHaveLength(0)
@@ -1069,15 +1093,13 @@ describe("WorkflowsPage — D-17: the project filter holds STARTERS out, and say
 
     serveNarrowedPublished()
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
     // THE NEGATIVE CASE FIRST: with "All projects" there is nothing to explain, so the note
     // is ABSENT. A note that is always present states nothing.
     expect(screen.queryByTestId("library-project-note")).toBeNull()
 
     selectProject("folder-aaa")
-    await waitFor(() => expect(renderedOfKind("published")).toHaveLength(boundPublished.length), {
-      timeout: 8000,
-    })
+    await waitFor(() => expect(renderedOfKind("published")).toHaveLength(boundPublished.length))
     // Drafts narrow CLIENT-side on their own project binding…
     expect(renderedOfKind("draft")).toHaveLength(boundDrafts.length)
     // …and every starter is still on screen. This is the row that would read as a broken
@@ -1111,7 +1133,7 @@ describe("WorkflowsPage — D-17: the project filter holds STARTERS out, and say
     mockListDrafts.mockResolvedValue(bulkDrafts)
 
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
     // Settled: the marker is ABSENT. A marker that is always present distinguishes nothing.
     await waitFor(() => expect(screen.queryByTestId("library-updating")).toBeNull())
 
@@ -1170,7 +1192,7 @@ describe("WorkflowsPage — D-04: is_mine agrees with feed-derived provenance (t
     // And the same agreement, observed THROUGH THE SURFACE: the *Yours* chip promises, and
     // then delivers, exactly the non-starter rows of the rendered list.
     mountBulk()
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
     const notStarters = BULK_TOTAL - renderedOfKind("starter").length
     expect(chipCount("yours")).toBe(notStarters)
     fireEvent.click(screen.getByTestId("library-chip-yours"))
@@ -1187,7 +1209,7 @@ describe("WorkflowsPage — D-04: is_mine agrees with feed-derived provenance (t
       published: bulkPublished.map(stripIsMine),
       starters: bulkStarters.map(stripIsMine),
     })
-    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
 
     expect(chipCount("yours")).toBe(BULK_PUBLISHED + BULK_DRAFTS)
     expect(chipCount("yours")).toBeGreaterThan(0)
@@ -1196,6 +1218,204 @@ describe("WorkflowsPage — D-04: is_mine agrees with feed-derived provenance (t
     expect(renderedOfKind("starter")).toHaveLength(0)
     expect(renderedOfKind("published")).toHaveLength(BULK_PUBLISHED)
     expect(renderedOfKind("draft")).toHaveLength(BULK_DRAFTS)
+  })
+})
+
+// ══ 192-11 — THE TWO **DOM** FENCES (F2, F3) ══════════════════════════════════════════
+//
+// F1, F4 and F5 are SOURCE fences and live in `library/librarySubtree.fences.test.ts`. F2 and
+// F3 ask a different question — what a person actually SEES — so they belong here, on the
+// rendered page. Both carry a POSITIVE CONTROL, because the Phase-187 lesson is that a
+// selector which matches nothing anywhere passes every absence test ever written against it.
+
+/** F2 (D-11) — the developer route vocabulary, as a person would read it. */
+const ROUTE_PATTERN = /GET \/workflows\//
+
+/** F3 (D-10) — the button that lied. Both the plain and the elided spelling. */
+const PUBLISH_LABEL_PATTERN = /^Publish…?$/
+
+/** Every TEXT NODE under `root` whose content matches — the walker both fences share. */
+function textNodesMatching(root: Node, pattern: RegExp): string[] {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const hits: string[] = []
+  let node = walker.nextNode()
+  while (node !== null) {
+    const text = node.textContent ?? ""
+    if (pattern.test(text)) hits.push(text)
+    node = walker.nextNode()
+  }
+  return hits
+}
+
+/** Every ELEMENT under `root` whose whole trimmed text matches. */
+function elementsWithText(root: ParentNode, pattern: RegExp): string[] {
+  return Array.from(root.querySelectorAll("*"))
+    .filter((el) => pattern.test((el.textContent ?? "").trim()))
+    .map((el) => (el.textContent ?? "").trim())
+}
+
+describe("WorkflowsPage — F2 (D-11): no route literal reaches a reader of the library", () => {
+  it("no user-visible node renders a GET /workflows/… string, and the SAME walker finds one when planted", async () => {
+    // The D14 honesty banner and the Published shelf's chip both rendered this literal as real
+    // DOM text before 192-10 deleted them. The fence is what keeps it deleted: developer
+    // vocabulary on a user surface is the thing D-11 removes, and prose cannot enforce it.
+    const { container } = render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    // All three provenances on screen, so the fence covers every card the library can draw.
+    await screen.findByTestId("draft-card")
+    await screen.findByTestId("starter-card")
+    expect(await screen.findAllByTestId("published-card")).toHaveLength(2)
+
+    const surface = container.firstElementChild as HTMLElement
+    expect(textNodesMatching(surface, ROUTE_PATTERN)).toEqual([])
+    // NON-VACUITY: the walker really is walking a populated surface rather than an empty node.
+    expect(textNodesMatching(surface, /./).length).toBeGreaterThan(20)
+
+    // POSITIVE CONTROL — the same walker, the same surface, one planted node.
+    const planted = document.createElement("p")
+    planted.textContent = "GET /workflows/published"
+    surface.appendChild(planted)
+    expect(textNodesMatching(surface, ROUTE_PATTERN)).toEqual(["GET /workflows/published"])
+    planted.remove()
+    expect(textNodesMatching(surface, ROUTE_PATTERN)).toEqual([])
+  })
+})
+
+describe("WorkflowsPage — F3 (D-10): the button that lied does not render anywhere", () => {
+  it("no element labelled Publish… renders on any row FACE, and the selector proves itself on a plant", async () => {
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("draft-card")
+    await screen.findByTestId("starter-card")
+    await screen.findAllByTestId("published-card")
+
+    expect(elementsWithText(document.body, PUBLISH_LABEL_PATTERN)).toEqual([])
+
+    // POSITIVE CONTROL — without it this assertion is satisfied by a selector that matches
+    // nothing anywhere, which is the Phase-187 finding applied where it binds.
+    const planted = document.createElement("button")
+    planted.textContent = "Publish…"
+    document.body.appendChild(planted)
+    expect(elementsWithText(document.body, PUBLISH_LABEL_PATTERN)).toEqual(["Publish…"])
+    planted.remove()
+    expect(elementsWithText(document.body, PUBLISH_LABEL_PATTERN)).toEqual([])
+  })
+
+  it("…and it is not hiding inside ANY of the three overflow menus either", async () => {
+    // An absence proved only on the face would be satisfied by a control that merely moved
+    // behind the `⋯`. Each row state's menu is opened and read in turn.
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const draftCard = await screen.findByTestId("draft-card")
+    const starterCard = await screen.findByTestId("starter-card")
+    const publishedCard = (await screen.findAllByTestId("published-card"))[0]
+
+    for (const card of [draftCard, publishedCard, starterCard]) {
+      const user = await openOverflow(card)
+      const menu = screen.getByRole("menu")
+      // The menu really has items — an empty menu would pass any absence check.
+      expect(within(menu).getAllByRole("menuitem").length).toBeGreaterThan(0)
+      expect(elementsWithText(menu, PUBLISH_LABEL_PATTERN)).toEqual([])
+      await user.keyboard("{Escape}")
+      await waitFor(() => expect(screen.queryByRole("menu")).toBeNull())
+    }
+  })
+})
+
+describe("WorkflowsPage — LIB-04 / SC#4: create LEADS, at 200 workflows", () => {
+  it("the create affordance precedes EVERY one of 200 rendered rows in document order", async () => {
+    // ⚠ ORDER, NEVER GEOMETRY. jsdom applies no CSS and paints nothing, so a coordinate
+    // assertion here would be fiction; and a structural test that also asserts layout starts
+    // failing for layout reasons. The VISUAL half — "findable without scrolling past two
+    // shelves" as a person experiences it — is UAT's (rows U2 / U3 / U7) and is deliberately
+    // NOT claimed here. What IS proved is the structural property D-02 bought: create leads a
+    // persistent toolbar, so it cannot drift back down a grid, because there is no grid above
+    // it to drift below.
+    const { container } = mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL))
+
+    const create = screen.getByTestId("library-create")
+    const cards = renderedCards()
+    expect(cards).toHaveLength(200)
+    for (const card of cards) {
+      expect(
+        create.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+        `a row rendered BEFORE the create affordance: ${card.textContent?.slice(0, 40)}`,
+      ).toBeTruthy()
+    }
+    // POSITIVE CONTROL — the bit-mask really discriminates: the first row precedes the last.
+    expect(
+      cards[0].compareDocumentPosition(cards[cards.length - 1]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      cards[cards.length - 1].compareDocumentPosition(cards[0]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeFalsy()
+
+    // …and it is the FIRST interactive element on the surface, so keyboard and screen-reader
+    // order agree with the DOM order asserted above.
+    const focusables = Array.from(
+      container.querySelectorAll(
+        "button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
+      ),
+    )
+    expect(focusables[0]).toBe(create)
+  }, 60000)
+})
+
+describe("WorkflowsPage — D-18: the two delete grades are DIFFERENT, and provably so", () => {
+  it("a draft delete arms first, then calls deleteWorkflowDraft — and NEVER the cascade pair", async () => {
+    // The cascade client and its preview client resolve a SLUG and destroy every version under
+    // it. For ONE draft that destroys far more than the person asked for, which is why D-18
+    // gives the draft the middle guard grade and its own single-row endpoint.
+    mockDeleteDraft.mockResolvedValue(undefined)
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const draftCard = await screen.findByTestId("draft-card")
+
+    const user = await openOverflow(draftCard)
+    await user.click(screen.getByTestId("draft-delete"))
+    // THE FIRST CLICK ARMS AND DOES NOT DELETE — a single stray click never reaches the wire.
+    expect(await screen.findByTestId("draft-delete-prompt")).toBeInTheDocument()
+    expect(mockDeleteDraft).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByTestId("draft-delete-confirm"))
+    await waitFor(() => expect(mockDeleteDraft).toHaveBeenCalledWith("draft-1"))
+    expect(mockDeleteCascade).not.toHaveBeenCalled()
+    expect(mockDeletePreview).not.toHaveBeenCalled()
+  })
+
+  it("a published delete is the HEAVIER grade: the victim-naming Sheet, server counts, then the cascade", async () => {
+    // The counterpart, so "demonstrably lighter" is a MEASUREMENT rather than a claim: this
+    // path fetches exact server counts and names its victim before offering the action; the
+    // draft path above does neither. The Sheet's full lifecycle is `PublishedCardDelete.test.tsx`'s
+    // job and is not duplicated — what this row adds is that the two grades take DIFFERENT
+    // endpoints from the same one card.
+    mockDeletePreview.mockResolvedValue({
+      name: "Vendor-risk review",
+      versions: 2,
+      runs: 3,
+      threads: 0,
+      in_flight: 0,
+    })
+    mockDeleteCascade.mockResolvedValue(undefined)
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const publishedCard = (await screen.findAllByTestId("published-card"))[0]
+
+    const user = await openOverflow(publishedCard)
+    await user.click(screen.getByTestId("published-delete"))
+    await waitFor(() => expect(mockDeletePreview).toHaveBeenCalledWith("pub-1"))
+    // The victim is NAMED, with the server's own counts. Scoped to the Sheet: the card behind
+    // it carries the same name, and a page-wide text query would find that one and pass on a
+    // Sheet that named nothing.
+    const sheet = await screen.findByRole("dialog")
+    expect(within(sheet).getByText("Delete this workflow?")).toBeInTheDocument()
+    expect(within(sheet).getByText("Vendor-risk review")).toBeInTheDocument()
+    expect(sheet.textContent).toContain("2 versions")
+    expect(sheet.textContent).toContain("3 run records")
+
+    fireEvent.click(await screen.findByTestId("delete-forever"))
+    await waitFor(() => expect(mockDeleteCascade).toHaveBeenCalledWith("pub-1"))
+    // …and the heavy path never touches the single-draft endpoint, which is the other half of
+    // "the grades are distinct".
+    expect(mockDeleteDraft).not.toHaveBeenCalled()
   })
 })
 
