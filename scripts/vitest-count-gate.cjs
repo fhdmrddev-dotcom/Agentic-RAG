@@ -849,6 +849,17 @@ const BASELINE = {
   "RunModal.test.tsx": 11,
   "RunModal.a11y.test.tsx": 8,
   "PublishedCardDelete.test.tsx": 7,
+  // 192-01 Task 2: the FIFTH covering suite. `WorkflowBuilderPage.session.test.tsx` renders
+  // the LIVE `WorkflowsPage` three times (`:482`, `:510`, `:768`) and was pinned by nothing —
+  // an unpinned covering suite is an UNGUARDED one, not a lightly-guarded one. It needed BOTH
+  // knobs, same as the four above.
+  // ⚠ RESEARCH ASSUMPTION A6 IS RECORDED IN THE TARGETS BLOCK BELOW, BEFORE THIS PIN: the
+  // "pane click" case was measured at 5060 ms against a 5000 ms limit under `--maxWorkers=4`
+  // in a mixed run and passed on re-run — a parallel-load flake, not latent rot. Confirmed
+  // before pinning by two standalone runs, both `23 passed (23)` / 0 failing. Read from this
+  // script's own `actual` column: it reported `— 23 new` on the run that first put the file
+  // inside TARGETS, and `delta 0` on the two runs after this pin landed.
+  "WorkflowBuilderPage.session.test.tsx": 23,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -1031,7 +1042,18 @@ const BASELINE = {
 //   (52 / 58, +6), both newly observed here and both outside Phase 192's blast radius.
 //   Folding an unrelated drift into a commit that did not cause it is the thing this whole
 //   header argues against.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2887 (192-01)
+// ⚠ AND AGAIN BY 192-01 TASK 2, in the very next commit: the pinned FILE count 55 → 56,
+// `WorkflowBuilderPage.session.test.tsx` (23) — the fifth `WorkflowsPage`-covering suite, and
+// the one whose adoption needed assumption A6 measured first (see the map entry and the
+// TARGETS block). The figure `2910` was CHECKED AGAINST this script's own printed
+// `pinned total` across two agreeing runs after the map entry landed, and the honest sequence
+// is recorded rather than implied: it was written as an EXPECTATION (2887 + 23) and then
+// falsified against the printed column — it agreed. Had the two disagreed, the printed value
+// is what stays; an expectation that survives a measurement is still only worth the
+// measurement. That is the whole difference between this note and the previous NINE times it
+// went stale by being computed and never checked. The pre-existing +24 drift named in the
+// paragraph above is UNCHANGED and still deliberately not re-pinned here.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2910 (192-01)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -1258,6 +1280,38 @@ const TARGETS = [
   "src/pages/__tests__/RunModal.test.tsx",
   "src/pages/__tests__/RunModal.a11y.test.tsx",
   "src/pages/__tests__/PublishedCardDelete.test.tsx",
+  // ── Also 192-01 (Task 2), the FIFTH covering suite — and the one adoption in this ──────
+  // ── phase that required a measurement of its own before it could be trusted. ──────────
+  //
+  // `WorkflowBuilderPage.session.test.tsx` renders the LIVE `WorkflowsPage` THREE times
+  // (`:482`, `:510`, `:768`) and was pinned by nothing: `src/pages` is reached only by named
+  // files above, and this one was not among them. An unpinned covering suite is an UNGUARDED
+  // one, not a lightly-guarded one — the 188-12 statement, applied here.
+  //
+  // ⚠ RESEARCH ASSUMPTION A6, RECORDED BEFORE THE PIN RATHER THAN AFTER IT
+  // (192-RESEARCH.md § "Assumptions Log" A6 / Pitfall 7): this suite's "pane click" case was
+  // measured timing out at **5060 ms against a 5000 ms limit** under `--maxWorkers=4` in a
+  // mixed eight-file run, and PASSING on re-run of the same set. That is a parallel-load
+  // flake, NOT latent rot, so the adoption is expected to import ZERO rot.
+  // CONFIRMED BEFORE PINNING, per the plan: the suite was run standalone TWICE with
+  // `GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4`, and both runs reported
+  // `1 passed (1) / 23 passed (23)` — zero failures, the flake did not reproduce.
+  // THE STANDING INSTRUCTION FOR THE REST OF PHASE 192: if "pane click" reds, RE-RUN before
+  // declaring red. A consistent red is a PRE-EXISTING flake to re-run, not a regression this
+  // phase introduced and not a defect to chase.
+  //
+  // ── DECLINED, with its reason, so a decline can never read as an oversight ────────────
+  // `src/components/layout/__tests__/ChatLayoutLaunch.test.tsx` (2 tests) is DELIBERATELY NOT
+  // adopted — into neither TARGETS nor BASELINE. It reaches `WorkflowsPage` only transitively
+  // through `ChatLayout`, its two cases are owned by the LAYOUT concern rather than the
+  // library one, and `ChatLayout`'s own launch contract is already pinned by
+  // `ChatLayout.launch.test.tsx` (17, adopted at 188-09). Adopting it would make Phase 192
+  // the owner of the layout directory's future rot for two tests that assert nothing about
+  // the library IA. This script's own adoption rule requires a stated reason either way: a
+  // decline with no recorded reason is indistinguishable from an oversight, which is exactly
+  // the failure mode the rule exists to prevent. A later phase touching the layout launch
+  // seam should adopt it deliberately, with its own measured number.
+  "src/pages/WorkflowBuilderPage.session.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
