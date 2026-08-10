@@ -12,10 +12,15 @@
  *   F5  no user-visible string here overstates what the search does (D-08). The field
  *       matches the letters you type; a word implying otherwise is a CORRECTNESS defect
  *       — it is a promise about capability, not a style preference.
- *   TG  `lib/threadGroups.tsx` is byte-unchanged by this phase. 192 IMPORTS
- *       `HighlightTitle` and modifies nothing, which is what makes 158-B's re-open
- *       trigger #3 (*"any phase touches … threadGroups for another reason"*) a mechanical
- *       fact rather than an ambiguity resolved in prose and re-litigated later.
+ *   TG  `lib/threadGroups.tsx` is byte-unchanged by this phase, which is what makes 158-B's
+ *       re-open trigger #3 (*"any phase touches … threadGroups for another reason"*) a
+ *       mechanical fact rather than an ambiguity resolved in prose and re-litigated later.
+ *       ⚠ CORRECTED IN 192-12 — this paragraph used to add *"192 IMPORTS `HighlightTitle`"*.
+ *       Measured, that half is FALSE and always was; see the TG section's own ⚠ note below.
+ *   OD  the cut has ONE DIRECTION. `WorkflowsPage.tsx` imports every library module it
+ *       consumes, DECLARES none of them, and leaves NO RE-EXPORT SHIM. Without the third
+ *       clause F4's two negatives are also satisfied by a page that kept the coupling behind
+ *       a re-export — the `WorkflowCanvas.test.tsx:756-765` shape, applied here.
  *
  * ⚠ THE SEVEN PATHS ARE LISTED EXPLICITLY, AND FOUR OF THEM DO NOT EXIST AT THIS COMMIT.
  * THAT IS THE POINT (the `WorkflowCanvas.test.tsx:55-83` idiom). `RunModal.tsx`,
@@ -51,6 +56,9 @@
 import { describe, it, expect } from "vitest"
 import ts from "typescript"
 import threadGroupsSource from "@/lib/threadGroups?raw"
+// ⚠ A `?raw` import of the page is the ONE legal way this subtree may name it, and F4's own
+// NEGATIVE CONTROL (`:246-256`) exists so this line does not red the fence beside it.
+import pageSource from "@/pages/WorkflowsPage?raw"
 
 // ── the swept corpus ─────────────────────────────────────────────────────────────────
 
@@ -352,8 +360,47 @@ describe("F5 — no copy in the subtree overstates the search (D-08)", () => {
 /**
  * ⚠ THE FILE IS `.tsx`, NOT `.ts` as 158-B's re-open trigger #3 spells it — it ships a JSX
  * component (`HighlightTitle`), which its own docblock at `:17-19` explains. The trigger
- * asks whether any phase "touches" it for another reason; 192 IMPORTS it and edits nothing,
- * and this hash is what turns that from a claim into a fact.
+ * asks whether any phase "touches" it for another reason, and the hash below is what turns
+ * the answer from a claim into a fact.
+ *
+ * ⚠ THIS PARAGRAPH USED TO READ *"192 IMPORTS it and edits nothing"*. THE FIRST HALF IS
+ * FALSE AND WAS NEVER TRUE — corrected in 192-12 rather than smoothed over, per the house
+ * rule that a guard which only passes by making a comment lie is a broken guard
+ * (D-ITEM-183-02). MEASURED, twice, at this commit:
+ *
+ *   · `grep -rn "HighlightTitle" frontend/src` returns ZERO consumers under
+ *     `components/workflows/library/`; the three live call sites are all in
+ *     `components/layout/`. `192-11-SUMMARY.md` § "THE MEASURED CORRECTION" records the
+ *     same fact from the other side, with a positive control.
+ *   · `WorkflowCard` renders `row.name` as plain text and takes no `query` prop at all.
+ *
+ * So D-07's SECOND half — *"with the hit highlighted"* — is NOT SHIPPED. It is DEFERRED
+ * rather than owed-as-a-small-wiring-job, and the reason is a STRUCTURAL CONFLICT this plan
+ * measured rather than predicted: `HighlightTitle`'s props are `{ title, query }`, so the
+ * wiring `192-11` handed forward (`<HighlightTitle title={row.name} query={query} />`)
+ * spells a JSX ATTRIBUTE named `title` inside the swept subtree — and F1 above walks JSX
+ * attribute NAMES, so it reds on it. Observed, not reasoned: the wiring was planted into
+ * `WorkflowCard.tsx` and F1 failed with *"expected [ 'data-testid', 'data-card', …(73) ] to
+ * not include 'title'"*, the identical failure the deliberate `title="x"` plant produces.
+ * F1's existing SCOPING CONTROL does not cover it — that control is about an object
+ * PROPERTY (`{ title: "…" }`), which is a different node kind.
+ *
+ * ⚠ THE CONFLICT IS REAL AND IT IS NOT F1'S FAULT. F1 is D-14 ("touch has no hover") and it
+ * is deliberately blunt; the shipped `HighlightTitle` merely happens to spell its prop with
+ * the forbidden word. **Wiring D-07's highlight therefore requires F1 to become
+ * element-aware** (a DOM tooltip on an intrinsic element, versus a React prop on a
+ * capitalised component) — a change to the very fence this plan exists to prove fires, in
+ * the closing plan of the phase, which is exactly the "a closure round may not add a
+ * capability" shape G-7 forbids. RE-OPEN TRIGGER, concrete: **the next phase that touches
+ * `WorkflowCard.tsx` or the library search** wires the highlight AND narrows F1 to
+ * intrinsic elements in the same commit, driving the narrowed F1 RED against a real
+ * `<button title="…">` plant so the loosening is proved not to have blinded it. The
+ * limitation test in `WorkflowsPage.test.tsx` (*"⚠ MEASURED, NOT ASSUMED"*) is what must be
+ * INVERTED when it lands, and its positive control already pins the shipped behaviour any
+ * wiring must match: the FIRST match only.
+ *
+ * ⚠ LIB-01 IS UNAFFECTED. REQUIREMENTS.md's wording is *"search the Workflows page by name
+ * and filter the list"* — the highlight belongs to decision D-07, not to the requirement.
  *
  * ⚠ `matchesTitle` (`threadGroups.tsx:74`) is DELIBERATELY NOT REUSED. Its signature is
  * `(t: Thread, q: string)`, and widening it to take a library row WOULD be touching the
@@ -374,6 +421,13 @@ describe("F5 — no copy in the subtree overstates the search (D-08)", () => {
  * cryptographic digest. It is not defending against a crafted collision; it is defending
  * against an edit.
  */
+/**
+ * D-07's two consumption shapes — an IMPORT of the component, and a RENDER of it. Prose that
+ * merely names it satisfies neither, which is the point (see the case below).
+ */
+const HIGHLIGHT_IMPORT = /import\s*(?:type\s*)?\{[^}]*\bHighlightTitle\b/
+const HIGHLIGHT_ELEMENT = /<HighlightTitle[\s/>]/
+
 const normalizeEol = (source: string) => source.replace(/\r\n/g, "\n")
 
 const digest = (source: string): string => {
@@ -411,9 +465,139 @@ describe("TG — 158-B trigger #3, as a fact rather than a reading", () => {
     expect(digest(normalized)).toBe(THREAD_GROUPS_DIGEST)
   })
 
-  it("…and the thing 192 imports from it is really there", () => {
-    // Byte-identity alone is satisfied by a file nobody uses. This is why the pin matters.
+  it("…and the two exports the pin exists to protect are really there", () => {
+    // Byte-identity alone is satisfied by a file nobody uses. This is why the pin matters —
+    // and note the claim is about what the file EXPORTS, not about what 192 imports, which
+    // is the correction the ⚠ block above records.
     expect(threadGroupsSource).toContain("export function HighlightTitle(")
     expect(threadGroupsSource).toContain("export function matchesTitle(")
+  })
+
+  it("POSITIVE CONTROLS — the two highlight detectors catch real consumption", () => {
+    expect('import { HighlightTitle } from "@/lib/threadGroups"').toMatch(HIGHLIGHT_IMPORT)
+    expect('import { folderLabel, HighlightTitle } from "@/lib/threadGroups"').toMatch(
+      HIGHLIGHT_IMPORT,
+    )
+    expect("<HighlightTitle title={row.name} query={q} />").toMatch(HIGHLIGHT_ELEMENT)
+    expect("<HighlightTitle\n  title={row.name}\n/>").toMatch(HIGHLIGHT_ELEMENT)
+    // SCOPING CONTROL — the prose form really is not caught, which is the whole reason
+    // these two exist instead of a raw substring check.
+    const prose = " * renders it: highlighting is `HighlightTitle`'s job (`threadGroups.tsx:137`)"
+    expect(prose).not.toMatch(HIGHLIGHT_IMPORT)
+    expect(prose).not.toMatch(HIGHLIGHT_ELEMENT)
+  })
+
+  it("D-07's highlight is UNSHIPPED, and the F1 conflict that defers it is pinned here", () => {
+    // ⚠ Two facts, so a later author inherits a MEASUREMENT instead of re-deriving one.
+    //
+    // 1. Nothing in this subtree CONSUMES the shipped highlight. Asserted over the swept
+    //    corpus rather than over one file, so a highlight wired into ANY library module
+    //    fails this line and forces the author to read the ⚠ block above.
+    //
+    //    ⚠ THE DETECTOR IS IMPORT/ELEMENT-SHAPED, NOT A RAW `toContain`, AND THAT IS
+    //    MEASURED RATHER THAN CAUTIOUS: a raw substring check FAILS on this very tree,
+    //    because `libraryFilter.ts:182` names the component in PROSE ("highlighting is
+    //    `HighlightTitle`'s job"). It was written raw first and observed RED against exactly
+    //    that comment — the 187-24 trap, which this file already documents for F1 and F5.
+    expect(subtreeSource).not.toMatch(HIGHLIGHT_IMPORT)
+    expect(subtreeSource).not.toMatch(HIGHLIGHT_ELEMENT)
+    //    NON-VACUITY: the corpus really does mention it in prose, so the two negatives above
+    //    are narrower than a substring check rather than merely luckier than one.
+    expect(subtreeSource).toContain("HighlightTitle")
+
+    // 2. WHY it is deferred rather than owed as small wiring: the component's prop is
+    //    spelled with F1's forbidden word, so the wiring is an F1 violation by
+    //    construction. This is what makes the conflict inherent rather than incidental.
+    expect(threadGroupsSource).toContain("HighlightTitle({ title, query }")
+    expect(FORBIDDEN_ATTRIBUTE).toBe("title")
+
+    // POSITIVE CONTROL — F1's own detector, run over the exact wiring 192-11 handed
+    // forward, really does catch it. Without this the paragraph above is an argument; with
+    // it, the deferral rests on the same detector the fence ships.
+    const wiring = `export const Row = () => <span><HighlightTitle ${FORBIDDEN_ATTRIBUTE}={row.name} query={q} /></span>\n`
+    expect(jsxAttributeNamesOf("./planted.tsx", wiring)).toContain(FORBIDDEN_ATTRIBUTE)
+  })
+})
+
+// ── OD — the cut has ONE DIRECTION, and no shim preserves the old coupling ────────────
+
+/**
+ * F4 proves nothing under `library/` reaches UP. This proves the edge EXISTS and points
+ * DOWN — the `WorkflowCanvas.test.tsx:756-765` shape. Without it, F4's negatives are also
+ * satisfied by a page that declares everything itself and by two modules nobody uses.
+ *
+ * ⚠ THE SIX IMPORTED PATHS ARE MEASURED, NOT ASSUMED. `grep -n "workflows/library"
+ * frontend/src/pages/WorkflowsPage.tsx` at this commit returns exactly six specifiers, and
+ * `WorkflowDeleteSheet` is deliberately NOT among them: the page never mounts the Sheet — the
+ * CARD does (`WorkflowCard.tsx`, the `deleteSheetRef` black box). Listing it here would
+ * assert a coupling that does not exist and would red on the correct architecture.
+ */
+const PAGE_IMPORTED_MODULES = [
+  "RunModal",
+  "libraryFilter",
+  "libraryRow",
+  "LibraryToolbar",
+  "WorkflowCard",
+  "libraryVocabulary",
+] as const
+
+/** The six symbols the page must no longer DECLARE — the three cards, the modal, the two leaves. */
+const PAGE_MUST_NOT_DECLARE = [
+  "function RunModal(",
+  "type DeletePhase",
+  "function FilterItem(",
+  "function PublishedCard(",
+  "function DraftCard(",
+  "function StarterCard(",
+] as const
+
+/** A re-export shim — the thing that keeps the coupling while every negative stays green. */
+const REEXPORT_STAR = /export\s+\*\s+from\s+["'][^"']*library\//
+const REEXPORT_NAMED = /export\s+\{[^}]*\}\s+from\s+["'][^"']*library\//
+
+describe("OD — WorkflowsPage imports the subtree, declares none of it, shims nothing", () => {
+  it("POSITIVE CONTROLS — every detector below catches what it forbids", () => {
+    expect('export * from "@/components/workflows/library/WorkflowCard"').toMatch(REEXPORT_STAR)
+    expect('export { RunModal } from "./library/RunModal"').toMatch(REEXPORT_NAMED)
+    expect('export { WorkflowCard, type X } from "@/components/workflows/library/WorkflowCard"').toMatch(
+      REEXPORT_NAMED,
+    )
+    // …and a LEGAL local export is not mistaken for a shim, or this fence reds on the
+    // page's own `export default WorkflowsPage`.
+    expect("export default WorkflowsPage").not.toMatch(REEXPORT_NAMED)
+    expect("export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {").not.toMatch(
+      REEXPORT_NAMED,
+    )
+  })
+
+  it("the page really is the file under test (non-vacuity)", () => {
+    // A `?raw` import that silently resolved to an empty string would make every assertion
+    // below pass while covering nothing — the failure shape this whole suite exists to stop.
+    expect(pageSource.length).toBeGreaterThan(10000)
+    expect(pageSource).toContain("export function WorkflowsPage(")
+  })
+
+  it.each(PAGE_IMPORTED_MODULES)("imports %s from the library subtree", (moduleName) => {
+    // ⚠ `(\.[jt]sx?)?` IS DELIBERATE AND IS F4's OWN IDIOM, ten lines up. Written WITHOUT it
+    // first, this line reddened on a `…/RunModal.tsx` specifier — which is LEGAL here
+    // (`tsconfig.app.json` sets `allowImportingTsExtensions`) and is still a one-direction
+    // edge. A fence that reds on correct code is worse than none: it trains its reader to
+    // edit the fence. The regression this actually guards is the module going UNIMPORTED,
+    // which is the plant it was driven RED against.
+    expect(pageSource).toMatch(
+      new RegExp(`from\\s+["']@/components/workflows/library/${moduleName}(\\.[jt]sx?)?["']`),
+    )
+  })
+
+  it.each(PAGE_MUST_NOT_DECLARE)("no longer declares %s", (declaration) => {
+    expect(pageSource).not.toContain(declaration)
+  })
+
+  it("leaves NO re-export shim pointing back at library/", () => {
+    // The clause that makes the two negatives mean what they say. A shim would let every
+    // other assertion in this file stay green while the page remained the subtree's front
+    // door — which is the coupling D-01 exists to remove.
+    expect(pageSource).not.toMatch(REEXPORT_STAR)
+    expect(pageSource).not.toMatch(REEXPORT_NAMED)
   })
 })

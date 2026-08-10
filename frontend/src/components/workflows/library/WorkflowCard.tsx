@@ -107,6 +107,39 @@
  * the vocabulary module is not one of them (the same boundary `192-07` recorded for its four).
  * Their re-home is OWED. They are not outside the honesty guarantee while they wait: this file
  * is one of the seven paths F5 sweeps BY NAME.
+ *
+ * ── ⚠ THE SUBTREE DELTA, MEASURED IN 192-12 — AND IT IS FAR LARGER THAN THE ESTIMATE ─────
+ * Recorded HERE as well as in the SUMMARY, for 188.2's stated reason: a later reader must not
+ * be able to mistake this growth for a regression, and the figure has to live where the growth
+ * is. Measured with a line classifier (blank / comment / code, counting JSX comment blocks as
+ * comment) that was VALIDATED against 188.2's own published known-good — the
+ * pre-cut `PhaseNodeCard.tsx` at `95a4c915`, `797/518/249/30` — and reproduced it exactly
+ * before any Phase-192 number was trusted.
+ *
+ *   PAGE      `WorkflowsPage.tsx`  1407 → 1007  (−28.4 %)   CODE 1021 → 479  (−53.1 %)
+ *   SUBTREE   page + these 7 modules  1407 → **3182  (+126.2 %)**   CODE 1021 → 1499 (+46.8 %)
+ *
+ * **RESEARCH's assumption A2 estimated +5 % to +16 % (a ~1480–1630 subtree). The measured
+ * figure is +126.2 % — roughly EIGHT TIMES the top of that range, and nearly double 188.2's
+ * +67.1 %.** A2 was labelled an estimate precisely so this could contradict it in the open, so
+ * it is stated rather than smoothed, with the two reasons it missed:
+ *
+ *   1. It predicted the PAGE at 250–400 L. Measured: **1007** — a 2.5–4× miss on the single
+ *      largest row. D-01 moved the library view; it never moved the Builder host, the
+ *      gauntlet mount, the door switch, the three fork/create handlers or the fetch
+ *      orchestration, all of which still live there. See the CLAUDE.md ledger row.
+ *   2. It listed FIVE destination modules; **seven** shipped (`libraryRow.ts` and
+ *      `libraryVocabulary.ts` appear nowhere in its table), and every module landed above its
+ *      own estimate — this card most of all, 250 est. → **545**.
+ *
+ * WHERE THE GROWTH ACTUALLY WENT, so the number is attributable rather than merely admitted:
+ * **COMMENT is the dominant term, 334 → 1523 (+355.9 %)** — 1039 of the 2175 new module lines,
+ * 48 %, are prose. CODE grew +46.8 % against a subtree that replaced three card components
+ * with one and added a filter engine, a vocabulary module, six counted chips and a merge that
+ * did not exist before. ⚠ THE FIGURES INCLUDE THIS DOCBLOCK — it was measured, written, then
+ * RE-measured, and only the digits were corrected so the line count could not move again.
+ * Re-derive: `git show 6bdc4684:<page> | wc -l` → 1407, then `wc -l` on the page and on this
+ * directory's seven SOURCE modules (test files excluded, as 188.2 excluded them).
  */
 import { useRef, useState } from "react"
 import { Loader2, MoreHorizontal, Trash2 } from "lucide-react"
