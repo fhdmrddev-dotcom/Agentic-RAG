@@ -845,7 +845,39 @@ const BASELINE = {
   // ⚠ `WorkflowsPage.test.tsx`'s pin WILL be LOWERED later in Phase 192, when D-01's
   // restructure deletes the shelf-order cases. That lowering must ride in the SAME COMMIT as
   // the deletion, at a number read from this column — never to make a red gate go quiet.
-  "WorkflowsPage.test.tsx": 23,
+  //
+  // ── 192-10: THE LOWERING PREDICTED ABOVE, 23 → 22. THE ONE PIN THIS PHASE LOWERS. ──────
+  //
+  // It rides in the same commit as the deletions that justify it, and the two deletions are
+  // NAMED so a later reader can audit the trade rather than take it on trust:
+  //
+  //   DELETED (2) — both asserted the DOM ORDER OF THE THREE SECTIONS that D-02 removes:
+  //     1. "the Published shelf renders ABOVE the Drafts shelf (DOM order — BUG-260628-01
+  //        fold, D-143-5)"
+  //     2. "folds BUG-260628-01 (SC-e): section order is Starters → Published → Drafts
+  //        (runnable no longer buried under drafts)"
+  //   ADDED (1) — "a REJECTED /workflows/drafts still renders the published rows and the
+  //     starter". The D-16 merge's highest-risk defect: `/drafts` is gated while /published
+  //     and /starters are the RUN CARVE-OUT, so a `Promise.all` plus one shared error path
+  //     empties the WHOLE library on a 403. A test where all three feeds resolve is green
+  //     against both shapes and proves nothing; this one is not.
+  //
+  //   23 − 2 + 1 = 22, which is arithmetic — and arithmetic is NOT how this number was
+  //   obtained. IT WAS READ FROM THIS SCRIPT'S OWN `actual` COLUMN: the run made against the
+  //   restructured suite printed `WorkflowsPage.test.tsx  23  22  -1`, and two further runs
+  //   after this edit printed `delta 0`. The sum above merely has to AGREE with the
+  //   measurement; if it ever did not, the measurement would win.
+  //
+  //   The BUG the two deleted cases folded is not un-fixed by their removal: BUG-260628-01
+  //   was "runnable work is buried under drafts", and 157-B answers it more strongly than a
+  //   section order can — a user who wants runnable rows says so with the *Ready to run*
+  //   chip and receives exactly the count that chip promised, which `libraryFilter.test.ts`
+  //   proves as arithmetic, per chip, without a DOM.
+  //
+  // NO OTHER PIN IS LOWERED HERE. `WorkflowBuilderPage.header.test.tsx` (32) and
+  // `.session.test.tsx` (23) both had selectors updated by the same restructure and both
+  // still read their pinned numbers exactly — a selector change must never move a count.
+  "WorkflowsPage.test.tsx": 22,
   "RunModal.test.tsx": 11,
   "RunModal.a11y.test.tsx": 8,
   "PublishedCardDelete.test.tsx": 7,

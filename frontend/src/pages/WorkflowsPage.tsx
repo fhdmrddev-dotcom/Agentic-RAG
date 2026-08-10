@@ -197,6 +197,22 @@ interface WorkflowsPageProps {
 
 type PageView = "library" | "builder"
 
+/**
+ * 192-10 (D-16) — each feed's own answer, TRI-STATE and never boolean.
+ *
+ * `pending` is not a shade of `failed` and not a shade of `ok`: *"we have not asked yet"*,
+ * *"there are none"* and *"we could not ask"* are three DIFFERENT FACTS, and the shipped
+ * `DescribeKbPicker` rule is that a surface which collapses them lies about at least one.
+ * A per-source record rather than a page-wide flag is also what makes the RUN CARVE-OUT
+ * survivable: the gated drafts feed can be `failed` while the other two are `ok`.
+ *
+ * ⚠ A re-query does NOT return a source to `pending`. Previously-committed rows stay
+ * rendered with their correct counts while the new answer is in flight (D-17's companion
+ * rule); the in-flight fact is carried by `publishedUpdating` instead, because blanking a
+ * settled source to signal motion is the count-zeroing the rule forbids by name.
+ */
+type SourceState = "pending" | "ok" | "failed"
+
 export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
@@ -265,20 +281,17 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
    * drafts into an empty LIBRARY — the gate re-introduced client-side on exactly the two feeds
    * the carve-out exists to protect. Per-source state is what makes that unavailable.
    */
-  const [sourceFailed, setSourceFailed] = useState<Record<Provenance, boolean>>({
-    published: false,
-    starter: false,
-    draft: false,
+  const [sourceState, setSourceState] = useState<Record<Provenance, SourceState>>({
+    published: "pending",
+    starter: "pending",
+    draft: "pending",
   })
-  /** True until the first settle of all three feeds. NO COUNT IS RENDERED WHILE IT IS TRUE — a
-   *  count of 0 during a load is a lie, not a conservative default. */
-  const [loading, setLoading] = useState(true)
   /** A published re-query is in flight (D-17's companion rule). The previously-committed rows
    *  stay rendered with their correct counts under a quiet marker; nothing is zeroed. */
   const [publishedUpdating, setPublishedUpdating] = useState(false)
 
-  const markSource = useCallback((source: Provenance, failed: boolean) => {
-    setSourceFailed((prev) => (prev[source] === failed ? prev : { ...prev, [source]: failed }))
+  const markSource = useCallback((source: Provenance, next: Exclude<SourceState, "pending">) => {
+    setSourceState((prev) => (prev[source] === next ? prev : { ...prev, [source]: next }))
   }, [])
 
   const refetchPublished = useCallback(async () => {
@@ -301,12 +314,12 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       } else {
         setPublished(rows)
       }
-      markSource("published", false)
+      markSource("published", "ok")
     } catch (err) {
       // A superseded failure is as stale as a superseded success — it must not paint a
       // failure notice over a selection that has already moved on.
       if (seq !== publishedSeqRef.current) return
-      markSource("published", true)
+      markSource("published", "failed")
       throw err
     } finally {
       if (seq === publishedSeqRef.current) setPublishedUpdating(false)
@@ -322,10 +335,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       const rows = await listStarterWorkflows()
       if (seq !== startersSeqRef.current) return
       setStarters(rows)
-      markSource("starter", false)
+      markSource("starter", "ok")
     } catch (err) {
       if (seq !== startersSeqRef.current) return
-      markSource("starter", true)
+      markSource("starter", "failed")
       throw err
     }
   }, [markSource])
@@ -337,13 +350,13 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
       // Same latest-wins guard (drafts are re-fetched on mount + after publish/tweak).
       if (seq !== draftsSeqRef.current) return
       setDrafts(rows)
-      markSource("draft", false)
+      markSource("draft", "ok")
     } catch (err) {
       if (seq !== draftsSeqRef.current) return
       // ⚠ THE ONE GATED FEED. A refusal here is a NORMAL outcome for a user without
       // `workflow_authoring` visibility, not an exception — it degrades to zero drafts and
       // says so, and it must NEVER be able to remove a published row or a starter from view.
-      markSource("draft", true)
+      markSource("draft", "failed")
       throw err
     }
   }, [markSource])
@@ -363,14 +376,23 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
    * THE ASYMMETRY IS PRESERVED: the first run settles all three; every later run is a project
    * change, and only `published` re-queries (`refetchStarters` / `refetchDrafts` are `[]`-stable
    * so they can never re-trigger this effect). That is D-17's cause, kept rather than collapsed.
+   *
+   * ⚠ AND ONE HONEST QUALIFICATION, MEASURED RATHER THAN ASSUMED. Swapping this line to
+   * `Promise.all` today does NOT break the library, and the test that proves the carve-out
+   * stays green when you do — because the isolation that actually saves it is the per-source
+   * `try`/`catch` in each `refetch*` above, each committing behind its own ticket. What
+   * `allSettled` buys RIGHT NOW is that the aggregate settles without throwing; what it buys
+   * LATER is the thing worth keeping, because the first consumer this aggregate acquires — a
+   * settle-gated spinner, a telemetry hook, anything that reads the result — makes `all`
+   * re-introduce the gate on the two carve-out feeds instantly and silently. It is therefore
+   * pinned as SOURCE by `WorkflowsPage.test.tsx`, not claimed by a behavioural assertion that
+   * cannot see the difference. The claim and the check match; neither overstates the other.
    */
   const didInitialLoadRef = useRef(false)
   useEffect(() => {
     if (!didInitialLoadRef.current) {
       didInitialLoadRef.current = true
-      void Promise.allSettled([refetchPublished(), refetchStarters(), refetchDrafts()]).then(
-        () => setLoading(false),
-      )
+      void Promise.allSettled([refetchPublished(), refetchStarters(), refetchDrafts()])
       return
     }
     refetchPublished().catch(console.error)
@@ -432,9 +454,33 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
 
   /** The sources that answered with a refusal, NAMED — never folded into one page-wide error. */
   const failedSources = useMemo(
-    () => (Object.keys(sourceFailed) as Provenance[]).filter((source) => sourceFailed[source]),
-    [sourceFailed],
+    () => (Object.keys(sourceState) as Provenance[]).filter((s) => sourceState[s] === "failed"),
+    [sourceState],
   )
+
+  /**
+   * ⚠ `loading` MEANS "NOTHING HAS ANSWERED YET", NOT "NOT EVERYTHING HAS ANSWERED", and the
+   * difference is a defect this plan shipped once and then measured.
+   *
+   * The first version gated the list on all three feeds settling. That is wrong for the same
+   * reason `Promise.all` is wrong, one layer up: it makes the two RUN CARVE-OUT feeds
+   * conditional on the slowest — and the latest-wins guard drove it straight out, because that
+   * case deliberately holds the published fetch open while the other two return. Two feeds had
+   * committed real rows and the page rendered a loading line over them. Waiting for a feed that
+   * has answered is the same lie as hiding a feed that failed.
+   *
+   * So: as soon as ANY source has an answer, its rows are shown; `updating` keeps saying that
+   * more is coming until every source has settled, so a count is never presented as final early.
+   */
+  const anySettled = useMemo(
+    () => (Object.keys(sourceState) as Provenance[]).some((s) => sourceState[s] !== "pending"),
+    [sourceState],
+  )
+  const allSettled = useMemo(
+    () => (Object.keys(sourceState) as Provenance[]).every((s) => sourceState[s] !== "pending"),
+    [sourceState],
+  )
+  const loading = !anySettled
 
   // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row —
   //    then open the FORKED copy's existing steps in the Builder (NOT the describe
@@ -857,7 +903,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         projectId={selectedProjectId}
         onProjectChange={setSelectedProjectId}
         folders={folders}
-        updating={loading || publishedUpdating}
+        updating={!allSettled || publishedUpdating}
         onCreate={openBuilderFresh}
         onClearAll={clearAllFilters}
       />
