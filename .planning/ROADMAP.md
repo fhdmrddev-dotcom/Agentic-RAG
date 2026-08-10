@@ -71,7 +71,7 @@ is the incumbent any proposal must beat.
 **Goal**: The Workflows page can be searched, filtered and read at a glance, and its card actions are predictable.
 **Depends on**: Nothing (first phase of the milestone; deliberately the most independent).
 **Requirements**: LIB-01, LIB-02, LIB-03, LIB-04
-**Flags**: **G-2 fires (visual)** — sketch before spec/discuss. SEED-136 re-open trigger #3 says the same: do the IA question FIRST, do not restyle underneath it. **G-5**: `WorkflowsPage.tsx` is not on the hot-file ledger — audit at discuss-time.
+**Flags**: **G-2 fires (visual)** — sketch before spec/discuss. SEED-136 re-open trigger #3 says the same: do the IA question FIRST, do not restyle underneath it. **G-5 FIRED and was HONORED** at discuss-phase (`514c8e64`) — `WorkflowsPage.tsx` had been absent from the hot-file ledger for all ten phases that touched it (row added `d0c76525`); the seam is split by what survives 192 (D-01). **G-2 SATISFIED** — sketches 157/158/159, winners 157-B · 158-A · 159-C.
 **Success Criteria** (what must be TRUE):
 
   1. A user can find a named workflow by typing part of its name.
