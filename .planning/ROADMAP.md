@@ -48,44 +48,122 @@ most independent first — 194 in particular is mostly UI over an endpoint that 
 construction** — SEED-141 requires proving the need before shipping a primitive, and `execute_code`
 is the incumbent any proposal must beat.
 
-### Phase details
+### Phase Checklist
 
-**Phase 192: Workflow Library IA** — LIB-01…04 · *G-2 fires (visual)*
-1. A user can find a named workflow by typing part of its name.
-2. A user can narrow the list without reading every card.
-3. A user can state what a card's actions will do before clicking one; "Tweak" no longer surprises.
-4. The create affordance is reachable without scrolling past the existing shelves.
+- [ ] **Phase 192: Workflow Library IA** — search, filter, at-a-glance cards, predictable card actions, findable create affordance (LIB-01…04)
+- [ ] **Phase 193: Authoring Doors + Template Placement** — the two doors are tellable apart before choosing; template supply has a findable home (AUTH-01, AUTH-03)
+- [ ] **Phase 194: Stop a Running Workflow** — a run can be stopped mid-execution and reports `cancelled` honestly (RUN-01)
+- [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
+- [ ] **Phase 196: Registry-Backed Model Picker (canvas)** — a step's model comes from the live registry, never typed (AUTH-04)
+- [ ] **Phase 197: Guided Authoring** — drafting from a description guides the decisions that change the result (AUTH-02)
+- [ ] **Phase 198: Node Vocabulary (research-first)** — prove the deterministic-primitive need before shipping one; cover structured mid-run input (NODE-01, NODE-02)
 
-**Phase 193: Authoring Doors + Template Placement** — AUTH-01, AUTH-03 · *G-2 fires*
-1. A person who has not seen the Builder can predict what each door does before clicking.
-2. The number of perceived choices does not increase (the 187 template-door lesson — seed the existing path, do not add a third).
-3. A user with a template to fill can find where to supply it.
+### Phase Details
 
-**Phase 194: Stop a Running Workflow** — RUN-01
-1. A user can stop a run mid-execution from the run surface.
-2. The stopped run reports `cancelled` honestly — not failed, not silently complete.
-3. Stopping is safe mid-phase: no partial write is presented as finished. *(reuses the owned cancel endpoint + `run_lifecycle` internals — this is not a new runtime path)*
+> ⚠ **Format note (2026-08-10).** This section was rewritten from bold `**Phase NNN: …**` labels to
+> `#### Phase NNN: …` headings. The GSD SDK resolves a phase with `#{2,4}\s*Phase\s+<n>\s*:`
+> (`bin/lib/phase.cjs:221`); under the bold form **every** phase op for 192-198 returned
+> `phase_found: false`, blocking `discuss-phase`, `plan-phase`, `execute-phase` and `progress`.
+> No goal, requirement or success criterion was changed — only heading level and field structure.
 
-**Phase 195: Show the Deliverable** — RUN-02, RUN-03
-1. A completed workflow that produced a file shows that file from the run surface.
-2. The presentation reuses `OutputFileCard` / `FilesSection` / `fileIcon` — no second file UI.
-3. Multiple produced files are handled with the shipped hero/working split, not a new pattern.
-   ⚠ **First task is measurement:** establish whether a workflow run emits output files onto the wire at all (SEED-148 records this as explicitly unmeasured). Backend-vs-frontend scope depends on the answer.
+#### Phase 192: Workflow Library IA
 
-**Phase 196: Registry-Backed Model Picker (canvas)** — AUTH-04
-1. A step's model is chosen from a list sourced from the live registry.
-2. An unregistered model cannot be silently selected — the pick-time honesty SEED-135 asks for.
-3. The app-wide sweep is NOT attempted; the canvas surface only. *(scope fence, deliberate)*
+**Goal**: The Workflows page can be searched, filtered and read at a glance, and its card actions are predictable.
+**Depends on**: Nothing (first phase of the milestone; deliberately the most independent).
+**Requirements**: LIB-01, LIB-02, LIB-03, LIB-04
+**Flags**: **G-2 fires (visual)** — sketch before spec/discuss. SEED-136 re-open trigger #3 says the same: do the IA question FIRST, do not restyle underneath it. **G-5**: `WorkflowsPage.tsx` is not on the hot-file ledger — audit at discuss-time.
+**Success Criteria** (what must be TRUE):
 
-**Phase 197: Guided Authoring** — AUTH-02 · *G-2 fires*
-1. A user drafting from a description is asked the decisions that change the result, rather than receiving a finished draft in one shot.
-2. The fast door stays fast — guidance must not turn "Describe & run" into the strict door (D-05).
-3. A user can still get a one-shot draft if they want one.
+  1. A user can find a named workflow by typing part of its name.
+  2. A user can narrow the list without reading every card.
+  3. A user can state what a card's actions will do before clicking one; "Tweak" no longer surprises.
+  4. The create affordance is reachable without scrolling past the existing shelves.
 
-**Phase 198: Node Vocabulary (research-first)** — NODE-01, NODE-02
-1. **Research output first:** count how many prompts in real workflows exist only to reshape data between two real steps. If the number is low, NODE-01 ships nothing and says so.
-2. Any primitive proposed answers three constraints explicitly: the spine is LINEAR, governance vocabulary assumes an AI step, and a node's face is computed from its config.
-3. Structured mid-run input is covered — starting from what `llm_human_input` already does, not from a blank form node.
+**Plans**: TBD — `/gsd:plan-phase 192`
+
+#### Phase 193: Authoring Doors + Template Placement
+
+**Goal**: A user can tell the two authoring doors apart before choosing, and can find where to supply a template.
+**Depends on**: Phase 192 (the library is the surface the doors are reached from).
+**Requirements**: AUTH-01, AUTH-03
+**Flags**: **G-2 fires.** AUTH-03 is placement and discoverability — the capability shipped in Phase 152; this is NOT a rebuild.
+**Success Criteria** (what must be TRUE):
+
+  1. A person who has not seen the Builder can predict what each door does before clicking.
+  2. The number of perceived choices does not increase (the 187 template-door lesson — seed the existing path, do not add a third).
+  3. A user with a template to fill can find where to supply it.
+
+**Plans**: TBD — `/gsd:plan-phase 193`
+
+#### Phase 194: Stop a Running Workflow
+
+**Goal**: A run can be stopped at any point and says so honestly.
+**Depends on**: Nothing structural — mostly UI over an endpoint that already exists.
+**Requirements**: RUN-01
+**Flags**: Reuses the owned cancel endpoint + `run_lifecycle` internals — **this is not a new runtime path**. Hard prerequisite for the deferred scheduled/recurring-runs work (Phase 105 carry-forward).
+**Success Criteria** (what must be TRUE):
+
+  1. A user can stop a run mid-execution from the run surface.
+  2. The stopped run reports `cancelled` honestly — not failed, not silently complete.
+  3. Stopping is safe mid-phase: no partial write is presented as finished.
+
+**Plans**: TBD — `/gsd:plan-phase 194`
+
+#### Phase 195: Show the Deliverable
+
+**Goal**: A workflow that produces a file shows it, reusing the shipped file presentation.
+**Depends on**: Nothing structural — but see the measurement fence below; backend-vs-frontend scope is unknown until it is answered.
+**Requirements**: RUN-02, RUN-03
+**Flags**: ⚠ **First task is measurement** — establish whether a workflow run emits output files onto the wire at all (SEED-148 records this as explicitly unmeasured). RUN-03 exists specifically to forbid rebuilding output-file UI.
+**Success Criteria** (what must be TRUE):
+
+  1. A completed workflow that produced a file shows that file from the run surface.
+  2. The presentation reuses `OutputFileCard` / `FilesSection` / `fileIcon` — no second file UI.
+  3. Multiple produced files are handled with the shipped hero/working split, not a new pattern.
+
+**Plans**: TBD — `/gsd:plan-phase 195`
+
+#### Phase 196: Registry-Backed Model Picker (canvas)
+
+**Goal**: A step's model is chosen from the live registry, never typed.
+**Depends on**: Nothing structural — the canvas surface it edits shipped in v3.6.
+**Requirements**: AUTH-04
+**Flags**: **Scope fence, deliberate** — the app-wide model single-source sweep (SEED-040 / SEED-088) is explicitly OUT; the canvas/workflow surface only.
+**Success Criteria** (what must be TRUE):
+
+  1. A step's model is chosen from a list sourced from the live registry.
+  2. An unregistered model cannot be silently selected — the pick-time honesty SEED-135 asks for.
+  3. The app-wide sweep is NOT attempted; the canvas surface only.
+
+**Plans**: TBD — `/gsd:plan-phase 196`
+
+#### Phase 197: Guided Authoring
+
+**Goal**: Drafting from a description guides the decisions that matter.
+**Depends on**: Phase 193 (the doors must be legible before the fast door is deepened).
+**Requirements**: AUTH-02
+**Flags**: **G-2 fires.** D-05 red line — the fast door must stay fast; guidance must not turn "Describe & run" into the strict door.
+**Success Criteria** (what must be TRUE):
+
+  1. A user drafting from a description is asked the decisions that change the result, rather than receiving a finished draft in one shot.
+  2. The fast door stays fast — guidance must not turn "Describe & run" into the strict door (D-05).
+  3. A user can still get a one-shot draft if they want one.
+
+**Plans**: TBD — `/gsd:plan-phase 197`
+
+#### Phase 198: Node Vocabulary (research-first)
+
+**Goal**: Establish whether deterministic primitives earn their place, and cover structured mid-run input.
+**Depends on**: Last by construction — SEED-141 requires proving the need before shipping a primitive, and `execute_code` is the incumbent any proposal must beat.
+**Requirements**: NODE-01, NODE-02
+**Flags**: **Research-first — NODE-01 may legitimately ship nothing.** Branching/looping stays OUT: the spine is LINEAR by design; any primitive must stay linear-compatible or the linear commitment is revisited as its own decision. **G-5 fires** on `backend/app/services/harness/phase_types.py` (35 commits / 14 phases) — a phase adding a SECOND concern to that file produces a refactor recommendation first.
+**Success Criteria** (what must be TRUE):
+
+  1. **Research output first:** count how many prompts in real workflows exist only to reshape data between two real steps. If the number is low, NODE-01 ships nothing and says so.
+  2. Any primitive proposed answers three constraints explicitly: the spine is LINEAR, governance vocabulary assumes an AI step, and a node's face is computed from its config.
+  3. Structured mid-run input is covered — starting from what `llm_human_input` already does, not from a blank form node.
+
+**Plans**: TBD — `/gsd:plan-phase 198`
 
 ---
 
