@@ -883,6 +883,25 @@ async def _check_grounding_fidelity(
 # ── the shared D-13 publish invariant (Pitfall 4 — one source, even trivial) ───
 
 
+#: The author-facing sentence for a missing ``business_requirement``, in ONE place.
+#:
+#: The PREDICATE above was already shared between publish stage 1 and the ``/validate``
+#: seam; the MESSAGE was not, and sat copy-pasted in ``publish_service.py`` and
+#: ``workflows.py``. That is the drift D-klo-DEF-01 predicted, so the string now lives
+#: beside the rule it explains and both sites reference it.
+#:
+#: It reaches the author VERBATIM — ``blockedReason`` relays the first verdict's message
+#: and D-182-06 forbids a client-side message map — so this string IS the UI copy, and it
+#: must say what to DO rather than name the field. It used to read "a workflow must
+#: declare exactly one business_requirement before publish", which named an internal
+#: snake_case field at a user who had nowhere to type it (BUG-260809-02). The control now
+#: exists and is labelled "Business requirement", so the copy points at that label.
+BUSINESS_REQUIREMENT_MISSING_MESSAGE: str = (
+    "Add the Business requirement — one line saying what this workflow must deliver — "
+    "before publishing."
+)
+
+
 def business_requirement_missing(definition: "WorkflowDefinition") -> bool:
     """The D-13 publish invariant: a workflow must declare exactly one
     ``business_requirement`` before publish.

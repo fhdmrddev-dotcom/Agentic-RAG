@@ -3108,3 +3108,152 @@ describe("WorkflowBuilderPage 187-28 — a route-assigned verdict GATES the Publ
     )
   })
 })
+
+// ── BUG-260809-02 — the business requirement is REACHABLE from the canvas door ────
+//
+// Quick task 260809-klo. APPENDED; no existing `it(` above is edited or renamed.
+//
+// THE BUG. A workflow authored on the CANVAS could never be published. The publish
+// gauntlet's stage 1 refuses without `business_requirement`, and the field was reachable
+// from the NL door (the model emits it) and the template door (the seed row carries it)
+// and from NOWHERE ELSE. The operator hit it on live cloud minutes after the v3.6 deploy,
+// on a draft they had built by hand, and the refusal named an internal field with no
+// control anywhere to satisfy it.
+//
+// WHAT THESE ROWS ASSERT, AND WHY IT IS THE PAYLOAD AND NOT THE DOM. The load-bearing
+// case reads the argument actually handed to `updateWorkflowDraft`. A controlled input
+// echoing its own prop proves only that React works; the claim that closes this bug is
+// that the typed sentence reaches the PATCH BODY — because that is what the publish
+// gauntlet later reads back off the stored row.
+//
+// ⚠ `WorkflowBuilderPage.header.test.tsx` gets NO edit. Its byte-for-byte flag-off
+// `<header>` pin passing UNCHANGED is the evidence D-181-01 still holds; if it reds, the
+// `canvasEnabled` gate on the new control is wrong — fix the gate, never the pin.
+
+describe("WorkflowBuilderPage — the business requirement reaches the PATCH body (BUG-260809-02)", () => {
+  /** The bug's own starting condition: a hand-built draft with no requirement at all. */
+  function withoutRequirement(): BuilderDefinition {
+    const { business_requirement: _omitted, ...rest } = definition
+    return rest as BuilderDefinition
+  }
+
+  function renderRequirement(
+    features: { features: EffectiveFeatures; loading: boolean },
+    def: BuilderDefinition = withoutRequirement(),
+  ) {
+    return render(
+      <EffectiveFeaturesProvider value={{ ...features, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage initial={{ definition: def, draftId: "draft-1" }} />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+  }
+
+  it("THE BEHAVIOUR GUARD — the typed sentence is in the argument handed to updateWorkflowDraft", async () => {
+    renderRequirement(FLAG_ON)
+    const input = await screen.findByTestId("business-requirement-input")
+
+    fireEvent.change(input, { target: { value: "Summarise vendor risk each Monday." } })
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    // Asserted on the RECORDED CALL ARGUMENT, never on a DOM value — a controlled input
+    // echoing its own prop would pass a DOM read while the payload stayed empty.
+    const [, sent] = mockUpdate.mock.calls[0] as [string, BuilderDefinition, unknown]
+    expect(sent.business_requirement).toBe("Summarise vendor risk each Monday.")
+    // The endpoint takes a COMPLETE WorkflowDefinition with `phases` required, so a write
+    // that truncated them would trade this bug for a worse one.
+    expect(sent.phases).toHaveLength(definition.phases.length)
+  })
+
+  it("THE RELOAD ROUND TRIP — a stored requirement renders back into the control", async () => {
+    // Open seeds the store through the same `{ phases, ...initialMeta }` destructure the
+    // PATCH body is rebuilt from, so this is what proves the field SURVIVES a reload
+    // rather than merely being sent once.
+    renderRequirement(FLAG_ON, { ...withoutRequirement(), business_requirement: "Draft the board risk memo." })
+
+    const input = (await screen.findByTestId("business-requirement-input")) as HTMLInputElement
+    expect(input.value).toBe("Draft the board risk memo.")
+  })
+
+  it("the SERVER's requirement verdict is relayed verbatim and un-blocks on the SERVER's answer", async () => {
+    // The verdict is the SERVER's (`workflows.py:712-721`) and the client adds no rule of
+    // its own — D-182-06. So the block is driven by the stub, and it clears when the STUB
+    // flips, never because the client decided the sentence was long enough.
+    const message = "a workflow must declare exactly one business_requirement before publish"
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [
+        { code: "business_requirement", phase: null, severity: "incomplete", message },
+      ],
+    })
+
+    render(
+      <EffectiveFeaturesProvider value={{ ...FLAG_ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage
+            initial={{ definition: withoutRequirement(), draftId: "draft-1" }}
+            renderPublish={(d, id, blockedReason) => (
+              <PublishGauntlet
+                definitionId={id ?? "draft-1"}
+                definition={d as never}
+                blockedReason={blockedReason}
+              />
+            )}
+          />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+
+    await waitFor(
+      () => expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(message),
+      { timeout: 3000 },
+    )
+    expect(screen.getByTestId("publish-trigger")).toBeDisabled()
+
+    // The server changes its mind — the only thing that may release the gate.
+    mockValidate.mockResolvedValue({ ok: true, verdicts: [] })
+    fireEvent.change(await screen.findByTestId("business-requirement-input"), {
+      target: { value: "Summarise vendor risk each Monday." },
+    })
+
+    await waitFor(() => expect(screen.queryByTestId("publish-blocked-reason")).toBeNull(), {
+      timeout: 5000,
+    })
+    expect(screen.getByTestId("publish-trigger")).not.toBeDisabled()
+  })
+
+  it("D-181-01 — the control is ABSENT with the flag OFF, and PRESENT with it ON", async () => {
+    // The negative WITH its positive control, in one test: a `queryByTestId(...) === null`
+    // assertion alone passes just as happily against a control that was never built.
+    renderRequirement(FLAG_OFF)
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+    expect(screen.queryByTestId("builder-business-requirement")).toBeNull()
+    expect(screen.queryByTestId("business-requirement-input")).toBeNull()
+
+    cleanup()
+
+    renderRequirement(FLAG_ON)
+    expect(await screen.findByTestId("builder-business-requirement")).toBeInTheDocument()
+    expect(screen.getByTestId("business-requirement-input")).toBeInTheDocument()
+  })
+
+  it("typing flips hasEdited — the live check starts on a Builder that had issued none", async () => {
+    // A zero-step draft is the one open that issues NO validate on mount (the loop's
+    // enable is `hasEdited || (canvasEnabled && phases.length > 0)`), which is what makes
+    // "had issued none" a measured premise rather than a hopeful one.
+    renderRequirement(FLAG_ON, { ...withoutRequirement(), phases: [] })
+    await screen.findByTestId("builder-view-toggle")
+    expect(mockValidate).toHaveBeenCalledTimes(0)
+
+    fireEvent.change(await screen.findByTestId("business-requirement-input"), {
+      target: { value: "Summarise vendor risk each Monday." },
+    })
+
+    // Without the call-site `setHasEdited(true)` a fresh Open plus one requirement edit
+    // would leave the loop silent for the rest of the session.
+    await waitFor(() => expect(mockValidate.mock.calls.length).toBeGreaterThanOrEqual(1), {
+      timeout: 5000,
+    })
+  })
+})
