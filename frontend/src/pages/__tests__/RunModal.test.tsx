@@ -662,3 +662,146 @@ describe("RunModal 192-03 — the pre-move rendered DOM, byte for byte", () => {
     expect(on).not.toContain("new chat thread")
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 192-06 Task 2 (D-01) — THE CUT, AND THE GUARD THE CUT MADE TESTABLE.
+//
+// Appended as a PURE INSERTION, same discipline as the 192-03 block above: nothing
+// already in this file was edited, renamed or re-described, and not one import line
+// was widened. `RunModal` and the page's own source both arrive through dynamic
+// `await import(…)` inside the blocks that use them.
+//
+// TWO THINGS ARE PINNED HERE, AND THEY ARE DIFFERENT KINDS OF CLAIM.
+//
+//  1. THE EDGE HAS ONE DIRECTION. The page imports the module, declares the
+//     component nowhere, and left NO re-export shim. The third clause is the one
+//     that is easy to skip and the one that matters: without it the two negatives
+//     are also satisfied by two modules nobody uses, and a shim would quietly
+//     preserve exactly the coupling the cut exists to remove while every other
+//     assertion here stayed green (`WorkflowCanvas.test.tsx:756-763`).
+//
+//  2. F1 FROM 192-03 IS CLOSED. That summary recorded, BY PLANT, that the
+//     mid-launch dismissal guard is DOUBLE — the modal's own `if (!submitting)`
+//     and the page's `onCancel` (`if (runSubmitting) return`) — and that deleting
+//     the MODAL's half ALONE left the a11y row GREEN, because the page's half
+//     still refused. So no assertion in this repo covered the modal's own guard,
+//     and D-01 moves the modal while LEAVING `onCancel` on the page: dropping the
+//     inner guard during the move would have been invisible.
+//
+//     192-03 named the fix and named why it could not do it: closing this needs
+//     `RunModal` rendered IN ISOLATION, which was impossible while the component
+//     was a module-private function inside a 1407-line page. The cut is what makes
+//     it possible, so the assertion lands in the same commit as the cut.
+//
+//     The rows below render the component DIRECTLY with an `onCancel` that has no
+//     outer guard of any kind. Escape mid-launch must not reach it. Driven RED
+//     against a real deletion of `if (!submitting)` in
+//     `components/workflows/library/RunModal.tsx`, then restored — the observed
+//     output is recorded in 192-06-SUMMARY.md rather than asserted here.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Types only — `typeof import(…)` is a type expression and adds no import line. */
+type RunModalModule = typeof import("@/components/workflows/library/RunModal")
+type RunModalPropsT = Parameters<RunModalModule["RunModal"]>[0]
+
+/**
+ * A minimal published row for the ISOLATED render. Deliberately NOT one of the fixtures
+ * above: those exist to drive the page's feed, and reusing one here would blur whether the
+ * modal or the page is under test — which is the entire point of these rows.
+ */
+const isolatedWf: RunModalPropsT["wf"] = {
+  id: "iso-1",
+  slug: "isolated",
+  name: "Isolated modal",
+}
+
+/** Render `RunModal` alone, with NO page around it and NO outer guard on `onCancel`. */
+async function renderIsolatedModal(submitting: boolean) {
+  const { RunModal } = await import("@/components/workflows/library/RunModal")
+  const onCancel = vi.fn()
+  const rendered = render(
+    <RunModal
+      wf={isolatedWf}
+      folders={[]}
+      authorDefaultFolderId={null}
+      kickoff=""
+      submitting={submitting}
+      onKickoffChange={() => {}}
+      onCancel={onCancel}
+      onRun={async () => {}}
+    />,
+  )
+  return { onCancel, rendered }
+}
+
+describe("RunModal 192-06 — the cut has one direction", () => {
+  it("the page imports the modal, declares it nowhere, and left no re-export shim", async () => {
+    const pageSource = (await import("../WorkflowsPage?raw")).default as string
+
+    // NON-VACUITY first: a `?raw` import that silently resolved to "" would satisfy every
+    // negative below forever.
+    expect(pageSource.length).toBeGreaterThan(10000)
+
+    // The edge exists, and it points at the library module.
+    expect(pageSource).toMatch(
+      /import \{ RunModal \} from ["']@\/components\/workflows\/library\/RunModal["']/,
+    )
+    // The declaration is GONE from the page — this is a cut, not a copy.
+    expect(pageSource).not.toContain("function RunModal(")
+    // …and no shim was left behind, in either spelling.
+    expect(pageSource).not.toContain("export { RunModal")
+    expect(pageSource).not.toContain("export * from")
+
+    // The render site survived the cut with its identity-forcing key: `key={runFor.id}` is
+    // what resets the staged file and the scope pick between two different workflows, so a
+    // cut that dropped it would be a real behaviour change no capture above could see (each
+    // capture opens exactly one modal, exactly once).
+    expect(pageSource).toContain("key={runFor.id}")
+  })
+
+  it("the page still exports the component the cut deleted 353 lines above", () => {
+    // The delete range ended three lines above `export default WorkflowsPage`, so an
+    // off-by-one would have taken the page's own export with it. Also pinned byte-exact in
+    // `WorkflowBuilderPage.header.test.tsx` (which holds the signature line as a plant
+    // target and is pinned at 32); this row is the cheap local tell.
+    expect(typeof WorkflowsPage).toBe("function")
+  })
+})
+
+describe("RunModal 192-06 — the modal's OWN mid-launch guard (192-03 F1, closed)", () => {
+  it("Escape mid-launch does NOT reach onCancel — the modal refuses on its own", async () => {
+    const { onCancel, rendered } = await renderIsolatedModal(true)
+    await screen.findByTestId("run-modal")
+
+    fireEvent.keyDown(document, { key: "Escape" })
+
+    // No page wrapper exists here, so nothing but the component's own `if (!submitting)`
+    // can be producing this. THIS is the assertion 192-03 measured it could not make.
+    expect(onCancel).not.toHaveBeenCalled()
+    rendered.unmount()
+  })
+
+  it("POSITIVE CONTROL — the same Escape DOES reach onCancel when no launch is in flight", async () => {
+    // Without this the row above passes for a component that ignores Escape entirely, or
+    // one whose keydown listener never attached — a guard proved by a broken wire.
+    const { onCancel, rendered } = await renderIsolatedModal(false)
+    await screen.findByTestId("run-modal")
+
+    fireEvent.keyDown(document, { key: "Escape" })
+
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    rendered.unmount()
+  })
+
+  it("the isolated render really is isolated — no page chrome came with it", async () => {
+    // If `RunModal` had quietly kept a dependency on the page, the cheapest tell is page
+    // furniture appearing around it. The modal is the whole tree here.
+    const { rendered } = await renderIsolatedModal(false)
+    const modal = await screen.findByTestId("run-modal")
+
+    expect(screen.queryByTestId("published-card")).toBeNull()
+    expect(within(modal).getByTestId("run-confirm")).toBeTruthy()
+    expect(within(modal).getByTestId("run-kickoff")).toBeTruthy()
+    rendered.unmount()
+  })
+})
