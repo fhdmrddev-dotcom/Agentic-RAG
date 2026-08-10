@@ -673,17 +673,32 @@ const isolatedWf: SheetProps["wf"] = {
 }
 
 describe("WorkflowDeleteSheet 192-08 — the cut has one direction", () => {
-  it("the page imports the Sheet, declares none of its four spans, and left no re-export shim", async () => {
+  it("the Sheet's ONE host imports it, the page declares none of its four spans, and no shim exists", async () => {
     const pageSource = (await import("../WorkflowsPage?raw")).default as string
+    // 192-10 (D-01/D-09): THE HOST MOVED ON, AND THIS ROW MOVED WITH IT. When 192-08 wrote
+    // this case the Sheet's host was `PublishedCard`, declared INSIDE the page — so "the page
+    // imports the Sheet" was the same claim as "exactly one host imports the Sheet". 192-09
+    // built the ONE card and 192-10 deleted the three it replaces, so the host is now
+    // `WorkflowCard` and the page names the Sheet nowhere at all. The PROPERTY this row
+    // guards is unchanged — one host, a real import edge, no re-export shim, the trigger
+    // testid carried — and only its subject is re-pointed. Both sources are read, so the
+    // negatives below still bind to the page.
+    const cardSource = (
+      await import("@/components/workflows/library/WorkflowCard?raw")
+    ).default as string
 
     // NON-VACUITY FIRST: a `?raw` import that silently resolved to "" would satisfy every
     // negative below forever, and would look exactly like a clean cut.
     expect(pageSource.length).toBeGreaterThan(10000)
+    expect(cardSource.length).toBeGreaterThan(5000)
 
-    // The edge exists, and it points at the library module.
-    expect(pageSource).toMatch(
-      /WorkflowDeleteSheet,?\s*[\s\S]{0,120}from ["']@\/components\/workflows\/library\/WorkflowDeleteSheet["']/,
+    // The edge exists, and it points at the library module — from the card that mounts it.
+    expect(cardSource).toMatch(
+      /WorkflowDeleteSheet,?\s*[\s\S]{0,160}from ["']\.\/WorkflowDeleteSheet["']/,
     )
+    // The page's edge is GONE, which is strictly stronger than 192-08 could assert: the page
+    // does not mount the guard, so it must not name the module either.
+    expect(pageSource).not.toContain("library/WorkflowDeleteSheet")
 
     // …and all four moved spans are GONE from the page. One assertion per span, so a
     // partial cut names WHICH piece stayed behind rather than failing anonymously.
@@ -699,9 +714,11 @@ describe("WorkflowDeleteSheet 192-08 — the cut has one direction", () => {
     expect(pageSource).not.toContain("export { WorkflowDeleteSheet")
     expect(pageSource).not.toContain("export * from")
 
-    // The trigger survived the cut. `published-delete` is what every row above drives, and
-    // it is one of the testids the `192-09` card rewrite must carry across verbatim.
-    expect(pageSource).toContain('data-testid="published-delete"')
+    // The trigger survived BOTH cuts. `published-delete` is what every row above drives, and
+    // `192-09` carried it across verbatim — which is why those rows are still green against a
+    // card that did not exist when they were written. It is now emitted by the card.
+    expect(cardSource).toContain('data-testid="published-delete"')
+    expect(pageSource).not.toContain('data-testid="published-delete"')
   })
 
   it("the module owns the state AND the JSX — the split that would pass every capture above", async () => {

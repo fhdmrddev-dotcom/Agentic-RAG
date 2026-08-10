@@ -21,9 +21,23 @@
  *  - On a gauntlet PASS the view auto-returns to the library + surfaces a Run CTA
  *    on the new version (sketch 023-A).
  *
- * Honesty (D14): only GET /workflows/published + POST /workflows/{id}/publish are
- * live; the draft-CRUD affordances + the Workflows nav entry wear a net-new violet
- * flag.
+ * Honesty (D14 → 192-10 D-11): this paragraph used to claim that only the published-list read
+ * and the publish write were live, and that the draft-CRUD affordances were therefore net-new.
+ * ⚠ THAT CLAIM IS FALSE AND WAS MEASURED FALSE — all four draft-CRUD routes are live and gated
+ * today (create, the drafts list, the update and the delete each carry the authoring
+ * visibility dependency in `backend/app/api/workflows.py`), and three of their clients are
+ * called from this very file. The banner that carried the claim to the user was DELETED rather
+ * than re-worded, because a re-worded falsehood is a new falsehood. See the receipt at the
+ * banner's old render site below.
+ *
+ * ⚠ Two endpoint literals in this file are deliberately DESCRIBED rather than spelled, and it
+ * is not fastidiousness: D-11's mechanical check is a RAW SOURCE COUNT of the published-list
+ * route string, so prose explaining that the string is absent would satisfy the very grep that
+ * proves it absent. This is the trap 192-06, 192-08 and 192-09 each hit once, in three
+ * different files. The ONE spelling that remains in this file is `NetNewFlag`'s tooltip, and
+ * it is load-bearing: `WorkflowBuilderPage.header.test.tsx` pins the Builder breadcrumb band by
+ * BYTE-EXACT `innerHTML` including that whole attribute. It is a Phase-193 residual, not 192's
+ * — see `NetNewFlag`'s own docblock.
  */
 // Phase 192-06 (D-01): `useMemo`, `Upload`, `X` and `cn` left with the Run modal and are
 // gone from this line — READ OUT of the post-cut file (five `TS6133`s), never assumed:
@@ -38,6 +52,12 @@
 // property the one-direction row at the foot of `PublishedCardDelete.test.tsx` greps for, so
 // their identifiers are described here rather than spelled. `MoreHorizontal` and `Trash2`
 // STAY — the ⋯-menu and its Delete item are card chrome and did not move.
+// Phase 192-10 (D-01/D-09): they stay no longer. `tsc` named FOUR orphans when the three card
+// components left, and each was removed on its say-so: the whole `lucide-react` line and the
+// whole `ui/dropdown-menu` line (`TS6192` ×2 — the ⋯-menu is the ONE card's chrome now), the
+// shared `WorkflowSoul` (`TS6133` — consumed unchanged, by the card rather than by the page),
+// and the whole `WorkflowDeleteSheet` line including its handle type, because the guard is
+// mounted by the card that offers the action and a ref held here would point at nothing.
 // Phase 192-10 (D-16): `useMemo` COMES BACK on this line, and it is worth one sentence why.
 // 192-06 removed it with the Run modal — read out of `tsc`, not predicted. It returns because
 // the merge is a DERIVATION over three pieces of state rather than a fourth piece of state:
@@ -45,13 +65,6 @@
 // at 200 rows is the 045 real-scale lesson's cost, and a fourth `useState` holding the merged
 // list is the drift where two sources of truth disagree about what the library contains.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MoreHorizontal, Trash2 } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   listPublishedWorkflows,
   listStarterWorkflows,
@@ -73,7 +86,6 @@ import { PublishGauntlet } from "@/components/workflows/PublishGauntlet"
 //  expects:" hint line and nothing else on this page. `DefShape` stays: the page still
 //  reads `definition.project_folder_id` to pass the modal its author default.)
 import { type DefShape } from "@/components/workflows/soulData"
-import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 // Phase 124-02 Task 2 (WUX-02): the Studio authoring entry forks into the two-door
 // shell (047-A). The govern door delegates to the existing Builder (the shell mounts
 // it; the page no longer mounts WorkflowBuilderPage directly).
@@ -89,12 +101,10 @@ import { RunModal } from "@/components/workflows/library/RunModal"
 // same way — 175 measured lines across FOUR spans (the `DeletePhase` union + its docblock, the
 // `onDeleted` D-LOCK-04 docblock, the WFIN-03 surface comment + five state hooks + `descId`
 // + `openDeleteSheet` + `handleDelete`, and the `<Sheet>` JSX). HARD CUT: this page declares
-// none of them and leaves NO re-export shim. The Sheet owns its own state, so `PublishedCard`
-// keeps only a ref to ASK it to open — a guard whose state stays behind is split, not moved.
-import {
-  WorkflowDeleteSheet,
-  type WorkflowDeleteSheetHandle,
-} from "@/components/workflows/library/WorkflowDeleteSheet"
+// none of them and leaves NO re-export shim. The Sheet owned its own state, so the card that
+// offered the action kept only a ref to ASK it to open — a guard whose state stays behind is
+// split, not moved. 192-10: that mount moved on with `PublishedCard`, so this page no longer
+// names the Sheet at all — it is `WorkflowCard`'s heaviest guard grade and lives entirely there.
 // Phase 192-10 (D-16 / D-17) — the merge and the narrow, IMPORTED as pure functions rather
 // than written here. The page owns fetching, state and composition; it computes no predicate
 // of its own, because a second copy of a predicate is a second answer to one question.
@@ -107,10 +117,16 @@ import {
 // closing it is this plan's job: one home, reached from here.
 import {
   UNBOUND,
+  chipCounts,
   filterLibrary,
   mergeLibrary,
 } from "@/components/workflows/library/libraryFilter"
-import type { Provenance } from "@/components/workflows/library/libraryRow"
+import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/library/libraryRow"
+// Phase 192-10 (D-02 / D-09): the two surfaces this page now COMPOSES rather than declares.
+// One persistent toolbar over one flat list of one card — the page owns fetching, filter
+// state and layout, and declares no card, no filter item and no modal of its own.
+import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
+import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
 import {
   LIBRARY_STATES,
   sourceFailedMessage,
@@ -127,7 +143,29 @@ function freshHash(): string {
   return h.slice(0, 6)
 }
 
-/** A small violet net-new honesty flag (D14). */
+/**
+ * A small violet net-new honesty flag (D14).
+ *
+ * ⚠ 192-10 (D-11) — THIS FUNCTION SURVIVES ON PURPOSE, AND ITS ONE REMAINING RENDER IS NOT
+ * 192'S TO TOUCH. The page used to render it THREE times: on the honesty banner, on the
+ * Drafts-shelf header, and in the BUILDER BREADCRUMB BAND. The first two were library surface
+ * and left with the banner and the shelf; the third stays, and deleting the function with them
+ * would have taken it too.
+ *
+ * `WorkflowBuilderPage.header.test.tsx` pins that band by BYTE-EXACT `innerHTML` — including
+ * this component's ENTIRE tooltip string and its complete class list — and two further cases
+ * require the `net-new-flag` testid to be present. That suite is pinned at 32.
+ *
+ * ⚠ TWO RESIDUALS ARE THEREFORE DEFERRED TO PHASE 193, NAMED HERE SO A LATER REVIEWER CANNOT
+ * READ THEM AS 192'S OVERSIGHT:
+ *   1. the hover-only tooltip attribute below — D-14 says touch has no hover, and the library
+ *      subtree is fenced against it, but this render is Builder chrome and outside that fence;
+ *   2. the developer vocabulary inside it — the same route literal D-11 removed from the
+ *      library surface, still spelled here.
+ * TRIGGER: whichever phase next edits the Builder breadcrumb band — Phase 193, which owns that
+ * band — re-captures the byte-exact baseline and retires both in the same commit. Neither can
+ * be fixed from 192 without editing a cross-phase assertion this plan is not allowed to move.
+ */
 function NetNewFlag({ label = "net-new" }: { label?: string }) {
   return (
     <span
@@ -167,6 +205,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   const [pageView, setPageView] = useState<PageView>("library")
   // null = "All projects"; "__unbound__" = unbound; else a folder id.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  // 192-10 (D-06 / D-03): the always-on search text and the pressed chips. Both live HERE,
+  // because the toolbar is presentational and the list they narrow is the page's.
+  const [query, setQuery] = useState("")
+  const [activeChips, setActiveChips] = useState<readonly ChipId[]>([])
   const [published, setPublished] = useState<PublishedWorkflow[]>([])
   // Phase 143 (WF-01): the curated Starters shelf (is_system_global + category='starter').
   const [starters, setStarters] = useState<PublishedWorkflow[]>([])
@@ -362,9 +404,31 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // stating that fact in words rather than leaving it to be inferred from a filter that looks
   // broken.
   const visibleRows = useMemo(
-    () => filterLibrary(rows, { query: "", chips: [], projectId: selectedProjectId }),
-    [rows, selectedProjectId],
+    () => filterLibrary(rows, { query, chips: activeChips, projectId: selectedProjectId }),
+    [rows, query, activeChips, selectedProjectId],
   )
+
+  /**
+   * D-03 — each chip's honest number, computed over the SAME rows the list renders and under
+   * the SAME query and project. `chipCounts` deliberately takes no `chips` argument: the
+   * number a chip shows is the number clicking IT gives you, which is what makes the promise
+   * mechanical rather than aspirational.
+   */
+  const counts = useMemo(
+    () => chipCounts(rows, query, selectedProjectId),
+    [rows, query, selectedProjectId],
+  )
+
+  const toggleChip = useCallback((chip: ChipId) => {
+    setActiveChips((prev) => (prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip]))
+  }, [])
+
+  /** The one-click way out of a list filtered down to nothing (sketch 158). */
+  const clearAllFilters = useCallback(() => {
+    setQuery("")
+    setActiveChips([])
+    setSelectedProjectId(null)
+  }, [])
 
   /** The sources that answered with a refusal, NAMED — never folded into one page-wide error. */
   const failedSources = useMemo(
@@ -471,6 +535,52 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     setBuilderInitial(null)
     setPageView("builder")
   }, [])
+
+  // ── 192-10 (D-09 / D-12) — THE CARD'S FIVE CALLBACKS ─────────────────────────────────
+  //
+  // `WorkflowCard` speaks `LibraryRow`; the four shipped handlers above speak the WIRE types.
+  // These five adapters are the whole seam, and each reads `row.source` — the original wire
+  // object, kept whole by `libraryRow.ts` precisely so a handler never receives a rebuilt
+  // object that has quietly lost a field (`onOpenDraft` needs the draft's opaque `token`; a
+  // rebuilt object that drops it is the D-186-07 SILENT CLOBBER — a behaviour bug that
+  // typechecks).
+  //
+  // ⚠ D-12 — THE TWO FORK ADAPTERS ARE SIBLINGS AND ARE NEVER MERGED. `onForkNewVersion`
+  // reaches `onTweak` (SAME slug at version N+1) and `onForkStarter` reaches `onUseStarter`
+  // (a FRESH auto-suffixed slug at version 1, retried once on a 409). They share one word on
+  // the card face because the user's intent is identical; merging the handlers behind that
+  // word breaks the GLOBAL `UNIQUE(slug, version)` constraint the moment two people fork one
+  // shared starter. The card branches on `provenance` and constructs neither slug nor version.
+  const handleRun = useCallback((row: LibraryRow) => {
+    setRunFor(row.source as PublishedWorkflow)
+    setKickoff("")
+  }, [])
+
+  const handleOpen = useCallback(
+    (row: LibraryRow) => onOpenDraft(row.source as WorkflowDraftRow),
+    [onOpenDraft],
+  )
+
+  const handleForkNewVersion = useCallback(
+    (row: LibraryRow) => onTweak(row.source as PublishedWorkflow),
+    [onTweak],
+  )
+
+  const handleForkStarter = useCallback(
+    (row: LibraryRow) => onUseStarter(row.source as PublishedWorkflow),
+    [onUseStarter],
+  )
+
+  /**
+   * D-LOCK-04 — re-fetch after a CONFIRMED delete, never an optimistic vanish. BOTH feeds are
+   * re-queried rather than only `published`: the card now hosts TWO delete grades (the Sheet's
+   * cascade on a live row, and D-18's arm-to-confirm on a single draft), and a draft that was
+   * really deleted must leave the merged list as surely as a published one does.
+   */
+  const handleDeleted = useCallback(() => {
+    refetchPublished().catch(console.error)
+    refetchDrafts().catch(console.error)
+  }, [refetchPublished, refetchDrafts])
 
   /**
    * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's host half.
@@ -628,18 +738,24 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   }
 
   // ── LIBRARY view ──
-  // 192-10 Task 1 — TRANSITIONAL: the three shelves still render, but they now render the
-  // MERGED, NARROWED list partitioned by provenance rather than three independent pieces of
-  // fetch state. That is deliberate sequencing: it proves the merge, the `allSettled`
-  // isolation and D-17's project rules against the twenty-three tests that already exist,
-  // BEFORE Task 2 replaces the frame around them. Task 2 deletes this partition with the
-  // shelves it feeds.
-  const starterRows = visibleRows.filter((row) => row.provenance === "starter")
-  const publishedRows = visibleRows.filter((row) => row.provenance === "published")
-  const draftRows = visibleRows.filter((row) => row.provenance === "draft")
-
-  const runCtaWf =
-    runCta && published.find((w) => w.slug === runCta.slug)
+  //
+  // 192-10 (RESEARCH OQ1) — THE POST-PUBLISH RUN CTA SURVIVES, UNCHANGED, ABOVE THE TOOLBAR,
+  // and it is recorded here as a decision so a reviewer does not read its survival as an
+  // oversight. It is a PAGE-LEVEL banner about a thing that just happened, not a card verb, so
+  // D-09's "one primary verb per row" says nothing about it.
+  //
+  // Its lookup is RETARGETED to the merged list. It used to search `published` alone; a row
+  // that arrives on a different feed would then be silently un-findable and the CTA would
+  // simply not appear — the same class of failure WR-04 already fixed once on this banner when
+  // a hardcoded slug literal found nothing.
+  //
+  // The `provenance !== "draft"` half is not decoration: a Tweak fork carries the SAME slug as
+  // the published row it forked, so a slug match alone can land on a draft — and a CTA that
+  // offers to Run a draft offers something the product refuses by design (D12).
+  const runCtaRow = runCta
+    ? rows.find((row) => row.slug === runCta.slug && row.provenance !== "draft")
+    : undefined
+  const runCtaWf = runCtaRow ? (runCtaRow.source as PublishedWorkflow) : undefined
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -653,12 +769,23 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         </div>
       </header>
 
-      {/* Honesty banner (D14) */}
-      <div className="border-b border-accent-violet/20 bg-accent-violet/5 px-6 py-2 text-[12px] text-muted-foreground">
-        Drafts are yours to shape; <b className="text-foreground">Published</b> is live (
-        <span className="font-mono text-[11px] text-success">GET /workflows/published</span>). Draft
-        create/list/update/delete are <NetNewFlag />.
-      </div>
+      {/* ── 192-10 (D-11) — THE D14 HONESTY BANNER WAS REMOVED, AND IT WAS REMOVED BECAUSE
+            ITS CLAIM WAS MEASURED FALSE, NOT BECAUSE IT WAS INCONVENIENT. ─────────────────
+            The banner told the user that only the published-list read and the publish write
+            were live, and that draft create/list/update/delete were net-new. D-11 asked for a
+            plan-time check before touching it. RESEARCH performed that check and the answer is
+            that all four draft-CRUD routes are LIVE and gated today — create, the drafts list,
+            the update and the delete each carry `require_visible("workflow_authoring")` in
+            `backend/app/api/workflows.py` — and three of their clients are called from THIS
+            VERY FILE. A disclosure of a falsehood cannot be honestly re-worded: re-phrasing it
+            would ship a NEW false statement in plainer language, which is strictly worse than
+            the one it replaced. So it goes, and this comment is the receipt.
+
+            It also carried the second half of D-11's ask: the published-list route string,
+            rendered as user-visible text on the Published shelf's chip. That chip left with the
+            shelf in this same commit, so no route literal reaches a reader of this page now.
+            (The route is named in words here for the reason the file header states: the check
+            is a raw source count, and prose spelling it would satisfy it.) */}
 
       {/* Post-publish Run CTA (sketch 023-A) */}
       {runCtaWf && (
@@ -702,138 +829,74 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           {sourceFailedMessage(source)}
         </p>
       ))}
-      {publishedUpdating && !loading && (
-        <p
-          data-testid="library-updating"
-          data-state="updating"
-          aria-live="polite"
-          className="px-6 pb-1 text-[11.5px] text-muted-foreground"
-        >
-          updating…
-        </p>
-      )}
+      {/* The in-flight marker itself lives in the TOOLBAR, next to the counts it qualifies —
+          it is the toolbar's `updating` prop, not a second marker here. Two nodes carrying one
+          `data-testid` is a selector that throws rather than a surface that reports twice. */}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[200px_1fr] gap-6 overflow-y-auto px-6 py-5">
-        {/* ── Project filter rail (live ?project_folder_id= re-query) ── */}
-        <nav aria-label="Project filter" className="flex flex-col gap-1">
-          <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Project
+      {/* ── 192-10 (D-02 / D-05 / LIB-04 / SC#4) — ONE PERSISTENT TOOLBAR ──────────────
+          157-B's claim, composed rather than described: create LEADS, search is always on,
+          the three deleted shelf NAMES survive as three of the six chips (so the taxonomy
+          outlives the shelves instead of being dropped with them), and the 200px project
+          rail is now one control inside this bar — which also returns 200px of width to the
+          grid, a measurable win at 200 workflows.
+
+          ⚠ IT IS MOUNTED DURING THE FIRST LOAD, NOT AFTER IT, and that is a MEASURED
+          requirement rather than a preference. The latest-wins guard exercises a state in
+          which the mount fetch is still in flight while the project selection moves, so a
+          toolbar withheld until the first settle would make the project control unreachable
+          in exactly the state that guard exists to cover. `updating` therefore carries the
+          INITIAL LOAD as well as a re-query: while it is set, the counts beside each chip are
+          marked — machine-readably, via the toolbar's `data-state` — as describing rows that
+          are not yet final, so a zero is never presented as a settled fact. */}
+      <LibraryToolbar
+        query={query}
+        onQueryChange={setQuery}
+        activeChips={activeChips}
+        onToggleChip={toggleChip}
+        counts={counts}
+        projectId={selectedProjectId}
+        onProjectChange={setSelectedProjectId}
+        folders={folders}
+        updating={loading || publishedUpdating}
+        onCreate={openBuilderFresh}
+        onClearAll={clearAllFilters}
+      />
+
+      {/* ── ONE FLAT LIST (D-02) ──────────────────────────────────────────────────────
+          No shelf, no section header, no per-shelf empty line — a row's kind is carried by
+          its own provenance mark on the card, and by the chips that can narrow to it. The
+          three states below are held APART on purpose: nothing is rendered while the feeds
+          are still settling (the loading line above says so), "you have none" and "none
+          match what you asked for" are DIFFERENT FACTS, and the second one keeps the
+          toolbar's way out one click away. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        {loading ? null : visibleRows.length > 0 ? (
+          <div data-testid="library-list" className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {visibleRows.map((row) => (
+              <WorkflowCard
+                key={row.id}
+                row={row}
+                folderName={folderName(row.def?.project_folder_id)}
+                onRun={handleRun}
+                onOpen={handleOpen}
+                onForkNewVersion={handleForkNewVersion}
+                onForkStarter={handleForkStarter}
+                onDeleted={handleDeleted}
+              />
+            ))}
+          </div>
+        ) : rows.length === 0 ? (
+          <p data-testid="library-empty" className="text-[13px] italic text-muted-foreground">
+            {LIBRARY_STATES.empty}
           </p>
-          <FilterItem label="All projects" active={selectedProjectId === null} onClick={() => setSelectedProjectId(null)} />
-          {folders.map((f) => (
-            <FilterItem
-              key={f.id}
-              label={f.name}
-              active={selectedProjectId === f.id}
-              onClick={() => setSelectedProjectId(f.id)}
-            />
-          ))}
-          <FilterItem
-            label="Unbound (no project)"
-            active={selectedProjectId === UNBOUND}
-            onClick={() => setSelectedProjectId(UNBOUND)}
-          />
-        </nav>
-
-        {/* ── Shelves: Starters → Published → Drafts (BUG-260628-01 fold, D-143-5):
-              runnable/curated on top, drafts below (they were burying published). ── */}
-        <div className="flex flex-col gap-6">
-          {/* Starters shelf (WF-01, D-143-5/8 — curated, fork-able global starters, on TOP) */}
-          <section data-testid="starters-shelf">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Starters · {starterRows.length}
-              </h2>
-              <span
-                title="Curated, official starter workflows — fork one into your own editable copy"
-                className="rounded-full border border-primary/40 bg-primary/10 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-primary"
-              >
-                curated
-              </span>
-            </div>
-            {starterRows.length === 0 ? (
-              <p className="text-[13px] italic text-muted-foreground">No starters available yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {starterRows.map((row) => {
-                  const wf = row.source as PublishedWorkflow
-                  return <StarterCard key={row.id} wf={wf} onUse={() => onUseStarter(wf)} />
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Published shelf (live-backed, MINE-only — D-143-2a; scaffolds+starters de-duped) */}
-          <section data-testid="published-shelf">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Published · {publishedRows.length}
-              </h2>
-              <span
-                title="The live, owner-scoped endpoint (mine-only via ?scope=mine)"
-                className="rounded-full border border-success/40 bg-success/10 px-1.5 py-0.5 font-mono text-[8px] font-semibold text-success"
-              >
-                GET /workflows/published
-              </span>
-            </div>
-            {publishedRows.length === 0 ? (
-              <p className="text-[13px] italic text-muted-foreground">
-                No published workflows{selectedProjectId ? " for this project" : ""} yet.
-              </p>
-            ) : (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {publishedRows.map((row) => {
-                  const wf = row.source as PublishedWorkflow
-                  return (
-                  <PublishedCard
-                    key={wf.id}
-                    wf={wf}
-                    folderName={folderName((wf.definition as DefShape | undefined)?.project_folder_id)}
-                    onRun={() => { setRunFor(wf); setKickoff("") }}
-                    onTweak={() => onTweak(wf)}
-                    // 152-04 (WFIN-03): after a confirmed cascade delete, re-fetch the
-                    // Published shelf so the card is removed ONLY on server confirmation
-                    // (D-LOCK-04 — no optimistic vanish; the list never filters locally).
-                    onDeleted={() => { refetchPublished().catch(console.error) }}
-                  />
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          {/* Drafts & seeds shelf (below the runnable shelves; the Build-card lives here) */}
-          <section data-testid="drafts-shelf">
-            <div className="mb-3 flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Drafts &amp; seeds · {draftRows.length}
-              </h2>
-              <NetNewFlag label="net-new list" />
-            </div>
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {/* The dashed "Build a workflow" build-card FIRST. */}
-              <button
-                type="button"
-                data-testid="build-card"
-                onClick={openBuilderFresh}
-                className="flex min-h-[150px] flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-transparent p-4 text-center transition-colors hover:border-primary/60"
-              >
-                <span aria-hidden="true" className="text-2xl text-muted-foreground">
-                  ＋
-                </span>
-                <span className="text-[14px] font-medium text-foreground">Build a workflow</span>
-                <span className="text-[12px] text-muted-foreground">
-                  Describe it in plain English → AI drafts it
-                </span>
-              </button>
-
-              {draftRows.map((row) => {
-                const d = row.source as WorkflowDraftRow
-                return <DraftCard key={row.id} draft={d} onOpen={() => onOpenDraft(d)} />
-              })}
-            </div>
-          </section>
-        </div>
+        ) : (
+          <p
+            data-testid="library-filtered-empty"
+            className="text-[13px] italic text-muted-foreground"
+          >
+            {LIBRARY_STATES["filtered-empty"]}
+          </p>
+        )}
       </div>
 
       {/* ── Run modal (152 WFIN-01/02: scope <select> + staged template + provenance;
@@ -875,227 +938,24 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   )
 }
 
-function FilterItem({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        "flex items-center justify-between rounded-md border px-3 py-1.5 text-left text-[12.5px] transition-colors " +
-        (active
-          ? "border-primary/40 bg-primary/10 text-primary"
-          : "border-transparent text-muted-foreground hover:bg-accent/40 hover:text-foreground")
-      }
-    >
-      <span className="truncate">{label}</span>
-    </button>
-  )
-}
-
-function DraftCard({ draft, onOpen }: { draft: WorkflowDraftRow; onOpen: () => void }) {
-  const def = draft.definition as DefShape | undefined
-  return (
-    <div
-      data-testid="draft-card"
-      className="flex flex-col gap-3 rounded-lg border border-dashed border-border bg-card p-4"
-    >
-      {/* Card chrome (NOT a soul atom): name/version header row + status pill. */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true">📝</span>
-            <span className="truncate text-[14px] font-medium text-foreground">
-              {draft.name ?? draft.slug}
-            </span>
-            <span className="font-mono text-[11px] text-muted-foreground">v{draft.version}</span>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-full border border-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-muted-foreground">
-          draft
-        </span>
-      </div>
-      {/* WUX-01: the shared card-scale soul replaces the old TierBadge + PhaseChain +
-          "entry needs" trio — the SAME essence the run header + publish summary show. */}
-      <WorkflowSoul def={def} scale="card" />
-      {/* D12: a draft CANNOT be Run — Open✎ + Publish… only (publish is the test). */}
-      <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
-        <button
-          type="button"
-          data-testid="draft-open"
-          onClick={onOpen}
-          className="rounded-md border border-border px-3 py-1.5 text-[13px] text-foreground hover:bg-accent/40"
-        >
-          ✎ Open
-        </button>
-        <button
-          type="button"
-          data-testid="draft-publish"
-          onClick={onOpen}
-          className="rounded-md border border-border px-3 py-1.5 text-[13px] text-foreground hover:bg-accent/40"
-        >
-          Publish…
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function PublishedCard({
-  wf,
-  folderName,
-  onRun,
-  onTweak,
-  onDeleted,
-}: {
-  wf: PublishedWorkflow
-  folderName: string | null
-  onRun: () => void
-  onTweak: () => void
-  /** Forwarded straight to <WorkflowDeleteSheet>, which is the single home of the D-LOCK-04
-   *  re-fetch seam since 192-08 — the contract moved WITH the code that honours it, verbatim
-   *  and with its docblock. Two copies of one contract is exactly the drift an extraction
-   *  exists to remove, so this prop points at the owner rather than restating it. */
-  onDeleted: () => void
-}) {
-  const def = wf.definition as DefShape | undefined
-  const version = typeof def?.version === "number" ? def.version : undefined
-
-  // Phase 192-08 (D-01): the `DeletePhase` union, the five state hooks, `descId`,
-  // `openDeleteSheet` and `handleDelete` ALL left with the Sheet — a guard whose state
-  // stays behind is not moved, it is split. What the card keeps is a way to ASK.
-  // (Both mentions above deliberately avoid spelling the DECLARATION: the one-direction
-  //  row at the foot of `PublishedCardDelete.test.tsx` is a raw source grep, and 192-06's
-  //  deviation 2 recorded the same trap in the other direction.)
-  const deleteSheetRef = useRef<WorkflowDeleteSheetHandle>(null)
-
-  return (
-    <div data-testid="published-card" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-      {/* Card chrome (NOT a soul atom): name/version header, folder chip, ⋯-menu + status pill. */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true">📄</span>
-            <span className="truncate text-[14px] font-medium text-foreground">{wf.name}</span>
-            {version !== undefined && (
-              <span className="font-mono text-[11px] text-muted-foreground">v{version}</span>
-            )}
-          </div>
-          {folderName && (
-            <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">📁 {folderName}</span>
-          )}
-        </div>
-        {/* Right cluster: the NET-NEW ⋯ menu (Pitfall 8 — no menu existed on this card)
-            sits immediately left of the published pill. Neutral treatment; the destructive
-            weight lands ONLY on Delete-forever in the sheet (UI-SPEC Visual Hierarchy). */}
-        <div className="flex flex-none items-center gap-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                aria-label="Workflow actions"
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                data-testid="published-delete"
-                className="text-destructive focus:text-destructive"
-                onClick={() => deleteSheetRef.current?.openDeleteSheet()}
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
-                Delete workflow…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <span className="rounded-full border border-primary/40 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary">
-            published
-          </span>
-        </div>
-      </div>
-      {/* WUX-01: the shared card-scale soul (tier chip + glyph-dot spine + needs +
-          output) replaces the old TierBadge + PhaseChain + "entry needs" trio. */}
-      <WorkflowSoul def={def} scale="card" />
-      {/* D-01: the Run/Tweak footer stays UNCHANGED — the Phase-121 one-click launch —
-          it is NEVER routed through the two-door fork. */}
-      <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
-        <button
-          type="button"
-          data-testid="published-tweak"
-          onClick={onTweak}
-          title="Fork a new version into the Builder (the published row stays frozen)"
-          className="rounded-md border border-border px-2.5 py-1.5 text-[13px] text-foreground hover:bg-accent/40"
-        >
-          ⑂ Tweak
-        </button>
-        <button
-          type="button"
-          data-testid="published-run"
-          onClick={onRun}
-          className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
-        >
-          ▶ Run
-        </button>
-      </div>
-
-      {/* ── WFIN-03 victim-naming delete Sheet (D-LOCK-03/04/05) — MOVED VERBATIM in 192-08
-            (D-01) to `components/workflows/library/WorkflowDeleteSheet.tsx`, which owns its
-            own state AND its own JSX. All five properties of the heaviest guard grade went
-            with it, comments included: exact server counts fetched BEFORE the destructive
-            action is offered, the amber cancel-first banner only when a run is live, the
-            in-place lifecycle, never dismissing mid-delete, and no optimistic vanish/undo.
-            This card holds a ref and forwards two props; it decides none of it. ── */}
-      <WorkflowDeleteSheet ref={deleteSheetRef} wf={wf} onDeleted={onDeleted} />
-    </div>
-  )
-}
-
-// Phase 143 (WF-01, D-143-8) — the curated Starter card. Reuses the EXACT PublishedCard
-// chrome + the shared <WorkflowSoul scale="card"> (no new card design; G-2 waived), with
-// two swaps: a "Starter" chip (the Glean verified-badge analog, cloned from the published
-// pill) and a "Use this" fork affordance (data-testid="use-starter") wired to onUseStarter
-// instead of the ⑂ Tweak / ▶ Run pair. The published starter row is never mutated by the
-// card — "Use this" mints a fresh OWNED copy (createWorkflowDraft INSERT).
-function StarterCard({ wf, onUse }: { wf: PublishedWorkflow; onUse: () => void }) {
-  const def = wf.definition as DefShape | undefined
-  return (
-    <div data-testid="starter-card" className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
-      {/* Card chrome: name header + the curated "Starter" chip (filled primary — distinct
-          from the outlined "published" pill so curated ≠ user-made reads at a glance). */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span aria-hidden="true">✨</span>
-            <span className="truncate text-[14px] font-medium text-foreground">{wf.name}</span>
-          </div>
-        </div>
-        <span
-          title="A curated, official starter — fork it into your own editable copy"
-          className="shrink-0 rounded-full border border-primary/50 bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] uppercase text-primary"
-        >
-          Starter
-        </span>
-      </div>
-      {/* The SAME shared card-scale soul the published + draft cards render. */}
-      <WorkflowSoul def={def} scale="card" />
-      {/* D-143-1/1a: "Use this" forks a FRESH owned copy (new slug + v1) into the Builder —
-          NOT the same-slug Tweak. (Label omits the word "starter" so the "Starter" chip is
-          the single curated marker on the card.) */}
-      <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2">
-        <button
-          type="button"
-          data-testid="use-starter"
-          onClick={onUse}
-          title="Fork a fresh personal copy of this starter into the Builder"
-          className="rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
-        >
-          Use this →
-        </button>
-      </div>
-    </div>
-  )
-}
-
+// ── 192-10 (D-01 / D-02 / D-09) — WHAT USED TO LIVE BELOW THIS LINE, AND WHY IT DOES NOT ──
+//
+// Four components were DECLARED here and are declared nowhere now. This page is composition:
+// it owns fetching, merge and filter state, and the Builder handoff, and it declares no card,
+// no filter item and no modal.
+//
+//  • `FilterItem`    — the project rail's toggle. Its shipped `aria-pressed` contract survives
+//                      as the toolbar's chip skin; the rail itself is one `<select>` (D-05).
+//  • `DraftCard`     — one of three cards for one list. Replaced by the ONE card (D-09).
+//  • `PublishedCard` — the same, and it took the ⋯-menu and the delete-Sheet mount with it.
+//  • `StarterCard`   — the same, and its "Use this →" is now the shared fork verb (D-12/D-13).
+//
+// ⚠ THE FUNCTION AND ITS LAST RENDER LEAVE IN THE SAME COMMIT, ALWAYS. `noUnusedLocals` and
+// `noUnusedParameters` are on in `tsconfig.app.json`, so a helper left behind after its last
+// call site is removed is a TYPE ERROR, not a lint warning — and every import those four
+// declarations were the last consumer of had to go with them. Which imports those were was
+// READ OUT of `tsc`, the same method 192-06 and 192-08 used for their own cuts, never guessed.
+//
+// `NetNewFlag` DELIBERATELY STAYS (see its own docblock above): only its two LIBRARY renders
+// were removed. Its Builder-band render is Phase 193's surface and is asserted byte-exactly.
 export default WorkflowsPage
