@@ -197,6 +197,27 @@ describe("F1 — no hover-only explanation anywhere in the library subtree", () 
   })
 })
 
+// ── XSS — the highlight is IMPORTED, never re-implemented (T-192-04) ─────────────────
+//
+// D-07 highlights the user-authored `business_requirement` — user-controlled text on a
+// rendering path. `HighlightTitle` (`threadGroups.tsx:137`) renders each segment as a JSX
+// TEXT NODE so React escapes it, and its docblock records that the sketch's `innerHTML`
+// highlight was deliberately NOT ported because it is an XSS vector on exactly this text.
+// The threat is therefore RE-IMPLEMENTATION, and it has two halves: the TG pin below (the
+// shipped control cannot be weakened) and this (a second, unsafe highlight cannot be
+// written next door). `WorkflowSoul`'s own rule says the same thing about the same field.
+const RAW_HTML = /dangerouslySetInnerHTML/
+
+describe("T-192-04 — no raw-HTML rendering anywhere in the library subtree", () => {
+  it("POSITIVE CONTROL — the detector catches the escape hatch", () => {
+    expect('<p dangerouslySetInnerHTML={{ __html: marked }} />').toMatch(RAW_HTML)
+  })
+
+  it.each(LIBRARY_SUBTREE_PATHS)("%s renders no raw HTML", (path) => {
+    expect(LIBRARY_MODULES[path] ?? "").not.toMatch(RAW_HTML)
+  })
+})
+
 // ── F4 — no ESM cycle back to the page ───────────────────────────────────────────────
 //
 // ⚠ `(\.[jt]sx?)?` IS LOAD-BEARING, and it is here because the canvas fence shipped
