@@ -95,6 +95,10 @@ vi.mock("@/lib/api", () => ({
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"
+// 192-11 (D-07) — imported for ONE job: to be the POSITIVE CONTROL of the highlight
+// measurement below. Nothing on the library surface renders it today, and the test that says
+// so would be worthless without a demonstration that the selector it uses can find a real one.
+import { HighlightTitle } from "@/lib/threadGroups"
 import type { Folder } from "@/types"
 
 const folders: Folder[] = [
@@ -187,6 +191,192 @@ const starterRow = {
       },
     ],
   },
+}
+
+// ══ 192-11 — THE 200-ROW FIXTURE, AND THE HELPERS THE SCALE SUITE READS THE DOM WITH ══
+//
+// ⚠ JUDGE EVERY FINDABILITY AND DENSITY CLAIM AT 200 WORKFLOWS. That is the 045 real-scale
+// lesson and it is why all three of this phase's sketches ship a 12/54/200 scale selector: a
+// suite that only ever renders four fixtures proves the feature works on a demo. The four
+// literal fixtures above stay — they are the shipped contracts' fixtures and every case that
+// asserts a CONTRACT still uses them. What follows is for the cases that assert a PROPERTY AT
+// SCALE, which is a different question.
+//
+// GENERATED IN THIS FILE, NOT IN A SHARED FIXTURES MODULE. Nothing else needs these rows, and
+// a shared module for one consumer is this phase's rot to own. The house precedent for an
+// in-file typed bulk generator is `PhaseReconcile.test.tsx:117` (`Array.from({length: n}, …)`);
+// there is no factory module and no MSW anywhere in this repo — re-verified at this commit —
+// so there is no third pattern to avoid inventing.
+
+/** 120 published + 20 starters + 60 drafts = the 200 rows the merged library renders. */
+const BULK_PUBLISHED = 120
+const BULK_STARTERS = 20
+const BULK_DRAFTS = 60
+const BULK_TOTAL = BULK_PUBLISHED + BULK_STARTERS + BULK_DRAFTS
+
+const pad3 = (n: number) => String(n).padStart(3, "0")
+
+/** Every row's name. A 3-digit tail makes any three characters of ONE name globally unique. */
+const bulkName = (i: number) => `Workflow ${pad3(i)}`
+
+/**
+ * The ONE row whose search word lives ONLY in its purpose sentence — the case that makes D-07
+ * measurably wider than SC#1's literal wording ("part of its name"). It is a PUBLISHED index on
+ * purpose: the widened scope has to work on the feed a reader spends most of their time in.
+ */
+const PURPOSE_ONLY_INDEX = 42
+const PURPOSE_ONLY_WORD = "porcupine"
+
+/** A word a third of the rows carry — the SECOND live query the chip audit runs under. */
+const SHARED_PURPOSE_WORD = "contracts"
+
+/**
+ * The purpose sentence (`business_requirement`) — the card's hero atom, and half of D-07's
+ * search scope. Deliberately DIGIT-FREE so a name search can never be answered by a purpose.
+ */
+function bulkPurpose(i: number): string {
+  if (i === PURPOSE_ONLY_INDEX) {
+    return `Reviews the annual ${PURPOSE_ONLY_WORD} sanctuary budget before sign-off.`
+  }
+  return i % 3 === 0
+    ? `Checks supplier ${SHARED_PURPOSE_WORD} for renewal risk.`
+    : "Summarises the quarterly operating review."
+}
+
+/**
+ * Real spread across the two DERIVED chips, so neither is satisfied by a uniform block:
+ * every even row emits a FILE (`soulDeliverable` → `kind: "file"`), and every fourth row emits
+ * STRICTLY (`tierForDefinition` → `TIERS.STRICT`). An odd row is programmatic-only: no file,
+ * and LOOSE.
+ */
+function bulkPhases(i: number) {
+  if (i % 2 !== 0) {
+    return [{ slug: `step-${i}`, phase_index: 0, config: { phase_type: "programmatic" } }]
+  }
+  return [
+    { slug: `pull-${i}`, phase_index: 0, config: { phase_type: "programmatic" } },
+    {
+      slug: `emit-${i}`,
+      phase_index: 1,
+      config: {
+        phase_type: "llm_emit",
+        citation_policy: i % 4 === 0 ? "strict" : "draft",
+      },
+    },
+  ]
+}
+
+/** Every fifth row is bound to the one folder the toolbar can select. */
+const bulkProject = (i: number) => (i % 5 === 0 ? "folder-aaa" : null)
+
+/** A `/workflows/published` row. `is_mine: true` — the feed is `?scope=mine`. */
+function makePublishedRow(i: number, overrides: Record<string, unknown> = {}) {
+  const base = {
+    id: `bulk-pub-${i}`,
+    slug: `bulk-pub-${i}`,
+    name: bulkName(i),
+    is_mine: true,
+    is_system_global: false,
+    definition: {
+      slug: `bulk-pub-${i}`,
+      version: 1,
+      name: bulkName(i),
+      business_requirement: bulkPurpose(i),
+      project_folder_id: bulkProject(i),
+      phases: bulkPhases(i),
+    },
+  }
+  return { ...base, ...overrides } as typeof base
+}
+
+/**
+ * A `/workflows/starters` row. `is_mine: false`, and NO `project_folder_id` at all — that is
+ * what the three seeded starters actually look like (`094_starter_workflows.sql`), and it is
+ * the data property D-17's toolbar note states rather than apologises for.
+ */
+function makeStarterRow(i: number, overrides: Record<string, unknown> = {}) {
+  const base = {
+    id: `bulk-star-${i}`,
+    slug: `bulk-star-${i}`,
+    name: bulkName(i),
+    is_mine: false,
+    is_system_global: true,
+    definition: {
+      slug: `bulk-star-${i}`,
+      version: 1,
+      name: bulkName(i),
+      status: "published",
+      category: "starter",
+      business_requirement: bulkPurpose(i),
+      phases: bulkPhases(i),
+    },
+  }
+  return { ...base, ...overrides } as typeof base
+}
+
+/** A `/workflows/drafts` row. It carries NO `is_mine`: the feed is already owner-scoped. */
+function makeDraftRow(i: number, overrides: Record<string, unknown> = {}) {
+  const base = {
+    id: `bulk-draft-${i}`,
+    slug: `bulk-draft-${i}`,
+    version: 1,
+    name: bulkName(i),
+    definition: {
+      slug: `bulk-draft-${i}`,
+      version: 1,
+      name: bulkName(i),
+      business_requirement: bulkPurpose(i),
+      project_folder_id: bulkProject(i),
+      phases: bulkPhases(i),
+    },
+  }
+  return { ...base, ...overrides } as typeof base
+}
+
+/** ONE array of 200 indices, PARTITIONED three ways — so the three feeds cannot overlap. */
+const BULK_INDICES = Array.from({ length: 200 }, (_, i) => i)
+const bulkPublished = BULK_INDICES.slice(0, BULK_PUBLISHED).map((i) => makePublishedRow(i))
+const bulkStarters = BULK_INDICES.slice(BULK_PUBLISHED, BULK_PUBLISHED + BULK_STARTERS).map((i) =>
+  makeStarterRow(i),
+)
+const bulkDrafts = BULK_INDICES.slice(BULK_PUBLISHED + BULK_STARTERS).map((i) => makeDraftRow(i))
+
+/** The rendered rows, read from the DOM — never from the fixture array (that would be circular). */
+const renderedCards = (): HTMLElement[] =>
+  Array.from(document.querySelectorAll<HTMLElement>('[data-card="workflow-card"]'))
+
+/**
+ * The six chips, SPELLED OUT rather than imported from `libraryVocabulary`. A test that reads
+ * the order from the module under test cannot notice a renamed chip; six literals can. The
+ * count of rendered chips is asserted against this list's length, so a SEVENTH chip is a
+ * failure here too rather than a silently unaudited one.
+ */
+const CHIPS = [
+  "ready-to-run",
+  "yours",
+  "still-building",
+  "starters",
+  "makes-a-file",
+  "strict",
+] as const
+
+/** The number a chip PROMISES, read off the chip itself. */
+const chipCount = (chip: string): number =>
+  Number(screen.getByTestId(`library-chip-count-${chip}`).textContent)
+
+/** Type into the always-on search field. One `change` = one re-render, at 200 rows. */
+function setSearch(text: string) {
+  fireEvent.change(screen.getByTestId("library-search"), { target: { value: text } })
+}
+
+/** Mount the page over the 200-row fixture (any feed replaceable per case). */
+function mountBulk(
+  opts: { published?: unknown[]; starters?: unknown[]; drafts?: unknown[] } = {},
+) {
+  mockListPublished.mockResolvedValue(opts.published ?? bulkPublished)
+  mockListStarters.mockResolvedValue(opts.starters ?? bulkStarters)
+  mockListDrafts.mockResolvedValue(opts.drafts ?? bulkDrafts)
+  return render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
 }
 
 /**
@@ -661,6 +851,139 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
     // Fresh build → the chooser, NOT an already-loaded definition's spine nodes.
     expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
     expect(screen.queryByTestId("spine-node-draft")).not.toBeInTheDocument()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 192-11 — WHERE THE REQUIREMENTS ACQUIRE EVIDENCE
+//
+// Everything above this line proves a MECHANISM. Everything below proves a REQUIREMENT, at
+// the surface a user actually touches and at the scale the operator chose. The distinction
+// is the whole point of this plan: five earlier plans each showed that a part works; none of
+// them showed that LIB-01…04 are TRUE.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 scope)", () => {
+  it("SC#1 — three characters of ONE workflow's name narrow 200 rendered rows to that one row", async () => {
+    mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    // The scale is REAL: 200 rows through the real merge, the real filter and the real DOM.
+    expect(BULK_INDICES).toHaveLength(BULK_TOTAL)
+
+    setSearch(pad3(PURPOSE_ONLY_INDEX + 1)) // "043" — three characters of ONE name
+    await waitFor(() => expect(renderedCards()).toHaveLength(1))
+    expect(within(renderedCards()[0]).getByText(bulkName(43))).toBeInTheDocument()
+    // …and the other 199 are NOT rendered. Asserting the survivor alone would pass on a list
+    // that never narrowed at all.
+    expect(screen.queryByText(bulkName(44))).toBeNull()
+    expect(screen.queryByText(bulkName(143))).toBeNull()
+  })
+
+  it("D-07 — a word that appears ONLY in the purpose sentence finds the row too (wider than SC#1's literal bar)", async () => {
+    mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+
+    setSearch(PURPOSE_ONLY_WORD)
+    await waitFor(() => expect(renderedCards()).toHaveLength(1))
+    const card = renderedCards()[0]
+    expect(within(card).getByText(bulkName(PURPOSE_ONLY_INDEX))).toBeInTheDocument()
+    // THE HALF SC#1'S WORDING DOES NOT REACH: the word is absent from the name and present in
+    // the purpose the reader can already see on the card (`soul-purpose`, the hero atom).
+    expect(bulkName(PURPOSE_ONLY_INDEX)).not.toContain(PURPOSE_ONLY_WORD)
+    expect(within(card).getByTestId("soul-purpose").textContent).toContain(PURPOSE_ONLY_WORD)
+  })
+
+  it("⚠ MEASURED, NOT ASSUMED: the search hit is NOT highlighted today — D-07's second half is unshipped", async () => {
+    // This case asserts a GAP, deliberately, and it is named so the intent survives reading.
+    //
+    // D-07 reads "…with the hit highlighted". The highlight is NOT shipped: `WorkflowCard`
+    // renders `row.name` and the purpose atom as plain text and takes no query prop at all, so
+    // no module on the library surface consumes the shared highlight component. 192-09's own
+    // SUMMARY records the same fact from the other side ("this card renders no highlight at
+    // all"). Wiring it is a SOURCE change across two files this plan is not allowed to touch —
+    // it is recorded as owed rather than quietly asserted as present.
+    mountBulk()
+    await waitFor(() => expect(renderedCards().length).toBeGreaterThan(0), { timeout: 8000 })
+    setSearch(pad3(PURPOSE_ONLY_INDEX))
+    await waitFor(() => expect(renderedCards()).toHaveLength(1))
+
+    expect(document.querySelector("mark")).toBeNull()
+
+    // POSITIVE CONTROL — the selector above is not vacuous: it finds a highlight the instant a
+    // real one renders, so the null result is a fact about the surface and not about the query.
+    const control = render(<HighlightTitle title={bulkName(PURPOSE_ONLY_INDEX)} query="042" />)
+    expect(control.container.querySelector("mark")?.textContent).toBe("042")
+    // And the shipped behaviour a future wiring must match: the FIRST match only.
+    const twice = render(<HighlightTitle title="risk risk" query="risk" />)
+    expect(twice.container.querySelectorAll("mark")).toHaveLength(1)
+  })
+
+  it("D-08 — the paraphrase \"the thing that checks vendors\" returns ZERO rows, honestly, with one click out (a LIMITATION, asserted on purpose)", async () => {
+    // The search is SUBSTRING matching, not meaning. This case exists to keep that true: if a
+    // later phase quietly upgrades the engine, this test is what fails first and asks whether
+    // the copy, the placeholder and this decision were all revisited together.
+    mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+
+    setSearch("the thing that checks vendors")
+    await waitFor(() => expect(renderedCards()).toHaveLength(0))
+    // "none match what you asked for" is a DIFFERENT FACT from "you have none", and the page
+    // holds them apart rather than collapsing both into one blank surface.
+    expect(screen.getByTestId("library-filtered-empty")).toBeInTheDocument()
+    expect(screen.queryByTestId("library-empty")).toBeNull()
+    // …and the way out is one click, and it really works.
+    fireEvent.click(screen.getByTestId("library-clear-all"))
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+  })
+})
+
+describe("WorkflowsPage — LIB-02 / SC#2: every chip's number is the number it delivers (D-03)", () => {
+  it("at 200 rows, and under TWO different live searches, chipCount(c) === the rows clicking c renders", async () => {
+    // ⚠ THE EXPECTED VALUE IS COMPUTED FROM THE DOM, NEVER FROM THE FIXTURE ARRAY. Deriving it
+    // from the fixtures would re-implement the six predicates in the test and prove only that
+    // the test agrees with itself. The rule asserted here is the mechanical form of D-03's
+    // promise: the number on the chip is the number clicking it gives you.
+    mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+
+    // A seventh chip would be unaudited by a fixed loop, so the chip COUNT is pinned too.
+    expect(within(screen.getByTestId("library-chips")).getAllByRole("button")).toHaveLength(
+      CHIPS.length,
+    )
+
+    for (const query of ["", SHARED_PURPOSE_WORD]) {
+      setSearch(query)
+      for (const chip of CHIPS) {
+        const promised = chipCount(chip)
+        fireEvent.click(screen.getByTestId(`library-chip-${chip}`))
+        // Six assertions per query, ONE PER ChipId, each named so a failure says which chip
+        // broke its promise rather than only that some number disagreed.
+        await waitFor(() =>
+          expect(
+            renderedCards(),
+            `chip "${chip}" promised ${promised} rows under query "${query}"`,
+          ).toHaveLength(promised),
+        )
+        fireEvent.click(screen.getByTestId(`library-chip-${chip}`)) // release it again
+      }
+    }
+  }, 60000)
+
+  it("a chip whose count is ZERO still renders — the question stays askable (the honest-empty-state rule)", async () => {
+    mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    // A name search that can only match ONE published row leaves three chips at zero.
+    setSearch(pad3(PURPOSE_ONLY_INDEX))
+    await waitFor(() => expect(renderedCards()).toHaveLength(1))
+
+    for (const chip of ["still-building", "starters"]) {
+      expect(screen.getByTestId(`library-chip-${chip}`)).toBeInTheDocument()
+      expect(chipCount(chip)).toBe(0)
+    }
+    // …and a zero is a real zero: clicking it renders nothing and says so, rather than hiding.
+    fireEvent.click(screen.getByTestId("library-chip-starters"))
+    await waitFor(() => expect(renderedCards()).toHaveLength(0))
+    expect(screen.getByTestId("library-filtered-empty")).toBeInTheDocument()
   })
 })
 
