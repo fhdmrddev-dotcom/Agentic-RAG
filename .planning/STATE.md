@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: null
 milestone_name: "none — v3.6 closed 2026-08-09; next milestone not yet scoped"
 status: milestone_complete
-last_updated: 2026-08-09T12:55:00.000Z
+last_updated: 2026-08-09T15:20:00.000Z
 last_activity: "2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "Milestone closed cleanly. Nothing is mid-flight. NEXT = `/gsd:new-milestone` — the sequenced slot is the connections / integrations milestone (read SEED-146 first)."
+stopped_at: "Milestone closed cleanly. Nothing is mid-flight. Quick task 260809-klo landed the canvas `business_requirement` control (`da668c96`, `1c58a3fb`) — BUG-260809-02 stays `open` pending one live publish row. NEXT = `/gsd:new-milestone` — the sequenced slot is the connections / integrations milestone (read SEED-146 first)."
 resume_file: null
 ---
 
@@ -164,6 +164,19 @@ the 11 seeds are intentionally dormant.
 | verification_gap | 182 — 182-VERIFICATION.md | gaps_found (⚠ its recorded regression is FIXED at `api/workflows.py:852`; the file is stale) |
 | verification_gap | 188.2 — 188.2-VERIFICATION.md | human_needed |
 | verification_gap | 190 — 190-VERIFICATION.md | human_needed (⚠ frontmatter says `3/5` + "no SECURITY.md"; its own body addendum says `4/5` and `190-SECURITY.md` exists at `threats_open: 0`) |
+
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260809-klo | fix BUG-260809-02 — add a `business_requirement` input to the canvas Builder | 2026-08-09 | `da668c96` + `1c58a3fb` | [260809-klo-…](./quick/260809-klo-fix-bug-260809-02-add-a-business-require/) |
+
+⚠ **`BUG-260809-02` is deliberately still `open`.** The unit suite proves the typed sentence reaches
+the recorded `updateWorkflowDraft` argument; it cannot prove the live gauntlet accepts it. The plan
+gates closure on a live reload + publish row that **was not driven** — no browser automation was
+available in the executor session. **Owed manual UAT (run this first):** on the canvas door, type a
+requirement, reload, confirm it survived, then Publish and confirm stage 1 "Goal" passes. Local
+`feature_visibility.visual_workflow_canvas.audience` is `"everyone"`, so the control is visible.
 
 ## Guardrail overrides
 

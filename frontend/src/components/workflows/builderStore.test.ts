@@ -726,6 +726,95 @@ describe("builderStore — setProjectFolder writes and arms in ONE act (F14)", (
   })
 })
 
+// ── 13. BUG-260809-02 — the business requirement is WRITABLE (quick 260809-klo) ──
+//
+// APPENDED, never edited, and — like section 12 above — deliberately still ABOVE the
+// whole-suite network tripwire so the "exactly 0 calls" claim covers these too.
+//
+// WHY THIS SECTION EXISTS. A workflow authored on the CANVAS could never be published:
+// `business_requirement` was declared on the definition and round-tripped by the store,
+// but no UI anywhere WROTE it, and the publish gauntlet's stage 1 refuses without it
+// (`backend/app/api/workflows.py:712-721`). The store half of that hole is this action.
+//
+// The load-bearing case is the FIRST one: what reaches `selectDefinition` is what reaches
+// the PATCH body (`useDraftPersistence.ts:619` calls exactly that), so asserting on the
+// recombined definition — phases reference included — is what proves the write cannot
+// truncate the payload the endpoint requires whole.
+
+describe("builderStore — setBusinessRequirement writes into the PATCH body (BUG-260809-02)", () => {
+  it("reaches selectDefinition, leaving the phases array REFERENTIALLY unchanged", () => {
+    const store = createBuilderStore(draft())
+    const phasesBefore = store.getState().phases
+
+    store.getState().setBusinessRequirement("Summarise vendor risk.")
+
+    const out = selectDefinition(store.getState())
+    expect(out.business_requirement).toBe("Summarise vendor risk.")
+    // The PATCH takes a COMPLETE WorkflowDefinition — a meta write that disturbed
+    // `phases` could silently truncate it. Identity, not deep-equality, is the claim.
+    expect(out.phases).toBe(phasesBefore)
+    expect(out.phases).toHaveLength(3)
+  })
+
+  it("arms dirty in the SAME act — clean immediately before, dirty immediately after", () => {
+    const store = createBuilderStore(draft())
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setBusinessRequirement("Summarise vendor risk.")
+
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("is UNTRACKED — typing a sentence never floods the undo stack (positive control inline)", () => {
+    const store = createBuilderStore(draft())
+    const depthBefore = past(store).length
+
+    store.getState().setBusinessRequirement("S")
+    store.getState().setBusinessRequirement("Su")
+    store.getState().setBusinessRequirement("Sum")
+
+    expect(past(store)).toHaveLength(depthBefore)
+
+    // The positive control, in this same test: without it the assertion above would
+    // pass just as happily on a store where NOTHING is tracked at all.
+    store.getState().addPhaseOfType("llm_single")
+    expect(past(store)).toHaveLength(depthBefore + 1)
+  })
+
+  it("a non-drafted builder is a NO-OP — meta unchanged by reference, still clean", () => {
+    const store = createBuilderStore(null)
+    expect(store.getState().builderPhase).toBe("empty")
+    const metaBefore = store.getState().meta
+
+    store.getState().setBusinessRequirement("x")
+
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("writes whitespace THROUGH — the server owns the emptiness rule, not this client", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setBusinessRequirement("   ")
+
+    // `grounding.py:894` is `not (definition.business_requirement or "").strip()`.
+    // A client that trimmed or nulled here would be a second copy of a server
+    // predicate, which D-182-06 forbids.
+    expect(store.getState().meta.business_requirement).toBe("   ")
+  })
+
+  it("carries no other meta field away with it", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setBusinessRequirement("Summarise vendor risk.")
+
+    const meta = store.getState().meta
+    expect(meta.slug).toBe("risk-register")
+    expect(meta.version).toBe(1)
+    expect(meta.project_folder_id).toBeNull()
+  })
+})
+
 describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()

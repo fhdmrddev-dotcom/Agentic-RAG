@@ -265,6 +265,10 @@ export interface BuilderStoreState extends TrackedSlice {
    *  action that arms `dirty` itself — `setProjectFolder`'s docblock in the factory below
    *  says why a `meta`-only edit has to. */
   setProjectFolder: (id: string | null) => void
+  /** Set the workflow's one-line business requirement — the publish-required purpose
+   *  (BUG-260809-02). Untracked, and arms `dirty` itself for the same reason
+   *  `setProjectFolder` does; see its implementation docblock in the factory below. */
+  setBusinessRequirement: (text: string) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -587,6 +591,54 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           const s = get()
           if (s.builderPhase !== "drafted") return
           set({ meta: { ...s.meta, project_folder_id: id }, dirty: true })
+        },
+
+        /**
+         * Quick 260809-klo (BUG-260809-02) — write the workflow's one-line business
+         * requirement. A WORKFLOW-LEVEL definition edit, and the store half of the one
+         * hole that made a canvas-authored workflow UNPUBLISHABLE: the field is declared
+         * on `BuilderDefinition`, round-tripped by `setDrafted`'s `{ phases, ...meta }`
+         * destructure and already carried into the PATCH body by `selectDefinition` — but
+         * until now nothing in the app ever WROTE it, while the publish gauntlet's stage 1
+         * refuses without it (`backend/app/api/workflows.py:712-721`). The NL door works
+         * because the model emits the field; the template door works because the seed row
+         * carries it; the canvas door had no writer at all.
+         *
+         * A STRUCTURAL MIRROR OF `setProjectFolder` ABOVE, deliberately — the two
+         * `meta`-writing siblings are the same field class with the same failure shape
+         * (D-186-15 fixed BUG-260731-03 exactly this way), and a second, different answer
+         * to one question is drift.
+         *
+         * WHY IT SETS `dirty` EXPLICITLY, rather than relying on the subscription below.
+         * Identical to `setProjectFolder`'s reason: that subscription arms `dirty` on a
+         * change to the **`phases`** reference and on nothing else. `business_requirement`
+         * lives on `meta`, so a typed requirement would otherwise be a genuine definition
+         * change the leave guard never noticed — a new `definition` memo identity on the
+         * page (autosave even fires) while `dirty` stayed false, so no `beforeunload`, no
+         * leave prompt, and a toolbar reading clean. Writing and arming in ONE `set()` is
+         * what makes that impossible to forget at a second call site.
+         *
+         * WHY IT IS UNTRACKED. `partialize` (below) narrows the undo stack to `phases`
+         * plus the two edit discriminators, and the `meta` field's own docblock states the
+         * rule: an undo restores STEPS, never the workflow's identity. Typing a sentence
+         * must not flood the undo stack — and nothing is lost, because native field-level
+         * undo still works INSIDE the input: the page's `⌘Z` listener yields whenever the
+         * event target is an `INPUT`/`TEXTAREA` (`WorkflowBuilderPage.tsx:742-744`).
+         *
+         * WHY THERE IS NO TRIM AND NO EMPTY-CHECK. Whitespace is written THROUGH. The
+         * server owns the emptiness rule — `grounding.py:894` is literally
+         * `not (definition.business_requirement or "").strip()` — and a client that
+         * trimmed or nulled here would be a second copy of a server predicate, which
+         * D-182-06 forbids. No client-side validation rule is added by this action.
+         *
+         * The `builderPhase !== "drafted"` bail is the shipped guard shape every
+         * document-scoped action carries, keeping the write out of the composing beat
+         * where `meta` is deliberately empty.
+         */
+        setBusinessRequirement: (text) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          set({ meta: { ...s.meta, business_requirement: text }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

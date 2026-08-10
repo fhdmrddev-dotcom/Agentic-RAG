@@ -329,6 +329,33 @@ export const SAVING_PUBLISH_WAIT = "Saving your last change — Publish will be 
 export const UNBOUND_KB_INVITATION = "No knowledge base · searches everything"
 
 /**
+ * What the header's requirement control says when the workflow has not declared its
+ * purpose yet (quick 260809-klo · BUG-260809-02).
+ *
+ * IT ASKS FOR THE THING, AND NAMES THE CONSEQUENCE. The blocking sentence the author
+ * eventually meets — "a workflow must declare exactly one business_requirement before
+ * publish" — names an internal FIELD, which is precisely why the reporting operator had
+ * no recovery path from inside the product. This placeholder is the other end of that
+ * sentence: it asks in plain words for what the field holds, and says when it is needed.
+ * (The blocking copy itself is authored in two BACKEND sites and relayed verbatim by
+ * `blockedReason` below; rewriting it here would install exactly the client-side message
+ * mapping D-182-06 forbids. Carried as `D-klo-DEF-01` with its own re-open trigger.)
+ *
+ * AN INVITATION, NOT A CLAIMED VERDICT — the same fence `UNBOUND_KB_INVITATION` above
+ * carries, for the same reason. No severity and no code is computed here: an empty
+ * `business_requirement` is not a client-side finding, and the emptiness rule stays the
+ * server's (`grounding.py:894`). D-182-06 stays intact.
+ *
+ * WHERE IT IS ALLOWED TO TRAVEL: this one placeholder, and nowhere else. It must never
+ * join `blockedReason`, never become a `Verdict`, never enter `verdicts` or
+ * `groupVerdicts`, never add a problems-tray row and never mark a node. The server
+ * already owns this verdict (`backend/app/api/workflows.py:712-721`), it already routes
+ * to the tray as a workflow-wide `incomplete`, and its message is what `blockedReason`
+ * relays word for word. A second warning authored here would be a second truth-teller.
+ */
+export const REQUIREMENT_INVITATION = "What must this workflow deliver? · required to publish"
+
+/**
  * What the picker calls a binding it cannot NAME — a folder that is not in the author's
  * own list, because it was deleted or because the draft was forked from a workflow that
  * bound someone else's.
@@ -1768,6 +1795,98 @@ export function WorkflowBuilderPage({
     </span>
   ) : null
 
+  /**
+   * Quick 260809-klo — THE CONTROL THAT CLOSES BUG-260809-02.
+   *
+   * THE BUG. A workflow authored on the CANVAS could never be published. The gauntlet's
+   * stage 1 refuses without `business_requirement`; the field was reachable from the NL
+   * door (the model emits it as part of the generated definition) and the template door
+   * (the seeded starter row carries it) and from NOWHERE ELSE. A live-cloud census of
+   * eight drafts found exactly one with a null requirement — the one built by hand. So
+   * the canvas was the one authoring door of three that could not populate a
+   * publish-required field, and the author discovered it only at the publish gate, after
+   * doing all the work.
+   *
+   * THE WHOLE GAP WAS THE INPUT. Nothing else needed building, and three of the four
+   * things a fix would normally need were already shipped: the store round-trips `meta`,
+   * `selectDefinition` spreads it into the PATCH body (so this rides the shipped write
+   * path with ZERO change to the write loop), and the author-time warning already travels
+   * server → tray → `blockedReason` end to end. A second warning here would be a second
+   * truth-teller; none is added.
+   *
+   * WHY IT LIVES IN `identityGroup`, AS A SIBLING OF `kbAffordance`. This is D-186-15's
+   * shape applied a second time to the same field class with the same failure: that
+   * decision fixed BUG-260731-03 — a definition-level field choosable only on the
+   * pre-draft describe screen, so most ways into this Builder never offered it — by
+   * promoting the KB chip into a control in this exact group under this exact gate. A
+   * second, different answer to one question is drift. It also has to be the header: the
+   * header renders above the grid on BOTH graph views, while a control in `graphColumn`
+   * would steal a third `auto` row from the flag-on wrapper's grid and permanently
+   * shorten the flow — the exact complaint 184.1 exists to have fixed. And the group is
+   * already "what workflow is this" (name · draft · knowledge base); purpose is that same
+   * category, and per the workflow soul it is the HERO of it — the drafted Builder
+   * surfaced it nowhere at all before this.
+   *
+   * WHY THE `canvasEnabled` GATE IS MANDATORY, NOT STYLISTIC. D-181-01 promises the
+   * flag-OFF Builder is byte-identical to what shipped, and `WorkflowBuilderPage.header.test.tsx`
+   * pins that `<header>` as literal markup. An unconditional control would break the v3.6
+   * revert switch — the milestone's HARD gate #1. The flag-off branch is therefore a
+   * plain `null`, with no display-only fallback: that surface currently says nothing
+   * about the purpose, and the byte pin requires it keep saying nothing.
+   *
+   * AND THE GATE COSTS THIS BUG NOTHING. The canvas door does not exist with the flag
+   * off — the view-toggle strip renders only under `canvasEnabled` and `activeGraphView`
+   * is pinned to `"spine"` otherwise — and BUG-260809-02 was reported against the canvas.
+   * So a flag-gated control covers 100% of the reported surface. ACCEPTED RESIDUAL,
+   * recorded rather than hidden: with the flag OFF the field stays unreachable, which
+   * costs nothing today because both flag-off entry paths (NL generate, starter fork)
+   * populate it already — the bug report's own live census is the evidence.
+   *
+   * THE GLYPH IS `✎`, the describe screen's own glyph on this page — deliberately NOT
+   * `✦`, which is the shipped Working badge and which the icon convention refuses for
+   * canvas-adjacent surfaces because it sits on the verdict mark's coordinates.
+   */
+  const requirementAffordance = canvasEnabled ? (
+    <span
+      data-testid="builder-business-requirement"
+      className="flex min-w-0 shrink items-center gap-1 rounded border border-border bg-card px-1.5 py-0.5 text-[11px] text-muted-foreground"
+    >
+      <span aria-hidden="true">✎</span>
+      <input
+        type="text"
+        data-testid="business-requirement-input"
+        aria-label="Business requirement — the one line this workflow must satisfy"
+        placeholder={REQUIREMENT_INVITATION}
+        // CONTROLLED, and read straight off the definition. There is deliberately NO
+        // page-level `useState` mirror of this text: in the drafted view the definition
+        // is the single source of truth, and a second copy is the drift D-14 forbids —
+        // the same reason `boundFolderId` reads `meta` rather than the describe screen's
+        // own state. The `typeof` narrowing is because `meta` carries an index signature.
+        value={typeof meta.business_requirement === "string" ? meta.business_requirement : ""}
+        onChange={(e) => {
+          // The store half: `setBusinessRequirement` writes `meta.business_requirement`
+          // AND arms `dirty` in ONE `set()`, so the leave guard and the autosave loop
+          // cannot see an edit the other missed. The write itself is not this file's — it
+          // lands about a second later through `useDraftPersistence` (D-186-05), and the
+          // field is already in that PATCH body the moment the store holds it, because
+          // `selectDefinition` spreads `meta`.
+          store.getState().setBusinessRequirement(e.target.value)
+          // The page half, mirroring the KB picker's call site exactly: flip `hasEdited`
+          // HERE rather than by widening the store subscription. That exclusion exists so
+          // generate/open (which always replace `meta`) do not start the live-validation
+          // loop, and widening it would restart the loop on every document load. A
+          // call-site flip is precise; a subscription change is a blunt instrument.
+          setHasEdited(true)
+        }}
+        // The dirty-gated blur commit that already exists. NOT a second save path, and
+        // deliberately not a direct `persistence.saveNow()` — every field here is
+        // controlled, so the value already reached the store on the keystroke.
+        onBlur={onFieldCommit}
+        className="min-w-0 w-[240px] truncate bg-transparent text-[11px] text-muted-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary"
+      />
+    </span>
+  ) : null
+
   const identityGroup = (
     <>
       <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
@@ -1777,6 +1896,7 @@ export function WorkflowBuilderPage({
         draft
       </span>
       {kbAffordance}
+      {requirementAffordance}
     </>
   )
 
