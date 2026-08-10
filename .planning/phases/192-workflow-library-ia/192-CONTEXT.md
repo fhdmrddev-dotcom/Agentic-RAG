@@ -161,9 +161,51 @@ sketches deliberately left open, it does not re-open the frame.
   feature-gated (`workflows.py:171` — "DO NOT gate /published or /starters"); the merge must not
   introduce a gate. Dedupe is a plan-time concern.
 
+### Resolved at plan time (2026-08-10) — operator, on measured research findings
+
+- **D-17: The project filter holds STARTERS OUT, and the toolbar says so.** RESEARCH.md measured an
+  IA defect no sketch and no decision had named: `?project_folder_id=` narrows **only** `/published`
+  (`backend/app/db/workflows.py:291–293`), and the three seeded starters carry no project at all
+  (`grep -c "project_folder_id" supabase/migrations/094_starter_workflows.sql` → **0**). Under three
+  labelled shelves that read as *"the filter applies to Published"*; under 157-B's single flat list it
+  reads as a broken filter.
+
+  **Decision:** published rows filter **server-side** (unchanged, D-05), drafts filter **client-side**
+  on `definition.project_folder_id`, and **starters are held out of the project filter and stay
+  visible**, with one short line in the toolbar stating why — e.g. *"Starters aren't tied to a
+  project."* A starter having no project is a property of the data, not a gap in the filter, so the
+  honest surface states the fact rather than silently dropping rows or silently ignoring the filter.
+  This reuses the shipped `UNBOUND` sentinel pattern (`WorkflowsPage.tsx:67`, client narrow at
+  `:172–173`) rather than inventing one. **Silence is a FAIL** — this is UAT row U6.
+
+  **The companion rule for D-03 × D-05 (chip counts during an in-flight re-query):** a chip count
+  **always describes the rows currently rendered**. Previously-committed rows stay rendered with
+  correct counts while a project re-query is in flight, under a quiet "updating…" marker. Counts are
+  never zeroed, never pre-computed for rows that have not arrived, and never left describing a set the
+  user cannot see. Mechanically checkable: at every render,
+  `chipCount(c) === renderedRows.filter(pred(c)).length`.
+
+- **D-18: `Delete` SHIPS on the draft row's `⋯` overflow — as wiring, not as new capability.**
+  D-09's verb table gives drafts a `Delete` that no draft card has ever exposed, which raised a fair
+  scope question. Measured before deciding: `DELETE /workflows/{definition_id}` (`delete_draft`,
+  `backend/app/api/workflows.py:1138`) already accepts a draft id and returns **204**, and
+  `deleteWorkflowDraft` already exists at `frontend/src/lib/api.ts:3525` **with a passing test
+  (`api.workflows.test.ts:198`) and ZERO UI callers**. Only the call site is missing.
+
+  **Decision:** wire the existing `deleteWorkflowDraft` client function. **Do NOT route drafts through
+  the cascade path** — `deleteWorkflowCascade` / `getWorkflowDeletePreview` resolve a *slug* and
+  destroy every version under it, which is the wrong semantics for a single draft. Grade the guard by
+  consequence per the recorded 146–148 rule: a draft has no published history, no runs and no threads
+  to destroy, so it earns a **lighter guard than the published victim-naming Sheet** — never the
+  reverse. The published row keeps its Sheet unchanged (it is one of D-01's two verbatim moves).
+
 ### Claude's Discretion
 
 - Toolbar layout order and responsive collapse behaviour below the mockup's breakpoints.
+- The exact guard shape for D-18's draft delete (inline arm-to-confirm vs a lightweight confirm),
+  provided it is demonstrably lighter than the published victim-naming Sheet and never silent.
+- Where the "updating…" marker lives during a project re-query (toolbar, list header, or row overlay)
+  — composition only; D-17 requires that it exist.
 - Whether the merged feed fetches in parallel or sequentially, and the loading/empty-state
   composition — subject to the honest-empty-state rule (`WorkflowSoul`'s D-03 pattern: the atom is
   always rendered, never hidden, never fabricated).
