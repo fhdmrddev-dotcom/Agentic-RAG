@@ -272,8 +272,14 @@ async def list_published_workflows(
     if owned_only:
         # D-143-2b — the Workflows-page Published shelf only; drop the bare
         # is_system_global so curated globals live solely in the Starters shelf.
+        #
+        # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected
+        # FOR SERVER-SIDE COMPUTATION ONLY. The API layer consumes the raw ``created_by``
+        # to compute the one bit ``PublishedWorkflow.is_mine`` and NEVER serializes it —
+        # this pool bypasses RLS, so whatever leaves the API layer is what the caller gets.
+        # The projection widens; the predicate does NOT.
         sql = (
-            "SELECT id, slug, name, definition FROM workflow_definitions "
+            "SELECT id, slug, name, definition, created_by, is_system_global FROM workflow_definitions "
             "WHERE status = 'published' AND created_by = $1"
         )
     else:
@@ -284,7 +290,11 @@ async def list_published_workflows(
             # ``definition``. This is purely ADDITIVE — the pre-103 id/slug/name
             # picker callers ignore the extra column (asyncpg's pool codec decodes
             # the JSONB to a dict).
-            "SELECT id, slug, name, definition FROM workflow_definitions "
+            #
+            # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected
+            # FOR SERVER-SIDE COMPUTATION ONLY — consumed inside the API layer to compute
+            # ``is_mine``, never serialized. Projection only; the predicate is untouched.
+            "SELECT id, slug, name, definition, created_by, is_system_global FROM workflow_definitions "
             "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
     params: list = [user_id]
@@ -314,8 +324,11 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     (V5 — no injection surface). Returns the id/slug/name/definition the shelf card
     needs (mirrors ``list_published_workflows``' additive ``definition`` column).
     """
+    # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected FOR
+    # SERVER-SIDE COMPUTATION ONLY — ``get_starter_workflows`` computes ``is_mine`` from the
+    # raw ``created_by`` and never serializes it. Projection only; the predicate is untouched.
     rows = await pool.fetch(
-        "SELECT id, slug, name, definition FROM workflow_definitions "
+        "SELECT id, slug, name, definition, created_by, is_system_global FROM workflow_definitions "
         "WHERE status = 'published' AND is_system_global = true "
         "AND definition->>'category' = 'starter' "
         "ORDER BY name"
