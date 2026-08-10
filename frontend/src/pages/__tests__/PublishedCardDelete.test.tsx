@@ -19,7 +19,7 @@
  * cancel-first, no orphans) is the row in 152-VALIDATION.md — NOT duplicated here.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within, waitFor } from "@testing-library/react"
+import { render, screen, within, waitFor, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
 const {
@@ -636,5 +636,187 @@ describe("delete Sheet — invariant 2: NO optimistic vanish (D-LOCK-04)", () =>
     expect(screen.getByTestId("published-card")).toBeInTheDocument()
     expect(dialog).toHaveTextContent("Couldn’t delete the workflow")
     expect(mockListPublished.mock.calls.length).toBe(fetchesBeforeClick)
+  })
+})
+
+/* ══════════════════════════════════════════════════════════════════════════════
+ * Phase 192 Plan 08 Task 2 (D-01) — THE CUT HAS ONE DIRECTION, AND THE GUARD WENT
+ * WITH ITS STATE.
+ *
+ * The 26 rows above are the pre-move contract and they all still pass, un-re-captured,
+ * on the SAME render path they were captured from — which is exactly why this cut was
+ * scheduled while `PublishedCard` still exists. What they CANNOT see is the shape of
+ * the extraction itself: seven byte-identical captures are equally satisfied by a move
+ * that left `sheetOpen` on the page, by a re-export shim that preserved the coupling,
+ * and by a module that imports the page straight back. These rows read source.
+ *
+ * ⚠ THE FAILURE MODE THIS BLOCK IS AIMED AT is not "the Sheet broke" — it is "the Sheet
+ * was SPLIT". `192-PATTERNS.md` § 2 names it: the JSX block reads self-contained and is
+ * not, because it closes over five hooks declared ~100 lines above it inside the very
+ * component D-01 deletes. A split passes every capture above and hands `192-09` a piece
+ * of the heaviest shipped action guard to re-implement by hand.
+ * ══════════════════════════════════════════════════════════════════════════════ */
+
+/** Types only — `typeof import(…)` is a type expression and adds no runtime import. */
+type SheetModule = typeof import("@/components/workflows/library/WorkflowDeleteSheet")
+type SheetProps = Parameters<SheetModule["WorkflowDeleteSheet"]>[0]
+/** Type-only, therefore erased: the handle the card holds, without a runtime import. */
+import type { WorkflowDeleteSheetHandle } from "@/components/workflows/library/WorkflowDeleteSheet"
+
+/** A published row for the ISOLATED render. Deliberately NOT `boundPublished`: that one
+ *  exists to drive the page's feed, and reusing it would blur whether the Sheet or the
+ *  page is under test — which is the whole point of these rows. */
+const isolatedWf: SheetProps["wf"] = {
+  id: "iso-1",
+  slug: "isolated",
+  name: "Isolated sheet",
+}
+
+describe("WorkflowDeleteSheet 192-08 — the cut has one direction", () => {
+  it("the page imports the Sheet, declares none of its four spans, and left no re-export shim", async () => {
+    const pageSource = (await import("../WorkflowsPage?raw")).default as string
+
+    // NON-VACUITY FIRST: a `?raw` import that silently resolved to "" would satisfy every
+    // negative below forever, and would look exactly like a clean cut.
+    expect(pageSource.length).toBeGreaterThan(10000)
+
+    // The edge exists, and it points at the library module.
+    expect(pageSource).toMatch(
+      /WorkflowDeleteSheet,?\s*[\s\S]{0,120}from ["']@\/components\/workflows\/library\/WorkflowDeleteSheet["']/,
+    )
+
+    // …and all four moved spans are GONE from the page. One assertion per span, so a
+    // partial cut names WHICH piece stayed behind rather than failing anonymously.
+    expect(pageSource).not.toContain("type DeletePhase")           // span A
+    expect(pageSource).not.toContain("const [sheetOpen")            // span C — the state
+    expect(pageSource).not.toContain("const descId")                // span C — the a11y id
+    expect(pageSource).not.toContain("getWorkflowDeletePreview")    // span C — the preview
+    expect(pageSource).not.toContain("deleteWorkflowCascade")       // span C — the cascade
+    expect(pageSource).not.toContain("<SheetContent")               // span D — the JSX
+
+    // No shim, in either spelling. A shim keeps exactly the coupling the cut removes while
+    // every negative above stays green.
+    expect(pageSource).not.toContain("export { WorkflowDeleteSheet")
+    expect(pageSource).not.toContain("export * from")
+
+    // The trigger survived the cut. `published-delete` is what every row above drives, and
+    // it is one of the testids the `192-09` card rewrite must carry across verbatim.
+    expect(pageSource).toContain('data-testid="published-delete"')
+  })
+
+  it("the module owns the state AND the JSX — the split that would pass every capture above", async () => {
+    const sheetSource = (
+      await import("@/components/workflows/library/WorkflowDeleteSheet?raw")
+    ).default as string
+    expect(sheetSource.length).toBeGreaterThan(5000)
+
+    // All five hooks, `descId` and both handlers live HERE. Byte-identity of the rendered
+    // DOM says nothing about which file declared the state that produced it.
+    for (const owned of [
+      "const [sheetOpen",
+      "const [preview",
+      "const [previewError",
+      "const [deletePhase",
+      "const descId",
+      "const openDeleteSheet",
+      "const handleDelete",
+    ]) {
+      expect(sheetSource).toContain(owned)
+    }
+
+    // The two invariant comments came across, not just the code they guard. They are the
+    // written record of WHY the guard refuses, and D-15 and D-18 are both arguments made by
+    // reference to it — a re-typed comment is how a guard quietly loses its reason.
+    expect(sheetSource).toContain('if (!o && deletePhase === "deleting") return')
+    expect(sheetSource).toContain("Never dismiss mid-delete (the action is in flight)")
+    expect(sheetSource).toContain(
+      "// Server-confirmed: re-fetch the shelf so the card leaves the list ONLY now",
+    )
+
+    // F4's own subject, asserted from this side too: no path back to the page.
+    expect(sheetSource).not.toMatch(/from\s+["'][^"']*WorkflowsPage(\.[jt]sx?)?["']/)
+  })
+})
+
+describe("WorkflowDeleteSheet 192-08 — the guard refuses on its OWN, with no page around it", () => {
+  /** Render the Sheet alone and open it through the handle the card now holds. */
+  async function renderIsolatedSheet() {
+    const { WorkflowDeleteSheet } = await import(
+      "@/components/workflows/library/WorkflowDeleteSheet"
+    )
+    const onDeleted = vi.fn()
+    const ref: { current: WorkflowDeleteSheetHandle | null } = { current: null }
+    const rendered = render(
+      <WorkflowDeleteSheet ref={ref} wf={isolatedWf} onDeleted={onDeleted} />,
+    )
+    // The handle is the ONLY way in — if the imperative wiring were broken, nothing below
+    // could open, which is itself the assertion.
+    await act(async () => {
+      ref.current?.openDeleteSheet()
+    })
+    const dialog = await screen.findByRole("dialog")
+    return { onDeleted, dialog, rendered }
+  }
+
+  it("opens through the handle and names THIS row's counts — no page state involved", async () => {
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    const { dialog, rendered } = await renderIsolatedSheet()
+    await within(dialog).findByText("Permanently removed")
+    // Keyed by the isolated row's id, and the describedby id is derived from it — the
+    // `wf-delete-${wf.id}` shape moved with the code (D-14's precedent on this page).
+    expect(mockPreview).toHaveBeenCalledWith("iso-1")
+    expect(dialog.getAttribute("aria-describedby")).toBe("wf-delete-iso-1")
+    rendered.unmount()
+  })
+
+  it("Escape mid-delete does NOT close it — the refusal is the module's own, not the page's", async () => {
+    // Nothing but this component exists in the tree, so no page-level handler can be
+    // producing the refusal. This is the row that proves the guard was MOVED, not split.
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    mockDelete.mockReturnValue(new Promise<void>(() => {}))
+    const user = userEvent.setup()
+    const { dialog, rendered } = await renderIsolatedSheet()
+    await within(dialog).findByText("Permanently removed")
+    await user.click(within(dialog).getByTestId("delete-forever"))
+    await within(dialog).findByText(/Deleting/)
+
+    await user.keyboard("{Escape}")
+    expect(screen.getByRole("dialog")).toBeInTheDocument()
+    expect(dialog).toHaveTextContent("Deleting")
+    rendered.unmount()
+  })
+
+  it("POSITIVE CONTROL — the same Escape DOES close it when no delete is in flight", async () => {
+    // Without this, the row above is satisfied by a Sheet that never closes at all — a
+    // different and worse defect wearing the same green tick.
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    const user = userEvent.setup()
+    const { dialog, rendered } = await renderIsolatedSheet()
+    await within(dialog).findByText("Permanently removed")
+    await user.keyboard("{Escape}")
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+    expect(dialog).toBeDefined()
+    rendered.unmount()
+  })
+
+  it("no optimistic call — onDeleted fires ONLY after the cascade resolves", async () => {
+    // The other half of the graded guard, asserted at the seam rather than through the
+    // page's feed: `onDeleted` is the re-fetch trigger, so calling it early IS the
+    // optimistic vanish, wherever the list happens to live.
+    mockPreview.mockResolvedValue(PREVIEW_READY)
+    let resolveDelete!: () => void
+    mockDelete.mockReturnValue(new Promise<void>((r) => { resolveDelete = () => r() }))
+    const user = userEvent.setup()
+    const { onDeleted, dialog, rendered } = await renderIsolatedSheet()
+    await within(dialog).findByText("Permanently removed")
+    await user.click(within(dialog).getByTestId("delete-forever"))
+    await within(dialog).findByText(/Deleting/)
+
+    expect(onDeleted).not.toHaveBeenCalled()
+    await act(async () => {
+      resolveDelete()
+    })
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1))
+    rendered.unmount()
   })
 })
