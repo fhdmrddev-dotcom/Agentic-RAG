@@ -714,9 +714,8 @@ async def validate_workflow(
             {
                 "code": "business_requirement",
                 "phase": None,
-                "message": (
-                    "a workflow must declare exactly one business_requirement before publish"
-                ),
+                # ONE source with publish stage 1 — see the constant's docblock.
+                "message": grounding.BUSINESS_REQUIREMENT_MISSING_MESSAGE,
             }
         )
 

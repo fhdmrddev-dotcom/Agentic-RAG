@@ -86,7 +86,10 @@ async def publish_workflow(
     # Phase 182 (D-182-02 / Pitfall 4): the D-13 stage-1 predicate is now a SHARED
     # one-liner in the grounding module so publish and the canvas /validate seam call
     # ONE copy — a copy-pasted rule drifts, even a trivial one.
-    from app.services.harness.grounding import business_requirement_missing
+    from app.services.harness.grounding import (
+        BUSINESS_REQUIREMENT_MISSING_MESSAGE,
+        business_requirement_missing,
+    )
     from app.services.harness.reachability import lint_workflow
 
     user_id_raw = user.get("id")
@@ -163,9 +166,8 @@ async def publish_workflow(
             user_id=user_id,
             definition_id=definition_id,
             stage="business_requirement",
-            named_failures=[
-                "a workflow must declare exactly one business_requirement before publish"
-            ],
+            # ONE source with the /validate seam — see the constant's docblock.
+            named_failures=[BUSINESS_REQUIREMENT_MISSING_MESSAGE],
             golden_run_id=None,
         )
 

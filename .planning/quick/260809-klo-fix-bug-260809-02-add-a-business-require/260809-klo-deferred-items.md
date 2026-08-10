@@ -7,6 +7,52 @@ execution. Every entry has a concrete re-open trigger; none is left as a vague "
 
 ## D-klo-DEF-01 — the blocking copy names an internal field
 
+**Status: ✅ CLOSED 2026-08-10.** Fixed as its own change once the owed UAT row on
+BUG-260809-02 passed. **Two claims in the analysis below were FALSE and are corrected at
+the end of this section — do not inherit them.**
+
+The copy now reads:
+
+> **Add the Business requirement — one line saying what this workflow must deliver — before publishing.**
+
+Rather than editing the two strings "in lockstep" as this entry proposed, the string was
+given **one home**: `BUSINESS_REQUIREMENT_MISSING_MESSAGE` in
+`backend/app/services/harness/grounding.py`, directly beside the
+`business_requirement_missing` predicate that was ALREADY shared. Phase 182 had shared the
+rule but left the sentence copy-pasted — which is exactly the drift this entry predicted,
+so the structural fix removes the possibility rather than re-synchronising two copies.
+`workflows.py` (the `/validate` seam) and `publish_service.py` (publish stage 1) now both
+reference the constant; `grep -rn "must declare exactly one business_requirement"
+backend/app/` returns nothing but stale `.pyc`.
+
+**Verified:** `tests/unit/test_publish_service.py` 28 passed; `tests/unit -k "workflow or
+grounding or validate or publish"` **180 passed**; `PublishGauntlet.test.tsx` +
+`WorkflowBuilderPage.canvas.test.tsx` **179 passed / 2 files** at
+`GSD_VITEST_MAX_WORKERS=4`. Driven live in the browser against local on a draft that still
+has no requirement (`fdc29e13`) — the Publish affordance renders the NEW sentence and stays
+correctly disabled.
+
+**⚠ Two corrections to this entry, on measurement.** It asserted the change would need
+test edits because "`PublishGauntlet.test.tsx:239` pins the `named_failures` text, and
+`backend/tests/` pins the publish stage-1 prose." **Both are false, in both halves:**
+- `PublishGauntlet.test.tsx:239` supplies its own **fixture** string — and already a
+  DIFFERENT one (*"exactly one business_requirement must be declared"*), which is itself
+  proof it was never a pin on the shipped wording.
+- The real prose site is `WorkflowBuilderPage.canvas.test.tsx:3183`, which likewise
+  **defines** the message and asserts it is relayed verbatim — so it tests relay fidelity
+  with an arbitrary string and is indifferent to the backend's wording.
+- `backend/tests/` pins only `blocked_stage == "business_requirement"` (the CODE), and its
+  one `named_failures` fixture at `test_publish_service.py:1009` uses yet a third invented
+  string.
+
+**Net: zero test edits were required.** The wording was changeable all along; the entry's
+own analysis is what made it look expensive. Same lesson as the `PHASE_GLYPHS` pointer —
+nothing typechecks prose, so a plausible file:line in a planning doc survives every gate.
+
+---
+
+<details><summary>Original entry, kept for the record (contains the two false claims corrected above)</summary>
+
 **Status:** deferred, carried verbatim from the plan. **Not folded in — it is a BACKEND
 change**, and this task was capped at the frontend control.
 
@@ -31,6 +77,8 @@ connections milestone, raise it as its own `/gsd:fast`.
 **Why deferring is safe now:** with this task landed, the author reading that sentence has
 the control in the header directly above the Publish button they just pressed. The copy is
 unhelpful; it is **no longer a dead end**, which was the blocking half.
+
+</details>
 
 ---
 

@@ -4,10 +4,10 @@ title: A workflow built on the canvas can never be published — no UI anywhere 
 reported: 2026-08-09
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: closed
 affected_areas: [workflows/canvas-builder, workflows/publish-gauntlet, frontend/workflow-authoring]
 folded_into: quick-260809-klo
-verified_closed_by: null
+verified_closed_by: live-uat-2026-08-10-local-chrome-devtools-mcp
 related_seeds: [SEED-123]
 re_open_trigger: null
 reproduces_on:
@@ -112,10 +112,8 @@ requirement is satisfied by construction. Commits `da668c96`, `1c58a3fb`. Diff: 
 410 insertions, **0 deletions**. `tsc -p tsconfig.app.json` unmoved at 33; the scoped 4-suite vitest
 went 242 → 253 passing (+11 = exactly the tests added), 0 failing across 4 consecutive runs.
 
-⚠ **Status remains `open`, deliberately.** The tests prove the typed sentence reaches the recorded
-`updateWorkflowDraft` argument. They do **not** prove the live gauntlet accepts it — the reload +
-publish row was not driven (no browser automation in the executor session). Flip to `closed` only
-after that row runs against a real draft.
+~~⚠ **Status remains `open`, deliberately.**~~ **The owed row was driven 2026-08-10 — see
+§"Owed UAT row driven" below. Status is now `closed`.**
 
 **Two corrections to this report, on measurement:**
 - The report's own §"Fix sketch" guessed placement *"alongside name/slug"*. There is no name/slug
@@ -134,6 +132,49 @@ client-side message map), so it is not a frontend one-liner.
 (`project_folder_id` **is** reachable).
 `D-klo-DEF-03` two shipped tests flake ~1-in-6 on a 1 s `waitFor`; pre-existing rate could not be
 excluded, and no pinned test was edited to manufacture green.
+
+## Owed UAT row driven 2026-08-10 — PASS, and the bug is closed
+
+Driven against **local** (`http://localhost:5173`, backend `:8000` reporting
+`{"status":"ok","redis":"ok","maintenance":false}`) through the chrome-devtools MCP server, as one
+continuous session in the real UI. `visual_workflow_canvas` was confirmed
+`audience: everyone` in `app_settings.feature_visibility` first, so the `canvasEnabled` gate on the
+control was actually open rather than assumed.
+
+**Target draft `a0ed8ee9-103e-4be4-a9dc-6e2370f762e8`** — *"Read-only refusal (098 UAT — D-13
+whitelist)"* v2, 1 phase (`llm_agent`), `business_requirement: null`. Chosen deliberately as the
+simplest shape on the board so that no unrelated gauntlet stage could muddy the verdict.
+
+| # | Step | Observed |
+|---|---|---|
+| 0 | Pre-state in the Builder | Publish button **`disabled`**, `description="a workflow must declare exactly one business_requirement before publish"`. The draft card read *"draft · purpose not declared yet"*. This is the reported bug, reproduced live. |
+| 1 | The control exists | `input[aria-label="Business requirement — the one line this workflow must satisfy"]`, placeholder *"What must this workflow deliver? · required to publish"*, empty, visible. |
+| 2 | Type the sentence | `PATCH /workflows/a0ed8ee9-…` → **200**, then `POST /workflows/validate` → **200**. Header flipped to *"Saved · just now"*; Publish became **enabled** and the blocked reason cleared. |
+| 3 | DB after the PATCH | `business_requirement` persisted verbatim, **and `phases` still length 1** — the full-definition PATCH did not truncate. |
+| 4 | **Hard reload** (cache-ignoring) | The sentence survives. Draft card now renders the requirement **instead of** *"purpose not declared yet"*; re-opening the Builder shows the input repopulated; Publish still enabled. **This is the half the executor's unit tests could not prove.** |
+| 5 | Canvas view | Same input, same value, present in **both** `≣Spine` and `⬡Canvas` — the fix's both-views claim holds by observation, not by reading the gate expression. |
+| 6 | Publish gauntlet | Ran for real (golden run against the KB + independent judge). `POST /workflows/{id}/publish` → **200**, body `{"published":true,"version":2,"golden_run_id":"bcb58ff0-0487-4077-8e68-c8aa9197d859","blocked_stage":null,"named_failures":[]}`. **`blocked_stage: null`** — stage 1 no longer returns the `business_requirement` verdict. Row is `published` in `workflow_definitions`. |
+
+**⚠ One honest limitation, recorded rather than buried.** The Claude-in-Chrome extension (which
+drives literal OS keystrokes) was not connected, so the sentence was entered by dispatching a
+React-native `input` event from the page after setting the value through
+`HTMLInputElement.prototype.value`'s native setter. The chrome-devtools `fill` tool was tried
+FIRST and is recorded here because its failure is informative: it set the DOM value but produced
+**no** `PATCH` and **no** re-`validate`, and Publish stayed disabled — React's `onChange` never
+fired. That is the standard CDP-sets-`.value`-directly artifact and **not** app behaviour, but it
+is an inference about the harness, not a measurement of it. What the driven row therefore proves is
+the `onChange → builderStore → debounced PATCH → reload → publish` path — the same path keystrokes
+take. What it does **not** exercise is the keypress layer itself (per-character debounce, IME,
+paste). If a future defect is reported at that layer, this row is not evidence against it.
+
+Two notes for whoever reads this next:
+- `definition` is stored as a **JSON string scalar**, so `definition->>'business_requirement'` and
+  `definition->'phases'` both silently mislead — an initial sweep read every draft as `phases=0`,
+  which was false (the target has 1, another has 4). Parse the column in the client. Same trap
+  already recorded for `phase_type`.
+- The three `D-klo-DEF-*` deferrals are untouched by this row and remain open on their own triggers
+  — in particular `D-klo-DEF-01` (the blocking copy still names the internal field name) and
+  `D-klo-DEF-03` (the two ~1-in-6 flaky tests).
 
 ## Routing note
 
