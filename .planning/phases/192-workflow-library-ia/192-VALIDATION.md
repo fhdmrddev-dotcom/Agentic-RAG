@@ -141,7 +141,12 @@ recorded in the SUMMARY (the 190-16 precedent).
 | **F2** | The rendered library view contains no node whose text matches `/GET \/workflows\//` | Re-insert the `:577` chip text into the toolbar | md5 |
 | **F3** | No element with text `/^Publish…?$/` renders on any row (D-10) | Add a `Publish…` button to the draft branch | md5 |
 | **F4** | No module under `library/` contains `from "@/pages/WorkflowsPage"` (ESM cycle) | Add that import to the moved `RunModal.tsx` — note it **typechecks and lints clean**, which is exactly why the fence must exist | md5 |
-| **F5** | No copy in the library vocabulary module contains a meaning-search word (`semantic`, `meaning`, `similar`, `AI-powered`, `smart`, `understands`, `natural language`) (D-08) | Set the search placeholder to `"Search by meaning…"` | md5 |
+| **F5** | No copy **anywhere under `components/workflows/library/**`** contains a meaning-search word (`semantic`, `meaning`, `similar`, `AI-powered`, `smart`, `understands`, `natural language`) (D-08) | Set the search placeholder to `"Search by meaning…"` — authored in the toolbar module, **not** the vocabulary module | md5 |
+
+⚠ **F5's scope is the subtree, not one file** (PATTERNS.md correction C-3). A fence scoped to
+`libraryVocabulary.ts` alone is evaded by a `placeholder` authored inline in the toolbar — which is
+exactly where its own plant lives. Widen it to `library/**`, the way
+`governanceVocabulary.test.ts:66–77` already does.
 
 **One positive control is required** (the Phase 187 lesson — an absence assertion with no positive
 control proves nothing): F3's selector must be shown to actually *find* a `Publish…` button when one
@@ -188,7 +193,7 @@ DOM geometry via `evaluate_script`; `computer` CLICKS can deliver **zero events*
 | **U1** | At 200 workflows, find one named workflow by typing three characters | LIB-01 | `evaluate_script` types into the search input, counts rendered rows | Target row visible **without scrolling**; `elementFromPoint` on its centre returns a node inside that row |
 | **U2** | Narrow with two chips at once and read the counts | LIB-01/02 | click chips, read chip label text + `querySelectorAll` row count | Every chip's number **equals** the rows it produces; no chip promises results it cannot deliver |
 | **U3** | The create affordance is reachable with **zero scroll** | LIB-04 | measure `getBoundingClientRect().top` vs viewport at 200 rows | `top < window.innerHeight` at first paint, and it is the **first** interactive element in DOM order |
-| **U4** | The fork verb's consequence is readable **without hover** | LIB-03 / D-14 | count `[title]` inside the library subtree; read the `aria-describedby` target's `textContent` | `title` count = **0**; described text present, non-empty, names **both** halves (new private copy **and** published stays live) |
+| **U4** | The fork verb's consequence is readable **without hover** | LIB-03 / D-14 | count `[title]` inside the library subtree **excluding the `workflow-soul` subtree** (see the correction below); read the `aria-describedby` target's `textContent` | `title` count = **0** in this phase's own chrome; described text present, non-empty, names **both** halves (new private copy **and** published stays live) |
 | **U5** | "Tweak" no longer surprises — operator reads the card and states what the verb will do *before* clicking | LIB-03 / SC#3 | manual, operator | The stated expectation matches what happens |
 | **U6** | Pick a project → what happens to starters is **explained, not silent** | D-17 | click the project select, read the toolbar | Starters remain **with a stated reason**. **Silence is a FAIL.** |
 | **U7** | A paraphrase returns zero and the page does not pretend otherwise | LIB-01 / D-08 | type *"the thing that checks vendors"* | 0 results, honest empty state, one-click *Clear search & filters*, **no copy implying meaning-search** |
@@ -199,6 +204,26 @@ DOM geometry via `evaluate_script`; `computer` CLICKS can deliver **zero events*
 
 **U6 exists because of a measured defect** (RESEARCH § "The unnamed IA defect"). It is the row most
 likely to fail and the one no structural test can catch.
+
+### ⚠ Correction to U4, made at plan time and stated rather than quietly fixed
+
+U4 originally read `[title]` count = **0** across the whole library subtree. **That bar is
+unachievable, and not for any reason 192 causes.** Measured independently
+(`grep -n "title=" src/components/workflows/WorkflowSoul.tsx src/components/workflows/PhaseSpine.tsx`):
+
+- `WorkflowSoul.tsx:99` — `title={tier.description}`
+- `PhaseSpine.tsx:77` — `title={name || undefined}` (the comment above it says so outright: *"At card
+  scale the name lives only in title= (quiet, hover-only)"*)
+
+Both render inside **every** library row, and both files are locked as **consumed unchanged** (D-01
+scope + `WorkflowSoul`'s own G-5 red line). This is precisely the carried defect CONTEXT.md
+§`code_context` already recorded — *"the phase-type word is still hover-only (`title=`) on every chain
+glyph … recorded here so a later reviewer cannot discover it and assume 192 added it."*
+
+**Therefore:** U4's DOM sweep excludes the `workflow-soul` subtree and measures only the chrome this
+phase authors. **F1 is unaffected** — it is a source fence over `library/**`, and neither
+`WorkflowSoul.tsx` nor `PhaseSpine.tsx` lives there. Left unstated, U4 would have failed the phase for
+a defect two prior phases shipped.
 
 ---
 
