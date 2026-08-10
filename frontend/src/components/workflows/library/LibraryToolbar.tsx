@@ -1,10 +1,11 @@
 /**
- * Phase 192-07 (LIB-01 / LIB-02 / LIB-04 — D-02 / D-03 / D-06 / D-14) — THE LIBRARY'S
- * PERSISTENT TOOLBAR.
+ * Phase 192-07 (LIB-01 / LIB-02 / LIB-04 — D-02 / D-03 / D-05 / D-06 / D-14 / D-17) — THE
+ * LIBRARY'S PERSISTENT TOOLBAR.
  *
  * 157-B replaces three labelled shelves with ONE flat list, and this is the instrument that
- * makes the flat list navigable: create, then always-on search, then six counted chips. Task 2
- * of this plan adds the project select, its D-17 note, the in-flight marker and clear-all.
+ * makes the flat list navigable: create, then always-on search, then six counted chips, then
+ * the quiet in-flight marker, then the ONE project select with the honest line it owes, then
+ * the way out of an over-filtered list.
  *
  * ── WHY THE CREATE CONTROL IS FIRST, AND WHY THAT IS THE WHOLE FIX ──────────────────────
  * SC#4 asks that the create affordance be reachable without scrolling past existing
@@ -53,7 +54,7 @@
  * the chip is provably the same mark as the card's own tier atom rather than a second mark
  * that agrees today.
  *
- * ── ⚠ TWO STRINGS ARE DECLARED HERE, NOT IN `libraryVocabulary.ts`, AND IT IS A SCOPE
+ * ── ⚠ FOUR STRINGS ARE DECLARED HERE, NOT IN `libraryVocabulary.ts`, AND IT IS A SCOPE
  *    BOUNDARY RATHER THAN AN OVERSIGHT ─────────────────────────────────────────────────
  * The house rule is one vocabulary home, and this plan's own verification gate is
  * `git diff --name-only` listing exactly TWO files under `library/` — the vocabulary module is
@@ -66,11 +67,17 @@
 import { useId } from "react"
 
 import { Input } from "@/components/ui/input"
+import type { Folder } from "@/types"
 
+import { UNBOUND } from "./libraryFilter"
 import type { ChipId } from "./libraryRow"
 import {
   CHIP_ORDER,
   CHIP_WORDS,
+  CLEAR_FILTERS_LABEL,
+  PROJECT_LABEL,
+  PROJECT_STARTERS_NOTE,
+  PROJECT_UNBOUND_LABEL,
   SEARCH_HINT,
   SEARCH_LABEL,
   SEARCH_PLACEHOLDER,
@@ -88,6 +95,18 @@ const CREATE_LABEL = "Build a workflow"
 
 /** The build-card's sub-line, also verbatim (`WorkflowsPage.tsx:624`). */
 const CREATE_SUBLABEL = "Describe it in plain English → AI drafts it"
+
+/** The project select's "no narrowing" option — the shipped rail's own word (`:524`). */
+const PROJECT_ALL_LABEL = "All projects"
+
+/**
+ * The quiet in-flight marker (D-17's companion rule). Lower-case and understated ON PURPOSE:
+ * its job is to let a reader tell "these counts describe stale rows" from "these counts are
+ * final", NOT to interrupt. The rows on screen stay rendered with their correct counts while
+ * a project re-query is in flight; nothing is zeroed, and nothing is pre-computed for rows
+ * that have not arrived.
+ */
+const UPDATING_LABEL = "updating…"
 
 // ── Shared class strings ─────────────────────────────────────────────────────────────
 
@@ -118,8 +137,25 @@ export interface LibraryToolbarProps {
    * that renders blank.
    */
   counts: Record<ChipId, number>
+  /**
+   * `null` = all projects · a folder id · the shipped `UNBOUND` sentinel for "no project".
+   *
+   * ⚠ `UNBOUND` IS IMPORTED FROM `libraryFilter`, NOT FROM THE PAGE, and that is a fence
+   * rather than a preference: F4 forbids any module under `library/` from naming a
+   * `WorkflowsPage` specifier in any import form, so `192-05` re-homed the sentinel here with
+   * a byte-identical value. Two identical declarations exist until `192-10` rewrites the page
+   * and deletes its copy — a deliberate transient, not a duplicate to tidy up now.
+   */
+  projectId: string | null
+  onProjectChange: (next: string | null) => void
+  /** The project options — already loaded by the page; this component asks for nothing. */
+  folders: readonly Folder[]
+  /** A project re-query is in flight. Drives the quiet marker; changes no count. */
+  updating: boolean
   /** Opens the Builder fresh (the shipped `openBuilderFresh` contract, unchanged). */
   onCreate: () => void
+  /** The one-click way out of a filtered-to-empty list (sketch 158). */
+  onClearAll: () => void
 }
 
 // ── The toolbar ──────────────────────────────────────────────────────────────────────
@@ -130,9 +166,25 @@ export function LibraryToolbar({
   activeChips,
   onToggleChip,
   counts,
+  projectId,
+  onProjectChange,
+  folders,
+  updating,
   onCreate,
+  onClearAll,
 }: LibraryToolbarProps) {
   const searchHintId = useId()
+  const projectNoteId = useId()
+
+  /**
+   * A project counts as "selected" for BOTH a real folder AND the `UNBOUND` sentinel, and
+   * D-17's note is honest in both cases: starters are held out of the project filter either
+   * way (`libraryFilter.matchesProject` returns `true` for every starter, whatever the
+   * selection), so a reader who narrows to "Unbound (no project)" watches starters remain for
+   * exactly the reason the note states.
+   */
+  const projectSelected = projectId !== null
+  const anythingActive = query.length > 0 || activeChips.length > 0 || projectSelected
 
   return (
     <div
@@ -211,6 +263,96 @@ export function LibraryToolbar({
           )
         })}
       </div>
+
+      {/* ── 4 · THE QUIET IN-FLIGHT MARKER (D-17's companion rule) ───────────────────
+          It lives adjacent to the chip row because the CHIP COUNTS are what it qualifies.
+          `data-state` follows the `DescribeKbPicker.tsx:162-164` convention, and it is here
+          so "these counts describe stale rows" is MACHINE-CHECKABLE rather than merely
+          legible to a careful reader. PATTERNS "No Analog Found" G-B records that NO shipped
+          surface holds previously-committed rows with correct counts while a re-query is in
+          flight — this is that pattern's first home in the codebase, which is exactly why it
+          gets a machine-readable state rather than a spinner.
+
+          Its ABSENCE is the settled state, and the suite asserts that negative: a marker that
+          is always present distinguishes nothing and would prove nothing. */}
+      {updating && (
+        <span
+          data-testid="library-updating"
+          data-state="updating"
+          aria-live="polite"
+          className={NOTE_CLASSES}
+        >
+          {UPDATING_LABEL}
+        </span>
+      )}
+
+      {/* ── 5 · THE PROJECT FILTER, AND THE FACT IT OWES (D-05 / D-17) ───────────────
+          ONE instrument in the toolbar, not a 200px rail beside it — the recorded "one home
+          per concern" red line, and a select scales to any N projects where a rail becomes a
+          scroll wall (it also returns 200px of width to the grid at 200 workflows).
+
+          A NATIVE `<select>`, in both shipped pickers' shape: free a11y, free keyboard
+          type-ahead, no new dependency. Deliberately NOT a command palette — Radix `Select`
+          ships no built-in search, no command-palette package exists in `package.json` today,
+          and 158-B's deferral was costed against adding exactly one. If a filter over the
+          options is wanted later it is a change to THIS ONE CONTROL, not a package.
+
+          ⚠ The forbidden package is not NAMED here for the same reason the tooltip attribute
+          is not spelled above: T-192-SC's check is a raw count of its name in this file, and
+          prose explaining why it is absent would satisfy the grep that proves it absent. */}
+      <label className="flex flex-col gap-1">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {PROJECT_LABEL}
+        </span>
+        <select
+          data-testid="library-project-select"
+          aria-label={PROJECT_LABEL}
+          value={projectId ?? ""}
+          onChange={(event) => onProjectChange(event.target.value === "" ? null : event.target.value)}
+          {...(projectSelected ? { "aria-describedby": projectNoteId } : {})}
+          className="rounded-md border border-border bg-card px-2 py-1.5 text-[12.5px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        >
+          <option value="">{PROJECT_ALL_LABEL}</option>
+          {folders.map((folder) => (
+            <option key={folder.id} value={folder.id}>
+              {folder.name}
+            </option>
+          ))}
+          <option value={UNBOUND}>{PROJECT_UNBOUND_LABEL}</option>
+        </select>
+
+        {/* D-17 — SILENCE HERE IS A UAT FAILURE (row U6), NOT A NEUTRAL DEFAULT.
+            `?project_folder_id=` narrows ONLY `/published` (`db/workflows.py:291-293`), and
+            the three seeded starters carry no project at all (`094_starter_workflows.sql` →
+            0 hits). Under three labelled shelves that read as "the filter applies to
+            Published"; under 157-B's single flat list it reads as a BROKEN FILTER. A starter
+            having no project is a property of the DATA, not a gap in the filter — so the
+            honest surface states the fact in plain words rather than silently dropping the
+            rows or silently ignoring the selection.
+
+            It is wired to the select by `aria-describedby`, so the reason reaches a screen
+            reader on the control it explains — and it is real DOM text, never a tooltip. */}
+        {projectSelected && (
+          <span id={projectNoteId} data-testid="library-project-note" className={NOTE_CLASSES}>
+            {PROJECT_STARTERS_NOTE}
+          </span>
+        )}
+      </label>
+
+      {/* ── 6 · THE WAY OUT (sketch 158's zero-results behaviour) ────────────────────
+          Present whenever a query, any chip, or a project is active, so a user who has
+          filtered down to nothing is never stuck. Absent when nothing is active — a permanent
+          "clear" on an unfiltered list is noise that reports no state. */}
+      {anythingActive && (
+        <button
+          type="button"
+          data-testid="library-clear-all"
+          onClick={onClearAll}
+          className="self-center rounded-md px-2 py-1 text-[11.5px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          {CLEAR_FILTERS_LABEL}
+        </button>
+      )}
     </div>
   )
 }
