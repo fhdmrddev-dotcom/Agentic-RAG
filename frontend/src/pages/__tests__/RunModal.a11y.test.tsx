@@ -217,3 +217,182 @@ describe("RunModal a11y — workflow-delete confirm (152 WFIN-03) role/name/conf
     expect(within(dialog).getByRole("button", { name: /keep it/i })).toBeInTheDocument()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 192-03 Task 2 (D-01) — THE PRE-MOVE FOCUS / DIALOG CONTRACT.
+//
+// Appended at the foot of the file as a pure insertion; nothing above was edited.
+//
+// ⚠ THIS BLOCK IS A DIFFERENT KIND OF EVIDENCE FROM THE `innerHTML` CAPTURES IN
+// `RunModal.test.tsx`, AND CONFLATING THE TWO IS HOW A REVIEWER ENDS UP
+// RE-CAPTURING A BASELINE TO MAKE A RED TEST GREEN. The two answer different
+// questions:
+//
+//   · A CAPTURE answers "does it still render what it rendered?" Its literal was
+//     read out of the DOM, it is not an expectation, and a diff against it after
+//     the move is a behaviour change to EXPLAIN — never a test to update.
+//   · THESE ARE BEHAVIOURAL ASSERTIONS — a CONTRACT, stated in advance and on
+//     purpose. They say what the dialog must DO, not what it happens to look
+//     like, and they are exactly the things an `innerHTML` capture cannot see:
+//     where focus lands, what a key does, and whether Tab escapes.
+//
+// WHY THE CONTRACT NEEDS ITS OWN GUARD. D-01 calls the RunModal a VERBATIM move.
+// The modal's focus behaviour is a DELIBERATE minimal trap that the shipped source
+// justifies in its own words (`WorkflowsPage.tsx:1190-1192`): "a lightweight focus
+// contract for the aria-modal dialog — Escape-to-close, initial focus on the
+// textarea, and Tab containment within the dialog (a minimal trap, no heavy dep /
+// no shadcn Dialog rewrite)". A move that swapped it for a shadcn `Dialog` would
+// keep every `data-testid` and could even keep most of the markup, so the captures
+// would not necessarily notice — but it would not be a verbatim move. This block
+// is what makes that substitution loud.
+//
+// PROOF THAT THIS PREDATES THE MOVE — the 188.2 method, recorded so it can be
+// re-run rather than believed (full verbatim output in 192-03-SUMMARY.md):
+//
+//     $ git rev-parse HEAD
+//     14b309b4bd3b04ad5718caa821c24ddb613e2d3f
+//     $ git show HEAD:frontend/src/components/workflows/library/RunModal.tsx
+//     fatal: path 'frontend/src/components/workflows/library/RunModal.tsx' does not
+//       exist in 'HEAD'                                                    [exit 128]
+//
+// This plan modifies NO source file — only this file and `RunModal.test.tsx`.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** The commit the contract below was pinned at, and at which the destination module
+ *  provably does not exist. Kept beside the assertions so the two travel together. */
+const CAPTURE_SHA = "14b309b4bd3b04ad5718caa821c24ddb613e2d3f"
+
+/**
+ * The focusable-element selector the shipped Tab handler uses, VERBATIM
+ * (`WorkflowsPage.tsx:1212-1214`). Copied rather than approximated: a test that
+ * computed "the focusables" its own way would be asserting containment over a
+ * different set than the one the handler actually cycles, and would stay green
+ * through a change to either.
+ */
+const SHIPPED_FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input, textarea, select, [tabindex]:not([tabindex="-1"])'
+
+/**
+ * `waitFor`, reached by dynamic import rather than by widening this file's existing RTL
+ * import line at `:27`. That keeps this block a PURE insertion — `git diff` shows one
+ * contiguous addition and not one line above it touched — using the same
+ * `await import(…)`-inside-a-test idiom the repo already ships at
+ * `WorkflowBuilderPage.canvas.test.tsx:656`. Vite caches the module, so this is a map
+ * lookup after the first call, not a second load.
+ */
+async function waitForRTL() {
+  return (await import("@testing-library/react")).waitFor
+}
+
+describe("RunModal 192-03 — the pre-move dialog + focus CONTRACT (behaviour, not a capture)", () => {
+  it("the capture commit is recorded and is a full SHA", () => {
+    expect(CAPTURE_SHA).toMatch(/^[0-9a-f]{40}$/)
+  })
+
+  it("the modal root is a role=dialog with aria-modal and an accessible name", async () => {
+    const { modal } = await openRunModal()
+    // Named by the workflow it is about to run — `aria-label={`Run ${wf.name}`}`.
+    expect(modal.getAttribute("role")).toBe("dialog")
+    expect(modal.getAttribute("aria-modal")).toBe("true")
+    expect(modal).toHaveAccessibleName("Run Vendor-risk review")
+  })
+
+  it("initial focus lands INSIDE the dialog, on the kickoff textarea", async () => {
+    const { modal } = await openRunModal()
+    const kickoff = within(modal).getByTestId("run-kickoff")
+    expect(document.activeElement).toBe(kickoff)
+    // …and the focused element really is inside the dialog, so a future change that
+    // moved the textarea out of the modal could not satisfy this by identity alone.
+    expect(modal.contains(document.activeElement)).toBe(true)
+  })
+
+  it("Escape closes the dialog", async () => {
+    const waitFor = await waitForRTL()
+    await openRunModal()
+    expect(screen.getByTestId("run-modal")).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: "Escape" })
+    await waitFor(() => expect(screen.queryByTestId("run-modal")).not.toBeInTheDocument())
+  })
+
+  it("POSITIVE CONTROL — Escape does NOT close mid-launch (one click = one run)", async () => {
+    // Without this, "Escape closes" is satisfied by a handler that closes unconditionally:
+    // a person could dismiss the modal while a launch was already in flight.
+    //
+    // ⚠ MEASURED, NOT ASSUMED — WHAT THIS ROW ACTUALLY GUARDS. The mid-launch dismissal
+    // refusal is a DOUBLE guard, and only the OUTER half is observable from a live-page
+    // drive. Driven RED against real plants at `CAPTURE_SHA`:
+    //   · deleting the MODAL's own `if (!submitting)` (`WorkflowsPage.tsx:1205`) alone left
+    //     this row GREEN — the page's `onCancel` (`:648-651`, `if (runSubmitting) return`)
+    //     still refuses;
+    //   · deleting BOTH turned it RED.
+    // So this row pins the OBSERVABLE behaviour (Escape cannot dismiss a run in flight) and
+    // NOT the modal's own inner guard in isolation. Stated here rather than left implied,
+    // because the D-01 move takes the modal and LEAVES `onCancel` on the page: a move that
+    // dropped the inner guard would not be caught by this assertion, and a later reader must
+    // not inherit the belief that it would. The three focus rows below, and "Escape closes"
+    // above, were each driven RED against their own plant and DO isolate the modal.
+    const waitFor = await waitForRTL()
+    const pending = vi.fn().mockReturnValue(new Promise<void>(() => {}))
+    const { modal } = await openRunModal(pending)
+    fireEvent.click(within(modal).getByTestId("run-confirm"))
+    await waitFor(() =>
+      expect(within(modal).getByTestId("run-confirm")).toHaveTextContent("Running…"),
+    )
+    fireEvent.keyDown(document, { key: "Escape" })
+    // Still open — the in-flight guard held.
+    expect(screen.getByTestId("run-modal")).toBeInTheDocument()
+  })
+
+  it("Tab from the LAST focusable returns into the dialog rather than leaving it", async () => {
+    const { modal } = await openRunModal()
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(SHIPPED_FOCUSABLE_SELECTOR),
+    )
+    // NON-VACUITY: an empty node list would make every containment claim below trivially
+    // true, and the shipped handler itself early-returns on it.
+    expect(focusables.length).toBeGreaterThan(1)
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    // The shipped order, pinned: the KB-scope <select> opens the cycle and the
+    // "▶ Run workflow" button closes it.
+    expect(first).toBe(within(modal).getByTestId("run-scope-select"))
+    expect(last).toBe(within(modal).getByTestId("run-confirm"))
+
+    last.focus()
+    expect(document.activeElement).toBe(last)
+    fireEvent.keyDown(document, { key: "Tab" })
+    // Wrapped to the FIRST focusable — focus never left the dialog.
+    expect(document.activeElement).toBe(first)
+    expect(modal.contains(document.activeElement)).toBe(true)
+  })
+
+  it("Shift+Tab from the FIRST focusable wraps backwards — the other half of the trap", async () => {
+    const { modal } = await openRunModal()
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(SHIPPED_FOCUSABLE_SELECTOR),
+    )
+    expect(focusables.length).toBeGreaterThan(1)
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    first.focus()
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true })
+    expect(document.activeElement).toBe(last)
+    expect(modal.contains(document.activeElement)).toBe(true)
+  })
+
+  it("POSITIVE CONTROL — a Tab from the MIDDLE is left alone (a trap, not a hijack)", async () => {
+    // The three assertions above are also satisfied by a handler that forces focus to a
+    // fixed element on every Tab. The contract is containment at the EDGES only; in the
+    // middle the browser's own tab order must be left to do its job.
+    const { modal } = await openRunModal()
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(SHIPPED_FOCUSABLE_SELECTOR),
+    )
+    expect(focusables.length).toBeGreaterThan(2)
+    const middle = focusables[1]
+    middle.focus()
+    fireEvent.keyDown(document, { key: "Tab" })
+    // Untouched: the handler did not preventDefault and did not move focus itself.
+    expect(document.activeElement).toBe(middle)
+  })
+})
