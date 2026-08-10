@@ -86,8 +86,8 @@ is the incumbent any proposal must beat.
 - [x] `192-03-PLAN.md` (wave 2) — `RunModal` characterization baseline, 6 states, captured while `library/RunModal.tsx` provably does not exist.
 - [x] `192-04-PLAN.md` (wave 2) — delete-Sheet characterization baseline, 7 states + the two graded-guard invariants; the real ≈169 L extent recorded.
 - [x] `192-05-PLAN.md` (wave 2) — the pure leaves: `libraryRow` · `libraryVocabulary` · `libraryFilter` (merge/dedupe-by-id/chips/substring search) + the F1/F4/F5 subtree fences.
-- [ ] `192-06-PLAN.md` (wave 3) — D-01 move 1: `RunModal` out of the page, create-additively then cut, zero re-capture.
-- [ ] `192-07-PLAN.md` (wave 3) — `LibraryToolbar`: create leads · always-on search · six counted chips · project select + the D-17 starters note · the updating marker.
+- [x] `192-06-PLAN.md` (wave 3) — D-01 move 1: `RunModal` out of the page, create-additively then cut, zero re-capture.
+- [x] `192-07-PLAN.md` (wave 3) — `LibraryToolbar`: create leads · always-on search · six counted chips · project select + the D-17 starters note · the updating marker.
 - [ ] `192-08-PLAN.md` (wave 4) — D-01 move 2: `WorkflowDeleteSheet` out of `PublishedCard`, state + JSX as one unit, proved on the original render path.
 - [ ] `192-09-PLAN.md` (wave 5) — `WorkflowCard` (159-C): one verb + `⋯`, the fork consequence as an `aria-describedby` contract, no `Publish…`, the D-18 draft delete.
 - [ ] `192-10-PLAN.md` (wave 6) — the page becomes composition: `allSettled` merge, one flat list, shelves/rail/cards/banner deleted, four tests rewritten and two deleted with the one authorized pin lowering.
