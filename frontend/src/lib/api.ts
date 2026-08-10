@@ -1345,12 +1345,29 @@ export interface WorkflowPhaseState {
  *  Phase 103-06 (REQ-7 D9/D10): `definition` is the ADDITIVE full WorkflowDefinition
  *  JSONB the Workflows page card uses to derive the client-side strictness tier
  *  (deriveTier) + the phase-type chain. Optional — the composer Harness picker only
- *  reads id/slug/name and ignores it (backward compatible). */
+ *  reads id/slug/name and ignores it (backward compatible).
+ *
+ *  Phase 192 (LIB-01 / D-04): `is_mine` + `is_system_global` are the ADDITIVE ownership
+ *  bits that let the library's *Yours* and *Starters* chips filter client-side with honest
+ *  SIMULTANEOUS counts, instead of the `?scope=mine` server round-trip a re-query chip
+ *  would need. Both are computed server-side against the authenticated caller; the backend
+ *  deliberately never sends a raw `created_by` UUID (see the binding rule on the Python
+ *  model — that pool bypasses RLS, so whatever it emits, the caller receives).
+ *
+ *  DECLARED OPTIONAL ON PURPOSE, AND THIS IS A CONTRACT, NOT LAZINESS. A frontend deployed
+ *  AHEAD of the backend receives rows without these keys. The honest client behaviour is to
+ *  read `undefined` as "unknown" and fall back to feed-derived provenance
+ *  (`provenance !== "starter"`), which is CORRECT rather than merely non-fatal — a row is
+ *  still genuinely the user's own even when the field is absent. Consumers (notably
+ *  `library/libraryFilter.ts`) inherit that rule from here: never treat `undefined` as
+ *  `false`, because that silently renders an empty *Yours* chip on a stale deploy. */
 export interface PublishedWorkflow {
   id: string
   slug: string
   name: string
   definition?: WorkflowDefinitionJSON | null
+  is_mine?: boolean
+  is_system_global?: boolean
 }
 
 /** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.

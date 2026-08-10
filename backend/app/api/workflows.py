@@ -120,12 +120,56 @@ class PublishedWorkflow(BaseModel):
     Phase 103-06 (REQ-7 D9/D10): ``definition`` is ADDITIVE — the Workflows page
     card derives its client-side strictness tier + phase chain from the real
     definition JSONB. It is optional so the pre-103 picker callers (the composer
-    Harness dropdown) keep validating against the id/slug/name shape unchanged."""
+    Harness dropdown) keep validating against the id/slug/name shape unchanged.
+
+    Phase 192 (LIB-01 / D-04): ``is_mine`` + ``is_system_global`` are ADDITIVE and
+    DEFAULTED, following the ``definition`` precedent — the 22 frontend references and
+    the three production consumers (``WorkflowsPage.tsx``, ``panel/WorkspacePanel.tsx``,
+    ``workflows/StarterTemplatePicker.tsx``) keep validating unchanged, and a frontend
+    deployed AHEAD of this backend degrades to "nothing is mine" rather than crashing.
+    They exist so the Workflows-page *Yours* and *Starters* chips filter client-side with
+    honest SIMULTANEOUS counts instead of a ``?scope=mine`` server round-trip.
+
+    BINDING RULE — ``is_mine`` IS COMPUTED SERVER-SIDE FROM THE AUTHENTICATED CALLER, AND
+    A RAW ``created_by`` IS DELIBERATELY NOT PROJECTED ONTO THIS MODEL. ``list_published_
+    workflows`` runs on a service-role asyncpg pool that BYPASSES RLS, so the predicate
+    ``(is_system_global = true OR created_by = $1)`` is the ONLY boundary — whatever this
+    model carries, the caller receives. A raw ``created_by`` is safe under TODAY's predicate
+    (the sole non-caller rows are migration-seeded globals) and starts emitting other users'
+    identifiers the moment a later phase widens it — and v3.4's co-tenant ``org_id`` /
+    ``is_org_shared`` model is exactly that widening, with no code change here and no review.
+    That is the mig-116 / CR-01 shape, applied prospectively. ``is_mine`` CANNOT widen: it
+    discloses one bit about the caller themselves. ``is_system_global`` describes the ROW,
+    never a person."""
 
     id: UUID
     slug: str
     name: str
     definition: dict | None = None
+    is_mine: bool = False
+    is_system_global: bool = False
+
+
+def _caller_uuid(current_user: dict) -> UUID | None:
+    """The authenticated caller's id as a ``UUID`` — the one coercion both feeds share.
+
+    Phase 192 (D-04): ``get_published_workflows`` already normalises ``current_user["id"]``
+    through ``UUID(...)`` when it is a ``str`` before handing it to the db layer. ``is_mine``
+    must be computed IDENTICALLY in ``/published`` and ``/starters``, so the coercion lives
+    in ONE place rather than being retyped per handler (a retyped coercion is how the two
+    endpoints silently disagree). Returns ``None`` when the id is absent or unparseable, so
+    ``is_mine`` degrades to ``False`` — never to a 500 on a read path the RUN CARVE-OUT
+    protects.
+    """
+    raw = current_user.get("id")
+    if isinstance(raw, UUID):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return UUID(raw)
+        except ValueError:
+            return None
+    return None
 
 
 # ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD response shapes ────────────────
@@ -209,12 +253,18 @@ async def get_published_workflows(
         project_folder_id=project_folder_id,
         owned_only=(scope == "mine"),
     )
+    # Phase 192 (D-04): the row's raw ``created_by`` is consumed HERE and dies HERE — it is
+    # compared against the authenticated caller to produce one bit and is never assigned to a
+    # response-model field. See PublishedWorkflow's binding rule.
+    caller = _caller_uuid(current_user)
     return [
         PublishedWorkflow(
             id=r["id"],
             slug=r["slug"],
             name=r["name"],
             definition=_coerce_definition(r.get("definition")),
+            is_mine=(caller is not None and r.get("created_by") == caller),
+            is_system_global=bool(r.get("is_system_global")),
         )
         for r in rows
     ]
@@ -239,12 +289,20 @@ async def get_starter_workflows(
     """
     pool = await get_pg_pool()
     rows = await list_starter_workflows(pool)
+    # Phase 192 (D-04): ``is_mine`` is computed IDENTICALLY to /published, NOT hard-coded
+    # ``False``. Under today's seeding it is always False here (mig 094 seeds ``created_by``
+    # as the system user 00000000-0000-0000-0000-000000000001), but hard-coding would ship
+    # that as an UNSTATED invariant — a later seeding change would make the field lie in
+    # silence. Same fence as /published: the raw ``created_by`` dies in this expression.
+    caller = _caller_uuid(current_user)
     return [
         PublishedWorkflow(
             id=r["id"],
             slug=r["slug"],
             name=r["name"],
             definition=_coerce_definition(r.get("definition")),
+            is_mine=(caller is not None and r.get("created_by") == caller),
+            is_system_global=bool(r.get("is_system_global")),
         )
         for r in rows
     ]
