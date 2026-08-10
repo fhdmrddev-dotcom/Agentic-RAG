@@ -76,6 +76,24 @@
  * truthful as well costs one word of phrasing and spares a later reader the adjudication. The
  * same reason is why the removed second draft button is described above rather than named.
  *
+ * ── THE FORK OPENS NOTHING (D-15), AND THE TWO DELETES ARE DIFFERENT GRADES (D-18) ──────
+ * The recorded 146-148 rule grades a guard BY CONSEQUENCE — victim-naming sheet, then
+ * arm-to-confirm, then direct flip. Applied here that gives three different answers on one
+ * card, and each of them is an argument rather than a taste:
+ *
+ *   fork           DIRECT FLIP. It is non-destructive and reversible — the live version stays
+ *                  live and unchanged — so a sheet on it would spend the guard vocabulary the
+ *                  delete relies on to mean anything (`CapabilityGrid.tsx:11-13`). The sketch
+ *                  attached a confirm to 159-C; it is deliberately not shipped.
+ *   draft delete   ARM-TO-CONFIRM (`MaintenancePanel.tsx:39-129`'s shipped shape). A draft has
+ *                  no live history, no runs and no threads to destroy. One extra click, no
+ *                  fetch, NO FABRICATED COUNT (`CapabilityGrid.tsx:15-21`), never silent.
+ *   live delete    THE SHEET, unchanged — server counts fetched before the action is offered,
+ *                  the victim named, an in-place lifecycle, no optimistic vanish, no undo.
+ *
+ * "Demonstrably lighter than the Sheet" is therefore arguable by PRECEDENT rather than by
+ * taste: sheet (server preview + victim naming + terminal lifecycle) versus arm (one click).
+ *
  * ── WHAT THIS CARD DOES NOT OWN ──────────────────────────────────────────────────────────
  * `WorkflowSoul scale="card"` renders the five atoms and is CONSUMED UNCHANGED — purpose hero,
  * needs, glyph-dot spine, tier chip, deliverable. This card adds chrome and one sentence AROUND
@@ -90,8 +108,8 @@
  * Their re-home is OWED. They are not outside the honesty guarantee while they wait: this file
  * is one of the seven paths F5 sweeps BY NAME.
  */
-import { useRef } from "react"
-import { MoreHorizontal, Trash2 } from "lucide-react"
+import { useRef, useState } from "react"
+import { Loader2, MoreHorizontal, Trash2 } from "lucide-react"
 
 import {
   DropdownMenu,
@@ -100,10 +118,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
+import { deleteWorkflowDraft } from "@/lib/api"
 
 import { CHIP_PREDICATES } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
-import { FORK_VERB } from "./libraryVocabulary"
+import { FORK_CONSEQUENCE, FORK_VERB } from "./libraryVocabulary"
 import {
   WorkflowDeleteSheet,
   type WorkflowDeleteSheetHandle,
@@ -125,12 +144,32 @@ const OPEN_LABEL = "✎ Open"
  */
 const DELETE_WORKFLOW_LABEL = "Delete workflow…"
 
+/**
+ * D-18's word for a draft. NO ellipsis, and the asymmetry is the point: this guard is one
+ * extra click IN PLACE, not a Sheet, so an ellipsis promising a further surface would
+ * overstate it. The vocabulary has to keep meaning what it means.
+ */
+const DELETE_DRAFT_LABEL = "Delete"
+
+/**
+ * The armed prompt. It names the victim's KIND and the irreversibility, and it names NO
+ * COUNT — the `CapabilityGrid.tsx:15-21` honesty rule: no preview is fetched here, and a
+ * fabricated number is worse than no number.
+ */
+const DELETE_DRAFT_PROMPT = "Delete this draft? It cannot be recovered."
+const DELETE_DRAFT_CONFIRM = "Delete draft"
+const DELETE_DRAFT_CANCEL = "Cancel"
+
+/** Never silent (D-18). A guard that fails quietly is a guard that lies about succeeding. */
+const DELETE_DRAFT_FAILED = "Couldn't delete this draft — try again."
+
 // ── Shared class strings (the shipped card chrome, unchanged) ────────────────────────
 
 const CARD_CLASSES = "flex flex-col gap-3 rounded-lg border bg-card p-4"
 const NAME_CLASSES = "truncate text-[14px] font-medium text-foreground"
 const VERSION_CLASSES = "font-mono text-[11px] text-muted-foreground"
 const PILL_BASE = "shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase "
+const NOTE_CLASSES = "text-[11.5px] leading-snug text-muted-foreground"
 const FOOTER_CLASSES = "mt-auto flex items-center gap-2 border-t border-border/60 pt-2"
 const PRIMARY_CLASSES =
   "rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
@@ -216,8 +255,52 @@ export function WorkflowCard({
 }: WorkflowCardProps) {
   const deleteSheetRef = useRef<WorkflowDeleteSheetHandle>(null)
 
+  /**
+   * D-18's guard state — `MaintenancePanel.tsx:42-44`'s shipped arm-to-confirm, verbatim in
+   * shape: THE FIRST CLICK ARMS AND DOES NOT DELETE, Confirm deletes, Cancel disarms. A
+   * single stray click never reaches the endpoint.
+   */
+  const [armed, setArmed] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteFailed, setDeleteFailed] = useState(false)
+
   const runnable = row.provenance !== "draft"
   const face = FACE[row.provenance]
+
+  /**
+   * D-13 / D-14 — the id of the one consequence sentence, derived from the ROW id. That
+   * shape is the page's own precedent, not an invention: `WorkflowDeleteSheet.tsx:126`
+   * builds `wf-delete-${wf.id}` the same way, and RESEARCH measured it as the only
+   * `aria-describedby` the shipped page had.
+   */
+  const consequenceId = `wf-fork-${row.id}`
+
+  /**
+   * D-18 — the single-draft endpoint, and NEVER the cascade pair. The cascade client and its
+   * preview client resolve a SLUG and destroy every version under it, which for one draft
+   * destroys far more than the person asked for. Both are reachable from this card only
+   * THROUGH the Sheet, which is the only place their semantics are correct — so their
+   * identifiers are described here rather than spelled, because the check that proves this
+   * module never reaches them is a raw source count that prose would satisfy (the trap
+   * `192-08` recorded on the page and `192-06` recorded before that).
+   *
+   * The row does not leave the list until the server confirms — `onDeleted` re-fetches, and
+   * nothing here vanishes optimistically (the D-LOCK-04 rule the Sheet also honours).
+   */
+  async function confirmDeleteDraft() {
+    if (deleting) return
+    setDeleting(true)
+    setDeleteFailed(false)
+    try {
+      await deleteWorkflowDraft(row.id)
+      setArmed(false)
+      onDeleted()
+    } catch {
+      setDeleteFailed(true)
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   /**
    * Whether this row's owner is the person looking at it — read through the SHIPPED predicate
@@ -228,8 +311,8 @@ export function WorkflowCard({
    */
   const owned = CHIP_PREDICATES.yours(row)
 
-  /** The fork verb, and the destructive item, both live behind `⋯`. Drafts join in D-18. */
-  const showOverflow = runnable
+  /** Every row state has something behind `⋯` — the fork and the two delete grades. */
+  const showOverflow = true
 
   return (
     <div
@@ -277,20 +360,25 @@ export function WorkflowCard({
                 {row.provenance === "published" && (
                   <DropdownMenuItem
                     data-testid="published-tweak"
+                    aria-describedby={consequenceId}
                     onClick={() => onForkNewVersion(row)}
                   >
                     {FORK_VERB}
                   </DropdownMenuItem>
                 )}
                 {row.provenance === "starter" && (
-                  <DropdownMenuItem data-testid="use-starter" onClick={() => onForkStarter(row)}>
+                  <DropdownMenuItem
+                    data-testid="use-starter"
+                    aria-describedby={consequenceId}
+                    onClick={() => onForkStarter(row)}
+                  >
                     {FORK_VERB}
                   </DropdownMenuItem>
                 )}
 
                 {/* The heaviest guard's trigger — the ONLY control on this card that
                     wears destructive weight. It merely ASKS the Sheet to open. */}
-                {owned && (
+                {runnable && owned && (
                   <DropdownMenuItem
                     data-testid="published-delete"
                     className={DESTRUCTIVE_ITEM_CLASSES}
@@ -298,6 +386,25 @@ export function WorkflowCard({
                   >
                     <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
                     {DELETE_WORKFLOW_LABEL}
+                  </DropdownMenuItem>
+                )}
+
+                {/* ── D-18: the LIGHTER grade, and lighter by a measurable amount ────
+                    The published row's guard fetches exact server counts, names its
+                    victim and drives an in-place lifecycle. A draft has no published
+                    history, no runs and no threads to destroy, so it earns the middle
+                    grade instead: one extra click, no fetch. This item ARMS. */}
+                {!runnable && (
+                  <DropdownMenuItem
+                    data-testid="draft-delete"
+                    className={DESTRUCTIVE_ITEM_CLASSES}
+                    onClick={() => {
+                      setDeleteFailed(false)
+                      setArmed(true)
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                    {DELETE_DRAFT_LABEL}
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -309,6 +416,21 @@ export function WorkflowCard({
 
       {/* LIB-02: the shared card-scale soul, CONSUMED UNCHANGED — all five atoms. */}
       <WorkflowSoul def={row.def} scale="card" />
+
+      {/* ── THE ONE SENTENCE THIS SURFACE SPENDS (D-13 / D-14) ───────────────────────
+          Real DOM text, always visible, wired to the fork control by `aria-describedby`
+          — so the explanation reaches a touch user and a screen reader alike, which the
+          hover-only tooltip it replaces never did. It names BOTH halves: what you get,
+          and what stays true. Naming only the first half reproduces the exact surprise
+          LIB-03 exists to end, which is why the sentence is imported rather than typed.
+
+          It is spent ONCE, here. `Run` runs and `Open` opens; neither earns a sentence,
+          and repeating one on all 200 cards is the clutter LIB-02 exists to cure. */}
+      {runnable && (
+        <p id={consequenceId} data-testid="fork-consequence" className={NOTE_CLASSES}>
+          {FORK_CONSEQUENCE}
+        </p>
+      )}
 
       {/* ── The ONE primary verb (D-09) ──────────────────────────────────────────────
           Exactly one per row state, chosen by provenance. A draft reaches no Run
@@ -334,6 +456,47 @@ export function WorkflowCard({
           </button>
         )}
       </div>
+
+      {/* ── D-18's armed prompt — the deliberate SECOND step ─────────────────────────
+          `MaintenancePanel.tsx:100-131`'s shipped shape. It appears only once the menu
+          item has armed it, it states the consequence in words and NO COUNT, and a
+          failure is said out loud rather than swallowed. */}
+      {armed && (
+        <div
+          data-testid="draft-delete-prompt"
+          className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5"
+        >
+          <p className="text-[13px] font-medium text-foreground">{DELETE_DRAFT_PROMPT}</p>
+          <div className="mt-2.5 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              data-testid="draft-delete-cancel"
+              onClick={() => setArmed(false)}
+              disabled={deleting}
+              className="rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-60"
+            >
+              {DELETE_DRAFT_CANCEL}
+            </button>
+            <button
+              type="button"
+              data-testid="draft-delete-confirm"
+              onClick={confirmDeleteDraft}
+              disabled={deleting}
+              className={
+                "inline-flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-[13px] font-semibold text-destructive-foreground transition-colors hover:opacity-90 disabled:opacity-60"
+              }
+            >
+              {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />}
+              {DELETE_DRAFT_CONFIRM}
+            </button>
+          </div>
+          {deleteFailed && (
+            <p data-testid="draft-delete-error" role="status" className="mt-2 text-[11.5px] text-destructive">
+              {DELETE_DRAFT_FAILED}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* The WFIN-03 victim-naming Sheet (192-08), mounted as a black box: this card
           holds a ref and forwards two props, and decides none of the guard. */}
