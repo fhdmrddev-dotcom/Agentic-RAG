@@ -484,13 +484,16 @@ describe("WorkflowBuilderPage session — the unsaved-work leave guard (D-184-16
       </EffectiveFeaturesProvider>,
     )
 
-    fireEvent.click(await screen.findByTestId("build-card"))
+    // 192-10 (D-02): the create affordance is the toolbar's, and "the library is back" is
+    // now witnessed by the toolbar itself rather than by a shelf — 157-B replaced three
+    // shelves with one persistent bar, so the bar is the library's presence.
+    fireEvent.click(await screen.findByTestId("library-create"))
     await screen.findByTestId("workflow-doors")
 
     fireEvent.click(screen.getByTestId("builder-back"))
     expect(confirmSpy).not.toHaveBeenCalled()
     await waitFor(() => expect(screen.queryByTestId("builder-back")).toBeNull())
-    expect(screen.getByTestId("drafts-shelf")).toBeInTheDocument()
+    expect(screen.getByTestId("library-toolbar")).toBeInTheDocument()
   })
 
   it("the ← Workflows breadcrumb REFUSES to leave a DIRTY Builder, and leaves once confirmed", async () => {
@@ -522,13 +525,14 @@ describe("WorkflowBuilderPage session — the unsaved-work leave guard (D-184-16
     fireEvent.click(screen.getByTestId("builder-back"))
     expect(confirmSpy).toHaveBeenCalledTimes(1)
     expect(screen.getByTestId("door-govern")).toBeInTheDocument()
-    expect(screen.queryByTestId("drafts-shelf")).toBeNull()
+    // 192-10 (D-02): the library's presence is the toolbar, not a shelf.
+    expect(screen.queryByTestId("library-toolbar")).toBeNull()
 
     // …and once the author says yes, it leaves.
     confirmSpy.mockReturnValue(true)
     fireEvent.click(screen.getByTestId("builder-back"))
     expect(confirmSpy).toHaveBeenCalledTimes(2)
-    await waitFor(() => expect(screen.getByTestId("drafts-shelf")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByTestId("library-toolbar")).toBeInTheDocument())
   })
 })
 

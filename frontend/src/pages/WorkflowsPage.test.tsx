@@ -4,19 +4,47 @@
  * The project-filtered browse + launch home. These tests pin the locked contracts:
  *  - selecting a project re-queries listPublishedWorkflows with that
  *    project_folder_id; "All projects" calls it with no project filter.
- *  - the Drafts shelf renders ABOVE the Published shelf (DOM order) with the dashed
- *    build-card; NO draft card exposes a Run affordance; published cards DO.
+ *  - NO draft row exposes a Run affordance; runnable rows DO.
  *  - the tier badge is CLIENT-derived (a draft-policy def renders a different tier
  *    than a strict-policy def) with no extra fetch for the badge.
- *  - the build-card switches the page view to the Builder.
+ *  - the create affordance switches the page view to the Builder.
  *  - Run opens a modal (read-only folder chip + one textarea + hint; enabled on
  *    empty) and clicking Run calls onLaunch(def, kickoff).
  *  - Tweak calls createWorkflowDraft with version = def.version + 1, same slug,
  *    status 'draft' (INSERT — never an UPDATE of the published row), then opens the
  *    Builder.
+ *
+ * ── Phase 192-10 (D-02) — WHAT THIS FILE'S RESTRUCTURE DID, AND WHAT IT DELIBERATELY
+ *    DID NOT DO ──────────────────────────────────────────────────────────────────────
+ * 157-B replaced three labelled shelves with ONE flat list under ONE persistent toolbar,
+ * so the page's DOM changed underneath every case here. The classification applied was
+ * RESEARCH's, and it is worth stating because the distinction is the difference between
+ * a real regression and a plan task:
+ *
+ *   • TWO tests were DELETED, and only two: the pair that asserted the DOM ORDER OF THE
+ *     THREE SECTIONS (the published-above-drafts case, and the full
+ *     Starters → Published → Drafts case). Both pin a contract D-02 deliberately removes,
+ *     and there are no sections left to order. A deletion here is an AUTHORIZED ACT — it
+ *     rides in the same commit as the count-gate pin lowering that permits it, with the
+ *     reason named there too. (Their old titles are quoted in that commit's message rather
+ *     than here: the deletion's own mechanical check is a raw source count of the word
+ *     those titles are built on, so quoting them would satisfy the grep that proves them
+ *     gone — the trap 192-06, 192-08 and 192-09 each hit once in three other files.)
+ *   • FOUR tests were REWRITTEN in the way RESEARCH predicted (the project re-query, the
+ *     create affordance, the draft-has-no-Run contract, the starter row).
+ *   • ⚠ SEVEN MORE NEEDED THEIR INTERACTION REWRITTEN TOO, and RESEARCH's table did not
+ *     predict that — it classified by CONTRACT and those seven contracts are all intact.
+ *     What moved was the click target: the fork verb is now ONE WORD inside the card's
+ *     `⋯` overflow (D-09/D-12) rather than two differently-labelled buttons on two
+ *     different card faces, and the fresh-build entry is the toolbar's. Every assertion
+ *     in those seven is unchanged; only the route to it is. Measured, not assumed: the
+ *     restructure turned 13 of 23 red, against a predicted 6.
+ *   • ONE test was ADDED — the `allSettled` partial-failure path, and it is the most
+ *     important row in this file. See its own comment.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within, waitFor, fireEvent } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 
 const {
   mockListPublished,
@@ -28,6 +56,7 @@ const {
   mockListFolders,
   mockListSkills,
   mockListStarters,
+  mockDeleteDraft,
 } = vi.hoisted(() => ({
   mockListPublished: vi.fn(),
   mockListDrafts: vi.fn(),
@@ -38,12 +67,20 @@ const {
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
   mockListStarters: vi.fn(),
+  mockDeleteDraft: vi.fn(),
 }))
 
 // Mock the api seam. The page consumes listPublishedWorkflows + listDraftWorkflows
 // + createWorkflowDraft; the hosted Builder consumes generate/create/update +
 // listFolders/listSkills (103-ux folder/skill name maps); the Gauntlet consumes publish.
-// Phase 143 (WF-01): the Starters shelf consumes listStarterWorkflows (RED until Plan 04).
+// Phase 143 (WF-01): the curated starters feed consumes listStarterWorkflows.
+//
+// ⚠ 192-10 (D-18): `deleteWorkflowDraft` is listed because THIS FACTORY IS EXHAUSTIVE — it
+// replaces the whole module, so every api symbol the page or anything it mounts imports has
+// to appear or the reference throws. `WorkflowCard` is mounted by this page now and reaches
+// that client for the draft delete grade. The other five suites that mount this page were
+// each RE-RUN rather than pre-emptively edited, and all five stayed green, so none of them
+// gained a line it did not need.
 vi.mock("@/lib/api", () => ({
   listPublishedWorkflows: mockListPublished,
   listDraftWorkflows: mockListDrafts,
@@ -54,6 +91,7 @@ vi.mock("@/lib/api", () => ({
   listFolders: mockListFolders,
   listSkills: mockListSkills,
   listStarterWorkflows: mockListStarters,
+  deleteWorkflowDraft: mockDeleteDraft,
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"
@@ -151,8 +189,40 @@ const starterRow = {
   },
 }
 
+/**
+ * 192-10 (D-05) — pick a project through the TOOLBAR'S SELECT.
+ *
+ * The 200px rail is gone and its `FilterItem` toggles with it, so `click(getByText(name))`
+ * now lands on an `<option>` — which fires no `change` event in jsdom and would leave the
+ * selection silently unmoved. Driving the `<select>` is the honest equivalent of what the
+ * rail click used to do, and every assertion built on it is unchanged.
+ */
+function selectProject(value: string) {
+  fireEvent.change(screen.getByTestId("library-project-select"), { target: { value } })
+}
+
+/**
+ * 192-10 (D-09 / D-12) — reach the fork verb.
+ *
+ * The fork is no longer a button on a card face: D-09 gives each row ONE primary verb and
+ * puts everything else behind a quiet `⋯`, and D-12 keeps the two fork HANDLERS separate
+ * behind ONE shared word. So the route to `published-tweak` / `use-starter` is now: open the
+ * row's overflow, then pick the item. The shim below is the shipped one — Radix's menu uses
+ * pointer-capture and `scrollIntoView`, neither of which jsdom implements.
+ */
+async function openOverflow(card: HTMLElement) {
+  const user = userEvent.setup()
+  await user.click(within(card).getByRole("button", { name: /workflow actions/i }))
+  await screen.findByRole("menu")
+  return user
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
+  if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
+  if (!Element.prototype.setPointerCapture) Element.prototype.setPointerCapture = () => {}
+  if (!Element.prototype.releasePointerCapture) Element.prototype.releasePointerCapture = () => {}
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
   mockListPublished.mockResolvedValue([strictPublished, loosePublished])
   mockListDrafts.mockResolvedValue([draftRow])
   mockListStarters.mockResolvedValue([starterRow])
@@ -162,7 +232,7 @@ beforeEach(() => {
   mockListSkills.mockResolvedValue([])
 })
 
-describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-query)", () => {
+describe("WorkflowsPage — project filter (live ?project_folder_id= re-query)", () => {
   it("'All projects' calls listPublishedWorkflows with no project filter on mount", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     await waitFor(() => expect(mockListPublished).toHaveBeenCalled())
@@ -175,8 +245,11 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     await waitFor(() => expect(mockListPublished).toHaveBeenCalled())
     mockListPublished.mockClear()
-    fireEvent.click(screen.getByText("DBA Chapters"))
-    // Phase 143 (D-143-2a): the Workflows-page Published shelf now opts into scope:"mine"
+    // 192-10 (D-05): the instrument changed from a rail toggle to one toolbar select. The
+    // CONTRACT below — which arguments the re-query is made with — is byte-for-byte the one
+    // this case has always asserted.
+    selectProject("folder-aaa")
+    // Phase 143 (D-143-2a): the Workflows-page published feed opts into scope:"mine"
     // (mine-only de-dupe). The project folder id stays the FIRST arg; scope rides in the
     // 3rd options arg so the composer picker / WorkspacePanel (no scope) stay unchanged.
     await waitFor(() =>
@@ -197,51 +270,133 @@ describe("WorkflowsPage — project filter rail (live ?project_folder_id= re-que
 
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     // Switch to the project BEFORE the mount fetch resolves.
-    fireEvent.click(screen.getByText("DBA Chapters"))
-    // The project (later) fetch resolves first → 1 published card.
+    //
+    // ⚠ 192-10: THIS ROW IS WHY THE TOOLBAR MOUNTS DURING THE FIRST LOAD RATHER THAN AFTER
+    // IT. The state under test is precisely "the mount fetch has not returned and the
+    // selection moves anyway", so a toolbar withheld until the first settle would make the
+    // project control unreachable in the one state this guard exists to cover. RESEARCH
+    // classified this case as "must stay green" WITHOUT a rewrite; measured, its interaction
+    // had to change for the same reason the case above it did.
+    selectProject("folder-aaa")
+    // The project (later) fetch resolves first → 1 published row.
     await waitFor(() => expect(screen.getAllByTestId("published-card")).toHaveLength(1))
     // Now the stale mount fetch finally resolves with a DIFFERENT (larger) list.
     releaseAll([strictPublished, loosePublished])
-    // It must be DROPPED — the rendered list stays at the current selection (1 card).
+    // It must be DROPPED — the rendered list stays at the current selection (1 row).
     await waitFor(() => expect(mockListPublished).toHaveBeenCalledTimes(2))
     expect(screen.getAllByTestId("published-card")).toHaveLength(1)
   })
 })
 
-describe("WorkflowsPage — published-above-drafts shelves + build-card", () => {
-  it("the Published shelf renders ABOVE the Drafts shelf (DOM order — BUG-260628-01 fold, D-143-5)", async () => {
-    // Phase 143 (D-143-5): the sections are reordered Starters → Published → Drafts so
-    // runnable published/starters are no longer buried under drafts (this replaces the
-    // old drafts-above-published contract; the full 3-shelf order is asserted in the
-    // Starters-shelf block below).
-    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const published = await screen.findByTestId("published-shelf")
-    const drafts = screen.getByTestId("drafts-shelf")
-    // compareDocumentPosition: FOLLOWING (4) means `drafts` comes after `published`.
-    expect(published.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  })
+// ── 192-10 (D-16, T-192-03) — THE MERGE TRAP, PROVED RATHER THAN ARGUED ────────────────
 
-  it("the dashed build-card is present in the drafts shelf and opens the two-door chooser (WUX-02)", async () => {
+describe("WorkflowsPage — a refused feed subtracts ONLY itself (D-16, the RUN CARVE-OUT)", () => {
+  it("a REJECTED /workflows/drafts still renders the published rows and the starter", async () => {
+    // ⚠ THE SINGLE HIGHEST-RISK DEFECT THE D-16 MERGE CAN SHIP, and the only mechanical
+    // guard against it.
+    //
+    // `GET /workflows/drafts` carries `require_visible("workflow_authoring")`. `GET
+    // /workflows/published` and `GET /workflows/starters` carry NO dependency at all —
+    // they are the Phase-148 RUN CARVE-OUT, the feeds that keep Run working for EVERY user,
+    // and the backend says so verbatim at the route. A `Promise.all` plus one shared error
+    // path therefore turns a 403 on the gated feed into an EMPTY LIBRARY: the gate
+    // re-introduced client-side, on exactly the two feeds the carve-out withheld it from.
+    //
+    // A test in which all three feeds resolve does not test this AT ALL — it is green
+    // against `all` and against `allSettled` alike. This one is not.
+    mockListDrafts.mockRejectedValue(new Error("403 Forbidden"))
+
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const draftsShelf = await screen.findByTestId("drafts-shelf")
-    const buildCard = within(draftsShelf).getByTestId("build-card")
-    expect(buildCard).toBeInTheDocument()
-    fireEvent.click(buildCard)
-    // A fresh build now forks at the Studio authoring ENTRY into the two-door chooser
-    // (047-A) — Describe & run vs Author & govern — NOT the describe screen directly.
+
+    // The two carve-out feeds render in full…
+    await waitFor(() => expect(screen.getAllByTestId("published-card")).toHaveLength(2))
+    expect(screen.getByTestId("starter-card")).toBeInTheDocument()
+    // …the refused one degrades to ZERO DRAFTS, not to zero library…
+    expect(screen.queryByTestId("draft-card")).toBeNull()
+    // …and the failure is NAMED rather than folded into a page-wide error, so a partial
+    // library is never presented as a complete one.
+    expect(screen.getByTestId("library-source-failed-draft")).toBeInTheDocument()
+    // The two feeds that succeeded say nothing, because nothing went wrong with them.
+    expect(screen.queryByTestId("library-source-failed-published")).toBeNull()
+    expect(screen.queryByTestId("library-source-failed-starter")).toBeNull()
+
+    // ── ⚠ AND THE SHAPE, BECAUSE THE BEHAVIOURAL HALF ABOVE CANNOT SEE IT ──────────────
+    // This was MEASURED, not assumed. Swapping the aggregate to `Promise.all` and driving
+    // the case above leaves it GREEN — because the isolation that actually saves the
+    // library is the PER-SOURCE try/catch inside each refetch, and the aggregate's only
+    // remaining job is to settle without throwing. (The plant that DOES redden the case
+    // above is the real defect: gating the list on "no source failed", which is the single
+    // shared error path RESEARCH names. It was driven RED and restored md5-identical.)
+    //
+    // So the keyword is pinned separately, on the source, rather than claimed by a
+    // behavioural assertion that cannot distinguish it. `Promise.all` must never reappear
+    // here: the day the aggregate acquires a consumer again — a settle-gated spinner, a
+    // telemetry hook — `all` would silently re-introduce exactly the coupling the carve-out
+    // exists to prevent, and no behavioural test would notice.
+    const pageSource = (await import("./WorkflowsPage?raw")).default as string
+    expect(pageSource.length).toBeGreaterThan(10000) // non-vacuity: an empty `?raw` proves nothing
+    expect(pageSource).toContain("Promise.allSettled(")
+    expect(pageSource).not.toContain("Promise.all(")
+  })
+})
+
+/**
+ * ⚠ TWO TESTS WERE DELETED HERE, AND THE DELETION IS THE POINT OF THE COMMENT.
+ *
+ *   1. the published-above-drafts DOM-order case (BUG-260628-01 fold, D-143-5), which lived
+ *      in this block;
+ *   2. the full Starters → Published → Drafts order case (SC-e), which lived in the starter
+ *      block below.
+ *
+ * Both asserted an ORDER OF SECTIONS, and D-02 deletes the sections. There is no ordering
+ * left to be right or wrong about — one flat list has one order — and the taxonomy those
+ * three sections carried survives as three of the toolbar's six chips.
+ *
+ * The BUG they folded is NOT un-fixed by removing them. BUG-260628-01 was "runnable work is
+ * buried under drafts"; 157-B's answer is stronger than re-ordering three sections, because a
+ * user who wants runnable rows now says so with the *Ready to run* chip and gets exactly the
+ * count that chip promised — which `libraryFilter.test.ts` proves as arithmetic, per chip.
+ *
+ * These two deletions are the ONLY ones in this file, and they are what authorizes the ONE
+ * count-gate pin lowering this phase makes. The lowering rides in the same commit, at a
+ * number read from the gate's own `actual` column — never to make a red gate go quiet.
+ */
+describe("WorkflowsPage — the create affordance and the draft-cannot-Run contract", () => {
+  it("the toolbar create affordance opens the two-door chooser (WUX-02)", async () => {
+    // 192-10 (D-02): the dashed build-card was the first cell of the THIRD grid and died
+    // with the shelves; SC#4's fix is structural, not a promotion — create now LEADS a
+    // persistent toolbar and cannot drift back down a grid because there is no grid above
+    // it. The half of this case that matters is the seam to Phase 193, and it is untouched:
+    // a fresh build still lands at the two-door chooser, not at the describe screen.
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const create = await screen.findByTestId("library-create")
+    expect(create).toBeInTheDocument()
+    fireEvent.click(create)
     expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
     expect(screen.getByTestId("door-card-describe")).toBeInTheDocument()
     expect(screen.getByTestId("door-card-govern")).toBeInTheDocument()
   })
 
-  it("NO draft card exposes a Run affordance; published cards DO", async () => {
+  it("NO draft row exposes a Run affordance, in its face OR its menu; runnable rows DO", async () => {
+    // ⚠ THE LOAD-BEARING HALF, REWRITTEN RATHER THAN DELETED. "A draft cannot be Run
+    // (publish is the test)" is stated in the page's own docblock and this is the only
+    // page-level mechanical guard on it. D-09 keeps the invariant exactly; what changed is
+    // that `Publish…` is GONE (D-10 — it was a button that opened the editor, so its label
+    // lied), and the draft's one verb is `✎ Open`.
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const draftCard = await screen.findByTestId("draft-card")
-    // A draft shows Open + Publish, never Run.
     expect(within(draftCard).queryByTestId("published-run")).not.toBeInTheDocument()
     expect(within(draftCard).getByTestId("draft-open")).toBeInTheDocument()
-    expect(within(draftCard).getByTestId("draft-publish")).toBeInTheDocument()
-    // The published cards carry Run.
+    // D-10: the button that lied is gone from the row entirely.
+    expect(within(draftCard).queryByTestId("draft-publish")).not.toBeInTheDocument()
+    // …and it is not hiding in the overflow either — an absence proved only on the face
+    // would be satisfied by a Run that merely moved behind the `⋯`.
+    await openOverflow(draftCard)
+    const menu = screen.getByRole("menu")
+    expect(within(menu).queryByTestId("published-run")).not.toBeInTheDocument()
+    expect(within(menu).queryByTestId("draft-publish")).not.toBeInTheDocument()
+
+    // The runnable rows carry Run.
     const published = await screen.findAllByTestId("published-card")
     expect(within(published[0]).getByTestId("published-run")).toBeInTheDocument()
   })
@@ -390,11 +545,18 @@ describe("WorkflowsPage — Run launch (D-103-1) reuses onLaunch", () => {
   })
 })
 
+/**
+ * 192-10 (D-09 / D-12) — the three cases below keep EVERY assertion they have always made.
+ * Only the route changed: the fork is one word inside the row's `⋯` overflow now, shared
+ * with the starter fork, and the two HANDLERS behind that one word stay separate siblings —
+ * which is what the starter block below proves from the other side.
+ */
 describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", () => {
   it("Tweak calls createWorkflowDraft with version = def.version + 1, same slug, status 'draft'", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    fireEvent.click(within(cards[0]).getByTestId("published-tweak"))
+    const user = await openOverflow(cards[0])
+    await user.click(screen.getByTestId("published-tweak"))
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     const forked = mockCreateDraft.mock.calls[0][0]
     expect(forked.slug).toBe("vendor-risk")
@@ -410,7 +572,8 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     // never the empty describe box.
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    fireEvent.click(within(cards[0]).getByTestId("published-tweak"))
+    const user = await openOverflow(cards[0])
+    await user.click(screen.getByTestId("published-tweak"))
     // The forked strict def's phases render as spine nodes (pull + emit).
     expect(await screen.findByTestId("spine-node-pull")).toBeInTheDocument()
     expect(screen.getByTestId("spine-node-emit")).toBeInTheDocument()
@@ -423,30 +586,40 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     // on a non-null draftId in renderPublish) renders immediately in the edit view.
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    fireEvent.click(within(cards[0]).getByTestId("published-tweak"))
+    const user = await openOverflow(cards[0])
+    await user.click(screen.getByTestId("published-tweak"))
     await screen.findByTestId("spine-node-pull")
     // The header carries the Tweak caption with the new version.
     expect(screen.getByText(/Tweak · vendor-risk v3/)).toBeInTheDocument()
   })
 })
 
-describe("WorkflowsPage — Starters shelf (WF-01, D-143-1/2/5/8) [RED until Plan 04]", () => {
-  it("renders the Starters shelf with the curated card, its Starter/Official chip, and a Use-this-starter control", async () => {
+describe("WorkflowsPage — the starter row and its fresh-copy fork (WF-01, D-143-1/2/8)", () => {
+  it("a starter row renders in the ONE list with its provenance mark and the fork verb", async () => {
+    // 192-10 (D-02 / D-09): there is no curated section to render it in. What survives — and
+    // what actually mattered in the deleted assertion — is that a curated row is
+    // DISTINGUISHABLE from a user's own at a glance, and that the fork affordance is on it.
+    // The distinction is now the row's own provenance mark plus a machine-readable
+    // `data-provenance`, and the fork is the shared verb behind the `⋯`.
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const shelf = await screen.findByTestId("starters-shelf")
-    // The seeded curated starter renders as a card inside the shelf.
-    const card = within(shelf).getByTestId("starter-card")
+    const card = await screen.findByTestId("starter-card")
+    // It sits in the one flat list, not in a section of its own.
+    expect(within(screen.getByTestId("library-list")).getByTestId("starter-card")).toBe(card)
     expect(within(card).getByText("Risk Register")).toBeInTheDocument()
-    // The curated-vs-mine visual distinction (D-143-8, Glean verified-badge analog).
+    // The curated-vs-mine distinction (D-143-8, Glean verified-badge analog), now carried by
+    // the row itself rather than by the section it used to sit under.
+    expect(card.getAttribute("data-provenance")).toBe("starter")
     expect(within(card).getByText(/starter|official/i)).toBeInTheDocument()
-    // The fork affordance ("Use this starter", Zapier clone-CTA analog).
-    expect(within(card).getByTestId("use-starter")).toBeInTheDocument()
+    // The fork affordance, reached the way D-09 puts it.
+    await openOverflow(card)
+    expect(screen.getByTestId("use-starter")).toBeInTheDocument()
   })
 
   it("onUseStarter forks a FRESH copy: new suffixed slug + v1 + draft (INSERT, never UPDATE the frozen starter)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const shelf = await screen.findByTestId("starters-shelf")
-    fireEvent.click(within(shelf).getByTestId("use-starter"))
+    const card = await screen.findByTestId("starter-card")
+    const user = await openOverflow(card)
+    await user.click(screen.getByTestId("use-starter"))
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     const forked = mockCreateDraft.mock.calls[0][0]
     // D-143-1: a brand-new owned identity — a NEW auto-suffixed slug off "risk-register".
@@ -455,21 +628,15 @@ describe("WorkflowsPage — Starters shelf (WF-01, D-143-1/2/5/8) [RED until Pla
     expect(forked.status).toBe("draft")
     // It is an INSERT (createWorkflowDraft) — the frozen published starter is NEVER UPDATEd.
     expect(mockUpdate).not.toHaveBeenCalled()
+    // ⚠ D-12, from the OTHER side, and this is the assertion the shared word makes
+    // necessary: a starter's fork reached `onUseStarter`, so it minted a NEW slug at v1
+    // rather than this slug at v(N+1). Merging the two handlers behind one label breaks the
+    // GLOBAL `UNIQUE(slug, version)` constraint the moment two people fork one starter.
+    expect(forked.slug).not.toBe("risk-register")
   })
 
-  it("folds BUG-260628-01 (SC-e): section order is Starters → Published → Drafts (runnable no longer buried under drafts)", async () => {
-    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const starters = await screen.findByTestId("starters-shelf")
-    const published = screen.getByTestId("published-shelf")
-    const drafts = screen.getByTestId("drafts-shelf")
-    // compareDocumentPosition FOLLOWING (4): starters precedes published precedes drafts.
-    expect(
-      starters.compareDocumentPosition(published) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(
-      published.compareDocumentPosition(drafts) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-  })
+  // ⚠ The section-order case that lived here was DELETED — see the block comment above the
+  // create-affordance describe for the authorization and the reason.
 })
 
 describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)", () => {
@@ -485,10 +652,12 @@ describe("WorkflowsPage — Open a draft loads it in the Builder (edit-in-place)
     expect(mockCreateDraft).not.toHaveBeenCalled()
   })
 
-  it("the build-card opens a TRUE fresh build (the 'both' door chooser, no initial)", async () => {
+  it("the create affordance opens a TRUE fresh build (the 'both' door chooser, no initial)", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
-    const draftsShelf = await screen.findByTestId("drafts-shelf")
-    fireEvent.click(within(draftsShelf).getByTestId("build-card"))
+    // 192-10 (D-02): same seam, new click target. `openBuilderFresh` →
+    // `setBuilderInitial(null)` + `setPageView("builder")` is UNCHANGED — 192 must not move
+    // Phase 193's authoring doors, only the affordance that reaches them.
+    fireEvent.click(await screen.findByTestId("library-create"))
     // Fresh build → the chooser, NOT an already-loaded definition's spine nodes.
     expect(await screen.findByTestId("workflow-doors")).toBeInTheDocument()
     expect(screen.queryByTestId("spine-node-draft")).not.toBeInTheDocument()
@@ -500,8 +669,7 @@ describe("WorkflowsPage — back-nav refreshes the library lists", () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     // Enter the Builder host via a fresh build (does not itself refetch). The fresh
     // build opens the two-door chooser.
-    const draftsShelf = await screen.findByTestId("drafts-shelf")
-    fireEvent.click(within(draftsShelf).getByTestId("build-card"))
+    fireEvent.click(await screen.findByTestId("library-create"))
     await screen.findByTestId("workflow-doors")
     mockListDrafts.mockClear()
     mockListPublished.mockClear()
@@ -509,7 +677,8 @@ describe("WorkflowsPage — back-nav refreshes the library lists", () => {
     fireEvent.click(screen.getByTestId("builder-back"))
     await waitFor(() => expect(mockListDrafts).toHaveBeenCalledTimes(1))
     expect(mockListPublished).toHaveBeenCalledTimes(1)
-    // The library is back.
-    expect(await screen.findByTestId("drafts-shelf")).toBeInTheDocument()
+    // The library is back — witnessed by its persistent toolbar, which is what 157-B put in
+    // the place three shelves used to occupy.
+    expect(await screen.findByTestId("library-toolbar")).toBeInTheDocument()
   })
 })

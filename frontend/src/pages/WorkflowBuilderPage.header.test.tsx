@@ -388,7 +388,11 @@ describe("Builder header, canvas flag ON — ONE row (D-184.1-01)", () => {
         </div>
       </EffectiveFeaturesProvider>,
     )
-    fireEvent.click(await screen.findByTestId("build-card"))
+    // 192-10 (D-02): the fresh-build entry is the TOOLBAR's create control now — the dashed
+    // build-card was the first cell of the third grid and died with the shelves. The seam
+    // this case actually guards (a fresh build must still reach the two-door chooser with a
+    // breadcrumb back) is unchanged; only the affordance that opens it moved.
+    fireEvent.click(await screen.findByTestId("library-create"))
     await screen.findByTestId("workflow-doors")
     expect(screen.getByRole("button", { name: "← Workflows" })).toBeInTheDocument()
   })
