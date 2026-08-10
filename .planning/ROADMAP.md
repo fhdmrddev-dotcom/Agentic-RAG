@@ -83,9 +83,9 @@ is the incumbent any proposal must beat.
 
 - [x] `192-01-PLAN.md` (wave 1) — count-gate adoption: the five suites covering this page were in NEITHER knob (74 of 123 tests invisible). Must be commit 1.
 - [x] `192-02-PLAN.md` (wave 1) — D-04 backend: `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, never a raw `created_by`; the widened wire type.
-- [ ] `192-03-PLAN.md` (wave 2) — `RunModal` characterization baseline, 6 states, captured while `library/RunModal.tsx` provably does not exist.
-- [ ] `192-04-PLAN.md` (wave 2) — delete-Sheet characterization baseline, 7 states + the two graded-guard invariants; the real ≈169 L extent recorded.
-- [ ] `192-05-PLAN.md` (wave 2) — the pure leaves: `libraryRow` · `libraryVocabulary` · `libraryFilter` (merge/dedupe-by-id/chips/substring search) + the F1/F4/F5 subtree fences.
+- [x] `192-03-PLAN.md` (wave 2) — `RunModal` characterization baseline, 6 states, captured while `library/RunModal.tsx` provably does not exist.
+- [x] `192-04-PLAN.md` (wave 2) — delete-Sheet characterization baseline, 7 states + the two graded-guard invariants; the real ≈169 L extent recorded.
+- [x] `192-05-PLAN.md` (wave 2) — the pure leaves: `libraryRow` · `libraryVocabulary` · `libraryFilter` (merge/dedupe-by-id/chips/substring search) + the F1/F4/F5 subtree fences.
 - [ ] `192-06-PLAN.md` (wave 3) — D-01 move 1: `RunModal` out of the page, create-additively then cut, zero re-capture.
 - [ ] `192-07-PLAN.md` (wave 3) — `LibraryToolbar`: create leads · always-on search · six counted chips · project select + the D-17 starters note · the updating marker.
 - [ ] `192-08-PLAN.md` (wave 4) — D-01 move 2: `WorkflowDeleteSheet` out of `PublishedCard`, state + JSX as one unit, proved on the original render path.
