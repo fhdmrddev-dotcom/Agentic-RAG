@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: "v3.7"
 milestone_name: "Workflow Product Completion"
 status: executing
-last_updated: 2026-08-11T04:05:00.000Z
+last_updated: 2026-08-11T05:20:00.000Z
 last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "v3.7 Workflow Product Completion OPENED 2026-08-10 — requirements + roadmap written, no phase started. Nothing is mid-flight. Since the v3.6 close: BUG-260809-02 CLOSED (owed reload+publish UAT row driven against local via Chrome DevTools MCP — publish 200, `blocked_stage: null`); D-klo-DEF-01 closed (the block copy now has one home in `grounding.py` and says what to do); v3.6 phase dirs archived to `.planning/milestones/v3.6-phases/`; the missing v2.9 STRETCH carry-forward guide written (105-108); SEED-147..150 planted. Production is at `7dc53ffa` — the canvas `business_requirement` control and the copy fix are LIVE. 2026-08-10: ROADMAP v3.7 repaired (`2313329c`) — its phase details were bold labels, not `#### Phase NNN:` headings, so every SDK phase op for 192-198 returned `phase_found: false`; all seven now resolve. G-2 fired on 192 and was HONORED, then SATISFIED the same day — sketches 157/158/159 built, operator picked 157-B (one list, shelves become filters) · 158-A (always-on page search; CmdK indexing deferred with a 3-condition trigger) · 159-C (one verb, consequence as real DOM text). G-5 also fired on `WorkflowsPage.tsx` (21 commits / 10 phases / 1407 L; the file was missing from the ledger entirely) and was **HONORED at discuss-phase 192** (`514c8e64`) — no override, no waiver: the seam is split by what survives 192 (`RunModal` + the WFIN-03 delete Sheet verbatim-move with baselines captured FIRST; the three cards rewritten as new code under `components/workflows/library/`, because 188.2 measured a pure extraction grows the subtree +67% and three of the six components are being replaced). 192-CONTEXT.md written — 16 decisions. ⚠ **D-04: 192 is NOT frontend-only** — the `Yours` chip needs an ownership field `PublishedWorkflow` does not carry (`api.ts:1349`), so the phase touches `backend/app/api/workflows.py`, the `list_published_workflows` query and `api.ts`. ⚠ **D-12 CORRECTS the sketch MANIFEST**: `onTweak` and `onUseStarter` are siblings, NOT twins — merging the handlers would break the global `UNIQUE(slug, version)` constraint; they share one WORD, never one FUNCTION. **2026-08-10 (later): Phase 192 PLANNED — 12 plans / 8 waves (`8090971f`), checker fixes `1d077bbb`; RESEARCH `7d73a53e`, VALIDATION+D-17/D-18 `6bf1b4ab`, PATTERNS `c172c403`.** Plan-checker: **0 blockers, 2 warnings, both closed surgically.** Research corrected SIX CONTEXT.md line numbers at `HEAD = a0795512` (notably the starter-fork `title=` cited as `:155`, which is actually a race-guard `useRef` — the real site is `:1044`), and found that **the vitest count gate covers NEITHER this phase's own test file NOR the three `src/pages/__tests__/` suites — 74 of 123 covering tests invisible, the EIGHTH two-knob occurrence**; `192-01` is therefore commit 1. Two operator decisions added at plan time: **D-17** (project filter holds starters out and SAYS so — silence is a UAT fail) and **D-18** (draft Delete ships as WIRING: `delete_draft` + `deleteWorkflowDraft` already exist and are tested with zero UI callers; never the cascade path). **2026-08-10 (later still): Phase 192 EXECUTING — wave 1 of 8 merged at `5178100e`, 2 of 12 plans complete (`192-01` count-gate adoption + `192-02` D-04 ownership). Post-merge gate green: tsc 33 unmoved, count gate exit 0, backend ownership suite 17/17.** **Wave 2 merged `3d1a9567` — 5 of 12 plans done.** **Wave 3 merged `15f1b5c2` — 7 of 12 plans done; `WorkflowsPage.tsx` 1407 → 1068 L.** NEXT = wave 4 (`192-08`)."
-resume_file: ".planning/phases/192-workflow-library-ia/192-08-PLAN.md"
+stopped_at: "v3.7 Workflow Product Completion OPENED 2026-08-10 — requirements + roadmap written, no phase started. Nothing is mid-flight. Since the v3.6 close: BUG-260809-02 CLOSED (owed reload+publish UAT row driven against local via Chrome DevTools MCP — publish 200, `blocked_stage: null`); D-klo-DEF-01 closed (the block copy now has one home in `grounding.py` and says what to do); v3.6 phase dirs archived to `.planning/milestones/v3.6-phases/`; the missing v2.9 STRETCH carry-forward guide written (105-108); SEED-147..150 planted. Production is at `7dc53ffa` — the canvas `business_requirement` control and the copy fix are LIVE. 2026-08-10: ROADMAP v3.7 repaired (`2313329c`) — its phase details were bold labels, not `#### Phase NNN:` headings, so every SDK phase op for 192-198 returned `phase_found: false`; all seven now resolve. G-2 fired on 192 and was HONORED, then SATISFIED the same day — sketches 157/158/159 built, operator picked 157-B (one list, shelves become filters) · 158-A (always-on page search; CmdK indexing deferred with a 3-condition trigger) · 159-C (one verb, consequence as real DOM text). G-5 also fired on `WorkflowsPage.tsx` (21 commits / 10 phases / 1407 L; the file was missing from the ledger entirely) and was **HONORED at discuss-phase 192** (`514c8e64`) — no override, no waiver: the seam is split by what survives 192 (`RunModal` + the WFIN-03 delete Sheet verbatim-move with baselines captured FIRST; the three cards rewritten as new code under `components/workflows/library/`, because 188.2 measured a pure extraction grows the subtree +67% and three of the six components are being replaced). 192-CONTEXT.md written — 16 decisions. ⚠ **D-04: 192 is NOT frontend-only** — the `Yours` chip needs an ownership field `PublishedWorkflow` does not carry (`api.ts:1349`), so the phase touches `backend/app/api/workflows.py`, the `list_published_workflows` query and `api.ts`. ⚠ **D-12 CORRECTS the sketch MANIFEST**: `onTweak` and `onUseStarter` are siblings, NOT twins — merging the handlers would break the global `UNIQUE(slug, version)` constraint; they share one WORD, never one FUNCTION. **2026-08-10 (later): Phase 192 PLANNED — 12 plans / 8 waves (`8090971f`), checker fixes `1d077bbb`; RESEARCH `7d73a53e`, VALIDATION+D-17/D-18 `6bf1b4ab`, PATTERNS `c172c403`.** Plan-checker: **0 blockers, 2 warnings, both closed surgically.** Research corrected SIX CONTEXT.md line numbers at `HEAD = a0795512` (notably the starter-fork `title=` cited as `:155`, which is actually a race-guard `useRef` — the real site is `:1044`), and found that **the vitest count gate covers NEITHER this phase's own test file NOR the three `src/pages/__tests__/` suites — 74 of 123 covering tests invisible, the EIGHTH two-knob occurrence**; `192-01` is therefore commit 1. Two operator decisions added at plan time: **D-17** (project filter holds starters out and SAYS so — silence is a UAT fail) and **D-18** (draft Delete ships as WIRING: `delete_draft` + `deleteWorkflowDraft` already exist and are tested with zero UI callers; never the cascade path). **2026-08-10 (later still): Phase 192 EXECUTING — wave 1 of 8 merged at `5178100e`, 2 of 12 plans complete (`192-01` count-gate adoption + `192-02` D-04 ownership). Post-merge gate green: tsc 33 unmoved, count gate exit 0, backend ownership suite 17/17.** **Wave 2 merged `3d1a9567` — 5 of 12 plans done.** **Wave 3 merged `15f1b5c2` — 7 of 12 plans done; `WorkflowsPage.tsx` 1407 → 1068 L.** **Wave 4 merged `b52bd4f4` — 8 of 12 plans done; page 1068 → 926 L.** NEXT = wave 5 (`192-09`, the unified card)."
+resume_file: ".planning/phases/192-workflow-library-ia/192-09-PLAN.md"
 ---
 
 # Project State
@@ -32,10 +32,10 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
-**Phase:** 192 Workflow Library IA — **EXECUTING: 7 of 12 plans complete, waves 1-3 of 8 merged**
-**Plan:** waves 1-3 done; wave 4 next (`192-08`, the delete-Sheet move — single plan)
+**Phase:** 192 Workflow Library IA — **EXECUTING: 8 of 12 plans complete, waves 1-4 of 8 merged**
+**Plan:** waves 1-4 done; wave 5 next (`192-09`, the unified card — single plan)
 **Status:** In progress
-**Next action:** continue `/gsd:execute-phase 192` at **wave 4**. Downstream MUST read `192-CONTEXT.md` (**18** decisions) and `192-RESEARCH.md`, which **corrects six CONTEXT.md line numbers** measured at `HEAD = a0795512` — re-derive every line number, HEAD has moved.
+**Next action:** continue `/gsd:execute-phase 192` at **wave 5**. Downstream MUST read `192-CONTEXT.md` (**18** decisions) and `192-RESEARCH.md`, which **corrects six CONTEXT.md line numbers** measured at `HEAD = a0795512` — re-derive every line number, HEAD has moved.
 **Last activity:** 2026-08-10 — **Phase 192 wave 1 executed and merged** (`5178100e`). `192-01`: five `WorkflowsPage`-covering suites adopted into BOTH count-gate knobs (pinned files 51 → 56, pinned total 2838 → 2910), zero source changed. `192-02`: D-04 ownership — `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, raw `created_by` fenced off the wire. Post-merge gate green: `tsc -p tsconfig.app.json` unmoved at **33**, count gate exit 0 / `failed 0`, new backend suite 17/17.
 
 ### Wave 1 — three measured findings not to re-derive
@@ -94,7 +94,7 @@ Post-merge: count gate exit 0 / `failed 0` / total 2910 → 3060 all-growth, `ts
    trips it.
 
 **Owed to `192-12`** (the pinning sweep): `RunModal.test.tsx` 11 → **32** (192-06 re-measured; wave 2 read 27 before the move added cases), `RunModal.a11y.test.tsx`
-8 → **16**, `PublishedCardDelete.test.tsx` 7 → **26**, plus first pins for `libraryFilter.test.ts`
+8 → **16**, `PublishedCardDelete.test.tsx` 7 → **32** (192-08 re-measured; 192-04-SUMMARY.md records 26, which is stale), plus first pins for `libraryFilter.test.ts`
 (36) and `librarySubtree.fences.test.ts` (47), plus RED plants for the four subtree modules.
 ⚠ **If `192-06` moves tests into a new `library/RunModal.test.tsx`, the old files' counts DECREASE —
 the one thing this gate fails on. 192-06 and 192-12 must settle those pins together.**
@@ -129,6 +129,40 @@ today. That is D-14 working; the `aria-describedby` conversion belongs with the 
    leads in **focus and screen-reader order**; the visual half is owed to UAT U2/U7 and `192-11`
    and was NOT claimed.
 7. **Wrong base: 6 of 6 worktrees.** Unchanged and systematic.
+
+### Wave 4 — the second D-01 move, and a claim this orchestrator got wrong (merged `b52bd4f4`)
+
+`192-08` moved the WFIN-03 delete Sheet out of `PublishedCard` into
+`library/WorkflowDeleteSheet.tsx` (296 L). **Page 1068 → 926 L** (40 ins / 182 del). Four spans
+`diff`ed IDENTICAL against the base blob, **zero characters added inside any span**. All seven
+192-04 captures + both graded-guard invariants green with **zero re-capture** — `git diff` over
+`pages/__tests__/` was empty at the moment they re-ran. Post-merge: count gate exit 0 / `failed 0` /
+total 3107, `tsc` 33.
+
+1. **⚠ THE `title=` CLAIM WAS FALSE, AND THIS ORCHESTRATOR PROPAGATED IT.** `192-05` claimed both
+   D-01 moves would trip fence F1; `192-06` refuted it for `RunModal` but kept "`:857` is a genuine
+   hit for 192-08" — and the wave-4 dispatch brief repeated that as fact **without re-deriving it**.
+   Measured: the page's six `title` attributes sit at `:98 :564 :588 :871 :1042 :1058`, and `:871`
+   (the post-cut position of old `:857`) is the **⑂ Tweak button in `PublishedCard`'s footer**, ten
+   lines ABOVE the Sheet's comment at `:886`. **Zero `title` attributes were inside the moved
+   range.** No conversion was owed; none was performed; the plan's own acceptance criterion
+   (`grep -c "title=" ` on the module = 0) had it right. **⇒ The `:871` D-14 conversion is now
+   `192-09`/`192-10`'s debt** — 192-09 must not reintroduce it on the new card, and 192-10 deletes
+   the old one. **Lesson, same class as the project's standing rule: a claim inherited through two
+   summaries and an orchestrator brief is still an unmeasured claim.**
+2. **Every inherited line number was +14 stale** — all four spans re-derived by content, not number.
+   Third line-number correction in this phase.
+3. **192-04's "169-line extent" measures 175 here** — two comment blocks documenting the moved code
+   that its span list did not name.
+4. **The guard was re-proved ON the moved code:** deleting the mid-delete refusal inside
+   `WorkflowDeleteSheet.tsx` reddened exactly 4 rows — **including 192-04's two page-driven rows**,
+   which is the cleanest available proof the invariants follow the code and not the filename — with
+   all four positive controls green, then restored.
+5. **New pattern introduced, cost stated:** the Sheet opens via a React 19 ref-as-prop imperative
+   handle, chosen so `sheetOpen` could not stay on the caller. `useImperativeHandle` had **zero**
+   prior uses in this codebase.
+6. **The count gate did NOT flake in this single-executor wave** — consistent with the
+   concurrency-induced explanation, not a latent suite problem.
 
 **Owed to a later plan** (raised by `192-02`, from RESEARCH): an integration assertion that
 `is_mine === (provenance !== "starter")` over the merged list — the cross-check that makes feed
