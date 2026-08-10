@@ -1387,9 +1387,14 @@ fail, and it is the one no structural test can catch.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All four were resolved at plan time (2026-08-10) and each carries an inline `RESOLVED:` token
+> naming where it landed. Nothing else in this section has been edited.
 
 1. **Does the post-publish Run CTA (`:496–516`, testid `run-cta`) survive the single-list frame?**
+   **RESOLVED:** `192-10` Task 2 — it survives unchanged above the toolbar, with its lookup retargeted to
+   the merged list, recorded as an explicit decision.
    - Known: it is a page-level banner, not a card verb; it is set on a gauntlet PASS
      (`onGauntletPublished`, `:347–355`) and looks up the row by slug in `published` (`:473–474`).
    - Unclear: whether it should now target the merged list instead, and whether it belongs above or
@@ -1398,7 +1403,10 @@ fail, and it is the one no structural test can catch.
      so a just-published row is found regardless of feed. Record it as an explicit decision so a
      reviewer does not read the survival as an oversight.
 
-2. **Does the `Delete` overflow item appear on draft rows?** D-09's table says the draft overflow
+2. **Does the `Delete` overflow item appear on draft rows?**
+   **RESOLVED:** superseded by locked **D-18** (operator decision, 2026-08-10) — it ships as WIRING of the
+   already-shipped `deleteWorkflowDraft`, never through the cascade path, behind an arm-to-confirm guard.
+   Implemented in `192-09` Task 2, asserted in `192-11` Task 3. D-09's table says the draft overflow
    carries `Delete` — but the shipped delete is `deleteWorkflowCascade` wired to a *published* row's
    preview (`getWorkflowDeletePreview(wf.id)`), and no draft card has ever exposed delete.
    - **Recommendation:** verify at plan time that `DELETE /workflows/{id}` (`:1141`) and the preview
@@ -1406,11 +1414,15 @@ fail, and it is the one no structural test can catch.
      `Delete` on drafts is **net-new capability** and — per **G-7** — does not belong inside this
      phase's scope without being named as such.
 
-3. **Adopt `WorkflowBuilderPage.session.test.tsx` (23 tests) into the count gate?** It renders the live
+3. **Adopt `WorkflowBuilderPage.session.test.tsx` (23 tests) into the count gate?**
+   **RESOLVED:** `192-01` Task 2 — adopt `session` (assumption A6 recorded in the adoption comment first),
+   decline `ChatLayoutLaunch.test.tsx` with its reason written down. It renders the live
    `WorkflowsPage` three times and is unguarded. **Recommendation: yes** — but with the flake in A6
    recorded first, so the adoption does not import a red gate.
 
-4. **Where does the "updating…" marker live during a project re-query?** Toolbar, list header, or a row
+4. **Where does the "updating…" marker live during a project re-query?**
+   **RESOLVED:** `192-07` Task 2 — in the toolbar, adjacent to the chip row, carrying a `data-state`
+   attribute in `DescribeKbPicker`'s convention so the state is machine-readable. Toolbar, list header, or a row
    overlay. Purely a composition call (Claude's discretion), but it must exist — the honest-count rule
    depends on the user being able to tell "these counts describe stale rows" from "these counts are
    final".
