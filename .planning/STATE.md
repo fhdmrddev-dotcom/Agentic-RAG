@@ -5,7 +5,7 @@ milestone_name: "Workflow Product Completion"
 status: planning
 last_updated: 2026-08-10T14:30:00.000Z
 last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "v3.7 Workflow Product Completion OPENED 2026-08-10 — requirements + roadmap written, no phase started. Nothing is mid-flight. Since the v3.6 close: BUG-260809-02 CLOSED (owed reload+publish UAT row driven against local via Chrome DevTools MCP — publish 200, `blocked_stage: null`); D-klo-DEF-01 closed (the block copy now has one home in `grounding.py` and says what to do); v3.6 phase dirs archived to `.planning/milestones/v3.6-phases/`; the missing v2.9 STRETCH carry-forward guide written (105-108); SEED-147..150 planted. Production is at `7dc53ffa` — the canvas `business_requirement` control and the copy fix are LIVE. NEXT = `/gsd:discuss-phase 192`."
+stopped_at: "v3.7 Workflow Product Completion OPENED 2026-08-10 — requirements + roadmap written, no phase started. Nothing is mid-flight. Since the v3.6 close: BUG-260809-02 CLOSED (owed reload+publish UAT row driven against local via Chrome DevTools MCP — publish 200, `blocked_stage: null`); D-klo-DEF-01 closed (the block copy now has one home in `grounding.py` and says what to do); v3.6 phase dirs archived to `.planning/milestones/v3.6-phases/`; the missing v2.9 STRETCH carry-forward guide written (105-108); SEED-147..150 planted. Production is at `7dc53ffa` — the canvas `business_requirement` control and the copy fix are LIVE. 2026-08-10: ROADMAP v3.7 repaired (`2313329c`) — its phase details were bold labels, not `#### Phase NNN:` headings, so every SDK phase op for 192-198 returned `phase_found: false`; all seven now resolve. G-2 fired on 192 and was HONORED. NEXT = `/gsd:sketch 192`, then `/gsd:discuss-phase 192`."
 resume_file: null
 ---
 
@@ -35,8 +35,14 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Phase:** Not started (requirements + roadmap written)
 **Plan:** —
 **Status:** Planning
-**Next action:** `/gsd:discuss-phase 192` (Workflow Library IA)
-**Last activity:** 2026-08-10 — v3.7 opened; v3.6 phases archived; SEED-147..150 planted; v2.9 STRETCH carry-forward guide written
+**Next action:** `/gsd:sketch 192` (Workflow Library IA) — **G-2 fired and is HONORED**, not overridden
+**Last activity:** 2026-08-10 — v3.7 opened; v3.6 phases archived; SEED-147..150 planted; v2.9 STRETCH carry-forward guide written; **ROADMAP v3.7 repaired** (`2313329c`) so the SDK can resolve 192-198
+
+### Guardrail activity
+
+| Date | Rule | Phase | Outcome |
+|---|---|---|---|
+| 2026-08-10 | **G-2** (sketch before discuss/spec on visual scope) | 192 | **HONORED.** `/gsd:discuss-phase 192` was requested; the ROADMAP itself flags 192 *G-2 fires (visual)*, and SEED-136 re-open trigger #3 independently says *"do the IA question FIRST, do not restyle underneath it."* No existing sketch covers this IA — sketch 021 (Phase 103) designed the very card-grid + project rail that SEED-136 now calls unbrowsable. Routed to `/gsd:sketch 192`; discuss-phase deferred until an operator-approved mockup exists. **Not an override — no waiver recorded.** |
 
 > Phase numbering continues from 190 and **starts at 192** — **191 is reserved** for the deferred
 > canvas-scale phase (`.planning/v3.6-STRETCH-CARRYFORWARD.md`). Do not reuse it.
