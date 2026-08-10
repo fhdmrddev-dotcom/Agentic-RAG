@@ -877,10 +877,13 @@ const BASELINE = {
   // NO OTHER PIN IS LOWERED HERE. `WorkflowBuilderPage.header.test.tsx` (32) and
   // `.session.test.tsx` (23) both had selectors updated by the same restructure and both
   // still read their pinned numbers exactly — a selector change must never move a count.
-  "WorkflowsPage.test.tsx": 22,
-  "RunModal.test.tsx": 11,
-  "RunModal.a11y.test.tsx": 8,
-  "PublishedCardDelete.test.tsx": 7,
+  // ⚠ ALL FOUR RAISED BY 192-12 (the phase's closing commit) — 22→39, 11→32, 8→16, 7→32.
+  // The argument, the per-suite attribution and the four drifts deliberately left alone are
+  // in the 192-12 block at the foot of this map. Read from the printed `actual`, twice.
+  "WorkflowsPage.test.tsx": 39,
+  "RunModal.test.tsx": 32,
+  "RunModal.a11y.test.tsx": 16,
+  "PublishedCardDelete.test.tsx": 32,
   // 192-01 Task 2: the FIFTH covering suite. `WorkflowBuilderPage.session.test.tsx` renders
   // the LIVE `WorkflowsPage` three times (`:482`, `:510`, `:768`) and was pinned by nothing —
   // an unpinned covering suite is an UNGUARDED one, not a lightly-guarded one. It needed BOTH
@@ -892,6 +895,70 @@ const BASELINE = {
   // script's own `actual` column: it reported `— 23 new` on the run that first put the file
   // inside TARGETS, and `delta 0` on the two runs after this pin landed.
   "WorkflowBuilderPage.session.test.tsx": 23,
+  // ── 192-12 (Phase 192 Wave 8, the CLOSING commit): THE EXEMPTION EXPIRES ───────────────
+  //
+  // 188-12's statement, applied to this phase's own output: AN UNPINNED SUITE IS AN
+  // UNGUARDED ONE, not a lightly-guarded one. Waves 2–5 deliberately left the four suites
+  // they CREATED out of this map while their counts were still growing — the same exemption
+  // 188-12 granted and then had to revoke fifteen times. `192-VALIDATION.md` § "Gate
+  // ownership across waves" wrote the expiry date into the plan rather than leaving it to
+  // anyone's memory, and this is that expiry.
+  //
+  // ⚠ NO `TARGETS` LINE IS NEEDED FOR THE FOUR NEW ONES, AND THAT IS MEASURED RATHER THAN
+  // ASSUMED — which matters, because the two-knob trap has now fired eight times in this
+  // script and its EIGHTH firing (192-01) was on this very phase. All four live under
+  // `src/components/workflows/library/`, which the DIRECTORY entry `src/components/workflows`
+  // already reaches: the gate's own printed columns listed each of them as `— NN new`,
+  // i.e. it was already EXECUTING them and merely not PINNING them. A file the gate never
+  // runs cannot report a number at all, so a printed `actual` IS the proof that TARGETS
+  // already covers it. (Contrast 192-01's four, which printed nothing until their TARGETS
+  // lines landed.)
+  //
+  // EVERY NUMBER BELOW WAS READ FROM THIS SCRIPT'S OWN PRINTED `actual` COLUMN across two
+  // agreeing runs — never hand-counted from `it(` literals, never carried from a SUMMARY.
+  // ⚠ THAT DISTINCTION IS NOT CEREMONIAL HERE: `192-10-SUMMARY.md` recorded
+  // `WorkflowsPage.test.tsx` as "settled at 22 and needs nothing further", and by wave 7 it
+  // was 39. `192-11-SUMMARY.md` in turn handed forward `librarySubtree.fences.test.ts` at
+  // 47, and this plan's OWN Task 1 took it to 64. A pin quoted from prose is stale by
+  // default; a pin read from the column is stale only if the column is.
+  //
+  // ── The four suites Phase 192 CREATED, pinned here for the first time ──────────────────
+  "libraryFilter.test.ts": 36,
+  "librarySubtree.fences.test.ts": 64,
+  "LibraryToolbar.test.tsx": 36,
+  "WorkflowCard.test.tsx": 35,
+  // ── The four RAISES owed by suites Phase 192 GREW ──────────────────────────────────────
+  //
+  // All four already sat in this map (192-01 adopted them in the phase's first commit). Each
+  // grew because the restructure moved behaviour INTO reach of a suite that could already
+  // see it, not because anything was duplicated:
+  //   `WorkflowsPage.test.tsx`      22 → 39  (+17) — 192-11's 200-row LIB-01…04 evidence,
+  //                                          plus the F2/F3 DOM fences.
+  //   `PublishedCardDelete.test.tsx` 7 → 32  (+25) — 192-04's seven characterization
+  //                                          baselines and the delete-grade cases.
+  //   `RunModal.test.tsx`           11 → 32  (+21) — 192-03's six whole-`innerHTML` captures
+  //                                          plus both canvas-gate destination branches.
+  //   `RunModal.a11y.test.tsx`       8 → 16   (+8) — the a11y half of the same capture.
+  //
+  // ⚠ NOT ONE OF THESE IS A LOWERING. The single lowering this phase is permitted (23 → 22)
+  // landed in 192-10, in the same commit as the two deletions that justified it, and is
+  // argued in full above. Nothing here makes a red gate go quiet.
+  //
+  // The four raised VALUES are edited in place above (this map may hold one entry per
+  // basename), beside the 192-01 block that first adopted them.
+  //
+  // ── FOUR DRIFTED PINS ARE DELIBERATELY NOT RE-PINNED HERE, AND THEY ARE NAMED ─────────
+  //
+  // The same run that produced every number above also printed four PRE-EXISTING drifts
+  // this phase did not cause and does not touch:
+  //   `ExternalActionSection.test.tsx`   25 pinned / 34 actual  (+9)  — owed since 190-12
+  //   `PhaseTimeline.test.tsx`           17 / 21                (+4)  — owed since 190-12
+  //   `WorkflowBuilderPage.canvas.test.tsx` 128 / 133           (+5)  — first seen at 192-01
+  //   `builderStore.test.ts`             52 / 58                (+6)  — first seen at 192-01
+  // **24 cases are therefore deletable with this gate green today.** They are RECORDED as
+  // owed rather than absorbed: folding an unrelated drift into a commit that did not cause
+  // it is the thing this whole header argues against, and it is the reason 190-12, 190-15,
+  // 190-16 and 192-01 each declined the same four. Owed as its own edit.
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -1085,7 +1152,35 @@ const BASELINE = {
 // measurement. That is the whole difference between this note and the previous NINE times it
 // went stale by being computed and never checked. The pre-existing +24 drift named in the
 // paragraph above is UNCHANGED and still deliberately not re-pinned here.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 2910 (192-01)
+// ⚠ AND BY 192-12 (Phase 192 Wave 8, the closing commit): the pinned FILE count 56 → 60 and
+// the pinned total 2909 → **3151**, from the four suites this phase CREATED
+// (`librarySubtree.fences.test.ts` 64, `libraryFilter.test.ts` 36, `LibraryToolbar.test.tsx`
+// 36, `WorkflowCard.test.tsx` 35) plus the four RAISES owed by suites it GREW
+// (`WorkflowsPage.test.tsx` 22→39, `PublishedCardDelete.test.tsx` 7→32, `RunModal.test.tsx`
+// 11→32, `RunModal.a11y.test.tsx` 8→16). The full argument is in the 192-12 block inside the
+// map above.
+//   ⚠ AND IT WAS STALE AGAIN — THE TENTH TIME, and by the SMALLEST margin yet, which is the
+//   most useful kind: the trailing marker read `2910 (192-01)` while the gate printed
+//   `pinned total 2909` on an UNMODIFIED tree, a drift of ONE. 192-01's own note explains
+//   how: it wrote 2910 as an EXPECTATION (2887 + 23), said it had been checked against the
+//   printed column, and recorded that "an expectation that survives a measurement is still
+//   only worth the measurement". The measurement was 2909. A drift of 1 is invisible to
+//   every reader and to every check, because `BASELINE_TOTAL` is the `reduce` and this line
+//   is prose beside it — which is precisely the argument, not a counterexample to it.
+//   `3151` below is READ from this script's own printed `pinned total`, on two agreeing
+//   runs, in the SAME COMMIT as the eight pins that moved it.
+//   ⚠ The run still prints `total 3175`, i.e. **+24 above the pin**, and that gap is NOT this
+//   phase's: it is the four pre-existing drifts named at the foot of the map
+//   (`ExternalActionSection` +9, `PhaseTimeline` +4, `WorkflowBuilderPage.canvas` +5,
+//   `builderStore` +6). 24 cases are deletable with this gate green today. Owed as its own
+//   edit, deliberately not absorbed here.
+//   ⚠ THE `failed` LINE VARIED AND IS NOT SMOOTHED: three consecutive runs of this gate on
+//   the SAME tree printed `failed 0`, `failed 1`, `failed 0` with IDENTICAL per-file count
+//   columns on all three. That is D-188.2-DEF-01 recurring, and 192-01's standing
+//   instruction covers it — the suite it names (`WorkflowBuilderPage.session.test.tsx`,
+//   the "pane click" case) was re-run standalone here and reported 23 passed / 0 failed.
+//   THE COUNT COLUMNS ARE THE REGRESSION BACKSTOP; the `failed` line, on this machine, is not.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3151 (192-12)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
