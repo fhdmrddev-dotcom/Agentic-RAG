@@ -79,7 +79,20 @@ is the incumbent any proposal must beat.
   3. A user can state what a card's actions will do before clicking one; "Tweak" no longer surprises.
   4. The create affordance is reachable without scrolling past the existing shelves.
 
-**Plans**: TBD — `/gsd:plan-phase 192`
+**Plans**: 12 plans across 8 waves — `/gsd:execute-phase 192`
+
+- [ ] `192-01-PLAN.md` (wave 1) — count-gate adoption: the five suites covering this page were in NEITHER knob (74 of 123 tests invisible). Must be commit 1.
+- [ ] `192-02-PLAN.md` (wave 1) — D-04 backend: `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, never a raw `created_by`; the widened wire type.
+- [ ] `192-03-PLAN.md` (wave 2) — `RunModal` characterization baseline, 6 states, captured while `library/RunModal.tsx` provably does not exist.
+- [ ] `192-04-PLAN.md` (wave 2) — delete-Sheet characterization baseline, 7 states + the two graded-guard invariants; the real ≈169 L extent recorded.
+- [ ] `192-05-PLAN.md` (wave 2) — the pure leaves: `libraryRow` · `libraryVocabulary` · `libraryFilter` (merge/dedupe-by-id/chips/substring search) + the F1/F4/F5 subtree fences.
+- [ ] `192-06-PLAN.md` (wave 3) — D-01 move 1: `RunModal` out of the page, create-additively then cut, zero re-capture.
+- [ ] `192-07-PLAN.md` (wave 3) — `LibraryToolbar`: create leads · always-on search · six counted chips · project select + the D-17 starters note · the updating marker.
+- [ ] `192-08-PLAN.md` (wave 4) — D-01 move 2: `WorkflowDeleteSheet` out of `PublishedCard`, state + JSX as one unit, proved on the original render path.
+- [ ] `192-09-PLAN.md` (wave 5) — `WorkflowCard` (159-C): one verb + `⋯`, the fork consequence as an `aria-describedby` contract, no `Publish…`, the D-18 draft delete.
+- [ ] `192-10-PLAN.md` (wave 6) — the page becomes composition: `allSettled` merge, one flat list, shelves/rail/cards/banner deleted, four tests rewritten and two deleted with the one authorized pin lowering.
+- [ ] `192-11-PLAN.md` (wave 7) — LIB-01…04 behaviour at 200 workflows: search, chip honesty, the carve-out, D-17, the D-04 cross-check, F2/F3 and create-first DOM order.
+- [ ] `192-12-PLAN.md` (wave 8) — every fence driven RED against a real plant and restored md5-identical, the subtree delta MEASURED, all suites pinned, G-5 recorded satisfied, and the eleven G-4 UAT rows.
 
 #### Phase 193: Authoring Doors + Template Placement
 

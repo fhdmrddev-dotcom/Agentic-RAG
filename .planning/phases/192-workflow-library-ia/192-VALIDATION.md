@@ -1,7 +1,7 @@
 ---
 phase: 192
 slug: workflow-library-ia
-status: draft
+status: planned
 nyquist_compliant: false
 wave_0_complete: false
 created: 2026-08-10
@@ -89,11 +89,64 @@ commit 1 is a gate-adoption commit, before any source change.
 > Filled by the planner. One row per task; every task either carries an automated command or names a
 > Wave 0 dependency that will provide one.
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _pending planner_ | | | | | | | | | ⬜ pending |
+| Task ID | Plan | Wave | Req | Threat | Secure behavior | Test type | Automated command | Suite exists |
+|---|---|---|---|---|---|---|---|---|
+| 192-01-T1 | 01 | 1 | LIB-01…04 | T-192-06 | A deleted `it()` in any covering suite fails the gate with `[count-decrease]` | config | `node scripts/vitest-count-gate.cjs` | yes |
+| 192-01-T2 | 01 | 1 | LIB-01…04 | T-192-07 | Adopt/decline recorded with its reason; every pin READ, never computed | config | `node scripts/vitest-count-gate.cjs` | yes |
+| 192-02-T1 | 02 | 1 | LIB-01 | T-192-02 | Projection widens; no `WHERE` / `ORDER BY` / `owned_only` line changes | unit | `cd backend && venv/Scripts/python -m pytest tests/unit -k "workflow" -q` | yes |
+| 192-02-T2 | 02 | 1 | LIB-01 | T-192-01 | `is_mine` computed server-side; **no raw `created_by` on the wire**, fence driven RED | unit + negative fence | `cd backend && venv/Scripts/python -m pytest tests/unit/test_published_workflow_ownership.py -q` | **192-02 creates it** |
+| 192-02-T3 | 02 | 1 | LIB-01 | T-192-01 | Both fields optional → a frontend ahead of the backend degrades to *correct*, not merely non-fatal | typecheck | `cd frontend && npx tsc -p tsconfig.app.json --noEmit 2>&1 \| grep -c "error TS"` → **33** | yes |
+| 192-03-T1 | 03 | 2 | LIB-03 | T-192-09 | Six modal states read OUT of the live DOM, observed twice, labelled CAPTURE, non-vacuous | characterization | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/__tests__/RunModal.test.tsx` | yes |
+| 192-03-T2 | 03 | 2 | LIB-03 | T-192-08 | Capture provably predates the move — `git show <sha>:…/library/RunModal.tsx` exits non-zero | characterization + CLI proof | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/__tests__/RunModal.a11y.test.tsx src/pages/__tests__/RunModal.test.tsx` | yes |
+| 192-04-T1 | 04 | 2 | LIB-03 | T-192-12 | Seven Sheet states captured with EXACT server counts; the real ≈169 L extent recorded | characterization | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/__tests__/PublishedCardDelete.test.tsx` | yes |
+| 192-04-T2 | 04 | 2 | LIB-03 | T-192-11 | Never dismisses mid-delete · no optimistic vanish — pinned as behaviour, not bytes | unit + CLI proof | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/__tests__/PublishedCardDelete.test.tsx` | yes |
+| 192-05-T1 | 05 | 2 | LIB-01, LIB-03 | T-192-14 | One vocabulary home; zero meaning-search words; the lock mark READ from `TIERS.STRICT.glyph` | typecheck + lint | `cd frontend && npx tsc -p tsconfig.app.json --noEmit 2>&1 \| grep -c "error TS"` → **33** | **192-05 creates it** |
+| 192-05-T2 | 05 | 2 | LIB-01, LIB-02 | T-192-15 | Dedupe by `id`; chips derive only via `tierForDefinition` / `soulDeliverable`; no runtime API-client import | unit (pure) | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/components/workflows/library/libraryFilter.test.ts` | **192-05 creates it** |
+| 192-05-T3 | 05 | 2 | LIB-01, LIB-03 | T-192-13, T-192-14 | F1 · F4 · F5 · threadGroups hash — over an explicitly-named subtree, written before four files exist | source fence + synthetic controls | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/components/workflows/library/librarySubtree.fences.test.ts` | **192-05 creates it** |
+| 192-06-T1 | 06 | 3 | LIB-03 | T-192-13 | Module exports the component and no runtime value; names no `WorkflowsPage` specifier | typecheck + lint + fence | `cd frontend && npx tsc -p tsconfig.app.json --noEmit 2>&1 \| grep -c "error TS"` → **33** | yes (192-05) |
+| 192-06-T2 | 06 | 3 | LIB-03 | T-192-16, T-192-18 | Six baselines hold with **ZERO re-capture**; export signature + default export unchanged | characterization | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/__tests__/RunModal.test.tsx src/pages/__tests__/RunModal.a11y.test.tsx src/pages/WorkflowsPage.test.tsx src/pages/WorkflowBuilderPage.header.test.tsx` | yes |
+| 192-07-T1 | 07 | 3 | LIB-04, LIB-01 | T-192-14, T-192-21 | Create leads; search always on; six typed chips; zero `title=`; no invented glyph | lint + source fence | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/components/workflows/library/librarySubtree.fences.test.ts` | yes (192-05) |
+| 192-07-T2 | 07 | 3 | LIB-01 | T-192-19, T-192-27 | Native `<select>`; the D-17 note; a `data-state` updating marker; no `cmdk` | a11y lint | `cd frontend && npx eslint src/components/workflows/library/LibraryToolbar.tsx -c eslint.a11y.config.js` | yes |
+| 192-07-T3 | 07 | 3 | LIB-04, LIB-02 | T-192-21 | DOM-order proof; a zero-count chip still renders; no-title WITH a positive control | unit + positive control | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/components/workflows/library/LibraryToolbar.test.tsx` | **192-07 creates it** |
+| 192-08-T1 | 08 | 4 | LIB-03 | T-192-11 | State + JSX move as ONE component; both invariant comments intact | a11y lint | `cd frontend && npx eslint src/components/workflows/library/WorkflowDeleteSheet.tsx -c eslint.a11y.config.js` | n/a — lint gate; the Sheet's behaviour is covered by `PublishedCardDelete.test.tsx` |
+| 192-08-T2 | 08 | 4 | LIB-03 | T-192-12 | Seven baselines hold with **ZERO re-capture**, on the ORIGINAL render path | characterization | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/__tests__/PublishedCardDelete.test.tsx src/pages/WorkflowsPage.test.tsx src/pages/__tests__/RunModal.test.tsx` | yes |
+| 192-09-T1 | 09 | 5 | LIB-02, LIB-03 | T-192-04 | One primary verb per row state; `Publish…` absent; `WorkflowSoul` consumed unchanged | a11y lint + fence | `cd frontend && npx eslint src/components/workflows/library/WorkflowCard.tsx -c eslint.a11y.config.js` | **192-09 creates it** |
+| 192-09-T2 | 09 | 5 | LIB-03 | T-192-23, T-192-24 | One fork word → two intact handlers; consequence via `aria-describedby`; draft delete on the single-draft endpoint | typecheck + source assertions | `cd frontend && npx tsc -p tsconfig.app.json --noEmit 2>&1 \| grep -c "error TS"` → **33** | yes |
+| 192-09-T3 | 09 | 5 | LIB-02, LIB-03 | T-192-23, T-192-25 | `getElementById` round trip; two absences each with a positive control; cascade `not.toHaveBeenCalled` | unit + positive controls | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/components/workflows/library` | **192-09 creates it** |
+| 192-10-T1 | 10 | 6 | LIB-01 | T-192-03, T-192-26 | `allSettled` with per-source isolation; three latest-wins tickets intact; D-17 semantics | unit | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/WorkflowsPage.test.tsx` | yes |
+| 192-10-T2 | 10 | 6 | LIB-02, LIB-04 | T-192-18, T-192-28 | Shelves / rail / cards / banner removed; `NetNewFlag` and its `:382` Builder render UNTOUCHED | unit + byte-exact source | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/WorkflowBuilderPage.header.test.tsx src/pages/WorkflowBuilderPage.session.test.tsx` | yes |
+| 192-10-T3 | 10 | 6 | LIB-01…04 | T-192-06 | Four rewrites, two authorized deletions, and the ONE pin lowering — same commit | config + unit | `node scripts/vitest-count-gate.cjs` | yes |
+| 192-11-T1 | 11 | 7 | LIB-01, LIB-02 | T-192-19 | Search by name and by purpose at 200 rows; the paraphrase returns 0; every chip count equals its rows | unit | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/WorkflowsPage.test.tsx` | yes |
+| 192-11-T2 | 11 | 7 | LIB-01 | T-192-03, T-192-27 | A rejected `/drafts` still renders published + starters; starters survive the project filter with a stated reason; `is_mine` ↔ provenance | unit | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages/WorkflowsPage.test.tsx` | yes |
+| 192-11-T3 | 11 | 7 | LIB-02, LIB-03, LIB-04 | T-192-29, T-192-23 | F2 · F3 (+ positive control) · create-first by `compareDocumentPosition` · draft endpoint vs cascade | negative fence + unit | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages src/components/workflows/library` | yes |
+| 192-12-T1 | 12 | 8 | LIB-01…04 | T-192-06 | All five fences + the hash fence observed RED against REAL plants, restored md5-identical | negative fence, driven RED | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run --maxWorkers=4 src/pages src/components/workflows/library` | yes |
+| 192-12-T2 | 12 | 8 | LIB-01…04 | T-192-30, T-192-31 | Subtree delta MEASURED (never the estimate); every suite pinned from a READ number; the G-5 ledger row updated | config + CLI measurement | `node scripts/vitest-count-gate.cjs` | yes |
+| 192-12-T3 | 12 | 8 | LIB-01…04 | T-192-21, T-192-32 | Eleven G-4 rows driven at 200 workflows; a blocked row is ⛔ with its reason, never omitted | **manual — Chrome MCP** | manual (`evaluate_script` for DOM geometry; `take_screenshot` times out) | n/a |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status legend for execution: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky. Every row above starts ⬜ pending.*
+
+**Sampling continuity:** no three consecutive tasks lack an automated verify. The only manual task in the
+phase is `192-12-T3`, the G-4 operator checkpoint, and it is the LAST task of the LAST plan.
+
+**Wave 0 dependencies, named rather than implied.** `192-02-T2`, `192-05-T1/T2/T3`, `192-07-T3`,
+`192-08-T1` and `192-09-T1/T3` each create the suite that verifies them, in the same commit as the code
+they verify. Every other task runs against a suite that already existed — because `192-01` (wave 1) put
+the four previously-invisible covering suites into the gate **before any source changed**, and `192-03` /
+`192-04` (wave 2) captured both characterization baselines while the destination modules **provably did
+not exist**.
+
+**Gate ownership across waves.** Worktrees isolate files, not a single shared config, so
+`scripts/vitest-count-gate.cjs` is written by exactly THREE plans in three different waves: `192-01`
+(adoption), `192-10` (the one authorized **lowering**, riding in the same commit as its two named
+deletions) and `192-12` (pin every suite this phase created or grew). Suites created in waves 2–5 are
+deliberately left unpinned **while their counts are still growing** — the 188-12 precedent, quoted in the
+script itself — and that exemption **expires in `192-12`**. An unpinned suite is an unguarded one, so the
+pin is owed, not waived.
+
+**Parallelism, stated honestly.** Waves 1–3 run 2–3 plans concurrently; waves 4–8 are mostly serial. That
+is not an oversight: `WorkflowsPage.tsx` is a single 1407-line file that four plans must cut, and
+`scripts/vitest-count-gate.cjs` is a single shared config. Both are `files_modified` conflicts that no
+amount of worktree isolation can remove. Every plan that CAN run beside another does.
 
 ### Requirement → behavior map (from RESEARCH § "Phase Requirements → Test Map")
 
