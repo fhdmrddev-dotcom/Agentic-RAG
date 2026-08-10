@@ -341,9 +341,23 @@ const bulkStarters = BULK_INDICES.slice(BULK_PUBLISHED, BULK_PUBLISHED + BULK_ST
 )
 const bulkDrafts = BULK_INDICES.slice(BULK_PUBLISHED + BULK_STARTERS).map((i) => makeDraftRow(i))
 
+/**
+ * Remove `is_mine` ENTIRELY — not set it to `undefined`. The degraded state D-04 names is a
+ * frontend deployed AHEAD of its backend, where the key was never in the payload at all.
+ */
+function stripIsMine<T extends object>(row: T): T {
+  const clone = { ...(row as Record<string, unknown>) }
+  delete clone.is_mine
+  return clone as T
+}
+
 /** The rendered rows, read from the DOM — never from the fixture array (that would be circular). */
 const renderedCards = (): HTMLElement[] =>
   Array.from(document.querySelectorAll<HTMLElement>('[data-card="workflow-card"]'))
+
+/** The rendered rows of ONE provenance, read off the card's own machine-readable mark. */
+const renderedOfKind = (provenance: string): HTMLElement[] =>
+  renderedCards().filter((card) => card.getAttribute("data-provenance") === provenance)
 
 /**
  * The six chips, SPELLED OUT rather than imported from `libraryVocabulary`. A test that reads
@@ -984,6 +998,204 @@ describe("WorkflowsPage — LIB-02 / SC#2: every chip's number is the number it 
     fireEvent.click(screen.getByTestId("library-chip-starters"))
     await waitFor(() => expect(renderedCards()).toHaveLength(0))
     expect(screen.getByTestId("library-filtered-empty")).toBeInTheDocument()
+  })
+})
+
+describe("WorkflowsPage — the RUN CARVE-OUT at scale (D-16, T-192-03)", () => {
+  it("a refused /workflows/drafts subtracts EXACTLY itself out of 200 rows, and the carve-out counts say so", async () => {
+    // The case above (192-10's) proves the PROPERTY at four rows: a rejected gated feed
+    // renders the two ungated ones. This one proves the same property is ARITHMETICALLY EXACT
+    // at 200 — the refusal removes the 60 drafts and nothing else — and it adds the half no
+    // earlier case covers: THE CHIP COUNTS STAY HONEST UNDER A FAILED SOURCE. A count is the
+    // one thing a partial library could fabricate without anybody noticing, because a number
+    // that describes rows nobody can reach looks exactly like a number that describes rows
+    // they can.
+    mockListPublished.mockResolvedValue(bulkPublished)
+    mockListStarters.mockResolvedValue(bulkStarters)
+    mockListDrafts.mockRejectedValue(new Error("403 Forbidden"))
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await waitFor(
+      () => expect(renderedCards()).toHaveLength(BULK_PUBLISHED + BULK_STARTERS),
+      { timeout: 8000 },
+    )
+
+    // Exactly the refused feed is missing — and it is missing ENTIRELY, not partially.
+    expect(renderedOfKind("draft")).toHaveLength(0)
+    expect(renderedOfKind("published")).toHaveLength(BULK_PUBLISHED)
+    expect(renderedOfKind("starter")).toHaveLength(BULK_STARTERS)
+
+    // The counts describe what is reachable, and the refused feed's chip reads a true zero
+    // rather than the number it would have had.
+    expect(chipCount("ready-to-run")).toBe(BULK_PUBLISHED + BULK_STARTERS)
+    expect(chipCount("still-building")).toBe(0)
+    expect(chipCount("starters")).toBe(BULK_STARTERS)
+
+    // The refusal is NAMED — a partial library is never presented as a complete one — and
+    // the two feeds that answered say nothing, because nothing went wrong with them.
+    expect(screen.getByTestId("library-source-failed-draft").textContent).toContain("your drafts")
+    expect(screen.queryByTestId("library-source-failed-published")).toBeNull()
+    expect(screen.queryByTestId("library-source-failed-starter")).toBeNull()
+    // …and "you have none" is never shown over a library that has 140 rows.
+    expect(screen.queryByTestId("library-empty")).toBeNull()
+  })
+})
+
+describe("WorkflowsPage — D-17: the project filter holds STARTERS out, and says so", () => {
+  /** The server's own contract, simulated: `?project_folder_id=` narrows `/published` only. */
+  function serveNarrowedPublished() {
+    mockListPublished.mockImplementation(async (projectArg: string | null) =>
+      projectArg == null
+        ? bulkPublished
+        : bulkPublished.filter((row) => row.definition.project_folder_id === projectArg),
+    )
+    mockListStarters.mockResolvedValue(bulkStarters)
+    mockListDrafts.mockResolvedValue(bulkDrafts)
+  }
+
+  it("selecting a project narrows published (server) and drafts (client) while EVERY starter stays, with the reason as real text", async () => {
+    const boundPublished = bulkPublished.filter(
+      (row) => row.definition.project_folder_id === "folder-aaa",
+    )
+    const boundDrafts = bulkDrafts.filter(
+      (row) => row.definition.project_folder_id === "folder-aaa",
+    )
+    // The fixture has to actually exercise a NARROW; a filter that removes nothing proves
+    // nothing about a filter.
+    expect(boundPublished.length).toBeGreaterThan(0)
+    expect(boundPublished.length).toBeLessThan(BULK_PUBLISHED)
+    expect(boundDrafts.length).toBeGreaterThan(0)
+    expect(boundDrafts.length).toBeLessThan(BULK_DRAFTS)
+
+    serveNarrowedPublished()
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    // THE NEGATIVE CASE FIRST: with "All projects" there is nothing to explain, so the note
+    // is ABSENT. A note that is always present states nothing.
+    expect(screen.queryByTestId("library-project-note")).toBeNull()
+
+    selectProject("folder-aaa")
+    await waitFor(() => expect(renderedOfKind("published")).toHaveLength(boundPublished.length), {
+      timeout: 8000,
+    })
+    // Drafts narrow CLIENT-side on their own project binding…
+    expect(renderedOfKind("draft")).toHaveLength(boundDrafts.length)
+    // …and every starter is still on screen. This is the row that would read as a broken
+    // filter if the surface said nothing about it.
+    expect(renderedOfKind("starter")).toHaveLength(BULK_STARTERS)
+    expect(renderedCards()).toHaveLength(
+      boundPublished.length + boundDrafts.length + BULK_STARTERS,
+    )
+
+    // D-17: SILENCE HERE IS A UAT FAILURE (row U6), NOT A NEUTRAL DEFAULT. The note is
+    // asserted by its TEXT — a present-but-blank node must not pass — and by the literal
+    // sentence rather than by the constant, so emptying the constant would fail this too.
+    const note = screen.getByTestId("library-project-note")
+    expect(note.textContent).toBe("Starters aren't tied to a project.")
+    // It reaches a screen reader on the control it explains, as real DOM text.
+    const select = screen.getByTestId("library-project-select")
+    expect(select.getAttribute("aria-describedby")).toBe(note.getAttribute("id"))
+  })
+
+  it("D-17's companion rule — a PENDING project re-query never zeroes a count, and the updating marker appears then disappears", async () => {
+    // PATTERNS "No Analog Found" G-B: no shipped surface in this codebase holds
+    // previously-committed rows with correct counts while a re-query is in flight. This is
+    // that pattern's only mechanical guard.
+    let release: (rows: unknown[]) => void = () => {}
+    const held = new Promise<unknown[]>((r) => (release = r))
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockResolvedValueOnce(bulkPublished) // the mount fetch
+      .mockReturnValueOnce(held) // the project re-query — held open
+    mockListStarters.mockResolvedValue(bulkStarters)
+    mockListDrafts.mockResolvedValue(bulkDrafts)
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    // Settled: the marker is ABSENT. A marker that is always present distinguishes nothing.
+    await waitFor(() => expect(screen.queryByTestId("library-updating")).toBeNull())
+
+    selectProject("folder-aaa")
+    const boundDrafts = bulkDrafts.filter(
+      (row) => row.definition.project_folder_id === "folder-aaa",
+    )
+    const stillOnScreen = BULK_PUBLISHED + BULK_STARTERS + boundDrafts.length
+
+    // IN FLIGHT: the marker is up, machine-readably…
+    expect(screen.getByTestId("library-updating").getAttribute("data-state")).toBe("updating")
+    // …the previously-committed published rows are ALL still rendered (blanking a settled
+    // source to signal motion is the count-zeroing this rule forbids by name)…
+    expect(renderedOfKind("published")).toHaveLength(BULK_PUBLISHED)
+    expect(renderedCards()).toHaveLength(stillOnScreen)
+    // …NO count has been zeroed…
+    for (const chip of CHIPS) expect(chipCount(chip)).toBeGreaterThan(0)
+    // …and the counts still describe exactly the rows on screen: the three provenances
+    // partition the list, so their two chips must sum to it.
+    expect(chipCount("ready-to-run") + chipCount("still-building")).toBe(stillOnScreen)
+
+    // SETTLED: the answer lands, the list narrows, and the marker goes away again.
+    const boundPublished = bulkPublished.filter(
+      (row) => row.definition.project_folder_id === "folder-aaa",
+    )
+    release(boundPublished)
+    await waitFor(() =>
+      expect(renderedCards()).toHaveLength(
+        boundPublished.length + boundDrafts.length + BULK_STARTERS,
+      ),
+    )
+    await waitFor(() => expect(screen.queryByTestId("library-updating")).toBeNull())
+  })
+})
+
+describe("WorkflowsPage — D-04: is_mine agrees with feed-derived provenance (the cross-check 192-02 raised)", () => {
+  it("over the merged list, is_mine === (provenance !== \"starter\") for every row the wire supplies it on", async () => {
+    // ⚠ THE CROSS-CHECK OWED SINCE 192-02, AND THE REASON IT IS A CROSS-CHECK RATHER THAN A
+    // SOURCE OF TRUTH: `mergeLibrary` assigns provenance from FEED ORIGIN, and `is_mine` is
+    // computed independently server-side. Two independent answers to "is this mine?" that are
+    // never compared is how a disagreement ships unnoticed — the *Yours* chip would then
+    // promise one set and the list deliver another, which is exactly what LIB-02 forbids.
+    const merged = [
+      ...bulkPublished.map((row) => ({ is_mine: row.is_mine, provenance: "published" as const })),
+      ...bulkStarters.map((row) => ({ is_mine: row.is_mine, provenance: "starter" as const })),
+    ]
+    expect(merged).toHaveLength(BULK_PUBLISHED + BULK_STARTERS)
+    for (const row of merged) expect(row.is_mine).toBe(row.provenance !== "starter")
+
+    // POSITIVE CONTROL — the check is not vacuous. A starter the backend called ours FAILS it.
+    expect(() => {
+      const contradiction = { is_mine: true, provenance: "starter" as const }
+      expect(contradiction.is_mine).toBe(contradiction.provenance !== "starter")
+    }).toThrow()
+
+    // And the same agreement, observed THROUGH THE SURFACE: the *Yours* chip promises, and
+    // then delivers, exactly the non-starter rows of the rendered list.
+    mountBulk()
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+    const notStarters = BULK_TOTAL - renderedOfKind("starter").length
+    expect(chipCount("yours")).toBe(notStarters)
+    fireEvent.click(screen.getByTestId("library-chip-yours"))
+    await waitFor(() => expect(renderedCards()).toHaveLength(notStarters))
+    expect(renderedOfKind("starter")).toHaveLength(0)
+  })
+
+  it("with is_mine ABSENT from the wire, the Yours chip is still CORRECT — not merely non-fatal", async () => {
+    // A frontend deployed ahead of its backend. Reading a missing bit as `false` would render
+    // an EMPTY *Yours* chip — the failure shape that looks like lost data — so the contract is
+    // to fall back to feed origin instead. "Degraded" has to mean slower or plainer, never
+    // wrong.
+    mountBulk({
+      published: bulkPublished.map(stripIsMine),
+      starters: bulkStarters.map(stripIsMine),
+    })
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_TOTAL), { timeout: 8000 })
+
+    expect(chipCount("yours")).toBe(BULK_PUBLISHED + BULK_DRAFTS)
+    expect(chipCount("yours")).toBeGreaterThan(0)
+    fireEvent.click(screen.getByTestId("library-chip-yours"))
+    await waitFor(() => expect(renderedCards()).toHaveLength(BULK_PUBLISHED + BULK_DRAFTS))
+    expect(renderedOfKind("starter")).toHaveLength(0)
+    expect(renderedOfKind("published")).toHaveLength(BULK_PUBLISHED)
+    expect(renderedOfKind("draft")).toHaveLength(BULK_DRAFTS)
   })
 })
 
