@@ -32,9 +32,9 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
-**Phase:** 192 Workflow Library IA — ✅ **COMPLETE 2026-08-11** (12 plans, 67 commits, verified **6/6**)
-**Plan:** all 12 done; `192-12` Task 3 closed by deferral per operator decision
-**Status:** Phase complete. Next phase 193 not yet discussed.
+**Phase:** 192 Workflow Library IA — 12 plans complete + **gap-closure round 1 open (plans 13-16)**
+**Plan:** `192-13` ✅ executed 2026-08-11 (3 commits, 39/39). Next in the round: `192-14`.
+**Status:** Gap-closure round 1 in flight — closing the U5 blocker (`192-UAT.md` test 11).
 
 ### How 192 verified
 
@@ -68,6 +68,39 @@ bodies are labelled as such — fixing them requires re-capturing the move basel
 **No cross-tenant or RLS defect in the diff** — the backend change is projection-only, predicates
 untouched, and the `created_by` fence is load-bearing (exact field set + a serialized-payload sweep
 on both handlers).
+
+### Gap-closure round 1 — `192-13` executed 2026-08-11 (the U5 blocker's WORDS)
+
+**Round 1 of 4 plans (13-16). G-7 clear at plan time.** `192-13` gives the library the two facts
+the shipped surface could not state: *you already have a copy of this* and *your click failed*.
+Three commits — `5bbe0a8a` (vocabulary), `efbd57e3` (the card's state-aware sentence), `f085c29d`
+(4 new cases, 39/39). `tsc` **33** unmoved across three measurements, eslint + a11y clean, fences
+**64** unmoved by the new copy, library subtree **175 passed**.
+
+1. **The gap was not only the silent 409 — it was the sentence that was ABOUT to become a lie.**
+   `FORK_CONSEQUENCE` promises *a new private copy*; under the operator's 2026-08-11 decision a row
+   you already forked opens your EXISTING draft. `192-14` changes the verb; without this the card
+   would have kept stating a false consequence, which is trading a silent failure for a quiet lie.
+   `WorkflowCard` gains ONE optional prop defaulting to `false` — one node, two sentences, selected
+   never appended, so no card atom was added (U5-b stays out of the round).
+2. **⚠ THE PLAN'S OWN NUMBER WAS WRONG AND WAS CORRECTED IN THE OPEN.** It instructed the docblock
+   to record *"16 of the 18"* multi-version slugs as `published v1 + draft v2`. Re-measured against
+   the live DB: **18 is confirmed**, but the exact shape is **14** (**15** under a loose predicate
+   that admits `pm-weekly-status-report`'s four versions). No predicate yields 16. Sixth phase in a
+   row in which an inherited figure measured false.
+3. **⚠ THE COUNT GATE IS RED AND IT IS NOT 192-13's — dated, not assumed.** Four runs alternating
+   the source state: HEAD `failed 1`, HEAD `failed 1`, **base `7e4abd25` with all three files
+   reverted to their shipped bytes `failed 2`**, HEAD `failed 4`. Every failure is
+   `STACK_TRACE_ERROR` at **~5000–5500 ms** = vitest's default 5 s `testTimeout`, and all the
+   `WorkflowsPage.test.tsx` ones sit in its `search finds a row among 200` describe — a file that
+   runs **40 passed / 0 failed in 32 s standalone**. Same class 192-11 hardened elsewhere with
+   `asyncUtilTimeout` and 192-12 rated at 2/14 on `WorkflowBuilderPage.canvas`. Logged as
+   **`D-192-DEF-01`** in `.planning/phases/192-workflow-library-ia/deferred-items.md`, NOT fixed.
+   **The PIN dimension is clean:** no `[count-decrease]`, `pinned total` 3152 unchanged.
+4. **Owed to `192-16`:** the `WorkflowCard.test.tsx` pin raise **35 → 39** (read from the gate's own
+   `actual`, measured 39 four times), plus the ROADMAP / CLAUDE.md / `192-UAT.md` writes — this plan
+   deliberately wrote none of those three files, and `192-13-SUMMARY.md` says so, so the absence
+   reads as ownership rather than oversight.
 
 ### ⛔ OWED — eleven G-4 UAT rows, NOT run (operator decision 2026-08-11)
 
