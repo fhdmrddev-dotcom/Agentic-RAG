@@ -126,6 +126,13 @@ import { WorkflowsPage } from "./WorkflowsPage"
 // measurement below. Nothing on the library surface renders it today, and the test that says
 // so would be worthless without a demonstration that the selector it uses can find a real one.
 import { HighlightTitle } from "@/lib/threadGroups"
+// 192-14 (U5) — the two consequence sentences, read from their ONE home rather than re-typed.
+// A test that hardcodes the copy cannot notice the card drifting off it, and the whole point
+// of the sentence is that it agrees with what the verb actually does.
+import {
+  FORK_CONSEQUENCE,
+  FORK_CONSEQUENCE_EXISTING,
+} from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
 
 const folders: Folder[] = [
@@ -217,6 +224,33 @@ const starterRow = {
         config: { phase_type: "llm_emit", citation_policy: "strict" },
       },
     ],
+  },
+}
+
+/**
+ * 192-14 (the U5 blocker) — THE DRAFT THE OPERATOR ALREADY HAS OF `vendor-risk`.
+ *
+ * Same slug as `strictPublished` above, at version 2. This one fixture is the entire reason
+ * the U5 blocker was invisible to 3176 passing tests: every fork fixture in this file forks a
+ * slug that NOTHING else in the seeded feeds shares, so the shipped suite only ever exercised
+ * the FIRST fork of a workflow. In the live DB that shape is the minority — 18 slugs carry
+ * more than one version and 14 of those are exactly `published v1 + draft v2` (re-measured by
+ * `192-13`; the plan authorising it said 16).
+ *
+ * ⚠ Its phase slug is `tuneup`, deliberately unlike the published def's `pull`/`emit`, so
+ * "the Builder opened THIS definition" is an assertion the DOM can carry rather than an
+ * inference. Its `token` is the 186-07 concurrency guard `onOpenDraft` threads.
+ */
+const existingForkDraft = {
+  id: "draft-vendor-risk",
+  slug: "vendor-risk",
+  version: 2,
+  name: "Vendor-risk review",
+  token: "tok-existing",
+  definition: {
+    slug: "vendor-risk",
+    version: 2,
+    phases: [{ slug: "tuneup", phase_index: 0, config: { phase_type: "llm_agent" } }],
   },
 }
 
@@ -822,6 +856,124 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     await screen.findByTestId("spine-node-pull")
     // The header carries the Tweak caption with the new version.
     expect(screen.getByText(/Tweak · vendor-risk v3/)).toBeInTheDocument()
+  })
+})
+
+/**
+ * ══ 192-14 (the U5 BLOCKER) — THE BRANCH 3176 PASSING TESTS COULD NOT REACH ══════════════
+ *
+ * The three cases above prove the FIRST fork of a workflow, and they are correct. What they
+ * cannot see is the second one: every fixture they run against forks a slug no other seeded
+ * row shares, so the create always succeeds. On a slug that already carries the version the
+ * create tries to mint, `UNIQUE(slug, version)` is GLOBAL and the insert 409s — deterministically,
+ * forever, with the shipped `catch` swallowing it into `console.error`. An operator hit exactly
+ * that on the live surface (`192-UAT.md` test 11): two clicks, two 409s, nothing on screen and
+ * `workflow_definitions` unmoved at 222.
+ *
+ * ⚠ THE ONLY DIFFERENCE BETWEEN THIS BLOCK AND THE ONE ABOVE IS ONE EXTRA ROW IN THE DRAFTS
+ * FEED. That is the whole lesson, and it is the same shape as this phase's CR-01: the suite
+ * pinned the branch it expected and never entered the wrong one. The seeding is per-test rather
+ * than in the shared `beforeEach`, on purpose — changing the shared fixture would alter what the
+ * two shipped fork cases run against, and those two must keep proving the first fork unchanged.
+ *
+ * The operator's 2026-08-11 decision: on such a row the verb OPENS THE DRAFT YOU ALREADY HAVE.
+ * It creates nothing, so it cannot collide — the failure class is removed rather than made rarer.
+ */
+describe("192-14 (U5 blocker) — forking a slug you ALREADY have a draft of opens that draft", () => {
+  /** The unrelated draft the whole file seeds, PLUS an existing v2 fork of `vendor-risk`. */
+  function seedExistingFork() {
+    mockListDrafts.mockResolvedValue([draftRow, existingForkDraft])
+  }
+
+  /**
+   * The published `vendor-risk` card, located by the NAME it renders rather than by its index
+   * in the list. The extra draft this block seeds changes what the merged list contains, and a
+   * positional lookup would quietly start asserting about a different row.
+   */
+  async function publishedCardNamed(name: string): Promise<HTMLElement> {
+    const cards = await screen.findAllByTestId("published-card")
+    const card = cards.find((c) => within(c).queryByText(name) !== null)
+    expect(card, `no published card renders the name "${name}"`).toBeTruthy()
+    return card as HTMLElement
+  }
+
+  it("the fork verb creates NOTHING and opens the copy you already started", async () => {
+    seedExistingFork()
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    // ⚠ THE LOAD-BEARING ASSERTION, AND IT IS FIRST ON PURPOSE. The shipped code reaches
+    // `createWorkflowDraft` here with `{slug: "vendor-risk", version: 3}` — a write that 409s
+    // on any slug already carrying that version. Nothing is written on this path at all, so
+    // there is no request to fail and nothing to report.
+    expect(mockCreateDraft).not.toHaveBeenCalled()
+    // Nor is the published row edited — the frozen-published contract is untouched either way.
+    expect(mockUpdate).not.toHaveBeenCalled()
+
+    // The Builder opened on the EXISTING draft's OWN definition: `tuneup` is that draft's
+    // phase and appears in neither the published def (`pull`/`emit`) nor `draftRow`.
+    expect(await screen.findByTestId("spine-node-tuneup")).toBeInTheDocument()
+    expect(screen.queryByTestId("spine-node-pull")).not.toBeInTheDocument()
+    // And the caption is `onOpenDraft`'s edit-in-place one, never `onTweak`'s fork caption.
+    expect(screen.getByText(/Edit · Vendor-risk review v2/)).toBeInTheDocument()
+    expect(screen.queryByText(/Tweak · vendor-risk/)).not.toBeInTheDocument()
+  })
+
+  it("the publish gauntlet mounts on the EXISTING draft, not on a fork that was never created", async () => {
+    // The mirror of the shipped "gauntlet mounts on the NEW forked draft id" case. The gauntlet
+    // is gated on a non-null draftId in `renderPublish`, so its trigger mounts on BOTH paths —
+    // which is exactly why this case waits on it and then asserts WHICH draft the Builder is
+    // holding. A wait that succeeds on both paths cannot fail as a bare timeout and so cannot
+    // be confused with the D-192-DEF-01 timeout class this file already carries.
+    // (`gauntlet-spine` lives inside the modal the trigger opens, not in the resting view.)
+    seedExistingFork()
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    expect(await screen.findByTestId("publish-trigger")).toBeInTheDocument()
+    expect(screen.getByText(/Edit · Vendor-risk review v2/)).toBeInTheDocument()
+    expect(screen.queryByText(/Tweak · vendor-risk v3/)).not.toBeInTheDocument()
+    expect(mockCreateDraft).not.toHaveBeenCalled()
+  })
+
+  it("the card SAID so before the click — and only on the row where the behaviour differs", async () => {
+    // D-14, mechanically: the sentence and the verb agree in the SAME render. `vendor-risk` has
+    // an existing draft, `quick-notes` does not, and both are published rows on one screen.
+    seedExistingFork()
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const forked = await publishedCardNamed("Vendor-risk review")
+    const unforked = await publishedCardNamed("Quick notes")
+
+    expect(within(forked).getByTestId("fork-consequence")).toHaveTextContent(
+      FORK_CONSEQUENCE_EXISTING,
+    )
+    expect(within(unforked).getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
+  })
+
+  it("a STARTER is untouched: it still mints a fresh suffixed slug at v1 even when a draft shares its slug", async () => {
+    // ⚠ D-12 FROM THE THIRD SIDE. The two fork handlers are siblings and are NEVER merged, so
+    // the new lookup must not leak across: a starter's fork ALWAYS makes a genuinely new copy
+    // (fresh auto-suffixed slug at v1), so "you already have one" is false on a starter row
+    // even when a draft happens to share its slug — which is why the page's `hasExistingFork`
+    // is gated on `provenance === "published"` rather than on the slug alone.
+    mockListDrafts.mockResolvedValue([
+      draftRow,
+      { ...existingForkDraft, id: "draft-risk-register", slug: "risk-register" },
+    ])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const card = await screen.findByTestId("starter-card")
+    // The sentence on a starter row is the ordinary one, same-slug draft or not.
+    expect(within(card).getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
+
+    const user = await openOverflow(card)
+    await user.click(screen.getByTestId("use-starter"))
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    const forked = mockCreateDraft.mock.calls[0][0]
+    expect(forked.slug).toMatch(/^risk-register-[a-z0-9]{6}$/)
+    expect(forked.version).toBe(1)
+    expect(forked.status).toBe("draft")
   })
 })
 
