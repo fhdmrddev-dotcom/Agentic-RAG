@@ -15,10 +15,10 @@ Where a requirement's seed carries analysis, the seed is the spec input — read
 
 ### Library — finding and choosing a workflow (LIB)
 
-- [ ] **LIB-01**: A user can search the Workflows page by name and filter the list, instead of scanning three unlabelled shelves. *(SEED-136)*
-- [ ] **LIB-02**: A workflow card shows what the workflow is for, at a glance, without the reader having to decode internal vocabulary. *(SEED-136)*
-- [ ] **LIB-03**: A user can predict what each card action does before clicking — in particular, "Tweak" must not silently open a full edit surface. *(SEED-136, operator 2026-08-10)*
-- [ ] **LIB-04**: The create affordance is findable without scrolling past two shelves of existing workflows. *(SEED-136)*
+- [x] **LIB-01**: A user can search the Workflows page by name and filter the list, instead of scanning three unlabelled shelves. *(SEED-136)*
+- [x] **LIB-02**: A workflow card shows what the workflow is for, at a glance, without the reader having to decode internal vocabulary. *(SEED-136)*
+- [x] **LIB-03**: A user can predict what each card action does before clicking — in particular, "Tweak" must not silently open a full edit surface. *(SEED-136, operator 2026-08-10)*
+- [x] **LIB-04**: The create affordance is findable without scrolling past two shelves of existing workflows. *(SEED-136)*
 
 ### Authoring — the doors and the journey (AUTH)
 
@@ -69,7 +69,7 @@ Where a requirement's seed carries analysis, the seed is the spec input — read
 
 | REQ | Phase |
 |---|---|
-| LIB-01, LIB-02, LIB-03, LIB-04 | 192 |
+| LIB-01, LIB-02, LIB-03, LIB-04 | 192 | Complete 2026-08-11 — verified 6/6 must-haves in shipped source at 200 rows (192-VERIFICATION.md). Marked here only after verification, never per-plan. ⛔ Lived-experience confirmation OWED: the eleven G-4 UAT rows were NOT run (operator decision 2026-08-11, U6 first) — the requirements are proved structurally, not experientially. ⛔ D-07 search HIGHLIGHT deferred (wiring it reds fence F1 by construction); LIB-01 wording is "search by name and filter the list", which ships. |
 | AUTH-01, AUTH-03 | 193 |
 | RUN-01 | 194 |
 | RUN-02, RUN-03 | 195 |

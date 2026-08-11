@@ -50,7 +50,7 @@ is the incumbent any proposal must beat.
 
 ### Phase Checklist
 
-- [ ] **Phase 192: Workflow Library IA** — search, filter, at-a-glance cards, predictable card actions, findable create affordance (LIB-01…04)
+- [x] **Phase 192: Workflow Library IA** ✓ 2026-08-11 (12 plans, 67 commits; verified 6/6 — 5/6 at verification + CR-01 closed under G-3. ⛔ 11 G-4 UAT rows OWED by operator decision, U6 first) — search, filter, at-a-glance cards, predictable card actions, findable create affordance (LIB-01…04)
 - [ ] **Phase 193: Authoring Doors + Template Placement** — the two doors are tellable apart before choosing; template supply has a findable home (AUTH-01, AUTH-03)
 - [ ] **Phase 194: Stop a Running Workflow** — a run can be stopped mid-execution and reports `cancelled` honestly (RUN-01)
 - [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
