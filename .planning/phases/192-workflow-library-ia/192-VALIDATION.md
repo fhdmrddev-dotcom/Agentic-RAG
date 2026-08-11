@@ -241,19 +241,85 @@ three sketches ship a 12/54/200 selector for exactly this reason).
 DOM geometry via `evaluate_script`; `computer` CLICKS can deliver **zero events** while `hover` /
 `left_click_drag` work; `elementFromPoint` is machine-checkable reachability.
 
-| # | Behavior | Req | Driven how | Pass bar |
-|---|---|---|---|---|
-| **U1** | At 200 workflows, find one named workflow by typing three characters | LIB-01 | `evaluate_script` types into the search input, counts rendered rows | Target row visible **without scrolling**; `elementFromPoint` on its centre returns a node inside that row |
-| **U2** | Narrow with two chips at once and read the counts | LIB-01/02 | click chips, read chip label text + `querySelectorAll` row count | Every chip's number **equals** the rows it produces; no chip promises results it cannot deliver |
-| **U3** | The create affordance is reachable with **zero scroll** | LIB-04 | measure `getBoundingClientRect().top` vs viewport at 200 rows | `top < window.innerHeight` at first paint, and it is the **first** interactive element in DOM order |
-| **U4** | The fork verb's consequence is readable **without hover** | LIB-03 / D-14 | count `[title]` inside the library subtree **excluding the `workflow-soul` subtree** (see the correction below); read the `aria-describedby` target's `textContent` | `title` count = **0** in this phase's own chrome; described text present, non-empty, names **both** halves (new private copy **and** published stays live) |
-| **U5** | "Tweak" no longer surprises — operator reads the card and states what the verb will do *before* clicking | LIB-03 / SC#3 | manual, operator | The stated expectation matches what happens |
-| **U6** | Pick a project → what happens to starters is **explained, not silent** | D-17 | click the project select, read the toolbar | Starters remain **with a stated reason**. **Silence is a FAIL.** |
-| **U7** | A paraphrase returns zero and the page does not pretend otherwise | LIB-01 / D-08 | type *"the thing that checks vendors"* | 0 results, honest empty state, one-click *Clear search & filters*, **no copy implying meaning-search** |
-| **U8** | The delete Sheet still names exact counts and refuses to dismiss mid-delete (the moved code) | D-01 | open ⋯ → Delete workflow… | Exact server counts render; `Escape` during `deleting` does **not** close |
-| **U9** | Run still launches (the moved RunModal) | D-01 | open Run → confirm | Lands on the run surface (canvas flag on) or a new chat thread (flag off) — matching the `run-destination` copy shown |
-| **U10** | Touch, no hover (the real experience for a large share of users) | D-14 | emulate touch, re-read every action | Every explanation still legible |
-| **U11** | A draft can be deleted from the library, under a guard lighter than the published Sheet | D-18 | open a draft's ⋯ → Delete | Row disappears; the published victim-naming Sheet is **not** what appeared |
+---
+
+### ⛔ STATUS: ALL ELEVEN ROWS ARE **OWED**. NOT ONE WAS DRIVEN. — recorded 2026-08-11
+
+**The decision, dated and attributed.** On **2026-08-11**, at plan `192-12`'s Task 3
+`checkpoint:human-verify`, the **operator** answered: *"close with the rows owed, U6 first."* Phase 192
+therefore closes with all eleven G-4 rows **un-driven**. That is legitimate and is stated as a DECISION,
+per CLAUDE.md § "Workflow guardrails" verbatim: *"Closing a phase with owed manual UAT rows is
+legitimate, and is often the right call — but state it as a DECISION, never as a claim that everything
+ran. Record the owed rows in the ROADMAP progress row and STATE.md, and name which row to run first."*
+
+**No row below was run, simulated, inferred, or approximated. No row is marked passed.** A PASS inferred
+from a neighbouring row's evidence is not a driven row, and an unrecognised state renders *"state
+unknown"*, not *"complete"* — that standard applies to eleven un-driven rows exactly as it applies to
+one.
+
+**▶ RUN `U6` FIRST.** *Pick a project → starters must remain **with a stated reason**; **SILENCE IS A
+FAIL**.* It is first because it exists on account of a **measured IA defect** (RESEARCH § "The unnamed
+IA defect", decision D-17) that **no structural test can catch** — the unit suite can prove starters
+still render under a project selection, but only a human reading the toolbar can tell whether the page
+*says why*. It is also the row most likely to fail. Its outcome must quote the **exact rendered text**.
+
+**▶ RUN `U4` SECOND**, because it is the row this phase's own correction changed, and the correction
+must travel with it. The `[title]` sweep counts **only inside the library subtree, EXCLUDING the
+`workflow-soul` subtree**, and must be **0 in this phase's own chrome**. The two surviving `title=`
+attributes — **`WorkflowSoul.tsx:99`** (`title={tier.description}`) and **`PhaseSpine.tsx:77`**
+(`title={name || undefined}`) — are **INHERITED from two prior phases**, are locked as *consumed
+unchanged* by D-01 and by `WorkflowSoul`'s own G-5 red line, and are recorded in CONTEXT.md
+§`code_context` as a carried defect. **Left unstated, U4 would fail Phase 192 for a defect Phase 124 /
+187 shipped.** The full derivation is in § "Correction to U4" below — read it before driving the row.
+
+**Driving notes, recorded so the next session does not re-derive them:**
+
+- **200 workflows, NEVER 12.** Every pass bar below is a real-scale bar; at 12 rows most of them are
+  vacuously true. (The 045 real-scale lesson; all three sketches ship a 12/54/200 selector for this.)
+- **Read DOM geometry with `evaluate_script`.** `take_screenshot` **times out repeatedly** on this
+  setup — it is not a flake to retry through.
+- **`computer` CLICKS can deliver ZERO events** while `hover` and `left_click_drag` work. If a click
+  appears to do nothing, that is the tooling, not the surface. `elementFromPoint` is the
+  machine-checkable reachability check.
+- A row that cannot be driven is recorded **⛔ with its reason and blocking issue id — never silently
+  omitted**. A scoreboard that lists only what passed is not a scoreboard.
+- Setup owed for every row: a locally running backend + frontend and ~200 seeded workflows. No external
+  service, dependency, migration or env var.
+
+### ⚠ THE PLAN'S `<what-built>` COPY IS WRONG — corrected here, BEFORE anyone drives a row
+
+`192-12-PLAN.md`'s checkpoint copy says the library ships *"an always-on search over name + purpose
+**with the hit highlighted**"*. **It does not. D-07's highlight is UNSHIPPED and deliberately
+DEFERRED** — measured in `192-11` (zero `HighlightTitle` consumers under `library/`; `WorkflowCard`
+takes no `query` prop) and decided in `192-12`, because wiring it **reds fence F1 by construction**:
+`HighlightTitle`'s prop is spelled `title`, F1 walks JSX attribute names, and the wiring was **observed
+RED against a real plant**, not argued. Nobody may be asked to verify a behaviour that does not exist.
+
+> **Corrected `<what-built>` — use THIS when driving the rows.** The Workflows library is now one flat
+> list under one persistent toolbar: create leads, an always-on search over name **and purpose** — the
+> matched text is rendered **plain, with NO highlight** (D-07's second half is unshipped and deferred) —
+> six chips that recount against the live search, a project select that states what it does to starters,
+> and one card with one primary verb, a `⋯` overflow, and one consequence sentence wired as real DOM
+> text. `RunModal` and the victim-naming delete Sheet moved to their own modules with byte-identical
+> rendering; the backend now returns `is_mine` and `is_system_global`; `Publish…` and the
+> developer-vocabulary strings are gone.
+
+| # | Behavior | Req | Driven how | Pass bar | Status (2026-08-11) |
+|---|---|---|---|---|---|
+| **U1** | At 200 workflows, find one named workflow by typing three characters | LIB-01 | `evaluate_script` types into the search input, counts rendered rows | Target row visible **without scrolling**; `elementFromPoint` on its centre returns a node inside that row | ⛔ **OWED — NOT RUN** |
+| **U2** | Narrow with two chips at once and read the counts | LIB-01/02 | click chips, read chip label text + `querySelectorAll` row count | Every chip's number **equals** the rows it produces; no chip promises results it cannot deliver | ⛔ **OWED — NOT RUN** |
+| **U3** | The create affordance is reachable with **zero scroll** | LIB-04 | measure `getBoundingClientRect().top` vs viewport at 200 rows | `top < window.innerHeight` at first paint, and it is the **first** interactive element in DOM order — record the numeric `top` AND `window.innerHeight` | ⛔ **OWED — NOT RUN** |
+| **U4** | The fork verb's consequence is readable **without hover** | LIB-03 / D-14 | count `[title]` inside the library subtree **excluding the `workflow-soul` subtree** (see the correction below); read the `aria-describedby` target's `textContent` | `title` count = **0** in this phase's own chrome; described text present, non-empty, names **both** halves (new private copy **and** published stays live) | ⛔ **OWED — NOT RUN** · **run 2nd** |
+| **U5** | "Tweak" no longer surprises — operator reads the card and states what the verb will do *before* clicking | LIB-03 / SC#3 | manual, operator | The stated expectation matches what happens | ⛔ **OWED — NOT RUN** |
+| **U6** | Pick a project → what happens to starters is **explained, not silent** | D-17 | click the project select, read the toolbar | Starters remain **with a stated reason**. **Silence is a FAIL.** Quote the **exact rendered text** | ⛔ **OWED — NOT RUN** · **▶ run 1st** |
+| **U7** | A paraphrase returns zero and the page does not pretend otherwise | LIB-01 / D-08 | type *"the thing that checks vendors"* | 0 results, honest empty state, one-click *Clear search & filters*, **no copy implying meaning-search** | ⛔ **OWED — NOT RUN** |
+| **U8** | The delete Sheet still names exact counts and refuses to dismiss mid-delete (the moved code) | D-01 | open ⋯ → Delete workflow… | Exact server counts render; `Escape` during `deleting` does **not** close | ⛔ **OWED — NOT RUN** |
+| **U9** | Run still launches (the moved RunModal) | D-01 | open Run → confirm | Lands on the run surface (canvas flag on) or a new chat thread (flag off) — matching the `run-destination` copy shown | ⛔ **OWED — NOT RUN** |
+| **U10** | Touch, no hover (the real experience for a large share of users) | D-14 | emulate touch, re-read every action | Every explanation still legible | ⛔ **OWED — NOT RUN** |
+| **U11** | A draft can be deleted from the library, under a guard lighter than the published Sheet | D-18 | open a draft's ⋯ → Delete | Row disappears; the published victim-naming Sheet is **not** what appeared | ⛔ **OWED — NOT RUN** |
+
+**Eleven rows · 0 driven · 0 passed · 0 failed · 11 owed.** The tally is written out so no reader can
+mistake an empty outcome column for an absent obligation.
 
 **U6 exists because of a measured defect** (RESEARCH § "The unnamed IA defect"). It is the row most
 likely to fail and the one no structural test can catch.
@@ -304,7 +370,9 @@ indistinguishable from one that forgot.
 - [ ] F3's positive control demonstrated
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 90 s
-- [ ] All eleven G-4 UAT rows driven, or explicitly recorded as owed with the row to run first
+- [x] All eleven G-4 UAT rows driven, **or** explicitly recorded as owed with the row to run first —
+      satisfied by the **SECOND** clause only: **0 of 11 driven, all 11 recorded ⛔ OWED**, U6 named
+      first and U4 second (operator decision, 2026-08-11). **This box does NOT assert any row ran.**
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
