@@ -20,6 +20,7 @@ provides:
   - "the MEASURED subtree delta, against a VALIDATED classifier, contradicting RESEARCH's estimate"
   - "every suite this phase created or grew, pinned from a read number"
   - "the CLAUDE.md hot-file ledger row for WorkflowsPage.tsx, G-5 satisfied"
+  - "the G-4 DEFERRAL RECORD — eleven UAT rows marked ⛔ OWED / not-run, U6 first, U4 second with its scope correction, plus the corrected <what-built> copy"
 affects: []
 
 # Tech tracking
@@ -38,6 +39,7 @@ key-files:
     - frontend/src/components/workflows/library/WorkflowCard.tsx
     - scripts/vitest-count-gate.cjs
     - CLAUDE.md
+    - .planning/phases/192-workflow-library-ia/192-VALIDATION.md
 
 key-decisions:
   - "D-07's search highlight is DEFERRED, not owed as small wiring — because wiring it reds F1 BY CONSTRUCTION (HighlightTitle's prop is spelled `title`), measured with a real plant rather than reasoned"
@@ -45,6 +47,7 @@ key-decisions:
   - "RESEARCH assumption A2 (+5%…+16%) is FALSIFIED at +126.2% and stated plainly, with both reasons it missed named"
   - "The four pre-existing drifted pins (+24 cases) are RECORDED as owed, never absorbed into a commit that did not cause them"
   - "Task 3's operator-facing copy was corrected before the checkpoint — it claimed a highlight that does not exist"
+  - "OPERATOR DECISION 2026-08-11: close with the eleven G-4 UAT rows OWED, U6 first — Task 3 is CLOSED BY DEFERRAL, not completed, and zero rows were driven"
 
 requirements-completed: []
 
@@ -55,9 +58,12 @@ completed: 2026-08-11
 
 # Phase 192 Plan 12: The Phase-Close Record — Summary
 
-**⚠ THIS PLAN IS INCOMPLETE BY DESIGN. Tasks 1 and 2 are executed and committed; Task 3 — the
-eleven-row G-4 operator UAT — is a `checkpoint:human-verify` with `gate="blocking"` and is
-OUTSTANDING. It was not attempted and was not self-approved.**
+**⚠ TASKS 1 AND 2 ARE COMPLETED. TASK 3 IS *CLOSED BY DEFERRAL* — NOT COMPLETED.** Task 3 is the
+eleven-row G-4 operator UAT, a `checkpoint:human-verify` with `gate="blocking"`. It was returned to the
+operator, and on **2026-08-11 the operator answered: *"close with the rows owed, U6 first."*** So the
+plan closes with **all eleven rows ⛔ OWED and NOT ONE DRIVEN** — recorded as a decision in
+`192-VALIDATION.md`, never as a claim that anything ran. **No UAT row was driven, simulated, inferred or
+approximated, and no row is marked passed.**
 
 Every fence this phase wrote is now proved to fire against a real defect in production source, the
 restructure's real cost is measured against a validated classifier and is **eight times** the
@@ -68,13 +74,15 @@ reason is a structural conflict that was **measured with a plant, not argued**.
 
 ## Performance
 
-- **Duration:** ~1 h 35 · **Tasks:** 2 of 3 · **Commits:** 2 (plus this SUMMARY)
-- **Files:** 0 created, **4 modified** · `git diff --diff-filter=D 23ebf229..HEAD` → **empty**
+- **Duration:** ~1 h 35 execution + the checkpoint round trip · **Tasks:** **2 completed, 1 closed by
+  deferral** · **Commits:** 3 (2 execution + this record)
+- **Files:** 0 created, **4 modified** in source · `git diff --diff-filter=D 23ebf229..HEAD` → **empty**
 
 | Commit | Task |
 |---|---|
 | `e2cff33e` | Task 1 — six fences driven RED against real plants; the OD one-direction block; the D-07 correction |
 | `4ca5acf6` | Task 2 — the measured delta, eight pins, the CLAUDE.md ledger row |
+| *this commit* | Task 3 — **closed by deferral**: the eleven owed rows recorded in `192-VALIDATION.md`, U6 first. **Zero rows driven.** |
 
 ## THE PLANTS — nine, all in production source, all restored md5-identical
 
@@ -367,8 +375,8 @@ Every vitest and gate invocation carried `GSD_VITEST_MAX_WORKERS=4`.
 | T-192-06 | mitigate | **Mitigated.** All five fences plus the hash fence driven RED against nine real plants in production source, every file restored md5-identical, failure messages recorded. F4 additionally proved to typecheck at 33 and lint at 0 on the planted tree — with the plan's own weaker plant corrected. |
 | T-192-30 | mitigate | **Mitigated, and the estimate is REFUTED.** Measured with a classifier validated against 188.2's known-good, recorded in the SUMMARY, the card's docblock and the CLAUDE.md row, and stated plainly at +126.2 % against an estimated +5 %…+16 %. |
 | T-192-31 | mitigate | **Mitigated.** Eight pins, every number read from the printed `actual` across two agreeing runs; the 188-12 growing-suite exemption expires in this commit; the four unrelated drifts named and left owed. |
-| T-192-21 | mitigate | ⛔ **OUTSTANDING** — U4 and U10 are Task 3 rows and Task 3 has not run. F1's SOURCE half is proved (nine plants); the RENDERED half at 200 rows is the operator's. |
-| T-192-32 | mitigate | ⛔ **OUTSTANDING** — the UAT record does not exist yet. This SUMMARY records zero rows rather than claiming any. |
+| T-192-21 | mitigate | ⛔ **UNMITIGATED — OWED BY DECISION.** U4 and U10 are Task 3 rows and **Task 3 was not driven**. F1's SOURCE half is proved (nine plants); the RENDERED half at 200 rows is the operator's and remains owed, recorded ⛔ in `192-VALIDATION.md` rather than closed. |
+| T-192-32 | mitigate | ⛔ **UNMITIGATED — OWED BY DECISION, but the RECORD now exists and is honest.** The scoreboard is written with all eleven rows ⛔ OWED / not-run, the tally spelled out (`0 driven · 0 passed · 0 failed · 11 owed`), U6 named first and U4 second. **Zero rows are claimed.** The threat this row names — spoofing of verification — is what the deferral record is written to prevent. |
 | T-192-SC | accept | **Held.** Zero packages installed. |
 
 **Threat flags:** none. No network surface, auth path, file access or schema touched; the only source
@@ -381,24 +389,62 @@ not exist** — deferred with the concrete re-open trigger above, pinned mechani
 control, and removed from the operator-facing checkpoint copy so nobody is asked to verify it.
 No other stub.
 
-## ⛔ WHAT IS OUTSTANDING — Task 3, and it is a DECISION, not an omission
+## ⛔ TASK 3 — **CLOSED BY DEFERRAL**, and it is a DECISION, not an omission and not a completion
 
-**The eleven-row G-4 UAT at 200 workflows has NOT been driven.** It is a `checkpoint:human-verify`
-with `gate="blocking"`, it requires a human driving Chrome against a locally running app with ~200
-seeded workflows, and in this project the operator drives browser UAT. It was not attempted and was
-not self-approved.
+**THE ELEVEN-ROW G-4 UAT AT 200 WORKFLOWS WAS NOT DRIVEN. Zero of eleven rows ran. Zero passed. Zero
+failed. Eleven are owed.** Task 3 is a `checkpoint:human-verify` with `gate="blocking"`; it requires a
+human driving Chrome against a locally running app with ~200 seeded workflows, and in this project the
+operator drives browser UAT. It was **not attempted, not simulated, not inferred from any neighbouring
+evidence, and not self-approved.**
 
-**The row to run first is U6** — *"pick a project → what happens to starters is explained, not
-silent; SILENCE IS A FAIL"*. It exists because of a measured IA defect, it is the row most likely to
-fail, and no structural test can catch it. Its outcome must quote the **exact rendered text**.
+**The operator's decision, dated and attributed.** On **2026-08-11**, presented with the checkpoint,
+the **operator** answered: ***"close with the rows owed, U6 first."*** That is legitimate under
+CLAUDE.md § "Workflow guardrails" verbatim — *"Closing a phase with owed manual UAT rows is legitimate,
+and is often the right call — but state it as a DECISION, never as a claim that everything ran. Record
+the owed rows in the ROADMAP progress row and STATE.md, and name which row to run first."* This section
+and `192-VALIDATION.md` § "Manual-Only Verifications" are that record. **Task 3 is therefore closed by
+deferral — it is NOT complete, and nothing in this plan may be read as UAT having passed.**
 
-**Second is U4**, because it is the row this phase's own correction changed: the `[title]` sweep
-**excludes the `workflow-soul` subtree**. The two remaining `title=`s are inherited
-(`WorkflowSoul.tsx:99`, `PhaseSpine.tsx:77`), out of scope by D-01, and recorded in CONTEXT.md.
-Left unstated, U4 would fail the phase for a defect two prior phases shipped.
+**The eleven owed rows, in full, so none can go missing between documents:**
 
-⚠ **The checkpoint copy shipped in `192-12-PLAN.md` claims the search shows "the hit highlighted".
-It does not.** The corrected wording is in the checkpoint returned to the orchestrator.
+| Row | What is owed | Status |
+|---|---|---|
+| **U6** | pick a project → starters remain **with a stated reason**; **silence is a FAIL** | ⛔ owed · **▶ RUN FIRST** |
+| **U4** | `[title]` count = 0 in this phase's chrome (**excluding `workflow-soul`**) + the `aria-describedby` text names both halves | ⛔ owed · **run 2nd** |
+| **U1** | three characters find one row among 200, visible without scrolling | ⛔ owed |
+| **U2** | two chips at once; every chip's number equals the rows it produces | ⛔ owed |
+| **U3** | create affordance `top < window.innerHeight` at first paint, first in DOM order | ⛔ owed |
+| **U5** | the fork verb does what the card says it will, stated before clicking | ⛔ owed |
+| **U7** | the paraphrase returns 0 with an honest empty state and no meaning-search copy | ⛔ owed |
+| **U8** | the moved delete Sheet names exact counts; `Escape` mid-`deleting` does not close | ⛔ owed |
+| **U9** | the moved `RunModal` lands where its `run-destination` copy said | ⛔ owed |
+| **U10** | touch, no hover — every explanation still legible | ⛔ owed |
+| **U11** | a draft deletes under a lighter guard; the victim-naming Sheet does not appear | ⛔ owed |
+
+**▶ U6 IS THE ROW TO RUN FIRST** — *"pick a project → what happens to starters is explained, not silent;
+SILENCE IS A FAIL"*. It exists because of a **measured IA defect** (RESEARCH § "The unnamed IA defect",
+D-17), it is the row most likely to fail, and **no structural test can catch it**: the suite can prove
+starters still render under a project selection, but only a human reading the toolbar can tell whether
+the page *says why*. Its outcome must quote the **exact rendered text**.
+
+**U4 IS SECOND**, because it is the row this phase's own correction changed and the correction must
+travel with it: the `[title]` sweep **excludes the `workflow-soul` subtree** and must be **0 in this
+phase's own chrome**. The two remaining `title=`s are **INHERITED** — `WorkflowSoul.tsx:99`
+(`title={tier.description}`) and `PhaseSpine.tsx:77` (`title={name || undefined}`) — locked as
+*consumed unchanged* by D-01, and recorded in CONTEXT.md §`code_context`. **Left unstated, U4 would
+fail Phase 192 for a defect two prior phases shipped.**
+
+**Driving notes, recorded so the next session does not re-derive them:** **200 workflows, never 12**;
+read DOM geometry with **`evaluate_script`** because `take_screenshot` **times out repeatedly** on this
+setup; **`computer` clicks can deliver zero events** while `hover` / `left_click_drag` work
+(`elementFromPoint` is the machine-checkable reachability check). Setup owed: a locally running backend
++ frontend and ~200 seeded workflows — no external service, dependency, migration or env var.
+
+⚠ **The checkpoint copy in `192-12-PLAN.md` claims the search shows "the hit highlighted". IT DOES
+NOT** — D-07's highlight is unshipped and deliberately deferred (wiring it reds F1 by construction,
+measured with a real plant). **The corrected `<what-built>` wording is now written into
+`192-VALIDATION.md`**, so whoever picks these rows up cannot be asked to verify a behaviour that does
+not exist.
 
 **Also owed, inherited and untouched by this plan:** the RED-plant obligation on
 `WorkflowDeleteSheet.tsx` (from `192-08`), the nine string re-homes into `libraryVocabulary.ts`
@@ -411,7 +457,12 @@ It does not.** The corrected wording is in the checkpoint returned to the orches
 `.planning/STATE.md`, `.planning/ROADMAP.md` and `.planning/REQUIREMENTS.md` are untouched. **They are
 user-observable now, which is exactly what makes an early tick plausible and still premature: the
 phase is not verified until the operator's eleven rows are driven, and one half of D-07 is
-deliberately unshipped.** Marking them is the orchestrator's job, after Task 3.
+deliberately unshipped.** **Task 3 closing BY DEFERRAL does not change that** — the eleven rows are
+owed, not satisfied, so a tick here would be exactly the false record this project has recorded seven
+GSD verbs producing. Marking them stays the orchestrator's job, and it should follow the owed rows
+rather than this commit. **This plan touched no `state.*`, `requirements.mark-complete` or
+`roadmap.update-plan-progress` verb, and `.planning/STATE.md`, `ROADMAP.md` and `REQUIREMENTS.md`
+remain unmodified — including by this deferral commit.**
 
 ## User Setup Required
 
@@ -425,6 +476,9 @@ service configuration, no dependency, no migration, no env var.
 - `scripts/vitest-count-gate.cjs` — **FOUND** (60/60 pinned, exit 0 twice)
 - `CLAUDE.md` — **FOUND** (`WorkflowsPage.tsx` row reads *satisfied (192 — 2026-08-11)*)
 - `.planning/phases/192-workflow-library-ia/192-12-SUMMARY.md` — **FOUND**
+- `.planning/phases/192-workflow-library-ia/192-VALIDATION.md` — **FOUND** (eleven rows carry an explicit
+  ⛔ **OWED — NOT RUN** status; the string `0 driven · 0 passed · 0 failed · 11 owed` is present; **no row
+  reads as passed, and the file contains no claim that any UAT was exercised**)
 - Commit `e2cff33e` — **FOUND** in `git log`
 - Commit `4ca5acf6` — **FOUND** in `git log`
 - `git diff --diff-filter=D 23ebf229..HEAD` — empty
@@ -433,4 +487,5 @@ service configuration, no dependency, no migration, no env var.
 
 ---
 *Phase: 192-workflow-library-ia*
-*Completed: Tasks 1–2 on 2026-08-11. **Task 3 OUTSTANDING — blocking operator checkpoint.***
+*Completed: Tasks 1–2 on 2026-08-11. **Task 3 CLOSED BY DEFERRAL on 2026-08-11 — operator decision
+"close with the rows owed, U6 first". Eleven G-4 UAT rows are OWED; NONE was driven.***
