@@ -880,7 +880,10 @@ const BASELINE = {
   // ⚠ ALL FOUR RAISED BY 192-12 (the phase's closing commit) — 22→39, 11→32, 8→16, 7→32.
   // The argument, the per-suite attribution and the four drifts deliberately left alone are
   // in the 192-12 block at the foot of this map. Read from the printed `actual`, twice.
-  "WorkflowsPage.test.tsx": 39,
+  // 40, not 39: the CR-01 fix (all-three-feeds-fail must not claim "you have no workflows
+  // yet") added one case AFTER 192-12's pinning sweep read 39. Raised here rather than left
+  // low — a pin below the real count is a pin that cannot see the next deletion.
+  "WorkflowsPage.test.tsx": 40,
   "RunModal.test.tsx": 32,
   "RunModal.a11y.test.tsx": 16,
   "PublishedCardDelete.test.tsx": 32,

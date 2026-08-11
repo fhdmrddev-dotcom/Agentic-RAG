@@ -931,6 +931,26 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
               />
             ))}
           </div>
+        ) : rows.length === 0 && failedSources.length > 0 ? (
+          /**
+           * ⚠ AN EMPTY LIST AND A FAILED FEED ARE DIFFERENT CLAIMS, and only one of them is
+           * ours to make. `loading` is `!anySettled`, and a source that FAILED counts as
+           * settled — so without this branch the all-feeds-fail path fell straight through to
+           * `LIBRARY_STATES.empty` and told the user "You have no workflows yet" while the
+           * banners above it said we could not load them. That is an affirmative statement
+           * about the user's own data, made from evidence we do not have.
+           *
+           * `LIBRARY_STATES["source-failed"]` was authored in 192-05 for exactly this state and
+           * had no consumer until this branch — the vocabulary knew the honest answer before
+           * the page asked for it. Found by the 192 code review (CR-01), reproduced
+           * independently at verification, fixed here under G-3 rather than as a gap round.
+           */
+          <p
+            data-testid="library-empty-source-failed"
+            className="text-[13px] italic text-muted-foreground"
+          >
+            {LIBRARY_STATES["source-failed"]}
+          </p>
         ) : rows.length === 0 ? (
           <p data-testid="library-empty" className="text-[13px] italic text-muted-foreground">
             {LIBRARY_STATES.empty}

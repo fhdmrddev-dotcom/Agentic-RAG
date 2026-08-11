@@ -1063,6 +1063,43 @@ describe("WorkflowsPage — the RUN CARVE-OUT at scale (D-16, T-192-03)", () => 
     // …and "you have none" is never shown over a library that has 140 rows.
     expect(screen.queryByTestId("library-empty")).toBeNull()
   })
+
+  it("when ALL THREE feeds fail, the page says the list is incomplete — never that the user has none", async () => {
+    // CR-01, found by the 192 code review and reproduced independently at verification.
+    //
+    // WHY THE TWO CASES ABOVE COULD NOT SEE THIS: both reject `/drafts` and let the other two
+    // return rows, so both leave `rows.length > 0` and never reach the empty-state branch at
+    // all. They pin the CORRECT branch without ever entering the WRONG one — which is exactly
+    // how a defect survives a suite that looks thorough. The distinguishing input is not "a
+    // feed failed", it is "a feed failed AND nothing else answered".
+    //
+    // The claim under test is about EPISTEMICS, not layout: "You have no workflows yet" is an
+    // affirmative statement about the user's own data, and when every source refused we have no
+    // evidence for it. `loading` is `!anySettled`, and a FAILED source counts as settled, so
+    // this path renders — it does not hang on a spinner.
+    mockListPublished.mockRejectedValue(new Error("503 Service Unavailable"))
+    mockListStarters.mockRejectedValue(new Error("503 Service Unavailable"))
+    mockListDrafts.mockRejectedValue(new Error("403 Forbidden"))
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+
+    // Every source is named — the page never folds three refusals into one page-wide error.
+    await waitFor(() =>
+      expect(screen.getByTestId("library-source-failed-published")).toBeInTheDocument(),
+    )
+    expect(screen.getByTestId("library-source-failed-starter")).toBeInTheDocument()
+    expect(screen.getByTestId("library-source-failed-draft")).toBeInTheDocument()
+
+    // THE ASSERTION THAT WOULD HAVE CAUGHT CR-01: the false claim is absent…
+    expect(screen.queryByTestId("library-empty")).toBeNull()
+    // …and the honest one is present, wired to the vocabulary entry authored for this state
+    // in 192-05 that had no consumer until the fix.
+    expect(screen.getByTestId("library-empty-source-failed").textContent).toContain("incomplete")
+
+    // No rows are claimed, and the list is not stuck pretending to still be loading.
+    expect(renderedCards()).toHaveLength(0)
+    expect(screen.queryByTestId("library-loading")).toBeNull()
+  })
 })
 
 describe("WorkflowsPage — D-17: the project filter holds STARTERS out, and says so", () => {
