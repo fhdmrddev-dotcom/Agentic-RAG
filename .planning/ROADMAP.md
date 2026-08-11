@@ -50,7 +50,7 @@ is the incumbent any proposal must beat.
 
 ### Phase Checklist
 
-- [x] **Phase 192: Workflow Library IA** ✓ 2026-08-11 (12 plans, 67 commits; verified 6/6 — 5/6 at verification + CR-01 closed under G-3. ⛔ 11 G-4 UAT rows OWED by operator decision, U6 first) — search, filter, at-a-glance cards, predictable card actions, findable create affordance (LIB-01…04)
+- [x] **Phase 192: Workflow Library IA** ✓ 2026-08-11, **RE-OPENED for gap-closure round 1 and re-closed 2026-08-12** (12 plans + 4 round-1 plans = **16**; verified 6/6 at close — 5/6 at verification + CR-01 closed under G-3). ⚠ **The re-open was not bookkeeping: SC#3 was found UNMET in lived experience by a human on the first real click** — the fork verb 409'd twice in silence (`192-UAT.md` U5). ⛔ 11 G-4 UAT rows still OWED by operator decision, **U6 first**; U5 is re-driven or re-owed at the round-1 checkpoint — search, filter, at-a-glance cards, predictable card actions, findable create affordance (LIB-01…04)
 - [ ] **Phase 193: Authoring Doors + Template Placement** — the two doors are tellable apart before choosing; template supply has a findable home (AUTH-01, AUTH-03)
 - [ ] **Phase 194: Stop a Running Workflow** — a run can be stopped mid-execution and reports `cancelled` honestly (RUN-01)
 - [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
@@ -116,10 +116,49 @@ G-2, and folding it here would be the exact G-7 violation), and the **2 of 18** 
 slugs (`meridian-risk-summary-good-07aedc33`, `readonly_refusal_098uat`) whose fork still refuses —
 the change is that it now refuses OUT LOUD.
 
-- [ ] `192-13-PLAN.md` (round 1, wave 1) — the words: `FORK_CONSEQUENCE_EXISTING` + `forkFailedMessage`, and the card's consequence sentence becomes state-aware (default byte-identical to what shipped).
-- [ ] `192-14-PLAN.md` (round 1, wave 2) — `onTweak` opens the existing draft instead of colliding with it; `hasExistingFork` wired from the merged feed; **the regression test that forks a slug WHICH ALREADY HAS A v2** — the branch 3176 passing tests never entered, driven RED first.
-- [ ] `192-15-PLAN.md` (round 1, wave 3) — WR-03: both fork handlers surface a visible failure; `onUseStarter`'s single 409 retry is PRESERVED and pinned at two calls; no toast library added.
-- [ ] `192-16-PLAN.md` (round 1, wave 4) — pin both grown suites at READ numbers with the `[count-decrease]` guard driven RED; fences + characterization baselines proved unmoved; ROADMAP + hot-file ledger updated on measurement; **blocking operator checkpoint: re-drive U5.**
+- [x] `192-13-PLAN.md` (round 1, wave 1) — the words: `FORK_CONSEQUENCE_EXISTING` + `forkFailedMessage`, and the card's consequence sentence becomes state-aware (default byte-identical to what shipped).
+- [x] `192-14-PLAN.md` (round 1, wave 2) — `onTweak` opens the existing draft instead of colliding with it; `hasExistingFork` wired from the merged feed; **the regression test that forks a slug WHICH ALREADY HAS A v2** — the branch 3176 passing tests never entered, driven RED first.
+- [x] `192-15-PLAN.md` (round 1, wave 3) — WR-03: both fork handlers surface a visible failure; `onUseStarter`'s single 409 retry is PRESERVED and pinned at two calls; no toast library added.
+- [x] `192-16-PLAN.md` (round 1, wave 4) — pin both grown suites at READ numbers with the `[count-decrease]` guard driven RED; fences + characterization baselines proved unmoved; ROADMAP + hot-file ledger updated on measurement; **blocking operator checkpoint: re-drive U5.**
+
+**⚠ GAP-CLOSURE ROUND 1 — CLOSED 2026-08-12. What it closed, and what it did NOT.**
+
+**Closed:** the dead fork verb. `⋯ → Make my own copy` on a published row you have already forked
+now OPENS the copy you started rather than attempting a colliding INSERT — the failure class is
+REMOVED on those rows, not made rarer, because the branch creates nothing that can 409 (`192-14`).
+Every fork click that still fails renders a visible sentence naming the workflow and stating that
+nothing was created and nothing was changed, on BOTH handlers, because D-12 gives them one word on
+the card face and a user cannot tell which they clicked (`192-15`). The card SAYS so before the
+click, selected into the ONE existing `fork-consequence` node so the card gains no atom (`192-13`).
+
+**Gates at round close, all measured** (`192-16`): count gate **60/60 pinned · total 3188 ·
+failed 0 · exit 0**, with the two grown suites now pinned at numbers READ from the gate's own
+`actual` column across two agreeing capped runs — `WorkflowsPage.test.tsx` **40 → 48**,
+`WorkflowCard.test.tsx` **35 → 39**. The pin was **driven RED, not asserted**: deleting one whole
+`it(` block printed `[count-decrease] … pinned 48, ran 47 (-1)` at `failed 0`, exit 1, and the file
+restored md5-identical. `tsc -p tsconfig.app.json` unmoved at **33**, eslint + a11y **0**. All five
+negative fences (**64**) and all three characterization baselines (`RunModal` **32**, `RunModal.a11y`
+**16**, `PublishedCardDelete` **32**) UNMOVED with **zero re-capture** — this round changed what a
+click does and what the page says, never how anything renders.
+
+⛔ **NOT closed, and named rather than implied:**
+- **U5-b card density** (13 atoms per row) — design work, routed to a sketch under G-2. Folding it
+  into a closure round would be the exact G-7 violation.
+- **The 2 of 18 `published + published` slugs** (`meridian-risk-summary-good-07aedc33`,
+  `readonly_refusal_098uat`) have no draft to open, so their fork still refuses. **The change is
+  that it now refuses OUT LOUD.** Named verbatim in `WorkflowsPage.tsx`.
+- **WR-08** — the 409 classification still keys on error prose (`String(e).includes("409")`), now
+  with ONE home instead of two. The real fix is a typed error at `createWorkflowDraft`'s throw site,
+  an `api.ts` change with callers outside this page. Re-open trigger: the next phase that touches
+  that throw site.
+- **The four pre-existing count-gate drifts** (`ExternalActionSection` +9, `PhaseTimeline` +4,
+  `WorkflowBuilderPage.canvas` +5, `builderStore` +6 = **+24 cases deletable with the gate green**)
+  are unchanged and still owed as their own edit — deliberately not absorbed into a commit that did
+  not cause them.
+- **`D-192-DEF-01`** stands, with an HONEST characterization replacing `192-14`'s: capping at
+  `GSD_VITEST_MAX_WORKERS=4` **REDUCES the flake, it does not eliminate it.** Measured by the
+  orchestrator across three CAPPED runs on one tree: `failed 0`, `failed 0`, **`failed 1`**. The
+  COUNT columns remain the regression backstop; the `failed` line, on this machine, is not.
 
 #### Phase 193: Authoring Doors + Template Placement
 
