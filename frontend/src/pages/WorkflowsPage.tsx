@@ -482,11 +482,88 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   )
   const loading = !anySettled
 
+  /**
+   * 192-14 (the U5 blocker) — THE DRAFTS THIS CALLER ALREADY OWNS, BY SLUG.
+   *
+   * Built from the `drafts` feed, which `GET /workflows/drafts` scopes server-side to
+   * `created_by = caller`. A slug match here can therefore only ever resolve to a row this
+   * person already owns — the lookup widens no scope and reaches no new endpoint.
+   *
+   * ⚠ THE HIGHEST VERSION WINS, and the rule is stated because "the draft for this slug" is
+   * genuinely ambiguous: measured in the live DB on 2026-08-11, `pm-weekly-status-report`
+   * carries `1:published, 2:draft, 3:published, 4:draft` — TWO drafts under one slug. Left to
+   * insertion order the answer would be whichever the server happened to return first, which is
+   * not an answer. The most recent fork is the one a person means by "my copy".
+   */
+  const draftBySlug = useMemo(() => {
+    const bySlug = new Map<string, WorkflowDraftRow>()
+    for (const d of drafts) {
+      const held = bySlug.get(d.slug)
+      if (!held || d.version > held.version) bySlug.set(d.slug, d)
+    }
+    return bySlug
+  }, [drafts])
+
+  // ── Open a draft: load THAT draft's definition into the Builder editing view
+  //    (edit-in-place — saves PATCH the same row via its real id). ──
+  //
+  // ⚠ 192-14: DECLARED ABOVE `onTweak` ON PURPOSE, and the move is required rather than
+  // stylistic. `onTweak` now lists this callback in its dependency array; a dep array is
+  // evaluated at RENDER time, so a `const` declared further down the component body is a
+  // temporal-dead-zone ReferenceError on every render — a crash, not a lint warning. The body
+  // below is the shipped one verbatim; only its position changed.
+  const onOpenDraft = useCallback((draft: WorkflowDraftRow) => {
+    setBuilderInitial({
+      definition: (draft.definition ?? {}) as WorkflowDefinitionJSON,
+      draftId: draft.id,
+      label: `Edit · ${draft.name ?? draft.slug} v${draft.version}`,
+      // 186-07: the ONE route that does not create — the drafts list itself now serves
+      // the token (186-03), so an edit-in-place session is guarded from its first write.
+      // `?? null` because a shelf row read before that field shipped simply has none, and
+      // an unguarded first write is the honest fallback rather than a crash.
+      token: draft.token ?? null,
+    })
+    setPageView("builder")
+  }, [])
+
   // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row —
   //    then open the FORKED copy's existing steps in the Builder (NOT the describe
-  //    screen). The new draft id is captured so every save PATCHes the fork. ──
+  //    screen). The new draft id is captured so every save PATCHes the fork.
+  //
+  //    ⚠ 192-14 — FIRST, THOUGH: if this caller ALREADY has a draft of this slug, the verb
+  //    OPENS THAT DRAFT and creates nothing. That branch is the operator's 2026-08-11
+  //    decision on the U5 blocker (`192-UAT.md` test 11), where a fork click 409'd twice and
+  //    the surface said nothing at all. Opening the existing copy removes the collision
+  //    class outright rather than making it rarer, and the card says so before the click
+  //    (`hasExistingFork`, 192-13). ──
   const onTweak = useCallback(
     async (wf: PublishedWorkflow) => {
+      // ── THE EXISTING-DRAFT BRANCH (192-14) ──
+      // Nothing is created and nothing is fetched, so there is no request that can 409.
+      // `onOpenDraft` is REUSED rather than a third `setBuilderInitial` call site added,
+      // which is what threads 186-07's opaque concurrency token by construction instead of
+      // by remembering to — a dropped token is a silent-clobber bug that typechecks.
+      const existing = draftBySlug.get(wf.slug)
+      if (existing) {
+        onOpenDraft(existing)
+        return
+      }
+
+      // ── THE CREATE PATH, DELIBERATELY UNCHANGED BELOW THIS LINE ──
+      // `def.version` is read off the JSONB `definition`, where it is NULL on every live row
+      // (the real version is the `version` COLUMN), so `nextVersion` is effectively the
+      // constant 2. That is left ALONE on purpose: `PublishedWorkflow` carries no `version`
+      // on the wire (root cause C in `192-UAT.md`), so the client is not told the real one,
+      // and a "smarter" guess would only make the collision RARER — which is exactly what the
+      // operator's decision rejected in favour of removing the failure class.
+      //
+      // ⚠ THE RESIDUAL, NAMED RATHER THAN SMOOTHED. Re-measured in the live local DB on
+      // 2026-08-11: 18 slugs carry more than one version, and 2 of them —
+      // `meridian-risk-summary-good-07aedc33` and `readonly_refusal_098uat` — are
+      // `published + published` with NO draft at all. The branch above cannot help those:
+      // their fork still 409s. Plan `192-15` is what makes that refusal VISIBLE instead of
+      // silent. 16 of 18 is not "the class is gone", and this comment exists so nobody reads
+      // it that way.
       const def = (wf.definition ?? {}) as Record<string, unknown>
       const currentVersion = typeof def.version === "number" ? (def.version as number) : 1
       const nextVersion = currentVersion + 1
@@ -512,7 +589,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         console.error("[WorkflowsPage] Tweak fork failed", e)
       }
     },
-    [refetchDrafts],
+    [refetchDrafts, draftBySlug, onOpenDraft],
   )
 
   // ── Use this starter (WF-01, D-143-1): a FRESH-COPY fork. A sibling of onTweak
@@ -557,22 +634,6 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     },
     [refetchDrafts],
   )
-
-  // ── Open a draft: load THAT draft's definition into the Builder editing view
-  //    (edit-in-place — saves PATCH the same row via its real id). ──
-  const onOpenDraft = useCallback((draft: WorkflowDraftRow) => {
-    setBuilderInitial({
-      definition: (draft.definition ?? {}) as WorkflowDefinitionJSON,
-      draftId: draft.id,
-      label: `Edit · ${draft.name ?? draft.slug} v${draft.version}`,
-      // 186-07: the ONE route that does not create — the drafts list itself now serves
-      // the token (186-03), so an edit-in-place session is guarded from its first write.
-      // `?? null` because a shelf row read before that field shipped simply has none, and
-      // an unguarded first write is the honest fallback rather than a crash.
-      token: draft.token ?? null,
-    })
-    setPageView("builder")
-  }, [])
 
   // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
   // token to carry. `useDraftPersistence` creates the row on the first write and adopts
