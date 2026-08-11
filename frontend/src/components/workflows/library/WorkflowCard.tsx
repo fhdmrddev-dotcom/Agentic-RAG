@@ -155,7 +155,7 @@ import { deleteWorkflowDraft } from "@/lib/api"
 
 import { CHIP_PREDICATES } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
-import { FORK_CONSEQUENCE, FORK_VERB } from "./libraryVocabulary"
+import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./libraryVocabulary"
 import {
   WorkflowDeleteSheet,
   type WorkflowDeleteSheetHandle,
@@ -271,6 +271,21 @@ export interface WorkflowCardProps {
    * on `provenance` and constructs no slug and no version itself.
    */
   onForkStarter: (row: LibraryRow) => void
+  /**
+   * TRUE only when THIS published row's slug already has a draft the caller owns — in which
+   * case the fork verb OPENS THAT EXISTING DRAFT and creates nothing, so the sentence has to
+   * change with it or the card states a consequence that is false (192-13, the U5 blocker).
+   *
+   * ⚠ ONLY THE PAGE CAN KNOW THIS, and that is why it arrives as a prop rather than as
+   * something computed here. The page holds the merged drafts feed; this card holds one row.
+   * The card computes NOTHING about slugs or versions — the same D-12 discipline that keeps it
+   * out of the two fork handlers' slug/version mechanics, and the reason the shipped 409 is a
+   * page-level defect rather than a card-level one.
+   *
+   * Optional, defaulting to `false`, so every existing call site and all 35 shipped cases are
+   * byte-identical in behaviour: an ordinary row still reads exactly as it shipped.
+   */
+  hasExistingFork?: boolean
   /** Re-fetch after a CONFIRMED delete. Forwarded to the Sheet; also called by D-18's guard. */
   onDeleted: () => void
 }
@@ -284,6 +299,7 @@ export function WorkflowCard({
   onOpen,
   onForkNewVersion,
   onForkStarter,
+  hasExistingFork = false,
   onDeleted,
 }: WorkflowCardProps) {
   const deleteSheetRef = useRef<WorkflowDeleteSheetHandle>(null)
@@ -458,10 +474,16 @@ export function WorkflowCard({
           LIB-03 exists to end, which is why the sentence is imported rather than typed.
 
           It is spent ONCE, here. `Run` runs and `Open` opens; neither earns a sentence,
-          and repeating one on all 200 cards is the clutter LIB-02 exists to cure. */}
+          and repeating one on all 200 cards is the clutter LIB-02 exists to cure.
+
+          ⚠ 192-13: WHICH sentence depends on the row's real state. On a row the person has
+          already forked the verb opens their EXISTING draft and creates nothing, so promising
+          "a new private copy" there would be a quiet lie — and trading the U5 silent failure
+          for a quiet lie is not closing that gap. STILL EXACTLY ONE NODE: the sentence is
+          selected, never appended, so the card gains no atom (U5-b is out of this round). */}
       {runnable && (
         <p id={consequenceId} data-testid="fork-consequence" className={NOTE_CLASSES}>
-          {FORK_CONSEQUENCE}
+          {hasExistingFork ? FORK_CONSEQUENCE_EXISTING : FORK_CONSEQUENCE}
         </p>
       )}
 
