@@ -129,6 +129,7 @@ import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
 import {
   LIBRARY_STATES,
+  forkFailedMessage,
   sourceFailedMessage,
 } from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
@@ -141,6 +142,28 @@ function freshHash(): string {
   let h = ""
   while (h.length < 6) h += Math.random().toString(36).slice(2)
   return h.slice(0, 6)
+}
+
+/**
+ * 192-15 (WR-03) — IS THIS FORK FAILURE A SLUG/VERSION COLLISION? ONE HOME FOR ONE QUESTION.
+ *
+ * It changes NOTHING about behaviour. `onUseStarter` already asked this question inline to
+ * decide whether to retry, and `onTweak` now has to ask it to decide which true sentence to
+ * show — and two copies of one predicate are two answers to one question waiting to disagree.
+ *
+ * ⚠ WR-08, RECORDED HONESTLY RATHER THAN HIDDEN BEHIND A TIDY NAME: keying control flow on
+ * ERROR PROSE is fragile, and giving it a function does not make it less so. `createWorkflowDraft`
+ * throws a bare `Error` whose MESSAGE carries the status (`…(status 409)`), so the status code is
+ * only reachable as a substring. The real fix is a typed error at the throw site — an `api.ts`
+ * change with callers OUTSIDE this page (notably `useDraftPersistence`), which is a new surface
+ * and therefore out of scope for a gap-closure round under G-7. Naming it here is the honest
+ * middle: the fragility now has exactly one place to be fixed instead of two.
+ *
+ * RE-OPEN TRIGGER: the next phase that touches `createWorkflowDraft`'s throw site replaces this
+ * substring test with the typed error's own discriminator, in the same commit.
+ */
+function isForkConflict(e: unknown): boolean {
+  return String(e).includes("409")
 }
 
 /**
@@ -254,6 +277,16 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   >(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
+  /**
+   * 192-15 (WR-03) — A FORK CLICK THAT FAILED, HELD UNTIL THE NEXT FORK ATTEMPT.
+   *
+   * It carries a DISPLAY NAME and a BOOLEAN, deliberately, rather than the error itself: a
+   * shape that cannot hold server prose, a status code or an id cannot leak one to the surface
+   * (T-192-40). The raw error keeps going to `console.error` at the boundary for whoever is
+   * debugging — the `WorkflowDraftUnreadableError` posture, where the developer's evidence and
+   * the person's sentence are two different things and one never replaces the other.
+   */
+  const [forkFailed, setForkFailed] = useState<{ name: string; conflict: boolean } | null>(null)
 
   // ── Latest-wins race guards (Phase 103-ux) ──────────────────────────────────
   // Rapid project-filter clicks fire overlapping fetches; without a guard a SLOW
@@ -573,6 +606,9 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         version: nextVersion,
         status: "draft",
       } as WorkflowDefinitionJSON
+      // 192-15: clear any notice from a PREVIOUS attempt before making this one. A failure
+      // message left standing over a later success is its own kind of lie (T-192-43).
+      setForkFailed(null)
       try {
         const created = await createWorkflowDraft(forked)
         await refetchDrafts()
@@ -586,7 +622,14 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
         })
         setPageView("builder")
       } catch (e) {
+        // 192-15 (WR-03): the log STAYS — it is the developer's evidence — and the person
+        // now gets a sentence too. This is the path the 2 measured `published + published`
+        // residual slugs above take, and it is the only thing standing between them and a
+        // dead button, so it reports rather than swallows. Tweak has NO retry and gains none:
+        // its 409 is a deterministic collision, and a second identical write would fail
+        // identically while making the surface look busy.
         console.error("[WorkflowsPage] Tweak fork failed", e)
+        setForkFailed({ name: wf.name, conflict: isForkConflict(e) })
       }
     },
     [refetchDrafts, draftBySlug, onOpenDraft],
@@ -603,6 +646,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   const onUseStarter = useCallback(
     async (starter: PublishedWorkflow) => {
       const def = (starter.definition ?? {}) as Record<string, unknown>
+      // 192-15: same rule as Tweak — clear before attempting, so a stale notice can never
+      // sit above a fork that has just succeeded. BEFORE the loop, not inside it: the retry
+      // is one attempt from the person's point of view.
+      setForkFailed(null)
       for (let attempt = 0; attempt < 2; attempt++) {
         // NOTE: `def` may carry `category:"starter"` — that is SAFE (Plan 01 added the
         // additive field to WorkflowDefinition); do NOT strip it from the fork body.
@@ -626,8 +673,19 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           return
         } catch (e) {
           // Retry ONCE on a slug/version collision; any other error surfaces + stops.
-          if (attempt === 0 && String(e).includes("409")) continue
+          //
+          // ⚠ 192-15 — THE RETRY IS UNTOUCHED. Only the classification moved into
+          // `isForkConflict` (byte-identical predicate, one home instead of two). Deleting the
+          // retry would have been "fixing" the silence by removing the very behaviour that
+          // needed reporting, so it is pinned from the inside by a case asserting exactly TWO
+          // `createWorkflowDraft` calls (T-192-42).
+          if (attempt === 0 && isForkConflict(e)) continue
+          // The TERMINAL branch — the one that already logged and returned. Now it also says
+          // so. Both fork handlers report, because they share ONE WORD on the card face (D-12)
+          // and a person cannot tell which of them they clicked; a surface that reports only
+          // half its failures is not honest.
           console.error("[WorkflowsPage] starter fork failed", e)
+          setForkFailed({ name: starter.name, conflict: isForkConflict(e) })
           return
         }
       }
@@ -936,6 +994,31 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           {sourceFailedMessage(source)}
         </p>
       ))}
+
+      {/* ── 192-15 (WR-03) — A FORK CLICK THAT FAILED, SAID OUT LOUD ────────────────────
+          It sits HERE, with this page's other failure vocabulary and above the fold, because
+          this region already IS the page's honest-failure home — extending it is one line of
+          the same concern, where a parallel notice region somewhere else would be a second
+          one (G-5: this file is on the hot-file ledger).
+
+          There is NO toast library in this repo — verified: zero `sonner` imports, no
+          `ui/toast` — and a gap-closure round is the wrong place to acquire a dependency.
+          `role="status"` is the shipped `draft-delete-error` precedent from the card: it is
+          what makes a message that appears AFTER a click announced rather than merely present,
+          which matters most for the person least able to notice a new line on a busy page.
+
+          EXACTLY ONE NODE. Two nodes carrying one `data-testid` is a selector that throws
+          rather than a surface that reports twice (this page's own recorded rule, stated at
+          the in-flight marker below). */}
+      {forkFailed && (
+        <p
+          data-testid="library-fork-failed"
+          role="status"
+          className="border-b border-warning/30 bg-warning/5 px-6 py-2 text-[12.5px] text-muted-foreground"
+        >
+          {forkFailedMessage(forkFailed.name, forkFailed.conflict)}
+        </p>
+      )}
       {/* The in-flight marker itself lives in the TOOLBAR, next to the counts it qualifies —
           it is the toolbar's `updating` prop, not a second marker here. Two nodes carrying one
           `data-testid` is a selector that throws rather than a surface that reports twice. */}
