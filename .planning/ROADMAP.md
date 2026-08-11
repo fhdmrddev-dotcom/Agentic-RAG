@@ -79,7 +79,13 @@ is the incumbent any proposal must beat.
   3. A user can state what a card's actions will do before clicking one; "Tweak" no longer surprises.
   4. The create affordance is reachable without scrolling past the existing shelves.
 
-**Plans**: 12 plans across 8 waves — `/gsd:execute-phase 192`
+**Plans**: 12 plans across 8 waves — **ALL 12 EXECUTED 2026-08-11** (65 commits off base `17c30d4f`). Gates at close: count gate **60/60 pinned · total 3175 · failed 0**, `tsc -p tsconfig.app.json` unmoved at **33**, eslint + a11y 0, zero file deletions. `WorkflowsPage.tsx` **1407 → 1007 L** — its CODE **615 → 479 (−22.1 %)**; comments carry the difference, stated rather than smoothed.
+
+⛔ **OWED — the eleven G-4 lived-experience UAT rows were NOT run.** Operator decision 2026-08-11: close with the rows owed. This is a DECISION, not a claim that everything ran. **Run U6 FIRST** — pick a project, and starters must remain **with a stated reason**; silence is a FAIL. It exists because of a measured IA defect under D-17 that no structural test can catch. **Then U4** — the `[title]` sweep, excluding the `workflow-soul` subtree (its two survivors at `WorkflowSoul.tsx:99` / `PhaseSpine.tsx:77` are inherited and out of scope; left unstated the row would fail 192 for a defect two prior phases shipped). Full record, tally (`0 driven · 0 passed · 0 failed · 11 owed`) and driving notes: `192-VALIDATION.md` § Manual-Only Verifications. Threats `T-192-21` / `T-192-32` remain **UNMITIGATED — OWED**.
+
+⛔ **DEFERRED — D-07's search HIGHLIGHT is unshipped**, on measured grounds: wiring `HighlightTitle` REDS fence F1 by construction, its prop being spelled `title` (observed with a real plant, not reasoned). LIB-01's wording is *"search by name and filter the list"*, so this is a deferred DECISION, not a requirement gap. Re-open trigger: any phase that makes `title` legal in the library subtree, or a `HighlightTitle` variant whose prop is not `title`.
+
+⚠ **NOT 192's, recorded so the next reader does not re-derive it:** an intermittent failure at **2 of 14** gate runs, always the same Phase-**184** case — `frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx` → *"184-11 … POSITIVE CONTROL — with the flag ON the very same read finds the key"*, `expected 0 to be greater than 0`. Identified from the gate's own JSON reports, not guessed. Deliberately NOT fixed inside 192 — it would fold unrelated drift into a commit that did not cause it. Re-open trigger: any phase touching that suite, or a third sighting outside 192.
 
 - [x] `192-01-PLAN.md` (wave 1) — count-gate adoption: the five suites covering this page were in NEITHER knob (74 of 123 tests invisible). Must be commit 1.
 - [x] `192-02-PLAN.md` (wave 1) — D-04 backend: `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, never a raw `created_by`; the widened wire type.
@@ -92,7 +98,7 @@ is the incumbent any proposal must beat.
 - [x] `192-09-PLAN.md` (wave 5) — `WorkflowCard` (159-C): one verb + `⋯`, the fork consequence as an `aria-describedby` contract, no `Publish…`, the D-18 draft delete.
 - [x] `192-10-PLAN.md` (wave 6) — the page becomes composition: `allSettled` merge, one flat list, shelves/rail/cards/banner deleted, four tests rewritten and two deleted with the one authorized pin lowering.
 - [x] `192-11-PLAN.md` (wave 7) — LIB-01…04 behaviour at 200 workflows: search, chip honesty, the carve-out, D-17, the D-04 cross-check, F2/F3 and create-first DOM order.
-- [ ] `192-12-PLAN.md` (wave 8) — every fence driven RED against a real plant and restored md5-identical, the subtree delta MEASURED, all suites pinned, G-5 recorded satisfied, and the eleven G-4 UAT rows.
+- [x] `192-12-PLAN.md` (wave 8) — every fence driven RED against a real plant and restored md5-identical, the subtree delta MEASURED, all suites pinned, G-5 recorded satisfied. **Task 3 (the eleven G-4 UAT rows) CLOSED BY DEFERRAL, not completed** — see the ⛔ OWED note above.
 
 #### Phase 193: Authoring Doors + Template Placement
 
