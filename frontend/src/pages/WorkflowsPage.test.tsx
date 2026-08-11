@@ -129,9 +129,13 @@ import { HighlightTitle } from "@/lib/threadGroups"
 // 192-14 (U5) — the two consequence sentences, read from their ONE home rather than re-typed.
 // A test that hardcodes the copy cannot notice the card drifting off it, and the whole point
 // of the sentence is that it agrees with what the verb actually does.
+// 192-15 (WR-03) — `forkFailedMessage` joins them for the same reason: the notice's text is
+// asserted against the vocabulary FUNCTION, never a re-typed literal, so a copy edit can make
+// these cases fail loudly rather than make them vacuous.
 import {
   FORK_CONSEQUENCE,
   FORK_CONSEQUENCE_EXISTING,
+  forkFailedMessage,
 } from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
 
@@ -974,6 +978,141 @@ describe("192-14 (U5 blocker) — forking a slug you ALREADY have a draft of ope
     expect(forked.slug).toMatch(/^risk-register-[a-z0-9]{6}$/)
     expect(forked.version).toBe(1)
     expect(forked.status).toBe("draft")
+  })
+})
+
+/**
+ * ══ 192-15 (WR-03) — A FORK CLICK THAT FAILS MUST SAY SO ═════════════════════════════════
+ *
+ * `192-14` above REMOVES the collision on every row that has a draft to open. It does not
+ * remove it everywhere, and the residual was measured rather than estimated: of the 18 slugs
+ * in the live DB carrying more than one version, **2 are `published + published` with no draft
+ * at all** (`meridian-risk-summary-good-07aedc33`, `readonly_refusal_098uat`). Their fork still
+ * reaches `createWorkflowDraft` and still 409s, deterministically, forever.
+ *
+ * ⚠ THE FIXTURE BELOW IS THAT SHAPE. `strictPublished` is a published `vendor-risk` and the
+ * drafts feed carries NO `vendor-risk` row — so 192-14's open-the-existing-draft branch cannot
+ * fire and the create path runs. That is deliberate: the notice these cases pin is the ONLY
+ * thing standing between a person and the residual, so it has to be proved on the residual's
+ * own path rather than on a convenient one.
+ *
+ * The shipped behaviour on that path is `catch (e) { console.error(…) }` and nothing else — no
+ * message, no state change, no retry. The operator's report was *"nothing happened, even the
+ * card's still the same"*, and it was literally accurate.
+ *
+ * BOTH handlers are pinned, because they share ONE WORD on the card face (D-12) and a person
+ * cannot tell which one they clicked. `onUseStarter`'s single 409 retry is asserted from the
+ * inside — TWO calls, no more — so this repair cannot quietly delete the behaviour it exists
+ * to report.
+ *
+ * ⚠ ON THE WAITS. This file sets `asyncUtilTimeout: 15000`, which is LONGER than vitest's 5 s
+ * per-test budget — so a bare `findByTestId` on a node that does not exist would blow the test
+ * timeout before Testing Library ever reported what it could not find, and a bare
+ * `Test timed out in 5000ms` in THIS file is indistinguishable from the `D-192-DEF-01` timeout
+ * class it already carries (192-14's recorded lesson). Every case here therefore waits FIRST on
+ * something true on BOTH the pre-fix and the post-fix path (the call count), and then asserts
+ * the notice under an explicit 2 s budget, so a RED is a real assertion error naming the missing
+ * node rather than a timeout that proves nothing.
+ */
+describe("192-15 (WR-03) — a fork click that fails says so", () => {
+  /** A 409 exactly as `createWorkflowDraft` throws it — a bare `Error` carrying the status. */
+  const conflict409 = () => new Error("Failed to create workflow draft (status 409)")
+
+  /** The published card, located by the NAME it renders rather than by its index in the list. */
+  async function publishedCardNamed(name: string): Promise<HTMLElement> {
+    const cards = await screen.findAllByTestId("published-card")
+    const card = cards.find((c) => within(c).queryByText(name) !== null)
+    expect(card, `no published card renders the name "${name}"`).toBeTruthy()
+    return card as HTMLElement
+  }
+
+  /** The notice: present, and carrying EXACTLY the vocabulary's sentence for this outcome. */
+  async function expectForkFailureNotice(name: string, conflict: boolean) {
+    await waitFor(
+      () => {
+        expect(
+          screen.queryByTestId("library-fork-failed"),
+          "the fork failed and the surface said NOTHING — the error reached console.error and nowhere else (WR-03)",
+        ).not.toBeNull()
+      },
+      { timeout: 2000 },
+    )
+    expect(screen.getByTestId("library-fork-failed").textContent).toBe(
+      forkFailedMessage(name, conflict),
+    )
+  }
+
+  /** Still on the library — a failed fork must not strand anyone half-way into a Builder. */
+  function expectStillOnTheLibrary() {
+    expect(screen.getByTestId("library-list")).toBeInTheDocument()
+    expect(screen.queryByTestId("builder-back")).not.toBeInTheDocument()
+  }
+
+  it("A — the 409 on the residual published+published shape refuses OUT LOUD, and writes nothing", async () => {
+    mockListDrafts.mockResolvedValue([draftRow]) // slug `contract-clause` — no `vendor-risk`
+    mockCreateDraft.mockRejectedValue(conflict409())
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    await expectForkFailureNotice("Vendor-risk review", true)
+    // Tweak has no retry and gains none here — the repair reports the failure, it does not
+    // paper over it with a second attempt at the same deterministic collision.
+    expect(mockCreateDraft).toHaveBeenCalledTimes(1)
+    expectStillOnTheLibrary()
+  })
+
+  it("B — a NON-conflict failure says the other true thing: nothing was created", async () => {
+    mockListDrafts.mockResolvedValue([draftRow])
+    mockCreateDraft.mockRejectedValue(new Error("Failed to create workflow draft (status 500)"))
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    await expectForkFailureNotice("Vendor-risk review", false)
+    expect(mockCreateDraft).toHaveBeenCalledTimes(1)
+    expectStillOnTheLibrary()
+  })
+
+  it("C — the STARTER fork's TERMINAL failure is visible, and its single 409 retry is still there", async () => {
+    // ⚠ TWO CALLS, ASSERTED FROM BOTH SIDES OF THE FIX. The retry is deliberate (a slug-hash
+    // clash on a shared starter) and pre-dates this plan — it is measured RED-side too, which
+    // is what makes "the retry was not introduced here, and cannot be deleted under cover of
+    // this repair" an observation rather than a claim.
+    mockCreateDraft.mockRejectedValue(conflict409())
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await screen.findByTestId("starter-card"))
+    await user.click(screen.getByTestId("use-starter"))
+
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(2))
+    await expectForkFailureNotice("Risk Register", true)
+    expect(mockCreateDraft).toHaveBeenCalledTimes(2)
+    expectStillOnTheLibrary()
+  })
+
+  it("D — a later SUCCESSFUL fork clears the notice: a stale failure over a success is its own lie", async () => {
+    mockListDrafts.mockResolvedValue([draftRow])
+    // The first attempt 409s; the second uses `beforeEach`'s resolving default.
+    mockCreateDraft.mockRejectedValueOnce(conflict409())
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const first = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await first.click(screen.getByTestId("published-tweak"))
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    await expectForkFailureNotice("Vendor-risk review", true)
+
+    const second = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await second.click(screen.getByTestId("published-tweak"))
+
+    // The Builder opened on the forked definition's own phases…
+    expect(await screen.findByTestId("spine-node-pull")).toBeInTheDocument()
+    // …and the notice did NOT ride along into the success.
+    expect(screen.queryByTestId("library-fork-failed")).toBeNull()
   })
 })
 
