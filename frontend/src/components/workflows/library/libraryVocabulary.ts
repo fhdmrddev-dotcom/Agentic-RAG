@@ -91,6 +91,67 @@ export const FORK_VERB = "Make my own copy"
 export const FORK_CONSEQUENCE =
   "Opens a new private copy you can edit. The published version stays live and unchanged."
 
+/**
+ * THE SECOND TRUE SENTENCE — the one the shipped surface could not say (192-13, gap-closure
+ * round 1 on the U5 blocker).
+ *
+ * `FORK_CONSEQUENCE` above promises *a new private copy*. On a row the person has ALREADY
+ * forked, that promise is FALSE, and the measured reason is not a rare race:
+ *
+ *   - `192-UAT.md` test 11 — the operator clicked the fork on a published row and **nothing
+ *     happened, twice**. The wire said `409 Conflict`; the surface said nothing at all.
+ *   - The next version is computed from a JSONB key that is NULL on every row, so it is
+ *     effectively the constant 2, and `UNIQUE(slug, version)` is **GLOBAL** — a slug that
+ *     already carries the colliding version 409s **deterministically, forever**. Not a hash
+ *     clash; a permanently dead button on that row.
+ *   - Measured in the live local DB on 2026-08-11 (`select slug … group by slug having
+ *     count(*) > 1`): **18 slugs carry more than one version**, and **14 of the 18 are exactly
+ *     this shape** — a published v1 with a draft v2 and nothing else. ⚠ The plan authorising
+ *     this export said *"16 of the 18"*; re-measured here rather than inherited, it is **14**
+ *     under the exact-shape predicate and **15** if a slug merely CONTAINS a published v1 and
+ *     a draft v2 (that admits `pm-weekly-status-report`, which carries four versions). The 18
+ *     is confirmed; the 16 is not, and is corrected rather than repeated.
+ *
+ * The operator's 2026-08-11 decision is to **OPEN THE EXISTING DRAFT** rather than mint the
+ * next free version — so on those rows the verb creates nothing, and this is what it does.
+ *
+ * It names BOTH halves exactly as D-13 requires — what you get (the copy you already started,
+ * opened) and what stays true (the published version is untouched) — plus the fact the person
+ * needs BEFORE the click rather than after it: a copy already exists. Naming only one half
+ * reproduces the surprise LIB-03 exists to end, and trading a silent failure for a quiet lie
+ * would not have closed this gap.
+ */
+export const FORK_CONSEQUENCE_EXISTING =
+  "You already have your own copy of this. Opens the copy you started. The published version stays live and unchanged."
+
+/**
+ * The page-level notice for a fork click that FAILED (consumed by `192-15`).
+ *
+ * The rule it closes: **a click that fails must never be silent.** Code review WR-03 recorded
+ * that both fork handlers swallow their failure into `console.error` while the card's own
+ * delete honours "never silent" — and it was then hit in the wild as the U5 blocker, where the
+ * operator's report was *"nothing happened, even the card's still the same"*. That report was
+ * **literally accurate**: the surface did nothing and reported nothing.
+ *
+ * BOTH branches assert the same load-bearing fact — **nothing was written**. That is deliberate
+ * rather than reassuring filler: the person has just been told their click failed, and a
+ * message that leaves *did it half-happen?* ambiguous is barely better than no message. The
+ * conflict branch additionally says WHY, in the user's own terms (a version already exists),
+ * because that is the state the 409 actually describes.
+ *
+ * It names only the workflow's display name and that nothing was written — no status code, no
+ * server prose, no ids (T-192-34). The raw error stays in `console.error` at the boundary, the
+ * `WorkflowDraftUnreadableError` precedent.
+ *
+ * Shaped as a FUNCTION for `sourceFailedMessage`'s reason: the interpolated half is data, and a
+ * template assembled at the call site is a string that leaks out of this module's fences.
+ */
+export function forkFailedMessage(name: string, conflict: boolean): string {
+  return conflict
+    ? `A version of “${name}” already exists, so a copy could not be made. Nothing was changed.`
+    : `We couldn't make your copy of “${name}”. Nothing was created and nothing was changed.`
+}
+
 // ── Search (D-06 always-on, D-07 scope, D-08 word class) ─────────────────────────────
 
 /** The always-on field's accessible label (D-06: a control you always open is always open). */
