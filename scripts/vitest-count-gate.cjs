@@ -883,7 +883,33 @@ const BASELINE = {
   // 40, not 39: the CR-01 fix (all-three-feeds-fail must not claim "you have no workflows
   // yet") added one case AFTER 192-12's pinning sweep read 39. Raised here rather than left
   // low — a pin below the real count is a pin that cannot see the next deletion.
-  "WorkflowsPage.test.tsx": 40,
+  //
+  // ── 192-16 (GAP-CLOSURE ROUND 1, wave 4): 40 → 48. AN EXTENSION, NEVER A LOWERING. ──────
+  //
+  // Nothing was deleted, renamed or moved out of this suite by the round — `git diff` over
+  // waves 2 and 3 is +291 insertions / 0 deletions on the test file — so no plan-authorised
+  // deletion needs to ride along (the LOWERED-vs-EXTENDED distinction in the header). The
+  // eight are the ONLY mechanical memory of a LIVE BLOCKER a human found by clicking:
+  //   · 192-14 (+4) — the fork-collision branch 3176 passing tests NEVER ENTERED. The only
+  //     difference between the new describe and the shipped one above it is ONE EXTRA ROW in
+  //     the drafts feed, which is the entire reason `⋯ → Make my own copy` could 409 twice in
+  //     silence through a 12-plan phase, a code review and a 6/6 verification.
+  //   · 192-15 (+4) — WR-03's failure visibility: the first tests in this repo that ever drive
+  //     a FAILING fork on EITHER handler, including the starter's single 409 retry pinned from
+  //     the inside at exactly two `createWorkflowDraft` calls (measured RED-side too, so the
+  //     retry can neither have been introduced by the repair nor be deleted under cover of it).
+  //
+  // THESE PINS EXIST SO THAT DELETING A REGRESSION TEST FOR A LIVE BLOCKER REDS THE GATE with
+  // `[count-decrease]` NAMING THE FILE — at `failed 0`, the count decrease being the only
+  // signal. Demonstrated, not asserted: one whole `it(` block removed from the 192-14 block
+  // was observed printing `WorkflowsPage.test.tsx 48 47 -1` → `[count-decrease]`, exit 1, and
+  // the file restored md5-identical (`192-16-SUMMARY.md` carries both hashes).
+  //
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-11, both
+  // printed `WorkflowsPage.test.tsx 40 48 +8` at `total 3188 · failed 0` — never hand-counted
+  // from `it(` literals, and NEVER taken from a SUMMARY: `192-14-SUMMARY.md` recorded this
+  // raise as owed at `40 → 44`, which was true when it was written and stale four cases later.
+  "WorkflowsPage.test.tsx": 48,
   "RunModal.test.tsx": 32,
   "RunModal.a11y.test.tsx": 16,
   "PublishedCardDelete.test.tsx": 32,
@@ -929,7 +955,20 @@ const BASELINE = {
   "libraryFilter.test.ts": 36,
   "librarySubtree.fences.test.ts": 64,
   "LibraryToolbar.test.tsx": 36,
-  "WorkflowCard.test.tsx": 35,
+  // ── 192-16 (GAP-CLOSURE ROUND 1, wave 4): 35 → 39. AN EXTENSION, NEVER A LOWERING. ──────
+  // The +4 are 192-13's card-sentence cases: a published row the user has ALREADY forked now
+  // SAYS SO before the click (`FORK_CONSEQUENCE_EXISTING`), selected into the ONE
+  // `fork-consequence` node rather than appended beside it — so the card's atom count is
+  // invariant and a truth fix cannot smuggle in card density (G-7 / U5-b). The set includes
+  // the `aria-describedby` round trip driven on the NEW variant, which is the only thing
+  // proving the sentence a screen reader receives is the state-aware one.
+  // Measured `git diff` over the round: **50 insertions / 1 deletion**, and the single deleted
+  // line is an IMPORT (`FORK_CONSEQUENCE, FORK_VERB`), not an `it(` —
+  // `git diff … | grep -c '^-.*\bit('` returns **0**, so nothing was deleted, renamed or moved
+  // out and no plan-authorised deletion needs to ride along.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-11, both
+  // printed `WorkflowCard.test.tsx 35 39 +4` at `total 3188 · failed 0` — never hand-counted.
+  "WorkflowCard.test.tsx": 39,
   // ── The four RAISES owed by suites Phase 192 GREW ──────────────────────────────────────
   //
   // All four already sat in this map (192-01 adopted them in the phase's first commit). Each
@@ -1183,7 +1222,30 @@ const BASELINE = {
 //   instruction covers it — the suite it names (`WorkflowBuilderPage.session.test.tsx`,
 //   the "pane click" case) was re-run standalone here and reported 23 passed / 0 failed.
 //   THE COUNT COLUMNS ARE THE REGRESSION BACKSTOP; the `failed` line, on this machine, is not.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3151 (192-12)
+// ⚠ AND BY 192-16 (GAP-CLOSURE ROUND 1, wave 4): the pinned total → **3164**, pinned FILE
+// count UNMOVED at 60 — both raised suites were already pinned and already ran. READ from this
+// script's own printed `pinned total` AFTER the two map entries above were edited, never by
+// adding 12 to a figure in this comment, which is what the eleven paragraphs above mean when
+// they say this note goes stale by being computed rather than read.
+//   ⚠ AND IT WAS STALE AGAIN — the ELEVENTH time, and again by ONE: the trailing marker read
+//   `3151 (192-12)` while the gate printed `pinned total 3152` on an UNMODIFIED tree. The
+//   missing one is CR-01's own extra case (`WorkflowsPage.test.tsx` 39 → 40, commit
+//   `60b8842f`), raised in the fix's commit AFTER 192-12 wrote this line. Corrected here
+//   rather than smoothed over.
+//   ⚠ THE +36 GAP THIS ROUND OPENED IS NOW DECOMPOSED, AND THE GATE ITSELF IS THE PROOF —
+//   not arithmetic. Before this edit the run printed `total 3188 · pinned 3152 · +36`, which
+//   is TWENTY-FOUR MORE than the +12 these two suites explain. It is NOT a mystery and NOT
+//   this round's: it is the same four PRE-EXISTING drifts named at the foot of the map
+//   (`ExternalActionSection` 25/34 +9 and `PhaseTimeline` 17/21 +4, owed since 190-12;
+//   `WorkflowBuilderPage.canvas` 128/133 +5 and `builderStore` 52/58 +6, first seen at
+//   192-01), every one of them printed in the gate's own highlighted rows on both runs.
+//   After the two pins above landed, the SAME tree printed `+24` — the delta fell by exactly
+//   the 12 that were pinned, which is the measurement that closes the question. **24 cases
+//   remain deletable with this gate green today.** Deliberately NOT absorbed here: re-pinning
+//   four suites this round did not author would fold unrelated drift into a commit that did
+//   not cause it — the thing this whole header argues against, and the reason 190-12, 190-15,
+//   190-16, 192-01 and 192-12 each declined the same four. Owed as its own edit.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3164 (192-16)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
