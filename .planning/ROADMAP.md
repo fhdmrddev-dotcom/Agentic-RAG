@@ -100,6 +100,27 @@ is the incumbent any proposal must beat.
 - [x] `192-11-PLAN.md` (wave 7) — LIB-01…04 behaviour at 200 workflows: search, chip honesty, the carve-out, D-17, the D-04 cross-check, F2/F3 and create-first DOM order.
 - [x] `192-12-PLAN.md` (wave 8) — every fence driven RED against a real plant and restored md5-identical, the subtree delta MEASURED, all suites pinned, G-5 recorded satisfied. **Task 3 (the eleven G-4 UAT rows) CLOSED BY DEFERRAL, not completed** — see the ⛔ OWED note above.
 
+**⚠ GAP-CLOSURE ROUND 1 — opened 2026-08-11 (4 plans, waves 1-4).** SC#3 was found **UNMET in lived
+experience**: `192-UAT.md` row U5, driven by the operator, hit `⋯ → Make my own copy` on *Compliance
+Gap Report* and got **HTTP 409 twice with zero user-visible signal** — `workflow_definitions` stayed
+at 222, nothing created, nothing navigated. Two compounding defects, both INHERITED from Phase 103
+(`3adcb0ae`) and never touched by 192: the fork's version is computed from `definition.version`, a
+JSONB key that is NULL on every row, so it is hard-wired to 2 in practice and collides forever on the
+GLOBAL `UNIQUE(slug, version)`; and the catch swallows every error into `console.error`. Re-measured
+at plan time: **18 slugs carry more than one version, 16 of them `v1 published + v2 draft`.**
+Operator decision (2026-08-11): **when the user forks a workflow they already have a draft fork of,
+OPEN THE EXISTING DRAFT** — it removes the failure class for those 16 rather than making the collision
+rarer, and needs no backend and no wire-type change. G-7 ran **clear** (exit 0, 0 prior gap plans).
+⛔ **NOT in this round:** U5-b card density (13 atoms per row — design work, routed to a sketch under
+G-2, and folding it here would be the exact G-7 violation), and the **2 of 18** `published + published`
+slugs (`meridian-risk-summary-good-07aedc33`, `readonly_refusal_098uat`) whose fork still refuses —
+the change is that it now refuses OUT LOUD.
+
+- [ ] `192-13-PLAN.md` (round 1, wave 1) — the words: `FORK_CONSEQUENCE_EXISTING` + `forkFailedMessage`, and the card's consequence sentence becomes state-aware (default byte-identical to what shipped).
+- [ ] `192-14-PLAN.md` (round 1, wave 2) — `onTweak` opens the existing draft instead of colliding with it; `hasExistingFork` wired from the merged feed; **the regression test that forks a slug WHICH ALREADY HAS A v2** — the branch 3176 passing tests never entered, driven RED first.
+- [ ] `192-15-PLAN.md` (round 1, wave 3) — WR-03: both fork handlers surface a visible failure; `onUseStarter`'s single 409 retry is PRESERVED and pinned at two calls; no toast library added.
+- [ ] `192-16-PLAN.md` (round 1, wave 4) — pin both grown suites at READ numbers with the `[count-decrease]` guard driven RED; fences + characterization baselines proved unmoved; ROADMAP + hot-file ledger updated on measurement; **blocking operator checkpoint: re-drive U5.**
+
 #### Phase 193: Authoring Doors + Template Placement
 
 **Goal**: A user can tell the two authoring doors apart before choosing, and can find where to supply a template.
