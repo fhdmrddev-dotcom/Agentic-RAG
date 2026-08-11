@@ -535,7 +535,7 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   //    decision on the U5 blocker (`192-UAT.md` test 11), where a fork click 409'd twice and
   //    the surface said nothing at all. Opening the existing copy removes the collision
   //    class outright rather than making it rarer, and the card says so before the click
-  //    (`hasExistingFork`, 192-13). ──
+  //    (the card's `FORK_CONSEQUENCE_EXISTING` sentence, 192-13). ──
   const onTweak = useCallback(
     async (wf: PublishedWorkflow) => {
       // ── THE EXISTING-DRAFT BRANCH (192-14) ──
@@ -988,6 +988,15 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 onOpen={handleOpen}
                 onForkNewVersion={handleForkNewVersion}
                 onForkStarter={handleForkStarter}
+                /* 192-14 — the sentence changes ONLY where the behaviour changes (D-14).
+                   The `provenance === "published"` clause is load-bearing, not defensive: a
+                   STARTER's fork runs `onUseStarter`, which ALWAYS mints a fresh
+                   auto-suffixed slug at v1 and therefore always makes a genuinely new copy,
+                   so "you already have one" would be false on a starter row even if some
+                   draft happened to share its slug. Draft rows render no consequence
+                   sentence at all, so they are unaffected either way. Only the page can
+                   answer this — it alone holds the merged drafts feed. */
+                hasExistingFork={row.provenance === "published" && draftBySlug.has(row.slug)}
                 onDeleted={handleDeleted}
               />
             ))}
