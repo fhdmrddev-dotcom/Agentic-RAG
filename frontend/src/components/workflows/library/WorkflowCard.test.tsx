@@ -56,7 +56,7 @@ vi.mock("@/lib/api", () => ({
 
 import { WorkflowCard, type WorkflowCardProps } from "./WorkflowCard"
 import type { LibraryRow, Provenance } from "./libraryRow"
-import { FORK_CONSEQUENCE, FORK_VERB } from "./libraryVocabulary"
+import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./libraryVocabulary"
 
 // ── fixtures ─────────────────────────────────────────────────────────────────────────
 
@@ -333,6 +333,55 @@ describe("D-13 / D-14 — one sentence, as real DOM text, wired by aria-describe
   it("a DRAFT row spends no sentence — the surface pays for it once, on the fork", () => {
     renderCard(DRAFT)
     expect(screen.queryByTestId("fork-consequence")).toBeNull()
+  })
+})
+
+// ── 4b · THE SENTENCE IS STATE-AWARE (192-13 — the U5 blocker) ───────────────────────
+
+/**
+ * Phase 192-13, gap-closure round 1. `192-UAT.md` test 11: the operator clicked the fork on a
+ * published row and **nothing happened, twice** — a deterministic 409 with no user-visible
+ * signal at all. Under the operator's 2026-08-11 decision the verb OPENS THE EXISTING DRAFT on
+ * such a row, which makes the shipped sentence's promise of *a new private copy* FALSE there.
+ *
+ * ⚠ These four cases were driven RED against the UNEDITED card before the prop existed. A and
+ * B failed on the sentence text (received: the shipped `FORK_CONSEQUENCE`) — NOT on an unknown
+ * prop, because React simply ignores one, which is what makes that RED mean something. C and D
+ * were GREEN before the change and are regression pins, not new claims.
+ */
+describe("192-13 — the consequence sentence is chosen by the row's real state", () => {
+  it("a published row the user has ALREADY forked says so, before the click", () => {
+    renderCard(PUBLISHED, { hasExistingFork: true })
+    expect(screen.getByTestId("fork-consequence").textContent).toBe(FORK_CONSEQUENCE_EXISTING)
+  })
+
+  it("the aria-describedby round trip holds on the NEW variant too", async () => {
+    // Driven on this variant rather than inherited from the case above: a PASS from another
+    // row's evidence is not a driven row, and 192-09's plant 5 proved this exact contract can
+    // break while every presence/text check stays green.
+    const { card } = renderCard(PUBLISHED, { hasExistingFork: true })
+    await openOverflow(card)
+    const describedBy = screen.getByTestId("published-tweak").getAttribute("aria-describedby")
+    expect(describedBy).toBeTruthy()
+    const sentence = document.getElementById(describedBy as string)
+    expect(sentence).not.toBeNull()
+    expect(sentence?.textContent).toBe(FORK_CONSEQUENCE_EXISTING)
+  })
+
+  it("with the prop ABSENT the shipped sentence is byte-identical — the default did not drift", () => {
+    // The regression pin. Every ordinary row must read exactly as it shipped; a state-aware
+    // sentence that quietly became state-aware for EVERYONE is the same defect in a new coat.
+    renderCard(PUBLISHED)
+    expect(screen.getByTestId("fork-consequence").textContent).toBe(FORK_CONSEQUENCE)
+  })
+
+  it("the new sentence arrives as ONE node of real text, and not as a tooltip", () => {
+    renderCard(PUBLISHED, { hasExistingFork: true })
+    // Still exactly one sentence on the card — the surface spends it once (D-13), and U5-b
+    // (card density) is explicitly out of this round: no atom is added.
+    expect(screen.queryAllByTestId("fork-consequence")).toHaveLength(1)
+    // D-14: touch has no hover. The positive control for this selector lives in block 4.
+    expect(() => screen.getByTitle(FORK_CONSEQUENCE_EXISTING)).toThrow()
   })
 })
 
