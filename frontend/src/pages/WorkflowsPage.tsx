@@ -134,6 +134,12 @@ import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/libr
 // state and layout, and declares no card, no filter item and no modal of its own.
 import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
+// Phase 192.1-06 (LIB-05 / D-05 / D-34): the identity resolver, reached rather than written.
+// The page owns the LIST — which is the only thing that can answer "what tells this row apart
+// from its namesakes" — so it builds the index and hands each card its resolved value. The
+// arithmetic (four-state lineage, the D-31 ranker, the O(1)-per-row claim) is proved without a
+// DOM in `rowIdentity.test.ts`; nothing about it is re-derived here.
+import { buildIdentityIndex, resolveIdentity } from "@/components/workflows/library/rowIdentity"
 // Phase 192.1-03 (D-01 / G-5): the fork concern, reached rather than declared. See the call
 // site below for why its POSITION in the component body is load-bearing, and the module's own
 // header for the ledger row that made this cut due.
@@ -461,6 +467,53 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     () => chipCounts(rows, query, selectedProjectId),
     [rows, query, selectedProjectId],
   )
+
+  /**
+   * ── 192.1-06 (LIB-05 / D-05 / D-28 / D-34) — THE IDENTITY INDEX, BUILT ONCE PER LIST ─────
+   *
+   * ⚠ THE DEPENDENCY ARRAY IS `[rows]` AND NOTHING ELSE, AND THE TRAP IS THREE LINES ABOVE.
+   * `counts` (`:460` — MEASURED at this commit, not the `:472` the plan and PATTERNS both
+   * quote; 192-14/15 moved it and a stale pointer is the failure Phase 189 banked) is keyed
+   * `[rows, query, selectedProjectId]` because a chip's number must
+   * describe the FILTERED view — that is correct for a chip and WRONG here, so this memo
+   * deliberately does not "harmonise" with the one directly above it. Two independent reasons,
+   * both requirements rather than optimisations:
+   *
+   *   1. **D-05 demands it.** `1 of N` is counted over the FULL merged library, BEFORE search,
+   *      chip and project filtering. A count that shrank as you typed would both FLICKER and
+   *      misdescribe the library — the discriminators answer *what tells this row apart from
+   *      its namesakes*, which is a property of the library, not of the current view.
+   *   2. **It makes typing free.** With `[rows]`, a keystroke re-runs `filterLibrary` only.
+   *      The approved sketch's per-row `identity(row, rows)` is worst-case O(n³) — RESEARCH
+   *      measured ≈ 230,000 inner-loop iterations per render on the operator's shape, twice a
+   *      render, on every keystroke. `buildIdentityIndex` does that work once per LIST.
+   *
+   * ⚠ AND IT TAKES NO `failedSources` (D-28), which is a DECISION rather than an omission.
+   * `1 of N` is NOT suppressed when a feed refuses. Drafts are 72 % of the operator's merged
+   * rows, so a drafts 403 genuinely collapses `N` — and suppressing the count would remove a
+   * discriminator at exactly the moment the list is hardest to read. The `source-failed` banner
+   * below is the disclosure, and it is spent in ONE place rather than 106 times. **UAT row U7
+   * is the named check**: fail the drafts feed at scale and confirm a reader is not misled.
+   */
+  const identityIndex = useMemo(() => buildIdentityIndex(rows), [rows])
+
+  /**
+   * ⚠ ONE CLOCK PER RENDER PASS — NOT ONE PER CARD, AND NOT ONE CAPTURED IN THE MEMO (P-1).
+   *
+   * There is no free option here and the trade is stated rather than engineered around:
+   *
+   *   · `Date.now()` read inside the card would let two cards in ONE render straddle a band
+   *     boundary, so a list could show `59 min ago` above `1 hour ago` for the same instant.
+   *   · `Date.now()` captured INSIDE the `[rows]`-keyed memo would FREEZE — a row could still
+   *     read `just now` an hour later, because nothing invalidates that memo but a new list.
+   *
+   * So identity, lineage and `1 of N` are keyed on `[rows]` (none of them depends on time) and
+   * `changed <rel>` is computed during render from this one value, which every card in the pass
+   * shares. **The value therefore only refreshes when something else re-renders, and that is
+   * ACCEPTED**: `relativeChanged.ts:39-43` records 188's `WorkflowRunPage` tick-gate bug as this
+   * project's evidence that a live clock is its own defect class. Do NOT add a timer.
+   */
+  const now = Date.now()
 
   const toggleChip = useCallback((chip: ChipId) => {
     setActiveChips((prev) => (prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip]))
@@ -954,6 +1007,12 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                    sentence at all, so they are unaffected either way. Only the page can
                    answer this — it alone holds the merged drafts feed. */
                 hasExistingFork={row.provenance === "published" && draftBySlug.has(row.slug)}
+                /* 192.1-06 (D-05 / D-08) — the 14th atom's content, RESOLVED HERE. The card
+                   computes nothing about slugs or versions; it paints what this returns. The
+                   index is keyed `[rows]` alone so `1 of N` describes the library rather than
+                   the current search, and `now` is the ONE clock every card in this pass
+                   shares — see both docblocks above for why neither can live in the other. */
+                identity={resolveIdentity(identityIndex, row, now)}
                 onDeleted={handleDeleted}
               />
             ))}
