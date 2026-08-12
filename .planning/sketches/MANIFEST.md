@@ -1435,3 +1435,104 @@ Tiers are `STRICT 🔒 / MIDDLE ◐ / LOOSE ○` (`deriveTier.ts`), derived, nev
   chain glyph — the shipped glyph vocabulary's own hover-only problem. Not introduced by these sketches
   and not in LIB-01…04's scope; record it rather than let a later reviewer discover it and assume 192
   added it.
+
+---
+
+### Phase 192.1 session — Workflow Identity (LIB-05) (2026-08-12)
+
+G-2 sketch, BEFORE plan-phase. **Phase 192 shipped the library; 192.1 gives its rows an identity.**
+Nine of eleven G-4 UAT rows passed on live evidence and the operator still could not tell the rows
+apart, because **43 of their 104 workflows are named "Compliance Gap Report."**
+
+Grounded by **re-auditing the shipped `library/` subtree at HEAD**, not by reasoning from 157/159's
+sketch-era CSS — and the audit produced four facts no planning document named:
+
+- **The ordering is complicit, and it is nobody's card design.** Both feeds are `ORDER BY name`
+  (`db/workflows.py:303` published, `:517` drafts) and `LibraryToolbar.tsx` has **no sort control at
+  all** — zero `sort` occurrences. So 43 identical names render as **43 *adjacent* identical rows**.
+  No atom-level treatment touches that.
+- **Duplicate names are a COPY, not a bug.** Both fork handlers spread `...def` and leave `name`
+  untouched — `onTweak` mints the same slug at v(N+1) (`WorkflowsPage.tsx:600-608`), `onUseStarter`
+  mints `<parent>-[a-z0-9]{6}` at v1 (`:656-661`). A customer reaches 43 identical names **by using
+  the product correctly.**
+- **Lineage is DERIVABLE and costs nothing on the wire.** A version fork shares its parent's slug; a
+  copy fork is a `-[a-z0-9]{6}` suffix on it. Measured over the generated fixture: **lineage resolves
+  for 100 % of the 80 forks, 0 unresolved.** The page already builds `draftBySlug`.
+- **The card renders 13 atoms and not one of them is an identity** (`WorkflowCard.tsx:366-565`).
+
+**Two operator decisions set the frame** (intake, 2026-08-12): sketch the write-path question rather
+than assume it (162 exists because the ROADMAP calls it *"the first scope question, not an
+assumption"*), and **confirm `updated_at` as real net-new wire** — so 192.1 is **not frontend-only**,
+the same surprise D-04 sprang on Phase 192.
+
+**The wire cost, graded — two of three SC axes are free:**
+
+| Axis | Cost |
+|---|---|
+| Lineage (SC#2) | **Zero.** Derived from the slug rules. |
+| Recency (SC#3) | **Cheap, net-new.** Additive `updated_at` projection on two queries + two TS types — exactly the `is_mine` shape (D-04). No migration, no predicate change. |
+| Owner *by name* | **Expensive, and nobody asked for it.** The wire has `is_mine` (a boolean, only since 192) and `created_by` (a uuid, never serialized). A human-readable owner needs a users join. **All variants render Yours / Shared and stop there.** |
+
+⚠ **The timestamp is already on the wire and you must not read it.** The drafts feed ships
+`updated_at` disguised as `token` — literally `to_char(updated_at AT TIME ZONE 'UTC', …)`
+(`db/workflows.py:93-95`). `api.ts:3338` forbids parsing it: Postgres keeps microseconds, a JS date
+keeps milliseconds, and a parsed-and-re-rendered token matches **zero rows**, so every later save
+refuses as stale (probed against the live DB 2026-08-01). **Project a separate field; never repurpose
+the token.**
+
+**The fixture is GENERATED, not typed** — `themes/library-fixture-192-1.js` applies the real
+`copyFork`/`versionFork` rules to a set of sources, so the duplicate names *fall out of the product's
+own behaviour*. It reproduces the operator's measured library: **43/41, 10/9, 8/5, 8/4 — all four
+families exact** — 14 duplicated names, 107 rows, 40 % under one name (measured 41 %).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 160 | telling-43-apart | When 43 rows carry one name, what makes a row identifiable at a glance? | *pending* | phase-192.1, lib-05, identity, lineage, recency, scale, shape, g2-sketch-gate |
+| 161 | where-identity-lives | Where does identity go on a card whose one sentence is already spent? | *pending* | phase-192.1, lib-05, card, atom-budget, sentence-slot, a11y, g2-sketch-gate |
+| 162 | naming-at-the-fork | Does the fork name the copy, or does the library derive it? | *pending* | phase-192.1, lib-05, fork, naming, scope, d-15, write-path, g2-sketch-gate |
+
+**Couplings and reopenings to decide at pick-time, not after:**
+
+- **162-A and 160/161 are NOT rivals.** A governs what the fork *writes*; 160/161 govern what the
+  library *shows*. **SC#1 is a statement about rows that already exist**, so picking A does not remove
+  the need for a read-side treatment. Reading A as "so we can skip the library work" is a misread.
+- **162-B reopens D-15.** The fork is a **direct flip** and the reason is recorded in shipped code
+  (`WorkflowCard.tsx:84-87`): a confirm on a non-destructive reversible action *spends the guard
+  vocabulary the delete relies on*. 159-C's confirm was deliberately not shipped. B is viable only
+  with an answer to **what makes a name prompt different from a confirm** — one candidate: *a prompt
+  that collects something the system cannot know is an input, not a guard.*
+- **161-C's viability turns on one distinction.** C spends the single sentence slot on identity, so a
+  forked row stops stating the fork consequence. **C is only safe if the selector keys on "can this be
+  forked into something new", not on "is this a fork"** — a design decision with a correctness
+  consequence, to settle now rather than in planning.
+- **161-B grows a region the house style treats as scarce.** Phase 185's corner seal claims top-right
+  on the **canvas node card** with a max-2 badge tuple. That rule is *scoped to the canvas*, not to
+  this library card — stated precisely so it is not mis-cited as a blocker, and stated at all so it is
+  not discovered in review.
+- **Every draft has an EMPTY sentence slot today** (`WorkflowCard.tsx:484` — it renders only when
+  `runnable`). Whatever wins, that slot is already paid for.
+
+**⚠ The lesson this session exists to bank — flip 160's `shape` switch.** Set it to *distinct names*
+and every tab, including *Today (shipped)*, becomes perfectly readable. **That is the fixture every
+automated check in Phase 192 ran against.** The phase tested at 12 rows *and* at 107 rows, but never
+at 107 rows carrying 14 duplicated names. **Volume was real; shape was not.** `LIB-02`'s bar — *"a
+card shows what the workflow is for, at a glance"* — is true of one card in isolation and false of the
+list. Standing question for any list-rendering phase: **is the fixture's SHAPE realistic, not just its
+SIZE?**
+
+**⚠ A retraction carried into 162 rather than quietly dropped.** The "two names" propagation defect
+claimed for this phase on 2026-08-12 is **RETRACTED** — generalised from **n=1** before the population
+was measured. `definition->>'name'` returns NULL on a **string scalar**; 83 rows are double-encoded,
+so "85 divergent" was 83 encoding artifacts plus **2 genuine conflicts**, both test fixtures. It is
+*rendered on 162's Today tab* because promoting one observation to a mechanism is the same failure
+this phase exists to correct.
+
+**⚠ Also inherited: a verification lesson about this project's own work.** Phase 192's post-fix
+re-drive located rows by `getElementById` on a known UUID — which proves the code and **cannot prove
+the row was findable**, because the driver never had to find it. The operator, who did, could not.
+**Any UAT row in 192.1 must be driven the way a person drives it: by looking.**
+
+**Verification, driven not asserted:** `node --check` on every extracted inline script plus headless
+JSDOM drives — **160: 40/40 · 161+162: 68/68 (108 total)**. Both `[title]`-attribute fences and the
+script-error channel carry **positive controls** proving they can actually fire; jsdom's own
+unimplemented `window.scrollTo` is excluded **by name**, never by silencing the channel.

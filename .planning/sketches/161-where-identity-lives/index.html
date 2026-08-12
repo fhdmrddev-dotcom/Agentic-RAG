@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 161 — Where identity lives on the card</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2,h3 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+
+.wrap { max-width:1320px; margin:0 auto; padding:var(--space-6) var(--space-5) 120px; }
+.lede { font-size:13px; color:var(--color-text-muted); line-height:1.62; margin:0 0 var(--space-4); max-width:88ch; }
+.lede b { color:var(--color-text); } .lede i { color:var(--color-text-muted); }
+.lede code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+/* the atom budget readout — the constraint being spent */
+.budget { display:flex; gap:var(--space-4); flex-wrap:wrap; align-items:stretch; margin-bottom:var(--space-5); }
+.bcard { flex:1 1 220px; border:1px solid var(--color-border); border-radius:var(--radius-md);
+  background:var(--color-surface); padding:11px var(--space-4); }
+.bcard .bk { font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--color-text-dim); }
+.bcard .bv { font-size:var(--text-lg); font-weight:700; font-family:var(--font-headline); margin-top:3px; }
+.bcard .bn { font-size:11px; color:var(--color-text-muted); line-height:1.45; margin-top:3px; }
+.bcard.warn { border-color:hsl(38 92% 60% / .45); background:hsl(38 92% 60% / .06); }
+.bcard.warn .bv { color:var(--color-warning); }
+.bcard.good { border-color:hsl(142 71% 45% / .4); background:hsl(142 71% 45% / .05); }
+.bcard.good .bv { color:var(--color-success); }
+
+.seclabel { font-size:10px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.09em;
+  color:var(--color-text-dim); margin:var(--space-6) 0 var(--space-3); display:flex; align-items:center; gap:10px; }
+.seclabel .rule { flex:1; height:1px; background:var(--color-border); }
+
+/* cards */
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:var(--space-3); }
+.grid.trio { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); }
+.card { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  padding:var(--space-4); display:flex; flex-direction:column; gap:10px; position:relative;
+  transition:all var(--dur-fast) var(--ease-out); }
+.card:hover { border-color:var(--color-primary-glow); box-shadow:var(--shadow-md); }
+.card.is-draft { border-style:dashed; }
+.chead { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.chead .left { min-width:0; flex:1; }
+.cname { display:flex; align-items:center; gap:7px; }
+.cname .t { font-size:14px; font-weight:600; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cname .ver { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); flex:none; }
+.folder { display:inline-block; margin-top:3px; font-size:11px; color:var(--color-text-dim); }
+.chead .right { display:flex; align-items:center; gap:5px; flex:none; }
+.pillrow { display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end; max-width:170px; }
+.pill { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.03em;
+  padding:2px 7px; border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.pill.published { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.pill.draft { color:var(--color-warning); border-color:hsl(38 92% 60% / .4); }
+.pill.starter { color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+.pill.yours { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.pill.copy { color:var(--color-text-muted); border-color:var(--color-border); text-transform:none;
+  font-family:var(--font-sans); font-size:10px; letter-spacing:0; }
+.kebab { width:28px; height:28px; display:grid; place-items:center; border-radius:var(--radius-sm);
+  background:transparent; border:1px solid transparent; color:var(--color-text-dim); cursor:pointer; }
+.kebab:hover { background:var(--color-accent); color:var(--color-text); }
+
+.purpose { font-size:12.5px; color:var(--color-text-muted); line-height:1.45; }
+.spine { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.spine .ph { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:var(--radius-sm);
+  background:var(--color-muted); border:1px solid var(--color-border-soft); font-size:10.5px; color:var(--color-text-muted); }
+.spine .arrow { color:var(--color-text-dim); font-size:9px; }
+.soulfoot { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; color:var(--color-text-dim); }
+.tier { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.04em; padding:2px 7px; border-radius:var(--radius-full);
+  border:1px solid var(--color-border); color:var(--color-text-muted); }
+
+/* THE ONE SENTENCE SLOT — the thing being fought over */
+.slot { font-size:11.5px; line-height:1.5; color:var(--color-text-dim); position:relative; }
+.slot.identity { color:var(--color-text-muted); }
+.slot.identity b { color:var(--color-text); font-weight:600; }
+.slot-mark { position:absolute; left:-13px; top:2px; width:3px; height:calc(100% - 4px); border-radius:2px;
+  background:var(--color-primary-glow); opacity:0; transition:opacity var(--dur-base); }
+.show-slots .slot-mark { opacity:1; }
+
+/* A — a dedicated second line (a NEW atom) */
+.identline { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:11.5px; margin-top:3px; }
+.identline .own { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em;
+  padding:1px 6px; border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.identline .own.yours { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.identline .of { color:var(--color-text-muted); }
+.identline .of b { color:var(--color-text); font-weight:600; }
+.identline .orig { color:var(--color-text-dim); font-style:italic; }
+.newatom { outline:1px dashed hsl(38 92% 60% / .5); outline-offset:2px; border-radius:3px; }
+.show-atoms .newatom::after { content:'new atom'; position:absolute; font-family:var(--font-mono); font-size:8px;
+  color:var(--color-warning); background:var(--color-bg); padding:0 3px; transform:translate(4px,-13px); }
+
+.cfoot { display:flex; align-items:center; gap:6px; margin-top:auto; padding-top:9px; border-top:1px solid var(--color-border-soft); }
+.btn-run { font-size:13px; font-weight:600; padding:6px 13px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-run:hover { filter:brightness(1.08); }
+.btn-open { font-size:12.5px; padding:6px 12px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; }
+.btn-open:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+
+.netnew { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:8.5px;
+  text-transform:uppercase; letter-spacing:.05em; padding:1px 5px; border-radius:var(--radius-full);
+  background:hsl(258 90% 66% / .16); border:1px solid hsl(258 90% 66% / .45); color:hsl(258 90% 80%); }
+
+.note { font-size:12px; color:var(--color-text-muted); background:var(--color-muted);
+  border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary);
+  padding:11px var(--space-4); border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin:var(--space-4) 0;
+  line-height:1.62; max-width:94ch; }
+.note b { color:var(--color-text); }
+.note code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+.note.warn { border-left-color:var(--color-warning); }
+.note.warn b { color:hsl(38 92% 78%); }
+
+.rowstates { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:var(--space-3); }
+.rsbtn { font-size:11.5px; padding:4px 10px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; }
+.rsbtn.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+
+.menu-host { position:relative; }
+.menu { position:absolute; right:0; top:calc(100% + 4px); z-index:70; min-width:236px; background:var(--color-surface-hi);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:5px; display:none; }
+.menu.open { display:block; }
+.mi { display:block; width:100%; text-align:left; padding:7px 10px; border-radius:var(--radius-sm);
+  background:transparent; border:none; color:var(--color-text); font-size:12.5px; cursor:pointer; }
+.mi:hover { background:var(--color-accent); }
+.mi.danger { color:var(--color-danger); }
+
+.toast { position:fixed; bottom:64px; left:50%; transform:translateX(-50%) translateY(14px); z-index:9997;
+  background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); color:var(--color-text);
+  padding:9px 16px; border-radius:var(--radius-full); font-size:12.5px; box-shadow:var(--shadow-lg);
+  opacity:0; pointer-events:none; transition:all var(--dur-base) var(--ease-out); }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.viewport-host { transition:max-width var(--dur-slow) var(--ease-out); margin:0 auto; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 161</span>
+  <button class="variant-tab today active" data-v="today" type="button">Today (shipped)</button>
+  <button class="variant-tab" data-v="a" type="button">A: Second line</button>
+  <button class="variant-tab" data-v="b" type="button">B: Pill group</button>
+  <button class="variant-tab" data-v="c" type="button">C: The sentence slot</button>
+</div>
+
+<div class="viewport-host" id="vp">
+<div class="wrap">
+  <h1 style="font-size:var(--text-xl);margin-bottom:6px">Where identity lives on the card</h1>
+  <p class="lede" id="lede"></p>
+
+  <div class="budget" id="budget"></div>
+
+  <div class="seclabel"><span>All four row states, side by side</span><span class="rule"></span></div>
+  <div class="rowstates" id="rowstates"></div>
+  <div class="grid trio" id="states"></div>
+
+  <div class="seclabel"><span>At scale — the 43, in the winning treatment</span><span class="rule"></span></div>
+  <div class="grid" id="scaled"></div>
+
+  <div class="note" id="closing"></div>
+  <div class="note warn" id="warnbox"></div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sketch-toolbar">
+  <button type="button" id="slotsBtn">mark the sentence slot</button>
+  <button type="button" id="atomsBtn">mark new atoms</button>
+  <span style="opacity:.6">vp</span>
+  <button type="button" data-vp="375">375</button>
+  <button type="button" data-vp="768">768</button>
+  <button type="button" data-vp="0">full</button>
+  <span style="opacity:.6">theme</span>
+  <select id="themeSel">
+    <option value="default">default</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+</div>
+
+<script src="../themes/library-fixture-192-1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LIB192;
+  var state = { variant: "today", openMenu: null, slots: false, atoms: false };
+
+  /* Four representative row states, chosen from the real fixture so nothing is invented. */
+  function samples() {
+    var rows = L.rows;
+    function find(fn) { for (var i = 0; i < rows.length; i++) if (fn(rows[i])) return rows[i]; return rows[0]; }
+    var starter = find(function (r) { return r.provenance === "starter"; });
+    var original = find(function (r) { return !r.parentSlug && r.provenance === "published" && r.isMine; });
+    var copy = find(function (r) { return r.forkKind === "copy" && r.provenance === "published"; });
+    var version = find(function (r) { return r.forkKind === "version"; });
+    return [
+      { row: starter,  label: "a shared starter (not yours)" },
+      { row: original, label: "your own original" },
+      { row: copy,     label: "your copy of a starter" },
+      { row: version,  label: "your next version of a live row" }
+    ];
+  }
+
+  /* ── the identity sentence, in words, derived ─────────────────────────────── */
+  function identityWords(row) {
+    var lin = L.lineageOf(row, L.rows);
+    if (!lin) {
+      return row.provenance === "starter"
+        ? { own: "Shared", text: "A starter everyone in your org can copy.", plain: "shared starter" }
+        : { own: "Yours", text: "You created this one. Nothing was copied to make it.", plain: "original" };
+    }
+    if (lin.kind === "copy") {
+      var isStarter = lin.of.provenance === "starter";
+      return {
+        own: "Yours",
+        text: "Your copy of " + (isStarter ? "the " : "") + "<b>" + esc(lin.of.name) + "</b>" +
+              (isStarter ? " starter" : "") + ". Changes here do not touch it.",
+        plain: "copy of " + lin.of.name
+      };
+    }
+    return {
+      own: "Yours",
+      text: "Your version " + row.version + " of <b>" + esc(lin.of.name) + "</b> v" + lin.of.version +
+            ", which is still live.",
+      plain: "v" + row.version + " of " + lin.of.name
+    };
+  }
+
+  function shortIdentity(row) {
+    var lin = L.lineageOf(row, L.rows);
+    if (!lin) return row.provenance === "starter" ? null : "Original";
+    if (lin.kind === "copy") return "Copy of " + lin.of.name;
+    return "v" + row.version + " of v" + lin.of.version;
+  }
+
+  /* ── card ────────────────────────────────────────────────────────────────── */
+  function card(row, variant, label) {
+    var el = document.createElement("div");
+    el.className = "card" + (row.provenance === "draft" ? " is-draft" : "");
+    el.setAttribute("data-state", row.forkKind || (row.provenance === "starter" ? "starter" : "original"));
+    var runnable = row.provenance !== "draft";
+    var mark = row.provenance === "published" ? "📄" : row.provenance === "starter" ? "✨" : "📝";
+    var ident = identityWords(row);
+    var tier = L.TIERS[row.tierId];
+
+    if (label) {
+      var lb = mk("div", "", label);
+      lb.style.cssText = "font-family:var(--font-mono);font-size:9px;text-transform:uppercase;" +
+        "letter-spacing:.08em;color:var(--color-text-dim);margin-bottom:2px";
+      el.appendChild(lb);
+    }
+
+    var head = document.createElement("div"); head.className = "chead";
+    var left = document.createElement("div"); left.className = "left";
+    var nm = document.createElement("div"); nm.className = "cname";
+    nm.innerHTML = '<span aria-hidden="true">' + mark + '</span><span class="t">' + esc(row.name) + '</span>' +
+      (row.version !== undefined ? '<span class="ver">v' + row.version + '</span>' : '');
+    left.appendChild(nm);
+
+    /* ── A: a dedicated second line. The card GAINS an atom. ── */
+    if (variant === "a") {
+      var il = document.createElement("div");
+      il.className = "identline newatom";
+      var short = shortIdentity(row);
+      il.innerHTML =
+        '<span class="own' + (row.isMine ? " yours" : "") + '">' + (row.isMine ? "Yours" : "Shared") + '</span>' +
+        (short ? '<span class="of">' + esc(short) + '</span>'
+               : '<span class="orig">Shared starter</span>') +
+        '<span class="when" style="font-family:var(--font-mono);font-size:10.5px;color:var(--color-text-dim)">· ' +
+          L.relTime(row.updatedAt, L.NOW) + '</span>' +
+        '<span class="netnew">time: net-new</span>';
+      left.appendChild(il);
+    }
+    if (row.projectName) left.appendChild(mk("span", "folder", "📁 " + row.projectName));
+    head.appendChild(left);
+
+    var right = document.createElement("div"); right.className = "right";
+    var mh = document.createElement("div"); mh.className = "menu-host";
+    var kb = document.createElement("button");
+    kb.type = "button"; kb.className = "kebab"; kb.setAttribute("aria-label", "Workflow actions"); kb.textContent = "⋯";
+    var menu = document.createElement("div"); menu.className = "menu";
+    if (runnable) menu.appendChild(mkBtn("mi", L.FORK_VERB, function () { toast(L.FORK_VERB); }));
+    menu.appendChild(mkBtn("mi danger", runnable ? "Delete workflow…" : "Delete", function () { toast("guarded"); }));
+    kb.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (state.openMenu && state.openMenu !== menu) state.openMenu.classList.remove("open");
+      menu.classList.toggle("open");
+      state.openMenu = menu.classList.contains("open") ? menu : null;
+    });
+    mh.appendChild(kb); mh.appendChild(menu);
+    right.appendChild(mh);
+
+    /* ── B: the existing top-right pill becomes a pill GROUP. No new row. ── */
+    if (variant === "b") {
+      var pr = document.createElement("div"); pr.className = "pillrow newatom";
+      pr.appendChild(mk("span", "pill " + row.provenance,
+        row.provenance === "starter" ? "Starter" : row.provenance));
+      pr.appendChild(mk("span", "pill" + (row.isMine ? " yours" : ""), row.isMine ? "Yours" : "Shared"));
+      var s = shortIdentity(row);
+      if (s) pr.appendChild(mk("span", "pill copy", s));
+      right.appendChild(pr);
+    } else {
+      right.appendChild(mk("span", "pill " + row.provenance,
+        row.provenance === "starter" ? "Starter" : row.provenance));
+    }
+    head.appendChild(right);
+    el.appendChild(head);
+
+    el.appendChild(mk("p", "purpose", row.purpose));
+    var sp = document.createElement("div"); sp.className = "spine";
+    row.chain.forEach(function (t, i) {
+      if (i) sp.appendChild(mk("span", "arrow", "→"));
+      var p = L.PHASE_TYPES[t];
+      sp.appendChild(mk("span", "ph", p.glyph + " " + p.word));
+    });
+    el.appendChild(sp);
+    var sf = document.createElement("div"); sf.className = "soulfoot";
+    sf.appendChild(mk("span", "tier", tier.glyph + " " + tier.word));
+    sf.appendChild(mk("span", "", row.deliverable === "file" ? "Makes a file" : "Answers in chat"));
+    if (variant === "c") {
+      sf.appendChild(mk("span", "", "· " + L.relTime(row.updatedAt, L.NOW)));
+      sf.appendChild(mk("span", "netnew", "time: net-new"));
+    }
+    el.appendChild(sf);
+
+    /* ── THE ONE SENTENCE SLOT ───────────────────────────────────────────────
+       Shipped rule: exactly one node, rendered only on a runnable row, and its
+       CONTENT is already state-selected — `hasExistingFork ? EXISTING : DEFAULT`
+       (WorkflowCard.tsx:486). C extends that selector by one more state. */
+    var slotText = null, slotKind = "";
+    if (variant === "c") {
+      if (row.forkKind) { slotText = ident.text; slotKind = " identity"; }
+      else if (runnable) { slotText = L.FORK_CONSEQUENCE; }
+      else { slotText = ident.text; slotKind = " identity"; }
+    } else if (runnable) {
+      slotText = L.FORK_CONSEQUENCE;
+    }
+    if (slotText) {
+      var p = document.createElement("p");
+      p.className = "slot" + slotKind;
+      p.setAttribute("data-testid", "fork-consequence");
+      p.innerHTML = '<span class="slot-mark"></span>' + slotText;
+      el.appendChild(p);
+    }
+
+    var foot = document.createElement("div"); foot.className = "cfoot";
+    if (runnable) foot.appendChild(mkBtn("btn-run", "▶ Run", function () { toast("Run → a new thread"); }));
+    else foot.appendChild(mkBtn("btn-open", "✎ Open", function () { toast("Open → the Builder"); }));
+    el.appendChild(foot);
+    return el;
+  }
+
+  /* ── copy ────────────────────────────────────────────────────────────────── */
+  var LEDE = {
+    today: "<b>The constraint, first.</b> 159-C's shipped rule is <i>one always-visible sentence, spent once</i> — " +
+      "and 192-13 already spent it on what the fork will do. The card renders <b>13 atoms</b> and not one of them is " +
+      "an identity. So the question is not <i>what</i> to say (160 answers that) but <b>where it goes without taxing " +
+      "a card that is already full</b>. Note the sentence appears only on runnable rows: a draft has <b>no sentence " +
+      "at all</b>, which is a free slot nobody is using.",
+    a: "<b>A: give identity its own line.</b> A dedicated row under the name — owner, lineage, when it changed. " +
+      "Unambiguous and easy to scan. The cost is honest and marked: <b>the card grows a 14th atom</b> on every one of " +
+      "the 107 rows. Hit <i>mark new atoms</i> in the toolbar.",
+    b: "<b>B: grow the pill group you already have.</b> Top-right already carries one state pill; make it carry two or " +
+      "three. <b>No new row</b>, so vertical rhythm is untouched — but pills are short, so lineage compresses to " +
+      "<i>“Copy of Compliance Gap Report”</i> and wraps at 375px. Watch the phone viewport.",
+    c: "<b>C: spend the sentence slot you already own.</b> The card has exactly one sentence node and its content is " +
+      "<i>already</i> state-selected — <code>hasExistingFork ? EXISTING : DEFAULT</code> " +
+      "(<code>WorkflowCard.tsx:486</code>). C adds one more state to that selector: a <b>forked</b> row says what it " +
+      "is; an <b>original</b> keeps the fork consequence; a <b>draft</b> finally uses its empty slot. " +
+      "<b>Zero new atoms.</b>"
+  };
+
+  var BUDGETS = {
+    today: [["atoms on the card", "13", "warn", "and none of them identifies the row"],
+            ["sentence nodes", "1", "", "spent on the fork consequence (192-13)"],
+            ["identity signals", "0", "warn", "the folder chip is a filter, not an identity"],
+            ["net-new wire", "none", "good", "nothing added — and nothing solved"]],
+    a:     [["atoms on the card", "14", "warn", "+1 on all 107 rows, marked with a dashed outline"],
+            ["sentence nodes", "1", "", "unchanged — the fork consequence keeps its slot"],
+            ["identity signals", "3", "good", "owner · lineage · changed-when, all on one line"],
+            ["net-new wire", "updated_at", "", "additive projection, flagged violet"]],
+    b:     [["atoms on the card", "13", "good", "the existing pill becomes a group — no new row"],
+            ["sentence nodes", "1", "", "unchanged"],
+            ["identity signals", "2", "", "owner + compressed lineage; no room for time"],
+            ["net-new wire", "none", "good", "lineage is derived; B declines the timestamp"]],
+    c:     [["atoms on the card", "13", "good", "zero new atoms — the slot already exists"],
+            ["sentence nodes", "1", "good", "one node, one more state in its selector"],
+            ["identity signals", "2", "", "lineage in words + time in the soul footer"],
+            ["net-new wire", "updated_at", "", "additive projection, flagged violet"]]
+  };
+
+  var CLOSING = {
+    today: "<b>What to look for:</b> the four cards above are four genuinely different row states from the real " +
+      "fixture — a shared starter, your own original, your copy of a starter, your next version of a live row. " +
+      "Today they are distinguishable only by the small state pill and the version number. Two of them render the " +
+      "identical sentence.",
+    a: "<b>What to look for:</b> A is the most legible of the three and the only one with room for all three signals " +
+      "at once. Ask whether a 14th atom is affordable on a card the operator already called dense — and note that " +
+      "the original density complaint (<code>U5-b</code>) was <b>retracted as the wrong diagnosis</b>, so \"the card " +
+      "is too dense\" is no longer evidence. It may be affordable now.",
+    b: "<b>What to look for:</b> switch to the <b>375px</b> viewport. Three pills in a 170px column wrap into a " +
+      "stack, and a wrapped pill group is a second line — which is A, minus A's typography. B's promise of \"no new " +
+      "row\" holds on desktop and quietly breaks on a phone.",
+    c: "<b>What to look for:</b> C is the cheapest by construction and the only one that reuses a shipped mechanism " +
+      "rather than adding one. The question is whether one sentence can carry identity <i>and</i> keep the fork " +
+      "promise. On a forked row C drops the fork consequence entirely — read the ⚠ box below before picking it."
+  };
+
+  var WARN = {
+    today: "<b>⚠ The free slot nobody is using.</b> The sentence renders only when <code>runnable</code> is true " +
+      "(<code>WorkflowCard.tsx:484</code>). Every draft — 40-odd rows in this fixture, and the rows most likely to be " +
+      "your own half-finished forks — has an <b>empty sentence slot</b> today. Whatever wins, that slot is already paid for.",
+    a: "<b>⚠ What A must not do.</b> The soul's five atoms are consumed unchanged (<code>WorkflowSoul scale=\"card\"</code>) " +
+      "and this line sits <i>around</i> them, never inside. If the new line pushes an atom off the card, A has traded " +
+      "LIB-02 for LIB-05 and both are success criteria.",
+    b: "<b>⚠ What B costs that the budget table cannot show.</b> Top-right is a <b>claimed region</b> elsewhere in this " +
+      "product: Phase 185's governance corner seal owns the top-right of the canvas node card, and the badge budget " +
+      "there is a max-2 tuple where a third is a typecheck error. That rule is scoped to the <i>canvas</i> node, not to " +
+      "this library card — but B grows exactly the region the house style treats as scarce, so say so deliberately " +
+      "rather than discover it in review.",
+    c: "<b>⚠ The real cost of C, stated plainly.</b> On a forked row, C spends the slot on identity — so that row " +
+      "<b>no longer states the fork consequence</b>. Is that acceptable? An argument that it is: the fork verb on a row " +
+      "you already forked opens your existing copy, and 192-13 <i>already</i> swaps the sentence for that case. An " +
+      "argument that it isn't: a published fork of your own can still be forked again, and its consequence sentence " +
+      "would then be gone. <b>C is only safe if the selector keys on \"can this be forked into something new\", not on " +
+      "\"is this a fork\".</b> That distinction is the thing to decide here, not in planning."
+  };
+
+  function render() {
+    document.getElementById("lede").innerHTML = LEDE[state.variant];
+    document.getElementById("closing").innerHTML = CLOSING[state.variant];
+    document.getElementById("warnbox").innerHTML = WARN[state.variant];
+
+    var b = document.getElementById("budget"); b.innerHTML = "";
+    BUDGETS[state.variant].forEach(function (r) {
+      var c = document.createElement("div");
+      c.className = "bcard" + (r[2] ? " " + r[2] : "");
+      c.innerHTML = '<div class="bk">' + r[0] + '</div><div class="bv">' + r[1] + '</div><div class="bn">' + r[3] + '</div>';
+      b.appendChild(c);
+    });
+
+    var st = document.getElementById("states"); st.innerHTML = "";
+    samples().forEach(function (s) { st.appendChild(card(s.row, state.variant, s.label)); });
+
+    var sc = document.getElementById("scaled"); sc.innerHTML = "";
+    L.rows.filter(function (r) { return r.name === "Compliance Gap Report"; })
+      .slice(0, 9)
+      .forEach(function (r) { sc.appendChild(card(r, state.variant, null)); });
+
+    document.body.classList.toggle("show-slots", state.slots);
+    document.body.classList.toggle("show-atoms", state.atoms);
+  }
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function mk(tag, cls, txt) { var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
+  function mkBtn(cls, txt, fn) { var b = document.createElement("button"); b.type = "button"; b.className = cls; if (txt) b.textContent = txt; b.addEventListener("click", fn); return b; }
+  var tt; function toast(m) { var t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove("show"); }, 1800); }
+
+  document.addEventListener("click", function () { if (state.openMenu) { state.openMenu.classList.remove("open"); state.openMenu = null; } });
+  Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (t) {
+    t.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (x) { x.classList.remove("active"); });
+      t.classList.add("active"); state.variant = t.getAttribute("data-v"); render();
+    });
+  });
+  document.getElementById("slotsBtn").addEventListener("click", function () { state.slots = !state.slots; render(); });
+  document.getElementById("atomsBtn").addEventListener("click", function () { state.atoms = !state.atoms; render(); });
+  document.getElementById("themeSel").addEventListener("change", function () {
+    document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css";
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-vp]"), function (bt) {
+    bt.addEventListener("click", function () {
+      var w = parseInt(bt.getAttribute("data-vp"), 10);
+      document.getElementById("vp").style.maxWidth = w ? w + "px" : "";
+    });
+  });
+  render();
+})();
+</script>
+</body>
+</html>

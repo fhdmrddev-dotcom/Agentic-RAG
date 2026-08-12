@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 160 — Telling 43 apart</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2,h3 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+.variant-tab .star { color:var(--color-warning); margin-left:5px; }
+
+.wrap { max-width:1320px; margin:0 auto; padding:var(--space-6) var(--space-5) 120px; }
+.lede { font-size:13px; color:var(--color-text-muted); line-height:1.62; margin:0 0 var(--space-4); max-width:86ch; }
+.lede b { color:var(--color-text); }
+.lede code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+/* measured-shape banner */
+.shapebar { display:flex; gap:var(--space-5); flex-wrap:wrap; align-items:center; padding:10px var(--space-4);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  margin-bottom:var(--space-4); font-family:var(--font-mono); font-size:11px; }
+.shapebar .k { color:var(--color-text-dim); }
+.shapebar .v { color:var(--color-text); font-weight:600; }
+.shapebar .hot { color:var(--color-warning); }
+
+/* toolbar (the shipped LibraryToolbar shape) */
+.libbar { display:flex; gap:var(--space-2); align-items:center; flex-wrap:wrap; margin-bottom:var(--space-3); }
+.searchbox { flex:1 1 260px; min-width:200px; display:flex; align-items:center; gap:7px; padding:7px 11px;
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
+.searchbox input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text);
+  font-family:inherit; font-size:13px; }
+.searchbox input::placeholder { color:var(--color-text-dim); }
+.libbar select { background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:7px 9px; font-family:inherit; font-size:12.5px; cursor:pointer; }
+.btn-create { font-size:13px; font-weight:600; padding:7px 14px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-create:hover { filter:brightness(1.08); }
+
+.chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:var(--space-3); }
+.chip { font-size:11.5px; padding:4px 10px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast); }
+.chip:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.chip.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.chip .n { font-family:var(--font-mono); font-size:10px; opacity:.72; margin-left:5px; }
+
+.countline { font-size:11.5px; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-3); }
+
+/* the card — chrome copied from the shipped WorkflowCard */
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(324px,1fr)); gap:var(--space-3); }
+.card { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  padding:var(--space-4); display:flex; flex-direction:column; gap:10px; transition:all var(--dur-fast) var(--ease-out); }
+.card:hover { border-color:var(--color-primary-glow); box-shadow:var(--shadow-md); }
+.card.is-draft { border-style:dashed; }
+.chead { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.chead .left { min-width:0; }
+.cname { display:flex; align-items:center; gap:7px; }
+.cname .mark { font-size:13px; }
+.cname .t { font-size:14px; font-weight:600; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cname .ver { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); flex:none; }
+.folder { display:inline-block; margin-top:3px; font-size:11px; color:var(--color-text-dim); }
+.chead .right { display:flex; align-items:center; gap:5px; flex:none; }
+.pill { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.03em;
+  padding:2px 7px; border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.pill.published { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.pill.draft { color:var(--color-warning); border-color:hsl(38 92% 60% / .4); }
+.pill.starter { color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+.kebab { width:28px; height:28px; display:grid; place-items:center; border-radius:var(--radius-sm);
+  background:transparent; border:1px solid transparent; color:var(--color-text-dim); cursor:pointer; }
+.kebab:hover { background:var(--color-accent); color:var(--color-text); }
+
+/* soul atoms — consumed unchanged, never redesigned here */
+.purpose { font-size:12.5px; color:var(--color-text-muted); line-height:1.45; }
+.spine { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.spine .ph { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:var(--radius-sm);
+  background:var(--color-muted); border:1px solid var(--color-border-soft); font-size:10.5px; color:var(--color-text-muted); }
+.spine .arrow { color:var(--color-text-dim); font-size:9px; }
+.soulfoot { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; color:var(--color-text-dim); }
+.tier { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.04em; padding:2px 7px; border-radius:var(--radius-full);
+  border:1px solid var(--color-border); color:var(--color-text-muted); }
+
+.consequence { font-size:11.5px; color:var(--color-text-dim); line-height:1.5; }
+.cfoot { display:flex; align-items:center; gap:6px; margin-top:auto; padding-top:9px; border-top:1px solid var(--color-border-soft); }
+.btn-run { font-size:13px; font-weight:600; padding:6px 13px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-run:hover { filter:brightness(1.08); }
+.btn-open { font-size:12.5px; padding:6px 12px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; }
+.btn-open:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+
+/* ── identity treatments (the thing being compared) ───────────────────── */
+
+/* A — lineage-led subtitle */
+.lineage { display:flex; align-items:center; gap:6px; font-size:11.5px; line-height:1.4; margin-top:3px; flex-wrap:wrap; }
+.lineage .own { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em;
+  padding:1px 6px; border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.lineage .own.yours { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.lineage .of { color:var(--color-text-muted); }
+.lineage .of b { color:var(--color-text); font-weight:600; }
+.lineage .orig { color:var(--color-text-dim); font-style:italic; }
+
+/* B — discriminator strip, present only where a name collides */
+.disc { display:flex; align-items:center; gap:0; flex-wrap:wrap; margin-top:4px; font-size:11.5px; }
+.disc .seg { color:var(--color-text); background:var(--color-muted); border:1px solid var(--color-border-soft);
+  padding:2px 8px; border-radius:var(--radius-full); margin:2px 4px 0 0; }
+.disc .seg.dim { color:var(--color-text-muted); background:transparent; border-color:var(--color-border-soft); }
+.disc .why { font-family:var(--font-mono); font-size:9.5px; color:var(--color-text-dim); margin:3px 0 0 2px; }
+.solo { margin-top:4px; font-size:11px; color:var(--color-text-dim); font-style:italic; }
+
+/* C — recency */
+.when { font-family:var(--font-mono); font-size:11px; color:var(--color-text-muted); }
+.when.fresh { color:var(--color-success); }
+.timegroup { margin:var(--space-5) 0 var(--space-3); display:flex; align-items:center; gap:10px; }
+.timegroup .lbl { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.09em;
+  color:var(--color-text-dim); }
+.timegroup .rule { flex:1; height:1px; background:var(--color-border); }
+.timegroup .n { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); }
+
+/* net-new honesty flag (the shipped D14 violet flag) */
+.netnew { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:8.5px;
+  text-transform:uppercase; letter-spacing:.05em; padding:1px 5px; border-radius:var(--radius-full);
+  background:hsl(258 90% 66% / .16); border:1px solid hsl(258 90% 66% / .45); color:hsl(258 90% 80%); }
+
+/* annotation callouts on the Today tab */
+.flaw { border-left:2px solid var(--color-danger); background:hsl(0 72% 51% / .07); padding:8px 11px;
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0; font-size:11.5px; color:hsl(0 80% 82%); margin-top:6px; }
+
+.note { font-size:12px; color:var(--color-text-muted); background:var(--color-muted);
+  border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary);
+  padding:11px var(--space-4); border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin:var(--space-4) 0;
+  line-height:1.6; max-width:92ch; }
+.note b { color:var(--color-text); }
+.note code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+.menu-host { position:relative; }
+.menu { position:absolute; right:0; top:calc(100% + 4px); z-index:70; min-width:236px; background:var(--color-surface-hi);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:5px; display:none; }
+.menu.open { display:block; }
+.mi { display:block; width:100%; text-align:left; padding:7px 10px; border-radius:var(--radius-sm);
+  background:transparent; border:none; color:var(--color-text); font-size:12.5px; cursor:pointer; }
+.mi:hover { background:var(--color-accent); }
+.mi.danger { color:var(--color-danger); }
+
+.empty { padding:var(--space-10); text-align:center; color:var(--color-text-dim); font-size:13px;
+  border:1px dashed var(--color-border); border-radius:var(--radius-md); }
+
+.toast { position:fixed; bottom:64px; left:50%; transform:translateX(-50%) translateY(14px); z-index:9997;
+  background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); color:var(--color-text);
+  padding:9px 16px; border-radius:var(--radius-full); font-size:12.5px; box-shadow:var(--shadow-lg);
+  opacity:0; pointer-events:none; transition:all var(--dur-base) var(--ease-out); }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+.viewport-host { transition:max-width var(--dur-slow) var(--ease-out); margin:0 auto; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 160</span>
+  <button class="variant-tab today active" data-v="today" type="button">Today (shipped)</button>
+  <button class="variant-tab" data-v="a" type="button">A: Lineage-led</button>
+  <button class="variant-tab" data-v="b" type="button">B: Disambiguate-on-collision</button>
+  <button class="variant-tab" data-v="c" type="button">C: Order &amp; recency</button>
+</div>
+
+<div class="viewport-host" id="vp">
+<div class="wrap">
+
+  <h1 style="font-size:var(--text-xl);margin-bottom:6px">Telling 43 apart</h1>
+  <p class="lede" id="lede"></p>
+
+  <div class="shapebar" id="shapebar"></div>
+
+  <div id="surface"></div>
+
+  <div class="note" id="closing"></div>
+
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">shape</span>
+  <select id="shapeSel">
+    <option value="real">realistic (14 dup names)</option>
+    <option value="distinct">distinct names (192's fixture)</option>
+  </select>
+  <span style="opacity:.6">scale</span>
+  <select id="scaleSel">
+    <option value="107">107</option>
+    <option value="12">12</option>
+  </select>
+  <span style="opacity:.6">vp</span>
+  <button type="button" data-vp="375">375</button>
+  <button type="button" data-vp="768">768</button>
+  <button type="button" data-vp="0">full</button>
+  <span style="opacity:.6">theme</span>
+  <select id="themeSel">
+    <option value="default">default</option>
+    <option value="canvas-184">canvas-184</option>
+  </select>
+</div>
+
+<script src="../themes/library-fixture-192-1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LIB192;
+
+  var state = {
+    variant: "today",
+    q: "",
+    chips: [],
+    project: "",
+    sort: "recent",
+    shape: "real",
+    scale: 107,
+    openMenu: null
+  };
+
+  /* ── the dataset, and the SHAPE switch that is the point of this sketch ──
+     Flipping to "distinct" gives every row a unique name — which is what every
+     automated check in Phase 192 ran against. Every variant, including Today,
+     looks fine there. That is why 3176 passing tests could not see this. */
+  function dataset() {
+    var rows = L.rows.slice(0, state.scale);
+    if (state.shape === "distinct") {
+      var seen = {};
+      rows = rows.map(function (r) {
+        seen[r.name] = (seen[r.name] || 0) + 1;
+        var n = seen[r.name] > 1 ? r.name + " " + seen[r.name] : r.name;
+        var c = {}; for (var k in r) c[k] = r[k];
+        c.name = n;
+        return c;
+      });
+    }
+    return rows;
+  }
+
+  var CHIPS = [
+    ["ready-to-run", "Ready to run", function (r) { return r.provenance !== "draft"; }],
+    ["yours", "Yours", function (r) { return r.isMine; }],
+    ["still-building", "Still building", function (r) { return r.provenance === "draft"; }],
+    ["starters", "Starters", function (r) { return r.provenance === "starter"; }],
+    ["makes-a-file", "Makes a file", function (r) { return r.deliverable === "file"; }],
+    ["strict", "Strict", function (r) { return r.tierId === "STRICT"; }]
+  ];
+
+  function filtered(rows) {
+    var q = state.q.trim().toLowerCase();
+    return rows.filter(function (r) {
+      if (q && (r.name + " " + r.purpose).toLowerCase().indexOf(q) === -1) return false;
+      if (state.project && r.projectId !== state.project) return false;
+      if (state.chips.length) {
+        var any = false;
+        state.chips.forEach(function (c) {
+          CHIPS.forEach(function (t) { if (t[0] === c && t[2](r)) any = true; });
+        });
+        if (!any) return false;
+      }
+      return true;
+    });
+  }
+
+  function sorted(rows) {
+    var out = rows.slice();
+    /* Today + A + B keep the SERVER's order — `ORDER BY name`
+       (db/workflows.py:303, :517). Only C changes it. */
+    if (state.variant !== "c" || state.sort === "name") {
+      out.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    } else if (state.sort === "recent") {
+      out.sort(function (a, b) { return b.updatedAt - a.updatedAt; });
+    } else if (state.sort === "project") {
+      out.sort(function (a, b) {
+        return (a.projectName || "zz").localeCompare(b.projectName || "zz") || a.name.localeCompare(b.name);
+      });
+    }
+    return out;
+  }
+
+  /* ── B's engine: among rows sharing a name, WHAT ACTUALLY DIFFERS? ──────── */
+  function discriminators(row, rows) {
+    var sibs = rows.filter(function (r) { return r.name === row.name; });
+    if (sibs.length < 2) return null;
+    var out = [], why = [];
+    function varies(fn) {
+      var v = {}; sibs.forEach(function (s) { v[String(fn(s))] = 1; });
+      return Object.keys(v).length > 1;
+    }
+    if (varies(function (s) { return s.projectName; })) {
+      out.push(row.projectName ? row.projectName : "No project"); why.push("project");
+    }
+    if (varies(function (s) { return s.provenance; })) {
+      out.push(row.provenance === "draft" ? "Still building"
+             : row.provenance === "starter" ? "Shared starter" : "Ready to run");
+      why.push("state");
+    }
+    if (varies(function (s) { return s.version; })) { out.push("v" + row.version); why.push("version"); }
+    if (varies(function (s) { return s.isMine; })) { out.push(row.isMine ? "Yours" : "Shared"); why.push("owner"); }
+    if (out.length < 3) {
+      out.push(L.relTime(row.updatedAt, L.NOW)); why.push("changed");
+    }
+    return { segs: out, why: why, of: sibs.length };
+  }
+
+  /* ── card render — chrome is IDENTICAL across variants; only identity differs ── */
+  function card(row, rows, variant) {
+    var el = document.createElement("div");
+    el.className = "card" + (row.provenance === "draft" ? " is-draft" : "");
+    var mark = row.provenance === "published" ? "📄" : row.provenance === "starter" ? "✨" : "📝";
+    var pillWord = row.provenance === "starter" ? "Starter" : row.provenance;
+    var lin = L.lineageOf(row, rows);
+    var runnable = row.provenance !== "draft";
+    var tier = L.TIERS[row.tierId];
+
+    /* head */
+    var head = document.createElement("div"); head.className = "chead";
+    var left = document.createElement("div"); left.className = "left";
+    var nm = document.createElement("div"); nm.className = "cname";
+    nm.innerHTML = '<span class="mark" aria-hidden="true">' + mark + '</span>' +
+                   '<span class="t">' + esc(row.name) + '</span>' +
+                   (row.version !== undefined ? '<span class="ver">v' + row.version + '</span>' : '');
+    left.appendChild(nm);
+
+    /* ── the identity treatment ── */
+    if (variant === "a") {
+      var la = document.createElement("div"); la.className = "lineage";
+      var own = row.isMine ? '<span class="own yours">Yours</span>' : '<span class="own">Shared</span>';
+      var of;
+      if (!lin) of = '<span class="orig">Original</span>';
+      else if (lin.kind === "copy")
+        of = '<span class="of">Your copy of ' + (lin.of.provenance === "starter" ? "the " : "") +
+             '<b>' + esc(lin.of.name) + '</b>' + (lin.of.provenance === "starter" ? " starter" : "") + '</span>';
+      else
+        of = '<span class="of">Your v' + row.version + ' of <b>' + esc(lin.of.name) + '</b> v' + lin.of.version + '</span>';
+      la.innerHTML = own + of;
+      left.appendChild(la);
+      if (row.projectName) left.appendChild(mk("span", "folder", "📁 " + row.projectName));
+    } else if (variant === "b") {
+      var d = discriminators(row, rows);
+      if (d) {
+        var db = document.createElement("div"); db.className = "disc";
+        d.segs.forEach(function (s, i) {
+          db.appendChild(mk("span", "seg" + (i ? " dim" : ""), s));
+        });
+        db.appendChild(mk("span", "why", "1 of " + d.of + " with this name"));
+        left.appendChild(db);
+      } else {
+        left.appendChild(mk("div", "solo", "the only one with this name"));
+      }
+    } else if (variant === "c") {
+      var lc = document.createElement("div"); lc.className = "lineage";
+      var fresh = (L.NOW - row.updatedAt) < 2 * 86400000;
+      lc.innerHTML = (row.isMine ? '<span class="own yours">Yours</span>' : '<span class="own">Shared</span>') +
+        '<span class="when' + (fresh ? " fresh" : "") + '">changed ' + L.relTime(row.updatedAt, L.NOW) + '</span>' +
+        '<span class="netnew">net-new</span>';
+      left.appendChild(lc);
+      if (row.projectName) left.appendChild(mk("span", "folder", "📁 " + row.projectName));
+    } else {
+      /* Today (shipped) — folder chip only. Nothing else identifies the row. */
+      if (row.projectName) left.appendChild(mk("span", "folder", "📁 " + row.projectName));
+    }
+
+    head.appendChild(left);
+
+    var right = document.createElement("div"); right.className = "right";
+    var mh = document.createElement("div"); mh.className = "menu-host";
+    var kb = document.createElement("button");
+    kb.type = "button"; kb.className = "kebab"; kb.setAttribute("aria-label", "Workflow actions");
+    kb.textContent = "⋯";
+    var menu = document.createElement("div"); menu.className = "menu";
+    if (runnable) menu.appendChild(mkBtn("mi", L.FORK_VERB, function () { toast(L.FORK_VERB + " — forks a copy"); }));
+    menu.appendChild(mkBtn("mi danger", runnable ? "Delete workflow…" : "Delete", function () {
+      toast(runnable ? "Opens the victim-naming sheet" : "Arms — one more click to delete");
+    }));
+    kb.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (state.openMenu && state.openMenu !== menu) state.openMenu.classList.remove("open");
+      menu.classList.toggle("open");
+      state.openMenu = menu.classList.contains("open") ? menu : null;
+    });
+    mh.appendChild(kb); mh.appendChild(menu);
+    right.appendChild(mh);
+    right.appendChild(mk("span", "pill " + row.provenance, pillWord));
+    head.appendChild(right);
+    el.appendChild(head);
+
+    /* soul atoms — consumed unchanged */
+    el.appendChild(mk("p", "purpose", row.purpose));
+    var sp = document.createElement("div"); sp.className = "spine";
+    row.chain.forEach(function (t, i) {
+      if (i) sp.appendChild(mk("span", "arrow", "→"));
+      var p = L.PHASE_TYPES[t];
+      sp.appendChild(mk("span", "ph", p.glyph + " " + p.word));
+    });
+    el.appendChild(sp);
+    var sf = document.createElement("div"); sf.className = "soulfoot";
+    sf.appendChild(mk("span", "tier", tier.glyph + " " + tier.word));
+    sf.appendChild(mk("span", "", row.deliverable === "file" ? "Makes a file" : "Answers in chat"));
+    el.appendChild(sf);
+
+    /* the one sentence — only on runnable rows, exactly as shipped */
+    if (runnable) el.appendChild(mk("p", "consequence", L.FORK_CONSEQUENCE));
+
+    var foot = document.createElement("div"); foot.className = "cfoot";
+    if (runnable) foot.appendChild(mkBtn("btn-run", "▶ Run", function () { toast("Run → hands off into a new thread"); }));
+    else foot.appendChild(mkBtn("btn-open", "✎ Open", function () { toast("Open → the Builder"); }));
+    el.appendChild(foot);
+
+    return el;
+  }
+
+  /* ── surface ─────────────────────────────────────────────────────────────── */
+
+  var LEDE = {
+    today: "<b>This is the diagnosis, and it is built from the real code.</b> The server returns <code>ORDER BY name</code> " +
+      "(<code>db/workflows.py:303</code>) and the toolbar has <b>no sort control at all</b> — so 43 rows named " +
+      "\"Compliance Gap Report\" render as 43 <i>adjacent</i> identical rows. Scroll to them. Every atom on every card is " +
+      "the same. Nothing here is broken: each of those rows is a correct fork.",
+    a: "<b>The bet: identity is where a row came from.</b> Names stay exactly as they are; a subtitle says whose it is and " +
+      "what it was forked from. Lineage is <b>derived</b> — a version fork shares its parent's slug, a copy fork is " +
+      "<code>&lt;parent&gt;-[a-z0-9]{6}</code> — so this costs <b>nothing on the wire</b>.",
+    b: "<b>The bet: spend atoms only where they buy something.</b> For each row, compute what actually differs among the rows " +
+      "sharing its name, and print only that. The 13 rows whose name is already unique get <i>no</i> strip at all — watch them " +
+      "stay calm while the 43 grow a discriminator.",
+    c: "<b>The bet: the ordering is the disease.</b> Stop sorting by name. Default to recently-changed, group by time, and put " +
+      "a timestamp on every row. The 43 stop being adjacent. Needs one additive <code>updated_at</code> projection — " +
+      "flagged violet on every row that uses it."
+  };
+
+  var CLOSING = {
+    today: "<b>Why no gate caught this.</b> Flip <code>shape</code> to <i>distinct names</i> in the bottom-right toolbar. " +
+      "This tab becomes perfectly readable — and that is the fixture every automated check in Phase 192 ran against. " +
+      "Volume was real; shape was not.",
+    a: "<b>What to check:</b> does \"Your copy of the Compliance Gap Report starter\" 43 times actually help? Every one of the " +
+      "43 says nearly the same thing, because they <i>are</i> nearly the same thing. Lineage answers <b>SC#2</b> cleanly. " +
+      "Whether it answers <b>SC#1</b> — pick a specific row out of the 43 — is the open question.",
+    b: "<b>What to check:</b> the strip is computed, so it says something different on every row (Finance · Still building · " +
+      "3 weeks ago). That is the most information per pixel of the three. The cost: the card grows a second variable-length " +
+      "region, and <b>the wording changes as the library changes</b> — a row's strip can shift when an unrelated row is deleted.",
+    c: "<b>What to check:</b> order alone genuinely helps — the 4 rows you touched this week float to the top and you will " +
+      "recognise them. But scroll down: at row 40 you are back in an undifferentiated block, because <i>within</i> a time " +
+      "bucket nothing distinguishes them. C may be necessary and insufficient."
+  };
+
+  function render() {
+    var host = document.getElementById("surface");
+    host.innerHTML = "";
+    document.getElementById("lede").innerHTML = LEDE[state.variant];
+    document.getElementById("closing").innerHTML = CLOSING[state.variant];
+
+    var all = dataset();
+    var nc = L.nameCounts(all);
+    var dupNames = Object.keys(nc).filter(function (n) { return nc[n] > 1; });
+    var top = Object.keys(nc).sort(function (a, b) { return nc[b] - nc[a]; })[0];
+    var sb = document.getElementById("shapebar");
+    sb.innerHTML =
+      '<span><span class="k">rows</span> <span class="v">' + all.length + '</span></span>' +
+      '<span><span class="k">distinct names</span> <span class="v">' + Object.keys(nc).length + '</span></span>' +
+      '<span><span class="k">duplicated names</span> <span class="v ' + (dupNames.length ? "hot" : "") + '">' +
+        dupNames.length + '</span></span>' +
+      '<span><span class="k">largest family</span> <span class="v ' + (nc[top] > 1 ? "hot" : "") + '">' +
+        nc[top] + ' × "' + esc(top) + '"</span></span>' +
+      '<span><span class="k">order</span> <span class="v">' +
+        (state.variant === "c" ? state.sort : "name (server)") + '</span></span>';
+
+    /* toolbar */
+    var bar = document.createElement("div"); bar.className = "libbar";
+    var sbx = document.createElement("div"); sbx.className = "searchbox";
+    sbx.innerHTML = '<span style="opacity:.55">⌕</span>';
+    var inp = document.createElement("input");
+    inp.type = "text"; inp.placeholder = "Search workflows"; inp.value = state.q;
+    inp.addEventListener("input", function () { state.q = inp.value; render(); requestAnimationFrame(function(){
+      var i = document.querySelector(".searchbox input"); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+    }); });
+    sbx.appendChild(inp);
+    bar.appendChild(mkBtn("btn-create", "＋ Create workflow", function () { toast("Create → the describe box"); }));
+    bar.appendChild(sbx);
+
+    var psel = document.createElement("select");
+    psel.innerHTML = '<option value="">All projects</option>' +
+      L.PROJECTS.filter(function (p) { return p.id; }).map(function (p) {
+        return '<option value="' + p.id + '"' + (state.project === p.id ? " selected" : "") + '>' + p.name + '</option>';
+      }).join("");
+    psel.addEventListener("change", function () { state.project = psel.value; render(); });
+    bar.appendChild(psel);
+
+    if (state.variant === "c") {
+      var ssel = document.createElement("select");
+      ssel.innerHTML =
+        '<option value="recent"' + (state.sort === "recent" ? " selected" : "") + '>Recently changed</option>' +
+        '<option value="name"' + (state.sort === "name" ? " selected" : "") + '>Name (A–Z)</option>' +
+        '<option value="project"' + (state.sort === "project" ? " selected" : "") + '>Project</option>';
+      ssel.addEventListener("change", function () { state.sort = ssel.value; render(); });
+      bar.appendChild(ssel);
+      var nn = mk("span", "netnew", "sort: net-new"); bar.appendChild(nn);
+    }
+    host.appendChild(bar);
+
+    /* chips */
+    var cs = document.createElement("div"); cs.className = "chips";
+    CHIPS.forEach(function (c) {
+      var n = filtered(all).filter(c[2]).length;
+      var b = mkBtn("chip" + (state.chips.indexOf(c[0]) > -1 ? " on" : ""), "", function () {
+        var i = state.chips.indexOf(c[0]);
+        if (i > -1) state.chips.splice(i, 1); else state.chips.push(c[0]);
+        render();
+      });
+      b.innerHTML = c[1] + '<span class="n">' + n + '</span>';
+      cs.appendChild(b);
+    });
+    host.appendChild(cs);
+
+    var rows = sorted(filtered(all));
+    host.appendChild(mk("div", "countline",
+      rows.length + " of " + all.length + " workflows" +
+      (state.variant === "today" ? "  ·  sorted by name, as the server returns them" : "")));
+
+    if (!rows.length) { host.appendChild(mk("div", "empty", "Nothing matches that. Clear the search or a chip.")); return; }
+
+    if (state.variant === "today") {
+      var f = mk("div", "flaw",
+        "Every card below carries 13 atoms and not one of them separates it from its 42 twins. " +
+        "The operator's words: “I can't tell which is which.”");
+      host.appendChild(f);
+    }
+
+    /* C groups by time; everyone else is one flat grid (157-B: one list) */
+    if (state.variant === "c" && state.sort === "recent") {
+      var buckets = [
+        ["Today", 86400000], ["This week", 7 * 86400000],
+        ["This month", 31 * 86400000], ["Older", Infinity]
+      ];
+      var idx = 0;
+      buckets.forEach(function (bk) {
+        var grp = [];
+        while (idx < rows.length && (L.NOW - rows[idx].updatedAt) <= bk[1]) { grp.push(rows[idx]); idx++; }
+        if (!grp.length) return;
+        var tg = document.createElement("div"); tg.className = "timegroup";
+        tg.innerHTML = '<span class="lbl">' + bk[0] + '</span><span class="rule"></span><span class="n">' + grp.length + '</span>';
+        host.appendChild(tg);
+        var g = document.createElement("div"); g.className = "grid";
+        grp.forEach(function (r) { g.appendChild(card(r, all, state.variant)); });
+        host.appendChild(g);
+      });
+    } else {
+      var g2 = document.createElement("div"); g2.className = "grid";
+      rows.forEach(function (r) { g2.appendChild(card(r, all, state.variant)); });
+      host.appendChild(g2);
+    }
+  }
+
+  /* ── helpers ─────────────────────────────────────────────────────────────── */
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function mk(tag, cls, txt) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (txt !== undefined) e.textContent = txt;
+    return e;
+  }
+  function mkBtn(cls, txt, fn) {
+    var b = document.createElement("button");
+    b.type = "button"; b.className = cls; if (txt) b.textContent = txt;
+    b.addEventListener("click", fn);
+    return b;
+  }
+  var toastT;
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(function () { t.classList.remove("show"); }, 1900);
+  }
+
+  document.addEventListener("click", function () {
+    if (state.openMenu) { state.openMenu.classList.remove("open"); state.openMenu = null; }
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (t) {
+    t.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (x) { x.classList.remove("active"); });
+      t.classList.add("active");
+      state.variant = t.getAttribute("data-v");
+      window.scrollTo(0, 0);
+      render();
+    });
+  });
+
+  document.getElementById("shapeSel").addEventListener("change", function () { state.shape = this.value; render(); });
+  document.getElementById("scaleSel").addEventListener("change", function () { state.scale = parseInt(this.value, 10); render(); });
+  document.getElementById("themeSel").addEventListener("change", function () {
+    document.querySelector('link[href*="themes"]').href = "../themes/" + this.value + ".css";
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-vp]"), function (b) {
+    b.addEventListener("click", function () {
+      var w = parseInt(b.getAttribute("data-vp"), 10);
+      document.getElementById("vp").style.maxWidth = w ? w + "px" : "";
+    });
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
