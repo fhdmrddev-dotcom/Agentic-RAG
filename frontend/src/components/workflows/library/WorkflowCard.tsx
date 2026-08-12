@@ -76,15 +76,58 @@
  * truthful as well costs one word of phrasing and spares a later reader the adjudication. The
  * same reason is why the removed second draft button is described above rather than named.
  *
- * ── THE FORK OPENS NOTHING (D-15), AND THE TWO DELETES ARE DIFFERENT GRADES (D-18) ──────
+ * ── THE FORK OPENS A NAME PROMPT (D-15, AMENDED BY 192.1's D-19), AND THE TWO DELETES ARE
+ *    DIFFERENT GRADES (D-18) ─────────────────────────────────────────────────────────────
  * The recorded 146-148 rule grades a guard BY CONSEQUENCE — victim-naming sheet, then
  * arm-to-confirm, then direct flip. Applied here that gives three different answers on one
  * card, and each of them is an argument rather than a taste:
  *
- *   fork           DIRECT FLIP. It is non-destructive and reversible — the live version stays
- *                  live and unchanged — so a sheet on it would spend the guard vocabulary the
- *                  delete relies on to mean anything (`CapabilityGrid.tsx:11-13`). The sketch
- *                  attached a confirm to 159-C; it is deliberately not shipped.
+ *   fork           NO GUARD AT ALL — an INPUT STEP. ⚠ AMENDED IN PHASE 192.1 (plan 192.1-07,
+ *                  D-19), IN THE SAME COMMIT THAT SHIPPED `ForkNameDialog.tsx`. What 192
+ *                  recorded here, and why, is left VISIBLE below rather than deleted; what
+ *                  changed is stated in full so the decision is never silently contradicted.
+ *
+ *                  192's REASONING, UNCHANGED AND STILL CORRECT AS FAR AS IT GOES:
+ *                    "DIRECT FLIP. It is non-destructive and reversible — the live version
+ *                     stays live and unchanged — so a sheet on it would spend the guard
+ *                     vocabulary the delete relies on to mean anything
+ *                     (`CapabilityGrid.tsx:11-13`). The sketch attached a confirm to 159-C;
+ *                     it is deliberately not shipped."
+ *
+ *                  WHAT REOPENED IT: sketch 162-B, chosen by the operator against a measured
+ *                  problem this card cannot solve on the read side — 43 of the operator's 104
+ *                  workflows carry ONE name, because every fork inherits its parent's. The
+ *                  identity line under the title tells them apart afterwards; a prompt at the
+ *                  fork is what stops the pile growing.
+ *
+ *                  WHY IT DOES NOT CONTRADICT THE PARAGRAPH ABOVE, and the reason is
+ *                  MECHANICAL rather than rhetorical: **the prompt collects something the
+ *                  system cannot know, so it is an INPUT, not a guard — and inputs do not
+ *                  spend guard vocabulary.** 159-C's confirm asked *are you sure?*, which is
+ *                  the ladder's question; this asks *what should it be called?*, which is not
+ *                  a question the ladder has ever asked. Each clause below is a TEST in
+ *                  `ForkNameDialog.test.tsx`, not a sentiment here:
+ *                    · it asks for a NAME, never for a confirmation — the field opens EMPTY,
+ *                      because a prefilled name is a confirmation wearing an input's clothes;
+ *                    · it wears NO destructive styling — no `DESTRUCTIVE_ITEM_CLASSES`, no
+ *                      red, no victim naming (asserted over the rendered markup, with a
+ *                      positive control proving the matcher catches the real tokens);
+ *                    · its primary button is `Create my copy`, and asserting *"the primary is
+ *                      NOT `Confirm`"* is what makes the distinction machine-checkable;
+ *                    · it WARNS AND NEVER BLOCKS on a colliding name (D-20) — proved by
+ *                      SUBMITTING THROUGH the clash, because "the warning renders" is
+ *                      satisfied identically by a dialog that warns and then refuses.
+ *
+ *                  ⚠ THE 146-148 LADDER IS UNTOUCHED, and that is the load-bearing claim: the
+ *                  victim-naming sheet still guards the live delete, arm-to-confirm still
+ *                  guards the draft delete, and the fork is not a THIRD, LIGHTER RUNG — it has
+ *                  left the ladder entirely. Nothing below was re-graded, and no guard word
+ *                  was spent to buy this prompt.
+ *
+ *                  ⚠ AND ON ONE ROW THE VERB STILL OPENS NO PROMPT AT ALL (D-23): where this
+ *                  caller ALREADY has a draft of a published slug, the fork opens that draft
+ *                  and creates nothing — so nothing is being named. This card already says so
+ *                  before the click, through `FORK_CONSEQUENCE_EXISTING`.
  *   draft delete   ARM-TO-CONFIRM (`MaintenancePanel.tsx:39-129`'s shipped shape). A draft has
  *                  no live history, no runs and no threads to destroy. One extra click, no
  *                  fetch, NO FABRICATED COUNT (`CapabilityGrid.tsx:15-21`), never silent.

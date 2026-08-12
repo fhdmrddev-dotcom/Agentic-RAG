@@ -1039,7 +1039,48 @@ const BASELINE = {
   // Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
   // printing `librarySubtree.fences.test.ts 80 111 +31` and `rowIdentity.test.ts — 72 new` at
   // `total 3367 · failed 0` — never hand-counted from `it(` literals.
-  "librarySubtree.fences.test.ts": 111,
+  // ── 192.1-07 Task 1 (D-19 / D-20 / D-33 / D-36): 111 → 116. THE FIVE-MULTIPLIER HELD. ────
+  // `./ForkNameDialog.tsx` joined the corpus in the commit that created it, and the FIVE
+  // `it.each(LIBRARY_SUBTREE_PATHS)` sweeps picked it up: one path × five sweeps = +5. That
+  // is the ⚠ one screen up landing exactly — the block above corrected "+3, the same
+  // arithmetic again" to FIVE before this addition, and this is the addition that tested it.
+  // ⚠ F1 IS THE FENCE THAT MATTERED HERE, and for a MEASURED reason rather than a general
+  // one: the natural shell to clone (`org/InviteMemberDialog.tsx`) carries the forbidden
+  // attribute TWICE (`:159`, `:228`), so a dialog module is the one place in this subtree
+  // where the violation arrives by COPYING rather than by invention. D-36 says not to clone
+  // it; the corpus entry is what makes that mechanical instead of remembered.
+  // ⚠ AND THE 187-24 TRAP FIRED AGAIN, INSIDE THIS VERY COMMIT — the fourth instance this
+  // subtree has recorded. `ForkNameDialog.tsx`'s docblock explained why the raw-HTML escape
+  // hatch is not used, spelled the prop, and T-192-04 (a RAW regex, not a parsed fence) went
+  // red on it: `expected '/**\n * Phase 192.1-07 Task 1 (LIB-05…' not to match
+  // /dangerouslySetInnerHTML/`. The prose now describes the hatch instead of naming it.
+  // ⚠ OBSERVED RED FIRST, as D-33 requires the corpus edit and this pin to be one commit:
+  // `expected [ './libraryRow.ts', …(11) ] to have a length of 11 but got 12`, before either
+  // number was written. Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING
+  // RUNS, 2026-08-12, both printing `librarySubtree.fences.test.ts 111 116 +5` and
+  // `ForkNameDialog.test.tsx — 18 new` at `total 3431 · failed 0` — never hand-counted.
+  "librarySubtree.fences.test.ts": 116,
+  // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
+  // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
+  // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
+  // The 18 cover D-19's four mechanical clauses — it ASKS (the field opens empty and focused,
+  // never prefilled), its primary is `Create my copy` AND no control is named `Confirm`
+  // (paired with a positive control that plants one), it wears no destructive styling
+  // (asserted over the rendered `outerHTML`, with a matcher control), and D-20's
+  // WARNS-NEVER-BLOCKS — whose headline case SUBMITS THROUGH THE CLASH and reads the argument
+  // the callback received, because "the warning renders" is satisfied identically by a dialog
+  // that warns and then refuses. Plus reset-on-open, both escapes, the not-`role="alert"`
+  // clash hint with its own alert control, and two `axe()` cases (idle and clash).
+  // ⚠ THE RED WAS DRIVEN AS REAL AssertionErrors, not as a module-not-found: the component was
+  // first written with TWO deliberate defects (`disabled={empty || clash}` and a `Confirm`
+  // primary), and the suite failed 4/18 with `expect(element).toBeEnabled() … disabled=""`,
+  // `expected "vi.fn()" to be called 1 times, but got 0 times`, and
+  // `toHaveAccessibleName() Expected: Create my copy / Received: Confirm`.
+  // ⚠ NO `TARGETS` LINE IS NEEDED, and that is measured rather than assumed: the gate printed
+  // `ForkNameDialog.test.tsx — 18 new`, and a file the gate never runs cannot report a number
+  // at all, so the printed `actual` IS the proof the `src/components/workflows` DIRECTORY
+  // entry already reaches it. (Two knobs: TARGETS decides what RUNS, BASELINE what is GUARDED.)
+  "ForkNameDialog.test.tsx": 18,
   // ── 192.1-05 Tasks 1+2 (LIB-05 / SC#1 / SC#2): a NEW suite, pinned in its first phase ─────
   // The identity resolver, proved as arithmetic in the `libraryFilter.test.ts` posture — no
   // `render`, no DOM, no clock mock. The 72 cover: the four-state lineage with the version branch

@@ -99,6 +99,14 @@ const LIBRARY_SUBTREE_PATHS = [
   "./relativeChanged.ts",
   // ── 192.1-05 (D-13 / D-31 / D-33): the identity resolver ──
   "./rowIdentity.ts",
+  // ── 192.1-07 (D-19 / D-20 / D-33 / D-36): 162-B's name prompt at the fork ──
+  // ⚠ THE FIFTH AND LAST SOURCE MODULE D-35 FORECAST, and it is listed in the same commit
+  // that creates it for the reason stated above: F1 in particular is load-bearing HERE, and
+  // for a measured reason rather than a general one — the natural shell to clone
+  // (`org/InviteMemberDialog.tsx`) carries the forbidden attribute TWICE, so an unswept
+  // dialog module is the one place in this subtree where the violation arrives by copying
+  // rather than by invention (D-36).
+  "./ForkNameDialog.tsx",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -132,7 +140,13 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // 10 but got 11` was OBSERVED before the 11 was written. The +3 arithmetic held for the
     // FOURTH consecutive addition — but note it changes with THIS commit, which adds two more
     // `it.each(LIBRARY_SUBTREE_PATHS)` sweeps: a fifth module will now move the pin by FIVE.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(11)
+    // ⚠ 192.1-07 read it the same way, one round later again — `expected [ './libraryRow.ts',
+    // …(11) ] to have a length of 11 but got 12` was OBSERVED before the 12 was written — and
+    // the FIVE forecast one line up HELD: the gate printed `librarySubtree.fences.test.ts
+    // 111 116 +5`. That is the corpus at 12 and the suite at 116, which is also D-35's
+    // forecast landing (12 modules) with its own suite arithmetic superseded, exactly as
+    // D-35 said to expect: *"re-derive the final number from the gate's own `actual` column"*.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(12)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
