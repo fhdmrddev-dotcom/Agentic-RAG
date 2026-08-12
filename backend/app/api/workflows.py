@@ -140,7 +140,29 @@ class PublishedWorkflow(BaseModel):
     ``is_org_shared`` model is exactly that widening, with no code change here and no review.
     That is the mig-116 / CR-01 shape, applied prospectively. ``is_mine`` CANNOT widen: it
     discloses one bit about the caller themselves. ``is_system_global`` describes the ROW,
-    never a person."""
+    never a person.
+
+    Phase 192.1 (LIB-05 / D-15): ``updated_at`` is ADDITIVE and DEFAULTED on the same
+    ``definition`` / ``is_mine`` precedent — a frontend deployed AHEAD of this backend reads
+    ``undefined`` and renders no *changed* segment, which degrades rather than crashing. It
+    feeds the library identity line's recency half ("changed 2 months ago").
+
+    IT PASSES THE BINDING RULE ABOVE, FOR THE RULE'S OWN STATED REASON — it "describes the
+    ROW, never a person", exactly as ``is_system_global`` does. It discloses WHEN a row the
+    caller can ALREADY see last changed, and it can never begin emitting a second user's
+    identifier however the predicate later widens. Recorded here so a reviewer meeting a new
+    field on this model does not have to re-litigate it as the mig-116 / CR-01 shape.
+
+    TYPED ``str``, NEVER ``datetime``, AND THE REASON IS THE ONE ``DraftCreateResponse.token``
+    ALREADY BANKED (:184-188): a ``datetime``-typed field re-serializes through Pydantic and
+    DROPS the fractional part when microseconds are 0, so the wire string's width would vary
+    with the clock. Typing it ``str`` and calling ``.isoformat()`` in the builder makes the
+    wire value exactly what the database returned.
+
+    ⚠ D-17 — ON A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS HONEST, NOT A BUG.
+    ``workflow_definitions_block_published`` (``full-schema.sql:3764``) makes a published row
+    immutable, so its ``updated_at`` is frozen at the publish flip — which IS the last time
+    it changed. Do NOT add a second field to "fix" this."""
 
     id: UUID
     slug: str
@@ -148,6 +170,7 @@ class PublishedWorkflow(BaseModel):
     definition: dict | None = None
     is_mine: bool = False
     is_system_global: bool = False
+    updated_at: str | None = None
 
 
 def _caller_uuid(current_user: dict) -> UUID | None:
@@ -170,6 +193,33 @@ def _caller_uuid(current_user: dict) -> UUID | None:
         except ValueError:
             return None
     return None
+
+
+def _iso_or_none(raw: object) -> str | None:
+    """A row's ``updated_at`` as an ISO-8601 ``str`` — the ONE coercion all THREE feeds share.
+
+    Phase 192.1 (LIB-05 / D-15). It lives in one place for the reason ``_caller_uuid`` above
+    does: ``updated_at`` is serialized by ``/published``, ``/starters`` AND ``/drafts``, and a
+    coercion retyped per handler is how three endpoints silently come to disagree about the
+    same column. asyncpg decodes ``timestamptz`` to a ``datetime``, so the live path is
+    ``.isoformat()``.
+
+    TYPED ``str`` ON THE WAY OUT, NEVER ``datetime``, AND THAT IS BINDING — see the field
+    docblocks on ``PublishedWorkflow.updated_at`` and ``DraftRow.updated_at``. A
+    ``datetime``-typed model field re-serializes through Pydantic and DROPS the fractional
+    part when microseconds are 0, so the wire string's width would vary with the clock.
+    Formatting HERE makes the wire value exactly what the database returned.
+
+    Tolerates a ``str`` already (a hand-built row dict in a test, or a driver configured with
+    a text codec) and answers ``None`` for a missing/NULL column, so a caller degrades to "no
+    changed segment" rather than raising on a read path the RUN CARVE-OUT protects.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw
+    isoformat = getattr(raw, "isoformat", None)
+    return isoformat() if callable(isoformat) else None
 
 
 # ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD response shapes ────────────────
@@ -202,7 +252,20 @@ class DraftRow(BaseModel):
     Phase 186 (D-186-07): ``token`` is ADDITIVE too — the Open-a-draft path needs a
     concurrency token in hand before its first autosave, or that save would have to write
     unguarded. Same binding typing rule as ``DraftCreateResponse.token``: ``str``, never
-    ``datetime``, never parsed."""
+    ``datetime``, never parsed.
+
+    Phase 192.1 (LIB-05 / D-15): ``updated_at`` is ADDITIVE and DEFAULTED — the recency half
+    of the library identity line. Typed ``str`` for the same Pydantic-drops-the-fraction
+    reason recorded on ``DraftCreateResponse.token`` (:184-188), serialized via
+    ``.isoformat()`` in the builder.
+
+    ⚠ D-16 — THERE ARE TWO FIELDS HERE OFF ONE SOURCE COLUMN, AND THAT IS DELIBERATE.
+    ``token`` is ``to_char(updated_at …)`` in disguise (``db/workflows.py:93-95``), so a
+    reader will reasonably ask why ``updated_at`` is not simply parsed out of it. Because
+    ``token`` is OPAQUE BY CONTRACT and parsing it is forbidden: Postgres keeps microseconds,
+    a JS ``Date`` keeps milliseconds, and a parsed-and-re-rendered token matches ZERO rows —
+    every later save then refuses as stale (probed live 2026-08-01). One field the server
+    compares byte-for-byte; one the client may format. Never collapse them."""
 
     id: UUID
     slug: str
@@ -210,6 +273,7 @@ class DraftRow(BaseModel):
     name: str | None = None
     definition: dict | None = None
     token: str
+    updated_at: str | None = None
 
 
 # Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT gate /published or /starters. They are the Run
@@ -257,6 +321,24 @@ async def get_published_workflows(
     # compared against the authenticated caller to produce one bit and is never assigned to a
     # response-model field. See PublishedWorkflow's binding rule.
     caller = _caller_uuid(current_user)
+    # Phase 192.1 (D-15 / D-17): ``updated_at`` is projected by the widened SELECT.
+    #
+    # READ WITH ``r.get(...)``, NOT ``r[...]``, AND THE REASON IS A SHIPPED TEST RATHER THAN
+    # A STYLE PREFERENCE. ``192.1-01-PLAN.md`` asked for ``r["updated_at"]`` so a
+    # silently-dropped column would fail loudly; measured, that reading raises ``KeyError``
+    # against ``test_row_dict_missing_both_columns_serializes_with_defaults``, which exists
+    # to pin that a pre-192 row dict still flows through both handlers. Every sibling
+    # optional column in this very expression (``definition``, ``created_by``,
+    # ``is_system_global``) is already ``.get(...)``; only ``id``/``slug``/``name`` are
+    # indexed. The "fail loudly" property the plan wanted is delivered INSTEAD by
+    # ``test_workflows_updated_at.py``'s SELECT-list assertions, which fail in CI if the
+    # column is ever dropped from the query — strictly earlier than a runtime ``KeyError``.
+    #
+    # ⚠ D-17 — FOR A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS THE HONEST ANSWER.
+    # ``workflow_definitions_block_published`` (full-schema.sql:3764) makes a published row
+    # immutable, so its ``updated_at`` is frozen at the publish flip. "changed <rel>" on a
+    # published card therefore means "when it was published" — which IS when it last changed.
+    # Do NOT add a second field to "fix" this.
     return [
         PublishedWorkflow(
             id=r["id"],
@@ -265,6 +347,7 @@ async def get_published_workflows(
             definition=_coerce_definition(r.get("definition")),
             is_mine=(caller is not None and r.get("created_by") == caller),
             is_system_global=bool(r.get("is_system_global")),
+            updated_at=_iso_or_none(r.get("updated_at")),
         )
         for r in rows
     ]
@@ -295,6 +378,11 @@ async def get_starter_workflows(
     # that as an UNSTATED invariant — a later seeding change would make the field lie in
     # silence. Same fence as /published: the raw ``created_by`` dies in this expression.
     caller = _caller_uuid(current_user)
+    # Phase 192.1 (D-15): ``updated_at`` is serialized here TOO, through the SAME
+    # ``_iso_or_none`` helper /published uses. This is RESEARCH's correction C-6 in force —
+    # ``PublishedWorkflow`` is ONE model serving TWO feeds, so a field added for the Published
+    # shelf and not mirrored here would leave every Starters card silently missing its
+    # "changed <rel>" segment while the type said it had one.
     return [
         PublishedWorkflow(
             id=r["id"],
@@ -303,6 +391,7 @@ async def get_starter_workflows(
             definition=_coerce_definition(r.get("definition")),
             is_mine=(caller is not None and r.get("created_by") == caller),
             is_system_global=bool(r.get("is_system_global")),
+            updated_at=_iso_or_none(r.get("updated_at")),
         )
         for r in rows
     ]
@@ -1089,6 +1178,11 @@ async def list_drafts(
             name=r.get("name"),
             definition=_coerce_definition(r.get("definition")),
             token=r["token"],  # Phase 186 — the shelf hands the builder a token
+            # Phase 192.1 (D-15 / D-16): a SEPARATE field, deliberately NOT derived from
+            # ``token`` on the line above — the two are the same source column and the token
+            # is opaque by contract. See DraftRow's docblock for why collapsing them breaks
+            # every subsequent save.
+            updated_at=_iso_or_none(r.get("updated_at")),
         )
         for r in rows
     ]
