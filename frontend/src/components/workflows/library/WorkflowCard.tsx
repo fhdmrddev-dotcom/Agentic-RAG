@@ -141,7 +141,7 @@
  * Re-derive: `git show 6bdc4684:<page> | wc -l` → 1407, then `wc -l` on the page and on this
  * directory's seven SOURCE modules (test files excluded, as 188.2 excluded them).
  */
-import { useRef, useState } from "react"
+import { Fragment, useRef, useState } from "react"
 import { Loader2, MoreHorizontal, Trash2 } from "lucide-react"
 
 import {
@@ -156,6 +156,7 @@ import { deleteWorkflowDraft } from "@/lib/api"
 import { CHIP_PREDICATES } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
 import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./libraryVocabulary"
+import type { RowIdentity } from "./rowIdentity"
 import {
   WorkflowDeleteSheet,
   type WorkflowDeleteSheetHandle,
@@ -204,6 +205,37 @@ const VERSION_CLASSES = "font-mono text-[11px] text-muted-foreground"
 const PILL_BASE = "shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase "
 const NOTE_CLASSES = "text-[11.5px] leading-snug text-muted-foreground"
 const FOOTER_CLASSES = "mt-auto flex items-center gap-2 border-t border-border/60 pt-2"
+
+/**
+ * Phase 192.1-06 (D-08) — THE 14TH ATOM'S CLASSES, declared in this block rather than inline
+ * because this block is the file's established home for chrome classes.
+ *
+ * ⚠ NO THIRD TEXT SIZE IS INVENTED. The house has exactly two secondary-line idioms and this
+ * takes the smaller one — `text-[11px] text-muted-foreground`, the folder chip's own size
+ * (`:389` below, and `PhaseSpine.tsx:67`, `ProblemsTray.tsx:214`, `BuilderSaveRegion.tsx:239`).
+ * That is chosen over `NOTE_CLASSES`'s 11.5px deliberately: the chip is this line's IMMEDIATE
+ * SIBLING and D-08 stacks them, so two adjacent secondary lines at different sizes would read
+ * as an accident. `flex-wrap` is load-bearing at the 43-row family's line length inside a
+ * two-column grid.
+ */
+const IDENTITY_CLASSES = "mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"
+
+/**
+ * The owner word wears the card's OWN pill shape (`PILL_BASE`), reused rather than re-specced —
+ * the mockup draws it as a small mono uppercase bordered pill, which is exactly what that
+ * constant already is. The colour is picked from `owned` — the file's ONE existing ownership-
+ * predicate read, reused rather than re-tested, because a second copy of that predicate is the
+ * drift D-03 forbids by name. The WORD itself is resolved by the page (D-09) and merely painted.
+ *
+ * ⚠ The predicate's identifier is deliberately NOT spelled in this prose. D-11's acceptance
+ * check is a RAW SOURCE COUNT of it, so a docblock naming it would answer the very grep that
+ * proves there is only one call — the 187-24 trap this file's header already records twice.
+ */
+const IDENTITY_OWN_YOURS = PILL_BASE + "border-primary/40 text-primary"
+const IDENTITY_OWN_SHARED = PILL_BASE + "border-border text-muted-foreground"
+
+/** The separator, spent BETWEEN present parts only. Decorative — a reader hears the parts. */
+const IDENTITY_SEPARATOR = "·"
 const PRIMARY_CLASSES =
   "rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
 const SECONDARY_CLASSES =
@@ -286,6 +318,27 @@ export interface WorkflowCardProps {
    * byte-identical in behaviour: an ordinary row still reads exactly as it shipped.
    */
   hasExistingFork?: boolean
+  /**
+   * Phase 192.1 (LIB-05 / D-06 / D-08 / D-09) — THIS ROW'S IDENTITY, ALREADY RESOLVED.
+   *
+   * ⚠ ONLY THE PAGE CAN KNOW THIS, for the same reason `hasExistingFork` above arrives as a
+   * prop: identity is a property of the row's place in the LIST, not of the row. `1 of 43` is
+   * counted over the FULL merged library before any filtering (D-05), the lineage phrase names
+   * a parent that lives in some other feed, and the discrimination ranker needs every namesake
+   * to know which axis narrows. This card holds one row.
+   *
+   * **The card computes NOTHING about slugs or versions** — the same D-12 discipline that keeps
+   * it out of the two fork handlers' slug/version mechanics. It paints `own`, then `segs` in
+   * the order given, then `ofN`, then `when`, and it invents no part and drops none. A `null`
+   * in `ofN` / `when` means RENDER NOTHING, never a placeholder.
+   *
+   * ⚠ REQUIRED, NOT OPTIONAL-WITH-A-DEFAULT, and the asymmetry with `hasExistingFork` directly
+   * above is deliberate rather than inconsistent. That prop is optional so 35 shipped card
+   * cases stay byte-identical in behaviour; **the identity line is UNCONDITIONAL** (D-06), so a
+   * default of "no line" would let an un-updated call site render a card the phase says cannot
+   * exist — silently, and on every row it owns. Required makes `tsc` enumerate the call sites.
+   */
+  identity: RowIdentity
   /** Re-fetch after a CONFIRMED delete. Forwarded to the Sheet; also called by D-18's guard. */
   onDeleted: () => void
 }
@@ -300,6 +353,7 @@ export function WorkflowCard({
   onForkNewVersion,
   onForkStarter,
   hasExistingFork = false,
+  identity,
   onDeleted,
 }: WorkflowCardProps) {
   const deleteSheetRef = useRef<WorkflowDeleteSheetHandle>(null)
@@ -360,6 +414,24 @@ export function WorkflowCard({
    */
   const owned = CHIP_PREDICATES.yours(row)
 
+  /**
+   * Phase 192.1-06 (D-03 / D-06) — the identity line's parts AFTER the owner word, in the one
+   * grammar the generated build contract declares:
+   *
+   *   [own pill] [computed seg] · [computed seg] [1 of N] · changed <rel>
+   *
+   * ⚠ THE `null`s ARE DROPPED HERE RATHER THAN RENDERED AS BLANKS, and that is what makes the
+   * separator rule mechanical instead of a matter of care: the card spends a `·` BETWEEN
+   * present parts and nowhere else, so a row with no recency reads `Yours` and never `Yours ·`.
+   * A dangling separator promises the reader something that is then not said, which is the same
+   * class of defect as an empty state that lies.
+   */
+  const identityParts: string[] = [
+    ...identity.segs,
+    ...(identity.ofN === null ? [] : [identity.ofN]),
+    ...(identity.when === null ? [] : [identity.when]),
+  ]
+
   /** Every row state has something behind `⋯` — the fork and the two delete grades. */
   const showOverflow = true
 
@@ -380,6 +452,45 @@ export function WorkflowCard({
             <span className={NAME_CLASSES}>{row.name}</span>
             {row.version !== undefined && <span className={VERSION_CLASSES}>v{row.version}</span>}
           </div>
+
+          {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────
+              161-A's PLACE, 160-B's CONTENT: DOM POSITION 2 inside this `min-w-0` column,
+              immediately after the name row and BEFORE the folder chip. Its own suite
+              asserts that by CHILD ORDER, never by a class name — a class assertion passes
+              on a node in the wrong column and fails on a Tailwind tidy-up.
+
+              ⚠ IT IS UNCONDITIONAL, AND THAT IS THE DECISION RATHER THAN AN OVERSIGHT. The
+              consequence sentence below is gated on `runnable`, so every DRAFT renders no
+              sentence today — and drafts are precisely the rows most likely to be a person's
+              own half-finished forks, i.e. the rows that most need to say what they came
+              from. This line sits OUTSIDE that guard (D-10). What varies between a colliding
+              row and a unique one is the CONTENT the page hands down, never the presence of
+              the node: D-06 `quiet` keeps 161-A's consistent placement while spending
+              discriminators only where they buy something.
+
+              ⚠ EVERY WORD HERE ARRIVES RESOLVED. No string is assembled in this file — D-14
+              makes a copy change a one-line diff in `libraryVocabulary.ts`, and a card that
+              spelled `"Copy of "` inline would have silently forked the acceptance bar. */}
+          <div
+            // Part of the shipped test surface, carried as a LITERAL for the same reason the
+            // root testids and `aria-label="Workflow actions"` are (`:435-437` below). It is
+            // this phase's ONE net-new test hook, and there is exactly one node per card.
+            data-testid="row-identity"
+            className={IDENTITY_CLASSES}
+          >
+            <span className={owned ? IDENTITY_OWN_YOURS : IDENTITY_OWN_SHARED}>{identity.own}</span>
+            {identityParts.map((part, index) => (
+              // The index belongs in the key: two parts CAN carry the same text (a version
+              // segment and a lineage phrase both reduce to short strings), and the list is
+              // rebuilt wholesale from a prop on every render, so there is no identity to
+              // preserve across one.
+              <Fragment key={`${index}-${part}`}>
+                <span aria-hidden="true">{IDENTITY_SEPARATOR}</span>
+                <span>{part}</span>
+              </Fragment>
+            ))}
+          </div>
+
           {folderName && (
             <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">
               📁 {folderName}
