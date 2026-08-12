@@ -985,7 +985,25 @@ const BASELINE = {
   // (`expected […] to have a length of 8 but got 9`), then read from this script's own
   // `actual` column across TWO AGREEING RUNS, 2026-08-12, both printing
   // `librarySubtree.fences.test.ts 67 70 +3` at `total 3217 · failed 0`.
-  "librarySubtree.fences.test.ts": 70,
+  // ── 192.1-03 Task 3 (D-01 / D-37): 70 → 77. THE OD FENCE, EXTENDED WITH THE CUT. ───────
+  // The +7 is arithmetic too, and it decomposes exactly: SIX new `PAGE_MUST_NOT_DECLARE`
+  // entries (the fork concern in BOTH declaration families — two module-scope `function`s
+  // that the shipped `"function …("` needle matches, and four component-scope `const`s that
+  // it never would have) plus ONE new `PAGE_IMPORTED_MODULES` entry (`useWorkflowFork`).
+  // ⚠ `libraryFork` is deliberately NOT an eighth: after the cut the page has no use for the
+  // pure leaves and does not import them, so listing it would assert a coupling that must not
+  // exist — the fence's own recorded rule for `WorkflowDeleteSheet`. This CORRECTS
+  // `192.1-03-PLAN.md` Task 3(a), which names both.
+  // ⚠ ALL SEVEN WERE DRIVEN RED BEFORE THE CUT, against the page's REAL shipped declarations
+  // — a stronger drive than a plant-and-restore, because no file was mutated and none needed
+  // restoring. Then read from this script's own `actual` column across TWO AGREEING RUNS,
+  // 2026-08-12, both printing `librarySubtree.fences.test.ts 70 77 +7` and
+  // `WorkflowsPage.test.tsx 48 48 0` at `total 3224`.
+  // ⚠ THE `failed` COLUMN DISAGREED ACROSS THOSE RUNS (1, then 0) AND IS RECORDED RATHER THAN
+  // RE-RUN AWAY: D-192-DEF-01 measured `0 / 0 / 1` on a clean tree with the same cap, so on
+  // this machine the COUNT columns are the regression backstop and the `failed` line is not.
+  // The counts agreed exactly on both runs.
+  "librarySubtree.fences.test.ts": 77,
   // ── 192.1-03 Task 1 (D-01 / D-22 / T-192.1-05): a NEW suite, pinned in its first commit ──
   // `freshHash` + `isForkConflict` proved as ARITHMETIC in the `libraryFilter.test.ts`
   // posture — both close over nothing, so nothing renders. Includes the T-192.1-05 grep

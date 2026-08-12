@@ -567,9 +567,33 @@ const PAGE_IMPORTED_MODULES = [
   "LibraryToolbar",
   "WorkflowCard",
   "libraryVocabulary",
+  // ── 192.1-03 (D-01 / G-5): the fork extraction's downward edge ──
+  "useWorkflowFork",
+  // ⚠ `libraryFork` IS DELIBERATELY NOT LISTED, for the same reason `WorkflowDeleteSheet` is
+  // not, and the ⚠ block above states that reason in general terms. Measured here: after the
+  // cut the page has NO remaining use of `freshHash` or `isForkConflict` — both are consumed
+  // only by the two handlers, which left with them — so the page does not import the module
+  // at all. Listing it would assert a coupling that must not exist, and `noUnusedLocals` makes
+  // manufacturing one a TYPE ERROR rather than merely untidy. The pure leaves are reached
+  // THROUGH the hook, which is the correct shape of a two-layer cut.
+  // ⚠ THIS CORRECTS `192.1-03-PLAN.md` Task 3(a), which says to add both names.
 ] as const
 
-/** The six symbols the page must no longer DECLARE — the three cards, the modal, the two leaves. */
+/**
+ * The symbols the page must no longer DECLARE — the three cards, the modal, and (192.1-03)
+ * the whole fork concern.
+ *
+ * ⚠ THE TWO SPELLING FAMILIES ARE NOT INTERCHANGEABLE, and the distinction is what makes the
+ * fork entries work at all. `freshHash` and `isForkConflict` were MODULE-SCOPE `function`
+ * declarations, so the existing `"function …("` pattern matches them exactly. `onTweak`,
+ * `onUseStarter`, `draftBySlug` and `forkFailed` are COMPONENT-SCOPE `const`s — a
+ * `"function …("` needle would never have matched them, and a fence that cannot match is a
+ * fence that passes vacuously. Their declaration spellings are used instead.
+ *
+ * All six were observed RED against the page as it stood BEFORE the cut — a stronger drive
+ * than a plant-and-restore, because the "plant" is the real shipped declaration, so no file
+ * was mutated and none needed restoring.
+ */
 const PAGE_MUST_NOT_DECLARE = [
   "function RunModal(",
   "type DeletePhase",
@@ -577,6 +601,13 @@ const PAGE_MUST_NOT_DECLARE = [
   "function PublishedCard(",
   "function DraftCard(",
   "function StarterCard(",
+  // ── 192.1-03 (D-01) — the fork concern, in both declaration families ──
+  "function freshHash(",
+  "function isForkConflict(",
+  "const onTweak = useCallback",
+  "const onUseStarter = useCallback",
+  "const [forkFailed, setForkFailed]",
+  "const draftBySlug = useMemo",
 ] as const
 
 /** A re-export shim — the thing that keeps the coupling while every negative stays green. */

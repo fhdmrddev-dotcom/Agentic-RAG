@@ -54,6 +54,49 @@
  *
  * `frontend/src/hooks/useDraftPersistence.ts:472` — one args object IN, a CALLBACK out, so the
  * caller keeps ownership of what happens next. Same shape here.
+ *
+ * ── ⚠ THE SUBTREE DELTA, MEASURED IN 192.1-03 — AND THE "BEFORE" HAD TO BE RE-MEASURED ───
+ *
+ * Recorded HERE as well as in the SUMMARY, for 188.2's and 192-12's stated reason: a later
+ * reader must not be able to mistake this growth for a regression, and the figure has to live
+ * where the growth is. Same named line classifier (blank / comment / code, every line exactly
+ * one of the three, JSX comment blocks counted as comment), and it was RE-VALIDATED before any
+ * figure below was trusted — run against 188.2's published known-good, the pre-cut
+ * `PhaseNodeCard.tsx` at `95a4c915`, it reproduced `797 / 518 / 249 / 30` exactly.
+ *
+ *   PAGE      `WorkflowsPage.tsx`  1180 → 1054  (−10.7 %)   CODE 518 → 440  (−15.1 %)
+ *   SUBTREE   page + these 9 modules  3469 → **3781  (+9.0 %)**   CODE 1550 → 1592  (+2.7 %)
+ *
+ * ⚠ **THE "BEFORE" IS 3469, NOT the 3438 `192.1-BASELINE.md` §8b publishes, and the difference
+ * is not an error in either number.** The baseline was measured at `8fc9bd74`, and Wave 1
+ * (`192.1-01`) then added `updatedAt` to `libraryFilter.ts` (+10 L) and `libraryRow.ts` (+21 L)
+ * — so the artifact's subtree figure was already stale by +31 at the commit this cut started
+ * from. Re-measured at this plan's own base `d991a68c` rather than inherited, which is the
+ * habit the CLAUDE.md ledger rows keep for exactly this reason: **a figure written at a
+ * phase's close goes stale on the next commit that touches any file it counted.** Against the
+ * artifact's 3438 the growth reads +10.0 %; against the honest base it is +9.0 %. Both are
+ * printed so neither can be quoted as the other.
+ *
+ * ⚠ **THIS IS AN ORDER OF MAGNITUDE SMALLER THAN THE TWO PRIOR CUTS, and the reason is
+ * structural rather than virtuous.** 188.2 measured **+67.1 %** and Phase 192 **+126.2 %**;
+ * both REWROTE while they moved (192 replaced three card components with one and added a
+ * filter engine, a vocabulary module and a merge that did not exist). This is a MOVE of ONE
+ * self-contained concern into TWO modules, and almost every line landed where it already was.
+ *
+ * WHERE THE GROWTH WENT, so the number is attributable rather than merely admitted:
+ * **COMMENT is again the dominant term — 1753 → 2014 (+261 L), which is 84 % of the +312.**
+ * CODE grew just +42 (1550 → 1592): the two new modules carry 120 code lines against the 78
+ * the page shed, and the difference is the two exported interfaces, the import block, the hook
+ * wrapper and the page's one `onForked` callback — the irreducible cost of a seam.
+ *
+ * ⚠ AND THE PAGE FELL BY LESS THAN THE ~225 LINES THAT MOVED (126, not 225), WHICH IS STATED
+ * RATHER THAN SMOOTHED: the cut left ~50 lines of RECEIPT prose at each site it emptied, in
+ * this page's own recorded habit (`WorkflowsPage.tsx:1160` is 192's). A receipt is not free,
+ * and pretending the delta is the span is how the next estimate goes wrong.
+ * Re-derive: `wc -l` on the page and on this directory's nine SOURCE modules (test files
+ * excluded, as 188.2 and 192 both excluded them); `git show d991a68c:<path> | wc -l` for the
+ * before column. ⚠ THE FIGURES INCLUDE THIS DOCBLOCK — measured, written, then RE-measured,
+ * and only the digits were corrected so the line count could not move again.
  */
 import { useCallback, useMemo, useState } from "react"
 import {
