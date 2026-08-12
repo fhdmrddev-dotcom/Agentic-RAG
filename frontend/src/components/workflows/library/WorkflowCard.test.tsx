@@ -73,7 +73,8 @@ import {
   STATE_STARTER,
   oneOfLabel,
 } from "./libraryVocabulary"
-import type { RowIdentity } from "./rowIdentity"
+import { buildIdentityIndex, lineageOf, resolveIdentity, type RowIdentity } from "./rowIdentity"
+import { FIXTURE_NOW, INHERENT_ORPHANS, makeLibraryFixture } from "./__fixtures__/libraryScale"
 
 // ── fixtures ─────────────────────────────────────────────────────────────────────────
 
@@ -857,5 +858,272 @@ describe("D-11 — every shipped testid survives the 14th atom, verbatim", () =>
     expect(within(card).getByTestId("draft-open")).toBeInTheDocument()
     await openOverflow(card)
     expect(screen.getByTestId("draft-delete")).toBeInTheDocument()
+  })
+})
+
+// ── 9 · THE LINE AT THE OPERATOR'S REAL SHAPE (SC#1 / SC#2 / SC#3 — D-30 / D-31) ──────
+
+/**
+ * Blocks 1-8 prove the card's contract one row at a time. THIS block proves the thing those
+ * cases structurally cannot: that the REAL resolver's output, painted by the REAL component,
+ * still obeys the sketch's measured invariants **at 100+ rows carrying 14 duplicated names**.
+ *
+ * ⚠ THAT IS THE WHOLE REASON PHASE 192.1 EXISTS. Phase 192 tested this surface at 12 rows AND
+ * at 107 and shipped a library the operator could not read, because every fixture it used
+ * carried DISTINCT NAMES — *"volume was real, shape was not."* A block that re-proved the card
+ * at three hand-built rows would repeat that miss exactly.
+ *
+ * ⚠ AND THE NUMBERS BELOW ARE RE-DERIVED, NEVER PINNED FROM THE SKETCH.
+ * `BUILD-CONTRACT.generated.md` reports `cards rendered: 108` and `lines carrying '1 of N': 94`.
+ * **Neither is this fixture's number, and the contract itself says so honestly**: the 108 is 107
+ * plus the row the 162-B drive really created, and the 94 was measured at those 108 cards. Every
+ * figure here is computed from `makeLibraryFixture()` and READ OUT of its own failing diff.
+ *
+ * ⚠ NOTHING IN THIS BLOCK IS ASYNC, AND THAT IS DELIBERATE (T-4). The identity line is
+ * synchronous markup, so there is no `findBy*` on an expected-absent node anywhere here — the
+ * trap where `asyncUtilTimeout` (15 s) outlives vitest's per-test budget (5 s) and turns a real
+ * RED into an uninformative timeout cannot arise. Every assertion runs against a settled tree.
+ */
+
+/**
+ * ONE fixture and ONE index for the whole block — built at module scope, exactly as the page
+ * builds its index once per `rows` change rather than once per card (D-34).
+ */
+const SCALE_ROWS = makeLibraryFixture()
+const SCALE_INDEX = buildIdentityIndex(SCALE_ROWS)
+
+/** How many rows share each name — the collision fact `1 of N` reports, derived not declared. */
+const NAMESAKES = SCALE_ROWS.reduce<Map<string, number>>(
+  (acc, row) => acc.set(row.name, (acc.get(row.name) ?? 0) + 1),
+  new Map(),
+)
+const isColliding = (row: LibraryRow): boolean => (NAMESAKES.get(row.name) ?? 1) > 1
+
+/** The resolved line for every row, without a DOM — the expectation the render must match. */
+const SCALE_IDENTITIES = new Map(
+  SCALE_ROWS.map((row) => [row.id, resolveIdentity(SCALE_INDEX, row, FIXTURE_NOW)] as const),
+)
+const identityFor = (row: LibraryRow): RowIdentity => SCALE_IDENTITIES.get(row.id) as RowIdentity
+
+/**
+ * THE DERIVATION, computed from the fixture rather than transcribed from the contract. Both
+ * headline figures are read out of a failing diff the first time and then pinned, which is this
+ * repository's habit for any number a later reader might be tempted to "correct".
+ */
+const DERIVED = {
+  /** Every row becomes a card — the line is UNCONDITIONAL (D-06), so this is also the line count. */
+  cards: SCALE_ROWS.length,
+  /** `1 of N` renders on a colliding name and nowhere else (D-04). */
+  linesWithOneOfN: SCALE_ROWS.filter(isColliding).length,
+  /** Names carried by more than one row — SC#1's "at least 14 duplicated names". */
+  duplicatedNames: [...NAMESAKES.values()].filter((n) => n > 1).length,
+}
+
+const noop = () => {}
+
+/** The whole library, rendered through the REAL card with the REAL resolver's output. */
+function renderLibrary(rows: readonly LibraryRow[] = SCALE_ROWS) {
+  return render(
+    <>
+      {rows.map((row) => (
+        <WorkflowCard
+          key={row.id}
+          row={row}
+          folderName={null}
+          onRun={noop}
+          onOpen={noop}
+          onForkNewVersion={noop}
+          onForkStarter={noop}
+          identity={identityFor(row)}
+          onDeleted={noop}
+        />
+      ))}
+    </>,
+  )
+}
+
+/** Every rendered identity line, in document order. */
+const allLines = (): HTMLElement[] => screen.getAllByTestId("row-identity")
+
+describe("SC#1 — at 100+ rows with 14 duplicated names, a colliding row can be told apart", () => {
+  it("the fixture really carries the shape this criterion is judged on", () => {
+    // The control. A corpus of 106 distinct names would make every case below pass for the
+    // wrong reason — which is precisely how Phase 192 passed and still shipped the defect.
+    expect(DERIVED.cards).toBeGreaterThanOrEqual(100)
+    expect(DERIVED.duplicatedNames).toBeGreaterThanOrEqual(14)
+  })
+
+  it("every colliding row's line carries a discriminator AND its 1 of N", () => {
+    renderLibrary()
+    expect(allLines()).toHaveLength(DERIVED.cards)
+
+    const withoutDiscriminator: string[] = []
+    const withoutCount: string[] = []
+    for (const row of SCALE_ROWS.filter(isColliding)) {
+      const identity = identityFor(row)
+      if (identity.segs.length === 0) withoutDiscriminator.push(row.slug)
+      if (identity.ofN === null) withoutCount.push(row.slug)
+    }
+    // Named rather than counted, so a failure says WHICH row cannot be told apart.
+    expect(withoutDiscriminator).toEqual([])
+    expect(withoutCount).toEqual([])
+  })
+
+  it("1 of N renders IF AND ONLY IF the name collides, over every rendered line", () => {
+    renderLibrary()
+    const oneOfN = /^1 of \d+$/
+    const lines = allLines()
+    let rendered = 0
+    SCALE_ROWS.forEach((row, index) => {
+      const has = identityParts(lines[index]).some((part) => oneOfN.test(part))
+      expect(has).toBe(isColliding(row))
+      if (has) rendered += 1
+    })
+    expect(rendered).toBe(DERIVED.linesWithOneOfN)
+  })
+
+  it("never more than 2 computed segments, over EVERY rendered line (D-04)", () => {
+    renderLibrary()
+    const overspent = SCALE_ROWS.filter((row) => identityFor(row).segs.length > 2)
+    expect(overspent.map((row) => row.slug)).toEqual([])
+    // …and the DOM agrees: own + at most 2 segs + at most 1 count + at most 1 recency.
+    for (const line of allLines()) expect(identityParts(line).length).toBeLessThanOrEqual(5)
+  })
+})
+
+describe("SC#2 — a row says how it relates to what it came from", () => {
+  it("a COPY fork names its parent, and a version fork names the version it came from", () => {
+    const kinds = new Set(SCALE_ROWS.map((row) => lineageOf(SCALE_INDEX, row).kind))
+    // Non-vacuity: the corpus really exercises all four states, so the claims below are not
+    // about a branch no fixture row reaches.
+    expect(kinds).toEqual(new Set(["original", "copy", "version", "unknown"]))
+
+    renderLibrary()
+    const copy = SCALE_ROWS.find((row) => lineageOf(SCALE_INDEX, row).kind === "copy") as LibraryRow
+    const version = SCALE_ROWS.find(
+      (row) => lineageOf(SCALE_INDEX, row).kind === "version",
+    ) as LibraryRow
+    const lineOf = (row: LibraryRow) => identityParts(allLines()[SCALE_ROWS.indexOf(row)])
+    expect(lineOf(copy).join(" ")).toContain(LINEAGE_COPY_OF)
+    expect(lineOf(version).some((part) => /^v\d+ of v\d+$/.test(part))).toBe(true)
+  })
+
+  it("the ORPHAN compliance-gap-report renders NO lineage segment (D-13's silence)", () => {
+    // ⚠ THE FAMILY'S OWN ORIGINAL IS AN ORPHAN, and it will read as a bug at UAT unless it is
+    // written down: `compliance-gap-report` matches `^(.*)-[a-z0-9]{6}$` because `report` is
+    // six legal base-36 characters, and `compliance-gap` does not exist. Labelling it
+    // `Original` would fabricate a fact about a row that may be a genuine copy whose parent is
+    // deleted or invisible to this reader — 57 resolve · 12 go quiet · 0 lie.
+    expect(INHERENT_ORPHANS).toContain("compliance-gap-report")
+
+    const orphan = SCALE_ROWS.find(
+      (row) => row.slug === "compliance-gap-report" && row.version === 1,
+    ) as LibraryRow
+    expect(orphan).toBeDefined()
+    expect(lineageOf(SCALE_INDEX, orphan).kind).toBe("unknown")
+
+    renderLibrary()
+    const rendered = identityParts(allLines()[SCALE_ROWS.indexOf(orphan)]).join(" ")
+    expect(rendered).not.toContain(LINEAGE_COPY_OF)
+    expect(rendered).not.toContain(LINEAGE_ORIGINAL)
+    expect(rendered).not.toMatch(/v\d+ of v\d+/)
+  })
+
+  it("POSITIVE CONTROL — a RESOLVING sibling of that very slug DOES name its parent", () => {
+    // Without this, the silence above passes identically on a resolver that never emits a
+    // lineage phrase at all, and on a family whose parent lookup is simply broken.
+    const child = SCALE_ROWS.find(
+      (row) =>
+        row.slug.startsWith("compliance-gap-report-") && lineageOf(SCALE_INDEX, row).kind === "copy",
+    ) as LibraryRow
+    expect(child).toBeDefined()
+
+    renderLibrary()
+    expect(identityParts(allLines()[SCALE_ROWS.indexOf(child)])).toContain(
+      LINEAGE_COPY_OF + "Compliance Gap Report" + LINEAGE_STARTER_SUF,
+    )
+  })
+
+  it("no rendered line leaks a slug, an id or a hash-shaped token", () => {
+    // D-31's residual is answered by 162-B's rename, never by inventing a machine-readable
+    // discriminator — that is the vocabulary drift the 187 node-face ladder forbids.
+    renderLibrary()
+    const lines = allLines()
+    const leaks: string[] = []
+    SCALE_ROWS.forEach((row, index) => {
+      const text = lines[index].textContent ?? ""
+      if (text.includes(row.slug) || text.includes(row.id)) leaks.push(row.slug)
+    })
+    expect(leaks).toEqual([])
+  })
+})
+
+describe("SC#3 — a user can tell which workflow changed most recently", () => {
+  it("changed <rel> renders on all three provenances, on every row the wire dated", () => {
+    renderLibrary()
+    const lines = allLines()
+    const seen = new Set<Provenance>()
+    const missing: string[] = []
+    SCALE_ROWS.forEach((row, index) => {
+      seen.add(row.provenance)
+      if (!identityParts(lines[index]).some((part) => part.startsWith("changed "))) {
+        missing.push(row.slug)
+      }
+    })
+    // All three feeds are represented, so "on all three provenances" is a measurement.
+    expect(seen).toEqual(new Set<Provenance>(["published", "starter", "draft"]))
+    expect(missing).toEqual([])
+  })
+
+  it("the recency band VARIES across the library — it is computed, not templated", () => {
+    // `seedRecent` puts four rows inside the sub-3-day bands on purpose; without variation
+    // `changed <rel>` would be decoration rather than information.
+    const bands = new Set(SCALE_ROWS.map((row) => identityFor(row).when))
+    expect(bands.size).toBeGreaterThan(5)
+  })
+})
+
+describe("the shipped surface survives the 14th atom at scale", () => {
+  it("one identity line per card, at DOM position 2, on every one of them", () => {
+    renderLibrary()
+    const cards = screen.getAllByTestId(/^(published|starter|draft)-card$/)
+    expect(cards).toHaveLength(DERIVED.cards)
+    expect(allLines()).toHaveLength(DERIVED.cards)
+    for (const card of cards) {
+      const lines = within(card).getAllByTestId("row-identity")
+      expect(lines).toHaveLength(1)
+      expect((lines[0].parentElement as HTMLElement).children[1]).toBe(lines[0])
+    }
+  })
+
+  it("all five soul atoms survive, and the sentence is spent exactly once per runnable row", () => {
+    renderLibrary()
+    expect(screen.getAllByTestId("workflow-soul")).toHaveLength(DERIVED.cards)
+    for (const atom of ["soul-purpose", "soul-needs", "soul-spine", "soul-tier", "soul-output"]) {
+      expect(screen.getAllByTestId(atom)).toHaveLength(DERIVED.cards)
+    }
+    const runnable = SCALE_ROWS.filter((row) => row.provenance !== "draft").length
+    const sentences = screen.getAllByTestId("fork-consequence")
+    expect(sentences).toHaveLength(runnable)
+    // …and every one of them is the SHIPPED sentence, imported rather than retyped (D-14).
+    for (const node of sentences) expect(node.textContent).toBe(FORK_CONSEQUENCE)
+  })
+
+  it("the owner word is one of exactly two, on every line — no owner display name (D-09)", () => {
+    renderLibrary()
+    expect(new Set(allLines().map((line) => identityParts(line)[0]))).toEqual(
+      new Set([OWN_YOURS, OWN_SHARED]),
+    )
+  })
+
+  it("the derived card count and 1-of-N line count, pinned with their derivation", () => {
+    // ⚠ READ OUT OF THIS ASSERTION'S OWN FAILING DIFF, never copied from the sketch. The
+    // contract's 108 / 94 were measured on a DIFFERENT corpus (107 rows plus the row the
+    // 162-B drive really created) and are recorded in this block's docblock so they cannot be
+    // mistaken for these. Re-derive: `makeLibraryFixture().length`, and the number of rows
+    // whose name is shared by at least one other row.
+    expect(DERIVED.cards).toBe(106)
+    expect(DERIVED.linesWithOneOfN).toBe(93)
+    expect(DERIVED.duplicatedNames).toBe(14)
   })
 })

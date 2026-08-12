@@ -1093,7 +1093,29 @@ const BASELINE = {
   // out and no plan-authorised deletion needs to ride along.
   // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-11, both
   // printed `WorkflowCard.test.tsx 35 39 +4` at `total 3188 · failed 0` — never hand-counted.
-  "WorkflowCard.test.tsx": 39,
+  // ── 192.1-06 (wave 5): 39 → 80. THE 14TH ATOM, AND ITS PROOF AT THE OPERATOR'S SHAPE. ────
+  // The +41 decomposes, so the number is attributable rather than merely large:
+  //   +27  block 8 — the identity line's own contract, one row at a time: the child-order
+  //        placement on all three provenances (D-08), the grammar and its separator rule
+  //        (D-03/D-06), the null-recency pair, D-10's draft case with its positive control,
+  //        the owner ceiling (D-09), the re-scoped tooltip sweep with a NON-VACUITY control,
+  //        and the three shipped-testid survival cases (D-11).
+  //   +14  block 9 — the SAME component driven at **106 fixture rows carrying 14 duplicated
+  //        names**, with named cases for SC#1, SC#2 and SC#3. This is the block Phase 192 did
+  //        not have: it tested at 12 rows AND at 107 and still shipped an unreadable library,
+  //        because every fixture it used carried DISTINCT names.
+  // ⚠ NO `TARGETS` LINE IS NEEDED, and it is measured rather than assumed for the same reason
+  // `libraryFork.test.ts` above records: the gate PRINTED a number for this file, and a file the
+  // gate never runs cannot report one — the `src/components/workflows` directory entry reaches it.
+  // ⚠ NOTHING WAS DELETED, RENAMED OR MOVED OUT, AND THE FIGURE IS MEASURED RATHER THAN
+  // ESTIMATED: `git diff --numstat d48e9699 -- <file>` over this whole plan reports
+  // **614 insertions / 0 deletions**, and `grep -c '^-.*\bit('` over the same diff returns
+  // **0**. A pure extension, so no plan-authorised deletion needs to ride along with the raise.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
+  // printing `WorkflowCard.test.tsx 39 80 +41` at `total 3408` — never hand-counted from `it(`
+  // literals. ⚠ The two runs agreed on every COUNT column and disagreed on `failed` (1, then 0),
+  // which is D-192-DEF-01 on this box; both readings are recorded rather than the green one kept.
+  "WorkflowCard.test.tsx": 80,
   // ── The four RAISES owed by suites Phase 192 GREW ──────────────────────────────────────
   //
   // All four already sat in this map (192-01 adopted them in the phase's first commit). Each
@@ -1387,7 +1409,19 @@ const BASELINE = {
 //   192-12 and 192-16 each declined for the same reason. It was +36 before 192-16 pinned 12, and
 //   it read +127 mid-plan here only because this plan's own 103 new cases were not yet pinned;
 //   after the two entries above it is back to exactly 24. Owed as its own edit (T-9).
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3343 (192.1-05)
+// ⚠ AND BY 192.1-06 (wave 5): the pinned total → **3384**. ONE map entry moved
+// (`WorkflowCard.test.tsx` 39 → 80); the pinned FILE count is UNCHANGED at 63, because this plan
+// adds no module and therefore no new suite — the 14th atom lands in a file the gate already
+// pinned. READ from this script's own printed `pinned total` after that entry was edited.
+//   ⚠ THE MARKER WAS NOT STALE THIS TIME, and saying so is worth as much as the twelve times it
+//   was: an UNMODIFIED tree at this plan's base printed `pinned total 3343`, exactly what the
+//   line below claimed. 192.1-05 corrected it on measurement and the correction held for one
+//   whole wave. The habit is what fixed it, not luck — so the habit is repeated here.
+//   ⚠ THE +24 GAP IS STILL UNCHANGED AND STILL NOT THIS PLAN'S DEBT — the same four pre-existing
+//   drifts, now declined by an eighth consecutive plan for the eighth identical reason (T-9). It
+//   read +65 mid-plan here only because this plan's own 41 new cases were not yet pinned; after
+//   the one entry above it is exactly 24 again, which is the measurement that closes the question.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3384 (192.1-06)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
