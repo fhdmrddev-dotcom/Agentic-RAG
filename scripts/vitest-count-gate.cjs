@@ -1003,7 +1003,35 @@ const BASELINE = {
   // RE-RUN AWAY: D-192-DEF-01 measured `0 / 0 / 1` on a clean tree with the same cap, so on
   // this machine the COUNT columns are the regression backstop and the `failed` line is not.
   // The counts agreed exactly on both runs.
-  "librarySubtree.fences.test.ts": 77,
+  // ── 192.1-04 Task 2 (D-14 / D-18 / D-33): 77 → 80. THE SAME +3 ARITHMETIC, A THIRD TIME. ─
+  // `./relativeChanged.ts` joined the corpus in the commit that created it, and the three
+  // `it.each(LIBRARY_SUBTREE_PATHS)` sweeps picked it up: one path × three sweeps = +3. The
+  // arithmetic has now held for three consecutive additions, which is why it is restated
+  // rather than re-derived: the NEXT module added moves this by three again.
+  // ⚠ THE FIXTURE `__fixtures__/libraryScale.ts` ADDS **NOTHING** HERE, AND THAT IS MEASURED
+  // RATHER THAN ASSUMED. The corpus glob at `librarySubtree.fences.test.ts:96` is
+  // `./*.{ts,tsx}` — NON-RECURSIVE — so a subdirectory module cannot enter it at all; listing
+  // the path would contribute the empty string forever, i.e. a path that reads as swept and
+  // is not. It is also a non-`.test` module, so the gate never runs it and it needs no pin.
+  // ⚠ OBSERVED RED FIRST, as D-33 requires the corpus edit and this pin to be one commit:
+  // `expected [ './libraryRow.ts', …(9) ] to have a length of 9 but got 10`, before either
+  // number was written. Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING
+  // RUNS, 2026-08-12, both printing `librarySubtree.fences.test.ts 77 80 +3` and
+  // `relativeChanged.test.ts — 37 new` at `total 3264 · failed 0` — never hand-counted.
+  "librarySubtree.fences.test.ts": 80,
+  // ── 192.1-04 Task 2 (LIB-05 / SC#3 / D-18): a NEW suite, pinned in its first commit ───────
+  // The nine-band formatter, proved in the `libraryFilter.test.ts` posture — pure `describe`s,
+  // no `render`, and NO CLOCK MOCK, because `now` is a parameter (`credentialLabel`'s shape).
+  // The 37 cover all nine bands, BOTH sides of all eight thresholds, the four values where
+  // truncation would disagree, every `null` case paired with a positive control, and four
+  // source fences (the imported prefix, no date library, no live tick, and the docblock's
+  // admission that this is the THIRD relative-time formatter in the repo).
+  // ⚠ NO `TARGETS` LINE IS NEEDED, AND THAT IS MEASURED RATHER THAN ASSUMED: the gate printed
+  // `relativeChanged.test.ts — 37 new`, and a file the gate never runs cannot report a number
+  // at all, so the printed `actual` IS the proof that the `src/components/workflows` DIRECTORY
+  // entry already reaches it. (The two-knob rule: TARGETS decides what RUNS, BASELINE what is
+  // GUARDED, and only the second one moved here.)
+  "relativeChanged.test.ts": 37,
   // ── 192.1-03 Task 1 (D-01 / D-22 / T-192.1-05): a NEW suite, pinned in its first commit ──
   // `freshHash` + `isForkConflict` proved as ARITHMETIC in the `libraryFilter.test.ts`
   // posture — both close over nothing, so nothing renders. Includes the T-192.1-05 grep

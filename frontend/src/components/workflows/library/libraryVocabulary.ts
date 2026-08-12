@@ -221,3 +221,203 @@ export const PROVENANCE_WORDS = {
 export function sourceFailedMessage(provenance: Provenance): string {
   return `We couldn't load ${PROVENANCE_WORDS[provenance]}. Everything else is shown below.`
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 192.1 (LIB-05) — THE IDENTITY LINE'S VOCABULARY (D-03 / D-06 / D-14 / D-18)
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * PORTED FROM THE GENERATED BUILD CONTRACT, NOT TRANSCRIBED FROM PROSE.
+ *
+ * The source is `.planning/sketches/163-the-assembled-card/BUILD-CONTRACT.generated.md`
+ * § "Exact strings" — a file emitted by `drive.cjs --emit` FROM THE RUNNING MOCKUP, so the
+ * strings below are the ones a human approved on screen rather than a re-typing of a README.
+ * The sketch's own `COPY` object (`163/index.html:227-258`) was deliberately shaped to mirror
+ * THIS module, which is what makes the port a copy rather than an interpretation.
+ *
+ * ⚠ THAT IS THE WHOLE ANTI-DRIFT MECHANISM, AND IT ONLY WORKS IF EVERY CONSUMER IMPORTS.
+ * D-14: a copy change must be a ONE-LINE DIFF IN ONE FILE. A resolver or a card that spells
+ * `"Copy of "` inline has silently forked the acceptance bar, and nothing typechecks prose.
+ *
+ * ⚠ THE TRAILING AND LEADING SPACES ARE LOAD-BEARING and are ported verbatim:
+ * `LINEAGE_COPY_OF` ends with one, `LINEAGE_STARTER_SUF` begins with one, and
+ * `CHANGED_PREFIX` ends with one. They are the concatenation joints the contract's rendered
+ * lines were measured with (`Copy of Compliance Gap Report starter`), so trimming one and
+ * "fixing" it at the call site reproduces the drift this table exists to prevent.
+ *
+ * ⚠ THE FIVE CARD LABELS IN THE SAME CONTRACT TABLE ARE DELIBERATELY NOT HERE.
+ * `RUN_LABEL`, `OPEN_LABEL`, `DELETE_WORKFLOW`, `DELETE_DRAFT` and `MENU_ARIA` already live
+ * module-private in `WorkflowCard.tsx:105-109`, where their re-home debt is recorded. Porting
+ * them would create a SECOND home for five strings — the exact failure this module exists to
+ * prevent — so they stay where they are, and no sixth escapee joins them.
+ */
+
+/** The owner pill, "yours" side (D-09). Read by the identity line, never by a chip. */
+export const OWN_YOURS: (typeof CHIP_WORDS)["yours"]["label"] = "Yours"
+
+/**
+ * The owner pill, "not yours" side (D-09). The line stops here: **no owner display name
+ * anywhere in this subtree** — the wire carries `is_mine` (a boolean) and `created_by` (a
+ * uuid that is never serialized), so a person's name would need a users join nobody asked
+ * for, and rendering one would be a claim the payload cannot support.
+ */
+export const OWN_SHARED = "Shared"
+
+/**
+ * Lineage state 1 of 3 — the row's slug is not a fork shape at all (D-13).
+ *
+ * ⚠ THERE IS NO CONSTANT FOR STATE 3, AND ITS ABSENCE IS THE DECISION. D-13's third state
+ * is SILENCE: a slug that matches `^(.*)-[a-z0-9]{6}$` whose parent is NOT in the merged list
+ * renders no lineage segment at all. Measured on the live local DB 2026-08-12 — 69 slugs match
+ * the copy shape, 57 resolve, **12 are false positives** (`report` and `101uat` are both legal
+ * six-character hashes) — so labelling those 12 `Original` would fabricate a fact about a
+ * genuine copy whose parent was deleted or is invisible to this reader. 57 resolve · 12 go
+ * quiet · 0 lie. The sketch's `lineagePhrase` returns `Original` there; on real data that is
+ * wrong, and this is the one place the port deliberately does NOT follow the mockup.
+ */
+export const LINEAGE_ORIGINAL = "Original"
+
+/** Lineage state 2a — a copy fork. ⚠ THE TRAILING SPACE IS PART OF THE STRING. */
+export const LINEAGE_COPY_OF = "Copy of "
+
+/** Suffixed onto a copy-fork phrase when the parent is a starter. ⚠ LEADING SPACE. */
+export const LINEAGE_STARTER_SUF = " starter"
+
+/**
+ * The state segment for a row that can be run. Byte-equal to the *Ready to run* chip, and
+ * that agreement is DELIBERATE — the chip and the segment name the same fact, so two
+ * different words for it would be the drift `runVocabulary.ts:44-48` forbids.
+ *
+ * ⚠ THE TYPE ANNOTATION IS THE FENCE, and it costs nothing at runtime: `CHIP_WORDS` is
+ * `as const`, so its label type is the literal itself and a rename on either side becomes a
+ * TYPECHECK ERROR rather than two words that quietly disagree. The literal is still spelled
+ * out because the build contract declares it as its own key — this pins the agreement without
+ * making the identity line's vocabulary a derivative of the chip table's.
+ */
+export const STATE_RUNNABLE: (typeof CHIP_WORDS)["ready-to-run"]["label"] = "Ready to run"
+
+/** The state segment for a draft. Same agreement, same fence, as `STATE_RUNNABLE`. */
+export const STATE_DRAFT: (typeof CHIP_WORDS)["still-building"]["label"] = "Still building"
+
+/**
+ * The state segment for a starter. ⚠ NOT the *Starters* chip's word — the chip labels a
+ * FILTER ("show me the starters") and this labels a ROW's state ("this row is a shared
+ * starter"), so they differ on purpose and carry no agreement fence.
+ */
+export const STATE_STARTER = "Shared starter"
+
+/** The project segment when a row carries no `project_folder_id` (D-17: starters never do). */
+export const NO_PROJECT = "No project"
+
+/**
+ * The recency segment's prefix (D-18). ⚠ THE TRAILING SPACE IS PART OF THE STRING —
+ * `relativeChanged` concatenates a band onto it (`changed 2 months ago`) and imports it from
+ * here rather than typing `"changed "`, which is what makes a copy change one line.
+ */
+export const CHANGED_PREFIX = "changed "
+
+/**
+ * Lineage state 2b — a version fork: `v3 of v2` (D-12).
+ *
+ * A FUNCTION, per `forkFailedMessage`'s idiom above: the interpolated half is data, and a
+ * template assembled at the call site is a string that leaks out of this module's fences.
+ */
+export function lineageVersionOf(mine: number, parent: number): string {
+  return `v${mine} of v${parent}`
+}
+
+/**
+ * The collision counter — `1 of 43` (D-04: rendered ONLY on a colliding name, counted over
+ * the FULL merged library before any filtering, per D-05).
+ *
+ * ⚠ THE LEADING `1` IS A CONSTANT, NOT AN INDEX, AND IT SHIPS THAT WAY ON PURPOSE (D-07).
+ * Every colliding row reads `1 of 43` — the *n*th namesake does not read `7 of 43`. That
+ * *can* be misread as a position, and the concern is REAL; it is routed to a human rather
+ * than fixed by an unrecorded rewrite, because the operator-approved mockup is the acceptance
+ * bar and changing a bar string at plan time is exactly the drift sketch 163 exists to
+ * prevent.
+ *
+ * **UAT ROW U4 ASKS A HUMAN WHETHER IT READS AS AN INDEX.** If the answer is yes, the fix is a
+ * ONE-LINE CHANGE IN THIS ONE FILE, by construction — which is the whole point of D-14. Do not
+ * "fix" it silently on the way past.
+ */
+export function oneOfLabel(n: number): string {
+  return `1 of ${n}`
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 192.1 (LIB-05) — THE 162-B FORK PROMPT'S VOCABULARY (D-19 / D-20)
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * THE NAME PROMPT IS AN INPUT STEP, NOT A GUARD, AND EVERY STRING BELOW CARRIES THAT CLAIM.
+ *
+ * D-19 reopens Phase 192's D-15 (the fork was a DIRECT FLIP, argued in `WorkflowCard.tsx:79-87`
+ * on the grounds that a confirm on a non-destructive, reversible action spends the guard
+ * vocabulary the delete relies on). The prompt is legal because it collects something the
+ * system cannot know — a name — so it is an INPUT, and inputs do not spend guard vocabulary.
+ * That claim is mechanical rather than asserted, and each clause below is a test:
+ *
+ *   · it asks for a NAME, never for a confirmation;
+ *   · its primary button is `Create my copy` — asserting *"the primary button is not
+ *     `Confirm`"* is what makes the distinction machine-checkable;
+ *   · it wears no destructive styling — no victim naming, no red, no arm-to-confirm;
+ *   · it WARNS AND NEVER BLOCKS on a colliding name (D-20). The only hard gate is emptiness.
+ *
+ * The graded-guard ladder (146-148) is therefore untouched: sheet for the live delete,
+ * arm-to-confirm for the draft delete, and the fork stays outside the ladder entirely.
+ *
+ * ⚠ `FORK_VERB` (`:78`) AND `FORK_CONSEQUENCE` (`:91`) ARE NOT RE-DECLARED HERE. They already
+ * live in this file and are read, never re-typed — and the sketch itself reads them from the
+ * fixture rather than spelling them, which is the proof the mechanism works: a drifted copy of
+ * either would have failed the drive that generated the contract these strings come from.
+ *
+ * ⚠ D-23 — NO PROMPT APPEARS ON THE ALREADY-FORKED PATH. On a published row the caller has
+ * already forked, the verb OPENS the existing draft and creates nothing, so nothing is being
+ * named. `FORK_CONSEQUENCE_EXISTING` (`:124`) is the sentence that path spends. Regressing
+ * this re-opens the U5 blocker.
+ */
+
+/** The dialog's heading. It names the OUTCOME, not the risk. */
+export const FORK_DIALOG_TITLE = "Name your copy"
+
+/** The primary button. ⚠ NOT `Confirm` — see the section docblock; that word is the ladder's. */
+export const FORK_DIALOG_OK = "Create my copy"
+
+/** The escape. */
+export const FORK_DIALOG_CANCEL = "Cancel"
+
+/**
+ * The ONE hard gate (D-20). An empty name is not a preference; there is nothing to create.
+ */
+export const FORK_HINT_EMPTY = "Give it a name."
+
+/** The clear state — said plainly, so silence is never the only signal that a name is fine. */
+export const FORK_HINT_FREE = "No other workflow of yours has this name."
+
+/**
+ * The collision WARNING (D-20 — it warns, it never blocks). A name you chose is a name you
+ * are allowed to have; refusing it would make the library's problem the user's fault. What it
+ * does instead is state the consequence in the reader's own terms, which is the same
+ * both-halves rule `FORK_CONSEQUENCE` follows.
+ *
+ * ⚠ D-21 — this is a check on the DISPLAY NAME, over the caller's OWN rows in the merged feed,
+ * and it must never be presented as a slug check. It is also NOT the WR-08 409: that is a
+ * `UNIQUE(slug, version)` violation and no name field prevents it (D-22).
+ */
+export const FORK_HINT_CLASH =
+  "You already have one called this. Allowed — but you will not be able to tell them apart."
+
+/**
+ * The dialog's sub-line — it names WHAT is being copied and says the choice is reversible,
+ * because a name demanded up front with no way back is a guard wearing an input's clothes.
+ *
+ * A FUNCTION for `forkFailedMessage`'s reason (the interpolated half is data). The curly
+ * quotes match that function's, so the two dialogs quote a workflow name the same way.
+ */
+export function forkDialogSub(sourceName: string): string {
+  return (
+    `You are copying “${sourceName}”. Give your copy a name you will recognise later — ` +
+    `you can change it in the Builder.`
+  )
+}

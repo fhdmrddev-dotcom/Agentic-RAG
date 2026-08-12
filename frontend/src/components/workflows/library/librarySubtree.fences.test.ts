@@ -90,6 +90,13 @@ const LIBRARY_SUBTREE_PATHS = [
   // ── 192.1-03 (D-01 / D-33): the G-5 fork extraction — its pure leaves, then the hook ──
   "./libraryFork.ts",
   "./useWorkflowFork.ts",
+  // ── 192.1-04 (D-14 / D-18 / D-33): the identity line's clock ──
+  // ⚠ ITS FIXTURE IS NOT HERE, AND THE OMISSION IS DELIBERATE RATHER THAN FORGOTTEN.
+  // `__fixtures__/libraryScale.ts` is a SUBDIRECTORY module, and the glob at `:96` is
+  // `./*.{ts,tsx}` — NON-RECURSIVE — so it has no key in `LIBRARY_MODULES` and listing it
+  // would contribute the empty string forever, i.e. a path that looks swept and is not.
+  // Test-only, ships to no user, renders nothing: outside this sweep by construction.
+  "./relativeChanged.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -116,7 +123,10 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // ⚠ AND THE ARITHMETIC IN THE PLANNING DOCUMENTS IS NOT THE SOURCE. `192.1-RESEARCH.md`
     // §7a says this list ends at 10 and `192.1-CONTEXT.md` D-35 corrects it to 12; both are
     // forecasts of a plan decision. The number here is the array's measured length.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(9)
+    // ⚠ 192.1-04 read it the same way, one round later: `expected […] to have a length of 9
+    // but got 10` was OBSERVED before the 10 was written. Three `it.each` sweeps × one new
+    // path = +3 cases, which is the arithmetic the count-gate pin records.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(10)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
@@ -124,6 +134,7 @@ describe("the sweep is looking at something (non-vacuity)", () => {
       "./LibraryToolbar.tsx",
       "./libraryFork.ts",
       "./useWorkflowFork.ts",
+      "./relativeChanged.ts",
     ]) {
       expect(LIBRARY_SUBTREE_PATHS as readonly string[]).toContain(later)
     }
