@@ -151,38 +151,64 @@
  * Their re-home is OWED. They are not outside the honesty guarantee while they wait: this file
  * is one of the seven paths F5 sweeps BY NAME.
  *
- * ── ⚠ THE SUBTREE DELTA, MEASURED IN 192-12 — AND IT IS FAR LARGER THAN THE ESTIMATE ─────
+ * ── ⚠ THE SUBTREE DELTA — MEASURED IN 192-12, RE-MEASURED AND CORRECTED IN 192.1-08 ──────
  * Recorded HERE as well as in the SUMMARY, for 188.2's stated reason: a later reader must not
  * be able to mistake this growth for a regression, and the figure has to live where the growth
  * is. Measured with a line classifier (blank / comment / code, counting JSX comment blocks as
  * comment) that was VALIDATED against 188.2's own published known-good — the
- * pre-cut `PhaseNodeCard.tsx` at `95a4c915`, `797/518/249/30` — and reproduced it exactly
- * before any Phase-192 number was trusted.
+ * pre-cut `PhaseNodeCard.tsx` at `95a4c915`, `797/518/249/30`. 192.1-08 re-ran that validation
+ * from scratch and reproduced `797 / 518 / 249 / 30` exactly, on the first attempt, before one
+ * figure below was re-derived — the point being that an inherited classifier is an inherited
+ * claim until it agrees with the known-good again.
  *
- *   PAGE      `WorkflowsPage.tsx`  1407 → 1007  (−28.4 %)   CODE 1021 → 479  (−53.1 %)
- *   SUBTREE   page + these 7 modules  1407 → **3182  (+126.2 %)**   CODE 1021 → 1499 (+46.8 %)
+ * ⚠ THE TWO LINES THAT USED TO STAND HERE WERE STALE, AND THEY ARE LEFT READABLE BESIDE THEIR
+ * CORRECTION RATHER THAN OVERWRITTEN — the CLAUDE.md ledger's own habit. This docblock is now
+ * the second recorded instance of the same failure mode: *a figure written at a phase's close
+ * goes stale on the next commit that touches any file it counted.*
  *
- * **RESEARCH's assumption A2 estimated +5 % to +16 % (a ~1480–1630 subtree). The measured
- * figure is +126.2 % — roughly EIGHT TIMES the top of that range, and nearly double 188.2's
- * +67.1 %.** A2 was labelled an estimate precisely so this could contradict it in the open, so
- * it is stated rather than smoothed, with the two reasons it missed:
+ *   WAS (192-12):  PAGE     1407 → 1007  (−28.4 %)    CODE 1021 →  479  (−53.1 %)
+ *   WAS (192-12):  SUBTREE  1407 → 3182  (+126.2 %)   CODE 1021 → 1499  (+46.8 %)
  *
- *   1. It predicted the PAGE at 250–400 L. Measured: **1007** — a 2.5–4× miss on the single
- *      largest row. D-01 moved the library view; it never moved the Builder host, the
- *      gauntlet mount, the door switch, the three fork/create handlers or the fetch
- *      orchestration, all of which still live there. See the CLAUDE.md ledger row.
- *   2. It listed FIVE destination modules; **seven** shipped (`libraryRow.ts` and
- *      `libraryVocabulary.ts` appear nowhere in its table), and every module landed above its
- *      own estimate — this card most of all, 250 est. → **545**.
+ * Both were already wrong before 192.1 opened. At this phase's base `8fc9bd74` the page was
+ * 1180 / CODE 518 and the subtree 3438 / CODE 1547 — see `192.1-BASELINE.md` §8c, correction
+ * B-6, which found the CODE columns stale too and not only the totals RESEARCH had named.
  *
- * WHERE THE GROWTH ACTUALLY WENT, so the number is attributable rather than merely admitted:
- * **COMMENT is the dominant term, 334 → 1523 (+355.9 %)** — 1039 of the 2175 new module lines,
- * 48 %, are prose. CODE grew +46.8 % against a subtree that replaced three card components
- * with one and added a filter engine, a vocabulary module, six counted chips and a merge that
- * did not exist before. ⚠ THE FIGURES INCLUDE THIS DOCBLOCK — it was measured, written, then
- * RE-measured, and only the digits were corrected so the line count could not move again.
- * Re-derive: `git show 6bdc4684:<page> | wc -l` → 1407, then `wc -l` on the page and on this
- * directory's seven SOURCE modules (test files excluded, as 188.2 excluded them).
+ *   NOW (192.1-08, HEAD):
+ *     PAGE      `WorkflowsPage.tsx`       1407 → 1160   (−17.6 %)    CODE 1021 →  462  (−54.8 %)
+ *     SUBTREE   page + these 12 modules   1407 → 5323   (+278.3 %)   CODE 1021 → 2095  (+105.2 %)
+ *
+ * ── 192.1'S OWN DELTA, AND IT OWES SIX NUMBERS RATHER THAN FOUR ──────────────────────────
+ * Two "before" readings are defensible and BOTH are published, so neither can be quoted as the
+ * other. Against this phase's BASE (`8fc9bd74`): SUBTREE 3438 → 5323 (+54.8 %), CODE 1547 →
+ * 2095 (+35.4 %). Against the honest PRE-CUT base — 192.1-01 had already added `updatedAt` to
+ * `libraryFilter.ts` (284 → 294) and `libraryRow.ts` (100 → 121), +31 L, so BASELINE §8b's 3438
+ * was ALREADY stale at Wave 3's own base — SUBTREE 3469 → 5323 (+53.4 %), CODE 1550 → 2095
+ * (+35.2 %). And the PAGE's single figure hides its shape: 1180 → 1054 at the D-01 fork cut
+ * (−126), then → 1113 (the identity memo) and → 1160 (the dialog mount) — a NET of only −20
+ * across a phase whose headline act was an extraction. An extraction that removes 126 lines and
+ * a phase that adds 106 back are two facts, and quoting one as the other is how the next
+ * estimate goes wrong.
+ *
+ * WHERE THE GROWTH WENT, so it is attributable rather than merely admitted: five NEW modules
+ * (`useWorkflowFork.ts` 517, `rowIdentity.ts` 509, `ForkNameDialog.tsx` 279,
+ * `relativeChanged.ts` 109, `libraryFork.ts` 64 = 1478 L) plus growth on three shipped ones
+ * (`libraryVocabulary.ts` 223 → 439, THIS FILE 567 → 747, `libraryRow` + `libraryFilter` +31)
+ * minus the page's −20. The nine deltas sum to EXACTLY the whole subtree delta — no
+ * unattributed residual. **PROSE is the dominant term for the third cut running: COMMENT
+ * 1725 → 2964 (+1239 L, 65.7 % of the growth) against CODE +548 (29.1 %) and BLANK +98.**
+ *
+ * ⚠ RESEARCH's 192-era assumption A2 estimated +5 % to +16 %; 192-12 measured +126.2 % and this
+ * reading is +278.3 %. A2 was labelled an estimate precisely so it could be contradicted in the
+ * open, and its two named misses stand: it predicted the PAGE at 250–400 L (measured 1007 then,
+ * 1160 now — a 3–4× miss on the single largest row), and it listed FIVE destination modules
+ * where seven shipped at 192 and TWELVE stand today.
+ *
+ * ⚠ THE FIGURES INCLUDE THIS DOCBLOCK — it was measured, written, then RE-measured, and only
+ * the digits were corrected so the line count could not move again (192.1-03 hit the identical
+ * loop and resolved it the identical way). Re-derive: `git show 6bdc4684:<page> | wc -l` → 1407;
+ * `git show 8fc9bd74:<page> | wc -l` → 1180; then `wc -l` on the page and on this directory's
+ * TWELVE SOURCE modules — test files and `__fixtures__/` excluded, as 188.2 and 192 excluded
+ * theirs.
  */
 import { Fragment, useRef, useState } from "react"
 import { Loader2, MoreHorizontal, Trash2 } from "lucide-react"
