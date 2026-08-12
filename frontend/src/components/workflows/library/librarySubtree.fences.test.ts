@@ -161,13 +161,25 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     }
   })
 
-  it("actually loads the modules that exist, and they are not empty", () => {
+  it("loads EVERY listed module, and none of them is empty", () => {
     // If a rename or a move silently emptied the glob, every negative below would pass
     // while covering nothing at all.
-    expect(SWEPT.length).toBeGreaterThanOrEqual(3)
-    expect(SWEPT.map((f) => f.path)).toEqual(
-      expect.arrayContaining(["./libraryRow.ts", "./libraryVocabulary.ts", "./libraryFilter.ts"]),
-    )
+    //
+    // ⚠ THIS WAS `>= 3` PLUS THREE HAND-NAMED MODULES UNTIL E-2 (`192.1-SECURITY.md`), WHICH
+    // LEFT NINE OF TWELVE WITH NO PROOF THEY LOAD AT ALL. `SWEPT` DROPS an unresolved path
+    // (`:123`), and every `it.each(LIBRARY_SUBTREE_PATHS)` sweep below reads
+    // `LIBRARY_MODULES[path] ?? ""` — so a module renamed, moved into a subdirectory or given a
+    // new extension was swept against the EMPTY STRING and passed green, one sweep at a time,
+    // silently. That is the Phase-190 CR-01 shape exactly: a fence that cannot fire. The audit
+    // measured the properties still holding at HEAD by independent grep, so nothing was broken
+    // — only undefended.
+    //
+    // Exact equality subsumes BOTH retired assertions and makes the corpus prove itself: every
+    // listed path resolved, none resolved to `""`, and the order still matches the list. It
+    // also pins the D-35 omission at `:94-98` from the other side — list the fixture, a
+    // subdirectory module the non-recursive glob cannot see, and THIS reds rather than quietly
+    // sweeping a permanent empty string.
+    expect(SWEPT.map((f) => f.path)).toEqual([...LIBRARY_SUBTREE_PATHS])
     expect(subtreeSource.length).toBeGreaterThan(1000)
   })
 
@@ -872,6 +884,23 @@ const PAGE_MUST_NOT_DECLARE = [
 const REEXPORT_STAR = /export\s+\*\s+from\s+["'][^"']*library\//
 const REEXPORT_NAMED = /export\s+\{[^}]*\}\s+from\s+["'][^"']*library\//
 
+/**
+ * T-192.1-16's dependency array — `[rows]` and nothing else.
+ *
+ * ⚠ THIS DETECTOR DID NOT EXIST WHEN THE PHASE CLOSED, AND THE REGISTER SAID IT DID. The
+ * threat's recorded mitigation reads *"the memo is keyed on `[rows]` alone (grep-asserted on the
+ * literal dependency array)"*. `/gsd:secure-phase` re-ran that grep (E-1, `192.1-SECURITY.md`):
+ * the only `[rows])` hit in ANY test file was a COMMENT at `rowIdentity.test.ts:815`, and
+ * `WorkflowsPage.test.tsx` names neither `identityIndex` nor `useMemo`. So the mitigation was
+ * prose. Widening the key to `[rows, query]` — the exact D-05 violation the phase names, and
+ * the shape the page's OWN neighbouring `counts` memo already uses, so it arrives by imitation
+ * rather than by invention — passed `tsc`, `eslint`, the count gate and all 52 page cases.
+ *
+ * Deliberately keyed on `buildIdentityIndex(rows)` rather than on `identityIndex`: a rename of
+ * the const is legal and must not red, while a second dependency is the regression.
+ */
+const IDENTITY_MEMO_KEYED_ON_ROWS_ALONE = /buildIdentityIndex\(\s*rows\s*\)\s*,\s*\[\s*rows\s*\]\s*\)/
+
 describe("OD — WorkflowsPage imports the subtree, declares none of it, shims nothing", () => {
   it("POSITIVE CONTROLS — every detector below catches what it forbids", () => {
     expect('export * from "@/components/workflows/library/WorkflowCard"').toMatch(REEXPORT_STAR)
@@ -908,6 +937,25 @@ describe("OD — WorkflowsPage imports the subtree, declares none of it, shims n
 
   it.each(PAGE_MUST_NOT_DECLARE)("no longer declares %s", (declaration) => {
     expect(pageSource).not.toContain(declaration)
+  })
+
+  it("keys the identity memo on [rows] ALONE — a second dependency is the D-05 violation", () => {
+    // POSITIVE CONTROLS FIRST — the detector must REJECT both realistic widenings, or the green
+    // on the real page below would mean nothing. `query` is the filter text; `chip` is the
+    // provenance filter. Either one re-resolves 106 rows on every keystroke, which RESEARCH
+    // measured at ≈ 230,000 inner-loop iterations per render, twice a render (T-192.1-14).
+    expect("useMemo(() => buildIdentityIndex(rows), [rows, query])").not.toMatch(
+      IDENTITY_MEMO_KEYED_ON_ROWS_ALONE,
+    )
+    expect("useMemo(() => buildIdentityIndex(rows), [rows, chip])").not.toMatch(
+      IDENTITY_MEMO_KEYED_ON_ROWS_ALONE,
+    )
+    // …and a legal reformat is NOT mistaken for a widening, or this fence trains its reader to
+    // edit the fence — the failure mode F4's docblock records ten lines up.
+    expect("useMemo(() => buildIdentityIndex(rows), [ rows ])").toMatch(
+      IDENTITY_MEMO_KEYED_ON_ROWS_ALONE,
+    )
+    expect(pageSource).toMatch(IDENTITY_MEMO_KEYED_ON_ROWS_ALONE)
   })
 
   it("leaves NO re-export shim pointing back at library/", () => {

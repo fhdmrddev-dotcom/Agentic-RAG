@@ -1096,7 +1096,25 @@ const BASELINE = {
   // md5 caught what a `git diff` could not have: git normalises EOL in the index, so the diff
   // was clean while the file on disk no longer matched its neighbours. Re-terminated to CRLF,
   // the page hashes `bbc827e055dd890b8c6da1e29d82125d` — EXACTLY its pre-plant value.
-  "librarySubtree.fences.test.ts": 117,
+  // ── /gsd:secure-phase 192.1 (E-1 / E-2): 117 → 118. ONE CASE, TWO FENCES REPAIRED. ──
+  // The audit found two DURABILITY holes — both properties held at HEAD, neither was defended:
+  //   E-1 T-192.1-16's register claimed the `[rows]` memo key was *"grep-asserted on the literal
+  //       dependency array"*. It was not. The only `[rows])` hit in ANY test file was a COMMENT
+  //       (`rowIdentity.test.ts:815`), and `WorkflowsPage.test.tsx` names neither `identityIndex`
+  //       nor `useMemo`. That is the NEW case, hence +1: an `it` in the OD block with three
+  //       synthetic controls (two widenings rejected, one reformat accepted).
+  //   E-2 the non-vacuity guard asserted `SWEPT.length >= 3` and named three of twelve modules,
+  //       so NINE had no proof they loaded. Repaired IN PLACE — exact equality against
+  //       `LIBRARY_SUBTREE_PATHS` subsumes both retired assertions — so it moves no count.
+  // ⚠ BOTH DRIVEN RED AGAINST REAL PLANTS, and the E-2 plant is the one worth recording: the
+  // corpus entry was changed to `./ForkNameDialog.jsx` (an extension change — exactly how a
+  // rename empties a glob key), and the new assertion failed with `- "./ForkNameDialog.jsx"` at
+  // 1 failed / 117 passed. THE FOUR `it.each` SWEEPS FOR THAT PATH STILL PASSED — swept against
+  // the empty string, green — which is the Phase-190 CR-01 shape demonstrated rather than
+  // argued. E-1's plant widened the real memo to `[rows, query]`: 1 failed / 117 passed.
+  // ⚠ Both restores md5-CHECKED per the note above: fences `c1f2c17f53fe2fd8a75f07fed0c6d8f1`,
+  // and `WorkflowsPage.tsx` left absent from `git status --porcelain`.
+  "librarySubtree.fences.test.ts": 118,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
