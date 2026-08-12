@@ -1018,7 +1018,41 @@ const BASELINE = {
   // number was written. Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING
   // RUNS, 2026-08-12, both printing `librarySubtree.fences.test.ts 77 80 +3` and
   // `relativeChanged.test.ts — 37 new` at `total 3264 · failed 0` — never hand-counted.
-  "librarySubtree.fences.test.ts": 80,
+  // ── 192.1-05 Task 3 (D-09 / D-16 / D-33 / D-35): 80 → 111. TWO NEW FENCES, +31. ─────────
+  // The arithmetic decomposes exactly, and it is worth reading because THE MULTIPLIER CHANGED:
+  //   +3   `./rowIdentity.ts` joining the corpus × the THREE pre-existing `it.each` sweeps
+  //        (F1 `:202`, T-192-04 `:224`, F4 `:266`) — the same +3 that has now held four times
+  //   +14  F6 (D-16, the opaque draft field never parsed as a date): 3 controls + an 11-path sweep
+  //   +14  F7 (D-09, no owner display name): 3 controls + an 11-path sweep
+  // ⚠ THE NEXT MODULE ADDED MOVES THIS BY **FIVE**, NOT THREE. There are now FIVE
+  // `it.each(LIBRARY_SUBTREE_PATHS)` blocks. The three previous additions each recorded "+3, the
+  // same arithmetic again"; that sentence is now false and is corrected here rather than copied.
+  // ⚠ BOTH NEW FENCES WOULD RED ON A CLEAN TREE AS RAW GREPS, MEASURED RATHER THAN INHERITED:
+  // the D-16 needle appears 24 times across 4 swept modules and `useWorkflowFork.ts:125,254,308`
+  // READS IT IN REAL CODE (so even comment-stripping fails), and the D-09 needle appears 6 times,
+  // every one of them prose explaining why the name is not rendered. Both are AST-parsed, both
+  // carry a scoping control run over the REAL sources, and both were driven RED against a real
+  // plant in `rowIdentity.ts` which was restored md5-identical
+  // (`bbc1218cb67abbf6e07e5271e5caada9` before and after, both times).
+  // ⚠ OBSERVED RED FIRST for the corpus edit, as D-33 requires it and this pin to be one commit:
+  // `expected [ './libraryRow.ts', …(10) ] to have a length of 10 but got 11`.
+  // Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
+  // printing `librarySubtree.fences.test.ts 80 111 +31` and `rowIdentity.test.ts — 72 new` at
+  // `total 3367 · failed 0` — never hand-counted from `it(` literals.
+  "librarySubtree.fences.test.ts": 111,
+  // ── 192.1-05 Tasks 1+2 (LIB-05 / SC#1 / SC#2): a NEW suite, pinned in its first phase ─────
+  // The identity resolver, proved as arithmetic in the `libraryFilter.test.ts` posture — no
+  // `render`, no DOM, no clock mock. The 72 cover: the four-state lineage with the version branch
+  // checked before the copy branch, D-13's silence driven on the real fixture's seven orphan
+  // SLUGS, the D-32 inherited-key probe across five prototype members (× three shapes), the D-31
+  // ranker's three rules, the flagship 44-row family with the sketch's `varies()` transcribed as
+  // an in-test CONTROL, the D-31 residual asserted as a FLOOR, the >20 / >8 distinctness
+  // properties from the sketches' own drives, D-05's scope proof, and D-34's call-count property.
+  // ⚠ NO `TARGETS` LINE IS NEEDED, and that is measured rather than assumed: the gate printed
+  // `rowIdentity.test.ts — 72 new`, and a file the gate never runs cannot report a number at all,
+  // so the printed `actual` IS the proof that the `src/components/workflows` DIRECTORY entry
+  // already reaches it. (Two knobs: TARGETS decides what RUNS, BASELINE what is GUARDED.)
+  "rowIdentity.test.ts": 72,
   // ── 192.1-04 Task 2 (LIB-05 / SC#3 / D-18): a NEW suite, pinned in its first commit ───────
   // The nine-band formatter, proved in the `libraryFilter.test.ts` posture — pure `describe`s,
   // no `render`, and NO CLOCK MOCK, because `now` is a parameter (`credentialLabel`'s shape).
@@ -1336,7 +1370,24 @@ const BASELINE = {
 //   four suites this round did not author would fold unrelated drift into a commit that did
 //   not cause it — the thing this whole header argues against, and the reason 190-12, 190-15,
 //   190-16, 192-01 and 192-12 each declined the same four. Owed as its own edit.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3164 (192-16)
+// ⚠ AND BY 192.1-05 (wave 4): the pinned total → **3343**, pinned FILE count 62 → **63** (the new
+// `rowIdentity.test.ts`). READ from this script's own printed `pinned total` after the two map
+// entries above were edited, across two agreeing runs — never computed from the marker below.
+//   ⚠ AND THE MARKER WAS STALE AGAIN — the TWELFTH time, and this time by SEVENTY-SIX, which is
+//   the largest drift it has carried. It read `3164 (192-16)` while an UNMODIFIED tree at this
+//   phase's base printed `pinned total 3240`. The 76 are this phase's own earlier waves
+//   (192.1-03's `libraryFork.test.ts` 11 and the fences 64 → 67 → 77; 192.1-04's
+//   `relativeChanged.test.ts` 37 and the fences 77 → 80), every one of them correctly pinned in
+//   its own commit while this reader-facing marker was left behind. It goes stale for exactly the
+//   reason the paragraphs above give: it is a number written by hand next to a number computed by
+//   `reduce`. Corrected on measurement rather than smoothed.
+//   ⚠ THE +24 GAP IS UNCHANGED BY THIS PLAN AND IS STILL NOT ITS DEBT: it is the same four
+//   pre-existing drifts (`ExternalActionSection` +9, `PhaseTimeline` +4,
+//   `WorkflowBuilderPage.canvas` +5, `builderStore` +6) that 190-12, 190-15, 190-16, 192-01,
+//   192-12 and 192-16 each declined for the same reason. It was +36 before 192-16 pinned 12, and
+//   it read +127 mid-plan here only because this plan's own 103 new cases were not yet pinned;
+//   after the two entries above it is back to exactly 24. Owed as its own edit (T-9).
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3343 (192.1-05)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
