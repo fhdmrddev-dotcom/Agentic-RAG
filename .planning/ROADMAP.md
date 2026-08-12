@@ -35,6 +35,7 @@ the right vocabulary, stop it, and see what it produced.
 | # | Phase | Goal | Requirements | SC |
 |---|-------|------|--------------|-----|
 | 192 | Workflow Library IA | The Workflows page can be searched, filtered and read at a glance, and its card actions are predictable | LIB-01…04 | 4 |
+| 192.1 | **(INSERT)** Workflow Identity | A user can tell one workflow from another at a glance — which is which, whose it is, and which one just changed | LIB-05 | 3 |
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
@@ -50,7 +51,7 @@ is the incumbent any proposal must beat.
 
 ### Phase Checklist
 
-- [x] **Phase 192: Workflow Library IA** ✓ 2026-08-11, **RE-OPENED for gap-closure round 1 and re-closed 2026-08-12** (12 plans + 4 round-1 plans = **16**; verified 6/6 at close — 5/6 at verification + CR-01 closed under G-3). ⚠ **The re-open was not bookkeeping: SC#3 was found UNMET in lived experience by a human on the first real click** — the fork verb 409'd twice in silence (`192-UAT.md` U5). ⛔ 11 G-4 UAT rows still OWED by operator decision, **U6 first**; U5 is re-driven or re-owed at the round-1 checkpoint — search, filter, at-a-glance cards, predictable card actions, findable create affordance (LIB-01…04)
+- [x] **Phase 192: Workflow Library IA** ✓ 2026-08-11, **RE-OPENED for gap-closure round 1 and re-closed 2026-08-12** (12 plans + 4 round-1 plans = **16**; verified 6/6 at close — 5/6 at verification + CR-01 closed under G-3). ⚠ **The re-open was not bookkeeping: SC#3 was found UNMET in lived experience by a human on the first real click** — the fork verb 409'd twice in silence (`192-UAT.md` U5). **G-4 UAT is now DRIVEN, not owed** (2026-08-11/12): **9 of 11 passed** on live Chrome-MCP evidence at 107 rendered rows (U1 U2 U3 U4 U6 U7 U8 U10 U11); **U9 ⛔ skipped with its reason** (a costed live run; the launch path is untouched by this phase and already pinned); **U5 ❌ FAILED, twice.** Round 1 fixed the 409 it was aimed at — verified live: the repaired row opens its existing draft with the DB unchanged, a row with no draft to open refuses out loud, a never-forked row still creates — and **U5 still failed**, because the operator could not perceive any of it: **43 of their 104 workflows are named "Compliance Gap Report."** That finding is capability, not defect repair, so it is **routed to Phase 192.1 (LIB-05), NOT to a third closure round** (G-7). ⚠ Also recorded: the post-fix re-drive located rows by `getElementById`, so it proved the code and could not prove the row was findable — **a machine check that bypasses the human's task does not verify it.** LIB-01…04 stand as shipped; LIB-05 is the new, honest gap
 - [ ] **Phase 193: Authoring Doors + Template Placement** — the two doors are tellable apart before choosing; template supply has a findable home (AUTH-01, AUTH-03)
 - [ ] **Phase 194: Stop a Running Workflow** — a run can be stopped mid-execution and reports `cancelled` honestly (RUN-01)
 - [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
@@ -159,6 +160,63 @@ click does and what the page says, never how anything renders.
   `GSD_VITEST_MAX_WORKERS=4` **REDUCES the flake, it does not eliminate it.** Measured by the
   orchestrator across three CAPPED runs on one tree: `failed 0`, `failed 0`, **`failed 1`**. The
   COUNT columns remain the regression backstop; the `failed` line, on this machine, is not.
+
+#### Phase 192.1: Workflow Identity
+
+**Goal**: A user can tell one workflow from another at a glance — which is which, whose it is, and which one just changed.
+**Depends on**: Phase 192 (this is the surface 192 built; 192.1 gives its rows an identity).
+**Requirements**: LIB-05 (new — see REQUIREMENTS.md)
+**Inserted**: 2026-08-12, from Phase 192's own UAT. **This is NOT a gap-closure round** — G-7 forbids new user-facing capability inside a closure round, and an identity axis is capability. Phase 192's round 1 is closed and stays closed.
+
+**Why this exists — measured, not asserted.** Phase 192 shipped search, six honest chips, one flat list
+and predictable card actions. Nine of eleven G-4 UAT rows passed on live evidence. The operator then
+used it and could not tell the rows apart. The measurement that explains it, over their own 104
+workflows:
+
+| Name | Rows | Distinct slugs |
+|---|---|---|
+| **Compliance Gap Report** | **43** | 41 |
+| Risk Register | 10 | 9 |
+| Weekly Status Report | 8 | 5 |
+| Project Meridian Risk Summary (GOOD) | 8 | 4 |
+
+**14 duplicated names; 41% of the library carries one name**, drafts and published interleaved.
+
+⚠ **The original diagnosis was WRONG and is corrected here rather than quietly replaced.** This was
+first logged as *"card density — 13 atoms per row"* (`U5-b`, severity minor). Removing atoms would not
+have helped at all: **forty-three identical titles are indistinguishable at any density.** Raised to
+major and re-scoped to identity.
+
+⚠ **It is partly UPSTREAM of the library.** Nothing in the product stops the duplicates being created —
+`onTweak` mints `<same name> v(N+1)` by design and always has. A read-side fix alone leaves the cause
+running. Whether this phase touches the naming/lineage side is the first scope question, not an
+assumption.
+
+⚠ **Why no gate caught it, recorded so the next phase inherits the lesson.** Every automated check in
+192 ran against fixtures with **distinct names**. `LIB-02`'s bar — *"a card shows what the workflow is
+for, at a glance"* — is true of one card in isolation and false of the list. 192 tested at 12 rows and
+at 107 rows but never at *107 rows carrying 14 duplicated names*: **volume was real, shape was not.**
+That is the 045 real-scale lesson in a new costume, and it is now a standing question for any
+list-rendering phase — *is the fixture's SHAPE realistic, not just its SIZE?*
+
+⚠ **And the verification of the fix was itself too weak — recorded against this project's own work.**
+The post-fix re-drive proved the repaired fork by selecting its row with `getElementById` on a known
+UUID. That proves the code and cannot prove the row was *findable*, because the driver never had to
+find it. The operator, who did, could not. **A machine check that bypasses the human's actual task
+does not verify the human's task.** Any UAT row in this phase must be driven the way a person would:
+by looking.
+
+**Flags**: **G-2 fires** — this is visual/IA work; sketch before planning. G-5: `WorkflowCard.tsx` and `WorkflowsPage.tsx` are both on the hot-file ledger — check it before planning. Cross-provider roster does NOT apply (no streaming, agent loop, provider routing, or UI-state surface).
+
+**Success Criteria** (what must be TRUE):
+
+  1. At 100+ rows containing at least 14 duplicated names, a user can identify a specific workflow without opening it — **the fixture must carry the duplicate shape, not just the row count.**
+  2. A row says whose it is and how it relates to what it came from (original vs your copy, and of what).
+  3. A user can tell which workflow changed most recently.
+
+**How we'd know this failed** (G-6): the operator opens the library on their real data and still cannot point at a row and say which one it is; or a fix is verified by a driver that located rows by id rather than by reading the screen.
+
+**Plans**: TBD — `/gsd:sketch 192.1` first (G-2), then `/gsd:plan-phase 192.1`
 
 #### Phase 193: Authoring Doors + Template Placement
 

@@ -19,6 +19,7 @@ Where a requirement's seed carries analysis, the seed is the spec input — read
 - [x] **LIB-02**: A workflow card shows what the workflow is for, at a glance, without the reader having to decode internal vocabulary. *(SEED-136)*
 - [x] **LIB-03**: A user can predict what each card action does before clicking — in particular, "Tweak" must not silently open a full edit surface. *(SEED-136, operator 2026-08-10)*
 - [x] **LIB-04**: The create affordance is findable without scrolling past two shelves of existing workflows. *(SEED-136)*
+- [ ] **LIB-05**: A user can tell one workflow from another at a glance — which row is which when many share a name, whose it is and what it was copied from, and which one changed most recently. *(Phase 192 UAT, operator 2026-08-12 — measured: 43 of 104 workflows share the name "Compliance Gap Report" across 41 slugs; 14 duplicated names in total. Distinct from LIB-02, which is about reading ONE card; this is about telling MANY apart.)*
 
 ### Authoring — the doors and the journey (AUTH)
 
@@ -69,6 +70,7 @@ Where a requirement's seed carries analysis, the seed is the spec input — read
 
 | REQ | Phase |
 |---|---|
+| LIB-05 | 192.1 | ⬜ Not started — inserted 2026-08-12 from Phase 192's own UAT. **LIB-02 is satisfied and LIB-05 is not, and that is not a contradiction:** LIB-02 asks whether ONE card is readable (it is — `WorkflowSoul`'s five atoms, verified); LIB-05 asks whether MANY cards are distinguishable (they are not — 43 rows share a name). The gap between those two questions is the whole phase. G-2 fires: sketch first. |
 | LIB-01, LIB-02, LIB-03, LIB-04 | 192 | Complete 2026-08-11 — verified 6/6 must-haves in shipped source at 200 rows (192-VERIFICATION.md). Marked here only after verification, never per-plan. ⛔ Lived-experience confirmation OWED: the eleven G-4 UAT rows were NOT run (operator decision 2026-08-11, U6 first) — the requirements are proved structurally, not experientially. ⛔ D-07 search HIGHLIGHT deferred (wiring it reds fence F1 by construction); LIB-01 wording is "search by name and filter the list", which ships. |
 | AUTH-01, AUTH-03 | 193 |
 | RUN-01 | 194 |
