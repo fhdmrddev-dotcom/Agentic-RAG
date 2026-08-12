@@ -640,6 +640,7 @@ the 11 seeds are intentionally dormant.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260809-klo | fix BUG-260809-02 — add a `business_requirement` input to the canvas Builder | 2026-08-09 | `da668c96` + `1c58a3fb` | [260809-klo-…](./quick/260809-klo-fix-bug-260809-02-add-a-business-require/) |
+| 260813-e12 | `/gsd:fast` — close **E-1** and **E-2** from `192.1-SECURITY.md`: the identity memo's `[rows]`-only key had NO assertion despite its register claiming one, and the subtree non-vacuity guard proved only 3 of 12 modules load. Both driven RED against real plants; E-2's plant showed the four `it.each` sweeps passing green against the empty string — the Phase-190 CR-01 shape. E-3 (INFO) left to the next phase touching `useWorkflowFork.ts`. | 2026-08-13 | `15472e7c` | — (inline, no plan dir) |
 
 ⚠ **`BUG-260809-02` is deliberately still `open`.** The unit suite proves the typed sentence reaches
 the recorded `updateWorkflowDraft` argument; it cannot prove the live gauntlet accepts it. The plan
