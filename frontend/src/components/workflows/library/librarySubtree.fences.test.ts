@@ -32,6 +32,12 @@
  * `import.meta.glob` expands at build time over files that EXIST, so a listed path with no
  * file simply has no key in the record and contributes the empty string — it never throws.
  *
+ * ⚠ 192.1-03 (D-33): THE LIST HAS GROWN AND WILL GROW AGAIN — read its length from the array,
+ * not from this paragraph. The seven above were Phase 192's; the G-5 fork extraction adds its
+ * own, and the identity pair follows. The rule that survives every one of those additions is
+ * the one stated at `LIBRARY_SUBTREE_PATHS` itself: **a module joins the list in the same
+ * commit that creates it**, because an unlisted module is swept by nothing at all.
+ *
  * ⚠ F1 IS PARSED, NOT GREPPED, AND THE REASON IS THIS FILE'S OWN NEIGHBOURS.
  * `libraryVocabulary.ts` EXPLAINS the D-14 rule in its docblock, and a raw source grep for
  * the attribute spelling reds on the prose that documents the very rule it enforces — the
@@ -62,7 +68,17 @@ import pageSource from "@/pages/WorkflowsPage?raw"
 
 // ── the swept corpus ─────────────────────────────────────────────────────────────────
 
-/** Every module of the library subtree, named now, before four of them exist. */
+/**
+ * Every module of the library subtree, named now, before some of them exist.
+ *
+ * ⚠ 192.1-03 (D-33) — THE LIST IS WIDENED IN THE SAME COMMIT THAT ADDS A MODULE, and that is
+ * a decision rather than a habit. The corpus is an EXPLICIT LIST, not a glob, so a module
+ * absent from it is swept by NOTHING — F1, T-192-04, F4 and F5 all silently skip it while
+ * every one of them stays green. That is the *"a guardrail cannot see what is absent from its
+ * list"* lesson `CLAUDE.md` records for `WorkflowsPage.tsx` and G-5, reproduced one layer
+ * down. The `toHaveLength` below is what makes forgetting impossible: adding a path reds it
+ * immediately, so the two edits cannot separate.
+ */
 const LIBRARY_SUBTREE_PATHS = [
   "./libraryRow.ts",
   "./libraryVocabulary.ts",
@@ -71,6 +87,9 @@ const LIBRARY_SUBTREE_PATHS = [
   "./WorkflowDeleteSheet.tsx",
   "./WorkflowCard.tsx",
   "./LibraryToolbar.tsx",
+  // ── 192.1-03 (D-01 / D-33): the G-5 fork extraction — its pure leaves, then the hook ──
+  "./libraryFork.ts",
+  "./useWorkflowFork.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -89,13 +108,22 @@ const SWEPT: { path: string; source: string }[] = LIBRARY_SUBTREE_PATHS.map((pat
 const subtreeSource = SWEPT.map(({ source }) => source).join("\n")
 
 describe("the sweep is looking at something (non-vacuity)", () => {
-  it("names all seven subtree modules, including the four not yet written", () => {
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(7)
+  it("names every subtree module, including the ones written after this fence", () => {
+    // ⚠ THE LITERAL IS READ OUT OF THIS ASSERTION'S OWN FAILING DIFF, never predicted.
+    // 192.1-03 added `./libraryFork.ts` and observed `expected […] to have a length of 7 but
+    // got 8` before writing the 8 — which is the whole point of the pin: the two edits cannot
+    // separate, so a module can never be added without entering the corpus.
+    // ⚠ AND THE ARITHMETIC IN THE PLANNING DOCUMENTS IS NOT THE SOURCE. `192.1-RESEARCH.md`
+    // §7a says this list ends at 10 and `192.1-CONTEXT.md` D-35 corrects it to 12; both are
+    // forecasts of a plan decision. The number here is the array's measured length.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(9)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
       "./WorkflowCard.tsx",
       "./LibraryToolbar.tsx",
+      "./libraryFork.ts",
+      "./useWorkflowFork.ts",
     ]) {
       expect(LIBRARY_SUBTREE_PATHS as readonly string[]).toContain(later)
     }
@@ -539,9 +567,33 @@ const PAGE_IMPORTED_MODULES = [
   "LibraryToolbar",
   "WorkflowCard",
   "libraryVocabulary",
+  // ── 192.1-03 (D-01 / G-5): the fork extraction's downward edge ──
+  "useWorkflowFork",
+  // ⚠ `libraryFork` IS DELIBERATELY NOT LISTED, for the same reason `WorkflowDeleteSheet` is
+  // not, and the ⚠ block above states that reason in general terms. Measured here: after the
+  // cut the page has NO remaining use of `freshHash` or `isForkConflict` — both are consumed
+  // only by the two handlers, which left with them — so the page does not import the module
+  // at all. Listing it would assert a coupling that must not exist, and `noUnusedLocals` makes
+  // manufacturing one a TYPE ERROR rather than merely untidy. The pure leaves are reached
+  // THROUGH the hook, which is the correct shape of a two-layer cut.
+  // ⚠ THIS CORRECTS `192.1-03-PLAN.md` Task 3(a), which says to add both names.
 ] as const
 
-/** The six symbols the page must no longer DECLARE — the three cards, the modal, the two leaves. */
+/**
+ * The symbols the page must no longer DECLARE — the three cards, the modal, and (192.1-03)
+ * the whole fork concern.
+ *
+ * ⚠ THE TWO SPELLING FAMILIES ARE NOT INTERCHANGEABLE, and the distinction is what makes the
+ * fork entries work at all. `freshHash` and `isForkConflict` were MODULE-SCOPE `function`
+ * declarations, so the existing `"function …("` pattern matches them exactly. `onTweak`,
+ * `onUseStarter`, `draftBySlug` and `forkFailed` are COMPONENT-SCOPE `const`s — a
+ * `"function …("` needle would never have matched them, and a fence that cannot match is a
+ * fence that passes vacuously. Their declaration spellings are used instead.
+ *
+ * All six were observed RED against the page as it stood BEFORE the cut — a stronger drive
+ * than a plant-and-restore, because the "plant" is the real shipped declaration, so no file
+ * was mutated and none needed restoring.
+ */
 const PAGE_MUST_NOT_DECLARE = [
   "function RunModal(",
   "type DeletePhase",
@@ -549,6 +601,13 @@ const PAGE_MUST_NOT_DECLARE = [
   "function PublishedCard(",
   "function DraftCard(",
   "function StarterCard(",
+  // ── 192.1-03 (D-01) — the fork concern, in both declaration families ──
+  "function freshHash(",
+  "function isForkConflict(",
+  "const onTweak = useCallback",
+  "const onUseStarter = useCallback",
+  "const [forkFailed, setForkFailed]",
+  "const draftBySlug = useMemo",
 ] as const
 
 /** A re-export shim — the thing that keeps the coupling while every negative stays green. */

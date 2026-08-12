@@ -65,11 +65,18 @@
 // at 200 rows is the 045 real-scale lesson's cost, and a fourth `useState` holding the merged
 // list is the drift where two sources of truth disagree about what the library contains.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+// Phase 192.1-03 (D-01): the draft-CREATE client is gone from this line, and it was READ OUT
+// of `tsc` rather than predicted — exactly ONE orphan (`TS6133`), where 192-06 had five,
+// 192-08 seven and 192-10 four. `noUnusedLocals` is on in `tsconfig.app.json`, so an import
+// left behind by a cut is a TYPE ERROR, not a lint warning, and the typecheck baseline is what
+// says which of the fork handlers' imports the rest of the page still needs. It needs all the
+// others: the three list clients feed the three feeds, and all three types are read by
+// `onOpenDraft`, the Builder seed state and the surviving `LibraryRow` adapters. This page now
+// reaches no workflow WRITE endpoint at all — the fork's POST is the hook's.
 import {
   listPublishedWorkflows,
   listStarterWorkflows,
   listDraftWorkflows,
-  createWorkflowDraft,
   type PublishedWorkflow,
   type WorkflowDraftRow,
   type WorkflowDefinitionJSON,
@@ -127,6 +134,13 @@ import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/libr
 // state and layout, and declares no card, no filter item and no modal of its own.
 import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
+// Phase 192.1-03 (D-01 / G-5): the fork concern, reached rather than declared. See the call
+// site below for why its POSITION in the component body is load-bearing, and the module's own
+// header for the ledger row that made this cut due.
+import {
+  useWorkflowFork,
+  type ForkSeed,
+} from "@/components/workflows/library/useWorkflowFork"
 import {
   LIBRARY_STATES,
   forkFailedMessage,
@@ -134,37 +148,17 @@ import {
 } from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
 
-/** Phase 143 (WF-01 / D-143-1) — a 6-char base36 fork-slug suffix for the fresh-copy
- *  fork (`<starter-slug>-<hash>`). Robustly 6 chars of [a-z0-9] even if a single
- *  Math.random().toString(36) run falls short (rare), so it always matches the
- *  `<slug>-[a-z0-9]{6}` shape the fork/collision contract expects (Pitfall 5). */
-function freshHash(): string {
-  let h = ""
-  while (h.length < 6) h += Math.random().toString(36).slice(2)
-  return h.slice(0, 6)
-}
-
-/**
- * 192-15 (WR-03) — IS THIS FORK FAILURE A SLUG/VERSION COLLISION? ONE HOME FOR ONE QUESTION.
- *
- * It changes NOTHING about behaviour. `onUseStarter` already asked this question inline to
- * decide whether to retry, and `onTweak` now has to ask it to decide which true sentence to
- * show — and two copies of one predicate are two answers to one question waiting to disagree.
- *
- * ⚠ WR-08, RECORDED HONESTLY RATHER THAN HIDDEN BEHIND A TIDY NAME: keying control flow on
- * ERROR PROSE is fragile, and giving it a function does not make it less so. `createWorkflowDraft`
- * throws a bare `Error` whose MESSAGE carries the status (`…(status 409)`), so the status code is
- * only reachable as a substring. The real fix is a typed error at the throw site — an `api.ts`
- * change with callers OUTSIDE this page (notably `useDraftPersistence`), which is a new surface
- * and therefore out of scope for a gap-closure round under G-7. Naming it here is the honest
- * middle: the fragility now has exactly one place to be fixed instead of two.
- *
- * RE-OPEN TRIGGER: the next phase that touches `createWorkflowDraft`'s throw site replaces this
- * substring test with the typed error's own discriminator, in the same commit.
- */
-function isForkConflict(e: unknown): boolean {
-  return String(e).includes("409")
-}
+// ── 192.1-03 (D-01 / G-5) — THE TWO PURE FORK LEAVES LEFT FROM HERE ────────────────────
+//
+// The 6-char base36 slug suffix and the 409 classifier were declared at this spot and are
+// declared nowhere on this page now. Both were module-scope and closed over NOTHING, so the
+// move was byte-preserving — verified by comparing the spans line for line, not asserted.
+// They live in `library/libraryFork.ts` with their docblocks and WR-08's re-open trigger
+// intact, and this page does not import them: their only two consumers were the two fork
+// handlers, which left in the same commit. The hook reaches them; the page reaches the hook.
+// The OD fence pins both halves of that (`librarySubtree.fences.test.ts` —
+// `PAGE_MUST_NOT_DECLARE` names each in its own declaration family, driven RED against these
+// very lines before they were deleted).
 
 /**
  * A small violet net-new honesty flag (D14).
@@ -277,16 +271,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   >(null)
   // The post-publish Run CTA (sketch 023-A): set on a gauntlet PASS.
   const [runCta, setRunCta] = useState<{ slug: string; version: number } | null>(null)
-  /**
-   * 192-15 (WR-03) — A FORK CLICK THAT FAILED, HELD UNTIL THE NEXT FORK ATTEMPT.
-   *
-   * It carries a DISPLAY NAME and a BOOLEAN, deliberately, rather than the error itself: a
-   * shape that cannot hold server prose, a status code or an id cannot leak one to the surface
-   * (T-192-40). The raw error keeps going to `console.error` at the boundary for whoever is
-   * debugging — the `WorkflowDraftUnreadableError` posture, where the developer's evidence and
-   * the person's sentence are two different things and one never replaces the other.
-   */
-  const [forkFailed, setForkFailed] = useState<{ name: string; conflict: boolean } | null>(null)
+  // 192.1-03 (D-01): the fork-failure notice STATE left with the fork concern — it is the
+  // hook's, and this page reads it back off `useWorkflowFork` below. The notice's RENDER stays
+  // here, in the failure region it has always shared with `failedSources`; see that render
+  // site for why the region, not the state, is what belongs to the page.
 
   // ── Latest-wins race guards (Phase 103-ux) ──────────────────────────────────
   // Rapid project-filter clicks fire overlapping fetches; without a guard a SLOW
@@ -515,28 +503,6 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   )
   const loading = !anySettled
 
-  /**
-   * 192-14 (the U5 blocker) — THE DRAFTS THIS CALLER ALREADY OWNS, BY SLUG.
-   *
-   * Built from the `drafts` feed, which `GET /workflows/drafts` scopes server-side to
-   * `created_by = caller`. A slug match here can therefore only ever resolve to a row this
-   * person already owns — the lookup widens no scope and reaches no new endpoint.
-   *
-   * ⚠ THE HIGHEST VERSION WINS, and the rule is stated because "the draft for this slug" is
-   * genuinely ambiguous: measured in the live DB on 2026-08-11, `pm-weekly-status-report`
-   * carries `1:published, 2:draft, 3:published, 4:draft` — TWO drafts under one slug. Left to
-   * insertion order the answer would be whichever the server happened to return first, which is
-   * not an answer. The most recent fork is the one a person means by "my copy".
-   */
-  const draftBySlug = useMemo(() => {
-    const bySlug = new Map<string, WorkflowDraftRow>()
-    for (const d of drafts) {
-      const held = bySlug.get(d.slug)
-      if (!held || d.version > held.version) bySlug.set(d.slug, d)
-    }
-    return bySlug
-  }, [drafts])
-
   // ── Open a draft: load THAT draft's definition into the Builder editing view
   //    (edit-in-place — saves PATCH the same row via its real id). ──
   //
@@ -559,139 +525,45 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     setPageView("builder")
   }, [])
 
-  // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row —
-  //    then open the FORKED copy's existing steps in the Builder (NOT the describe
-  //    screen). The new draft id is captured so every save PATCHes the fork.
+  /**
+   * 192.1-03 (D-01 / G-5) — THE BUILDER HANDOFF, AS THE FORK CONCERN'S ONE WAY BACK.
+   *
+   * `setBuilderInitial` and `setPageView` are this page's Builder host and did NOT move; the
+   * hook hands a seed back through this single callback instead. The reason is recorded in
+   * the code the hook inherited (192-14, at the existing-draft branch): reusing ONE seeding
+   * path is what threads 186-07's opaque concurrency token by construction instead of by
+   * remembering to — a dropped token is a silent-clobber bug that typechecks. Taking the
+   * setter into the hook would have re-opened two call sites for a future author to forget
+   * one of; taking a callback leaves exactly one fork-time seeding site, and it is here.
+   */
+  const onForked = useCallback((seed: ForkSeed) => {
+    setBuilderInitial(seed)
+    setPageView("builder")
+  }, [])
+
+  // ── 192.1-03 (D-01 / D-29 / G-5) — THE FORK CONCERN, NOW ONE CALL ──────────────────────
   //
-  //    ⚠ 192-14 — FIRST, THOUGH: if this caller ALREADY has a draft of this slug, the verb
-  //    OPENS THAT DRAFT and creates nothing. That branch is the operator's 2026-08-11
-  //    decision on the U5 blocker (`192-UAT.md` test 11), where a fork click 409'd twice and
-  //    the surface said nothing at all. Opening the existing copy removes the collision
-  //    class outright rather than making it rarer, and the card says so before the click
-  //    (the card's `FORK_CONSEQUENCE_EXISTING` sentence, 192-13). ──
-  const onTweak = useCallback(
-    async (wf: PublishedWorkflow) => {
-      // ── THE EXISTING-DRAFT BRANCH (192-14) ──
-      // Nothing is created and nothing is fetched, so there is no request that can 409.
-      // `onOpenDraft` is REUSED rather than a third `setBuilderInitial` call site added,
-      // which is what threads 186-07's opaque concurrency token by construction instead of
-      // by remembering to — a dropped token is a silent-clobber bug that typechecks.
-      const existing = draftBySlug.get(wf.slug)
-      if (existing) {
-        onOpenDraft(existing)
-        return
-      }
-
-      // ── THE CREATE PATH, DELIBERATELY UNCHANGED BELOW THIS LINE ──
-      // `def.version` is read off the JSONB `definition`, where it is NULL on every live row
-      // (the real version is the `version` COLUMN), so `nextVersion` is effectively the
-      // constant 2. That is left ALONE on purpose: `PublishedWorkflow` carries no `version`
-      // on the wire (root cause C in `192-UAT.md`), so the client is not told the real one,
-      // and a "smarter" guess would only make the collision RARER — which is exactly what the
-      // operator's decision rejected in favour of removing the failure class.
-      //
-      // ⚠ THE RESIDUAL, NAMED RATHER THAN SMOOTHED. Re-measured in the live local DB on
-      // 2026-08-11: 18 slugs carry more than one version, and 2 of them —
-      // `meridian-risk-summary-good-07aedc33` and `readonly_refusal_098uat` — are
-      // `published + published` with NO draft at all. The branch above cannot help those:
-      // their fork still 409s. Plan `192-15` is what makes that refusal VISIBLE instead of
-      // silent. 16 of 18 is not "the class is gone", and this comment exists so nobody reads
-      // it that way.
-      const def = (wf.definition ?? {}) as Record<string, unknown>
-      const currentVersion = typeof def.version === "number" ? (def.version as number) : 1
-      const nextVersion = currentVersion + 1
-      const forked = {
-        ...def,
-        slug: wf.slug,
-        version: nextVersion,
-        status: "draft",
-      } as WorkflowDefinitionJSON
-      // 192-15: clear any notice from a PREVIOUS attempt before making this one. A failure
-      // message left standing over a later success is its own kind of lie (T-192-43).
-      setForkFailed(null)
-      try {
-        const created = await createWorkflowDraft(forked)
-        await refetchDrafts()
-        // Load the fork's existing definition into the editing view with its NEW id.
-        setBuilderInitial({
-          definition: forked,
-          draftId: created.id,
-          label: `Tweak · ${wf.slug} v${nextVersion}`,
-          // 186-07: the create response's own token guards the fork's first PATCH.
-          token: created.token,
-        })
-        setPageView("builder")
-      } catch (e) {
-        // 192-15 (WR-03): the log STAYS — it is the developer's evidence — and the person
-        // now gets a sentence too. This is the path the 2 measured `published + published`
-        // residual slugs above take, and it is the only thing standing between them and a
-        // dead button, so it reports rather than swallows. Tweak has NO retry and gains none:
-        // its 409 is a deterministic collision, and a second identical write would fail
-        // identically while making the surface look busy.
-        console.error("[WorkflowsPage] Tweak fork failed", e)
-        setForkFailed({ name: wf.name, conflict: isForkConflict(e) })
-      }
-    },
-    [refetchDrafts, draftBySlug, onOpenDraft],
-  )
-
-  // ── Use this starter (WF-01, D-143-1): a FRESH-COPY fork. A sibling of onTweak
-  //    with exactly two deltas — a NEW auto-suffixed slug + version:1 (NOT the
-  //    same-slug Tweak's v(N+1)) — required because UNIQUE(slug, version) is GLOBAL
-  //    across all users, so two forkers of ONE shared starter can't both mint
-  //    <slug> v(N+1). The server (createWorkflowDraft → POST /workflows) forces
-  //    is_system_global=false / status=draft / created_by=caller; the published starter row
-  //    stays frozen. On a 409 slug/version collision (astronomically unlikely hash
-  //    clash) retry once with a fresh hash (Pitfall 5). Lands in the Builder (D-143-1a). ──
-  const onUseStarter = useCallback(
-    async (starter: PublishedWorkflow) => {
-      const def = (starter.definition ?? {}) as Record<string, unknown>
-      // 192-15: same rule as Tweak — clear before attempting, so a stale notice can never
-      // sit above a fork that has just succeeded. BEFORE the loop, not inside it: the retry
-      // is one attempt from the person's point of view.
-      setForkFailed(null)
-      for (let attempt = 0; attempt < 2; attempt++) {
-        // NOTE: `def` may carry `category:"starter"` — that is SAFE (Plan 01 added the
-        // additive field to WorkflowDefinition); do NOT strip it from the fork body.
-        const forked = {
-          ...def,
-          slug: `${starter.slug}-${freshHash()}`,
-          version: 1,
-          status: "draft",
-        } as WorkflowDefinitionJSON
-        try {
-          const created = await createWorkflowDraft(forked)
-          await refetchDrafts()
-          setBuilderInitial({
-            definition: forked,
-            draftId: created.id,
-            label: `From starter · ${starter.name}`,
-            // 186-07: same as Tweak — the fresh copy's create response carries it.
-            token: created.token,
-          })
-          setPageView("builder")
-          return
-        } catch (e) {
-          // Retry ONCE on a slug/version collision; any other error surfaces + stops.
-          //
-          // ⚠ 192-15 — THE RETRY IS UNTOUCHED. Only the classification moved into
-          // `isForkConflict` (byte-identical predicate, one home instead of two). Deleting the
-          // retry would have been "fixing" the silence by removing the very behaviour that
-          // needed reporting, so it is pinned from the inside by a case asserting exactly TWO
-          // `createWorkflowDraft` calls (T-192-42).
-          if (attempt === 0 && isForkConflict(e)) continue
-          // The TERMINAL branch — the one that already logged and returned. Now it also says
-          // so. Both fork handlers report, because they share ONE WORD on the card face (D-12)
-          // and a person cannot tell which of them they clicked; a surface that reports only
-          // half its failures is not honest.
-          console.error("[WorkflowsPage] starter fork failed", e)
-          setForkFailed({ name: starter.name, conflict: isForkConflict(e) })
-          return
-        }
-      }
-    },
-    [refetchDrafts],
-  )
+  // What used to be ~225 lines here — the 6-char slug suffix, the 409 classifier, the
+  // `forkFailed` state, the by-slug draft index, both fork handlers and the two `LibraryRow`
+  // adapters that feed them — is `library/useWorkflowFork.ts`. The ledger row for this file
+  // named this exact seam and named WR-08 as the trigger; 162-B's name prompt is the second
+  // concern that made it due, so the recommendation was produced first and taken.
+  //
+  // ⚠ THE CALL SITE'S POSITION IS LOAD-BEARING, AND IT TYPECHECKS EITHER WAY. It reads
+  // `onOpenDraft` (declared immediately above), `refetchDrafts` and `drafts`, and a hook
+  // argument is evaluated at RENDER time — so placing this where the draft index used to sit,
+  // ABOVE `onOpenDraft`, is a temporal-dead-zone `ReferenceError` on every render: a crash,
+  // not a lint warning. That is 192-14's warning nine lines up, inherited by the extraction
+  // rather than retired by it. It is verified by running the page's suites, not by reading.
+  //
+  // `refetchDrafts` is passed IN and stays here: it owns `draftsSeqRef`, `setDrafts` and
+  // `markSource("draft", …)` — the fetch-orchestration concern, which is still the page's.
+  const { forkFailed, draftBySlug, onForkNewVersion, onForkStarter } = useWorkflowFork({
+    drafts,
+    refetchDrafts,
+    onOpenDraft,
+    onForked,
+  })
 
   // 186-07: a TRUE fresh build seeds nothing at all — no row exists yet, so there is no
   // token to carry. `useDraftPersistence` creates the row on the first write and adopts
@@ -701,21 +573,26 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     setPageView("builder")
   }, [])
 
-  // ── 192-10 (D-09 / D-12) — THE CARD'S FIVE CALLBACKS ─────────────────────────────────
+  // ── 192-10 (D-09 / D-12) → 192.1-03 (D-29 / D-37) — THE CARD'S THREE REMAINING ADAPTERS ─
   //
-  // `WorkflowCard` speaks `LibraryRow`; the four shipped handlers above speak the WIRE types.
-  // These five adapters are the whole seam, and each reads `row.source` — the original wire
-  // object, kept whole by `libraryRow.ts` precisely so a handler never receives a rebuilt
+  // ⚠ THIS BLOCK SAID "THE CARD'S FIVE CALLBACKS" UNTIL 192.1-03, AND IT IS REWRITTEN RATHER
+  // THAN LEFT STANDING. Two of the five — the fork pair — moved into `useWorkflowFork` with
+  // the handlers they exist to feed (D-29), and a docblock asserting five where three remain
+  // is the wrong-pointer-in-prose failure Phase 189 banked: nothing typechecks prose, so the
+  // only thing that keeps it true is amending it in the same commit that falsifies it (D-37).
+  //
+  // `WorkflowCard` speaks `LibraryRow`; the handlers speak the WIRE types. These three
+  // adapters are what is left of that seam here, and each reads `row.source` — the original
+  // wire object, kept whole by `libraryRow.ts` precisely so a handler never receives a rebuilt
   // object that has quietly lost a field (`onOpenDraft` needs the draft's opaque `token`; a
   // rebuilt object that drops it is the D-186-07 SILENT CLOBBER — a behaviour bug that
-  // typechecks).
+  // typechecks). They feed `onRun`, `onOpen` and `onDeleted`, none of which is the fork
+  // concern — which is exactly why they stayed.
   //
-  // ⚠ D-12 — THE TWO FORK ADAPTERS ARE SIBLINGS AND ARE NEVER MERGED. `onForkNewVersion`
-  // reaches `onTweak` (SAME slug at version N+1) and `onForkStarter` reaches `onUseStarter`
-  // (a FRESH auto-suffixed slug at version 1, retried once on a 409). They share one word on
-  // the card face because the user's intent is identical; merging the handlers behind that
-  // word breaks the GLOBAL `UNIQUE(slug, version)` constraint the moment two people fork one
-  // shared starter. The card branches on `provenance` and constructs neither slug nor version.
+  // The card's other two props, `onForkNewVersion` and `onForkStarter`, are read off the hook
+  // above and passed through unchanged. ⚠ D-12'S NEVER-MERGED RULE MOVED WITH THEM and is
+  // stated in full beside the two adapters it now governs, in `useWorkflowFork.ts` — the one
+  // place that can enforce it, because it is the only place that still declares them.
   const handleRun = useCallback((row: LibraryRow) => {
     setRunFor(row.source as PublishedWorkflow)
     setKickoff("")
@@ -724,16 +601,6 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   const handleOpen = useCallback(
     (row: LibraryRow) => onOpenDraft(row.source as WorkflowDraftRow),
     [onOpenDraft],
-  )
-
-  const handleForkNewVersion = useCallback(
-    (row: LibraryRow) => onTweak(row.source as PublishedWorkflow),
-    [onTweak],
-  )
-
-  const handleForkStarter = useCallback(
-    (row: LibraryRow) => onUseStarter(row.source as PublishedWorkflow),
-    [onUseStarter],
   )
 
   /**
@@ -1009,7 +876,14 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
 
           EXACTLY ONE NODE. Two nodes carrying one `data-testid` is a selector that throws
           rather than a surface that reports twice (this page's own recorded rule, stated at
-          the in-flight marker below). */}
+          the in-flight marker below).
+
+          ⚠ 192.1-03 (D-01): THE STATE MOVED, THE RENDER DID NOT, and the split is the point.
+          `forkFailed` is `useWorkflowFork`'s — the fork concern owns its own failure. WHERE
+          the sentence appears is a page-LAYOUT decision, and the paragraph above is the whole
+          argument for this spot; moving the JSX into the hook would carry a layout decision
+          into a module that cannot see the region it belongs to, and would make the hook a
+          `.tsx`. The markup below is byte-identical to what 192-15 shipped. */}
       {forkFailed && (
         <p
           data-testid="library-fork-failed"
@@ -1069,8 +943,8 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 folderName={folderName(row.def?.project_folder_id)}
                 onRun={handleRun}
                 onOpen={handleOpen}
-                onForkNewVersion={handleForkNewVersion}
-                onForkStarter={handleForkStarter}
+                onForkNewVersion={onForkNewVersion}
+                onForkStarter={onForkStarter}
                 /* 192-14 — the sentence changes ONLY where the behaviour changes (D-14).
                    The `provenance === "published"` clause is load-bearing, not defensive: a
                    STARTER's fork runs `onUseStarter`, which ALWAYS mints a fresh

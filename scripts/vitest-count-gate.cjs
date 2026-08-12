@@ -969,7 +969,54 @@ const BASELINE = {
   // hand-counted from `it(` literals, never carried from a SUMMARY — the distinction this
   // block's header paragraph records is not ceremonial.
   "libraryFilter.test.ts": 48,
-  "librarySubtree.fences.test.ts": 64,
+  // ── 192.1-03 Task 1 (D-01 / D-33): 64 → 67. AN EXTENSION, NEVER A LOWERING. ────────────
+  // The +3 are arithmetic, not authorship: `LIBRARY_SUBTREE_PATHS` gained ONE path
+  // (`./libraryFork.ts`, the G-5 fork extraction's pure leaves) and exactly three
+  // `it.each(LIBRARY_SUBTREE_PATHS)` blocks sweep it — F1 (`:202`), T-192-04 (`:224`) and F4
+  // (`:266`). One path × three sweeps = +3, and the arithmetic is stated so the NEXT module
+  // added is expected to move this by three again rather than by a number someone guesses.
+  // ⚠ THE CORPUS EDIT AND THIS PIN ARE ONE COMMIT BY DESIGN (D-33). An unlisted module is
+  // swept by NOTHING while every fence stays green, so the `toHaveLength` assertion is what
+  // forces the pairing — it was observed RED (`expected […] to have a length of 7 but got 8`)
+  // before either number was written.
+  // ── 192.1-03 Task 2 (D-01 / D-29 / D-33): 67 → 70. The SAME +3 arithmetic, again. ──────
+  // `./useWorkflowFork.ts` joined the corpus in the commit that created it, and the three
+  // `it.each` sweeps picked it up: one path × three sweeps = +3. Observed RED first
+  // (`expected […] to have a length of 8 but got 9`), then read from this script's own
+  // `actual` column across TWO AGREEING RUNS, 2026-08-12, both printing
+  // `librarySubtree.fences.test.ts 67 70 +3` at `total 3217 · failed 0`.
+  // ── 192.1-03 Task 3 (D-01 / D-37): 70 → 77. THE OD FENCE, EXTENDED WITH THE CUT. ───────
+  // The +7 is arithmetic too, and it decomposes exactly: SIX new `PAGE_MUST_NOT_DECLARE`
+  // entries (the fork concern in BOTH declaration families — two module-scope `function`s
+  // that the shipped `"function …("` needle matches, and four component-scope `const`s that
+  // it never would have) plus ONE new `PAGE_IMPORTED_MODULES` entry (`useWorkflowFork`).
+  // ⚠ `libraryFork` is deliberately NOT an eighth: after the cut the page has no use for the
+  // pure leaves and does not import them, so listing it would assert a coupling that must not
+  // exist — the fence's own recorded rule for `WorkflowDeleteSheet`. This CORRECTS
+  // `192.1-03-PLAN.md` Task 3(a), which names both.
+  // ⚠ ALL SEVEN WERE DRIVEN RED BEFORE THE CUT, against the page's REAL shipped declarations
+  // — a stronger drive than a plant-and-restore, because no file was mutated and none needed
+  // restoring. Then read from this script's own `actual` column across TWO AGREEING RUNS,
+  // 2026-08-12, both printing `librarySubtree.fences.test.ts 70 77 +7` and
+  // `WorkflowsPage.test.tsx 48 48 0` at `total 3224`.
+  // ⚠ THE `failed` COLUMN DISAGREED ACROSS THOSE RUNS (1, then 0) AND IS RECORDED RATHER THAN
+  // RE-RUN AWAY: D-192-DEF-01 measured `0 / 0 / 1` on a clean tree with the same cap, so on
+  // this machine the COUNT columns are the regression backstop and the `failed` line is not.
+  // The counts agreed exactly on both runs.
+  "librarySubtree.fences.test.ts": 77,
+  // ── 192.1-03 Task 1 (D-01 / D-22 / T-192.1-05): a NEW suite, pinned in its first commit ──
+  // `freshHash` + `isForkConflict` proved as ARITHMETIC in the `libraryFilter.test.ts`
+  // posture — both close over nothing, so nothing renders. Includes the T-192.1-05 grep
+  // (no `randomUUID`, no `crypto.` — the "upgrade" that would break D-13's `[a-z0-9]{6}`
+  // lineage regex) and the D-22 assertion that WR-08's re-open trigger survived the move.
+  // ⚠ NO `TARGETS` LINE IS NEEDED and that is measured rather than assumed: the gate printed
+  // `libraryFork.test.ts — 11 new`, and a file the gate never runs cannot report a number at
+  // all, so a printed `actual` IS the proof the `src/components/workflows` DIRECTORY entry
+  // already reaches it.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
+  // printing `librarySubtree.fences.test.ts 64 67 +3` and `libraryFork.test.ts — 11 new` at
+  // `total 3214 · failed 0` — never hand-counted from `it(` literals.
+  "libraryFork.test.ts": 11,
   "LibraryToolbar.test.tsx": 36,
   // ── 192-16 (GAP-CLOSURE ROUND 1, wave 4): 35 → 39. AN EXTENSION, NEVER A LOWERING. ──────
   // The +4 are 192-13's card-sentence cases: a published row the user has ALREADY forked now
