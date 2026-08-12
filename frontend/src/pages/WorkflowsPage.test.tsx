@@ -135,6 +135,9 @@ import { HighlightTitle } from "@/lib/threadGroups"
 import {
   FORK_CONSEQUENCE,
   FORK_CONSEQUENCE_EXISTING,
+  // 192.1-07 (D-20): the collision WARNING, imported rather than spelled — a test that types
+  // the sentence inline has forked the acceptance bar the generated contract exists to hold.
+  FORK_HINT_CLASH,
   forkFailedMessage,
 } from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
@@ -486,6 +489,35 @@ async function openOverflow(card: HTMLElement) {
   return user
 }
 
+/**
+ * 192.1-07 (LIB-05 / D-19) — THE STEP 162-B PUT BETWEEN THE CLICK AND THE POST.
+ *
+ * ⚠ EVERY SHIPPED FORK CASE IN THIS FILE THAT REACHES `createWorkflowDraft` NOW CALLS THIS,
+ * AND THAT IS STATED PLAINLY RATHER THAN SLIPPED IN. The plan required 192-14's cases at
+ * `:886` and T-192-42's at `:1081` to stay green with their assertions unchanged, and they
+ * are: **not one `expect(…)` line in this file was edited to accommodate the prompt.** What
+ * changed is the INTERACTION — a fork click now opens a dialog, and a test that never types a
+ * name is a test of a person who walked away. The three cases at `:886` that assert the
+ * already-forked path are untouched even here, because D-23 means no prompt appears on them.
+ *
+ * The one assertion that DID move is `:862`'s Builder caption, and it moved because the
+ * behaviour did: the header used to read the parent's SLUG and now reads the typed NAME.
+ *
+ * ⚠ NO `findBy` ON AN ABSENT NODE (T-4). This file sets `asyncUtilTimeout: 15000`, longer than
+ * vitest's 5 s per-test budget, so a `findByTestId` for a dialog that never mounts blows the
+ * TEST timeout and yields a RED indistinguishable from D-192-DEF-01's timeout class. Here the
+ * node is expected to be PRESENT, which is the safe direction; the cases that assert its
+ * ABSENCE wait on a node that is present on their own path first, then query synchronously.
+ */
+async function nameTheCopy(user: Awaited<ReturnType<typeof openOverflow>>, name: string) {
+  const field = await screen.findByTestId("fork-name-input")
+  await user.type(field, name)
+  await user.click(screen.getByTestId("fork-name-create"))
+}
+
+/** The name typed at the prompt in the shipped fork cases, in one place so a case can read it. */
+const TYPED_NAME = "My vendor-risk copy"
+
 beforeEach(() => {
   vi.clearAllMocks()
   if (!Element.prototype.hasPointerCapture) Element.prototype.hasPointerCapture = () => false
@@ -826,6 +858,9 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     const cards = await screen.findAllByTestId("published-card")
     const user = await openOverflow(cards[0])
     await user.click(screen.getByTestId("published-tweak"))
+    // 192.1-07 (D-19): the copy is named before anything is written. The three slug/version/
+    // status assertions below are BYTE-IDENTICAL to the ones this case has always made.
+    await nameTheCopy(user, TYPED_NAME)
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     const forked = mockCreateDraft.mock.calls[0][0]
     expect(forked.slug).toBe("vendor-risk")
@@ -843,6 +878,7 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     const cards = await screen.findAllByTestId("published-card")
     const user = await openOverflow(cards[0])
     await user.click(screen.getByTestId("published-tweak"))
+    await nameTheCopy(user, TYPED_NAME)
     // The forked strict def's phases render as spine nodes (pull + emit).
     expect(await screen.findByTestId("spine-node-pull")).toBeInTheDocument()
     expect(screen.getByTestId("spine-node-emit")).toBeInTheDocument()
@@ -857,9 +893,16 @@ describe("WorkflowsPage — Tweak forks a v(N+1) draft (INSERT, never UPDATE)", 
     const cards = await screen.findAllByTestId("published-card")
     const user = await openOverflow(cards[0])
     await user.click(screen.getByTestId("published-tweak"))
+    await nameTheCopy(user, TYPED_NAME)
     await screen.findByTestId("spine-node-pull")
     // The header carries the Tweak caption with the new version.
-    expect(screen.getByText(/Tweak · vendor-risk v3/)).toBeInTheDocument()
+    // ⚠ 192.1-07 — THE ONE ASSERTION IN THIS FILE THE PROMPT CHANGED, and it changed because
+    // the BEHAVIOUR did. It read `/Tweak · vendor-risk v3/` — the parent's SLUG — and the
+    // caption now reads the name the person just typed. Showing them the slug back would be
+    // the surface disagreeing with the thing they had just told it. The version stays, because
+    // it is the one fact the name cannot carry.
+    // (Still a substring match, as it always was — `TYPED_NAME` carries no regex metacharacter.)
+    expect(screen.getByText(new RegExp(`Tweak · ${TYPED_NAME} v3`))).toBeInTheDocument()
   })
 })
 
@@ -973,11 +1016,90 @@ describe("192-14 (U5 blocker) — forking a slug you ALREADY have a draft of ope
 
     const user = await openOverflow(card)
     await user.click(screen.getByTestId("use-starter"))
+    // 192.1-07 (D-19 / D-12): a starter fork ALWAYS creates, so it ALWAYS asks — there is no
+    // "the copy you already started" on a fresh auto-suffixed slug. The three assertions
+    // below are unchanged, which is the point of this case: the prompt did not merge the two
+    // handlers behind the one word they share.
+    await nameTheCopy(user, "My risk register")
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     const forked = mockCreateDraft.mock.calls[0][0]
     expect(forked.slug).toMatch(/^risk-register-[a-z0-9]{6}$/)
     expect(forked.version).toBe(1)
     expect(forked.status).toBe("draft")
+  })
+
+  /**
+   * ⚠ 192.1-07 (D-23) — THE BLOCKER'S OWN GUARD, RESTATED AGAINST THE NEW STEP.
+   *
+   * The three cases above prove the already-forked path still opens the draft. What they
+   * cannot see is the prompt: a `pendingFork` set BEFORE the existing-draft lookup would leave
+   * every one of them green (the dialog does not create anything, so `createWorkflowDraft`
+   * stays at zero and the Builder still opens once the person cancels) while the surface asked
+   * a person to name a copy it was never going to make. That is the U5 blocker's own shape — a
+   * click that does something other than what it said — and it is worth its own case.
+   */
+  it("no NAME PROMPT appears on that path either, because nothing is being named", async () => {
+    seedExistingFork()
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    // ⚠ WAIT ON A NODE PRESENT ON THIS PATH FIRST (T-4). `spine-node-tuneup` is the EXISTING
+    // draft's own phase — it appears in neither the published def nor `draftRow` — so it is
+    // both the proof the right branch ran and a wait that cannot be satisfied by the wrong one.
+    // Only then is the absence queried, synchronously, so it can never read as a timeout.
+    expect(await screen.findByTestId("spine-node-tuneup")).toBeInTheDocument()
+    expect(screen.queryByTestId("fork-name-dialog")).toBeNull()
+    expect(mockCreateDraft).not.toHaveBeenCalled()
+  })
+
+  it("POSITIVE CONTROL — the same verb on a row with NO existing draft DOES ask", async () => {
+    // Without this, the case above is satisfied by a dialog that never mounts anywhere, by a
+    // renamed testid, and by a page that failed to render at all. `Quick notes` is the second
+    // published row in the shared fixture and no draft shares its slug.
+    seedExistingFork()
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Quick notes"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    expect(await screen.findByTestId("fork-name-dialog")).toBeInTheDocument()
+    // …and STILL nothing written: the prompt is the pause, not the write.
+    expect(mockCreateDraft).not.toHaveBeenCalled()
+  })
+
+  it("the copy ARRIVES under the typed name — `definition.name` is what the row is called", async () => {
+    // LIB-05's whole measurement in one assertion. 43 of the operator's 104 workflows share a
+    // name because a fork inherits its parent's; the server writes `definition.name` into the
+    // row's `name` COLUMN (`db/workflows.py:508-513`), which is the field every library feed
+    // renders. A caption-only change would have left the library exactly as unreadable.
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+    await nameTheCopy(user, "Q3 EU gap review")
+
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    expect(mockCreateDraft.mock.calls[0][0].name).toBe("Q3 EU gap review")
+    // The parent's name is NOT what was sent — which is the defect this phase exists to end.
+    expect(mockCreateDraft.mock.calls[0][0].name).not.toBe("Vendor-risk review")
+  })
+
+  it("a colliding name WARNS and still creates — the library's problem is not the user's fault", async () => {
+    // D-20 driven END TO END, over the REAL pre-flight rather than a stubbed `isClash`: the
+    // typed name is the display name of a row already in the merged feed (`draftRow` renders
+    // as "Contract clause review"), so the page's own predicate must classify it as a
+    // clash — and the create must happen anyway.
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
+    await user.click(screen.getByTestId("published-tweak"))
+
+    const field = await screen.findByTestId("fork-name-input")
+    await user.type(field, "Contract clause review")
+    expect(screen.getByTestId("fork-name-hint")).toHaveTextContent(FORK_HINT_CLASH)
+    expect(screen.getByTestId("fork-name-create")).toBeEnabled()
+
+    await user.click(screen.getByTestId("fork-name-create"))
+    await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
+    expect(mockCreateDraft.mock.calls[0][0].name).toBe("Contract clause review")
   })
 })
 
@@ -1055,6 +1177,12 @@ describe("192-15 (WR-03) — a fork click that fails says so", () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
     await user.click(screen.getByTestId("published-tweak"))
+    // 192.1-07 (D-19 / D-22): the copy is named FIRST, and it changes nothing about this
+    // case's subject. WR-08's 409 is a `UNIQUE(slug, version)` violation on SLUGS; the
+    // pre-flight reads DISPLAY NAMES. No name a person can type prevents this refusal, which
+    // is exactly why the notice below is still the only thing standing between them and a
+    // dead button. Every assertion in this case is unchanged.
+    await nameTheCopy(user, TYPED_NAME)
 
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     await expectForkFailureNotice("Vendor-risk review", true)
@@ -1071,6 +1199,7 @@ describe("192-15 (WR-03) — a fork click that fails says so", () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const user = await openOverflow(await publishedCardNamed("Vendor-risk review"))
     await user.click(screen.getByTestId("published-tweak"))
+    await nameTheCopy(user, TYPED_NAME)
 
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     await expectForkFailureNotice("Vendor-risk review", false)
@@ -1088,6 +1217,10 @@ describe("192-15 (WR-03) — a fork click that fails says so", () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const user = await openOverflow(await screen.findByTestId("starter-card"))
     await user.click(screen.getByTestId("use-starter"))
+    // ⚠ T-192-42's PIN IS ASSERTED THROUGH THE PROMPT, AND THE COUNT IS UNCHANGED AT TWO.
+    // One name typed once, one retry on the 409, two `createWorkflowDraft` calls — the prompt
+    // did not become a second attempt and the retry was not restructured under cover of it.
+    await nameTheCopy(user, "My risk register")
 
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(2))
     await expectForkFailureNotice("Risk Register", true)
@@ -1103,11 +1236,16 @@ describe("192-15 (WR-03) — a fork click that fails says so", () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const first = await openOverflow(await publishedCardNamed("Vendor-risk review"))
     await first.click(screen.getByTestId("published-tweak"))
+    await nameTheCopy(first, TYPED_NAME)
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     await expectForkFailureNotice("Vendor-risk review", true)
 
     const second = await openOverflow(await publishedCardNamed("Vendor-risk review"))
     await second.click(screen.getByTestId("published-tweak"))
+    // ⚠ THE SECOND PROMPT OPENS EMPTY, which is reset-on-open proved on the live page rather
+    // than only on the component: a field still holding the first attempt's name would make
+    // "the notice cleared" true while the surface quietly re-offered a failed answer.
+    await nameTheCopy(second, "My second attempt")
 
     // The Builder opened on the forked definition's own phases…
     expect(await screen.findByTestId("spine-node-pull")).toBeInTheDocument()
@@ -1142,6 +1280,7 @@ describe("WorkflowsPage — the starter row and its fresh-copy fork (WF-01, D-14
     const card = await screen.findByTestId("starter-card")
     const user = await openOverflow(card)
     await user.click(screen.getByTestId("use-starter"))
+    await nameTheCopy(user, "My risk register")
     await waitFor(() => expect(mockCreateDraft).toHaveBeenCalledTimes(1))
     const forked = mockCreateDraft.mock.calls[0][0]
     // D-143-1: a brand-new owned identity — a NEW auto-suffixed slug off "risk-register".

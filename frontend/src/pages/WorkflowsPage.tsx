@@ -147,6 +147,9 @@ import {
   useWorkflowFork,
   type ForkSeed,
 } from "@/components/workflows/library/useWorkflowFork"
+// Phase 192.1-07 (LIB-05 / D-19): 162-B's name prompt. It is MOUNTED here and wired to the
+// hook's pending fork; the page holds no fork logic of its own — see the mount below.
+import { ForkNameDialog } from "@/components/workflows/library/ForkNameDialog"
 import {
   LIBRARY_STATES,
   forkFailedMessage,
@@ -611,8 +614,26 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   //
   // `refetchDrafts` is passed IN and stays here: it owns `draftsSeqRef`, `setDrafts` and
   // `markSource("draft", …)` — the fetch-orchestration concern, which is still the page's.
-  const { forkFailed, draftBySlug, onForkNewVersion, onForkStarter } = useWorkflowFork({
+  //
+  // ⚠ 192.1-07 (D-19 / D-21): `rows` JOINS THE ARGUMENT OBJECT, and it strengthens the
+  // position rule above rather than merely extending it. `rows` is declared further UP this
+  // file than `onOpenDraft` is, so the hook call was already below both; a future author who
+  // moves this call to where the draft index used to sit now has TWO temporal-dead-zone
+  // crashes waiting rather than one. The list is passed IN because the page already merges it
+  // for the filter, the chip counts and the identity index — a second merge inside the hook
+  // would be a second answer to "what is in this library".
+  const {
+    forkFailed,
+    draftBySlug,
+    onForkNewVersion,
+    onForkStarter,
+    pendingFork,
+    confirmFork,
+    cancelFork,
+    isClash,
+  } = useWorkflowFork({
     drafts,
+    rows,
     refetchDrafts,
     onOpenDraft,
     onForked,
@@ -946,6 +967,32 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           {forkFailedMessage(forkFailed.name, forkFailed.conflict)}
         </p>
       )}
+
+      {/* ── 192.1-07 (LIB-05 / D-19 / D-21) — 162-B'S NAME PROMPT, MOUNTED AND NOTHING MORE ──
+          Five props, every one of them read straight off `useWorkflowFork`. THE PAGE GAINS NO
+          FORK LOGIC: it does not decide when to ask, it does not know what a clash is, it does
+          not build a slug or a version, and it does not touch the Builder here. That boundary
+          is the whole reason 192.1-03 cut the concern out first (D-01), and this mount is the
+          test of whether the cut held — a seam you can build a feature on without reopening.
+
+          ⚠ IT RENDERS UNCONDITIONALLY AND GATES ON `open`, rather than being wrapped in
+          `{pendingFork && …}`. That is Radix's contract, not a style: the primitive owns the
+          enter/exit transition and the focus return, and unmounting the tree underneath it
+          takes both away. `sourceName` falls back to `""` for the closed frames, where nothing
+          reads it.
+
+          ⚠ IT SITS OUTSIDE THE SCROLLING LIST ON PURPOSE. `DialogContent` portals to
+          `document.body` anyway, so its position in this tree decides nothing visual — but a
+          dialog declared INSIDE the list would be unmounted by every empty/failed/filtered
+          state below, which are exactly the states a person might be forking their way out of.
+          Beside the failure notice is where this page keeps things that outlive the list. */}
+      <ForkNameDialog
+        open={pendingFork !== null}
+        sourceName={pendingFork?.row.name ?? ""}
+        onCancel={cancelFork}
+        onCreate={confirmFork}
+        isClash={isClash}
+      />
       {/* The in-flight marker itself lives in the TOOLBAR, next to the counts it qualifies —
           it is the toolbar's `updating` prop, not a second marker here. Two nodes carrying one
           `data-testid` is a selector that throws rather than a surface that reports twice. */}

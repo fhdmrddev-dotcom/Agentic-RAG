@@ -909,7 +909,29 @@ const BASELINE = {
   // printed `WorkflowsPage.test.tsx 40 48 +8` at `total 3188 · failed 0` — never hand-counted
   // from `it(` literals, and NEVER taken from a SUMMARY: `192-14-SUMMARY.md` recorded this
   // raise as owed at `40 → 44`, which was true when it was written and stale four cases later.
-  "WorkflowsPage.test.tsx": 48,
+  // ── 192.1-07 Task 2 (LIB-05 / D-19…D-24): 48 → 52. AN EXTENSION, NEVER A LOWERING. ──────
+  // The +4 are the name prompt's END-TO-END arc, driven on the live page rather than on the
+  // component: (1) D-23's blocker guard — on an already-forked published row NO dialog mounts
+  // and `createWorkflowDraft` is called zero times; (2) its POSITIVE CONTROL — the same verb
+  // on a row with no existing draft DOES mount the dialog, and still writes nothing until the
+  // name is given; (3) the copy ARRIVES under the typed name (`definition.name`, which the
+  // server writes to the row's `name` COLUMN — LIB-05's actual fix, since a Builder caption
+  // alone would leave the library as unreadable as it was); (4) D-20 end-to-end over the REAL
+  // pre-flight rather than a stubbed `isClash` — a name already in the merged feed warns and
+  // the create happens anyway.
+  // ⚠ CASE (1) WAITS ON A PRESENT NODE BEFORE QUERYING AN ABSENCE (T-4). This file sets
+  // `asyncUtilTimeout: 15000`, longer than vitest's 5 s budget, so a `findBy` on an absent
+  // dialog would blow the TEST timeout and read as D-192-DEF-01 rather than as a defect.
+  // ⚠ NOT ONE `expect(…)` LINE IN THE TWELVE SHIPPED FORK CASES WAS EDITED — the 192-14 block
+  // and T-192-42's two-call pin are byte-identical and green. What changed is the
+  // INTERACTION: every case that reaches a create now types a name first, because that is
+  // what a person now does. The single exception is stated rather than buried — the Builder
+  // caption assertion moved from the parent's SLUG to the typed NAME, because the behaviour
+  // moved with it.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-13, both
+  // printing `WorkflowsPage.test.tsx 48 52 +4` and `librarySubtree.fences.test.ts 116 117 +1`
+  // at `total 3436 · failed 0` — never hand-counted from `it(` literals.
+  "WorkflowsPage.test.tsx": 52,
   "RunModal.test.tsx": 32,
   "RunModal.a11y.test.tsx": 16,
   "PublishedCardDelete.test.tsx": 32,
@@ -1039,7 +1061,63 @@ const BASELINE = {
   // Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
   // printing `librarySubtree.fences.test.ts 80 111 +31` and `rowIdentity.test.ts — 72 new` at
   // `total 3367 · failed 0` — never hand-counted from `it(` literals.
-  "librarySubtree.fences.test.ts": 111,
+  // ── 192.1-07 Task 1 (D-19 / D-20 / D-33 / D-36): 111 → 116. THE FIVE-MULTIPLIER HELD. ────
+  // `./ForkNameDialog.tsx` joined the corpus in the commit that created it, and the FIVE
+  // `it.each(LIBRARY_SUBTREE_PATHS)` sweeps picked it up: one path × five sweeps = +5. That
+  // is the ⚠ one screen up landing exactly — the block above corrected "+3, the same
+  // arithmetic again" to FIVE before this addition, and this is the addition that tested it.
+  // ⚠ F1 IS THE FENCE THAT MATTERED HERE, and for a MEASURED reason rather than a general
+  // one: the natural shell to clone (`org/InviteMemberDialog.tsx`) carries the forbidden
+  // attribute TWICE (`:159`, `:228`), so a dialog module is the one place in this subtree
+  // where the violation arrives by COPYING rather than by invention. D-36 says not to clone
+  // it; the corpus entry is what makes that mechanical instead of remembered.
+  // ⚠ AND THE 187-24 TRAP FIRED AGAIN, INSIDE THIS VERY COMMIT — the fourth instance this
+  // subtree has recorded. `ForkNameDialog.tsx`'s docblock explained why the raw-HTML escape
+  // hatch is not used, spelled the prop, and T-192-04 (a RAW regex, not a parsed fence) went
+  // red on it: `expected '/**\n * Phase 192.1-07 Task 1 (LIB-05…' not to match
+  // /dangerouslySetInnerHTML/`. The prose now describes the hatch instead of naming it.
+  // ⚠ OBSERVED RED FIRST, as D-33 requires the corpus edit and this pin to be one commit:
+  // `expected [ './libraryRow.ts', …(11) ] to have a length of 11 but got 12`, before either
+  // number was written. Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING
+  // RUNS, 2026-08-12, both printing `librarySubtree.fences.test.ts 111 116 +5` and
+  // `ForkNameDialog.test.tsx — 18 new` at `total 3431 · failed 0` — never hand-counted.
+  // ── 192.1-07 Task 2 (D-19): 116 → 117. ONE MORE, AND IT IS AN `OD` ENTRY, NOT A SWEEP. ──
+  // The page MOUNTS `ForkNameDialog`, so the downward edge exists and `PAGE_IMPORTED_MODULES`
+  // must name it — a one-case `it.each`, hence +1 rather than +5. It is the first entry there
+  // that is a COMPONENT THE PAGE RENDERS rather than a module it calls, which is exactly why
+  // `WorkflowDeleteSheet` still is not listed: the Sheet is mounted by the CARD.
+  // ⚠ DRIVEN RED AGAINST A REAL PLANT IN PRODUCTION SOURCE, not added blind: the page's import
+  // specifier was broken to `…/ForkNameDialogX` and the fence failed with `imports
+  // ForkNameDialog from the library subtree … AssertionError: expected '/**\n * Phase 103-06
+  // (REQ-7 / WFAUTH-…' to match /from\s+["']@\/components\/…/` at 1 failed / 116 passed.
+  // ⚠ AND THE RESTORE WAS md5-CHECKED, WHICH IS WHY THIS NOTE EXISTS. The first restore was
+  // CONTENT-correct and NOT byte-identical — `sed -i` under Git Bash rewrote the file LF-only
+  // against a CRLF working tree (1160 line endings flipped, zero characters changed), and the
+  // md5 caught what a `git diff` could not have: git normalises EOL in the index, so the diff
+  // was clean while the file on disk no longer matched its neighbours. Re-terminated to CRLF,
+  // the page hashes `bbc827e055dd890b8c6da1e29d82125d` — EXACTLY its pre-plant value.
+  "librarySubtree.fences.test.ts": 117,
+  // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
+  // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
+  // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).
+  // The 18 cover D-19's four mechanical clauses — it ASKS (the field opens empty and focused,
+  // never prefilled), its primary is `Create my copy` AND no control is named `Confirm`
+  // (paired with a positive control that plants one), it wears no destructive styling
+  // (asserted over the rendered `outerHTML`, with a matcher control), and D-20's
+  // WARNS-NEVER-BLOCKS — whose headline case SUBMITS THROUGH THE CLASH and reads the argument
+  // the callback received, because "the warning renders" is satisfied identically by a dialog
+  // that warns and then refuses. Plus reset-on-open, both escapes, the not-`role="alert"`
+  // clash hint with its own alert control, and two `axe()` cases (idle and clash).
+  // ⚠ THE RED WAS DRIVEN AS REAL AssertionErrors, not as a module-not-found: the component was
+  // first written with TWO deliberate defects (`disabled={empty || clash}` and a `Confirm`
+  // primary), and the suite failed 4/18 with `expect(element).toBeEnabled() … disabled=""`,
+  // `expected "vi.fn()" to be called 1 times, but got 0 times`, and
+  // `toHaveAccessibleName() Expected: Create my copy / Received: Confirm`.
+  // ⚠ NO `TARGETS` LINE IS NEEDED, and that is measured rather than assumed: the gate printed
+  // `ForkNameDialog.test.tsx — 18 new`, and a file the gate never runs cannot report a number
+  // at all, so the printed `actual` IS the proof the `src/components/workflows` DIRECTORY
+  // entry already reaches it. (Two knobs: TARGETS decides what RUNS, BASELINE what is GUARDED.)
+  "ForkNameDialog.test.tsx": 18,
   // ── 192.1-05 Tasks 1+2 (LIB-05 / SC#1 / SC#2): a NEW suite, pinned in its first phase ─────
   // The identity resolver, proved as arithmetic in the `libraryFilter.test.ts` posture — no
   // `render`, no DOM, no clock mock. The 72 cover: the four-state lineage with the version branch
