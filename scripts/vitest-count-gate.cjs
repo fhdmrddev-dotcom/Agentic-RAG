@@ -952,7 +952,23 @@ const BASELINE = {
   // default; a pin read from the column is stale only if the column is.
   //
   // ── The four suites Phase 192 CREATED, pinned here for the first time ──────────────────
-  "libraryFilter.test.ts": 36,
+  // ── 192.1-01 (LIB-05 / D-15): 36 → 48. AN EXTENSION, NEVER A LOWERING. ─────────────────
+  // The +12 are the `updated_at` → `updatedAt` hop and its D-16 fence: both normalizers
+  // lifting the field (each with its own POSITIVE CONTROL), the absent and explicit-null
+  // paths collapsing to `undefined` rather than to a fabricated time, survival through
+  // `mergeLibrary` on all three provenances including the `source-failed` partial, and the
+  // D-16 group — a draft whose `token` DISAGREES with its `updated_at`, so a normalizer
+  // reading the token cannot produce the right answer, plus a source fence over the two
+  // `updatedAt:` assignments with its own planted positive control.
+  // ⚠ THE SOURCE FENCE IS SCOPED TO NON-COMMENT LINES DELIBERATELY. Both normalizers carry a
+  // comment saying why `row.token` is forbidden, so an unscoped needle would RED on a clean
+  // tree — the trap `librarySubtree.fences.test.ts` already records twice (`:186-193`,
+  // `:497-506`). Stripping line comments is what makes the fence about code, not prose.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
+  // reporting `libraryFilter.test.ts  36  48  +12` and `total 3200 · failed 0`. Never
+  // hand-counted from `it(` literals, never carried from a SUMMARY — the distinction this
+  // block's header paragraph records is not ceremonial.
+  "libraryFilter.test.ts": 48,
   "librarySubtree.fences.test.ts": 64,
   "LibraryToolbar.test.tsx": 36,
   // ── 192-16 (GAP-CLOSURE ROUND 1, wave 4): 35 → 39. AN EXTENSION, NEVER A LOWERING. ──────

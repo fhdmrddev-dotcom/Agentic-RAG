@@ -1368,6 +1368,21 @@ export interface PublishedWorkflow {
   definition?: WorkflowDefinitionJSON | null
   is_mine?: boolean
   is_system_global?: boolean
+  /**
+   * Phase 192.1 (LIB-05 / D-15) — when this row last changed, ISO-8601 as the server
+   * rendered it. The recency half of the library identity line ("changed 2 months ago").
+   *
+   * OPTIONAL AND NULLABLE for the reason spelled out in the block above this interface: a
+   * frontend deployed AHEAD of the backend receives rows without the key. `undefined` means
+   * "the wire did not say", and the honest rendering of that is NO `changed` segment — never
+   * a fabricated time, and never `new Date()`.
+   *
+   * ⚠ D-17 — ON A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS HONEST RATHER THAN A
+   * BUG. `workflow_definitions_block_published` makes a published row immutable, so its
+   * `updated_at` is frozen at the publish flip — which IS the last time it changed. Do not
+   * add a second field to "fix" it.
+   */
+  updated_at?: string | null
 }
 
 /** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
@@ -3341,8 +3356,28 @@ export interface WorkflowDraftRow {
    * truncated and matches ZERO rows: every save would then refuse as stale (probed
    * against the live database, 2026-08-01). The server renders it and the server
    * compares it; this client only carries it.
+   *
+   * ⚠ IF YOU CAME HERE WANTING A TIMESTAMP, THE FIELD YOU WANT IS `updated_at` DIRECTLY
+   * BELOW. Phase 192.1 (D-16) added it as a SEPARATE field precisely because this one must
+   * never be parsed as a date, even though both are rendered from the same
+   * `workflow_definitions.updated_at` column server-side. Two fields off one column is the
+   * intended shape, not duplication.
    */
   token: string
+  /**
+   * Phase 192.1 (LIB-05 / D-15) — when this draft last changed, ISO-8601 as the server
+   * rendered it. Feeds the library identity line's "changed <rel>" segment.
+   *
+   * PLACED HERE, ADJACENT TO `token`, ON PURPOSE: this is where a reader wondering why there
+   * are two near-identical timestamps will look. See the ⚠ paragraph on `token` above — the
+   * token is opaque and comparison-only; this field is formattable and display-only. They
+   * are never interchangeable, and collapsing them makes every save after the first refuse
+   * as stale.
+   *
+   * Optional and nullable on the same stale-deploy contract as `PublishedWorkflow`:
+   * `undefined` is "the wire did not say", rendered as no `changed` segment.
+   */
+  updated_at?: string | null
 }
 
 /**

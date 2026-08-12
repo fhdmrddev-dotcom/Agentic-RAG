@@ -90,6 +90,12 @@ const rowOf = (provenance: Provenance, over: Partial<LibraryRow> = {}): LibraryR
   provenance,
   // The wire's ownership bit. A starter is not yours; the other two are.
   isMine: provenance === "starter" ? false : true,
+  // Phase 192.1 (LIB-05 / D-15). REQUIRED on `LibraryRow`, not optional, and that is the
+  // point: the identity line is unconditional (D-06), so `tsc` enumerates every construction
+  // site rather than letting one silently default. This builder is the site it found. The
+  // card does not render the field yet — Plan 05 does — and `...over` lets a case pass
+  // `undefined` to exercise the "the wire did not say" path.
+  updatedAt: "2026-06-12T09:30:15.123456+00:00",
   source: { id: `row-${provenance}`, slug: "vendor-risk", name: "Vendor-risk review" } as unknown as LibraryRow["source"],
   ...over,
 })
