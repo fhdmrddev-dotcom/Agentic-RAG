@@ -32,6 +32,12 @@
  * `import.meta.glob` expands at build time over files that EXIST, so a listed path with no
  * file simply has no key in the record and contributes the empty string — it never throws.
  *
+ * ⚠ 192.1-03 (D-33): THE LIST HAS GROWN AND WILL GROW AGAIN — read its length from the array,
+ * not from this paragraph. The seven above were Phase 192's; the G-5 fork extraction adds its
+ * own, and the identity pair follows. The rule that survives every one of those additions is
+ * the one stated at `LIBRARY_SUBTREE_PATHS` itself: **a module joins the list in the same
+ * commit that creates it**, because an unlisted module is swept by nothing at all.
+ *
  * ⚠ F1 IS PARSED, NOT GREPPED, AND THE REASON IS THIS FILE'S OWN NEIGHBOURS.
  * `libraryVocabulary.ts` EXPLAINS the D-14 rule in its docblock, and a raw source grep for
  * the attribute spelling reds on the prose that documents the very rule it enforces — the
@@ -62,7 +68,17 @@ import pageSource from "@/pages/WorkflowsPage?raw"
 
 // ── the swept corpus ─────────────────────────────────────────────────────────────────
 
-/** Every module of the library subtree, named now, before four of them exist. */
+/**
+ * Every module of the library subtree, named now, before some of them exist.
+ *
+ * ⚠ 192.1-03 (D-33) — THE LIST IS WIDENED IN THE SAME COMMIT THAT ADDS A MODULE, and that is
+ * a decision rather than a habit. The corpus is an EXPLICIT LIST, not a glob, so a module
+ * absent from it is swept by NOTHING — F1, T-192-04, F4 and F5 all silently skip it while
+ * every one of them stays green. That is the *"a guardrail cannot see what is absent from its
+ * list"* lesson `CLAUDE.md` records for `WorkflowsPage.tsx` and G-5, reproduced one layer
+ * down. The `toHaveLength` below is what makes forgetting impossible: adding a path reds it
+ * immediately, so the two edits cannot separate.
+ */
 const LIBRARY_SUBTREE_PATHS = [
   "./libraryRow.ts",
   "./libraryVocabulary.ts",
@@ -71,6 +87,8 @@ const LIBRARY_SUBTREE_PATHS = [
   "./WorkflowDeleteSheet.tsx",
   "./WorkflowCard.tsx",
   "./LibraryToolbar.tsx",
+  // ── 192.1-03 (D-01 / D-33): the G-5 fork extraction's pure leaves ──
+  "./libraryFork.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -89,13 +107,21 @@ const SWEPT: { path: string; source: string }[] = LIBRARY_SUBTREE_PATHS.map((pat
 const subtreeSource = SWEPT.map(({ source }) => source).join("\n")
 
 describe("the sweep is looking at something (non-vacuity)", () => {
-  it("names all seven subtree modules, including the four not yet written", () => {
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(7)
+  it("names every subtree module, including the ones written after this fence", () => {
+    // ⚠ THE LITERAL IS READ OUT OF THIS ASSERTION'S OWN FAILING DIFF, never predicted.
+    // 192.1-03 added `./libraryFork.ts` and observed `expected […] to have a length of 7 but
+    // got 8` before writing the 8 — which is the whole point of the pin: the two edits cannot
+    // separate, so a module can never be added without entering the corpus.
+    // ⚠ AND THE ARITHMETIC IN THE PLANNING DOCUMENTS IS NOT THE SOURCE. `192.1-RESEARCH.md`
+    // §7a says this list ends at 10 and `192.1-CONTEXT.md` D-35 corrects it to 12; both are
+    // forecasts of a plan decision. The number here is the array's measured length.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(8)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
       "./WorkflowCard.tsx",
       "./LibraryToolbar.tsx",
+      "./libraryFork.ts",
     ]) {
       expect(LIBRARY_SUBTREE_PATHS as readonly string[]).toContain(later)
     }

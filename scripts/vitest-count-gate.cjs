@@ -969,7 +969,30 @@ const BASELINE = {
   // hand-counted from `it(` literals, never carried from a SUMMARY — the distinction this
   // block's header paragraph records is not ceremonial.
   "libraryFilter.test.ts": 48,
-  "librarySubtree.fences.test.ts": 64,
+  // ── 192.1-03 Task 1 (D-01 / D-33): 64 → 67. AN EXTENSION, NEVER A LOWERING. ────────────
+  // The +3 are arithmetic, not authorship: `LIBRARY_SUBTREE_PATHS` gained ONE path
+  // (`./libraryFork.ts`, the G-5 fork extraction's pure leaves) and exactly three
+  // `it.each(LIBRARY_SUBTREE_PATHS)` blocks sweep it — F1 (`:202`), T-192-04 (`:224`) and F4
+  // (`:266`). One path × three sweeps = +3, and the arithmetic is stated so the NEXT module
+  // added is expected to move this by three again rather than by a number someone guesses.
+  // ⚠ THE CORPUS EDIT AND THIS PIN ARE ONE COMMIT BY DESIGN (D-33). An unlisted module is
+  // swept by NOTHING while every fence stays green, so the `toHaveLength` assertion is what
+  // forces the pairing — it was observed RED (`expected […] to have a length of 7 but got 8`)
+  // before either number was written.
+  "librarySubtree.fences.test.ts": 67,
+  // ── 192.1-03 Task 1 (D-01 / D-22 / T-192.1-05): a NEW suite, pinned in its first commit ──
+  // `freshHash` + `isForkConflict` proved as ARITHMETIC in the `libraryFilter.test.ts`
+  // posture — both close over nothing, so nothing renders. Includes the T-192.1-05 grep
+  // (no `randomUUID`, no `crypto.` — the "upgrade" that would break D-13's `[a-z0-9]{6}`
+  // lineage regex) and the D-22 assertion that WR-08's re-open trigger survived the move.
+  // ⚠ NO `TARGETS` LINE IS NEEDED and that is measured rather than assumed: the gate printed
+  // `libraryFork.test.ts — 11 new`, and a file the gate never runs cannot report a number at
+  // all, so a printed `actual` IS the proof the `src/components/workflows` DIRECTORY entry
+  // already reaches it.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-12, both
+  // printing `librarySubtree.fences.test.ts 64 67 +3` and `libraryFork.test.ts — 11 new` at
+  // `total 3214 · failed 0` — never hand-counted from `it(` literals.
+  "libraryFork.test.ts": 11,
   "LibraryToolbar.test.tsx": 36,
   // ── 192-16 (GAP-CLOSURE ROUND 1, wave 4): 35 → 39. AN EXTENSION, NEVER A LOWERING. ──────
   // The +4 are 192-13's card-sentence cases: a published row the user has ALREADY forked now
