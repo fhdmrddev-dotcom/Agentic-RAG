@@ -38,6 +38,7 @@ and is safe to run concurrently with other worktrees (CLAUDE.md § Parallel exec
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 import pytest
@@ -49,8 +50,16 @@ _OTHER = UUID("22222222-2222-2222-2222-222222222222")
 _SEED_SYSTEM_USER = UUID("00000000-0000-0000-0000-000000000001")
 
 
+_ROW_UPDATED_AT = datetime(2026, 8, 12, 9, 30, 15, 123456, tzinfo=timezone.utc)
+
+
 def _row(*, created_by: UUID, is_system_global: bool = False, name: str = "Row") -> dict:
-    """One asyncpg-shaped row as the db layer now returns it (Task 1's widened SELECT)."""
+    """One asyncpg-shaped row as the db layer now returns it (Task 1's widened SELECT).
+
+    Phase 192.1 (LIB-05 / D-15): carries ``updated_at`` as a ``datetime``, because that is
+    what asyncpg decodes a ``timestamptz`` to — a ``str`` fixture here would let the
+    ``.isoformat()`` coercion in the handler go untested.
+    """
     return {
         "id": UUID("33333333-3333-3333-3333-333333333333"),
         "slug": "some-workflow",
@@ -58,6 +67,7 @@ def _row(*, created_by: UUID, is_system_global: bool = False, name: str = "Row")
         "definition": {"phases": []},
         "created_by": created_by,
         "is_system_global": is_system_global,
+        "updated_at": _ROW_UPDATED_AT,
     }
 
 
@@ -170,7 +180,14 @@ async def test_starters_under_todays_seeding_is_not_mine(monkeypatch):
 
 # ── (d) THE NEGATIVE FENCE — no raw created_by reaches the wire ───────────────────────
 def test_published_workflow_field_set_excludes_created_by():
-    """Exact field set. Adding ``created_by: UUID | None = None`` turns this RED."""
+    """Exact field set. Adding ``created_by: UUID | None = None`` turns this RED.
+
+    ⚠ Phase 192.1 (LIB-05 / D-15): this set GREW BY ONE — ``updated_at`` — and the growth is
+    the pin doing its job, not a nuisance. An exact-set assertion means every new field on
+    this model must be argued for in a diff a reviewer reads, which is exactly the control
+    the mig-116 / CR-01 shape needs. ``updated_at`` passes the model's own BINDING RULE for
+    the rule's stated reason: it describes the ROW, never a person.
+    """
     from app.api.workflows import PublishedWorkflow
 
     assert set(PublishedWorkflow.model_fields) == {
@@ -180,6 +197,7 @@ def test_published_workflow_field_set_excludes_created_by():
         "definition",
         "is_mine",
         "is_system_global",
+        "updated_at",
     }
     assert "created_by" not in PublishedWorkflow.model_fields
 

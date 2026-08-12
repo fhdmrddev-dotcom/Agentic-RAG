@@ -365,3 +365,122 @@ describe("the module is pure — it imports NOTHING from the API client at runti
     expect(libraryFilterSource).not.toMatch(/document\./)
   })
 })
+
+// ── D-15: updated_at → updatedAt ─────────────────────────────────────────────────────
+//
+// The recency half of the identity line. One wire field, two normalizers, and one rule that
+// matters more than either: an ABSENT field renders nothing rather than a fabricated time.
+
+/** ISO-8601 with MICROSECONDS, as Postgres renders it — not a value a JS `Date` round-trips. */
+const PUB_UPDATED = "2026-06-12T09:30:15.123456+00:00"
+const DRAFT_UPDATED = "2026-08-11T14:02:44.987654+00:00"
+
+const publishedWithTime: PublishedWorkflow = { ...publishedVendor, updated_at: PUB_UPDATED }
+const draftWithTime: WorkflowDraftRow = { ...draftVendorFork, updated_at: DRAFT_UPDATED }
+
+describe("D-15 — the wire's updated_at reaches LibraryRow.updatedAt", () => {
+  it("POSITIVE CONTROL — fromPublished lifts the field when the wire carries it", () => {
+    // Paired with the absence cases below so neither can pass for the wrong reason (S-6):
+    // if the lift were missing entirely, the `undefined` assertions would still be green.
+    expect(fromPublished(publishedWithTime, "published").updatedAt).toBe(PUB_UPDATED)
+  })
+
+  it("POSITIVE CONTROL — fromDraft lifts the field when the wire carries it", () => {
+    expect(fromDraft(draftWithTime).updatedAt).toBe(DRAFT_UPDATED)
+  })
+
+  it("carries the string through VERBATIM, microseconds included", () => {
+    // The server formats it; this client only carries it. A normalizer that re-rendered the
+    // value through a `Date` would silently truncate `.123456` to `.123`.
+    const row = fromPublished(publishedWithTime, "published")
+    expect(row.updatedAt).toContain("123456")
+    expect(row.updatedAt).toBe(PUB_UPDATED)
+  })
+
+  it("an ABSENT wire field yields undefined, never a fabricated time", () => {
+    // `publishedVendor` predates this field, which is exactly the stale-deploy shape.
+    expect(fromPublished(publishedVendor, "published").updatedAt).toBeUndefined()
+    expect(fromDraft(draftVendorFork).updatedAt).toBeUndefined()
+  })
+
+  it("an explicit NULL collapses to undefined — one 'nothing to render' case, not two", () => {
+    expect(fromPublished({ ...publishedVendor, updated_at: null }, "published").updatedAt)
+      .toBeUndefined()
+    expect(fromDraft({ ...draftVendorFork, updated_at: null }).updatedAt).toBeUndefined()
+  })
+
+  it("the provenance a published row was normalized under does not change the answer", () => {
+    expect(fromPublished(publishedWithTime, "starter").updatedAt).toBe(PUB_UPDATED)
+    expect(fromPublished(publishedWithTime, "published").updatedAt).toBe(PUB_UPDATED)
+  })
+
+  it("survives the merge on all three provenances, including a partial feed", () => {
+    // mergeLibrary needs no edit of its own — it runs over whatever arrived — so this pins
+    // that the `source-failed` partial path carries the field by construction.
+    const rows = mergeLibrary(
+      [publishedWithTime],
+      [{ ...starterClause, updated_at: PUB_UPDATED }],
+      [draftWithTime],
+    )
+    expect(rows).toHaveLength(3)
+    expect(rows.every((r) => typeof r.updatedAt === "string")).toBe(true)
+
+    const draftsOnly = mergeLibrary([], [], [draftWithTime])
+    expect(draftsOnly[0].updatedAt).toBe(DRAFT_UPDATED)
+  })
+})
+
+// ── D-16: the timestamp is NOT the token ─────────────────────────────────────────────
+
+describe("D-16 — fromDraft reads updated_at and never the opaque token", () => {
+  it("a token that DISAGREES with updated_at does not become the timestamp", () => {
+    // The mechanical form of the fence. Both are rendered from one column server-side, so a
+    // normalizer reading `row.token` would look correct against any realistic fixture. Here
+    // they are made to disagree, so only the right source can produce the right answer.
+    const row = fromDraft({ ...draftWithTime, token: "1999-01-01T00:00:00.000001Z" })
+
+    expect(row.updatedAt).toBe(DRAFT_UPDATED)
+    expect(row.updatedAt).not.toBe("1999-01-01T00:00:00.000001Z")
+  })
+
+  it("a draft with a token but NO updated_at stays undefined rather than borrowing it", () => {
+    // The tempting shortcut, denied: `token` is always present on a draft row, so a
+    // `?? row.token` fallback would make this case silently "work" and break every save.
+    const row = fromDraft(draftVendorFork)
+
+    expect((row.source as WorkflowDraftRow).token).toBe(draftVendorFork.token)
+    expect(row.updatedAt).toBeUndefined()
+  })
+
+  it("the token still reaches its handler untouched through `source`", () => {
+    expect((fromDraft(draftWithTime).source as WorkflowDraftRow).token)
+      .toBe(draftVendorFork.token)
+  })
+
+  it("SOURCE FENCE — every updatedAt assignment reads `row.updated_at`", () => {
+    // ⚠ SCOPED TO NON-COMMENT LINES ON PURPOSE. Both normalizers carry a comment explaining
+    // why `row.token` is forbidden, so a naive search for "token" near "updatedAt" would go
+    // RED on a clean tree — the trap `librarySubtree.fences.test.ts` records twice. Stripping
+    // line comments first is what makes this fence about code rather than prose.
+    const code = libraryFilterSource
+      .split("\n")
+      .filter((line) => !line.trim().startsWith("//") && !line.trim().startsWith("*"))
+      .join("\n")
+
+    const assignments = code.match(/updatedAt:\s*[^,\n]+/g) ?? []
+    expect(assignments).toHaveLength(2)
+    for (const assignment of assignments) {
+      expect(assignment).toContain("row.updated_at")
+      expect(assignment).not.toContain("token")
+    }
+  })
+
+  it("POSITIVE CONTROL — that fence catches a token-derived assignment", () => {
+    const planted = "    updatedAt: row.token ?? undefined,"
+    const assignments = planted.match(/updatedAt:\s*[^,\n]+/g) ?? []
+
+    expect(assignments).toHaveLength(1)
+    expect(assignments[0]).toContain("token")
+    expect(assignments[0]).not.toContain("row.updated_at")
+  })
+})

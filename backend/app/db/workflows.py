@@ -278,8 +278,15 @@ async def list_published_workflows(
         # to compute the one bit ``PublishedWorkflow.is_mine`` and NEVER serializes it —
         # this pool bypasses RLS, so whatever leaves the API layer is what the caller gets.
         # The projection widens; the predicate does NOT.
+        #
+        # Phase 192.1 (LIB-05 / D-15): ``updated_at`` joins the same projection, and the
+        # same sentence applies verbatim — THE PROJECTION WIDENS; THE PREDICATE DOES NOT.
+        # It is the recency half of the library's identity line ("changed <rel>"), an
+        # ADDITIVE column on an existing NOT NULL field (full-schema.sql:1941) kept fresh
+        # by the ``workflow_definitions_set_updated_at`` trigger — no migration, no new
+        # column, and not one byte of the WHERE / ORDER BY / $N binding below is touched.
         sql = (
-            "SELECT id, slug, name, definition, created_by, is_system_global FROM workflow_definitions "
+            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
             "WHERE status = 'published' AND created_by = $1"
         )
     else:
@@ -294,7 +301,12 @@ async def list_published_workflows(
             # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected
             # FOR SERVER-SIDE COMPUTATION ONLY — consumed inside the API layer to compute
             # ``is_mine``, never serialized. Projection only; the predicate is untouched.
-            "SELECT id, slug, name, definition, created_by, is_system_global FROM workflow_definitions "
+            #
+            # Phase 192.1 (LIB-05 / D-15): ``updated_at`` joins that projection. The
+            # projection widens; the predicate does NOT — this branch's
+            # ``(is_system_global = true OR created_by = $1)`` is byte-identical to what
+            # shipped, and ``test_dual_mode_wiring.py:256`` asserts that exact substring.
+            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
             "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
     params: list = [user_id]
@@ -327,8 +339,14 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected FOR
     # SERVER-SIDE COMPUTATION ONLY — ``get_starter_workflows`` computes ``is_mine`` from the
     # raw ``created_by`` and never serializes it. Projection only; the predicate is untouched.
+    #
+    # Phase 192.1 (LIB-05 / D-15): ``updated_at`` joins that projection. The projection
+    # widens; the predicate does NOT — the three-clause WHERE and the ``ORDER BY name``
+    # below are byte-identical to what shipped. Note this feed serves the SAME
+    # ``PublishedWorkflow`` model as ``/published`` (RESEARCH C-6: one model, two feeds),
+    # so both SELECT lists must carry the column or one shelf renders no "changed" segment.
     rows = await pool.fetch(
-        "SELECT id, slug, name, definition, created_by, is_system_global FROM workflow_definitions "
+        "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
         "WHERE status = 'published' AND is_system_global = true "
         "AND definition->>'category' = 'starter' "
         "ORDER BY name"
@@ -514,7 +532,22 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # Phase 186 (D-186-07): and ``token``, so the Open-a-draft path arrives in the
         # builder already holding a concurrency token — otherwise the first autosave
         # would have to guess one, or write unguarded.
-        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token "
+        #
+        # Phase 192.1 (LIB-05 / D-15): and a SEPARATE ``updated_at``. The projection
+        # widens; the predicate does NOT.
+        #
+        # ⚠ D-16 IS A FENCE, NOT ADVICE, AND THIS LINE IS WHERE IT BINDS. ``token`` on the
+        # very same row is ALREADY ``updated_at`` in disguise —
+        # ``CONCURRENCY_TOKEN_SQL`` (:93-95) is
+        # ``to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`` — so
+        # the cheap-looking move is to reuse it and skip this column. DO NOT. The token is
+        # OPAQUE by contract (``api.ts:3334-3345`` forbids parsing it): Postgres keeps
+        # MICROSECONDS and a JS date value keeps only milliseconds, so a
+        # parsed-and-re-rendered token is truncated, matches ZERO rows, and every later
+        # save then refuses as stale — probed against the live database 2026-08-01. Two
+        # columns off one source field is the correct shape: one the server compares
+        # byte-for-byte, one the client may format.
+        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at "
         f"FROM workflow_definitions "
         f"WHERE status = 'draft' AND created_by = $1 "
         f"ORDER BY name",

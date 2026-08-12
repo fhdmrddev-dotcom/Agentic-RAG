@@ -92,6 +92,27 @@ export interface LibraryRow {
    */
   isMine: boolean | undefined
   /**
+   * Phase 192.1 (LIB-05 / D-15) — WHEN THIS ROW LAST CHANGED, ISO-8601, exactly the string
+   * the server rendered. The recency half of the identity line ("changed 2 months ago").
+   *
+   * camelCase because that is this type's habit: it already renames `is_mine` → `isMine`.
+   * The wire spelling is `updated_at`; the normalized spelling is this one, and the two
+   * normalizers are the only place they meet.
+   *
+   * `undefined` MEANS THE WIRE DID NOT SAY — a frontend deployed ahead of its backend, or a
+   * row whose column was NULL — AND THE HONEST READING OF THAT IS TO RENDER NO `changed`
+   * SEGMENT AT ALL. Never substitute `Date.now()`, never fall back to "just now", and never
+   * treat it as the epoch: each of those prints a specific claim about a row nobody made.
+   * This is the same rule `isMine` above states for its own `undefined`, for the same
+   * reason — a field that only ever holds what the wire said cannot lie.
+   *
+   * ⚠ FOR A DRAFT ROW, THIS IS **NOT** `source.token`, EVEN THOUGH THE SERVER RENDERS BOTH
+   * FROM ONE COLUMN. `token` is opaque by contract (`api.ts` — parsing it truncates the
+   * microseconds and makes every later save refuse as stale). `fromDraft` reads
+   * `row.updated_at` and must never read `row.token` (D-16).
+   */
+  updatedAt: string | undefined
+  /**
    * THE ORIGINAL WIRE OBJECT, KEPT WHOLE. See the ⚠ paragraph in this file's header —
    * `token` and the real `PublishedWorkflow` reach their handlers through here, and a
    * rebuilt object that drops one of them fails at runtime while typechecking clean.

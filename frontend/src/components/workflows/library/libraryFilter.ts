@@ -80,6 +80,10 @@ export function fromPublished(
     // Only ever what the wire said. `undefined` is "the backend did not tell us", which
     // the *Yours* predicate reads as the feed-derived fallback — never as `false`.
     isMine: row.is_mine,
+    // D-15. Same rule, one field over: only ever what the wire said. `?? undefined`
+    // collapses the wire's `null` and its absence into ONE value, so a consumer has a single
+    // "nothing to render" case instead of two — and neither becomes a fabricated time.
+    updatedAt: row.updated_at ?? undefined,
     source: row,
   }
 }
@@ -100,6 +104,12 @@ export function fromDraft(row: WorkflowDraftRow): LibraryRow {
     def: defOf(row.definition),
     provenance: "draft",
     isMine: undefined,
+    // D-15 / ⚠ D-16 — `row.updated_at`, NEVER `row.token`. The server renders both from the
+    // same column, so `row.token` would look like it works and would even read correctly in
+    // a fixture. It is forbidden: the token is opaque by contract, Postgres keeps
+    // microseconds where a JS `Date` keeps milliseconds, and anything that parses it
+    // produces a value matching ZERO rows. This line reads the display field.
+    updatedAt: row.updated_at ?? undefined,
     source: row,
   }
 }
