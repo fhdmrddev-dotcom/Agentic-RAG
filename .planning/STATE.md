@@ -519,13 +519,23 @@ has an author-facing field in `ExternalActionPhaseConfig` (`harness.py:242`). Bo
 `phase_types.py:2318-2332`, are caught, and report `failed`. **`D-190-DEF-17` — a phase, not a
 patch** → connections milestone.
 
-**2. ⚠ CLOUD PARITY IS SECURITY-BEARING. This is the loudest operational item in the repo.**
-Migrations **104 → 118** are owed at the next production push, and **118 closes a real credential
-exposure** (both `anon` and `authenticated` held column-level SELECT on
-`connector_connections.secret_ciphertext`). **Until 118 is applied, cloud still has that defect.**
-Migration 118 and the `connector_service.py` deploy **must land in the same operation** — the grant
-without the code breaks every connector read with `42501`; the code without the grant leaves the
-hole open. Re-derive with `bash scripts/pending-cloud-migrations.sh`; never quote a prose number.
+**2. ✅ CLOUD PARITY IS CLEAR — closed 2026-08-09, corrected here 2026-08-12.**
+Re-derived mechanically: `bash scripts/pending-cloud-migrations.sh` → **"(none) — cloud is already at
+the same migration watermark."** Migrations **104 → 118 were applied to cloud on 2026-08-09** during
+the v3.4+v3.5+v3.6 cutover (`origin/production` `4c9b487a` → `5d5ea200`, since advanced to
+`7dc53ffa`), and **118 — the credential exposure — is closed in cloud.** For the record, the defect
+118 fixed: both `anon` and `authenticated` held column-level SELECT on
+`connector_connections.secret_ciphertext`. It shipped in the same operation as the
+`connector_service.py` deploy, as its own rule required.
+
+> ⚠ **Why this correction is recorded rather than silently overwritten.** For three days this block
+> read *"Until 118 is applied, cloud still has that defect."* On **2026-08-12** an external reviewer
+> read exactly that line and reported, in good faith, that a product sold on its governance story had
+> **live customer credentials readable by the wrong database roles**. It did not. The reviewer was
+> right to trust the file; the file was wrong. **A stale security line in STATE.md is itself a
+> security-adjacent defect** — it is what an auditor, a technical buyer, or the next agent reads
+> first. The standing instruction on this block has always been *"re-derive; never quote a prose
+> number"* — that instruction was correct and nobody ran it, on either side. Run the script.
 
 **3. Verification debt — nine requirements ride on three missing `VERIFICATION.md` files.**
 Phase 184 (CANVAS-02/03/04 + VALID-02/03), Phase 188 (RUNVIZ-01/02/03), Phase 189 (**CONN-01**, the
