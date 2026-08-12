@@ -643,7 +643,7 @@ describe("D-03 / D-06 — the line's grammar, in order", () => {
       OWN_SHARED,
       "Copy of Compliance Gap Report starter",
       STATE_DRAFT,
-      "1 of 43",
+      "43 share this name",
       "changed 2 months ago",
     ])
   })
@@ -705,7 +705,7 @@ describe("D-18 / SC#3 — recency renders when the wire said, and goes silent wh
     })
     const line = within(card).getByTestId("row-identity")
     expect(line).toBeInTheDocument()
-    expect(identityParts(line)).toEqual([OWN_YOURS, LINEAGE_ORIGINAL, "1 of 2"])
+    expect(identityParts(line)).toEqual([OWN_YOURS, LINEAGE_ORIGINAL, "2 share this name"])
     expect(line.textContent ?? "").not.toContain("changed")
   })
 
@@ -716,7 +716,7 @@ describe("D-18 / SC#3 — recency renders when the wire said, and goes silent wh
       identity: identityOf({ segs: [LINEAGE_ORIGINAL], ofN: oneOfLabel(2), when: "changed yesterday" }),
     })
     const line = within(card).getByTestId("row-identity")
-    expect(identityParts(line)).toEqual([OWN_YOURS, LINEAGE_ORIGINAL, "1 of 2", "changed yesterday"])
+    expect(identityParts(line)).toEqual([OWN_YOURS, LINEAGE_ORIGINAL, "2 share this name", "changed yesterday"])
     expect(line.textContent ?? "").toContain("changed")
   })
 })
@@ -735,7 +735,7 @@ describe("D-10 — a DRAFT gains lineage for the first time, and gains no senten
       OWN_YOURS,
       "v2 of v1",
       STATE_DRAFT,
-      "1 of 43",
+      "43 share this name",
       "changed 2 months ago",
     ])
     expect(screen.queryByTestId("fork-consequence")).toBeNull()
@@ -969,9 +969,12 @@ describe("SC#1 — at 100+ rows with 14 duplicated names, a colliding row can be
     expect(withoutCount).toEqual([])
   })
 
-  it("1 of N renders IF AND ONLY IF the name collides, over every rendered line", () => {
+  it("the collision counter renders IF AND ONLY IF the name collides, over every rendered line", () => {
     renderLibrary()
-    const oneOfN = /^1 of \d+$/
+    // U4 (driven 2026-08-13): the operator read `1 of 43` as an INDEX, so the counter now reads
+    // `43 share this name`. The SHAPE is pinned, not the prose — and it stays anchored with a
+    // mandatory `\d+`, so a counter that silently lost its number still fails here.
+    const oneOfN = /^\d+ share this name$/
     const lines = allLines()
     let rendered = 0
     SCALE_ROWS.forEach((row, index) => {

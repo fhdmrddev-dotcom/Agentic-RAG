@@ -343,22 +343,31 @@ export function versionLabel(version: number): string {
 }
 
 /**
- * The collision counter — `1 of 43` (D-04: rendered ONLY on a colliding name, counted over
- * the FULL merged library before any filtering, per D-05).
+ * The collision counter — `43 share this name` (D-04: rendered ONLY on a colliding name,
+ * counted over the FULL merged library before any filtering, per D-05).
  *
- * ⚠ THE LEADING `1` IS A CONSTANT, NOT AN INDEX, AND IT SHIPS THAT WAY ON PURPOSE (D-07).
- * Every colliding row reads `1 of 43` — the *n*th namesake does not read `7 of 43`. That
- * *can* be misread as a position, and the concern is REAL; it is routed to a human rather
- * than fixed by an unrecorded rewrite, because the operator-approved mockup is the acceptance
- * bar and changing a bar string at plan time is exactly the drift sketch 163 exists to
- * prevent.
+ * ⚠ **UAT ROW U4 WAS DRIVEN 2026-08-13 AND THE OPERATOR ANSWERED YES: `1 of 43` READ AS AN
+ * INDEX.** The shipped string is therefore no longer the mockup's. The history matters more
+ * than the string, so it is recorded rather than replaced:
  *
- * **UAT ROW U4 ASKS A HUMAN WHETHER IT READS AS AN INDEX.** If the answer is yes, the fix is a
- * ONE-LINE CHANGE IN THIS ONE FILE, by construction — which is the whole point of D-14. Do not
- * "fix" it silently on the way past.
+ *   - Sketch 163 rendered `ONE_OF(n) = "1 of " + n`, and it shipped VERBATIM at plan time even
+ *     though the ambiguity was already noticed (D-07). The leading `1` is a CONSTANT, not a
+ *     position — every colliding row read `1 of 43`; the seventh namesake did not read
+ *     `7 of 43`. Rewriting an operator-approved bar string at plan time is precisely the drift
+ *     sketch 163's anti-drift mechanism exists to prevent, so the concern was routed to a human
+ *     instead of resolved by an executor.
+ *   - The human read it in context, on their own 43-row family, and it misled them.
+ *
+ * **That is the mechanism working, not failing.** The question reached a person, the person
+ * answered, and the answer cost ONE LINE IN ONE FILE — which is what D-14 buys and why every
+ * user-visible string on this surface lives here.
+ *
+ * The replacement carries no leading numeral to misread, and it states the fact as the WARNING
+ * it is meant to be (U4's second question): these rows are not distinguishable, and the answer
+ * the product offers is to rename the copy (`FORK_DIALOG_TITLE`).
  */
 export function oneOfLabel(n: number): string {
-  return `1 of ${n}`
+  return `${n} share this name`
 }
 
 // ══════════════════════════════════════════════════════════════════════════════════════
