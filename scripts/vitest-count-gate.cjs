@@ -979,7 +979,13 @@ const BASELINE = {
   // swept by NOTHING while every fence stays green, so the `toHaveLength` assertion is what
   // forces the pairing — it was observed RED (`expected […] to have a length of 7 but got 8`)
   // before either number was written.
-  "librarySubtree.fences.test.ts": 67,
+  // ── 192.1-03 Task 2 (D-01 / D-29 / D-33): 67 → 70. The SAME +3 arithmetic, again. ──────
+  // `./useWorkflowFork.ts` joined the corpus in the commit that created it, and the three
+  // `it.each` sweeps picked it up: one path × three sweeps = +3. Observed RED first
+  // (`expected […] to have a length of 8 but got 9`), then read from this script's own
+  // `actual` column across TWO AGREEING RUNS, 2026-08-12, both printing
+  // `librarySubtree.fences.test.ts 67 70 +3` at `total 3217 · failed 0`.
+  "librarySubtree.fences.test.ts": 70,
   // ── 192.1-03 Task 1 (D-01 / D-22 / T-192.1-05): a NEW suite, pinned in its first commit ──
   // `freshHash` + `isForkConflict` proved as ARITHMETIC in the `libraryFilter.test.ts`
   // posture — both close over nothing, so nothing renders. Includes the T-192.1-05 grep

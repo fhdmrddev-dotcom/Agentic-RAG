@@ -87,8 +87,9 @@ const LIBRARY_SUBTREE_PATHS = [
   "./WorkflowDeleteSheet.tsx",
   "./WorkflowCard.tsx",
   "./LibraryToolbar.tsx",
-  // ── 192.1-03 (D-01 / D-33): the G-5 fork extraction's pure leaves ──
+  // ── 192.1-03 (D-01 / D-33): the G-5 fork extraction — its pure leaves, then the hook ──
   "./libraryFork.ts",
+  "./useWorkflowFork.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -115,13 +116,14 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // ⚠ AND THE ARITHMETIC IN THE PLANNING DOCUMENTS IS NOT THE SOURCE. `192.1-RESEARCH.md`
     // §7a says this list ends at 10 and `192.1-CONTEXT.md` D-35 corrects it to 12; both are
     // forecasts of a plan decision. The number here is the array's measured length.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(8)
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(9)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
       "./WorkflowCard.tsx",
       "./LibraryToolbar.tsx",
       "./libraryFork.ts",
+      "./useWorkflowFork.ts",
     ]) {
       expect(LIBRARY_SUBTREE_PATHS as readonly string[]).toContain(later)
     }
