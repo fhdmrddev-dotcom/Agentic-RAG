@@ -2,7 +2,7 @@
 sketch: 162
 name: naming-at-the-fork
 question: "Does the fork name the copy, or does the library derive it? (the phase's scope question)"
-winner: null
+winner: "B"
 tags: [phase-192.1, lib-05, workflows-page, fork, naming, scope, d-15, write-path, upstream]
 ---
 

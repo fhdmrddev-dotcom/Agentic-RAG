@@ -2,7 +2,7 @@
 sketch: 161
 name: where-identity-lives
 question: "Where does identity go on a card whose one sentence is already spent?"
-winner: null
+winner: "A"
 tags: [phase-192.1, lib-05, workflows-page, card, atom-budget, sentence-slot, lineage, a11y]
 ---
 

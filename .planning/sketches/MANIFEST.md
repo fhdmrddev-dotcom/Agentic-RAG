@@ -1487,9 +1487,9 @@ families exact** — 14 duplicated names, 107 rows, 40 % under one name (measure
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 160 | telling-43-apart | When 43 rows carry one name, what makes a row identifiable at a glance? | *pending* | phase-192.1, lib-05, identity, lineage, recency, scale, shape, g2-sketch-gate |
-| 161 | where-identity-lives | Where does identity go on a card whose one sentence is already spent? | *pending* | phase-192.1, lib-05, card, atom-budget, sentence-slot, a11y, g2-sketch-gate |
-| 162 | naming-at-the-fork | Does the fork name the copy, or does the library derive it? | *pending* | phase-192.1, lib-05, fork, naming, scope, d-15, write-path, g2-sketch-gate |
+| 160 | telling-43-apart | When 43 rows carry one name, what makes a row identifiable at a glance? | **B — disambiguate-on-collision** ★ | phase-192.1, lib-05, identity, lineage, recency, scale, shape, g2-sketch-gate |
+| 161 | where-identity-lives | Where does identity go on a card whose one sentence is already spent? | **A — a second line** ★ | phase-192.1, lib-05, card, atom-budget, sentence-slot, a11y, g2-sketch-gate |
+| 162 | naming-at-the-fork | Does the fork name the copy, or does the library derive it? | **B — the fork asks** ★ (reopens D-15) | phase-192.1, lib-05, fork, naming, scope, d-15, write-path, g2-sketch-gate |
 
 **Couplings and reopenings to decide at pick-time, not after:**
 
@@ -1536,3 +1536,70 @@ the row was findable**, because the driver never had to find it. The operator, w
 JSDOM drives — **160: 40/40 · 161+162: 68/68 (108 total)**. Both `[title]`-attribute fences and the
 script-error channel carry **positive controls** proving they can actually fire; jsdom's own
 unimplemented `window.scrollTo` is excluded **by name**, never by silencing the channel.
+
+#### Winners — operator, 2026-08-12
+
+**160-B · 161-A · 162-B**, plus sketch **163** built afterwards to assemble them.
+
+| # | Winner | Why it won |
+|---|---|---|
+| 160 | **B — disambiguate-on-collision** | Says something *different* on every one of the 43, where A says nearly the same thing 43 times and C leaves row 40 in an undifferentiated block. Accepted cost: the strip is a property of the SET, so a row's wording can shift when an unrelated row is deleted. |
+| 161 | **A — a second line under the name** | Consistent placement and the only variant with room for owner + lineage + when at once. Accepted cost: **a 14th atom on every card** — affordable now that the *"13 atoms is too dense"* diagnosis (`U5-b`) is retracted. |
+| 162 | **B — the fork asks** | The write path IS in scope, and the operator chose the surface that produces the best names. **This REOPENS D-15** — see the decision owed below. |
+
+**⚠ 160-B and 161-A disagree at one edge, and 163 resolves it visibly rather than in prose.** B's
+argument was restraint (the 13 unique-name rows get no strip); A puts a line on every card. **163
+ships it as *quiet*:** a unique-name row keeps the line (A's consistent placement) but carries **no
+discriminator segments** (B's spend-where-it-buys rule). A toolbar toggle shows the strict-B
+alternative. **This is the last open question in the batch** and is owed a recorded decision.
+
+**⚠ A DECISION IS OWED AT PLAN-PHASE: 162-B reopens D-15.** The fork was a **direct flip** because a
+confirm on a non-destructive reversible action *spends the guard vocabulary the delete relies on*
+(`WorkflowCard.tsx:84-87`); 159-C's confirm was deliberately not shipped. The working rationale for
+why a name prompt is not that guard: **it collects something the system cannot know, so it is an
+input, not a guard.** The design carries that claim *mechanically* — it asks for a **name** not a
+confirmation, wears **no destructive styling**, and its primary button is **"Create my copy"**, never
+"Confirm" (asserted in the drive). **Record it as a decision and amend D-15 in the same commit** —
+never leave it silently contradicted.
+
+**The delta this phase makes, in full:** atoms per card **13 → 14**; identity lines **0 → 107**;
+sentence nodes **1 → 1, same text**; soul atoms **5 → 5, consumed unchanged**; net-new test hooks
+**1** (`row-identity`); net-new wire **`updated_at`**. **One line, and a prompt on one verb.**
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 163 | the-assembled-card | What exactly ships — and what keeps the build from drifting from it? | **the assembled card** ★ (one toggle open) | phase-192.1, lib-05, acceptance-bar, build-contract, anti-drift, g2-sketch-gate |
+
+---
+
+### ⚠ THE ANTI-DRIFT MECHANISM (operator note, 2026-08-12) — applies to EVERY future sketch session
+
+The operator's standing observation: **"I always see a difference between the sketch we do and the
+actual implementation — the final shape after we finish."** That is true, and the cause is
+**mechanical rather than carelessness**:
+
+1. The sketch is **HTML/CSS**; the build is **React + Tailwind + shadcn**. Nothing transfers
+   automatically, so every string, DOM order and spacing is **re-typed by an executor reading prose**.
+2. **Prose does not typecheck.** This codebase has banked that lesson repeatedly — a wrong
+   `PHASE_GLYPHS` pointer survived every gate in Phase 189 for exactly this reason.
+3. Plans are written from RESEARCH and CONTEXT, **not from the sketch**, so the mockup becomes a
+   reference nobody ever diffs against.
+
+**Three artifacts close it, and 163 is the first session to ship all three:**
+
+- **`BUILD-CONTRACT.generated.md`** — emitted **from the running sketch** by `drive.cjs --emit`, never
+  transcribed: every exact string, every composed string with a worked example, the rendered output
+  for each distinct row shape, and the measured invariants. It cannot go stale by being forgotten.
+- **`drive.cjs`, version-controlled beside the sketch** — its assertions ARE the contract in
+  executable form, and the README maps each one to the React equivalent the phase's own suite must
+  reproduce. (160 and 161/162 now carry their drives too.)
+- **One `COPY` table per sketch** — the sketch renders nothing not declared in it, mirroring the
+  shipped `libraryVocabulary.ts` shape, so **the build ports the object and imports it** rather than
+  hunting strings through JSX. 163 reads `FORK_VERB` and `FORK_CONSEQUENCE` from the *shipped*
+  constants rather than re-typing them, which is the mechanism proving itself: a drifted copy of
+  either would have failed the drive.
+
+**What this still cannot catch, said plainly:** pixel spacing, Tailwind class choices, and
+hover/focus states. Those stay a human comparison at UAT — **and the G-4 rows must name the sketch
+file as the reference**, driven the way a person drives it (**by looking**, never by
+`getElementById` on a known UUID — the verification lesson Phase 192 banked about its own re-drive).

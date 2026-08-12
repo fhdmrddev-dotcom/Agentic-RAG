@@ -2,7 +2,7 @@
 sketch: 160
 name: telling-43-apart
 question: "When 43 rows carry one name, what makes a row identifiable at a glance?"
-winner: null
+winner: "B"
 tags: [phase-192.1, lib-05, workflows-page, identity, lineage, recency, scale, shape, card]
 ---
 

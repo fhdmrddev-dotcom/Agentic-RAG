@@ -1,0 +1,716 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 163 — The assembled card (the acceptance bar)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+body { font-family:var(--font-sans); color:var(--color-text); background:var(--color-bg); padding-top:46px; margin:0; }
+h1,h2,h3 { font-family:var(--font-headline); margin:0; }
+button { font-family:inherit; }
+
+#variant-nav { position:fixed; top:0; left:0; right:0; z-index:9998; background:var(--color-bg-elev1);
+  border-bottom:1px solid var(--color-border); padding:7px 14px; display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+#variant-nav .brand { font-family:var(--font-mono); font-size:10px; color:var(--color-text-dim); margin-right:8px; letter-spacing:.06em; }
+.variant-tab { font-size:12px; padding:5px 11px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; transition:all var(--dur-fast) var(--ease-out); }
+.variant-tab:hover { color:var(--color-text); border-color:var(--color-primary-glow); }
+.variant-tab.active { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.variant-tab.today { border-style:dashed; }
+
+.wrap { max-width:1320px; margin:0 auto; padding:var(--space-6) var(--space-5) 120px; }
+.lede { font-size:13px; color:var(--color-text-muted); line-height:1.62; margin:0 0 var(--space-4); max-width:90ch; }
+.lede b { color:var(--color-text); } .lede code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+
+.barrow { display:flex; gap:var(--space-4); flex-wrap:wrap; align-items:center; padding:10px var(--space-4);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  margin-bottom:var(--space-4); font-family:var(--font-mono); font-size:11px; }
+.barrow .k { color:var(--color-text-dim); } .barrow .v { color:var(--color-text); font-weight:600; }
+.barrow .v.good { color:var(--color-success); } .barrow .v.hot { color:var(--color-warning); }
+
+.seclabel { font-size:10px; font-family:var(--font-mono); text-transform:uppercase; letter-spacing:.09em;
+  color:var(--color-text-dim); margin:var(--space-6) 0 var(--space-3); display:flex; align-items:center; gap:10px; }
+.seclabel .rule { flex:1; height:1px; background:var(--color-border); }
+
+.libbar { display:flex; gap:var(--space-2); align-items:center; flex-wrap:wrap; margin-bottom:var(--space-3); }
+.searchbox { flex:1 1 240px; min-width:190px; display:flex; align-items:center; gap:7px; padding:7px 11px;
+  border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface); }
+.searchbox input { flex:1; background:transparent; border:none; outline:none; color:var(--color-text);
+  font-family:inherit; font-size:13px; }
+.libbar select { background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:7px 9px; font-family:inherit; font-size:12.5px; cursor:pointer; }
+.btn-create { font-size:13px; font-weight:600; padding:7px 14px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:var(--space-3); }
+.chip { font-size:11.5px; padding:4px 10px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:transparent; color:var(--color-text-muted); cursor:pointer; }
+.chip.on { background:var(--color-primary-dim); color:var(--color-primary); border-color:var(--color-primary-glow); }
+.chip .n { font-family:var(--font-mono); font-size:10px; opacity:.72; margin-left:5px; }
+.countline { font-size:11.5px; color:var(--color-text-dim); font-family:var(--font-mono); margin-bottom:var(--space-3); }
+
+/* ── THE CARD — this markup IS the acceptance bar ─────────────────────────── */
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(324px,1fr)); gap:var(--space-3); }
+.card { border:1px solid var(--color-border); border-radius:var(--radius-md); background:var(--color-surface);
+  padding:var(--space-4); display:flex; flex-direction:column; gap:10px; transition:all var(--dur-fast) var(--ease-out); }
+.card:hover { border-color:var(--color-primary-glow); box-shadow:var(--shadow-md); }
+.card.is-draft { border-style:dashed; }
+.chead { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+.chead .left { min-width:0; }
+.cname { display:flex; align-items:center; gap:7px; }
+.cname .t { font-size:14px; font-weight:600; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cname .ver { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); flex:none; }
+
+/* THE IDENTITY LINE — 161-A's place, 160-B's content rule */
+.ident { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px; font-size:11.5px; line-height:1.4; }
+.ident .own { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; letter-spacing:.04em;
+  padding:1px 6px; border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); flex:none; }
+.ident .own.yours { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.ident .seg { color:var(--color-text); }
+.ident .seg.dim { color:var(--color-text-muted); }
+.ident .sep { color:var(--color-text-dim); }
+.ident .when { font-family:var(--font-mono); font-size:10.5px; color:var(--color-text-dim); }
+.ident .ofn { font-family:var(--font-mono); font-size:9px; color:var(--color-text-dim);
+  border:1px solid var(--color-border-soft); border-radius:var(--radius-full); padding:1px 5px; }
+.ident.quiet .seg { color:var(--color-text-muted); }
+
+.folder { display:inline-block; margin-top:3px; font-size:11px; color:var(--color-text-dim); }
+.chead .right { display:flex; align-items:center; gap:5px; flex:none; }
+.pill { font-family:var(--font-mono); font-size:9px; text-transform:uppercase; padding:2px 7px;
+  border-radius:var(--radius-full); border:1px solid var(--color-border); color:var(--color-text-dim); }
+.pill.published { color:var(--color-primary); border-color:var(--color-primary-glow); }
+.pill.draft { color:var(--color-warning); border-color:hsl(38 92% 60% / .4); }
+.pill.starter { color:var(--color-success); border-color:hsl(142 71% 45% / .4); }
+.kebab { width:28px; height:28px; display:grid; place-items:center; border-radius:var(--radius-sm);
+  background:transparent; border:1px solid transparent; color:var(--color-text-dim); cursor:pointer; }
+.kebab:hover { background:var(--color-accent); color:var(--color-text); }
+
+.purpose { font-size:12.5px; color:var(--color-text-muted); line-height:1.45; }
+.spine { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+.spine .ph { display:inline-flex; align-items:center; gap:4px; padding:2px 6px; border-radius:var(--radius-sm);
+  background:var(--color-muted); border:1px solid var(--color-border-soft); font-size:10.5px; color:var(--color-text-muted); }
+.spine .arrow { color:var(--color-text-dim); font-size:9px; }
+.soulfoot { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:11px; color:var(--color-text-dim); }
+.tier { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:9px; font-weight:700;
+  text-transform:uppercase; padding:2px 7px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  color:var(--color-text-muted); }
+.consequence { font-size:11.5px; color:var(--color-text-dim); line-height:1.5; }
+.cfoot { display:flex; align-items:center; gap:6px; margin-top:auto; padding-top:9px; border-top:1px solid var(--color-border-soft); }
+.btn-run { font-size:13px; font-weight:600; padding:6px 13px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-open { font-size:12.5px; padding:6px 12px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; }
+
+.menu-host { position:relative; }
+.menu { position:absolute; right:0; top:calc(100% + 4px); z-index:70; min-width:236px; background:var(--color-surface-hi);
+  border:1px solid var(--color-border); border-radius:var(--radius-md); box-shadow:var(--shadow-lg); padding:5px; display:none; }
+.menu.open { display:block; }
+.mi { display:block; width:100%; text-align:left; padding:7px 10px; border-radius:var(--radius-sm);
+  background:transparent; border:none; color:var(--color-text); font-size:12.5px; cursor:pointer; }
+.mi:hover { background:var(--color-accent); }
+.mi.danger { color:var(--color-danger); }
+
+/* 162-B — the name prompt */
+.scrim { position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(3px); z-index:9000;
+  display:none; align-items:center; justify-content:center; padding:var(--space-4); }
+.scrim.open { display:flex; }
+.dialog { width:100%; max-width:460px; background:var(--color-surface-hi); border:1px solid var(--color-border);
+  border-radius:var(--radius-lg); box-shadow:var(--shadow-lg); padding:var(--space-5); animation:fadeSlideUp .22s var(--ease-out); }
+.dialog h3 { font-size:15px; margin-bottom:6px; }
+.dialog .sub { font-size:12px; color:var(--color-text-muted); line-height:1.5; margin-bottom:var(--space-4); }
+.dialog label { display:block; font-size:10px; font-family:var(--font-mono); text-transform:uppercase;
+  letter-spacing:.06em; color:var(--color-text-dim); margin-bottom:5px; }
+.dialog input { width:100%; background:var(--color-bg); color:var(--color-text); border:1px solid var(--color-border);
+  border-radius:var(--radius-md); padding:9px 11px; font-family:inherit; font-size:13.5px; outline:none; }
+.dialog input:focus { border-color:var(--color-primary-glow); }
+.dhint { font-size:11px; margin-top:6px; line-height:1.45; color:var(--color-text-dim); min-height:16px; }
+.dhint.warn { color:var(--color-warning); } .dhint.good { color:var(--color-success); }
+.dactions { display:flex; justify-content:flex-end; gap:8px; margin-top:var(--space-5); }
+.btn-sec { font-size:12.5px; padding:7px 13px; border-radius:var(--radius-md); background:transparent;
+  color:var(--color-text-muted); border:1px solid var(--color-border); cursor:pointer; }
+.btn-primary { font-size:13px; font-weight:600; padding:7px 15px; border-radius:var(--radius-md);
+  background:var(--color-primary); color:hsl(240 60% 8%); border:none; cursor:pointer; }
+.btn-primary:disabled { opacity:.45; cursor:not-allowed; }
+.dconseq { font-size:11.5px; color:var(--color-text-dim); line-height:1.5; margin-top:var(--space-4);
+  padding-top:var(--space-3); border-top:1px solid var(--color-border-soft); }
+
+.note { font-size:12px; color:var(--color-text-muted); background:var(--color-muted);
+  border:1px solid var(--color-border-soft); border-left:2px solid var(--color-primary);
+  padding:11px var(--space-4); border-radius:0 var(--radius-sm) var(--radius-sm) 0; margin:var(--space-4) 0;
+  line-height:1.62; max-width:96ch; }
+.note b { color:var(--color-text); } .note code { font-family:var(--font-mono); font-size:11.5px; color:var(--color-primary); }
+.note.warn { border-left-color:var(--color-warning); } .note.warn b { color:hsl(38 92% 78%); }
+
+.decide { border:1px solid var(--color-primary-glow); background:var(--color-primary-dim); border-radius:var(--radius-md);
+  padding:var(--space-4); margin:var(--space-4) 0; }
+.decide .dh { font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.08em;
+  color:var(--color-primary); margin-bottom:8px; }
+.decide p { font-size:12.5px; line-height:1.62; color:var(--color-text-muted); margin:0 0 10px; }
+.decide b { color:var(--color-text); }
+.toggle { display:flex; gap:8px; flex-wrap:wrap; }
+.tgl { font-size:12px; padding:6px 12px; border-radius:var(--radius-full); border:1px solid var(--color-border);
+  background:var(--color-surface); color:var(--color-text-muted); cursor:pointer; }
+.tgl.on { background:var(--color-primary); color:hsl(240 60% 8%); border-color:var(--color-primary); font-weight:600; }
+
+.netnew { display:inline-flex; align-items:center; gap:4px; font-family:var(--font-mono); font-size:8.5px;
+  text-transform:uppercase; letter-spacing:.05em; padding:1px 5px; border-radius:var(--radius-full);
+  background:hsl(258 90% 66% / .16); border:1px solid hsl(258 90% 66% / .45); color:hsl(258 90% 80%); }
+
+.toast { position:fixed; bottom:64px; left:50%; transform:translateX(-50%) translateY(14px); z-index:9997;
+  background:var(--color-surface-hi); border:1px solid var(--color-primary-glow); color:var(--color-text);
+  padding:9px 16px; border-radius:var(--radius-full); font-size:12.5px; box-shadow:var(--shadow-lg);
+  opacity:0; pointer-events:none; transition:all var(--dur-base) var(--ease-out); }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.viewport-host { transition:max-width var(--dur-slow) var(--ease-out); margin:0 auto; }
+.empty { padding:var(--space-10); text-align:center; color:var(--color-text-dim); font-size:13px;
+  border:1px dashed var(--color-border); border-radius:var(--radius-md); }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 163 · ACCEPTANCE BAR</span>
+  <button class="variant-tab active" data-v="assembled" type="button">The assembled card</button>
+  <button class="variant-tab today" data-v="today" type="button">Today (shipped)</button>
+  <button class="variant-tab" data-v="anatomy" type="button">Anatomy &amp; exact strings</button>
+</div>
+
+<div class="viewport-host" id="vp">
+<div class="wrap">
+  <h1 style="font-size:var(--text-xl);margin-bottom:6px">The assembled card</h1>
+  <p class="lede" id="lede"></p>
+  <div class="barrow" id="barrow"></div>
+  <div id="surface"></div>
+</div>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h3 id="dlgTitle">Name your copy</h3>
+    <p class="sub" id="dlgSub"></p>
+    <label for="dlgInput">Name</label>
+    <input type="text" id="dlgInput" autocomplete="off">
+    <p class="dhint" id="dlgHint"></p>
+    <p class="dconseq" id="dlgConseq"></p>
+    <div class="dactions">
+      <button type="button" class="btn-sec" id="dlgCancel">Cancel</button>
+      <button type="button" class="btn-primary" id="dlgOk" disabled>Create my copy</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="sketch-toolbar">
+  <span style="opacity:.6">singleton line</span>
+  <select id="soloSel">
+    <option value="quiet">quiet (recommended)</option>
+    <option value="absent">absent (strict 160-B)</option>
+  </select>
+  <span style="opacity:.6">vp</span>
+  <button type="button" data-vp="375">375</button>
+  <button type="button" data-vp="768">768</button>
+  <button type="button" data-vp="0">full</button>
+</div>
+
+<script src="../themes/library-fixture-192-1.js"></script>
+<script>
+(function () {
+  "use strict";
+  var L = window.LIB192;
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE EXACT STRINGS. Everything the assembled card renders is declared
+     HERE and nowhere else, so the build imports a table rather than
+     re-typing prose out of a README. Mirrors the shipped
+     `libraryVocabulary.ts` shape.
+     ═══════════════════════════════════════════════════════════════════════ */
+  var COPY = {
+    OWN_YOURS:            "Yours",
+    OWN_SHARED:           "Shared",
+    LINEAGE_ORIGINAL:     "Original",
+    LINEAGE_COPY_OF:      "Copy of ",
+    LINEAGE_STARTER_SUF:  " starter",
+    LINEAGE_VERSION_OF:   function (mine, parent) { return "v" + mine + " of v" + parent; },
+    STATE_RUNNABLE:       "Ready to run",
+    STATE_DRAFT:          "Still building",
+    STATE_STARTER:        "Shared starter",
+    NO_PROJECT:           "No project",
+    CHANGED_PREFIX:       "changed ",
+    ONE_OF:               function (n) { return "1 of " + n; },
+    /* 162-B — the name prompt */
+    FORK_DIALOG_TITLE:    "Name your copy",
+    FORK_DIALOG_SUB:      function (src) {
+                            return "You are copying “" + src + "”. Give your copy a name you will " +
+                                   "recognise later — you can change it in the Builder.";
+                          },
+    FORK_DIALOG_OK:       "Create my copy",
+    FORK_DIALOG_CANCEL:   "Cancel",
+    FORK_HINT_EMPTY:      "Give it a name.",
+    FORK_HINT_FREE:       "No other workflow of yours has this name.",
+    FORK_HINT_CLASH:      "You already have one called this. Allowed — but you will not be able to tell them apart.",
+    /* verbatim from the shipped module — never retyped */
+    FORK_VERB:            L.FORK_VERB,
+    FORK_CONSEQUENCE:     L.FORK_CONSEQUENCE,
+    RUN_LABEL:            "▶ Run",
+    OPEN_LABEL:           "✎ Open",
+    DELETE_WORKFLOW:      "Delete workflow…",
+    DELETE_DRAFT:         "Delete",
+    MENU_ARIA:            "Workflow actions"
+  };
+
+  var state = { variant: "assembled", q: "", chips: [], project: "", openMenu: null, solo: "quiet",
+                extra: [], pending: null };
+
+  var CHIPS = [
+    ["ready-to-run", "Ready to run", function (r) { return r.provenance !== "draft"; }],
+    ["yours", "Yours", function (r) { return r.isMine; }],
+    ["still-building", "Still building", function (r) { return r.provenance === "draft"; }],
+    ["starters", "Starters", function (r) { return r.provenance === "starter"; }],
+    ["makes-a-file", "Makes a file", function (r) { return r.deliverable === "file"; }],
+    ["strict", "Strict", function (r) { return r.tierId === "STRICT"; }]
+  ];
+
+  function allRows() { return L.rows.concat(state.extra); }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     THE IDENTITY LINE RULE — 161-A's PLACE, 160-B's CONTENT.
+     One node, fixed grammar, computed content:
+
+       [own pill] [computed segments, max 2] [· 1 of N] [· changed <rel>]
+
+     Segment priority when the name COLLIDES (first two that vary win):
+       1 lineage   2 project   3 state   4 version
+     When the name is UNIQUE: no discriminator segments — lineage only if
+     the row is a fork (that is identity, not disambiguation).
+     ═══════════════════════════════════════════════════════════════════════ */
+  function lineagePhrase(row, rows) {
+    var lin = L.lineageOf(row, rows);
+    if (!lin) return row.provenance === "starter" ? null : COPY.LINEAGE_ORIGINAL;
+    if (lin.kind === "copy") {
+      return COPY.LINEAGE_COPY_OF + lin.of.name +
+        (lin.of.provenance === "starter" ? COPY.LINEAGE_STARTER_SUF : "");
+    }
+    return COPY.LINEAGE_VERSION_OF(row.version, lin.of.version);
+  }
+
+  function identity(row, rows) {
+    var sibs = rows.filter(function (r) { return r.name === row.name; });
+    var collides = sibs.length > 1;
+    var segs = [];
+
+    function varies(fn) {
+      var v = {}; sibs.forEach(function (s) { v[String(fn(s))] = 1; });
+      return Object.keys(v).length > 1;
+    }
+    var lp = lineagePhrase(row, rows);
+
+    if (collides) {
+      if (varies(function (s) { return lineagePhrase(s, rows); }) && lp) segs.push(lp);
+      if (segs.length < 2 && varies(function (s) { return s.projectName; }))
+        segs.push(row.projectName || COPY.NO_PROJECT);
+      if (segs.length < 2 && varies(function (s) { return s.provenance; }))
+        segs.push(row.provenance === "draft" ? COPY.STATE_DRAFT
+               : row.provenance === "starter" ? COPY.STATE_STARTER : COPY.STATE_RUNNABLE);
+      if (segs.length < 2 && varies(function (s) { return s.version; })) segs.push("v" + row.version);
+      if (!segs.length && lp) segs.push(lp);
+    } else if (lp && lp !== COPY.LINEAGE_ORIGINAL) {
+      segs.push(lp);
+    }
+
+    return {
+      own: row.isMine ? COPY.OWN_YOURS : COPY.OWN_SHARED,
+      segs: segs,
+      collides: collides,
+      ofN: collides ? COPY.ONE_OF(sibs.length) : null,
+      when: COPY.CHANGED_PREFIX + L.relTime(row.updatedAt, L.NOW)
+    };
+  }
+
+  /* ── the card ──────────────────────────────────────────────────────────── */
+  function card(row, rows, variant) {
+    var el = document.createElement("div");
+    el.className = "card" + (row.provenance === "draft" ? " is-draft" : "");
+    el.setAttribute("data-testid",
+      row.provenance === "published" ? "published-card" : row.provenance === "starter" ? "starter-card" : "draft-card");
+    el.setAttribute("data-provenance", row.provenance);
+    var runnable = row.provenance !== "draft";
+    var mark = row.provenance === "published" ? "📄" : row.provenance === "starter" ? "✨" : "📝";
+    var tier = L.TIERS[row.tierId];
+
+    var head = document.createElement("div"); head.className = "chead";
+    var left = document.createElement("div"); left.className = "left";
+    var nm = document.createElement("div"); nm.className = "cname";
+    nm.innerHTML = '<span aria-hidden="true">' + mark + '</span><span class="t">' + esc(row.name) + '</span>' +
+      (row.version !== undefined ? '<span class="ver">v' + row.version + '</span>' : '');
+    left.appendChild(nm);
+
+    /* THE IDENTITY LINE — the one net-new atom (13 → 14) */
+    if (variant === "assembled") {
+      var id = identity(row, rows);
+      var show = id.collides || state.solo === "quiet" || id.segs.length > 0;
+      if (show) {
+        var line = document.createElement("div");
+        line.className = "ident" + (id.collides ? "" : " quiet");
+        line.setAttribute("data-testid", "row-identity");
+        var html = '<span class="own' + (row.isMine ? " yours" : "") + '">' + esc(id.own) + '</span>';
+        id.segs.forEach(function (s, i) {
+          html += (i ? '<span class="sep">·</span>' : '') +
+                  '<span class="seg' + (i ? " dim" : "") + '">' + esc(s) + '</span>';
+        });
+        if (id.ofN) html += '<span class="ofn">' + esc(id.ofN) + '</span>';
+        html += '<span class="sep">·</span><span class="when">' + esc(id.when) + '</span>';
+        line.innerHTML = html;
+        left.appendChild(line);
+      }
+    }
+    if (row.projectName) left.appendChild(mk("span", "folder", "📁 " + row.projectName));
+    head.appendChild(left);
+
+    var right = document.createElement("div"); right.className = "right";
+    var mh = document.createElement("div"); mh.className = "menu-host";
+    var kb = document.createElement("button");
+    kb.type = "button"; kb.className = "kebab"; kb.setAttribute("aria-label", COPY.MENU_ARIA); kb.textContent = "⋯";
+    var menu = document.createElement("div"); menu.className = "menu";
+    if (runnable) {
+      var fi = mkBtn("mi", COPY.FORK_VERB, function (e) { e.stopPropagation(); closeMenus(); openForkDialog(row); });
+      fi.setAttribute("data-testid", row.provenance === "published" ? "published-tweak" : "use-starter");
+      fi.setAttribute("aria-describedby", "wf-fork-" + row.id);
+      menu.appendChild(fi);
+    }
+    var di = mkBtn("mi danger", runnable ? COPY.DELETE_WORKFLOW : COPY.DELETE_DRAFT,
+      function () { toast(runnable ? "Opens the victim-naming sheet" : "Arms — one more click"); });
+    di.setAttribute("data-testid", runnable ? "published-delete" : "draft-delete");
+    menu.appendChild(di);
+    kb.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (state.openMenu && state.openMenu !== menu) state.openMenu.classList.remove("open");
+      menu.classList.toggle("open");
+      state.openMenu = menu.classList.contains("open") ? menu : null;
+    });
+    mh.appendChild(kb); mh.appendChild(menu);
+    right.appendChild(mh);
+    right.appendChild(mk("span", "pill " + row.provenance,
+      row.provenance === "starter" ? "Starter" : row.provenance));
+    head.appendChild(right);
+    el.appendChild(head);
+
+    /* the soul — five atoms, consumed unchanged */
+    el.appendChild(mk("p", "purpose", row.purpose));
+    var sp = document.createElement("div"); sp.className = "spine";
+    row.chain.forEach(function (t, i) {
+      if (i) sp.appendChild(mk("span", "arrow", "→"));
+      var ph = L.PHASE_TYPES[t];
+      sp.appendChild(mk("span", "ph", ph.glyph + " " + ph.word));
+    });
+    el.appendChild(sp);
+    var sf = document.createElement("div"); sf.className = "soulfoot";
+    sf.appendChild(mk("span", "tier", tier.glyph + " " + tier.word));
+    sf.appendChild(mk("span", "", row.deliverable === "file" ? "Makes a file" : "Answers in chat"));
+    el.appendChild(sf);
+
+    /* the ONE sentence — untouched by this phase */
+    if (runnable) {
+      var p = mk("p", "consequence", COPY.FORK_CONSEQUENCE);
+      p.id = "wf-fork-" + row.id;
+      p.setAttribute("data-testid", "fork-consequence");
+      el.appendChild(p);
+    }
+
+    var foot = document.createElement("div"); foot.className = "cfoot";
+    if (runnable) {
+      var rb = mkBtn("btn-run", COPY.RUN_LABEL, function () { toast("Run → a new thread"); });
+      rb.setAttribute("data-testid", "published-run"); foot.appendChild(rb);
+    } else {
+      var ob = mkBtn("btn-open", COPY.OPEN_LABEL, function () { toast("Open → the Builder"); });
+      ob.setAttribute("data-testid", "draft-open"); foot.appendChild(ob);
+    }
+    el.appendChild(foot);
+    return el;
+  }
+
+  /* ── 162-B: the name prompt ────────────────────────────────────────────── */
+  function openForkDialog(row) {
+    state.pending = row;
+    var scrim = document.getElementById("scrim");
+    document.getElementById("dlgSub").textContent = COPY.FORK_DIALOG_SUB(row.name);
+    document.getElementById("dlgConseq").textContent = COPY.FORK_CONSEQUENCE;
+    document.getElementById("dlgOk").textContent = COPY.FORK_DIALOG_OK;
+    document.getElementById("dlgCancel").textContent = COPY.FORK_DIALOG_CANCEL;
+    var inp = document.getElementById("dlgInput");
+    inp.value = ""; validateDialog();
+    scrim.classList.add("open");
+    inp.focus();
+  }
+  function validateDialog() {
+    var v = document.getElementById("dlgInput").value.trim();
+    var hint = document.getElementById("dlgHint");
+    var ok = document.getElementById("dlgOk");
+    if (!v) { hint.className = "dhint"; hint.textContent = COPY.FORK_HINT_EMPTY; ok.disabled = true; return; }
+    var clash = allRows().some(function (r) { return r.isMine && r.name === v; });
+    hint.className = "dhint " + (clash ? "warn" : "good");
+    hint.textContent = clash ? COPY.FORK_HINT_CLASH : COPY.FORK_HINT_FREE;
+    ok.disabled = false;   /* WARNS, never BLOCKS — a name you chose is a name you may have */
+  }
+  function submitDialog() {
+    var v = document.getElementById("dlgInput").value.trim();
+    if (!v || !state.pending) return;
+    var src = state.pending;
+    state.extra.push({
+      id: "new-" + (state.extra.length + 1), slug: src.slug + "-" + L.hash6(), name: v, version: 1,
+      provenance: "draft", isMine: true, parentSlug: src.slug, forkKind: "copy",
+      projectName: src.projectName, projectId: src.projectId, updatedAt: L.NOW,
+      purpose: src.purpose, tierId: src.tierId, deliverable: src.deliverable, chain: src.chain
+    });
+    closeDialog(); render();
+    toast("Created “" + v + "” — opening the Builder");
+  }
+  function closeDialog() {
+    document.getElementById("scrim").classList.remove("open");
+    state.pending = null;
+  }
+
+  /* ── surface ───────────────────────────────────────────────────────────── */
+  var LEDE = {
+    assembled: "<b>This is the acceptance bar.</b> Your three picks composed into one surface at the real 107-row " +
+      "shape: <b>161-A</b> gives identity its own line under the name, <b>160-B</b> decides what goes in that line " +
+      "(computed from what actually differs), and <b>162-B</b> puts a name prompt on the fork. Scroll into the " +
+      "Compliance Gap Report block, then use <code>Make my own copy</code> from any <code>⋯</code> menu.",
+    today: "The shipped card, unchanged — the same 107 rows, the same server ordering. Flip between this and " +
+      "the assembled tab to see exactly what the phase adds: <b>one line</b>, and a prompt on one verb.",
+    anatomy: "<b>Every string and every hook the build must reproduce</b>, extracted from the running sketch rather " +
+      "than re-typed into prose. This table is the anti-drift artifact — the build imports these, it does not " +
+      "paraphrase them."
+  };
+
+  function render() {
+    var host = document.getElementById("surface"); host.innerHTML = "";
+    document.getElementById("lede").innerHTML = LEDE[state.variant];
+    var rows = allRows();
+
+    if (state.variant === "anatomy") { renderAnatomy(host, rows); return; }
+
+    var nc = L.nameCounts(rows);
+    var withLine = rows.filter(function (r) {
+      var i = identity(r, rows); return i.collides || state.solo === "quiet" || i.segs.length > 0;
+    }).length;
+    document.getElementById("barrow").innerHTML =
+      '<span><span class="k">rows</span> <span class="v">' + rows.length + '</span></span>' +
+      '<span><span class="k">atoms per card</span> <span class="v ' +
+        (state.variant === "assembled" ? "hot" : "good") + '">' +
+        (state.variant === "assembled" ? "14" : "13") + '</span></span>' +
+      '<span><span class="k">identity lines</span> <span class="v">' +
+        (state.variant === "assembled" ? withLine + " / " + rows.length : "0") + '</span></span>' +
+      '<span><span class="k">sentence nodes</span> <span class="v good">1</span> ' +
+        '<span class="k">(unchanged)</span></span>' +
+      '<span><span class="k">net-new wire</span> <span class="v">updated_at</span></span>';
+
+    var bar = document.createElement("div"); bar.className = "libbar";
+    bar.appendChild(mkBtn("btn-create", "＋ Create workflow", function () { toast("Create → the describe box"); }));
+    var sbx = document.createElement("div"); sbx.className = "searchbox";
+    sbx.innerHTML = '<span style="opacity:.55">⌕</span>';
+    var inp = document.createElement("input");
+    inp.type = "text"; inp.placeholder = "Search workflows"; inp.value = state.q;
+    inp.addEventListener("input", function () {
+      state.q = inp.value; render();
+      requestAnimationFrame(function () {
+        var i = document.querySelector(".searchbox input");
+        if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+      });
+    });
+    sbx.appendChild(inp); bar.appendChild(sbx);
+    var psel = document.createElement("select");
+    psel.innerHTML = '<option value="">All projects</option>' +
+      L.PROJECTS.filter(function (p) { return p.id; }).map(function (p) {
+        return '<option value="' + p.id + '"' + (state.project === p.id ? " selected" : "") + '>' + p.name + '</option>';
+      }).join("");
+    psel.addEventListener("change", function () { state.project = psel.value; render(); });
+    bar.appendChild(psel);
+    host.appendChild(bar);
+
+    var q = state.q.trim().toLowerCase();
+    var vis = rows.filter(function (r) {
+      if (q && (r.name + " " + r.purpose).toLowerCase().indexOf(q) === -1) return false;
+      if (state.project && r.projectId !== state.project) return false;
+      if (state.chips.length) {
+        var any = false;
+        state.chips.forEach(function (c) { CHIPS.forEach(function (t) { if (t[0] === c && t[2](r)) any = true; }); });
+        if (!any) return false;
+      }
+      return true;
+    });
+
+    var cs = document.createElement("div"); cs.className = "chips";
+    CHIPS.forEach(function (c) {
+      var b = mkBtn("chip" + (state.chips.indexOf(c[0]) > -1 ? " on" : ""), "", function () {
+        var i = state.chips.indexOf(c[0]);
+        if (i > -1) state.chips.splice(i, 1); else state.chips.push(c[0]);
+        render();
+      });
+      b.innerHTML = c[1] + '<span class="n">' + vis.filter(c[2]).length + '</span>';
+      cs.appendChild(b);
+    });
+    host.appendChild(cs);
+    host.appendChild(mk("div", "countline", vis.length + " of " + rows.length + " workflows"));
+
+    if (!vis.length) { host.appendChild(mk("div", "empty", "Nothing matches that.")); return; }
+    vis.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var g = document.createElement("div"); g.className = "grid";
+    vis.forEach(function (r) { g.appendChild(card(r, rows, state.variant)); });
+    host.appendChild(g);
+
+    if (state.variant === "assembled") {
+      var d = document.createElement("div"); d.className = "decide";
+      d.innerHTML =
+        '<div class="dh">the one edge your two picks disagree about</div>' +
+        '<p><b>160-B’s argument was restraint</b> — the 13 rows whose name is already unique get no strip at ' +
+        'all. <b>161-A puts a line on every card.</b> They answer different questions, but they disagree here. The ' +
+        'assembled card resolves it as <b>quiet</b>: a unique-name row still gets the line, carrying only ownership ' +
+        'and when it changed, with no discriminator segments — so placement stays consistent (A’s reason for ' +
+        'winning) while information is still only spent where it buys something (B’s reason).</p>' +
+        '<p>Flip it in the toolbar and look at <i>Board Minutes Formatter</i> or <i>NDA Redline Assistant</i>. ' +
+        '<b>This is the last open question in the batch</b> — whichever you pick becomes a recorded decision, not ' +
+        'an executor’s judgement call.</p>';
+      var tg = document.createElement("div"); tg.className = "toggle";
+      [["quiet", "Quiet line on unique names"], ["absent", "No line on unique names"]].forEach(function (o) {
+        var b = mkBtn("tgl" + (state.solo === o[0] ? " on" : ""), o[1], function () { state.solo = o[0]; document.getElementById("soloSel").value = o[0]; render(); });
+        tg.appendChild(b);
+      });
+      d.appendChild(tg);
+      host.appendChild(d);
+
+      var n = document.createElement("div"); n.className = "note warn";
+      n.innerHTML = '<b>⚠ 162-B reopens D-15, and picking it is a recorded decision.</b> The fork was a ' +
+        '<b>direct flip</b> because a confirm on a non-destructive reversible action <i>spends the guard vocabulary ' +
+        'the delete relies on</i> (<code>WorkflowCard.tsx:84-87</code>). The working rationale for why this prompt is ' +
+        'not that: <b>it collects something the system cannot know, so it is an input, not a guard</b> — which is ' +
+        'why it asks for a name rather than asking you to confirm, has no destructive styling, and its primary button ' +
+        'is <i>Create my copy</i> rather than <i>Confirm</i>. That rationale must be recorded as a decision at ' +
+        'plan-phase, and D-15 amended in the same commit rather than left silently contradicted.';
+      host.appendChild(n);
+
+      var n2 = document.createElement("div"); n2.className = "note";
+      n2.innerHTML = '<b>What the prompt deliberately does NOT do.</b> It <b>warns and never blocks</b> on a ' +
+        'colliding name — a name you chose is a name you are allowed to have, and blocking would make the ' +
+        'library’s problem the user’s fault. It is also the natural home for the <b>409</b>: a name field can ' +
+        'surface a slug collision before the request, retiring WR-08’s substring-matching of error prose ' +
+        '(<code>WorkflowsPage.tsx:165-167</code>) — <b>scope that deliberately at plan time; it is not free.</b>';
+      host.appendChild(n2);
+    }
+  }
+
+  function renderAnatomy(host, rows) {
+    document.getElementById("barrow").innerHTML =
+      '<span><span class="k">strings declared</span> <span class="v">' +
+      Object.keys(COPY).filter(function (k) { return typeof COPY[k] === "string"; }).length + '</span></span>' +
+      '<span><span class="k">test hooks</span> <span class="v">11</span></span>' +
+      '<span><span class="k">new atoms</span> <span class="v hot">1</span></span>';
+
+    var wrap = document.createElement("div");
+    var sample = null;
+    rows.forEach(function (r) { if (!sample && r.name === "Compliance Gap Report" && r.forkKind === "copy") sample = r; });
+
+    var tbl = '<div class="seclabel"><span>The identity line — grammar</span><span class="rule"></span></div>' +
+      '<div class="note"><code>[own pill] [computed seg] · [computed seg] [1 of N] · changed &lt;rel&gt;</code>' +
+      '<br><br><b>Segment priority when the name COLLIDES</b> (first two that vary win): ' +
+      '<code>lineage → project → state → version</code>. ' +
+      '<b>When the name is UNIQUE:</b> no discriminator segments; lineage only if the row is a fork. ' +
+      '<b>Max 2 segments, always.</b> The <code>1 of N</code> marker appears only on a colliding name.</div>';
+
+    tbl += '<div class="seclabel"><span>Exact strings — the build imports these</span><span class="rule"></span></div>';
+    tbl += '<div class="note" style="max-width:none"><table style="width:100%;border-collapse:collapse;font-size:12px">';
+    Object.keys(COPY).forEach(function (k) {
+      var v = COPY[k];
+      var shown = typeof v === "function"
+        ? (k === "LINEAGE_VERSION_OF" ? v(3, 2) : k === "ONE_OF" ? v(43) : v("Compliance Gap Report"))
+        : v;
+      tbl += '<tr><td style="padding:4px 10px 4px 0;vertical-align:top;font-family:var(--font-mono);font-size:10.5px;' +
+        'color:var(--color-primary);white-space:nowrap">' + k + (typeof v === "function" ? "()" : "") + '</td>' +
+        '<td style="padding:4px 0;color:var(--color-text)">' + esc(shown) + '</td></tr>';
+    });
+    tbl += '</table></div>';
+
+    tbl += '<div class="seclabel"><span>Test hooks — every one already shipped except the first</span><span class="rule"></span></div>';
+    tbl += '<div class="note" style="max-width:none"><table style="width:100%;border-collapse:collapse;font-size:12px">' +
+      [["row-identity", "THE ONE NET-NEW HOOK — the identity line"],
+       ["published-card / starter-card / draft-card", "root, per provenance — shipped"],
+       ["published-run", "primary verb, runnable — shipped"],
+       ["draft-open", "primary verb, draft — shipped"],
+       ["published-tweak", "fork on a published row — shipped, KEEPS ITS ID"],
+       ["use-starter", "fork on a starter — shipped, stays DISTINCT from the above"],
+       ["published-delete", "the victim-naming sheet trigger — shipped"],
+       ["draft-delete", "the arm-to-confirm trigger — shipped"],
+       ["fork-consequence", "the one sentence — shipped, UNCHANGED by this phase"]].map(function (r) {
+        return '<tr><td style="padding:4px 10px 4px 0;font-family:var(--font-mono);font-size:10.5px;color:' +
+          (r[1].indexOf("NET-NEW") > -1 ? "hsl(258 90% 80%)" : "var(--color-primary)") + ';white-space:nowrap">' +
+          r[0] + '</td><td style="padding:4px 0;color:var(--color-text-muted)">' + r[1] + '</td></tr>';
+      }).join("") + '</table></div>';
+
+    tbl += '<div class="seclabel"><span>The card’s DOM order — top to bottom</span><span class="rule"></span></div>' +
+      '<div class="note"><code>1 head</code> (name · version │ ⋯ · state pill)<br>' +
+      '<code>2 row-identity</code> ← <b>the only insertion this phase makes</b><br>' +
+      '<code>3 folder chip</code><br><code>4 purpose</code> │ <code>5 spine</code> │ <code>6 tier + deliverable</code> ' +
+      '— the soul, consumed unchanged<br><code>7 fork-consequence</code> (runnable only — unchanged)<br>' +
+      '<code>8 footer</code> (one primary verb)<br><br>' +
+      '<b>The identity line goes at position 2, above the folder chip.</b> Not below the purpose, not in the footer. ' +
+      'It reads with the name because it is part of what the row IS.</div>';
+
+    tbl += '<div class="seclabel"><span>Negative fences — what must stay FALSE</span><span class="rule"></span></div>' +
+      '<div class="note warn">• <b>Zero hover-only tooltip attributes</b> anywhere in the subtree (D-14 — touch has no hover).<br>' +
+      '• <b>The sentence node count stays exactly 1 per runnable card</b>, and its text is UNCHANGED — 161-A does not spend the slot.<br>' +
+      '• <b>All five soul atoms survive on every card</b> — the identity line sits around the soul, never inside it.<br>' +
+      '• <b>No draft exposes a Run affordance</b>, face or menu.<br>' +
+      '• <b>The identity line is never more than 2 computed segments.</b><br>' +
+      '• <b>The two fork testids stay distinct</b> — collapsing them erases the only mechanical evidence that D-12 holds.<br>' +
+      '• <b>No owner display NAME anywhere</b> — the wire has no users join; Yours/Shared is the honest ceiling.</div>';
+
+    wrap.innerHTML = tbl;
+    host.appendChild(wrap);
+
+    if (sample) {
+      var sl = document.createElement("div"); sl.className = "seclabel";
+      sl.innerHTML = '<span>A rendered card, for reference</span><span class="rule"></span>';
+      host.appendChild(sl);
+      var g = document.createElement("div"); g.className = "grid";
+      g.appendChild(card(sample, rows, "assembled"));
+      host.appendChild(g);
+    }
+  }
+
+  function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function mk(t, c, x) { var e = document.createElement(t); if (c) e.className = c; if (x !== undefined) e.textContent = x; return e; }
+  function mkBtn(c, x, fn) { var b = document.createElement("button"); b.type = "button"; b.className = c; if (x) b.textContent = x; b.addEventListener("click", fn); return b; }
+  function closeMenus() { if (state.openMenu) { state.openMenu.classList.remove("open"); state.openMenu = null; } }
+  var tt; function toast(m) { var t = document.getElementById("toast"); t.textContent = m; t.classList.add("show"); clearTimeout(tt); tt = setTimeout(function () { t.classList.remove("show"); }, 2000); }
+
+  document.addEventListener("click", closeMenus);
+  document.getElementById("dlgInput").addEventListener("input", validateDialog);
+  document.getElementById("dlgInput").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") submitDialog();
+    if (e.key === "Escape") closeDialog();
+  });
+  document.getElementById("dlgOk").addEventListener("click", submitDialog);
+  document.getElementById("dlgCancel").addEventListener("click", closeDialog);
+  document.getElementById("scrim").addEventListener("click", function (e) {
+    if (e.target === document.getElementById("scrim")) closeDialog();
+  });
+  document.getElementById("soloSel").addEventListener("change", function () { state.solo = this.value; render(); });
+  Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (t) {
+    t.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll(".variant-tab"), function (x) { x.classList.remove("active"); });
+      t.classList.add("active"); state.variant = t.getAttribute("data-v"); render();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-vp]"), function (b) {
+    b.addEventListener("click", function () {
+      var w = parseInt(b.getAttribute("data-vp"), 10);
+      document.getElementById("vp").style.maxWidth = w ? w + "px" : "";
+    });
+  });
+
+  window.__SKETCH163 = { COPY: COPY, identity: identity, lineagePhrase: lineagePhrase };
+  render();
+})();
+</script>
+</body>
+</html>
