@@ -262,7 +262,24 @@ by looking.
 
 **How we'd know this failed** (G-6): the operator opens the library on their real data and still cannot point at a row and say which one it is; or a fix is verified by a driver that located rows by id rather than by reading the screen.
 
-**Plans**: TBD — `/gsd:sketch 192.1` first (G-2), then `/gsd:plan-phase 192.1`
+**Plans**: 8 plans in 7 waves (G-2 satisfied — sketches 160/161/162 driven, operator picked 160-B · 161-A · 162-B, 163 assembled with a generated build contract).
+
+Plans:
+- [ ] 192.1-01-PLAN.md — `updated_at` end to end: 4 SELECT lists, 2 Pydantic models, 3 builders, 2 wire types, `LibraryRow.updatedAt`, both normalizers (D-15/16/17)
+- [ ] 192.1-02-PLAN.md — the pre-move baselines, captured on the UNMOVED tree, with the line classifier validated against 188.2's known-good (D-01)
+- [ ] 192.1-03-PLAN.md — **the G-5 extraction**: `libraryFork.ts` + `useWorkflowFork.ts`, the page cut over, the OD fence extended, the growth measured (D-01/22/24/29/37)
+- [ ] 192.1-04-PLAN.md — the ported COPY table, the nine-band `relativeChanged.ts`, and the scale fixture carrying the duplicate AND orphan shapes (D-14/18/25/26/30)
+- [ ] 192.1-05-PLAN.md — `rowIdentity.ts`: the O(n) index, the four-state lineage whose fourth state is silence, and the D-31 ranker (D-03/04/05/12/13/31/32/34) + the two new fences (D-09/16)
+- [ ] 192.1-06-PLAN.md — the 14th atom at DOM position 2, the `[rows]`-keyed memo and the hoisted clock (D-05/06/08/09/10/11/28/34)
+- [ ] 192.1-07-PLAN.md — 162-B's fork name prompt, and 192's D-15 amended in the same commit (D-19/20/21/22/23/24/36)
+- [ ] 192.1-08-PLAN.md — both hot-file ledger rows re-measured, the ROADMAP flag corrected, `192.1-UAT.md`'s nine G-4 rows, and the operator drive (D-02/07/27/28/31)
+
+⚠ **Wave parallelism is genuinely limited here and it is stated rather than smoothed.** Only Wave 1
+carries two plans. Every later wave is a single plan, because `WorkflowsPage.tsx` and
+`librarySubtree.fences.test.ts` are the two files nearly every part of this phase touches, and D-33
+requires the fences suite be widened in the SAME commit that adds a module — so two module-adding
+plans can never share a wave. The 2-concurrent-vitest cap (`GSD_VITEST_MAX_WORKERS=4`) is therefore
+never approached after Wave 1.
 
 #### Phase 193: Authoring Doors + Template Placement
 
