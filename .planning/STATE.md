@@ -32,9 +32,20 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
-**Phase:** 192.1 Workflow Identity — **8 of 8 plans executed**; `192.1-08` Task 3 (the blocking operator checkpoint) is **DONE**
+**Phase:** 192.1 Workflow Identity — ✅ **CLOSED 2026-08-13** (8 of 8 plans, 7 waves, LIB-05 satisfied)
 **Plan:** — none in flight
-**Status:** **UAT DRIVEN AND SECURED — one product decision and one artifact stand between this and a close.**
+**Status:** ✅ **PHASE CLOSED.** UAT driven 9/9, secured at `threats_open: 0`, U8's in-scope half accepted as a recorded deviation and routed to `SEED-155`. **NEXT = `/gsd:discuss-phase 193`.**
+
+**The close, in one line each:** LIB-05 satisfied · 9/9 UAT rows driven (7 pass, 2 fail) · U7's fail
+fixed same-day under G-3 · **U8's fail STANDS**, its in-scope half accepted → `SEED-155` · security
+`threats_open: 0` with E-1/E-2 repaired and E-3 open by decision · G-5 honoured in the order D-01
+requires (the extraction shipped Wave 3, *before* the feature it made room for) · ⚠ **no
+`192.1-VERIFICATION.md` exists.**
+
+⚠ **192.1 WAS ABSENT FROM THE ROADMAP CHECKLIST ENTIRELY UNTIL THIS CLOSE** — the list ran
+192 → 193 while an eight-plan phase executed between them, exactly as **188.2** was missing at the
+v3.6 close. Added as `- [x]` in the same commit. A phase missing from its own checklist is invisible
+to every audit that reads the checklist.
 
 ⚠ **THIS BLOCK WAS STALE FROM `0b2b7520` UNTIL 2026-08-13, AND THE STALENESS DID DAMAGE RATHER THAN
 JUST SITTING THERE.** It read *"⛔ AWAITING THE OPERATOR. Drive `U1…U9` … The phase is NOT complete
