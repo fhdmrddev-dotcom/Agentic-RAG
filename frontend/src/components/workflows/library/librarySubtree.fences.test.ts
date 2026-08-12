@@ -829,6 +829,12 @@ const PAGE_IMPORTED_MODULES = [
   // manufacturing one a TYPE ERROR rather than merely untidy. The pure leaves are reached
   // THROUGH the hook, which is the correct shape of a two-layer cut.
   // ⚠ THIS CORRECTS `192.1-03-PLAN.md` Task 3(a), which says to add both names.
+  // ── 192.1-07 (D-19): 162-B's name prompt is MOUNTED by the page, so it IS an edge ──
+  // ⚠ AND IT IS THE FIRST ENTRY HERE THAT IS A COMPONENT THE PAGE RENDERS RATHER THAN A
+  // MODULE IT CALLS, which is why it belongs and `WorkflowDeleteSheet` still does not: the
+  // Sheet is mounted by the CARD, this prompt is mounted by the PAGE. The distinction the ⚠
+  // block above draws is about WHO mounts, not about what kind of thing it is.
+  "ForkNameDialog",
 ] as const
 
 /**

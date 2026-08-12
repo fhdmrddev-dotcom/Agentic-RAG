@@ -909,7 +909,29 @@ const BASELINE = {
   // printed `WorkflowsPage.test.tsx 40 48 +8` at `total 3188 · failed 0` — never hand-counted
   // from `it(` literals, and NEVER taken from a SUMMARY: `192-14-SUMMARY.md` recorded this
   // raise as owed at `40 → 44`, which was true when it was written and stale four cases later.
-  "WorkflowsPage.test.tsx": 48,
+  // ── 192.1-07 Task 2 (LIB-05 / D-19…D-24): 48 → 52. AN EXTENSION, NEVER A LOWERING. ──────
+  // The +4 are the name prompt's END-TO-END arc, driven on the live page rather than on the
+  // component: (1) D-23's blocker guard — on an already-forked published row NO dialog mounts
+  // and `createWorkflowDraft` is called zero times; (2) its POSITIVE CONTROL — the same verb
+  // on a row with no existing draft DOES mount the dialog, and still writes nothing until the
+  // name is given; (3) the copy ARRIVES under the typed name (`definition.name`, which the
+  // server writes to the row's `name` COLUMN — LIB-05's actual fix, since a Builder caption
+  // alone would leave the library as unreadable as it was); (4) D-20 end-to-end over the REAL
+  // pre-flight rather than a stubbed `isClash` — a name already in the merged feed warns and
+  // the create happens anyway.
+  // ⚠ CASE (1) WAITS ON A PRESENT NODE BEFORE QUERYING AN ABSENCE (T-4). This file sets
+  // `asyncUtilTimeout: 15000`, longer than vitest's 5 s budget, so a `findBy` on an absent
+  // dialog would blow the TEST timeout and read as D-192-DEF-01 rather than as a defect.
+  // ⚠ NOT ONE `expect(…)` LINE IN THE TWELVE SHIPPED FORK CASES WAS EDITED — the 192-14 block
+  // and T-192-42's two-call pin are byte-identical and green. What changed is the
+  // INTERACTION: every case that reaches a create now types a name first, because that is
+  // what a person now does. The single exception is stated rather than buried — the Builder
+  // caption assertion moved from the parent's SLUG to the typed NAME, because the behaviour
+  // moved with it.
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-13, both
+  // printing `WorkflowsPage.test.tsx 48 52 +4` and `librarySubtree.fences.test.ts 116 117 +1`
+  // at `total 3436 · failed 0` — never hand-counted from `it(` literals.
+  "WorkflowsPage.test.tsx": 52,
   "RunModal.test.tsx": 32,
   "RunModal.a11y.test.tsx": 16,
   "PublishedCardDelete.test.tsx": 32,
@@ -1059,7 +1081,22 @@ const BASELINE = {
   // number was written. Then READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING
   // RUNS, 2026-08-12, both printing `librarySubtree.fences.test.ts 111 116 +5` and
   // `ForkNameDialog.test.tsx — 18 new` at `total 3431 · failed 0` — never hand-counted.
-  "librarySubtree.fences.test.ts": 116,
+  // ── 192.1-07 Task 2 (D-19): 116 → 117. ONE MORE, AND IT IS AN `OD` ENTRY, NOT A SWEEP. ──
+  // The page MOUNTS `ForkNameDialog`, so the downward edge exists and `PAGE_IMPORTED_MODULES`
+  // must name it — a one-case `it.each`, hence +1 rather than +5. It is the first entry there
+  // that is a COMPONENT THE PAGE RENDERS rather than a module it calls, which is exactly why
+  // `WorkflowDeleteSheet` still is not listed: the Sheet is mounted by the CARD.
+  // ⚠ DRIVEN RED AGAINST A REAL PLANT IN PRODUCTION SOURCE, not added blind: the page's import
+  // specifier was broken to `…/ForkNameDialogX` and the fence failed with `imports
+  // ForkNameDialog from the library subtree … AssertionError: expected '/**\n * Phase 103-06
+  // (REQ-7 / WFAUTH-…' to match /from\s+["']@\/components\/…/` at 1 failed / 116 passed.
+  // ⚠ AND THE RESTORE WAS md5-CHECKED, WHICH IS WHY THIS NOTE EXISTS. The first restore was
+  // CONTENT-correct and NOT byte-identical — `sed -i` under Git Bash rewrote the file LF-only
+  // against a CRLF working tree (1160 line endings flipped, zero characters changed), and the
+  // md5 caught what a `git diff` could not have: git normalises EOL in the index, so the diff
+  // was clean while the file on disk no longer matched its neighbours. Re-terminated to CRLF,
+  // the page hashes `bbc827e055dd890b8c6da1e29d82125d` — EXACTLY its pre-plant value.
+  "librarySubtree.fences.test.ts": 117,
   // ── 192.1-07 Task 1 (LIB-05 / D-19 / D-20 / D-36): a NEW suite, pinned in its first commit ─
   // 162-B's name prompt, in `RunModal.a11y.test.tsx`'s posture (the four Radix jsdom shims,
   // `axe()` on the OPEN dialog, roles and accessible names rather than class-name reading).

@@ -105,6 +105,7 @@ import {
   type WorkflowDefinitionJSON,
   type WorkflowDraftRow,
 } from "@/lib/api"
+import { CHIP_PREDICATES } from "./libraryFilter"
 import { freshHash, isForkConflict } from "./libraryFork"
 import type { LibraryRow } from "./libraryRow"
 
@@ -125,9 +126,36 @@ export interface ForkSeed {
   token: string
 }
 
+/**
+ * 192.1-07 (D-19 / D-23) — A FORK THAT HAS BEEN ASKED FOR BUT NOT YET NAMED.
+ *
+ * `kind` is what keeps D-12's never-merged rule intact through the prompt: ONE dialog serves
+ * both fork paths (the user's intent is identical and the card spends one word on it), but the
+ * two CREATE paths behind it stay siblings — same slug at v(N+1) versus a fresh auto-suffixed
+ * slug at v1. Losing this discriminator is how the two handlers get merged by accident, which
+ * breaks the GLOBAL `UNIQUE(slug, version)` constraint the moment two people fork one starter.
+ *
+ * ⚠ NOTHING IS WRITTEN WHILE THIS IS SET. It is the state between the click and the POST, and
+ * the whole point of D-19 is that the person, not the system, supplies what goes in the gap.
+ */
+export interface PendingFork {
+  row: LibraryRow
+  kind: "version" | "starter"
+}
+
 export interface WorkflowForkArgs {
   /** The drafts feed, server-scoped to `created_by = caller`. Feeds `draftBySlug`. */
   drafts: WorkflowDraftRow[]
+  /**
+   * The MERGED library list the page already holds — D-21's pre-flight reads it and nothing
+   * else, which is what makes the collision check free.
+   *
+   * ⚠ IT IS PASSED IN RATHER THAN REBUILT. `mergeLibrary` runs once on the page and feeds the
+   * filter, the chip counts and the identity index; a second merge here would be a second
+   * answer to "what is in this library", and the two would drift the first time a feed's
+   * scope changed.
+   */
+  rows: readonly LibraryRow[]
   /** The page's fetch-orchestration concern. Passed IN — see the header. */
   refetchDrafts: () => Promise<unknown> | void
   /** The page's drafts-navigation concern. Passed IN (D-01) — see the header. */
@@ -141,14 +169,26 @@ export interface WorkflowFork {
   forkFailed: { name: string; conflict: boolean } | null
   /** The caller's own drafts by slug, highest version wins. Also feeds `hasExistingFork`. */
   draftBySlug: Map<string, WorkflowDraftRow>
-  /** `WorkflowCard`'s fork verb on a PUBLISHED row — same slug at v(N+1). */
+  /**
+   * `WorkflowCard`'s fork verb on a PUBLISHED row — same slug at v(N+1).
+   * ⚠ On a row this caller has ALREADY forked it opens that draft and creates nothing, so it
+   * raises NO prompt either (D-23). See the handler.
+   */
   onForkNewVersion: (row: LibraryRow) => void
   /** `WorkflowCard`'s fork verb on a STARTER row — a fresh suffixed slug at v1. */
   onForkStarter: (row: LibraryRow) => void
+  /** 192.1-07 (D-19): the fork awaiting a name, or `null`. The page gates the dialog on it. */
+  pendingFork: PendingFork | null
+  /** The typed name, from the dialog. Runs the create path the pending fork's `kind` selects. */
+  confirmFork: (name: string) => void
+  /** Dismissed. Clears the pending fork and writes NOTHING. */
+  cancelFork: () => void
+  /** D-21's advisory pre-flight — see its declaration for what it is and is not. */
+  isClash: (name: string) => boolean
 }
 
 export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
-  const { drafts, refetchDrafts, onOpenDraft, onForked } = args
+  const { drafts, rows, refetchDrafts, onOpenDraft, onForked } = args
 
   /**
    * 192-15 (WR-03) — A FORK CLICK THAT FAILED, HELD UNTIL THE NEXT FORK ATTEMPT.
@@ -163,6 +203,16 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
    * disclosure threat — it is the only path from a thrown server error to the screen.
    */
   const [forkFailed, setForkFailed] = useState<{ name: string; conflict: boolean } | null>(null)
+
+  /**
+   * 192.1-07 (D-19) — THE FORK THAT HAS BEEN ASKED FOR AND NOT YET NAMED.
+   *
+   * ⚠ IT IS THE ONLY NEW STATE THIS PLAN ADDS, and it holds a ROW rather than a half-built
+   * definition on purpose: the slug and version mechanics stay inside the two create paths
+   * where D-12 governs them, so a pending fork cannot carry a slug that was computed before
+   * the person finished typing.
+   */
+  const [pendingFork, setPendingFork] = useState<PendingFork | null>(null)
 
   /**
    * 192-14 (the U5 blocker) — THE DRAFTS THIS CALLER ALREADY OWNS, BY SLUG.
@@ -186,34 +236,45 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
     return bySlug
   }, [drafts])
 
+  /**
+   * 192.1-07 (D-21) — THE PRE-FLIGHT COLLISION CHECK, AND WHAT IT IS NOT.
+   *
+   * It reads the caller's OWN rows in the merged feed and compares DISPLAY NAMES — the thing
+   * the human actually sees and the thing 43-of-104 duplicates are a problem about. It is free
+   * because the page already holds the list; no request is made and no scope is widened.
+   *
+   * ⚠ THE OWNERSHIP TEST IS THE SHIPPED PREDICATE, READ RATHER THAN RE-WRITTEN (D-09). A
+   * hand-rolled `row.isMine ?? …` here would be a SECOND answer to "is this mine", and the
+   * shipped one is not the obvious expression: it falls back to feed origin when the wire bit
+   * is absent, precisely so a frontend deployed ahead of its backend is RIGHT rather than
+   * merely non-fatal. Copying the short version is how that correctness rule gets lost.
+   *
+   * ⚠ IT IS ADVISORY, AND IT IS NOT A SLUG CHECK. It must never be presented as a guarantee
+   * that the create will succeed: WR-08's 409 is a `UNIQUE(slug, version)` violation on SLUGS,
+   * and no name field prevents it (D-22 — the residual is named at the create path below).
+   */
+  const isClash = useCallback(
+    (name: string) => {
+      const wanted = name.trim()
+      if (!wanted) return false
+      return rows.some((row) => CHIP_PREDICATES.yours(row) && row.name === wanted)
+    },
+    [rows],
+  )
+
   // ── Tweak: fork a v(N+1) DRAFT (INSERT) — never UPDATE the frozen published row —
   //    then open the FORKED copy's existing steps in the Builder (NOT the describe
   //    screen). The new draft id is captured so every save PATCHes the fork.
   //
-  //    ⚠ 192-14 — FIRST, THOUGH: if this caller ALREADY has a draft of this slug, the verb
-  //    OPENS THAT DRAFT and creates nothing. That branch is the operator's 2026-08-11
-  //    decision on the U5 blocker (`192-UAT.md` test 11), where a fork click 409'd twice and
-  //    the surface said nothing at all. Opening the existing copy removes the collision
-  //    class outright rather than making it rarer, and the card says so before the click
-  //    (the card's `FORK_CONSEQUENCE_EXISTING` sentence, 192-13). ──
-  const onTweak = useCallback(
-    async (wf: PublishedWorkflow) => {
-      // ── THE EXISTING-DRAFT BRANCH (192-14) ──
-      // Nothing is created and nothing is fetched, so there is no request that can 409.
-      // `onOpenDraft` is REUSED rather than a third `setBuilderInitial` call site added,
-      // which is what threads 186-07's opaque concurrency token by construction instead of
-      // by remembering to — a dropped token is a silent-clobber bug that typechecks.
-      //
-      // ⚠ 192.1-03 (D-23): THIS BRANCH MUST SURVIVE THE EXTRACTION UNCHANGED. It is a
-      // SHIPPED BLOCKER FIX, not an optimisation — regressing it re-opens U5. It survives by
-      // construction here: `onOpenDraft` is an argument, so the hook cannot reach the Builder
-      // setter even if a later author wanted to.
-      const existing = draftBySlug.get(wf.slug)
-      if (existing) {
-        onOpenDraft(existing)
-        return
-      }
-
+  //    ⚠ 192.1-07 (D-19): THE EXISTING-DRAFT BRANCH IS NO LONGER IN THIS FUNCTION — it moved
+  //    UP into `onForkNewVersion`, and the move is required rather than tidy. The prompt now
+  //    stands between the click and the create, and D-23 says NO PROMPT APPEARS on the
+  //    already-forked path *because nothing is being named there*. Leaving the branch down
+  //    here would mean opening a name dialog and then silently discarding the name — which is
+  //    the U5 blocker's own shape (a click that does something other than what it said).
+  //    What reaches this function is therefore only ever a real create, with a real name. ──
+  const createNewVersion = useCallback(
+    async (wf: PublishedWorkflow, name: string) => {
       // ── THE CREATE PATH, DELIBERATELY UNCHANGED BELOW THIS LINE ──
       // `def.version` is read off the JSONB `definition`, where it is NULL on every live row
       // (the real version is the `version` COLUMN), so `nextVersion` is effectively the
@@ -233,8 +294,15 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
       const def = (wf.definition ?? {}) as Record<string, unknown>
       const currentVersion = typeof def.version === "number" ? (def.version as number) : 1
       const nextVersion = currentVersion + 1
+      // ⚠ 192.1-07 (LIB-05) — `name` IS THE WHOLE POINT OF THE PROMPT, AND IT IS A REAL FIELD
+      // RATHER THAN A CAPTION. The server reads `definition.name` and writes it to the row's
+      // `name` COLUMN (`db/workflows.py:508-513`), which is what every library feed renders —
+      // so the copy genuinely ARRIVES under the typed name instead of inheriting its parent's.
+      // That is the 43-of-104 measurement's actual fix; a Builder caption alone would have
+      // left the library exactly as unreadable as it was.
       const forked = {
         ...def,
+        name,
         slug: wf.slug,
         version: nextVersion,
         status: "draft",
@@ -249,7 +317,11 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
         onForked({
           definition: forked,
           draftId: created.id,
-          label: `Tweak · ${wf.slug} v${nextVersion}`,
+          // ⚠ 192.1-07: THE CAPTION READS THE TYPED NAME, WHERE IT USED TO READ THE SLUG. The
+          // Builder header is the first thing a person sees after naming a copy; showing them
+          // the parent's slug back would be the surface disagreeing with the thing they just
+          // told it. The version stays — it is the one fact the name cannot carry.
+          label: `Tweak · ${name} v${nextVersion}`,
           // 186-07: the create response's own token guards the fork's first PATCH.
           token: created.token,
         })
@@ -270,7 +342,10 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
         setForkFailed({ name: wf.name, conflict: isForkConflict(e) })
       }
     },
-    [refetchDrafts, draftBySlug, onOpenDraft, onForked],
+    // ⚠ `draftBySlug` AND `onOpenDraft` ARE NO LONGER READ HERE — the existing-draft branch
+    // they served moved up to `onForkNewVersion` (D-23), so listing them would be a dependency
+    // on nothing. `noUnusedLocals` cannot see a stale dep array; the exhaustive-deps rule can.
+    [refetchDrafts, onForked],
   )
 
   // ── Use this starter (WF-01, D-143-1): a FRESH-COPY fork. A sibling of onTweak
@@ -281,8 +356,8 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
   //    is_system_global=false / status=draft / created_by=caller; the published starter row
   //    stays frozen. On a 409 slug/version collision (astronomically unlikely hash
   //    clash) retry once with a fresh hash (Pitfall 5). Lands in the Builder (D-143-1a). ──
-  const onUseStarter = useCallback(
-    async (starter: PublishedWorkflow) => {
+  const createFromStarter = useCallback(
+    async (starter: PublishedWorkflow, name: string) => {
       const def = (starter.definition ?? {}) as Record<string, unknown>
       // 192-15: same rule as Tweak — clear before attempting, so a stale notice can never
       // sit above a fork that has just succeeded. BEFORE the loop, not inside it: the retry
@@ -291,8 +366,12 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
       for (let attempt = 0; attempt < 2; attempt++) {
         // NOTE: `def` may carry `category:"starter"` — that is SAFE (Plan 01 added the
         // additive field to WorkflowDefinition); do NOT strip it from the fork body.
+        // ⚠ 192.1-07: `name` IS THE TYPED ONE, and it is inside the retry loop with the slug
+        // for a reason — the retry re-mints the SLUG, never the name. A person who typed a
+        // name once has answered once.
         const forked = {
           ...def,
+          name,
           slug: `${starter.slug}-${freshHash()}`,
           version: 1,
           status: "draft",
@@ -303,7 +382,8 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
           onForked({
             definition: forked,
             draftId: created.id,
-            label: `From starter · ${starter.name}`,
+            // ⚠ 192.1-07: the typed name, not the STARTER's — same reason as Tweak's caption.
+            label: `From starter · ${name}`,
             // 186-07: same as Tweak — the fresh copy's create response carries it.
             token: created.token,
           })
@@ -355,20 +435,83 @@ export function useWorkflowFork(args: WorkflowForkArgs): WorkflowFork {
   // `onRun`, `onOpen` and `onDeleted` — are NOT the fork concern and stayed on the page.
   //
   // ⚠ D-12 — THE TWO FORK ADAPTERS ARE SIBLINGS AND ARE NEVER MERGED. `onForkNewVersion`
-  // reaches `onTweak` (SAME slug at version N+1) and `onForkStarter` reaches `onUseStarter`
-  // (a FRESH auto-suffixed slug at version 1, retried once on a 409). They share one word on
-  // the card face because the user's intent is identical; merging the handlers behind that
-  // word breaks the GLOBAL `UNIQUE(slug, version)` constraint the moment two people fork one
-  // shared starter. The card branches on `provenance` and constructs neither slug nor version.
+  // reaches `createNewVersion` (SAME slug at version N+1) and `onForkStarter` reaches
+  // `createFromStarter` (a FRESH auto-suffixed slug at version 1, retried once on a 409). They
+  // share one word on the card face because the user's intent is identical; merging the
+  // handlers behind that word breaks the GLOBAL `UNIQUE(slug, version)` constraint the moment
+  // two people fork one shared starter. The card branches on `provenance` and constructs
+  // neither slug nor version.
+  //
+  // ⚠ 192.1-07 (D-19): THEY ARE NO LONGER PURE CASTS — each is now the ENTRY to a two-step
+  // flow (ask, then create), and `confirmFork` below is the second step. `kind` is what
+  // carries D-12's distinction across the gap, so the ONE dialog cannot collapse the TWO
+  // handlers by construction.
   const onForkNewVersion = useCallback(
-    (row: LibraryRow) => onTweak(row.source as PublishedWorkflow),
-    [onTweak],
+    (row: LibraryRow) => {
+      // ── THE EXISTING-DRAFT BRANCH (192-14), NOW THE FIRST THING THAT HAPPENS ──
+      // Nothing is created and nothing is fetched, so there is no request that can 409 —
+      // AND, since 192.1-07, no prompt either: nothing is being named on this path (D-23).
+      // `onOpenDraft` is REUSED rather than a third `setBuilderInitial` call site added,
+      // which is what threads 186-07's opaque concurrency token by construction instead of
+      // by remembering to — a dropped token is a silent-clobber bug that typechecks.
+      //
+      // ⚠ THIS IS A SHIPPED BLOCKER FIX, NOT AN OPTIMISATION. It is the operator's 2026-08-11
+      // decision on U5 (`192-UAT.md` test 11), where a fork click 409'd twice and the surface
+      // said nothing at all; regressing it re-opens that blocker. It survived the 192.1-03
+      // extraction by construction and it survives the prompt by ORDER — it runs before any
+      // pending state is set, so the dialog cannot mount on this row. The card already says
+      // so before the click (`FORK_CONSEQUENCE_EXISTING`, selected by `hasExistingFork`).
+      const existing = draftBySlug.get(row.slug)
+      if (existing) {
+        onOpenDraft(existing)
+        return
+      }
+      setPendingFork({ row, kind: "version" })
+    },
+    [draftBySlug, onOpenDraft],
   )
 
-  const onForkStarter = useCallback(
-    (row: LibraryRow) => onUseStarter(row.source as PublishedWorkflow),
-    [onUseStarter],
+  // A starter fork ALWAYS creates — a fresh auto-suffixed slug at v1 belongs to nobody yet, so
+  // there is no "the copy you already started" to open. It goes straight to the prompt.
+  const onForkStarter = useCallback((row: LibraryRow) => {
+    setPendingFork({ row, kind: "starter" })
+  }, [])
+
+  /**
+   * 192.1-07 (D-19 / D-12) — THE SECOND STEP: the person has typed a name.
+   *
+   * `kind` selects which sibling runs, which is the only place the two paths could ever have
+   * been merged and is therefore the only place worth guarding. The name is trimmed here as
+   * well as in the dialog — the dialog is a UI and this is the write path, and a write path
+   * that trusts its caller to have validated is one refactor away from not being validated.
+   */
+  const confirmFork = useCallback(
+    (name: string) => {
+      if (!pendingFork) return
+      const chosen = name.trim()
+      // D-20's one hard gate, restated where the write happens. An empty name is not a
+      // preference; there is nothing to create.
+      if (!chosen) return
+      const wire = pendingFork.row.source as PublishedWorkflow
+      const kind = pendingFork.kind
+      setPendingFork(null)
+      if (kind === "version") void createNewVersion(wire, chosen)
+      else void createFromStarter(wire, chosen)
+    },
+    [pendingFork, createNewVersion, createFromStarter],
   )
 
-  return { forkFailed, draftBySlug, onForkNewVersion, onForkStarter }
+  /** Dismissed — Escape, Cancel, the ✕ or the overlay. Nothing was written, so nothing undoes. */
+  const cancelFork = useCallback(() => setPendingFork(null), [])
+
+  return {
+    forkFailed,
+    draftBySlug,
+    onForkNewVersion,
+    onForkStarter,
+    pendingFork,
+    confirmFork,
+    cancelFork,
+    isClash,
+  }
 }
