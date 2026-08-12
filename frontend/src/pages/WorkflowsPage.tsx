@@ -926,11 +926,27 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           {LIBRARY_STATES.loading}
         </p>
       )}
+      {/* ⚠ THE COLOUR IS LOAD-BEARING, AND IT IS HERE BECAUSE UAT ROW U7 FAILED ON IT.
+          This notice shipped as `border-warning/30 bg-warning/5 text-muted-foreground` — a
+          warning tint at 5% behind words painted in the SAME grey as every other quiet line
+          on the page. So the warning colour never reached the text, and the operator, driving
+          U7 against a real blocked drafts feed, answered the row's own `fail:` clause
+          verbatim: they would READ the collapsed count and MISS the banner. That is precisely
+          the harm D-28 traded for when it chose to keep `N` on screen rather than suppress it
+          — the count is only honest if its disclosure is read FIRST.
+
+          Position was never the problem and is unchanged: measured at UAT, banner y=63 against
+          the chip strip at y=115 and the first row at y=242. SALIENCE was the problem. The
+          words now carry `text-warning` themselves.
+
+          Class-only change — the DOM is byte-identical, so the three suites pinning this node
+          (`WorkflowsPage.test.tsx:619`, `:1490` `toContain("your drafts")`, `:1518-1521`) pin
+          the testid and the TEXT, never the class, and none of them can see this edit. */}
       {failedSources.map((source) => (
         <p
           key={source}
           data-testid={`library-source-failed-${source}`}
-          className="border-b border-warning/30 bg-warning/5 px-6 py-2 text-[12.5px] text-muted-foreground"
+          className="border-b border-warning/40 bg-warning/10 px-6 py-2.5 text-[13px] font-medium text-warning"
         >
           {sourceFailedMessage(source)}
         </p>
