@@ -327,6 +327,22 @@ export function lineageVersionOf(mine: number, parent: number): string {
 }
 
 /**
+ * The VERSION discriminator segment — `v3` (D-04's fourth axis).
+ *
+ * ⚠ ADDED BY 192.1-05, AND IT IS THE ONE STRING THE PORT HAD TO AUTHOR RATHER THAN COPY.
+ * `BUILD-CONTRACT.generated.md` declares no key for it because the sketch assembles it inline
+ * (`163/index.html:316` — `segs.push("v" + row.version)`), which is precisely the drift D-14
+ * exists to prevent: a string that reaches the DOM from a module that is not this one cannot be
+ * changed in a one-line diff. The FORM is the mockup's, unchanged; only its home is new.
+ *
+ * A FUNCTION, matching `lineageVersionOf` directly above, so the two version spellings on the
+ * identity line — `v3` and `v3 of v2` — cannot drift apart at a call site.
+ */
+export function versionLabel(version: number): string {
+  return `v${version}`
+}
+
+/**
  * The collision counter — `1 of 43` (D-04: rendered ONLY on a colliding name, counted over
  * the FULL merged library before any filtering, per D-05).
  *

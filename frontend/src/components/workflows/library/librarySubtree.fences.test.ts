@@ -97,6 +97,8 @@ const LIBRARY_SUBTREE_PATHS = [
   // would contribute the empty string forever, i.e. a path that looks swept and is not.
   // Test-only, ships to no user, renders nothing: outside this sweep by construction.
   "./relativeChanged.ts",
+  // ── 192.1-05 (D-13 / D-31 / D-33): the identity resolver ──
+  "./rowIdentity.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -126,7 +128,11 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // ⚠ 192.1-04 read it the same way, one round later: `expected […] to have a length of 9
     // but got 10` was OBSERVED before the 10 was written. Three `it.each` sweeps × one new
     // path = +3 cases, which is the arithmetic the count-gate pin records.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(10)
+    // ⚠ 192.1-05 read it the same way, one round later again: `expected […] to have a length of
+    // 10 but got 11` was OBSERVED before the 11 was written. The +3 arithmetic held for the
+    // FOURTH consecutive addition — but note it changes with THIS commit, which adds two more
+    // `it.each(LIBRARY_SUBTREE_PATHS)` sweeps: a fifth module will now move the pin by FIVE.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(11)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
@@ -135,6 +141,7 @@ describe("the sweep is looking at something (non-vacuity)", () => {
       "./libraryFork.ts",
       "./useWorkflowFork.ts",
       "./relativeChanged.ts",
+      "./rowIdentity.ts",
     ]) {
       expect(LIBRARY_SUBTREE_PATHS as readonly string[]).toContain(later)
     }
@@ -391,6 +398,226 @@ describe("F5 — no copy in the subtree overstates the search (D-08)", () => {
     )
     expect(wordHits(legal, OVERSTATED_WORDS[1])).toEqual([])
     expect(wordHits(legal, OVERSTATED_WORDS[4])).toEqual([])
+  })
+})
+
+// ── F6 — no module parses the draft's opaque field as a date (D-16) ──────────────────
+
+/**
+ * ⚠ THE OBVIOUS SHORTCUT IS THE DEFECT, WHICH IS WHY THIS IS A FENCE AND NOT ADVICE.
+ *
+ * A draft row already carries a field that LOOKS like a timestamp and needs no backend change,
+ * because the server renders it and `updated_at` from ONE column
+ * (`db/workflows.py:93-95` — `to_char(updated_at AT TIME ZONE 'UTC', …)`). Reading it would work
+ * in a fixture and fail in life three ways: it is opaque BY CONTRACT (`api.ts:3334-3345`),
+ * Postgres keeps microseconds where a JS `Date` keeps milliseconds — so a parsed-and-re-rendered
+ * value matches ZERO rows and every later save refuses as stale (probed live 2026-08-01) — and it
+ * exists only on drafts, so two of the three feeds would silently render nothing.
+ *
+ * ⚠⚠ A RAW REGEX FOR THIS REDS ON A CLEAN TREE, AND 192.1-05 MEASURED IT RATHER THAN INHERITING
+ * THE WARNING. The needle appears **24 times across 4 swept modules** at this commit
+ * (`grep -o … | wc -l`), and — unlike the F1 case this file already documents twice
+ * (`:186-193`, `:497-506`) — **not all of them are prose**:
+ * `useWorkflowFork.ts:125, :254, :308` READ AND WRITE the field in real code,
+ * legitimately, because threading it verbatim is exactly what 186-07 requires. So a
+ * comment-stripping regex would fail too. The detector therefore keys on the SHAPE, not the word:
+ * a `new Date(…)` or `Date.parse(…)` **whose argument names that field**. Comments are not AST
+ * nodes, so prose is excluded by construction, and a legal read that never reaches a date
+ * constructor is untouched.
+ *
+ * Known limit, stated rather than discovered later: a value laundered through an intermediate
+ * variable (`const t = row.token; new Date(t)`) is invisible here, as it would be to any grep.
+ * The fence catches the shortcut an executor actually takes, which is the direct one.
+ */
+const OPAQUE_FIELD = tok("to", "ken")
+
+interface OpaqueDateScan {
+  /** How many `new Date(…)` / `Date.parse(…)` sites the walker actually visited. */
+  dateSites: number
+  /** The offending expressions, as source text. */
+  violations: string[]
+}
+
+const dateArgumentsOf = (node: ts.Node): readonly ts.Expression[] | null => {
+  if (ts.isNewExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "Date") {
+    return node.arguments ? Array.from(node.arguments) : []
+  }
+  if (
+    ts.isCallExpression(node) &&
+    ts.isPropertyAccessExpression(node.expression) &&
+    ts.isIdentifier(node.expression.expression) &&
+    node.expression.expression.text === "Date" &&
+    node.expression.name.text === "parse"
+  ) {
+    return Array.from(node.arguments)
+  }
+  return null
+}
+
+const namesOpaqueField = (node: ts.Node): boolean => {
+  let found = false
+  const walk = (inner: ts.Node): void => {
+    if (ts.isIdentifier(inner) && inner.text === OPAQUE_FIELD) found = true
+    else if (ts.isStringLiteralLike(inner) && inner.text === OPAQUE_FIELD) found = true
+    ts.forEachChild(inner, walk)
+  }
+  walk(node)
+  return found
+}
+
+const opaqueFieldAsDate = (path: string, source: string): OpaqueDateScan => {
+  const scan: OpaqueDateScan = { dateSites: 0, violations: [] }
+  const file = parse(path, source)
+  const visit = (node: ts.Node): void => {
+    const args = dateArgumentsOf(node)
+    if (args) {
+      scan.dateSites += 1
+      if (args.some(namesOpaqueField)) scan.violations.push(source.slice(node.pos, node.end).trim())
+    }
+    ts.forEachChild(node, visit)
+  }
+  ts.forEachChild(file, visit)
+  return scan
+}
+
+describe("F6 — the draft's opaque field is never read as a timestamp (D-16)", () => {
+  it("POSITIVE CONTROL — the detector catches every shape the shortcut takes", () => {
+    const shapes = [
+      `const t = Date.parse(${OPAQUE_FIELD})`,
+      `const d = new Date(row.source.${OPAQUE_FIELD})`,
+      `const e = new Date(draft.${OPAQUE_FIELD}).getTime()`,
+      `const f = +new Date(t.${OPAQUE_FIELD})`,
+      `const g = new Date(row["${OPAQUE_FIELD}"])`,
+    ]
+    for (const shape of shapes) {
+      expect(opaqueFieldAsDate("./planted.ts", `${shape}\n`).violations).toHaveLength(1)
+    }
+  })
+
+  it("SCOPING CONTROL — the 24 existing mentions are NOT caught, prose OR code", () => {
+    // ⚠ MEASURED AT THIS COMMIT, not assumed: four swept modules name the field, and one of them
+    // does so in real, correct code. This control is what proves the fence is narrower than the
+    // grep it replaces — and it runs over the REAL sources, never a synthetic stand-in.
+    // ⚠ The list below was itself CORRECTED BY A FAILING ASSERTION: it was written with five
+    // entries (`libraryVocabulary.ts` among them, carried over from F7's measurement one screen
+    // down) and the diff said `[…(3)] to deeply equal […(4)]`. Two adjacent measurements are not
+    // one measurement.
+    const mentions = SWEPT.filter(({ source }) => source.includes(OPAQUE_FIELD))
+    expect(mentions.map((m) => m.path).sort()).toEqual([
+      "./WorkflowCard.tsx",
+      "./libraryFilter.ts",
+      "./libraryRow.ts",
+      "./useWorkflowFork.ts",
+    ])
+    // …and the module that really READS it in code is the one 186-07 requires to.
+    expect(LIBRARY_MODULES["./useWorkflowFork.ts"] ?? "").toContain(`${OPAQUE_FIELD}: created.${OPAQUE_FIELD}`)
+    for (const { path, source } of mentions) {
+      expect(opaqueFieldAsDate(path, source).violations).toEqual([])
+    }
+  })
+
+  it("NON-VACUITY — the subtree DOES format time, and the walker DOES see date sites", () => {
+    // Without this, "no module parses that field as a date" would be satisfied by a subtree that
+    // does nothing with time at all — the F4 re-homed-sentinel shape (`:311-316`), applied here.
+    const clock = LIBRARY_MODULES["./relativeChanged.ts"] ?? ""
+    expect(clock).toContain("export function relativeChanged")
+    const scan = opaqueFieldAsDate("./relativeChanged.ts", clock)
+    expect(scan.dateSites).toBeGreaterThan(0) // it really parses a timestamp…
+    expect(scan.violations).toEqual([]) // …just never THAT one
+  })
+
+  it.each(LIBRARY_SUBTREE_PATHS)("%s reads no date out of the opaque field", (path) => {
+    expect(opaqueFieldAsDate(path, LIBRARY_MODULES[path] ?? "").violations).toEqual([])
+  })
+})
+
+// ── F7 — no owner display name anywhere in the subtree (D-09) ────────────────────────
+
+/**
+ * D-09, verbatim: *"The owner segment is `Yours` / `Shared` and stops there … **no owner display
+ * name anywhere in the subtree**, and that is a fence, not a preference."*
+ *
+ * The wire carries `is_mine` (a boolean) and a creator UUID that is never serialized, so a
+ * person's name would need a users join nobody asked for. The failure this guards is not a typo:
+ * it is a future author reaching for a name that is not in the payload, and rendering something
+ * the data cannot support — which on a SHARED library is also an information-disclosure step
+ * (T-192.1-12) taken without anyone deciding to take it.
+ *
+ * ⚠ AND THIS ONE ALSO REDS RAW, WHICH IS WHY IT IS PARSED. The creator column is named **six
+ * times** in the swept corpus at this commit — `libraryFilter.ts:94`, `libraryRow.ts:90`,
+ * `libraryVocabulary.ts:260`, `useWorkflowFork.ts:129, :171, :281` — every one of them PROSE
+ * explaining why the feed is already scoped, or why the name is not rendered. A raw grep reds on
+ * the paragraph that documents the rule. Second instance in this one commit; the sixth in the
+ * repository.
+ *
+ * The forbidden identifiers are ASSEMBLED (F5's `tok` trick, `:322`) so no contiguous literal of
+ * a forbidden name appears in this file either.
+ */
+const OWNER_NAME_FIELDS = [
+  tok("created", "_by"),
+  tok("owner", "_name"),
+  tok("user", "_name"),
+  tok("display", "_name"),
+  tok("full", "_name"),
+  tok("createdBy", ""),
+  tok("owner", "Name"),
+]
+
+/** Every identifier and string literal in CODE. Comments are not nodes, so prose is excluded. */
+const codeNamesOf = (path: string, source: string): string[] => {
+  const found: string[] = []
+  const visit = (node: ts.Node): void => {
+    if (ts.isIdentifier(node)) found.push(node.text)
+    else if (ts.isStringLiteralLike(node)) found.push(node.text)
+    ts.forEachChild(node, visit)
+  }
+  ts.forEachChild(parse(path, source), visit)
+  return found
+}
+
+const ownerNameHits = (path: string, source: string): string[] => {
+  const names = codeNamesOf(path, source)
+  return OWNER_NAME_FIELDS.filter((field) =>
+    names.some((name) => name === field || wordRegExp(field).test(name)),
+  )
+}
+
+describe("F7 — the subtree names no owner, only `Yours` and `Shared` (D-09)", () => {
+  it("POSITIVE CONTROL — the detector catches a read of each forbidden field", () => {
+    for (const field of OWNER_NAME_FIELDS) {
+      const planted = `export const who = (row: Row) => row.${field}\n`
+      expect(ownerNameHits("./planted.ts", planted)).toContain(field)
+      // …and through an element access, which a property-name-only walk would miss.
+      const indexed = `export const who = (row: Row) => row["${field}"]\n`
+      expect(ownerNameHits("./planted.ts", indexed)).toContain(field)
+    }
+  })
+
+  it("SCOPING CONTROL — the six existing PROSE mentions are not caught", () => {
+    const mentions = SWEPT.filter(({ source }) => OWNER_NAME_FIELDS.some((f) => source.includes(f)))
+    // MEASURED at this commit — four modules discuss the creator column in their docblocks.
+    expect(mentions.map((m) => m.path).sort()).toEqual([
+      "./libraryFilter.ts",
+      "./libraryRow.ts",
+      "./libraryVocabulary.ts",
+      "./useWorkflowFork.ts",
+    ])
+    for (const { path, source } of mentions) expect(ownerNameHits(path, source)).toEqual([])
+  })
+
+  it("NON-VACUITY — the subtree DOES render ownership, in exactly two words", () => {
+    // Otherwise "no owner name" is satisfied by a subtree that says nothing about ownership at
+    // all, which is a different (and wrong) surface.
+    const vocabulary = LIBRARY_MODULES["./libraryVocabulary.ts"] ?? ""
+    const strings = userVisibleTextOf("./libraryVocabulary.ts", vocabulary)
+    expect(strings).toContain("Yours")
+    expect(strings).toContain("Shared")
+    // And the extractor the fence uses really does see identifiers in this file.
+    expect(codeNamesOf("./libraryVocabulary.ts", vocabulary)).toContain("OWN_SHARED")
+  })
+
+  it.each(LIBRARY_SUBTREE_PATHS)("%s reads no owner display name", (path) => {
+    expect(ownerNameHits(path, LIBRARY_MODULES[path] ?? "")).toEqual([])
   })
 })
 
