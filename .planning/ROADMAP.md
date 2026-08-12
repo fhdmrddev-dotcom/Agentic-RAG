@@ -187,10 +187,33 @@ first logged as *"card density — 13 atoms per row"* (`U5-b`, severity minor). 
 have helped at all: **forty-three identical titles are indistinguishable at any density.** Raised to
 major and re-scoped to identity.
 
-⚠ **It is partly UPSTREAM of the library.** Nothing in the product stops the duplicates being created —
-`onTweak` mints `<same name> v(N+1)` by design and always has. A read-side fix alone leaves the cause
-running. Whether this phase touches the naming/lineage side is the first scope question, not an
-assumption.
+⚠ **It is partly UPSTREAM of the library — and on 2026-08-12 the upstream cause was FOUND, by
+accident, while cleaning up a test row.** This is no longer only a design phase; there is a mechanical
+defect underneath it.
+
+**A workflow row has TWO names and they disagree on 85 of the operator's 104 rows.** Measured:
+
+- the `name` **column** — what the library card renders (`libraryRow.ts:63-66`, the wire `name`)
+- `definition->>'name'` — the name inside the locked JSON
+
+For the row `sc10-armed-f77e72`: column = **"SC10 armed-wait probe"**, definition = **"Compliance Gap
+Report"**. `select count(*) … where definition->>'name' is distinct from name` → **85 of 104**.
+
+**The propagation is the defect.** `onTweak` forks `{...wf.definition}` (`WorkflowsPage.tsx:490-498`),
+and the insert sets the new row's `name` column from `definition.name`
+(`backend/app/db/workflows.py:490-495`). So **you click a row labelled "SC10 armed-wait probe" and get
+a draft labelled "Compliance Gap Report."** That was observed live — the cleanup delete returned a
+name nobody expected, which is how it was found.
+
+**This plausibly manufactures the 43 duplicates.** They are likely not 43 copies of one workflow but
+forks of *many different* workflows, each inheriting the same stale name from a definition JSON. **Not
+yet proven** — the source rows may have been seeded divergent, and that must be checked before the
+claim is relied on. But the propagation mechanism is real and reproduces regardless of how the sources
+got that way: a fork is named after the JSON, and the user chose the row by its column.
+
+**So 192.1 has two halves, and the defect half may be small:** make a fork inherit the name the user
+actually clicked (and decide which of the two names is authoritative — `SEED-085` terminology), then
+give rows an identity axis. Sketch the second half; the first is closer to a fix than a design.
 
 ⚠ **Why no gate caught it, recorded so the next phase inherits the lesson.** Every automated check in
 192 ran against fixtures with **distinct names**. `LIB-02`'s bar — *"a card shows what the workflow is
