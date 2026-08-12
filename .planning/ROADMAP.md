@@ -187,33 +187,56 @@ first logged as *"card density — 13 atoms per row"* (`U5-b`, severity minor). 
 have helped at all: **forty-three identical titles are indistinguishable at any density.** Raised to
 major and re-scoped to identity.
 
-⚠ **It is partly UPSTREAM of the library — and on 2026-08-12 the upstream cause was FOUND, by
-accident, while cleaning up a test row.** This is no longer only a design phase; there is a mechanical
-defect underneath it.
+### ⚠ A "two names" propagation defect was claimed here on 2026-08-12 and is **RETRACTED** — the check that would have caught it was run afterwards
 
-**A workflow row has TWO names and they disagree on 85 of the operator's 104 rows.** Measured:
+**The retracted claim:** that a row carries a `name` column and a conflicting `definition->>'name'`,
+that they disagree on 85 of 104 rows, and that `onTweak` therefore names a fork after the wrong
+workflow. **That was wrong.** It was generalised from **n=1** — one surprising name returned by a
+cleanup `DELETE` — and written up before the population was measured. It is left visible rather than
+deleted, because the failure mode (a single observation promoted to a mechanism) is the same one this
+phase exists to correct.
 
-- the `name` **column** — what the library card renders (`libraryRow.ts:63-66`, the wire `name`)
-- `definition->>'name'` — the name inside the locked JSON
+**What the measurement actually shows.** `select jsonb_typeof(definition) … group by 1`:
 
-For the row `sc10-armed-f77e72`: column = **"SC10 armed-wait probe"**, definition = **"Compliance Gap
-Report"**. `select count(*) … where definition->>'name' is distinct from name` → **85 of 104**.
+| `definition` column type | rows | have a `phases` array |
+|---|---|---|
+| **`string`** (double-encoded) | **83** | **0** |
+| `object` (a real definition) | 20 | 20 |
 
-**The propagation is the defect.** `onTweak` forks `{...wf.definition}` (`WorkflowsPage.tsx:490-498`),
-and the insert sets the new row's `name` column from `definition.name`
-(`backend/app/db/workflows.py:490-495`). So **you click a row labelled "SC10 armed-wait probe" and get
-a draft labelled "Compliance Gap Report."** That was observed live — the cleanup delete returned a
-name nobody expected, which is how it was found.
+`definition->>'name'` returns NULL on a **string scalar** — you cannot key into one. So "85 divergent"
+was never 85 conflicting names; it was **83 rows whose definition is double-encoded**, plus 2 genuine
+conflicts. `jsonb_object_keys` on them errors outright with *"cannot call on a scalar"*, which is the
+already-recorded `definition` string-scalar trap.
 
-**This plausibly manufactures the 43 duplicates.** They are likely not 43 copies of one workflow but
-forks of *many different* workflows, each inheriting the same stale name from a definition JSON. **Not
-yet proven** — the source rows may have been seeded divergent, and that must be checked before the
-claim is relied on. But the propagation mechanism is real and reproduces regardless of how the sources
-got that way: a fork is named after the JSON, and the user chose the row by its column.
+**The genuine conflicts are exactly 2**, and they are test fixtures, not a pattern:
 
-**So 192.1 has two halves, and the defect half may be small:** make a fork inherit the name the user
-actually clicked (and decide which of the two names is authoritative — `SEED-085` terminology), then
-give rows an identity axis. Sketch the second half; the first is closer to a fix than a design.
+| `name` column | `definition->>'name'` | slug |
+|---|---|---|
+| SC10 multi-tool probe | Compliance Gap Report | `sc10-multitool-84c452` |
+| SC10 armed-wait probe | Compliance Gap Report | `sc10-armed-f77e72` |
+
+**And the answer to the question that mattered: the 42 duplicates were SEEDED, not created.** All 42
+are `jsonb_typeof = string`. The app's own write paths bind `json.dumps(definition.model_dump())`
+through a Pydantic model on which **`name: str` is REQUIRED** (`harness.py:519-522`), for both the
+insert (`db/workflows.py:490-497`) and the update (`:580-598`, which writes `name` and `definition`
+**together from one model**, so editing cannot drift them). A row the app wrote therefore *cannot*
+have a null JSON name. These 83 did not come from those paths.
+
+**So there is no name-propagation defect, and 192.1 does NOT have a cheap defect half.** It is the
+design phase it was originally scoped as.
+
+⚠ **Two real things did fall out of the check, and neither is this phase:**
+1. **83 of 104 rows carry a double-encoded `definition`** — the recorded string-scalar trap, at
+   scale, in the dev database. Whether any *live* app path still writes that shape is **unverified and
+   worth its own check**; if one does, it is a real bug that silently empties `definition->'phases'`.
+2. **The duplicate names are largely a dev-database artifact.** That does **not** dissolve LIB-05 —
+   `onTweak` mints `<same name> v(N+1)` by design, so a real customer generates genuine duplicates by
+   using the product normally — but the *severity* seen on this machine is inflated by test data, and
+   192.1 must be judged against a fixture built to be realistic rather than against these 42 rows.
+
+⚠ **It is partly UPSTREAM of the library.** Nothing stops duplicates being created — `onTweak` mints
+`<same name> v(N+1)` deliberately. A read-side fix alone leaves that running. Whether this phase
+touches naming/lineage is the first scope question, not an assumption.
 
 ⚠ **Why no gate caught it, recorded so the next phase inherits the lesson.** Every automated check in
 192 ran against fixtures with **distinct names**. `LIB-02`'s bar — *"a card shows what the workflow is
