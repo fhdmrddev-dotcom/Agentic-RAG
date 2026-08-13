@@ -331,7 +331,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 193-10-PLAN.md — the pin sweep, the `WorkflowDoorSwitch.tsx` hot-file ledger row G-5 never had (D-07/D-09), and `193-UAT.md`
+- [x] 193-10-PLAN.md — the pin sweep, the `WorkflowDoorSwitch.tsx` hot-file ledger row G-5 never had (D-07/D-09), and `193-UAT.md`
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
