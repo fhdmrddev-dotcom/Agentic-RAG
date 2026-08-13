@@ -327,7 +327,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 193-09-PLAN.md — the D-04/D-22 restack on both bands, asserted by child order; re-capture 2 of 2
+- [x] 193-09-PLAN.md — the D-04/D-22 restack on both bands, asserted by child order; re-capture 2 of 2
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
