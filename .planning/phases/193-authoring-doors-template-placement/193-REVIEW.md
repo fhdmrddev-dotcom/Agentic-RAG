@@ -417,7 +417,7 @@ re-open trigger naming milestone close.
 | **WR-05** count-gate claims a case that does not exist | ✅ **FULLY FIXED** — comment corrected, and the `(2b)` arm added so a `config`-silent phase list reads `unknown`. **DRIVEN RED** against a disabled arm (both new cases: `expected 'does-not-admit' to be 'unknown'`), source restored md5-identical. | `bec117d0` + `6c060c4f` |
 | **WR-07** `unknown` rows mis-attributed to `phases: []` | ✅ **FULLY FIXED** — docblocks corrected in both files, and the jsonb string-scalar shape (194 of 223 live rows) is now pinned in `ADMISSION_CASES`. | `bec117d0` + `6c060c4f` |
 | **IN-01** declaration-order claim contradicted by line numbers | ✅ **FIXED** (prose) | `bec117d0` |
-| **WR-04** variant D on an unaudited third surface | ⏸ **OPERATOR RULING OWED** — door B's card says *you decide every setting*; its first screen now reads *the AI writes the steps*. Pre-existed in weaker form; the fast-fix made both surfaces agree without anyone ruling that they should. Pairs with UAT U1/U2. | open |
+| **WR-04** variant D on an unaudited third surface | ✅ **RULED: ACCEPT + SEED** (`SEED-156`). ⚠ **Measured WIDER than the finding as written** — the two doors' first screens are not merely similar, they share **11 of the govern door's 14 text nodes**, i.e. they are the same screen below the header strip. No copy was authored: G-2 requires a sketch (164 draws no mockup of either pre-draft screen), and the instrument that settles it is UAT U1/U2. | `SEED-156` |
 | **WR-06** containment assertion on a string declared unusable for containment | ✅ **FIXED** — compares the label's own node whole, per `doorVocabulary.ts`'s own rule. | `6c060c4f` |
 | **WR-08** test imports a `.planning/` sketch artifact across the package boundary | ✅ **FIXED (the real fix, not the documented minimum)** — `build.cjs` writes both copies from the SAME string, so they cannot drift; the suite imports the in-package copy. Regen verified idempotent, copies md5-identical, new file not gitignored. | `6c060c4f` |
 | **IN-02** stateful `/g` regex used with both `toMatch` and `.match()` | ✅ **FIXED** — split into `/m` for matching and `/gm` for counting. | `6c060c4f` |
@@ -427,14 +427,25 @@ re-open trigger naming milestone close.
 **exit 0 · total 3558 · failed 0 · 67/67 pinned** — byte-identical to the pre-edit run for the five
 prose commits, so not one test moved.
 
-**FINAL STATE (2026-08-14): 10 of 11 findings CLOSED. One remains, and it is not a code defect.**
+**FINAL STATE (2026-08-14): ALL 11 findings RESOLVED — 10 fixed in code, 1 ruled and seeded.**
 
-⚠ **WR-04 is the only open item, and it is deliberately open.** Door B's card reads *you decide
-every setting*; its first screen now reads *the AI writes the steps*. Whether those two should
-speak identically is a **product ruling**, not a defect to patch — the contradiction pre-existed in
-weaker form, and the fast-fix made both surfaces agree without anyone deciding they should.
-Changing it either way without that ruling is how a phase ships copy nobody chose. It pairs
-naturally with UAT rows U1/U2, which ask a human the same question from the other direction.
+⚠ **WR-04 was RULED rather than patched, and the ruling changed the finding.** Measured from this
+phase's own committed captures, `GOVERN_STANDALONE` shares **11 of its 14 text nodes** with
+`DESCRIBE_STANDALONE` — the two authoring doors open onto the *same first screen*, differing only in
+the header strip label and door A's extra switch strip. That is wider than "variant D renders on an
+unaudited surface", and it lands on **SC#1 and SC#2** directly.
+
+**It was NOT caused by the fast-fix.** Before `294a2ac8` the same two screens read
+`Draft the workflow` / `drafts the phases` against `Write the first draft` / `writes the steps` —
+synonymous words on an identical screen. The fix removed the cosmetic difference and made the
+duplication legible. Reverting it would restore ungoverned literals and re-hide the problem.
+
+**Decision: ACCEPT and SEED (`SEED-156`), author no copy.** Three reasons, in order of weight:
+G-2 requires an operator-approved sketch for a UX change and sketch 164 draws **no mockup of either
+door's pre-draft screen**; the 187 template-door lesson says seed the existing path rather than add
+a third variant; and the instrument that actually settles it — a cold reader's prediction — is UAT
+**U1/U2**, which are already written and owed. The seed records all three candidate resolutions so
+the next person does not re-derive them.
 
 Verification of the full fix pass: `tsc -p tsconfig.app.json` **33** (baseline, unmoved) · count gate
 **exit 0 · total 3561 · failed 0 · 67/67 pinned, no per-file decrease**. Every behaviour change was
