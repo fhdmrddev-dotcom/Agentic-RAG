@@ -61,7 +61,14 @@ import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./librar
 // The words and the resolver are IMPORTED, never re-typed: D-14 makes a copy change a
 // one-line diff in ONE file, and a test that spells `"Copy of "` inline has silently forked
 // the acceptance bar exactly the way the sketch's anti-drift mechanism exists to prevent.
+// ── Phase 193-06 (AUTH-03 / D-13 / D-14 / D-15 / D-21) — the template mark ──────────────
+// The word and the predicate are BOTH imported. The word for the same reason as every other
+// string here; the predicate because these cases must prove which ARM a fixture reaches, not
+// merely that some string appeared — a fixture whose arm is assumed is the 192 CR-01 defect
+// ("both failure tests pinned the correct branch without ever entering the wrong one").
+import { templateAdmission } from "@/components/workflows/soulData"
 import {
+  CARD_TEMPLATE_MARK,
   LINEAGE_COPY_OF,
   LINEAGE_ORIGINAL,
   LINEAGE_STARTER_SUF,
@@ -99,6 +106,28 @@ const DEF = {
   ],
 }
 
+/**
+ * Phase 193-06 (AUTH-03 / D-21) — THE THREE ARMS, AS REAL DEFINITION SHAPES.
+ *
+ * ⚠ THE HOUSE FIXTURE ABOVE ADMITS, AND THAT IS WHY EVERY GRAMMAR ARRAY IN THIS FILE CARRIES
+ * THE MARK. `DEF` has an `llm_emit` phase (the deliverable atom needs one) and binds no library
+ * template, which under D-21 is precisely `"admits"`. It is asserted below rather than reasoned
+ * about, so a later reader never has to wonder whether an expectation gained a segment because
+ * the card is right or because a fixture drifted.
+ *
+ * The two silent shapes are built FROM `DEF` by changing one field each, so the only difference
+ * between an arm that marks and an arm that does not is the field the predicate reads.
+ */
+const NO_EMIT_DEF = { ...DEF, phases: [DEF.phases[0]] }
+const EMPTY_PHASES_DEF = { ...DEF, phases: [] }
+/** An emit phase that ALREADY binds a library template — D-21's fourth rule, the unreachable-upload arm. */
+const BOUND_TEMPLATE_DEF = {
+  ...DEF,
+  assets: [{ kind: "template", asset_id: "tpl-0001" }],
+}
+
+const asDef = (def: unknown) => def as unknown as LibraryRow["def"]
+
 const rowOf = (provenance: Provenance, over: Partial<LibraryRow> = {}): LibraryRow => ({
   id: `row-${provenance}`,
   slug: "vendor-risk",
@@ -121,6 +150,17 @@ const rowOf = (provenance: Provenance, over: Partial<LibraryRow> = {}): LibraryR
 const PUBLISHED = rowOf("published")
 const STARTER = rowOf("starter")
 const DRAFT = rowOf("draft")
+
+/**
+ * Phase 193-06 (AUTH-03 / D-15) — the same published row on each of the two SILENT arms.
+ *
+ * They are separate constants rather than inline `over` objects because D-15's whole claim is
+ * that the two are INDISTINGUISHABLE: naming them lets the cases below assert both against ONE
+ * shared expected array, so a divergence is a failure rather than an untested difference.
+ */
+const PUBLISHED_NO_TEMPLATE = rowOf("published", { def: asDef(NO_EMIT_DEF) })
+const PUBLISHED_UNKNOWN_DEF = rowOf("published", { def: asDef(EMPTY_PHASES_DEF) })
+const PUBLISHED_BOUND_TEMPLATE = rowOf("published", { def: asDef(BOUND_TEMPLATE_DEF) })
 
 /**
  * A resolved identity, built by hand.
@@ -630,7 +670,27 @@ describe("D-08 / D-11 — one identity line per card, at DOM position 2", () => 
 })
 
 describe("D-03 / D-06 — the line's grammar, in order", () => {
-  it("a COLLIDING row renders own · segs · 1 of N · changed, in that order", () => {
+  /**
+   * ⚠ EVERY EXPECTATION IN THIS BLOCK GAINED ONE SEGMENT IN PHASE 193-06, AND IT GAINED IT
+   * BECAUSE THE HOUSE FIXTURE GENUINELY ADMITS — never to make a red go away. `DEF` carries an
+   * `llm_emit` phase and binds no library template, which is D-21's `"admits"` exactly; the
+   * non-vacuity case below asserts that rather than assuming it. The mark's SLOT is asserted by
+   * its ARRAY INDEX in these `toEqual`s and never by a class name — a class assertion passes on
+   * a node in the wrong column and fails on a Tailwind tidy-up.
+   *
+   * Read the arrays against `identityParts()`, which keeps the own PILL at index 0 and strips
+   * the separators. So the mark sits at index **1** of what this helper returns, which is index
+   * **0** of the card's own `identityParts` array — D-14's slot, *after provenance*.
+   */
+  it("NON-VACUITY — the house fixture really reaches the admitting arm (D-21)", () => {
+    // Without this, every array below could have gained a segment for a reason nobody checked.
+    expect(templateAdmission(asDef(DEF))).toBe("admits")
+    expect(templateAdmission(asDef(NO_EMIT_DEF))).toBe("does-not-admit")
+    expect(templateAdmission(asDef(BOUND_TEMPLATE_DEF))).toBe("does-not-admit")
+    expect(templateAdmission(asDef(EMPTY_PHASES_DEF))).toBe("unknown")
+  })
+
+  it("a COLLIDING row renders own · mark · segs · 1 of N · changed, in that order", () => {
     const { card } = renderCard(PUBLISHED, {
       identity: identityOf({
         own: OWN_SHARED,
@@ -641,6 +701,8 @@ describe("D-03 / D-06 — the line's grammar, in order", () => {
     })
     expect(identityParts(within(card).getByTestId("row-identity"))).toEqual([
       OWN_SHARED,
+      // D-14 — after provenance, before everything else. Recency stays last where 192.1 put it.
+      CARD_TEMPLATE_MARK,
       "Copy of Compliance Gap Report starter",
       STATE_DRAFT,
       "43 share this name",
@@ -656,7 +718,7 @@ describe("D-03 / D-06 — the line's grammar, in order", () => {
       identity: identityOf({ own: OWN_SHARED, segs: [], ofN: null, when: "changed 5 months ago" }),
     })
     const line = within(card).getByTestId("row-identity")
-    expect(identityParts(line)).toEqual([OWN_SHARED, "changed 5 months ago"])
+    expect(identityParts(line)).toEqual([OWN_SHARED, CARD_TEMPLATE_MARK, "changed 5 months ago"])
     expect(line.textContent ?? "").not.toMatch(/\b1 of \d/)
   })
 
@@ -670,6 +732,7 @@ describe("D-03 / D-06 — the line's grammar, in order", () => {
     })
     expect(identityParts(within(card).getByTestId("row-identity"))).toEqual([
       OWN_YOURS,
+      CARD_TEMPLATE_MARK,
       "Copy of Access Review Attestation",
       "changed just now",
     ])
@@ -678,7 +741,13 @@ describe("D-03 / D-06 — the line's grammar, in order", () => {
   it("the separator is spent BETWEEN present parts only — never a dangling one", () => {
     // An own word alone. A card that renders `Yours ·` has told the reader something follows
     // and then not said it, which is the same class of defect as an empty state that lies.
-    const { card } = renderCard(PUBLISHED, {
+    //
+    // ⚠ 193-06 changed the ROW here, not the expectation. This case is about a line with
+    // NOTHING after the own word, and the house fixture admits — so keeping `PUBLISHED` and
+    // appending the mark to the expectation would have quietly deleted the only case that
+    // renders a one-part line. The row now carries a definition with no emit phase, which is a
+    // positive `does-not-admit`, and both assertions survive VERBATIM.
+    const { card } = renderCard(PUBLISHED_NO_TEMPLATE, {
       identity: identityOf({ segs: [], ofN: null, when: null }),
     })
     const line = within(card).getByTestId("row-identity")
@@ -691,10 +760,157 @@ describe("D-03 / D-06 — the line's grammar, in order", () => {
       identity: identityOf({ segs: [NO_PROJECT, STATE_STARTER], ofN: oneOfLabel(43) }),
     })
     const parts = identityParts(within(card).getByTestId("row-identity"))
-    // own + 2 segs + `1 of N` + changed. The cap belongs to the resolver; what the CARD owes
-    // is that it renders every segment it is handed and invents none of its own.
-    expect(parts).toHaveLength(5)
-    expect(parts.slice(1, 3)).toEqual([NO_PROJECT, STATE_STARTER])
+    // own + THE MARK + 2 segs + `1 of N` + changed. The cap belongs to the resolver; what the
+    // CARD owes is that it renders every segment it is handed and invents none of its own —
+    // and the 193-06 mark is NOT a resolver segment, which is why the length moved by exactly
+    // one and the slice moved with it rather than the claim itself changing.
+    expect(parts).toHaveLength(6)
+    expect(parts[1]).toBe(CARD_TEMPLATE_MARK)
+    expect(parts.slice(2, 4)).toEqual([NO_PROJECT, STATE_STARTER])
+  })
+})
+
+/**
+ * ── Phase 193-06 (AUTH-03 — D-13 / D-14 / D-15 / D-21) — THE TEMPLATE MARK ────────────────
+ *
+ * SC#3 is *a user with a template to fill can find where to supply it*, and the search starts
+ * at the row. What this block owes is three things a green suite could otherwise fake:
+ *
+ *  1. THE THIRD ARM IS GENUINELY ENTERED. `unknown` is 110 of 145 published rows (a `phases: []`
+ *     stub nobody authored) — the arm the library ACTUALLY takes. A suite covering only `admits`
+ *     and a trivial no-emit case is the 192 CR-01 defect verbatim: *"both failure tests pinned
+ *     the correct branch without ever entering the wrong one."*
+ *  2. THE TWO SILENT ARMS ARE INDISTINGUISHABLE BY CONSTRUCTION. They are asserted against ONE
+ *     shared `SILENT_LINE` value, so a divergence is a FAILURE rather than a difference nobody
+ *     wrote a case for. Absence of the mark must never become readable as a positive claim that
+ *     no template is needed.
+ *  3. D-13 IS PROVED STRUCTURALLY, NOT BY INTENTION. ⚠ And the reason it needs proving is that
+ *     the inherited justification is FALSE: D-13 cites 188.2's `@ts-expect-error` two-badge
+ *     ceiling, which guards the CANVAS `PhaseNodeCard`. There is NO badge ceiling of any kind
+ *     under `library/`, and nothing here claims a typecheck enforces one. What does enforce it
+ *     is arithmetic over the rendered DOM: the line's direct child count is exactly
+ *     `1 + 2 × parts.length`, so a mark that arrived as a chip, a badge or any other node type
+ *     reds — on the count, not on a class name.
+ */
+describe("AUTH-03 — the template mark, and the silence on either side of it", () => {
+  /** The line every NON-admitting row renders, spelled ONCE so the two arms cannot diverge. */
+  const SILENT_LINE = [OWN_YOURS, LINEAGE_ORIGINAL, "changed 2 months ago"]
+  const SILENT_IDENTITY = identityOf({ segs: [LINEAGE_ORIGINAL], ofN: null })
+
+  it("ADMITS — an emit phase with no bound template renders the mark at the D-14 slot", () => {
+    // Non-vacuity first: the arm is measured, not assumed.
+    expect(templateAdmission(PUBLISHED.def)).toBe("admits")
+
+    const { card } = renderCard(PUBLISHED, { identity: SILENT_IDENTITY })
+    const parts = identityParts(within(card).getByTestId("row-identity"))
+    expect(parts).toEqual([OWN_YOURS, CARD_TEMPLATE_MARK, LINEAGE_ORIGINAL, "changed 2 months ago"])
+    // D-14 — index 1 of this helper's output is index 0 of the card's own `identityParts`,
+    // i.e. immediately AFTER provenance. Asserted by position in the array; never by a class.
+    expect(parts[1]).toBe(CARD_TEMPLATE_MARK)
+    expect(parts[0]).toBe(OWN_YOURS)
+  })
+
+  it("DOES-NOT-ADMIT — a definition with no emit phase renders no mark", () => {
+    expect(templateAdmission(PUBLISHED_NO_TEMPLATE.def)).toBe("does-not-admit")
+    const { card } = renderCard(PUBLISHED_NO_TEMPLATE, { identity: SILENT_IDENTITY })
+    expect(identityParts(within(card).getByTestId("row-identity"))).toEqual(SILENT_LINE)
+  })
+
+  it("DOES-NOT-ADMIT — a row that already BINDS a library template renders no mark (D-21)", () => {
+    // The measured half of D-21: on these rows `_exec_llm_emit` resolves the bound asset first
+    // and the run-time upload is unreachable code, so the mark would be simply FALSE. 16 of the
+    // 17 emit-phase published rows are this shape.
+    expect(templateAdmission(PUBLISHED_BOUND_TEMPLATE.def)).toBe("does-not-admit")
+    const { card } = renderCard(PUBLISHED_BOUND_TEMPLATE, { identity: SILENT_IDENTITY })
+    expect(identityParts(within(card).getByTestId("row-identity"))).toEqual(SILENT_LINE)
+  })
+
+  it("UNKNOWN — `phases: []`, the shape 110 of 145 published rows carry, renders no mark", () => {
+    expect(templateAdmission(PUBLISHED_UNKNOWN_DEF.def)).toBe("unknown")
+    const { card } = renderCard(PUBLISHED_UNKNOWN_DEF, { identity: SILENT_IDENTITY })
+    // ⚠ THE SAME `SILENT_LINE` VALUE AS THE TWO CASES ABOVE, ON PURPOSE. D-15 makes *does not*
+    // and *we do not know* indistinguishable on the card; asserting them against one shared
+    // expectation is what makes that a mechanical property instead of a coincidence.
+    expect(identityParts(within(card).getByTestId("row-identity"))).toEqual(SILENT_LINE)
+  })
+
+  it("the three silent arms agree with each other, node for node", () => {
+    // The pairwise statement of the same claim, so a future edit that changes ONE arm's
+    // rendering reds even if it changes the shared constant to match itself.
+    const rows = [PUBLISHED_NO_TEMPLATE, PUBLISHED_BOUND_TEMPLATE, PUBLISHED_UNKNOWN_DEF]
+    const rendered = rows.map((row) => {
+      const { card, unmount } = renderCard(row, { identity: SILENT_IDENTITY })
+      const parts = identityParts(within(card).getByTestId("row-identity"))
+      unmount()
+      return parts
+    })
+    expect(rendered[1]).toEqual(rendered[0])
+    expect(rendered[2]).toEqual(rendered[0])
+    // …and the corpus really contains both silent verdicts, so the agreement is not vacuous.
+    expect(new Set(rows.map((row) => templateAdmission(row.def)))).toEqual(
+      new Set(["does-not-admit", "unknown"]),
+    )
+  })
+
+  it("D-13 — the mark arrives as a PART, not as a new node type", () => {
+    // The structural proof. `row-identity`'s direct children are the own PILL plus, per composed
+    // part, a separator span and a text span — so `1 + 2 × segments` holds if and only if the
+    // mark joined the existing composition. A chip, a badge or an icon wrapper breaks it.
+    //
+    // ⚠ THE `− 1` IS LOAD-BEARING AND WAS FOUND BY A RED, not reasoned out: `identityParts()`
+    // reads the line's CHILDREN, so its first entry is the own pill itself. The card's own
+    // `identityParts` array is therefore this one MINUS that first entry. The plan's wording
+    // (`1 + 2 × parts.length`) counts the pill twice; corrected here on measurement — observed
+    // `expected … to have a length of 11 but got 9` before the fix.
+    const { card } = renderCard(PUBLISHED, {
+      identity: identityOf({ segs: [LINEAGE_ORIGINAL], ofN: oneOfLabel(43) }),
+    })
+    const line = within(card).getByTestId("row-identity")
+    const parts = identityParts(line)
+    expect(parts).toContain(CARD_TEMPLATE_MARK)
+    const segments = parts.length - 1
+    expect(line.children).toHaveLength(1 + 2 * segments)
+  })
+
+  it("POSITIVE CONTROL — the child-count arithmetic really reds on an extra node", () => {
+    // Without this, the case above passes on a helper that miscounts and on a line that renders
+    // nothing at all. A node this file plants itself breaks the identity by exactly one, so the
+    // control cannot be satisfied by the component under test.
+    const planted = document.createElement("div")
+    planted.innerHTML =
+      `<span>${OWN_YOURS}</span>` +
+      `<span aria-hidden="true">·</span><span>${CARD_TEMPLATE_MARK}</span>` +
+      `<span class="chip">extra</span>`
+    const parts = identityParts(planted).filter((text) => text !== "extra")
+    // Legal shape without the plant: 1 pill + 1 separator + 1 text = 3. With it: 4.
+    expect(1 + 2 * (parts.length - 1)).toBe(3)
+    expect(planted.children).toHaveLength(4)
+    expect(planted.children).not.toHaveLength(1 + 2 * (parts.length - 1))
+  })
+
+  it("the mark does not disturb the provenance node's DOM position (D-08)", () => {
+    // 192.1 asserts the identity line at child index 1 BY CHILD ORDER, and the point of
+    // asserting by child order was that it does not move. Driven here on an ADMITTING row,
+    // because the shipped `it.each` above would still pass on a card that rendered the mark
+    // outside the line entirely.
+    expect(templateAdmission(PUBLISHED.def)).toBe("admits")
+    const { card } = renderCard(PUBLISHED, { folderName: "Risk & Compliance" })
+    // Length first, so an absent line reds as an AssertionError rather than a `getBy*` throw.
+    expect(within(card).queryAllByTestId("row-identity")).toHaveLength(1)
+    const line = within(card).getByTestId("row-identity")
+    const column = line.parentElement as HTMLElement
+    expect(column.children).toHaveLength(3)
+    expect(column.children[0].textContent).toContain(PUBLISHED.name)
+    expect(column.children[1]).toBe(line)
+    expect(column.children[2].textContent).toContain("Risk & Compliance")
+    // …and the mark really is inside the line rather than beside it.
+    expect(identityParts(line)).toContain(CARD_TEMPLATE_MARK)
+  })
+
+  it("the mark is spelled in ONE place — this file imports it and never retypes it", () => {
+    // The same D-14 one-home rule every other string in this suite follows. If this ever fails,
+    // the copy has forked and a change in `libraryVocabulary.ts` no longer reaches the card.
+    expect(CARD_TEMPLATE_MARK).toBe("needs a template")
   })
 })
 
@@ -705,7 +921,12 @@ describe("D-18 / SC#3 — recency renders when the wire said, and goes silent wh
     })
     const line = within(card).getByTestId("row-identity")
     expect(line).toBeInTheDocument()
-    expect(identityParts(line)).toEqual([OWN_YOURS, LINEAGE_ORIGINAL, "2 share this name"])
+    expect(identityParts(line)).toEqual([
+      OWN_YOURS,
+      CARD_TEMPLATE_MARK,
+      LINEAGE_ORIGINAL,
+      "2 share this name",
+    ])
     expect(line.textContent ?? "").not.toContain("changed")
   })
 
@@ -716,7 +937,13 @@ describe("D-18 / SC#3 — recency renders when the wire said, and goes silent wh
       identity: identityOf({ segs: [LINEAGE_ORIGINAL], ofN: oneOfLabel(2), when: "changed yesterday" }),
     })
     const line = within(card).getByTestId("row-identity")
-    expect(identityParts(line)).toEqual([OWN_YOURS, LINEAGE_ORIGINAL, "2 share this name", "changed yesterday"])
+    expect(identityParts(line)).toEqual([
+      OWN_YOURS,
+      CARD_TEMPLATE_MARK,
+      LINEAGE_ORIGINAL,
+      "2 share this name",
+      "changed yesterday",
+    ])
     expect(line.textContent ?? "").toContain("changed")
   })
 })
@@ -733,6 +960,9 @@ describe("D-10 — a DRAFT gains lineage for the first time, and gains no senten
     expect(within(card).queryAllByTestId("row-identity")).toHaveLength(1)
     expect(identityParts(within(card).getByTestId("row-identity"))).toEqual([
       OWN_YOURS,
+      // A DRAFT is marked on exactly the same rule as a published row — the predicate reads the
+      // definition, never the provenance (D-15 has no per-provenance arm).
+      CARD_TEMPLATE_MARK,
       "v2 of v1",
       STATE_DRAFT,
       "43 share this name",
@@ -990,7 +1220,16 @@ describe("SC#1 — at 100+ rows with 14 duplicated names, a colliding row can be
     const overspent = SCALE_ROWS.filter((row) => identityFor(row).segs.length > 2)
     expect(overspent.map((row) => row.slug)).toEqual([])
     // …and the DOM agrees: own + at most 2 segs + at most 1 count + at most 1 recency.
-    for (const line of allLines()) expect(identityParts(line).length).toBeLessThanOrEqual(5)
+    //
+    // ⚠ 193-06 raised this cap BY ONE, PER ROW, AND ONLY ON THE ROWS THAT EARN IT — a blanket
+    // `<= 6` would have weakened the fence for every row in the corpus, including the ones that
+    // render no mark at all. The allowance is computed from the same predicate the card calls,
+    // so a mark on a row that does not admit still reds here.
+    const lines = allLines()
+    SCALE_ROWS.forEach((row, index) => {
+      const cap = templateAdmission(row.def) === "admits" ? 6 : 5
+      expect(identityParts(lines[index]).length).toBeLessThanOrEqual(cap)
+    })
   })
 })
 
