@@ -414,21 +414,31 @@ re-open trigger naming milestone close.
 | **WR-01** the copy fence missed the file that caused the gap | ✅ **FIXED and PROVED TO FIRE** — driven RED against a planted `DESCRIBE_CTA` literal (`expected [ 'DESCRIBE_CTA/plain' ] to deeply equal []`), plant restored md5-identical | `3f31e8cc` |
 | **WR-02** third re-capture, undocumented + a now-false bullet | ✅ **FIXED** (prose) | `bec117d0` |
 | **WR-03** docblock forbids the change below it | ✅ **FIXED** (prose) | `bec117d0` |
-| **WR-05** count-gate claims a case that does not exist | ◐ **comment FIXED**; ⚠ **code arm OPEN** — a `config`-less phase list still returns a positive `does-not-admit` where D-20 argues for `unknown`. Behaviour change, not prose. | `bec117d0` / open |
-| **WR-07** `unknown` rows mis-attributed to `phases: []` | ◐ **docblocks FIXED** in `soulData.ts` and `RunModal.tsx`; ⚠ **test case OPEN** — nothing pins the jsonb string-scalar shape, the dominant live shape | `bec117d0` / open |
+| **WR-05** count-gate claims a case that does not exist | ✅ **FULLY FIXED** — comment corrected, and the `(2b)` arm added so a `config`-silent phase list reads `unknown`. **DRIVEN RED** against a disabled arm (both new cases: `expected 'does-not-admit' to be 'unknown'`), source restored md5-identical. | `bec117d0` + `6c060c4f` |
+| **WR-07** `unknown` rows mis-attributed to `phases: []` | ✅ **FULLY FIXED** — docblocks corrected in both files, and the jsonb string-scalar shape (194 of 223 live rows) is now pinned in `ADMISSION_CASES`. | `bec117d0` + `6c060c4f` |
 | **IN-01** declaration-order claim contradicted by line numbers | ✅ **FIXED** (prose) | `bec117d0` |
 | **WR-04** variant D on an unaudited third surface | ⏸ **OPERATOR RULING OWED** — door B's card says *you decide every setting*; its first screen now reads *the AI writes the steps*. Pre-existed in weaker form; the fast-fix made both surfaces agree without anyone ruling that they should. Pairs with UAT U1/U2. | open |
-| **WR-06** containment assertion on a string declared unusable for containment | ⏸ **OPEN** — passes today only because the merged bar hosts none of the other two | open |
-| **WR-08** test imports a `.planning/` sketch artifact across the package boundary | ⏸ **OPEN** — breaks when `/gsd:complete-milestone` archives `.planning/` | open |
-| **IN-02** stateful `/g` regex used with both `toMatch` and `.match()` | ⏸ **OPEN** | open |
-| **IN-03** scale-cap loop pairs rows to lines by index without pinning lengths | ⏸ **OPEN** | open |
+| **WR-06** containment assertion on a string declared unusable for containment | ✅ **FIXED** — compares the label's own node whole, per `doorVocabulary.ts`'s own rule. | `6c060c4f` |
+| **WR-08** test imports a `.planning/` sketch artifact across the package boundary | ✅ **FIXED (the real fix, not the documented minimum)** — `build.cjs` writes both copies from the SAME string, so they cannot drift; the suite imports the in-package copy. Regen verified idempotent, copies md5-identical, new file not gitignored. | `6c060c4f` |
+| **IN-02** stateful `/g` regex used with both `toMatch` and `.match()` | ✅ **FIXED** — split into `/m` for matching and `/gm` for counting. | `6c060c4f` |
+| **IN-03** scale-cap loop pairs rows to lines by index without pinning lengths | ✅ **FIXED** — length pinned and a non-vacuity guard added. | `6c060c4f` |
 
 **Verification of the fix pass:** `tsc -p tsconfig.app.json` **33** (baseline, unmoved) · count gate
 **exit 0 · total 3558 · failed 0 · 67/67 pinned** — byte-identical to the pre-edit run for the five
 prose commits, so not one test moved.
 
-⚠ **Nothing was silently folded in.** The three findings with a code half (WR-05, WR-06, WR-07) had
-only their prose corrected; each open half is named above rather than closed by association.
+**FINAL STATE (2026-08-14): 10 of 11 findings CLOSED. One remains, and it is not a code defect.**
+
+⚠ **WR-04 is the only open item, and it is deliberately open.** Door B's card reads *you decide
+every setting*; its first screen now reads *the AI writes the steps*. Whether those two should
+speak identically is a **product ruling**, not a defect to patch — the contradiction pre-existed in
+weaker form, and the fast-fix made both surfaces agree without anyone deciding they should.
+Changing it either way without that ruling is how a phase ships copy nobody chose. It pairs
+naturally with UAT rows U1/U2, which ask a human the same question from the other direction.
+
+Verification of the full fix pass: `tsc -p tsconfig.app.json` **33** (baseline, unmoved) · count gate
+**exit 0 · total 3561 · failed 0 · 67/67 pinned, no per-file decrease**. Every behaviour change was
+driven RED before being trusted; every plant was restored md5-identical.
 
 ---
 
