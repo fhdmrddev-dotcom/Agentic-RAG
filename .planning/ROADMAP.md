@@ -317,8 +317,8 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 193-05-PLAN.md — all 21 governed strings → `doorVocabulary.ts` at their SHIPPED values, plus the D-24(a) copy fence (D-10/D-11/D-12)
-- [ ] 193-06-PLAN.md — the card mark `· needs a template` at index 0 of `identityParts`, three-arm silence (D-13/D-14/D-15)
+- [x] 193-05-PLAN.md — all 21 governed strings → `doorVocabulary.ts` at their SHIPPED values, plus the D-24(a) copy fence (D-10/D-11/D-12)
+- [x] 193-06-PLAN.md — the card mark `· needs a template` at index 0 of `identityParts`, three-arm silence (D-13/D-14/D-15)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
