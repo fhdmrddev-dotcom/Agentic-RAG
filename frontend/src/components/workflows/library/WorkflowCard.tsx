@@ -219,12 +219,18 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { templateAdmission } from "@/components/workflows/soulData"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { deleteWorkflowDraft } from "@/lib/api"
 
 import { CHIP_PREDICATES } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
-import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./libraryVocabulary"
+import {
+  CARD_TEMPLATE_MARK,
+  FORK_CONSEQUENCE,
+  FORK_CONSEQUENCE_EXISTING,
+  FORK_VERB,
+} from "./libraryVocabulary"
 import type { RowIdentity } from "./rowIdentity"
 import {
   WorkflowDeleteSheet,
@@ -484,18 +490,83 @@ export function WorkflowCard({
   const owned = CHIP_PREDICATES.yours(row)
 
   /**
+   * Phase 193-06 (AUTH-03 — D-13 / D-14 / D-15 / D-21) — CAN THIS ROW BE HANDED A TEMPLATE?
+   *
+   * SC#3 says *a user with a template to fill can find where to supply it*, and that search
+   * starts at the row rather than inside the Run modal. This is the one word that tells a
+   * person, before they open anything, that this workflow expects something from them.
+   *
+   * ── D-13: A PLAIN TEXT SEGMENT. NO CHIP, NO BADGE, NO NEW COLOUR, NO NEW COMPONENT ──────
+   * It joins `identityParts` as a `string`, muted by the line's existing classes and separated
+   * by the `·` the line already spends:
+   *
+   *     Yours · <the mark> · changed 2 months ago
+   *
+   * ⚠ The mark's WORDS are deliberately NOT SPELLED anywhere in this file, not even in this
+   * prose. They have ONE home — `CARD_TEMPLATE_MARK` in `libraryVocabulary.ts`, so a copy change
+   * is a one-line diff in one file — and this plan's acceptance check is a RAW SOURCE COUNT of
+   * them, which a docblock quoting the string would silently satisfy. That is the 187-24 trap
+   * this file's header already records twice, applied a third time.
+   *
+   * ⚠ AND THE STATED REASON IS CORRECTED HERE RATHER THAN REPEATED, because the inherited one
+   * measures FALSE. D-13's own text justifies the plain-text ruling by citing 188.2's two-badge
+   * ceiling and its `@ts-expect-error` control. That control guards the CANVAS `PhaseNodeCard`,
+   * a different component: **there is no badge ceiling of any kind under `library/`, and NO
+   * PLAN, TEST OR COMMENT MAY CLAIM A TYPECHECK ENFORCES THIS ONE.** The ruling STANDS on the
+   * reason that actually applies — SEED-155 / UAT U8, where sketch 163 drew a chip treatment
+   * this card structurally could not render, and a bordered chip here would repeat U8 exactly.
+   * What DOES guard it mechanically is structural and lives in this file's suite: the direct
+   * child count of the line is `1 + 2 × identityParts.length`, so a mark that arrived as any
+   * new node type reds there. An icon-only mark was rejected too — an unlabelled glyph is the
+   * same discoverability failure AUTH-03 exists to fix.
+   *
+   * ── D-15: SILENCE ON ANYTHING BUT A POSITIVE YES ────────────────────────────────────────
+   * The comparison is `=== "admits"`. `"does-not-admit"` and `"unknown"` BOTH render nothing
+   * and are deliberately INDISTINGUISHABLE — the same rule the `when` slot below already
+   * follows, where `undefined` means *the wire did not say* and the honest rendering of that is
+   * no segment. **Absence of the mark must never be readable as an assertion that no template
+   * is needed.** ⚠ The Run modal falls back the OPPOSITE way on `unknown` (D-20, `193-07`),
+   * because there a silent hide would strip a shipped capability. That asymmetry is a decision;
+   * do not "fix" the two into consistency.
+   *
+   * ── NO NEW PROP, AND NOT A `RowIdentity` FIELD ──────────────────────────────────────────
+   * `row.def` is already on the row type, and an in-card derivation from `row` is the shipped
+   * practice one line up. `RowIdentity`'s four fields are all properties of the row's PLACE IN
+   * THE LIST, resolved by an index built over `[rows]`; a definition-derived fact is a category
+   * error there and would force `rowIdentity.ts` to learn about definitions.
+   *
+   * ── D-21's COST, STATED NOT SMOOTHED ────────────────────────────────────────────────────
+   * Live scoring over the 145 published rows is **1 admits / 34 does-not-admit / 110 unknown**,
+   * so the mark is visible on exactly ONE published row locally — `ephemeral-template-fill-101uat`.
+   * 16 of the 17 emit-phase published rows already BIND a library template (on which the
+   * run-time upload is unreachable code, so the mark would be false), and 110 carry a `phases: []`
+   * stub nobody authored. A UAT row driven against any other slug cannot see this feature.
+   */
+  const templateMark = templateAdmission(row.def) === "admits" ? [CARD_TEMPLATE_MARK] : []
+
+  /**
    * Phase 192.1-06 (D-03 / D-06) — the identity line's parts AFTER the owner word, in the one
    * grammar the generated build contract declares:
    *
-   *   [own pill] [computed seg] · [computed seg] [1 of N] · changed <rel>
+   *   [own pill] [the AUTH-03 mark] [computed seg] · [computed seg] [1 of N] · changed <rel>
    *
    * ⚠ THE `null`s ARE DROPPED HERE RATHER THAN RENDERED AS BLANKS, and that is what makes the
    * separator rule mechanical instead of a matter of care: the card spends a `·` BETWEEN
    * present parts and nowhere else, so a row with no recency reads `Yours` and never `Yours ·`.
    * A dangling separator promises the reader something that is then not said, which is the same
    * class of defect as an empty state that lies.
+   *
+   * ⚠ INDEX 0 IS D-14's SLOT, AND IT IS *AFTER* PROVENANCE RATHER THAN FIRST — stated here so
+   * it is not re-derived later. `identity.own` is rendered SEPARATELY as the pill and this array
+   * begins after it, so index 0 of `identityParts` is immediately after provenance, giving
+   * *whose it is · what it needs · which copy · when it changed*, with recency still last where
+   * 192.1 put it. The mark must NOT be placed before `own`: 192.1 asserts the provenance node at
+   * DOM position 2 BY CHILD ORDER, and the whole point of asserting by child order was that it
+   * does not move. `templateMark` spreads an empty array on the two silent arms, so a row that
+   * does not admit composes byte-identically to the way it did before this phase.
    */
   const identityParts: string[] = [
+    ...templateMark,
     ...identity.segs,
     ...(identity.ofN === null ? [] : [identity.ofN]),
     ...(identity.when === null ? [] : [identity.when]),
