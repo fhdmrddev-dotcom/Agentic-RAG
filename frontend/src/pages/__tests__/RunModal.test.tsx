@@ -805,3 +805,114 @@ describe("RunModal 192-06 — the modal's OWN mid-launch guard (192-03 F1, close
     rendered.unmount()
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 193-01 Task 2 (D-08 / D-17 / AUTH-03) — LAUNCH FAILURE IS VISIBLE ON A
+// WORKFLOW THAT DOES NOT ADMIT A TEMPLATE.
+//
+// Appended as a PURE INSERTION, the same discipline as the 192-03 and 192-06 blocks
+// above: nothing already in this file was edited, renamed or re-described, no import
+// line was widened, and NOT ONE `*_BASELINE` literal was touched. `git diff --numstat`
+// over this commit reports ZERO DELETIONS — a deletion here would mean a capture had
+// been edited to agree with something.
+//
+// ⚠ WHY THIS CASE EXISTS, WHICH MATTERS MORE THAN WHAT IT DOES.
+//
+// `handleRun`'s catch sets `launchError` on **ANY** `onRun` rejection —
+// `setLaunchError(e instanceof Error ? e.message : "Run failed")`. The comment beside
+// it describes the server's `validate_upload` 422 because that is its COMMONEST cause,
+// and reading that comment as the whole story is the trap: a scope failure, a network
+// failure, a thread-creation failure or any other launch error lands in the SAME node.
+// That node — `data-testid="run-upload-error"` `role="alert"` — lives INSIDE the
+// `<div className="flex flex-col gap-1.5">` template block that Phase 193's D-17 hides
+// on a workflow whose definition does not admit a template.
+//
+// So a naive cut — wrapping the whole block in the admission predicate — makes LAUNCH
+// FAILURES SILENT on every non-template workflow: the run simply does not start and the
+// modal says nothing. That is the WR-03 class of defect Phase 192's gap round had to
+// repair on this very surface, and it is recorded in 193-CONTEXT.md as one of two
+// inherited claims measured FALSE by research.
+//
+// This case is captured NOW, on the SHIPPED tree where the block always renders and the
+// predicate does not yet exist, so that D-17's cut REDS A TEST THAT PREDATES IT rather
+// than shipping a silence nobody sees. The correct cut renders the error node OUTSIDE
+// the conditional wrapper; this row is what makes that a requirement rather than advice.
+//
+// It drives the modal DIRECTLY (the 192-06 isolated-render idiom) rather than through
+// the page, so nothing here depends on the page's feed and no capture row is disturbed.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * A published workflow whose definition contains NO `llm_emit` phase — the shape that will
+ * read `does-not-admit` once D-21's predicate ships. Deliberately NOT one of the fixtures
+ * above: every one of them declares `config: { phase_type: "llm_emit", citation_policy:
+ * "draft" }` and would therefore ADMIT, which is the opposite of the state under test.
+ */
+const nonAdmittingWf: RunModalPropsT["wf"] = {
+  id: "no-template-1",
+  slug: "programmatic-only",
+  name: "Programmatic only",
+  definition: {
+    slug: "programmatic-only",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [{ slug: "pull", phase_index: 0, config: { phase_type: "programmatic" } }],
+  },
+}
+
+/** A distinct, non-upload launch failure. The wording is deliberately NOT about templates:
+ *  a message mentioning uploads would be indistinguishable from the 422 the neighbouring
+ *  comment describes, which is precisely the conflation this case exists to break. */
+const SCOPE_FAILURE = "scope unavailable"
+
+describe("RunModal 193-01 — a launch failure is visible on a NON-admitting workflow", () => {
+  it("a rejected launch renders run-upload-error with role=alert and the server's message, on a workflow with no llm_emit phase", async () => {
+    // THE FIXTURE CANNOT SILENTLY DRIFT INTO ADMITTING. Asserted here rather than trusted,
+    // because the whole case is about the NON-admitting branch: if someone later gives this
+    // definition an `llm_emit` phase, the row would keep passing while testing nothing.
+    const phases = (nonAdmittingWf.definition as { phases: { config: { phase_type: string } }[] })
+      .phases
+    // Non-vacuity first: an EMPTY phase list also has no `llm_emit` phase, and would make the
+    // filter below trivially true against a workflow that is not a workflow.
+    expect(phases.length).toBeGreaterThan(0)
+    expect(phases.filter((p) => p.config.phase_type === "llm_emit")).toHaveLength(0)
+
+    const { RunModal } = await import("@/components/workflows/library/RunModal")
+    const rendered = render(
+      <RunModal
+        wf={nonAdmittingWf}
+        folders={[]}
+        authorDefaultFolderId={null}
+        kickoff=""
+        submitting={false}
+        onKickoffChange={() => {}}
+        onCancel={() => {}}
+        onRun={async () => {
+          throw new Error(SCOPE_FAILURE)
+        }}
+      />,
+    )
+    const modal = await screen.findByTestId("run-modal")
+
+    fireEvent.click(within(modal).getByTestId("run-confirm"))
+
+    const alert = await within(modal).findByTestId("run-upload-error")
+    expect(alert).toBeInTheDocument()
+    expect(alert).toHaveAttribute("role", "alert")
+    // VERBATIM, never a friendlier lie — and never the "Run failed" fallback, which would
+    // mean the rejection arrived as something other than an Error.
+    expect(alert).toHaveTextContent(SCOPE_FAILURE)
+    expect(alert).not.toHaveTextContent("Run failed")
+
+    // ⚠ WHERE IT LIVES IS THE POINT, and it is recorded as a MEASUREMENT of the shipped tree
+    // rather than as prose: today the alert shares a parent with the upload control and the
+    // provenance note, i.e. it sits inside the block D-17 conditionally removes. When that cut
+    // lands, this relationship is expected to CHANGE (the alert must move out) — and the
+    // assertions above are what force it to move rather than vanish.
+    const provenance = within(modal).getByTestId("run-provenance")
+    expect(alert.parentElement).toBe(provenance.parentElement)
+
+    rendered.unmount()
+  })
+})
