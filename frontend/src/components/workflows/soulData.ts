@@ -78,6 +78,17 @@ export interface DefShape {
     config?: { phase_type?: string; citation_policy?: string; [k: string]: unknown }
     validators?: Array<{ kind?: string }> | null
   }> | null
+  // Phase 193-02 (AUTH-03 / D-21): the bound-library-template read-shape. It was always
+  // REACHABLE through the index signature below, and therefore always UNTYPED; declaring
+  // it here rather than narrowing at the call site follows `libraryFilter.ts`'s
+  // "DERIVE, DO NOT RE-IMPLEMENT" rule — `DefShape` IS the declared read-shape, and a
+  // second local declaration of it is the drift this module exists to forbid. Only
+  // `kind` is ever consumed (`templateAdmission`); `asset_id` is declared because the
+  // live rows carry it, never read, never rendered, never logged (threat T-193-07).
+  // Measured: 74 `assets[]` entries across 223 live definitions, every one `kind:
+  // "template"`. Widening touches every consumer's type surface — `tsc -p
+  // tsconfig.app.json` was 33 before this member and is 33 after it.
+  assets?: Array<{ kind?: string; asset_id?: string | null; [k: string]: unknown }> | null
   [k: string]: unknown
 }
 
@@ -168,4 +179,77 @@ export function soulDeliverable(def: DefShape | null | undefined): SoulDeliverab
   const name = def?.name?.trim()
   const label = name ? `${name} · file` : "file deliverable"
   return { kind: "file", label }
+}
+
+/**
+ * Phase 193-02 (AUTH-03 / D-21 / D-25) — CAN THIS WORKFLOW BE HANDED A TEMPLATE?
+ *
+ * ⚠ THE CONTRACT'S SIGNAL DOES NOT EXIST IN THE DATA, and that correction is stated
+ * here rather than smoothed. The sketch BUILD-CONTRACT, its README and 193-CONTEXT's
+ * `<canonical_refs>` all describe the fill signal as *"admits `render_template` in the
+ * phase tool whitelist"* — i.e. `phases[].config.available_tools ∋ "render_template"`.
+ * Measured against the live library (223 definitions, `193-RESEARCH.md` §A.1-A.3):
+ * **0 of 223 rows carry it.** A predicate written to the contract's letter marks
+ * NOTHING AT ALL. The signal that does exist is `phases[].config.phase_type ===
+ * "llm_emit"` (79 live phases), and `EMITTER_REGISTRY` has exactly ONE entry today
+ * (`harness/emitters.py:183`), so `llm_emit` ⟺ *renders a template*.
+ *
+ * THE THREE STATES ARE LOAD-BEARING (D-20/D-25) — this is NOT a boolean with a `?? true`
+ * at one call site. The card and the Run modal fall back OPPOSITE ways:
+ *   WorkflowCard  (D-15): `templateAdmission(row.def) === "admits"`      — silence unless a positive yes
+ *   RunModal      (D-20): `templateAdmission(def) !== "does-not-admit"`  — hide only on a positive no
+ * On the card a missing mark costs nothing; in the modal, hiding on `unknown` would
+ * REMOVE A SHIPPED CAPABILITY (WFIN-01) from a user who may need it, with no way to
+ * discover it existed. The asymmetry is a decision, not an oversight — do not "fix" it
+ * into consistency, and do not collapse the union to make one call site read nicer.
+ * `soulDeliverable`, directly above, is the CAUTIONARY precedent: its `def?.phases ?? []`
+ * collapses `null` and `{ phases: [] }` into one answer, which is right for a deliverable
+ * label and would be a D-20 violation here.
+ *
+ * D-21's BOUND-ASSET ARM, measured (`193-RESEARCH.md` §A.4): `_exec_llm_emit` resolves
+ * `_emit_bound_asset_ref(definition)` FIRST, and `template_asset_service.py:144` returns
+ * UNCONDITIONALLY on Branch 1 when that ref is non-`None` — there is no override path,
+ * nothing clears the ref because a user uploaded something. So on a row that binds a
+ * library template the run-time upload is unreachable code: *Template to fill* would
+ * promise what the engine discards, and *· needs a template* would be simply FALSE.
+ *
+ * THE COST, STATED NOT SMOOTHED — D-21's live scoring over the 145 published rows is
+ * **1 admits / 34 does-not-admit / 110 unknown**, and the single admitting slug is
+ * `ephemeral-template-fill-101uat`. The card mark is therefore visible on exactly ONE
+ * published row locally. The 110 are `phases: []` (76 % of the library — an unauthored
+ * stub), and routing them to `unknown` is precisely what stops D-17 stripping a shipped
+ * capability from three-quarters of the library.
+ *
+ * WHY NOT THE SIMPLER "has an emit phase" (P1′): it is byte-for-byte
+ * `soulDeliverable(def).kind === "file"`, which ALREADY drives the shipped *Makes a file*
+ * chip (`library/libraryFilter.ts`). Under P1′ the new mark would be a second word for a
+ * fact this exact surface already states — and a second answer to one question is the
+ * drift this module exists to forbid. Nothing here re-implements a derivation
+ * `soulDeliverable` or `tierForDefinition` already owns.
+ */
+export type TemplateAdmission = "admits" | "does-not-admit" | "unknown"
+
+export function templateAdmission(def: DefShape | null | undefined): TemplateAdmission {
+  // (1) The wire did not say. Nullish, or a `phases` the server never sent as an array.
+  if (!def || !Array.isArray(def.phases)) return "unknown"
+  // (2) An empty `phases` is a stub nobody authored — 110 of 145 published rows. NOT a
+  //     positive no: D-20 keeps the Run modal's control on exactly this shape.
+  if (def.phases.length === 0) return "unknown"
+  // (3) No emit phase → a positive no. ⚠ An `llm_emit` phase with NO `emitter` key COUNTS
+  //     as `render_template` — that is the Pydantic default (`models/harness.py`), and the
+  //     shipped RunModal fixtures omit the key. Guarding on `emitter` rather than on
+  //     `phase_type` alone also makes a FUTURE second emitter read `does-not-admit` here
+  //     without a code change (RESEARCH assumption A1).
+  const fills = def.phases.some((p) => {
+    if (p.config?.phase_type !== "llm_emit") return false
+    const emitter = p.config?.emitter ?? "render_template"
+    return emitter === "render_template"
+  })
+  if (!fills) return "does-not-admit"
+  // (4) An emit phase exists, but the definition already BINDS a library template — the
+  //     run-time upload is unreachable (see the docblock's §A.4 measurement).
+  const bound = (Array.isArray(def.assets) ? def.assets : []).some((a) => a?.kind === "template")
+  if (bound) return "does-not-admit"
+  // (5) It fills a template and nothing is bound: this is where a user supplies one.
+  return "admits"
 }
