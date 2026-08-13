@@ -309,6 +309,72 @@ export const STATE_STARTER = "Shared starter"
 /** The project segment when a row carries no `project_folder_id` (D-17: starters never do). */
 export const NO_PROJECT = "No project"
 
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 193-02 (AUTH-03) — THE TEMPLATE WORDS (D-13 / D-18 / D-21)
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// PORTED FROM THE GENERATED BUILD CONTRACT, NOT TRANSCRIBED FROM PROSE — the same
+// mechanism the identity-line block above states, retargeted from sketch 163 to
+// `.planning/sketches/164-telling-the-doors-apart/BUILD-CONTRACT.generated.md`
+// § "AUTH-03 — the template proposal", rows `card.templateMark` and `run.templateLabel`.
+// Both were read out of that table and compared byte-for-byte, not typed from memory. As
+// with every string here, a copy change is a ONE-LINE DIFF IN ONE FILE.
+//
+// ⚠ WHY THEY LIVE HERE AND NOT IN `doorVocabulary.ts`. The two doors get their own
+// vocabulary module in this same phase, and it would be an easy mistake to file these
+// beside it because they arrive in the same sketch. They are LIBRARY strings: both render
+// inside the fence-swept `library/` subtree — the mark on `library/WorkflowCard.tsx`'s
+// identity line, the label on `library/RunModal.tsx` — and this module is that subtree's
+// one home. (D-11's "all 21 ids" governs the DOORS copy table only.) A second home for a
+// string is the exact failure this module exists to prevent.
+//
+// No consumer is added here; `193-06` and `193-07` import them.
+
+/**
+ * AUTH-03's card mark — the segment that tells a person, on the row, that this workflow is
+ * one they can hand a template to. Rendered ONLY on a positive `templateAdmission(def) ===
+ * "admits"` (D-15/D-21); silence otherwise, and the silence is deliberately the same for
+ * *does not* and *we do not know*.
+ *
+ * ⚠ D-13 — IT IS A PLAIN TEXT SEGMENT. No chip, no badge, no new colour, no new component;
+ * it joins the identity line muted, separated by the `·` the line already uses:
+ *
+ *     Yours · needs a template · changed 2 months ago
+ *
+ * ⚠ AND THE REASON IS CORRECTED HERE RATHER THAN REPEATED. D-13's own text justifies the
+ * plain-text ruling by citing the 188.2 two-badge ceiling and its `@ts-expect-error`
+ * control. Measured, that control guards the CANVAS `PhaseNodeCard`, a different component
+ * — **there is no badge ceiling of any kind under `library/`, and no plan may claim a
+ * typecheck enforces this one.** The ruling STANDS on the reason that actually applies:
+ * SEED-155 / UAT U8, where sketch 163 drew a chip treatment this card structurally could
+ * not render. A bordered chip here would repeat U8 exactly. An icon-only mark was rejected
+ * too — an unlabelled glyph is the same discoverability failure AUTH-03 exists to fix.
+ *
+ * Slot (D-14): after provenance, before recency — *whose it is · what it needs · when it
+ * changed*. It is declared here, immediately before `CHANGED_PREFIX`, for that reason. It
+ * must NOT go first: 192.1 asserts the provenance node at DOM position 2 BY CHILD ORDER,
+ * and the point of asserting by child order was that it does not move.
+ */
+export const CARD_TEMPLATE_MARK = "needs a template"
+
+/**
+ * AUTH-03's Run-modal label (D-18) — it turns a nameless quiet button into a named,
+ * expected input, which is the naming half of the requirement. Shown whenever
+ * `templateAdmission(def) !== "does-not-admit"`; the modal hides the control only on a
+ * POSITIVE no (D-20), the opposite fallback from the card's, because hiding on *unknown*
+ * would strip a shipped capability (WFIN-01) from a user who may genuinely need it.
+ *
+ * ⚠ THE a11y CONSTRAINT TRAVELS WITH THE STRING: render it as a TEXT NODE, never as a
+ * `<label htmlFor>`. The input it names is `className="hidden" tabIndex={-1}` — a label
+ * pointing at a control that cannot be focused is a promise the DOM does not keep.
+ *
+ * The provenance sentence that sits with this control (`Stored untrusted — never run as
+ * code, never fed to the fill engine.`) is Phase 152 security honesty and stays VERBATIM
+ * (D-19); it is not re-homed here and must not be re-worded to read better under the new
+ * label.
+ */
+export const RUN_TEMPLATE_LABEL = "Template to fill"
+
 /**
  * The recency segment's prefix (D-18). ⚠ THE TRAILING SPACE IS PART OF THE STRING —
  * `relativeChanged` concatenates a band onto it (`changed 2 months ago`) and imports it from

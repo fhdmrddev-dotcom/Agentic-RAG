@@ -22,6 +22,16 @@
  *  - soulDeliverable returns { kind: "file" } when a terminal llm_emit phase
  *    exists and the honest { kind: "chat" } when none does (D-03).
  *  - The module imports NOTHING from the API client (pure, client-side — D-02).
+ *
+ * Phase 193-02 (AUTH-03 / D-21 / D-25) adds the templateAdmission block below:
+ *  - the predicate answers in THREE states, and every arm is entered by a real case
+ *    — including `unknown` and the bound-asset `does-not-admit`, which are exactly the
+ *    two a green-looking suite would otherwise never reach (the 192 CR-01 lesson:
+ *    *both failure tests pinned the correct branch without ever entering the wrong one*).
+ *  - the states are asserted EXHAUSTIVE as a property, so a predicate that collapsed two
+ *    of them fails here even if every row's expectation had been edited to agree.
+ *  - and templateAdmission is proved to answer a DIFFERENT question from soulDeliverable
+ *    on a real shape — the mechanical statement of why P1′ was rejected (D-21).
  */
 import { describe, it, expect } from "vitest"
 import soulDataSource from "./soulData?raw"
@@ -31,6 +41,8 @@ import {
   PHASE_GLYPHS,
   entryInputKeys,
   soulDeliverable,
+  templateAdmission,
+  type TemplateAdmission,
   type DefShape,
 } from "./soulData"
 
@@ -267,6 +279,118 @@ describe("soulData.soulDeliverable — the honest deliverable resolver (D-03)", 
   it("returns { kind: 'chat' } for a null / undefined def (never fabricates)", () => {
     expect(soulDeliverable(null)).toEqual({ kind: "chat" })
     expect(soulDeliverable(undefined)).toEqual({ kind: "chat" })
+  })
+})
+
+// ── Phase 193-02 (AUTH-03 / D-21 / D-25) — THE THREE-STATE ADMISSION PREDICATE ──
+//
+// The shapes below are the LIVE ones, not invented ones. `phases: []` is 110 of the 145
+// published rows in the local library (76 %); the bound shape is the 16 rows carrying
+// `assets: [{ kind: "template", asset_id: "…/_library/….docx" }]`; and the emit-with-no-
+// `emitter` shape is what the shipped RunModal.test.tsx fixtures declare, which is why a
+// predicate REQUIRING an explicit `emitter` would read them as non-admitting and blow up
+// six whole-`innerHTML` baselines.
+//
+// Table-driven so a ninth shape inherits the coverage by being added to one array rather
+// than by someone remembering to write a matching `it()`.
+
+/** The emit phase the live definitions carry: no `emitter` key at all. */
+const emitPhaseNoEmitter = {
+  slug: "emit",
+  phase_index: 0,
+  config: { phase_type: "llm_emit", citation_policy: "draft" },
+}
+
+/** An emit phase that names the default emitter EXPLICITLY (all 79 live phases do). */
+const emitPhaseExplicit = {
+  slug: "emit",
+  phase_index: 0,
+  config: { phase_type: "llm_emit", citation_policy: "draft", emitter: "render_template" },
+}
+
+/** The bound shape — an emit phase whose definition ALREADY binds a library template, so
+ *  `template_asset_service` Branch 1 returns unconditionally and the run-time upload is
+ *  unreachable code. This is the fixture the non-duplication case below also uses. */
+const boundTemplateDef: DefShape = {
+  name: "Weekly status report",
+  phases: [emitPhaseNoEmitter],
+  assets: [{ kind: "template", asset_id: "workflows/_library/weekly-status.docx" }],
+}
+
+const ADMISSION_CASES: Array<[string, DefShape | null | undefined, TemplateAdmission]> = [
+  ["undefined — the wire did not say", undefined, "unknown"],
+  ["null — the wire did not say", null, "unknown"],
+  ["{} — no `phases` key at all", {}, "unknown"],
+  ["{ phases: null }", { phases: null }, "unknown"],
+  ["{ phases: <non-array> } — a server that sent the wrong shape", { phases: "nope" as never }, "unknown"],
+  ["{ phases: [] } — the unauthored stub, 110 of 145 published rows", { phases: [] }, "unknown"],
+  [
+    "one programmatic phase, no emit — a POSITIVE no",
+    { phases: [{ slug: "calc", phase_index: 0, config: { phase_type: "programmatic" } }] },
+    "does-not-admit",
+  ],
+  ["one llm_emit phase, NO `emitter` key, no assets", { phases: [emitPhaseNoEmitter] }, "admits"],
+  [
+    'one llm_emit phase with emitter: "render_template", no assets',
+    { phases: [emitPhaseExplicit] },
+    "admits",
+  ],
+  ["one llm_emit phase + a BOUND library template", boundTemplateDef, "does-not-admit"],
+  [
+    "one llm_emit phase + assets holding no template entry",
+    { phases: [emitPhaseNoEmitter], assets: [{ kind: "attachment", asset_id: "a.pdf" }] },
+    "admits",
+  ],
+  ["one llm_emit phase + assets: []", { phases: [emitPhaseNoEmitter], assets: [] }, "admits"],
+  [
+    "a mixed definition — programmatic + llm_emit, unbound",
+    {
+      phases: [
+        { slug: "calc", phase_index: 0, config: { phase_type: "programmatic" } },
+        { ...emitPhaseNoEmitter, phase_index: 1 },
+      ],
+    },
+    "admits",
+  ],
+]
+
+describe("soulData.templateAdmission — three states, never a boolean (D-21 / D-25)", () => {
+  it.each(ADMISSION_CASES)("%s → %s", (_label, input, expected) => {
+    expect(templateAdmission(input)).toBe(expected)
+  })
+
+  it("the table ENTERS all three states — a collapsed predicate cannot pass this", () => {
+    // The 192 CR-01 lesson, applied as a property rather than as care: two failure cases
+    // can both pin the correct branch without either ever entering the wrong one. Here the
+    // subject is the RETURN SET itself, so a predicate that merged `unknown` into
+    // `does-not-admit` fails even if every row's expectation above had been edited to agree.
+    const observed = new Set(ADMISSION_CASES.map(([, input]) => templateAdmission(input)))
+    expect([...observed].sort()).toEqual(["admits", "does-not-admit", "unknown"])
+    expect(observed.size).toBe(3)
+  })
+
+  it("answers a DIFFERENT question from soulDeliverable — why P1′ was rejected (D-21)", () => {
+    // On the bound fixture the two derivations DISAGREE, and that disagreement is the whole
+    // argument: `soulDeliverable(def).kind === "file"` is byte-for-byte the P1′ predicate and
+    // already drives the shipped *Makes a file* chip (library/libraryFilter.ts). If
+    // templateAdmission agreed with it on every shape, the new mark would be a second word
+    // for a fact this surface already states.
+    expect(soulDeliverable(boundTemplateDef).kind).toBe("file")
+    expect(templateAdmission(boundTemplateDef)).toBe("does-not-admit")
+  })
+
+  it("an empty `phases` is NOT the same answer as no emit phase (the D-20 arm)", () => {
+    // Stated on its own because it is the one distinction `soulDeliverable` deliberately
+    // does NOT make: it collapses both into { kind: "chat" }. Here they must differ, or the
+    // Run modal would strip WFIN-01 from 110 of 145 published rows.
+    expect(soulDeliverable({ phases: [] })).toEqual({ kind: "chat" })
+    expect(soulDeliverable({ phases: [{ config: { phase_type: "programmatic" } }] })).toEqual({
+      kind: "chat",
+    })
+    expect(templateAdmission({ phases: [] })).toBe("unknown")
+    expect(templateAdmission({ phases: [{ config: { phase_type: "programmatic" } }] })).toBe(
+      "does-not-admit",
+    )
   })
 })
 
