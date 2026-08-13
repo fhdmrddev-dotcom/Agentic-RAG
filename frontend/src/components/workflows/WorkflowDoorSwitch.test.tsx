@@ -5,7 +5,7 @@
  * These pin the locked two-door contract:
  *  - the "both" chooser renders BOTH door cards side by side.
  *  - the describe door shows the switch-to-govern strip + a WorkflowSoul preview,
- *    and the "‹ both doors" control returns to the chooser.
+ *    and the `both-doors` return control returns to the chooser.
  *  - GOVERN-DOOR DELEGATION (the G-5 ?raw source-grep, mirroring
  *    PhaseSpineGraph.test.tsx:153-159): the source IMPORTS and renders
  *    <WorkflowBuilderPage> and does NOT re-implement the advanced governance
@@ -19,6 +19,12 @@ import { render, screen, within, fireEvent, waitFor } from "@testing-library/rea
 // Read the component SOURCE via Vite's ?raw loader (the idiomatic vitest way — the
 // G-5 grep precedent at PhaseSpineGraph.test.tsx:16-19,153-159).
 import workflowDoorSwitchSource from "./WorkflowDoorSwitch?raw"
+// Phase 193-05 (D-24(a)): the SECOND swept source, and the module the needles are read OFF.
+// A namespace import is correct HERE and wrong in a component: the fence is about the WHOLE
+// table, so it must enumerate it rather than name 21 identifiers it would then have to keep
+// in step by hand.
+import doorHeaderStripSource from "./DoorHeaderStrip?raw"
+import * as doorVocabulary from "./doorVocabulary"
 
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
 // on mount (103-ux name maps) and owns the generate→draft flow. Mock the api seam so
@@ -87,7 +93,7 @@ describe("WorkflowDoorSwitch — the describe door (loose, D-05)", () => {
     render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
     fireEvent.click(screen.getByTestId("door-card-describe"))
     expect(screen.getByTestId("door-describe")).toBeInTheDocument()
-    // The one-click "switch to Author & govern ›" strip (D-05).
+    // The one-click `switch-strip` to the strict door (D-05).
     expect(screen.getByTestId("switch-strip")).toBeInTheDocument()
     expect(screen.getByTestId("switch-to-govern")).toHaveTextContent(/author & govern/i)
     // The soul PREVIEW of the current draft/definition.
@@ -97,7 +103,7 @@ describe("WorkflowDoorSwitch — the describe door (loose, D-05)", () => {
     expect(screen.getByTestId("describe-box")).toBeInTheDocument()
   })
 
-  it("the persistent '‹ both doors' control returns the describe door to the chooser", () => {
+  it("the persistent `both-doors` return control brings the describe door back to the chooser", () => {
     render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
     fireEvent.click(screen.getByTestId("door-card-describe"))
     expect(screen.getByTestId("door-describe")).toBeInTheDocument()
@@ -153,7 +159,7 @@ describe("WorkflowDoorSwitch — the describe door (loose, D-05)", () => {
     })
     fireEvent.click(screen.getByTestId("switch-to-govern"))
     expect(screen.getByTestId("door-govern")).toBeInTheDocument()
-    // Choosing "Author & govern" is the configure-first path — no premature generate.
+    // Choosing the strict door is the configure-first path — no premature generate.
     expect(mockGenerateWorkflow).not.toHaveBeenCalled()
   })
 
@@ -415,4 +421,108 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
     expect('import { listFolders } from "@/lib/api"').toMatch(/from ["']@\/lib\/api["']/)
     expect('const f = await listFolders()').toMatch(/listFolders/)
   })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 193-05 Task 3 (AUTH-01 · D-24(a) · T-193-17 / T-193-18) — THE COPY FENCE:
+// NO GOVERNED DOOR WORD MAY SURVIVE AS A LITERAL OUTSIDE `doorVocabulary.ts`.
+//
+// APPENDED, never interleaved. Not one assertion above this line moves.
+//
+// ⚠ THIS FENCE SPELLS ZERO DOOR LITERALS, AND THAT IS THE WHOLE TRICK. A fence that must
+// name 21 forbidden strings, written the obvious way, READS ITSELF and reds — the 187-24
+// trap in its inverted form, met three times in this project already. So the needles are
+// READ OFF THE MODULE AT RUNTIME (`runVocabulary.test.ts:110-118`'s idiom): nothing below
+// is re-typed, the list re-derives itself when `193-08` swaps in column D, and a 22nd id is
+// swept the moment it is exported.
+//
+// ⚠ IT SWEEPS THE **COMPONENTS**, NEVER A TEST FILE. `doorVocabulary.test.ts` legitimately
+// spells values — that is its falsification property — so a sweep that reached it would be
+// forbidding the one file allowed to speak. The exclusion is asserted, not merely intended
+// (`librarySubtree.fences.test.ts:186-188`).
+//
+// ⚠ BOTH SPELLINGS, because the two homes disagree by construction: JSX writes
+// `&amp;` where a TypeScript string writes `&`. A sweep for the plain form alone would miss
+// a re-typed literal in JSX — which is precisely the shape a future edit would take.
+//
+// ⚠ AND IT IS A **RAW** SWEEP, PROSE INCLUDED, ON PURPOSE. The alternative was the AST form
+// (`librarySubtree.fences.test.ts` F1, which parses so comments are excluded by
+// construction). It was measured and rejected: a docblock quoting a governed word is ALSO a
+// second home for it — it will read FALSE the moment `193-08` lands column D — so catching
+// prose is the fence working, not the fence misfiring. Both components were cleaned of such
+// quotes in the 193-05 rewire (they now name words by IDENTIFIER), which is what makes the
+// raw form achievable at zero hits. If a future author needs to discuss a door word in a
+// comment there, the answer is to name its identifier, never to weaken this sweep.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/** The two component sources this fence is about. Paths are labels for the failure message. */
+const SWEPT_SOURCES: { path: string; source: string }[] = [
+  { path: "./WorkflowDoorSwitch.tsx", source: workflowDoorSwitchSource },
+  { path: "./DoorHeaderStrip.tsx", source: doorHeaderStripSource },
+]
+
+/**
+ * Every governed word in BOTH spellings, derived from the module. `escaped` is omitted when
+ * it is identical to `plain` (no ampersand in that value), so the needle count is honest
+ * rather than padded.
+ */
+const NEEDLES: { id: string; spelling: "plain" | "escaped"; text: string }[] = Object.entries(
+  doorVocabulary,
+).flatMap(([id, value]) => {
+  const plain = value as string
+  const escaped = plain.replace(/&/g, "&amp;")
+  const rows: { id: string; spelling: "plain" | "escaped"; text: string }[] = [
+    { id, spelling: "plain", text: plain },
+  ]
+  if (escaped !== plain) rows.push({ id, spelling: "escaped", text: escaped })
+  return rows
+})
+
+/** Which needles a source carries, labelled so a failure NAMES the string it found. */
+const hitsIn = (source: string): string[] =>
+  NEEDLES.filter((n) => source.includes(n.text)).map((n) => `${n.id}/${n.spelling}`)
+
+describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 E-2 lesson)", () => {
+  it("both swept sources really loaded, and every needle is a real non-empty string", () => {
+    // NON-VACUITY FIRST, BEFORE ANY NEGATIVE. A `?raw` import of a moved or renamed module
+    // yields the EMPTY STRING in some resolvers rather than throwing, and `"".includes(x)` is
+    // false for every x — so the whole fence would pass green while defending nothing. This
+    // is the exact defect `/gsd:secure-phase 192.1` found: a fence swept against the empty
+    // string, with the property holding and NOTHING guarding it.
+    expect(SWEPT_SOURCES).toHaveLength(2)
+    for (const { path, source } of SWEPT_SOURCES) {
+      expect(source.length, `${path} did not load`).toBeGreaterThan(1000)
+    }
+    // …and the needle list covers every governed id, so a partially-populated namespace
+    // cannot shrink the sweep silently.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(21)
+    for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
+    // …and the SECOND spelling is not a no-op: at least one id really differs between the
+    // two, which is the only thing that makes sweeping twice worth the line.
+    expect(NEEDLES.filter((n) => n.spelling === "escaped").length).toBeGreaterThan(0)
+  })
+
+  it("sweeps NO test file — the one home allowed to spell these values is left alone", () => {
+    expect(SWEPT_SOURCES.filter((f) => /\.test\.tsx?$/.test(f.path))).toEqual([])
+  })
+
+  it("POSITIVE CONTROL — a planted literal IS caught, in both spellings", () => {
+    // A synthetic source, built from the module so this file still spells nothing. Without
+    // this, a broken `hitsIn` reads exactly like a fence that holds.
+    const plain = NEEDLES.find((n) => n.spelling === "plain")!
+    const escaped = NEEDLES.find((n) => n.spelling === "escaped")!
+    expect(hitsIn(`const x = <span>${plain.text}</span>`)).toContain(`${plain.id}/plain`)
+    expect(hitsIn(`const x = <span>${escaped.text}</span>`)).toContain(`${escaped.id}/escaped`)
+    // …and a source with none of them is clean, so the detector is not simply always-true.
+    expect(hitsIn("const x = <span>{SOME_IDENTIFIER}</span>")).toEqual([])
+  })
+})
+
+describe("D-24(a) — no governed door word survives as a literal in either component", () => {
+  it.each(SWEPT_SOURCES.map((f) => [f.path, f.source] as const))(
+    "%s carries none of the 21 governed words, in either spelling",
+    (_path, source) => {
+      expect(hitsIn(source)).toEqual([])
+    },
+  )
 })

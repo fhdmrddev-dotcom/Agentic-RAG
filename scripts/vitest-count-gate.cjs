@@ -275,7 +275,29 @@ const BASELINE = {
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
   // KEY is absent from the request the client actually sends). Both observed RED with
   // the picker's single `onChange("")` severed.
-  "WorkflowDoorSwitch.test.tsx": 23,
+  // 193-05 (D-24(a) / T-193-17 / T-193-18): 23 → 28, an EXTENSION and never a rewrite — the
+  // five are the copy fence and its controls. Three are SCOPE (both `?raw` sources really
+  // loaded at > 1000 chars, all 21 ids present in the needle list, the escaped spelling is
+  // not a no-op; the swept list contains no test file; a planted literal IS caught in both
+  // spellings) and two are the sweep itself, one per swept component. The 28 is read from
+  // THIS SCRIPT'S OWN `actual` column, never hand-counted.
+  //
+  // Without this raise the fence would ship UNGUARDED: a later edit deleting all five cases
+  // would leave `actual` back at 23 and the gate green, which is precisely the shape 193-03
+  // records as "an unpinned covering suite is an unguarded one".
+  "WorkflowDoorSwitch.test.tsx": 28,
+  // 193-05 (AUTH-01 / D-10 / D-11) — a NEW FILE, pinned in the SAME COMMIT that creates it,
+  // for the same reason as the 193-01 entry below: a `BASELINE` key naming a path that does
+  // not yet exist makes this gate ERROR (exit 2) rather than fail. No `TARGETS` edit
+  // accompanies it and that is MEASURED, not assumed — `src/components/workflows` is already
+  // a directory entry, so the gate printed `doorVocabulary.test.ts — 9 new` before this line
+  // was written. TARGETS decides what RUNS, BASELINE what is GUARDED.
+  //
+  // What would be unguarded without it: the whole-table properties of the 21 governed door
+  // words — the count, non-emptiness, pairwise distinctness against a DECLARED exception set,
+  // the zero-import leaf claim that makes `DoorHeaderStrip`'s import cycle-safe, and the
+  // demonstration that containment assertions on this table are vacuous by construction.
+  "doorVocabulary.test.ts": 9,
   // 193-01 (D-08 / AUTH-01) — a NEW FILE, pinned in the SAME COMMIT that creates it, which is
   // the only commit it CAN be pinned in: a `BASELINE` entry naming a path that does not yet
   // exist makes this gate ERROR (exit 2) rather than fail.
