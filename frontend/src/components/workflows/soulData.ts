@@ -247,6 +247,15 @@ export function templateAdmission(def: DefShape | null | undefined): TemplateAdm
   // (2) An empty `phases` is a stub nobody authored — 110 of 145 published rows. NOT a
   //     positive no: D-20 keeps the Run modal's control on exactly this shape.
   if (def.phases.length === 0) return "unknown"
+  // (2b) ⚠ 193 REVIEW WR-05 — A PHASE LIST THAT DECLARES NO `config` AT ALL DESCRIBES NOTHING
+  //      ABOUT PHASE TYPE, so it must read the same way (2) does. `config` is OPTIONAL in
+  //      `DefShape`, and before this arm existed a shape like
+  //      `{ phases: [{ slug: "a", phase_index: 0 }] }` fell through to (3), where
+  //      `undefined !== "llm_emit"` made `fills` false and produced a POSITIVE
+  //      `does-not-admit` — the answer that HIDES the control. That inverts D-20: hide only on
+  //      a positive no, never on a silence. The wire saying "there are phases" while saying
+  //      nothing about any of them is a silence, not a no.
+  if (def.phases.every((p) => p?.config?.phase_type === undefined)) return "unknown"
   // (3) No emit phase → a positive no. ⚠ An `llm_emit` phase with NO `emitter` key COUNTS
   //     as `render_template` — that is the Pydantic default (`models/harness.py`), and the
   //     shipped RunModal fixtures omit the key. Guarding on `emitter` rather than on

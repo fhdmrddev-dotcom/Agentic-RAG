@@ -443,7 +443,19 @@ describe("Builder header, canvas flag ON — ONE row (D-184.1-01)", () => {
     expect(bar).toHaveTextContent("Edit · Vendor brief v1")
     expect(bar).toHaveTextContent("vendor-brief")
     expect(bar).toHaveTextContent("draft")
-    expect(bar).toHaveTextContent(STRIP_LABEL_GOVERN)
+    // ⚠ 193 REVIEW WR-06 — COMPARED WHOLE, NOT CONTAINED. This read
+    // `expect(bar).toHaveTextContent(STRIP_LABEL_GOVERN)`, and `toHaveTextContent(string)` is a
+    // SUBSTRING match. `doorVocabulary.ts` singles out this exact string: `STRIP_LABEL_GOVERN`
+    // IS `DOOR_B_NAME` and is a strict PREFIX of `SWITCH_CTA`, so a containment check on it is
+    // true of all three and "cannot identify a row at all". It passed only because this bar
+    // happens to host neither of the other two — i.e. it was correct by accident, and would
+    // have gone on passing if a door-B card or the switch CTA ever rendered into the bar. Its
+    // sibling at `:260` was strengthened to `.toBe(STRIP_BACK)` in the same commit; this one
+    // was missed. Now it finds the label's OWN node and compares the whole textContent.
+    const governLabel = Array.from(bar.querySelectorAll("span")).find(
+      (n) => n.textContent === STRIP_LABEL_GOVERN,
+    )
+    expect(governLabel, "the merged row no longer carries the govern-door label").toBeDefined()
     expect(bar.contains(screen.getByTestId("net-new-flag"))).toBe(true)
     expect(bar.contains(screen.getByTestId("judge-locked"))).toBe(true)
     expect(bar.contains(screen.getByTestId("builder-save-state"))).toBe(true)

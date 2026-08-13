@@ -434,6 +434,29 @@ the D-27 rule Phase 192's own re-drive broke and 192.1 restored.
 
 fs.writeFileSync(path.join(HERE, "BUILD-CONTRACT.generated.md"), md, "utf8")
 
+// ⚠ 193 REVIEW WR-08 — THE SAME CONTRACT, ALSO EMITTED INSIDE THE FRONTEND PACKAGE.
+//
+// `doorVocabulary.test.ts` treats this contract as its acceptance bar and re-derives column D
+// from it rather than trusting a hand-port. It used to reach the copy above with a
+// `../../../../.planning/...?raw` import — OUT of `frontend/` and into a GSD planning artifact.
+// Two things break that: `/gsd:complete-milestone` archives `.planning/`, and Vite's
+// `server.fs.allow` root would reject the path under any config that does not happen to permit
+// it. Either way three cases red and the count gate fails for a reason unrelated to any code
+// change.
+//
+// Writing BOTH copies from the SAME `md` string is what keeps the guarantee: they cannot drift,
+// because there is one source and one generation step. The suite now imports the in-package
+// copy, so the acceptance bar still cannot be quietly re-typed, and archiving `.planning/`
+// cannot break the frontend suite.
+const FRONTEND_CONTRACT = path.join(
+  HERE,
+  "..", "..", "..",
+  "frontend", "src", "components", "workflows", "__contracts__",
+  "doors-copy.generated.md",
+)
+fs.mkdirSync(path.dirname(FRONTEND_CONTRACT), { recursive: true })
+fs.writeFileSync(FRONTEND_CONTRACT, md, "utf8")
+
 const misses = Object.entries(applyLog).flatMap(([k, log]) =>
   log.filter((l) => !l.ok).map((l) => `${k}:${l.id}`),
 )

@@ -57,7 +57,18 @@ import * as doorVocabulary from "./doorVocabulary"
 import doorVocabularySource from "./doorVocabulary?raw"
 // The GENERATED acceptance bar itself, read as text so the suite can re-derive column D
 // instead of trusting that someone ported it correctly (rule 3, D-02).
-import buildContractSource from "../../../../.planning/sketches/164-telling-the-doors-apart/BUILD-CONTRACT.generated.md?raw"
+//
+// ⚠ 193 REVIEW WR-08 — THIS IMPORT USED TO REACH OUT OF THE PACKAGE, at
+// `../../../../.planning/sketches/164-telling-the-doors-apart/BUILD-CONTRACT.generated.md?raw`.
+// That made a frontend suite depend on a GSD planning artifact: `/gsd:complete-milestone`
+// archives `.planning/`, and Vite's `server.fs.allow` root would reject the path under any
+// config that does not happen to permit it — either way three cases red and the count gate
+// fails for a reason unrelated to any code change.
+//
+// `build.cjs` now writes BOTH copies from the SAME string in one generation step, so the
+// in-package copy below cannot drift from the sketch's own — the acceptance bar is still
+// generated, still un-retypeable, and no longer hostage to where `.planning/` lives.
+import buildContractSource from "./__contracts__/doors-copy.generated.md?raw"
 
 /**
  * Every governed word the module owns, DERIVED from the module itself rather than

@@ -324,6 +324,34 @@ const ADMISSION_CASES: Array<[string, DefShape | null | undefined, TemplateAdmis
   ["{ phases: null }", { phases: null }, "unknown"],
   ["{ phases: <non-array> } — a server that sent the wrong shape", { phases: "nope" as never }, "unknown"],
   ["{ phases: [] } — the unauthored stub, 110 of 145 published rows", { phases: [] }, "unknown"],
+  // ⚠ 193 REVIEW WR-05. `config` is OPTIONAL in `DefShape`, so this shape is reachable, and
+  // before the (2b) arm it fell through to (3) and produced a POSITIVE `does-not-admit` — the
+  // answer that HIDES the Run modal's control. A phase list that says nothing about any phase
+  // type is a SILENCE, and D-20 hides only on a positive no. The count gate's own comment
+  // claimed this case existed while it did not, so the arm was documented as guarded and was
+  // not; that claim is now earned.
+  [
+    "{ phases: [{ … }] } with NO `config` key — says nothing about phase type (WR-05)",
+    { phases: [{ slug: "a", phase_index: 0 }] },
+    "unknown",
+  ],
+  [
+    "one phase WITH `config` but no `phase_type` — the same silence, one level down",
+    { phases: [{ slug: "a", phase_index: 0, config: {} }] },
+    "unknown",
+  ],
+  // ⚠ 193 REVIEW WR-07 — THE DOMINANT LIVE SHAPE, and nothing pinned it until now.
+  // `definition` is a jsonb STRING SCALAR on 194 of 223 rows (`CLAUDE.md` § jsonb string-scalar
+  // trap) and `libraryFilter`'s `defOf` casts it through UNPARSED, so `def` is very often a
+  // `string` here. It answers correctly today only by luck of ordering — a string is truthy,
+  // `("…").phases` is `undefined`, `Array.isArray` is false — so step (1) catches it. A future
+  // "tidy" of step (1) (`def?.phases ?? []`, or an added `JSON.parse`) could move the shape the
+  // MAJORITY of the live library carries into a different arm with this suite green.
+  [
+    "a jsonb STRING SCALAR — the shape 194 of 223 live rows carry (WR-07)",
+    '{"phases":[{"config":{"phase_type":"llm_emit"}}]}' as unknown as DefShape,
+    "unknown",
+  ],
   [
     "one programmatic phase, no emit — a POSITIVE no",
     { phases: [{ slug: "calc", phase_index: 0, config: { phase_type: "programmatic" } }] },

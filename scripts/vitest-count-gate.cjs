@@ -295,7 +295,13 @@ const BASELINE = {
   // express D-20. At the old pin of 17 every one of them was deletable with the gate green.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`soulData.test.ts 17 33 +16`), never hand-counted.
-  "soulData.test.ts": 33,
+  // 193 REVIEW WR-05 / WR-07 (2026-08-14): 33 → 36, read from THIS SCRIPT'S OWN `actual`
+  // column (`soulData.test.ts 33 36 +3`). Three `ADMISSION_CASES` rows the review found
+  // missing: two `config`-silent shapes (the WR-05 arm, DRIVEN RED against a disabled `(2b)` —
+  // both reported `expected 'does-not-admit' to be 'unknown'` — with the source restored
+  // md5-identical), and the jsonb STRING SCALAR that 194 of 223 live rows actually carry,
+  // which nothing pinned before despite being the dominant shape (WR-07).
+  "soulData.test.ts": 36,
   // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
   // KEY is absent from the request the client actually sends). Both observed RED with

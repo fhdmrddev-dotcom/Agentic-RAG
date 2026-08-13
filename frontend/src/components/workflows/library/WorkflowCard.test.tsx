@@ -1226,6 +1226,15 @@ describe("SC#1 — at 100+ rows with 14 duplicated names, a colliding row can be
     // render no mark at all. The allowance is computed from the same predicate the card calls,
     // so a mark on a row that does not admit still reds here.
     const lines = allLines()
+    // ⚠ 193 REVIEW IN-03 — PIN THE PAIRING BEFORE TRUSTING THE INDEX. The per-row cap below is
+    // only meaningful if `lines[index]` really is `SCALE_ROWS[index]`'s line. That holds because
+    // `renderLibrary` maps in order, but nothing asserted it — and a mis-pairing here would be
+    // SILENTLY WRONG (a `does-not-admit` row scored against an `admits` row's cap of 6) rather
+    // than throwing, which is the one shape this file's other assertions do not have.
+    expect(lines).toHaveLength(SCALE_ROWS.length)
+    // …and a non-vacuity guard, so the raise from 5 to 6 is not a no-op on a corpus where
+    // nothing admits: if no row admits, every cap is 5 and the `admits` branch never runs.
+    expect(SCALE_ROWS.some((r) => templateAdmission(r.def) === "admits")).toBe(true)
     SCALE_ROWS.forEach((row, index) => {
       const cap = templateAdmission(row.def) === "admits" ? 6 : 5
       expect(identityParts(lines[index]).length).toBeLessThanOrEqual(cap)

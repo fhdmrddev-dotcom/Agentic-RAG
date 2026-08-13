@@ -301,7 +301,15 @@ describe("DoorHeaderStrip 193-03 — the extracted module cannot import back (D-
     // checkable without listing every file.
     const COMPONENT_SIBLING = /from\s+["']@\/components\/workflows\/[A-Z]/
     const REACT_IMPORT = /from\s+["']react["']/
-    const ANY_IMPORT = /^\s*import\s/gm
+    // ⚠ 193 REVIEW IN-02 — TWO CONSTANTS, ON PURPOSE. A single `/gm` regex used for BOTH
+    // `toMatch` (which calls `regexp.test()` and ADVANCES `lastIndex`) and `String.match()`
+    // makes the count below order-dependent: it is correct today only because `.match()` with
+    // `/g` happens to reset `lastIndex`, so adding one more `toMatch(ANY_IMPORT)` anywhere
+    // above `:338` would silently change the count. The sibling suite
+    // (`doorVocabulary.test.ts:440`) already declares its matcher without `/g` for exactly
+    // this reason. `/g` belongs only on the one used for counting.
+    const ANY_IMPORT = /^\s*import\s/m
+    const ANY_IMPORT_G = /^\s*import\s/gm
     const IMPORT_SPECIFIER = /^\s*import\s[^\n]*?from\s+["']([^"']+)["']/gm
     const specifiersOf = (s: string) => [...s.matchAll(IMPORT_SPECIFIER)].map((m) => m[1])
     // POSITIVE CONTROLS first.
@@ -335,7 +343,7 @@ describe("DoorHeaderStrip 193-03 — the extracted module cannot import back (D-
     expect(specifiersOf(doorHeaderStripSource)).toEqual(["@/components/workflows/doorVocabulary"])
     // …and EVERY import line yielded a specifier, so a bare side-effect import (which carries
     // no `from` clause at all) cannot hide behind the equality above.
-    expect(doorHeaderStripSource.match(ANY_IMPORT) ?? []).toHaveLength(1)
+    expect(doorHeaderStripSource.match(ANY_IMPORT_G) ?? []).toHaveLength(1)
 
     // NON-VACUITY, anchored on what the file DOES declare — the component the negatives above
     // are supposed to be describing.
