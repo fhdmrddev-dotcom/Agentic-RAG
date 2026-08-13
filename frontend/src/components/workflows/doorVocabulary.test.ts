@@ -68,6 +68,15 @@ import doorVocabularySource from "./doorVocabulary?raw"
 // `build.cjs` now writes BOTH copies from the SAME string in one generation step, so the
 // in-package copy below cannot drift from the sketch's own — the acceptance bar is still
 // generated, still un-retypeable, and no longer hostage to where `.planning/` lives.
+//
+// ⚠ RESIDUAL, NAMED RATHER THAN CLAIMED FIXED (193 security audit UF-1). This import is now
+// durable; the GENERATOR is not. `build.cjs` still lives under `.planning/sketches/`, which
+// `/gsd:complete-milestone` archives. When that happens the contract below keeps BINDING — the
+// suite still fails if anyone re-types column D — but it can no longer be REGENERATED, so the
+// threat-model check that proves the two copies agree (T-193-13, "re-run the build and assert an
+// empty diff") becomes unrunnable. **Re-open trigger: the first milestone close that archives
+// `.planning/sketches/164-telling-the-doors-apart/`.** The fix at that point is to move
+// `build.cjs` beside its output, not to weaken this import.
 import buildContractSource from "./__contracts__/doors-copy.generated.md?raw"
 
 /**
