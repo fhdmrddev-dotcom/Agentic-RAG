@@ -407,6 +407,31 @@ import COLUMN_D_GENERATED from "./__contracts__/doors-copy.generated.json"
 If that is out of scope now, at minimum record the coupling in the suite's docblock with a
 re-open trigger naming milestone close.
 
+## Resolution status (updated 2026-08-14, after the fix pass)
+
+| Finding | State | Commit / owner |
+|---|---|---|
+| **WR-01** the copy fence missed the file that caused the gap | ✅ **FIXED and PROVED TO FIRE** — driven RED against a planted `DESCRIBE_CTA` literal (`expected [ 'DESCRIBE_CTA/plain' ] to deeply equal []`), plant restored md5-identical | `3f31e8cc` |
+| **WR-02** third re-capture, undocumented + a now-false bullet | ✅ **FIXED** (prose) | `bec117d0` |
+| **WR-03** docblock forbids the change below it | ✅ **FIXED** (prose) | `bec117d0` |
+| **WR-05** count-gate claims a case that does not exist | ◐ **comment FIXED**; ⚠ **code arm OPEN** — a `config`-less phase list still returns a positive `does-not-admit` where D-20 argues for `unknown`. Behaviour change, not prose. | `bec117d0` / open |
+| **WR-07** `unknown` rows mis-attributed to `phases: []` | ◐ **docblocks FIXED** in `soulData.ts` and `RunModal.tsx`; ⚠ **test case OPEN** — nothing pins the jsonb string-scalar shape, the dominant live shape | `bec117d0` / open |
+| **IN-01** declaration-order claim contradicted by line numbers | ✅ **FIXED** (prose) | `bec117d0` |
+| **WR-04** variant D on an unaudited third surface | ⏸ **OPERATOR RULING OWED** — door B's card says *you decide every setting*; its first screen now reads *the AI writes the steps*. Pre-existed in weaker form; the fast-fix made both surfaces agree without anyone ruling that they should. Pairs with UAT U1/U2. | open |
+| **WR-06** containment assertion on a string declared unusable for containment | ⏸ **OPEN** — passes today only because the merged bar hosts none of the other two | open |
+| **WR-08** test imports a `.planning/` sketch artifact across the package boundary | ⏸ **OPEN** — breaks when `/gsd:complete-milestone` archives `.planning/` | open |
+| **IN-02** stateful `/g` regex used with both `toMatch` and `.match()` | ⏸ **OPEN** | open |
+| **IN-03** scale-cap loop pairs rows to lines by index without pinning lengths | ⏸ **OPEN** | open |
+
+**Verification of the fix pass:** `tsc -p tsconfig.app.json` **33** (baseline, unmoved) · count gate
+**exit 0 · total 3558 · failed 0 · 67/67 pinned** — byte-identical to the pre-edit run for the five
+prose commits, so not one test moved.
+
+⚠ **Nothing was silently folded in.** The three findings with a code half (WR-05, WR-06, WR-07) had
+only their prose corrected; each open half is named above rather than closed by association.
+
+---
+
 ## Info
 
 ### IN-01: `CARD_TEMPLATE_MARK`'s docblock misstates its own declaration order
