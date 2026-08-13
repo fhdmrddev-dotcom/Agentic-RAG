@@ -39,7 +39,7 @@ still the source of truth and could still describe something unbuildable.
 
 | Step | Artifact | What it guarantees |
 |---|---|---|
-| 1 | `emit.test.tsx.src` renders the **real** `WorkflowDoorSwitch` + **real** `library/RunModal` under jsdom | `dom.generated.json` is the actual shipped DOM, not a redraw |
+| 1 | `emit.test.tsx.src` renders the **real** `WorkflowDoorSwitch` (chooser · describe door · **govern door**) + **real** `library/RunModal` under jsdom — **four** dumps since 2026-08-13, not three | `dom.generated.json` is the actual shipped DOM, not a redraw. A string no dump holds cannot be governed by the contract, which is exactly how `strip.labelGovern` went missing — see the dated section at the end. |
 | 2 | `build.cjs` applies the **COPY table** to that DOM | variants differ in *text nodes only* — layout drift is impossible |
 | 3 | the project's own `tailwind.config.js` builds the CSS over the generated HTML | the theme tokens are the app's Deep Midnight values, not an approximation |
 | 4 | `build.cjs` emits `BUILD-CONTRACT.generated.md` from the same COPY table | the contract cannot go stale by being forgotten |
