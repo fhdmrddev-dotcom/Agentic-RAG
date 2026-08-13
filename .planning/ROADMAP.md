@@ -294,7 +294,25 @@ never approached after Wave 1.
   2. The number of perceived choices does not increase (the 187 template-door lesson — seed the existing path, do not add a third).
   3. A user with a template to fill can find where to supply it.
 
-**Plans**: TBD — `/gsd:plan-phase 193`
+**Plans**: 11 plans in 7 waves
+
+Plans:
+- [ ] 193-01-PLAN.md — D-08 wave 0: six whole-`innerHTML` captures of the UNMOVED doors + the launch-error case that must survive D-17, in commits touching no source file
+- [ ] 193-02-PLAN.md — `templateAdmission()` in `soulData.ts` (D-21/D-25, three-state, bound-asset arm) + the two AUTH-03 strings in `libraryVocabulary.ts`
+- [ ] 193-03-PLAN.md — **the G-5 extraction**: `doorGroup` → `DoorHeaderStrip.tsx`, verbatim, with the D-24(b) ESM-cycle fence (D-05/D-06/D-08)
+- [ ] 193-04-PLAN.md — D-23 through the generator: the govern door captured, `strip.labelGovern` added to `build.cjs`, the contract regenerated to 21 rows
+- [ ] 193-05-PLAN.md — all 21 governed strings → `doorVocabulary.ts` at their SHIPPED values, plus the D-24(a) copy fence (D-10/D-11/D-12)
+- [ ] 193-06-PLAN.md — the card mark `· needs a template` at index 0 of `identityParts`, three-arm silence (D-13/D-14/D-15)
+- [ ] 193-07-PLAN.md — the Run modal: `Template to fill`, the render condition cut AROUND `run-upload-error`, the D-19 sentence untouched (D-17/D-18/D-20)
+- [ ] 193-08-PLAN.md — **variant D ships** (D-01/D-02/D-23): column D ported, codepoints pinned, four consumer suites re-captured (1 of 2)
+- [ ] 193-09-PLAN.md — the D-04/D-22 restack on both bands, asserted by child order; re-capture 2 of 2
+- [ ] 193-10-PLAN.md — the pin sweep, the `WorkflowDoorSwitch.tsx` hot-file ledger row G-5 never had (D-07/D-09), and `193-UAT.md`
+- [ ] 193-11-PLAN.md — the operator drives the eight G-4 rows; every fail dated, sized and routed
+
+⚠ **Wave parallelism is capped at two, and the reason is measured rather than stylistic.**
+`GSD_VITEST_MAX_WORKERS=4` is calibrated for TWO concurrent vitest runs; at three, `192-05` measured
+the count gate flipping `failed 6 → 0 → 1 → 3` on a single commit. Waves 5-7 carry one plan each
+because `DoorHeaderStrip.tsx` and `doorVocabulary.ts` are the files nearly every later step touches.
 
 #### Phase 194: Stop a Running Workflow
 
