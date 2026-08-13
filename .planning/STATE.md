@@ -34,8 +34,40 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
 **Phase:** **193 Authoring Doors + Template Placement — EXECUTED 2026-08-14, NOT YET COMPLETE**
 **Plan:** **10 of 11 plans have a SUMMARY.** `193-11` (the operator UAT checkpoint) is PART-DONE: its Task 1 and Task 3 are written, its Task 2 is 6 of 8 rows.
-**Status:** ⏸ **Blocked on human evidence, not on code.** Every automated gate is green — `tsc -p tsconfig.app.json` **33 (baseline, unmoved)** and the count gate **exit 0 · total 3557 · failed 0 · 67/67 pinned** — but **only 1 of the 3 ROADMAP success criteria is verified.**
-**NEXT = drive UAT rows U1 then U2** with a person who has not used the Builder (`193-UAT.md`). Then `/gsd:code-review 193` → `/gsd:verify-work 193` → `/gsd:secure-phase 193`.
+**Status:** ⏸ **ALL GATES RUN AND GREEN — blocked on human evidence, not on code.** `tsc -p tsconfig.app.json` **33 (baseline, unmoved all phase)** · count gate **exit 0 · total 3561 · failed 0 · 67/67 pinned** · code review **11 findings, ALL resolved** (10 fixed, 1 ruled+seeded) · security audit **50/51 closed, 0 code threats open** · verification **`human_needed`, 1/3**.
+**NEXT = drive UAT row U1, then U2**, with a person who has not used the Builder (`193-UAT.md`). Nothing else is owed by the code.
+
+**⚠ THE PHASE IS DELIBERATELY NOT MARKED COMPLETE.** `phase.complete` was NOT called. Marking it
+would write `[x]` against a phase whose headline claim — *the two doors are tellable apart* — has
+no evidence, and this project's STATE.md has been corrupted five times by verbs that wrote
+optimistic records. **1 of 3 success criteria verified is the honest number.**
+
+### Phase 193 — the four gates, run 2026-08-14 (all after execution, none skipped)
+
+| Gate | Verdict |
+|---|---|
+| **Code review** (`193-REVIEW.md`) | 0 Critical / 8 Warning / 3 Info — **all 11 resolved**: 10 fixed in code, WR-04 ruled ACCEPT+SEED. Scoped from `git diff`, NOT from SUMMARY `key_files` — the default would have missed `WorkflowBuilderPage.tsx`, the least-reviewed file in the phase. |
+| **Security** (`193-SECURITY.md`) | **50/51 closed, 0 code threats open.** The provenance claim was RE-TRACED TO CODE (`workspace.py:281` → `template_asset_service.py:197` → `tool_dispatcher.py:3320` → `template_render_service.py:947-951`, `assert engine != "docxtpl"`) rather than string-matched. T-193-48 was a blank-field gap, closed by marking U1/U2 ⛔ per the UAT file's own rule. |
+| **Verification** (`193-VERIFICATION.md`) | **`human_needed`, 1/3.** Reached independently rather than by trusting this file. |
+| **G-7** | **CLEAR** — `plans: 11 total · 0 gap-closure`, exit 0. Zero fails to route; no round opened. |
+
+**⚠ THE MOST IMPORTANT SINGLE FINDING — `SEED-156`, measured not impressionistic.** Comparing this
+phase's own committed captures node by node, **`GOVERN_STANDALONE` shares 11 of its 14 text nodes
+with `DESCRIBE_STANDALONE`**: below the header strip the two authoring doors open onto **the same
+screen**. Someone who picks *"you decide every setting"* is shown a box asking them to describe the
+goal, under *"the AI writes the steps, sets how strict it is"* — door A's promise, on door B.
+**It was NOT caused by the phase's fast-fix** — before it the same two screens read
+`Draft the workflow`/`drafts the phases` against `Write the first draft`/`writes the steps`:
+synonymous words on an identical screen. The fix removed the cosmetic difference and made the
+duplication legible. **No copy was authored in response**, because G-2 requires a sketch and
+sketch 164 draws no mockup of either pre-draft screen; the instrument that settles it is U1/U2.
+
+**Review findings worth carrying forward:** WR-01 — the D-24(a) copy fence swept two files while
+`WorkflowBuilderPage.tsx` had become a third consumer, so **the exact regression the phase closed
+could have recurred with every gate green**; fixed and DRIVEN RED. WR-05 — `templateAdmission`
+returned a POSITIVE `does-not-admit` for a `config`-silent phase list, inverting D-20; fixed and
+driven RED. WR-07 — nothing pinned the jsonb string scalar, **the shape 194 of 223 live rows
+carry**; now pinned.
 
 ### ⚠ Phase 193 — why it is NOT complete, stated so a later reader cannot mistake green gates for a delivered phase
 
