@@ -28,11 +28,13 @@
  * the point of pinning the count now, so the restack has to state its change rather than
  * absorb it.
  *
- * ⚠ NO `doorVocabulary` LEG IS SWEPT HERE, DELIBERATELY. That module does not exist yet
- * (`193-05` adds it), and `import.meta.glob` contributes the EMPTY STRING for an absent path
- * and never throws — the 192.1 E-2 finding, where a fence swept against the empty string passed
- * green while defending nothing. A fence is added when its subject exists, with its own
- * non-vacuity guard.
+ * ⚠ THE `doorVocabulary` LEG NOW EXISTS — IN THAT MODULE'S OWN SUITE, NOT HERE. 193-03 left
+ * it out because the module did not exist, and `import.meta.glob` contributes the EMPTY STRING
+ * for an absent path without ever throwing — the 192.1 E-2 finding, where a fence swept against
+ * the empty string passed green while defending nothing. `193-05` added the leg as the
+ * strictly STRONGER claim: `doorVocabulary.test.ts` asserts that module imports NOTHING AT
+ * ALL, with its own non-vacuity guard. This suite's leaf case below was narrowed in the same
+ * wave — see the ⚠ note inside it.
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
@@ -200,26 +202,50 @@ describe("DoorHeaderStrip 193-03 — the extracted module cannot import back (D-
     expect(doorHeaderStripSource).not.toMatch(DYNAMIC_IMPORT_DOORS)
   })
 
-  it("DoorHeaderStrip is a LEAF — it imports nothing at all, component sibling or otherwise", () => {
+  it("DoorHeaderStrip imports EXACTLY ONE module — the zero-import vocabulary leaf (D-10)", () => {
     // The house naming rule in this directory is the mechanism: a PascalCase sibling is a
     // component module, a camelCase one is a plain module. So "imports no component" is
     // checkable without listing every file.
     const COMPONENT_SIBLING = /from\s+["']@\/components\/workflows\/[A-Z]/
     const REACT_IMPORT = /from\s+["']react["']/
-    const ANY_IMPORT = /^\s*import\s/m
+    const ANY_IMPORT = /^\s*import\s/gm
+    const IMPORT_SPECIFIER = /^\s*import\s[^\n]*?from\s+["']([^"']+)["']/gm
+    const specifiersOf = (s: string) => [...s.matchAll(IMPORT_SPECIFIER)].map((m) => m[1])
     // POSITIVE CONTROLS first.
     expect('import { StepTypePicker } from "@/components/workflows/StepTypePicker"').toMatch(
       COMPONENT_SIBLING,
     )
     expect('import { useState } from "react"').toMatch(REACT_IMPORT)
     expect('import { DoorHeaderStrip } from "./DoorHeaderStrip"').toMatch(ANY_IMPORT)
+    // …and the specifier extractor really extracts, in order, including a type-only import
+    // and a multi-name list. Without this the equality below passes on an empty array.
+    expect(specifiersOf('import { A } from "alpha"\nimport type { B, C } from "@/beta"\n')).toEqual([
+      "alpha",
+      "@/beta",
+    ])
 
     expect(doorHeaderStripSource).not.toMatch(COMPONENT_SIBLING)
     expect(doorHeaderStripSource).not.toMatch(REACT_IMPORT)
-    expect(doorHeaderStripSource).not.toMatch(ANY_IMPORT)
-    // ⚠ NON-VACUITY FOR A ZERO-IMPORT LEAF CANNOT BE A POSITIVE IMPORT — there is none to find.
-    // So the claim is anchored on what the file DOES declare: the component the three negatives
-    // above are supposed to be describing.
+
+    // ⚠ 193-03 ASSERTED THAT THIS FILE IMPORTS NOTHING AT ALL, AND 193-05 MAKES THAT FALSE
+    // BY DESIGN. The door COPY moved to `doorVocabulary.ts` (D-10), which this strip must
+    // import to render its return control and its door label; the whole point of D-24(a) is
+    // that a governed word reaches JSX through that import and through nothing else. So the
+    // claim is NARROWED to what actually binds rather than deleted: an EQUALITY over the
+    // specifier list, which spells the one permitted import and reds on a second. Relaxing
+    // it to "no component sibling" alone would have let any camelCase module in silently.
+    //
+    // It stays cycle-safe for a mechanical reason rather than a hopeful one:
+    // `doorVocabulary.ts` imports NOTHING AT ALL (`doorVocabulary.test.ts` asserts exactly
+    // that as its own leaf claim), so this edge is one hop into a data leaf and cannot close
+    // a cycle in either direction.
+    expect(specifiersOf(doorHeaderStripSource)).toEqual(["@/components/workflows/doorVocabulary"])
+    // …and EVERY import line yielded a specifier, so a bare side-effect import (which carries
+    // no `from` clause at all) cannot hide behind the equality above.
+    expect(doorHeaderStripSource.match(ANY_IMPORT) ?? []).toHaveLength(1)
+
+    // NON-VACUITY, anchored on what the file DOES declare — the component the negatives above
+    // are supposed to be describing.
     expect(doorHeaderStripSource).toMatch(/export function DoorHeaderStrip\(/)
     expect(doorHeaderStripSource).toMatch(/export interface DoorHeaderStripProps/)
   })
