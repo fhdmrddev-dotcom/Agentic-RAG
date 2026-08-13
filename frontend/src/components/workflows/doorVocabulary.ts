@@ -1,5 +1,6 @@
 /**
- * Phase 193-05 Task 1 (AUTH-01 — D-10 / D-11 as superseded by D-23 / D-12 / D-02 / D-08)
+ * Phase 193-05 Task 1, RE-VALUED BY 193-08 Task 1
+ * (AUTH-01 — D-10 / D-11 as superseded by D-23 / D-12 / D-02 / D-08 / D-01)
  * — the AUTHORING DOORS' words.
  *
  * EVERY GOVERNED USER-FACING STRING ON THE TWO-DOOR AUTHORING SURFACE, IN ONE HOME:
@@ -26,40 +27,58 @@
  * property only holds if EVERY consumer imports from here: one literal left in JSX is a
  * second home, and a second home cannot be re-worded by a one-line diff.
  *
- * ── ⚠ THESE ARE THE **SHIPPED** VALUES (COLUMN A). `193-08` REPLACES THEM. ────────────
+ * ── ⚠ THESE ARE **COLUMN D**, THE PICK — NO LONGER THE SHIPPED COLUMN A ───────────────
  *
- * This module is the MOVE, not the reword. D-08 splits them deliberately and the split is
- * load-bearing rather than cosmetic: a characterization baseline only proves something if
- * it PREDATES the change (the 188.1 lesson), so extracting and rewording in one commit
- * would leave the move unprovable. A reader landing between the two waves is looking at
- * the strings exactly as they ship today; `193-08` flips each one to the contract's
- * column D. Do not "helpfully" reword anything here before that wave.
+ * `193-05` put the shipped strings here as a pure MOVE; `193-08` (this wave) replaced every
+ * one of them with **column D of the regenerated contract** — variant D, "the mix": B's door
+ * NAMES with C's two uppercase TIER labels, everything else B verbatim (D-01). The values
+ * were PORTED BY SCRIPT out of the generated markdown table and compared back 21/21, not
+ * hand-typed (D-02). ⚠ Two ids (`describe.h1`, `hint.frag3`) INHERIT their column-A string
+ * unchanged and are still governed — an id left out because "it isn't changing" is exactly
+ * the second home the next reword trips over (D-11).
  *
- * ⚠ THE MOVE'S PROOF IS AT THE **DOM** LEVEL, NOT THE SOURCE LEVEL, and the reason is
- * visible in the values below. JSX spells `Describe &amp; run`; a plain TypeScript string
- * spells `Describe & run`. React renders the identifier's value as a text child, and
- * `innerHTML` re-serialises `&` back to `&amp;` — so the rendered `textContent` and the
- * serialised markup are both unchanged while the SOURCE BYTES differ. A source-level diff
- * of these strings would therefore show a difference where the DOM shows none, which is
- * why `193-01`'s six whole-`innerHTML` captures and
- * `WorkflowBuilderPage.header.test.tsx`'s byte-exact band literal are the instruments
- * that prove this wave, and why both had to pass with ZERO edits.
+ * TWO DECLARED EQUALITIES NOW HOLD ACROSS THIS TABLE, and they are declared HERE so the
+ * exact-match rule's exceptions are a decision rather than a discovery:
+ *
+ *   • `STRIP_LABEL_GOVERN` ≡ `DOOR_B_NAME` — the same string, by D-23, pinned by a TYPE
+ *     ANNOTATION (see that export). Not a coincidence to be tolerated: the point is that the
+ *     govern strip echoes back the name of the door you opened.
+ *   • `DOOR_B_NAME` is a strict PREFIX of `SWITCH_CTA` — the CTA is that name plus a chevron.
+ *
+ * `doorVocabulary.test.ts` pins both as EQUALITIES and every other pair as distinct.
+ *
+ * ── ⚠ THE SPLIT BETWEEN THE MOVE AND THE REWORD, AND WHY IT WAS LOAD-BEARING ──────────
+ *
+ * D-08 split them deliberately: a characterization baseline only proves something if it
+ * PREDATES the change (the 188.1 lesson), so extracting and rewording in one commit would
+ * have left the move unprovable. It worked — `193-03` and `193-05` both passed with the six
+ * whole-`innerHTML` captures and the byte-exact band literal GREEN AND UNEDITED, which is
+ * what proves those waves moved bytes rather than changed them. THIS wave is the first that
+ * intentionally changes a rendered word, so those same instruments red here BY DESIGN and
+ * were re-captured once, deliberately, with the reason recorded in each file.
+ *
+ * ⚠ THE MOVE'S PROOF WAS AT THE **DOM** LEVEL, NOT THE SOURCE LEVEL, and the reason is
+ * still visible in the values below. JSX spells the ampersand as an entity; a plain
+ * TypeScript string spells it as one character. React renders the identifier's value as a
+ * text child and `innerHTML` re-serialises `&` back to the entity — so the rendered
+ * `textContent` and the serialised markup were both unchanged while the SOURCE BYTES
+ * differed. A source-level diff would have reported a difference the rendered surface did
+ * not have.
  *
  * ── ⚠ EXACT-MATCH ASSERTIONS ONLY, AND IT BINDS HARDER HERE THAN ANYWHERE ─────────────
  *
  * `runVocabulary.ts:57-59` states the rule and `libraryVocabulary.ts:15-18` repeats it. On
- * THIS table it stops being a caution and becomes arithmetic — after `193-08`:
- *
- *   • `DOOR_B_NAME` is a strict PREFIX of `SWITCH_CTA` (the CTA is the door name plus a
- *     chevron), so a `toContain` on the name is TRUE of both.
- *   • `STRIP_LABEL_GOVERN` becomes the SAME STRING as `DOOR_B_NAME` — that is D-23's
- *     whole point, echoing the door's name back on the door you opened — so a
- *     containment check cannot distinguish them at all.
+ * THIS table it stopped being a caution and became arithmetic the moment column D landed:
+ * `DOOR_B_NAME` is a strict PREFIX of `SWITCH_CTA` and is the SAME STRING as
+ * `STRIP_LABEL_GOVERN`, so a containment check on that fragment is true of all three and
+ * cannot identify a row at all.
  *
  * A `toContain` on a fragment of any of those three is vacuous BY CONSTRUCTION.
- * `doorVocabulary.test.ts` compares whole strings, and its pairwise-distinctness property
- * carries a declared exception SET (empty today, non-empty from `193-08`) so the next
- * author extends a list rather than discovering a surprise.
+ * `doorVocabulary.test.ts` compares whole strings with `toBe`, spells column D as literals
+ * in the TEST so the assertion falsifies this table rather than copying it, and carries the
+ * two equalities above as a DECLARED exception list — `193-05` left that list empty with the
+ * extension named in its docblock, and this wave EXTENDED it rather than weakening the
+ * distinctness property to make a red go away.
  *
  * ── ZERO IMPORTS ─────────────────────────────────────────────────────────────────────
  *
@@ -84,58 +103,67 @@
 // ── The chooser ("both doors") ───────────────────────────────────────────────────────
 
 /** `chooser.h1` — the chooser's heading. */
-export const CHOOSER_H1 = "How do you want to build this?"
+export const CHOOSER_H1 = "How do you want to start?"
 
 /** `chooser.sub` — the chooser's sub-line, directly beneath the heading. */
 export const CHOOSER_SUB =
-  "Pick the fast path or full control — nothing is locked, you can switch anytime."
+  "Both end up in the same place. You can switch between them at any time."
 
 // ── Door A — the loose door (`door-card-describe`) ───────────────────────────────────
 
-/** `doorA.tier` — the uppercase tier line on door A's card. */
-export const DOOR_A_TIER = "loose · fastest path"
-
 /**
- * `doorA.name` — door A's name.
+ * `doorA.tier` — the uppercase tier line on door A's card.
  *
- * ⚠ Spelled with a plain `&`. The JSX it replaces spelled `Describe &amp; run`; the
- * rendered text is identical and the serialised `innerHTML` is identical, which is the
- * entity conversion the header explains.
+ * ⚠ ONE OF THE TWO CELLS D TAKES FROM VARIANT C rather than B (the contract marks it
+ * `⬅ from C`). B's tier stated a BENEFIT; C's states what it COSTS YOU, and benefit
+ * language is what made the shipped wording vague in the first place (D-01).
  */
-export const DOOR_A_NAME = "Describe & run"
+export const DOOR_A_TIER = "you write one paragraph"
+
+/** `doorA.name` — door A's name. It answers WHO DOES THE WORK, which is the question
+ *  SEED-147's operator actually had. */
+export const DOOR_A_NAME = "Draft it for me"
 
 /** `doorA.desc` — door A's description paragraph. */
 export const DOOR_A_DESC =
-  "Say what recurring work this should do — the AI drafts the phases and sets the strictness."
+  "Describe the recurring work in plain language. The AI writes the steps, sets how strict it is, and asks you about anything it had to guess."
 
 /**
  * `doorA.note` — door A's italic footnote.
  *
- * ⚠ Plain `&` again (JSX: `Author &amp; govern`). Note this string NAMES the other door,
- * so `193-08` must reword it in step with `DOOR_B_NAME` or the two doors will disagree
- * about what the other one is called.
+ * ⚠ The dash is an EM DASH (U+2014), not a hyphen and not an en dash; the suite asserts the
+ * codepoint rather than trusting it to survive an editor. Note that column D's note no longer
+ * NAMES the other door, so the two doors can no longer disagree about what the other one is
+ * called — which is what the shipped string risked.
  */
-export const DOOR_A_NOTE = "nothing locked — switch to Author & govern anytime"
+export const DOOR_A_NOTE = "you can open the full editor at any point — nothing is locked in"
 
 // ── Door B — the strict door (`door-card-govern`) ────────────────────────────────────
 
-/** `doorB.tier` — the uppercase tier line on door B's card. */
-export const DOOR_B_TIER = "power · full control"
+/** `doorB.tier` — the uppercase tier line on door B's card. ⚠ The OTHER `⬅ from C` cell;
+ *  see `DOOR_A_TIER` for why D takes C here and B everywhere else. */
+export const DOOR_B_TIER = "you decide every setting"
 
 /**
- * `doorB.name` — door B's name. ⚠ Plain `&` (JSX: `Author &amp; govern`).
+ * `doorB.name` — door B's name, and the string this whole table now pivots on.
  *
- * After `193-08` this string is a strict PREFIX of `SWITCH_CTA` and EQUAL to
- * `STRIP_LABEL_GOVERN` — see the exact-match paragraph in the header.
+ * It is a strict PREFIX of `SWITCH_CTA` and EQUAL to `STRIP_LABEL_GOVERN` — both declared in
+ * the header, both pinned in the suite, and the second one pinned by a TYPE ANNOTATION so a
+ * rename on either side is a typecheck error rather than two words that quietly disagree.
  */
-export const DOOR_B_NAME = "Author & govern"
+export const DOOR_B_NAME = "Build it myself"
 
-/** `doorB.desc` — door B's description paragraph. */
+/** `doorB.desc` — door B's description paragraph. ⚠ Em dash (U+2014). */
 export const DOOR_B_DESC =
-  "Open the full Builder — every advanced control, the live strictness tier, the locked judge."
+  "Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step."
 
-/** `doorB.note` — door B's italic footnote. ⚠ Plain `&` (JSX: `scope &amp; model`). */
-export const DOOR_B_NOTE = "citation policy · gate set · per-phase scope & model"
+/**
+ * `doorB.note` — door B's italic footnote. ⚠ Plain `&` (JSX: `sources &amp; model`).
+ *
+ * The separators are MIDDLE DOTS (U+00B7), not bullets (U+2022) and not full stops. The
+ * suite asserts the codepoint and rejects both lookalikes.
+ */
+export const DOOR_B_NOTE = "what it must cite · required checks · per-step sources & model"
 
 // ── The header strips (both open doors) ──────────────────────────────────────────────
 
@@ -151,21 +179,39 @@ export const DOOR_B_NOTE = "citation policy · gate set · per-phase scope & mod
  * The leading character is U+2039 SINGLE LEFT-POINTING ANGLE QUOTATION MARK — not a
  * less-than sign and not a guillemet. `doorVocabulary.test.ts` asserts the codepoint.
  */
-export const STRIP_BACK = "‹ both doors"
+export const STRIP_BACK = "‹ Change how I start"
 
-/** `strip.label` — the describe door's current-door label. ⚠ Plain `&`. */
-export const STRIP_LABEL = "⚡ Describe & run"
+/** `strip.label` — the describe door's current-door label. The `⚡` is U+26A1, matching the
+ *  glyph the describe door's card already carries; the suite asserts the codepoint. */
+export const STRIP_LABEL = "⚡ Drafting it for you"
 
 /**
- * `strip.labelGovern` — the govern door's current-door label. ⚠ Plain `&`.
+ * `strip.labelGovern` — the govern door's current-door label. THE 21ST ID; the contract did
+ * not govern it until D-23 (`193-04` added it to `build.cjs` and regenerated), so it reaches
+ * this module through the generated contract like every other id, which is exactly what
+ * preserves D-02's derived-never-re-typed property.
  *
- * THE 21ST ID, and the contract did not govern it until D-23 (`193-04` added it to
- * `build.cjs` and regenerated). Before that, `🔧 Author & govern` was the one surviving
- * instance of the exact wording SEED-147 reports as illegible, sitting on the door whose
- * card `193-08` renames. It goes through the generated contract like every other id,
- * which is what preserves D-02's derived-never-re-typed property.
+ * ⚠ THE TYPE ANNOTATION IS THE FENCE, and it costs nothing at runtime — the
+ * `libraryVocabulary.ts:291-297` idiom. `DOOR_B_NAME` is a `const` with a literal
+ * initialiser, so its type IS the literal, and a rename on either side becomes a TYPECHECK
+ * ERROR rather than two words that quietly disagree. The literal is still spelled out
+ * because the build contract declares `strip.labelGovern` as its own key; this pins the
+ * agreement without making the strip's label a derivative of the card's name.
+ *
+ * WHAT THIS CLOSES. Before D-23, the govern strip carried the shipped door-B name with a 🔧
+ * in front of it — and after variant D ships everywhere else, that would have been THE ONE
+ * SURVIVING INSTANCE IN THE PRODUCT of the exact wording SEED-147 reports as illegible,
+ * sitting on the door whose own card now reads *Build it myself*. Echoing the door's name
+ * back confirms the choice in the same words the person used to make it.
+ *
+ * ⚠ THE 🔧 IS GONE FROM THIS LABEL WHILE `STRIP_LABEL` KEEPS ITS ⚡ — STATED, NOT SMOOTHED.
+ * That asymmetry is a direct CONSEQUENCE of D-23's wording ("its string becomes variant D's
+ * door name"), not a discretionary choice made here: the door name carries no glyph, and
+ * inventing one to restore symmetry would be re-typing rather than porting (D-02). It is
+ * routed to **UAT row U6** so the operator rules on it BY LOOKING, which is the only
+ * instrument that can settle a question about how a header reads.
  */
-export const STRIP_LABEL_GOVERN = "🔧 Author & govern"
+export const STRIP_LABEL_GOVERN: typeof DOOR_B_NAME = "Build it myself"
 
 // ── The describe door ────────────────────────────────────────────────────────────────
 
@@ -180,7 +226,7 @@ export const STRIP_LABEL_GOVERN = "🔧 Author & govern"
 export const DESCRIBE_H1 = "What recurring work should this automate?"
 
 /** `describe.cta` — the `describe-draft` button. */
-export const DESCRIBE_CTA = "Draft the workflow"
+export const DESCRIBE_CTA = "Write the first draft"
 
 // ── The describe hint — THREE FRAGMENTS, composed in JSX (D-12) ──────────────────────
 //
@@ -191,10 +237,10 @@ export const DESCRIBE_CTA = "Draft the workflow"
 // miniature templating language in a vocabulary leaf to save two exports.
 
 /** `hint.frag1` — the first bold fragment of the describe hint. */
-export const HINT_FRAG1 = "drafts the phases"
+export const HINT_FRAG1 = "writes the steps"
 
 /** `hint.frag2` — the second bold fragment. */
-export const HINT_FRAG2 = "sets the strictness"
+export const HINT_FRAG2 = "sets how strict it is"
 
 /**
  * `hint.frag3` — the third bold fragment. ⚠ The other id variant D inherits unchanged;
@@ -205,17 +251,19 @@ export const HINT_FRAG3 = "asks about anything it had to guess"
 // ── The switch strip (loose door → strict door) ──────────────────────────────────────
 
 /** `switch.prompt` — the `switch-strip` prompt. */
-export const SWITCH_PROMPT = "Need citation policy, gates, or per-phase scope?"
+export const SWITCH_PROMPT = "Need to set citations, checks, or per-step sources yourself?"
 
 /**
- * `switch.cta` — the `switch-to-govern` button. ⚠ Plain `&` (JSX: `Author &amp; govern ›`).
+ * `switch.cta` — the `switch-to-govern` button: `DOOR_B_NAME` plus a chevron, which is why
+ * the door name is a strict PREFIX of this string and why no assertion anywhere in this repo
+ * may use containment to tell the two apart.
  *
  * The trailing character is U+203A SINGLE RIGHT-POINTING ANGLE QUOTATION MARK, the mirror
  * of `STRIP_BACK`'s leading one. Asserted by codepoint in the suite.
  */
-export const SWITCH_CTA = "Author & govern ›"
+export const SWITCH_CTA = "Build it myself ›"
 
 // ── The soul preview ─────────────────────────────────────────────────────────────────
 
 /** `soul.label` — the uppercase label above the `describe-soul-preview` aside. */
-export const SOUL_LABEL = "This workflow's soul"
+export const SOUL_LABEL = "What this will do"
