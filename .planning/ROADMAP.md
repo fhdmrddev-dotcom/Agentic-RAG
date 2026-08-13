@@ -322,8 +322,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 193-07-PLAN.md — the Run modal: `Template to fill`, the render condition cut AROUND `run-upload-error`, the D-19 sentence untouched (D-17/D-18/D-20)
-- [ ] 193-08-PLAN.md — **variant D ships** (D-01/D-02/D-23): column D ported, codepoints pinned, four consumer suites re-captured (1 of 2)
+- [x] 193-07-PLAN.md — the Run modal: `Template to fill`, the render condition cut AROUND `run-upload-error`, the D-19 sentence untouched (D-17/D-18/D-20)
+- [x] 193-08-PLAN.md — **variant D ships** (D-01/D-02/D-23): column D ported, codepoints pinned, four consumer suites re-captured (1 of 2)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
