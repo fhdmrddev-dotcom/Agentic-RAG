@@ -238,12 +238,36 @@ export function WorkflowDoorSwitch({
           {/* ⚠ THE SECOND `strip.back` SITE. `DoorHeaderStrip.tsx` holds the first, with an
               identical class list; both render `STRIP_BACK`. That duplication is precisely
               the drift `doorVocabulary.ts` removes, and the D-24(a) fence sweeps BOTH
-              sources so a future edit cannot re-type one of them (193-05, RESEARCH § H-1). */}
+              sources so a future edit cannot re-type one of them (193-05, RESEARCH § H-1).
+
+              ⚠ 193-09 (D-22) — THIS CONTROL IS DEMOTED TOO, AND ONLY DEMOTED. The govern
+              strip dropped its escape hatch's box and outline under D-04; demoting one door's
+              escape and not the other's would manufacture a NEW inconsistency one click away,
+              which is a worse outcome than the peer reading the restack exists to break. So
+              the class string below is the govern control's, character for character — read
+              out of that module rather than re-typed, and PROVED equal by an assertion in
+              `WorkflowDoorSwitch.test.tsx` that extracts both strings from the two `?raw`
+              sources. Two hand-typed literals are two homes, and two homes drift.
+
+              ⚠ AND NO DIVIDER ON THIS SIDE. D-22 is explicit: the demotion is the box drop
+              and the muted treatment, nothing else. No locked-judge badge lives in this band,
+              so there is no third peer to separate from — a rule here would be a mark with
+              nothing to divide.
+
+              ⚠ DELIBERATE NON-ACTION: this band was NOT folded into the extracted govern
+              strip component. D-05's constraint is one component for the two GOVERN header
+              variants (standalone and inline); this is a different band, with no badge and
+              with its own host-lead slot, so folding it in would be a structural change with
+              neither a decision nor a mockup behind it. Recorded so the absence reads as a
+              choice rather than an oversight.
+
+              ⚠ NO MOCKUP EXISTS FOR EITHER BAND, so UAT row U3b is this side's acceptance
+              bar (U3 is the govern strip's). */}
           <button
             type="button"
             data-testid="both-doors"
             onClick={goBoth}
-            className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
+            className="px-1 py-1 text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
           >
             {STRIP_BACK}
           </button>
