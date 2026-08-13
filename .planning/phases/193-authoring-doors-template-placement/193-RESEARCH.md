@@ -1151,9 +1151,22 @@ genuinely new artifact is one pure function and one vocabulary leaf.
 
 ---
 
-## Open Questions
+## Open Questions — ALL FIVE RESOLVED 2026-08-13 (see `193-CONTEXT.md` § "AMENDED AT PLAN TIME", D-21…D-25)
 
-1. **Which predicate ships — P1′ (17 rows) or P2 (1 row)?** *(§A.4 — the escalation)*
+> **Every question below was put to the operator at plan time and answered.** The answers are locked
+> as decisions **D-21…D-25** in `193-CONTEXT.md`, which **overrides this section where they differ**.
+> The original text is left standing rather than rewritten, so a later reader can see what was open
+> and what closed it. Per-question resolution, and where it is implemented:
+>
+> | Q | Resolved as | Decision | Implementing plan |
+> |---|---|---|---|
+> | 1 | **P2** — emit phase AND no bound `assets[kind=="template"]`. 1 admits / 34 no / 110 unknown | **D-21** | `193-02` |
+> | 2 | `phases: []` ⇒ **`unknown`** (the recommendation was taken) | **D-21** | `193-02` |
+> | 3 | **Yes** — the describe band is demoted too, return control only, **no divider** there | **D-22** | `193-09` |
+> | 4 | **Add `strip.labelGovern`**, regenerate, string = variant D's door name **`Build it myself`** | **D-23** | `193-04` → `193-05` → `193-08` |
+> | 5 | **Yes** — both fences ship (copy-literal sweep + the ESM-cycle fence), each driven RED | **D-24** | `193-03`, `193-05` |
+
+1. **Which predicate ships — P1′ (17 rows) or P2 (1 row)?** *(§A.4 — the escalation)* **→ RESOLVED: P2 + the unknown arm (D-21).**
    - **Known:** an emit phase means a template is rendered; a bound `assets[kind=="template"]` means
      the app supplies it and the user's upload is unreachable code (`template_asset_service.py:144`).
      16 of 17 published admitting rows are bound.

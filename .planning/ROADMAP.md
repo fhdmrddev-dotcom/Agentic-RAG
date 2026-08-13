@@ -144,19 +144,24 @@ negative fences (**64**) and all three characterization baselines (`RunModal` **
 click does and what the page says, never how anything renders.
 
 ⛔ **NOT closed, and named rather than implied:**
+
 - **U5-b card density** (13 atoms per row) — design work, routed to a sketch under G-2. Folding it
   into a closure round would be the exact G-7 violation.
+
 - **The 2 of 18 `published + published` slugs** (`meridian-risk-summary-good-07aedc33`,
   `readonly_refusal_098uat`) have no draft to open, so their fork still refuses. **The change is
   that it now refuses OUT LOUD.** Named verbatim in `WorkflowsPage.tsx`.
+
 - **WR-08** — the 409 classification still keys on error prose (`String(e).includes("409")`), now
   with ONE home instead of two. The real fix is a typed error at `createWorkflowDraft`'s throw site,
   an `api.ts` change with callers outside this page. Re-open trigger: the next phase that touches
   that throw site.
+
 - **The four pre-existing count-gate drifts** (`ExternalActionSection` +9, `PhaseTimeline` +4,
   `WorkflowBuilderPage.canvas` +5, `builderStore` +6 = **+24 cases deletable with the gate green**)
   are unchanged and still owed as their own edit — deliberately not absorbed into a commit that did
   not cause them.
+
 - **`D-192-DEF-01`** stands, with an HONEST characterization replacing `192-14`'s: capping at
   `GSD_VITEST_MAX_WORKERS=4` **REDUCES the flake, it does not eliminate it.** Measured by the
   orchestrator across three CAPPED runs on one tree: `failed 0`, `failed 0`, **`failed 1`**. The
@@ -227,9 +232,11 @@ have a null JSON name. These 83 did not come from those paths.
 design phase it was originally scoped as.
 
 ⚠ **Two real things did fall out of the check, and neither is this phase:**
+
 1. **83 of 104 rows carry a double-encoded `definition`** — the recorded string-scalar trap, at
    scale, in the dev database. Whether any *live* app path still writes that shape is **unverified and
    worth its own check**; if one does, it is a real bug that silently empties `definition->'phases'`.
+
 2. **The duplicate names are largely a dev-database artifact.** That does **not** dissolve LIB-05 —
    `onTweak` mints `<same name> v(N+1)` by design, so a real customer generates genuine duplicates by
    using the product normally — but the *severity* seen on this machine is inflated by test data, and
@@ -266,6 +273,7 @@ by looking.
 **Plans**: 8 plans in 7 waves (G-2 satisfied — sketches 160/161/162 driven, operator picked 160-B · 161-A · 162-B, 163 assembled with a generated build contract).
 
 Plans:
+
 - [ ] 192.1-01-PLAN.md — `updated_at` end to end: 4 SELECT lists, 2 Pydantic models, 3 builders, 2 wire types, `LibraryRow.updatedAt`, both normalizers (D-15/16/17)
 - [ ] 192.1-02-PLAN.md — the pre-move baselines, captured on the UNMOVED tree, with the line classifier validated against 188.2's known-good (D-01)
 - [ ] 192.1-03-PLAN.md — **the G-5 extraction**: `libraryFork.ts` + `useWorkflowFork.ts`, the page cut over, the OD fence extended, the growth measured (D-01/22/24/29/37)
@@ -297,16 +305,36 @@ never approached after Wave 1.
 **Plans**: 11 plans in 7 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 193-01-PLAN.md — D-08 wave 0: six whole-`innerHTML` captures of the UNMOVED doors + the launch-error case that must survive D-17, in commits touching no source file
 - [ ] 193-02-PLAN.md — `templateAdmission()` in `soulData.ts` (D-21/D-25, three-state, bound-asset arm) + the two AUTH-03 strings in `libraryVocabulary.ts`
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 193-03-PLAN.md — **the G-5 extraction**: `doorGroup` → `DoorHeaderStrip.tsx`, verbatim, with the D-24(b) ESM-cycle fence (D-05/D-06/D-08)
 - [ ] 193-04-PLAN.md — D-23 through the generator: the govern door captured, `strip.labelGovern` added to `build.cjs`, the contract regenerated to 21 rows
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 193-05-PLAN.md — all 21 governed strings → `doorVocabulary.ts` at their SHIPPED values, plus the D-24(a) copy fence (D-10/D-11/D-12)
 - [ ] 193-06-PLAN.md — the card mark `· needs a template` at index 0 of `identityParts`, three-arm silence (D-13/D-14/D-15)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 193-07-PLAN.md — the Run modal: `Template to fill`, the render condition cut AROUND `run-upload-error`, the D-19 sentence untouched (D-17/D-18/D-20)
 - [ ] 193-08-PLAN.md — **variant D ships** (D-01/D-02/D-23): column D ported, codepoints pinned, four consumer suites re-captured (1 of 2)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 193-09-PLAN.md — the D-04/D-22 restack on both bands, asserted by child order; re-capture 2 of 2
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 193-10-PLAN.md — the pin sweep, the `WorkflowDoorSwitch.tsx` hot-file ledger row G-5 never had (D-07/D-09), and `193-UAT.md`
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 193-11-PLAN.md — the operator drives the eight G-4 rows; every fail dated, sized and routed
 
 ⚠ **Wave parallelism is capped at two, and the reason is measured rather than stylistic.**
