@@ -141,6 +141,12 @@ literal of the entire `doorGroup` band** — class lists, the `ml-auto`, the jud
 
 ## Manual-only — the G-4 rows this phase owes
 
+➡ **The drivable artifact is [`193-UAT.md`](./193-UAT.md)** — authored by `193-10` Task 3, driven by
+`193-11`. It carries these same eight rows (none invented, none renumbered, none dropped), each
+expanded into a recipe with its target named, its `fail:` conditions written **before** the drive,
+and an empty result field. **Status at authoring: `0 driven · 0 passed · 0 failed · 8 owed`.** The
+table below stays as the SCOPE of what is owed; the UAT file is how it gets driven.
+
 **Three of the four deliverables have NO mockup**: the D-04/D-22 restack (`164/README.md:149-157`
 says so) and both AUTH-03 surfaces (`build.cjs:23` — *"a PROPOSAL, not a generated dump"*). Those are
 exactly where sketch→build drift survives, and they must be driven **by looking**.
@@ -165,4 +171,44 @@ the rule Phase 192's re-drive broke and 192.1 restored).
 
 ## Per-Task Verification Map
 
-*(filled by `/gsd:plan-phase` once plans exist)*
+Filled by `193-10` Task 3 at the phase's close, from each plan's own `<verify><automated>` blocks —
+**quoted, not paraphrased**. One line per plan, all eleven, so a reader can re-run any plan's gate
+without opening it.
+
+⚠ **Every command here was authored with `GSD_VITEST_MAX_WORKERS=4`, and that cap is CORRECTED ON
+MEASUREMENT below** (see the note under the table). The commands are quoted as the plans wrote them;
+the cap to actually use is `2`.
+
+| Plan | Automated verification (verbatim from the plan) |
+|---|---|
+| `193-01` | `cd frontend && GSD_VITEST_MAX_WORKERS=4 npx vitest run src/components/workflows/WorkflowDoorSwitch.baseline.test.tsx` · `… npx vitest run src/pages/__tests__/RunModal.test.tsx` |
+| `193-02` | `cd frontend && npx tsc --noEmit -p tsconfig.app.json 2>&1 \| grep -c "error TS"` · `… npx vitest run src/components/workflows/soulData.test.ts` · `… npx vitest run src/components/workflows/library/librarySubtree.fences.test.ts` |
+| `193-03` | `… npx vitest run src/pages/WorkflowBuilderPage.header.test.tsx src/components/workflows/WorkflowDoorSwitch.baseline.test.tsx src/components/workflows/WorkflowDoorSwitch.test.tsx` · `… npx vitest run src/components/workflows/DoorHeaderStrip.test.tsx` · `cd frontend && GSD_VITEST_MAX_WORKERS=4 node ../scripts/vitest-count-gate.cjs` |
+| `193-04` | `node -e "const k=Object.keys(require('./.planning/sketches/164-telling-the-doors-apart/dom.generated.json'));if(!k.includes('govern'))process.exit(1);console.log(k.join(','))"` · `node .planning/sketches/164-telling-the-doors-apart/build.cjs && node …/assemble.cjs && grep -c "strip.labelGovern" …/BUILD-CONTRACT.generated.md` · `grep -c "strip.labelGovern" …/README.md` |
+| `193-05` | `cd frontend && npx tsc --noEmit -p tsconfig.app.json 2>&1 \| grep -c "error TS"` · `… npx vitest run …WorkflowDoorSwitch.baseline.test.tsx …WorkflowBuilderPage.header.test.tsx …WorkflowBuilderPage.describe.test.tsx …WorkflowDoorSwitch.test.tsx …DoorHeaderStrip.test.tsx` · `… npx vitest run src/components/workflows/doorVocabulary.test.ts src/components/workflows/WorkflowDoorSwitch.test.tsx` |
+| `193-06` | `… npx vitest run src/components/workflows/library/librarySubtree.fences.test.ts` · `… npx vitest run src/components/workflows/library/WorkflowCard.test.tsx` |
+| `193-07` | `… npx vitest run src/components/workflows/library/librarySubtree.fences.test.ts` · `… npx vitest run src/pages/__tests__/RunModal.test.tsx` · `… npx vitest run src/pages/__tests__/RunModal.test.tsx src/pages/__tests__/RunModal.a11y.test.tsx` |
+| `193-08` | `cd frontend && npx tsc --noEmit -p tsconfig.app.json 2>&1 \| grep -c "error TS"` · `… npx vitest run src/components/workflows/doorVocabulary.test.ts` · `… npx vitest run …WorkflowDoorSwitch.baseline.test.tsx …WorkflowDoorSwitch.test.tsx …WorkflowBuilderPage.header.test.tsx …WorkflowBuilderPage.describe.test.tsx …WorkflowBuilderPage.canvas.test.tsx` |
+| `193-09` | `cd frontend && npx eslint src/components/workflows/DoorHeaderStrip.tsx -c eslint.a11y.config.js` · `… npx eslint src/components/workflows/WorkflowDoorSwitch.tsx -c eslint.a11y.config.js` · `… npx vitest run …DoorHeaderStrip.test.tsx …WorkflowDoorSwitch.test.tsx …WorkflowDoorSwitch.baseline.test.tsx …WorkflowBuilderPage.header.test.tsx` |
+| `193-10` | `cd frontend && GSD_VITEST_MAX_WORKERS=4 node ../scripts/vitest-count-gate.cjs` · `grep -c "^#### Phase 193:" .planning/ROADMAP.md && grep -c "WorkflowDoorSwitch.tsx" CLAUDE.md` · `grep -c "ephemeral-template-fill-101uat" .planning/phases/193-authoring-doors-template-placement/193-UAT.md` |
+| `193-11` | `grep -c "result:" …/193-UAT.md` · `grep -c "result: *$" …/193-UAT.md` · `node scripts/check-gap-closure-rounds.cjs 193` |
+
+⚠ **`GSD_VITEST_MAX_WORKERS=4` IS THE WRONG CAP FOR THE FULL GATE ON THIS BOX, AND IT IS CORRECTED
+HERE ON MEASUREMENT RATHER THAN INHERITED.** The line at the head of this file — *"`=4` is mandatory
+in any worktree/parallel run"* — was calibrated at ~3400 gated cases for TWO concurrent agents. The
+gate now executes **3557**. Measured on the identical tree `f2c29778` during this phase:
+
+| Cap | Runs | `failed` |
+|---|---|---|
+| `4` | three | **17, then 4, then 3** |
+| uncapped (~16 workers) | one | **11** |
+| **`2`** | two | **0 and 0** |
+
+Every failure was `STACK_TRACE_ERROR` — vitest's timeout signature, never an assertion; every
+failing test lived in a file no plan had touched; and each such suite passed **in isolation** at
+full green counts. Fewer workers reduced timeouts monotonically, so the binding resource is
+**per-worker headroom against the 5000 ms per-test limit**, not core count. `193-10` reproduced the
+same shape at this HEAD: cap 2 gave `failed 4` on its first run (all four `STACK_TRACE_ERROR` in
+`WorkflowsPage.test.tsx`, which then ran `52 passed (52)` alone) and `failed 0` on the two runs
+after. **Use `GSD_VITEST_MAX_WORKERS=2` for the full count gate; `=4` remains fine for the
+single-suite quick runs above.**
