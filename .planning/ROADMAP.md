@@ -307,8 +307,8 @@ never approached after Wave 1.
 Plans:
 **Wave 1**
 
-- [ ] 193-01-PLAN.md — D-08 wave 0: six whole-`innerHTML` captures of the UNMOVED doors + the launch-error case that must survive D-17, in commits touching no source file
-- [ ] 193-02-PLAN.md — `templateAdmission()` in `soulData.ts` (D-21/D-25, three-state, bound-asset arm) + the two AUTH-03 strings in `libraryVocabulary.ts`
+- [x] 193-01-PLAN.md — D-08 wave 0: six whole-`innerHTML` captures of the UNMOVED doors + the launch-error case that must survive D-17, in commits touching no source file
+- [x] 193-02-PLAN.md — `templateAdmission()` in `soulData.ts` (D-21/D-25, three-state, bound-asset arm) + the two AUTH-03 strings in `libraryVocabulary.ts`
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
