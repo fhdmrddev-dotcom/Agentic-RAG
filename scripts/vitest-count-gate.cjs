@@ -298,6 +298,28 @@ const BASELINE = {
   // literals — the house rule this header states twice and `librarySubtree.fences.test.ts`
   // records five times.
   "WorkflowDoorSwitch.baseline.test.tsx": 17,
+  // 193-03 (D-05 / D-24(b) / AUTH-01) — a NEW FILE, pinned in the SAME COMMIT that creates it,
+  // for the reason the entry above states: a `BASELINE` key naming a path that does not yet
+  // exist makes this gate ERROR (exit 2), so this is the only commit it CAN be pinned in — and
+  // an unpinned covering suite is an UNGUARDED one, not a lightly-guarded one.
+  //
+  // ⚠ NO `TARGETS` EDIT ACCOMPANIES IT, MEASURED rather than assumed for the fourth time in this
+  // map: the file lives in `src/components/workflows`, already a DIRECTORY entry in TARGETS, so
+  // it RAN the moment it existed — the gate printed `DoorHeaderStrip.test.tsx — 12 new` before
+  // this line was written, which is where the 12 comes from. TARGETS decides what RUNS, BASELINE
+  // what is GUARDED, and only the second was missing.
+  //
+  // What would be unguarded without it: the D-05 `ml-auto` PAIR (present standalone, absent
+  // inline) — the whole risk of lifting the govern band out of `WorkflowDoorSwitch.tsx`, and
+  // asserted here against the class string READ OUT OF `WorkflowBuilderPage.header.test.tsx`'s
+  // band literal rather than re-typed — plus the D-24(b) ESM-cycle fence, whose four cases are
+  // ABSENCE assertions (the easiest kind to delete unnoticed) and which was observed RED against
+  // two real back-import plants, one per spelling of `allowImportingTsExtensions`.
+  //
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN, never hand-counted from `it(` literals — and
+  // note the count is 12 from SEVEN `it()`s, because two are `it.each` over both `inline`
+  // values, which is exactly why hand-counting is forbidden here.
+  "DoorHeaderStrip.test.tsx": 12,
   "PhaseSpine.test.tsx": 11,
   "deriveTier.test.ts": 9,
   "WorkflowSoul.test.tsx": 8,
