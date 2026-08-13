@@ -114,6 +114,9 @@ vi.mock("@/components/workflows/PhaseSpineGraph", async () => {
 // The component SOURCE via Vite's ?raw loader — the idiomatic way to make a scope
 // fence machine-checkable (the `PhaseSpineGraph.test.tsx:20-22` precedent).
 import builderSource from "./WorkflowBuilderPage?raw"
+// Phase 193 fast-fix (AUTH-01): the CTA is queried by its GOVERNED id, never by a literal —
+// a hard-coded name here is what let the page's copy go stale without any suite reddening.
+import { DESCRIBE_CTA } from "@/components/workflows/doorVocabulary"
 import { WorkflowBuilderPage, type BuilderDefinition } from "./WorkflowBuilderPage"
 // Plan 186-16 (WR-10), on its own line so this file's diff stays 0-deletion: the empty
 // draft's sentence, IMPORTED rather than re-typed, so the precedence row below compares
@@ -2390,7 +2393,7 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
   async function draftIt(text = "summarise the supplier renewals every week") {
     await screen.findByTestId("describe-hint")
     fireEvent.change(screen.getByLabelText("business requirement"), { target: { value: text } })
-    fireEvent.click(screen.getByRole("button", { name: "Draft the workflow" }))
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
   }
 
   beforeEach(() => {
@@ -2607,7 +2610,7 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     fireEvent.change(screen.getByLabelText("business requirement"), {
       target: { value: "summarise the supplier renewals every week" },
     })
-    fireEvent.click(screen.getByRole("button", { name: "Draft the workflow" }))
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
 
     await screen.findByTestId("seed-receipt")
     const arrival = readReceipt()

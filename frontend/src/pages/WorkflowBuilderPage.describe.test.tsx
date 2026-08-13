@@ -21,7 +21,7 @@
  * ── WHAT IS PINNED, AND WHY THAT REGION ────────────────────────────────────────────
  *
  * The CTA region: the flex column at `WorkflowBuilderPage.tsx:1450-1465` holding the
- * `Draft the workflow` button and the `describe-hint` line beneath it. That is where the
+ * `DESCRIBE_CTA` button and the `describe-hint` line beneath it. That is where the
  * door lands, so that is where the pin sits. It is resolved by WALKING UP from the
  * `describe-hint` node rather than by a CSS class — a class-based selector would silently
  * start matching a different node after a Tailwind edit, and a pin that quietly moved to
@@ -48,6 +48,23 @@
  * deferred item with its trigger in `193-08-SUMMARY.md` § Deferred rather than fixed inside a
  * plan whose `files_modified` does not include the page. When someone does move these four
  * strings into `doorVocabulary`, THIS suite reds — and that red is the correct signal.
+ *
+ * ── ✅ CLOSED, SAME DAY, AND THE PREDICTION ABOVE IS WHY THIS NOTE CAN BE TRUSTED ───────
+ *
+ * The operator took the fix rather than the deferral (2026-08-13, after `193-09`), and the
+ * paragraph above called the outcome exactly: moving the strings redded **24 cases across five
+ * suites**, and every one of those reds was this file and its neighbours doing their job. The
+ * deferral is closed; the trigger is spent.
+ *
+ * FOUR strings were predicted and **FIVE** were found — `DESCRIBE_H1` was duplicated too, and it
+ * only surfaced because the page was swept programmatically against all 21 governed values
+ * instead of being read by eye. That is the correction this note exists to carry forward.
+ *
+ * WHAT CHANGED HERE, precisely: the CTA and heading are now queried by `DESCRIBE_CTA` /
+ * `DESCRIBE_H1` rather than by hard-coded names — a literal query is exactly what let the page's
+ * copy rot without any suite reddening — and the `outerHTML` literal below was re-captured
+ * WORDS-ONLY, proved by the ordered TAG-token sequence being identical before and after (23 tags),
+ * never by re-recording whatever the page happened to render.
  *
  * ── THE OUTERHTML LITERAL ──────────────────────────────────────────────────────────
  *
@@ -132,6 +149,10 @@ vi.mock("@/lib/api", () => {
   }
 })
 
+// Phase 193 fast-fix (AUTH-01): this suite queried the CTA by a hard-coded literal, so when
+// variant D landed in `doorVocabulary.ts` the page's own copy went stale WITHOUT this file
+// reddening — it was pinning the inconsistency. Named ids cannot drift apart from the source.
+import { DESCRIBE_CTA, DESCRIBE_H1 } from "@/components/workflows/doorVocabulary"
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
@@ -230,7 +251,7 @@ function ctaRegion(): Element {
   const hint = screen.getByTestId("describe-hint")
   const region = hint.parentElement
   expect(region).not.toBeNull()
-  expect(region!.contains(screen.getByRole("button", { name: "Draft the workflow" }))).toBe(true)
+  expect(region!.contains(screen.getByRole("button", { name: DESCRIBE_CTA }))).toBe(true)
   return region!
 }
 
@@ -247,14 +268,14 @@ describe("Builder describe screen, canvas flag OFF — the surface is reachable 
       await renderDescribeScreen(variant.value)
 
       // The screen itself: the prompt, the box, the CTA, the hint.
-      expect(screen.getByRole("heading", { name: "What recurring work should this automate?" })).toBeInTheDocument()
+      expect(screen.getByRole("heading", { name: DESCRIBE_H1 })).toBeInTheDocument()
       expect(screen.getByLabelText("business requirement")).toBeInTheDocument()
-      expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeInTheDocument()
+      expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeInTheDocument()
 
       // …and the region the door lands in resolves by walking up from the hint, and
       // reads as one addressable string.
       expect(ctaRegion().contains(screen.getByTestId("describe-hint"))).toBe(true)
-      expect(describeRegion()).toContain("Draft the workflow")
+      expect(describeRegion()).toContain(DESCRIBE_CTA)
       // No flag-on chrome leaked in: the merged header bar is gated on `canvasEnabled`.
       expect(screen.queryByTestId("builder-header-bar")).toBeNull()
     })
@@ -284,7 +305,7 @@ describe("Builder describe screen, canvas flag OFF — the surface is reachable 
  * being proved is that these two audiences receive the same bytes.
  */
 const FLAG_OFF_DESCRIBE_MARKUP =
-  `<div class="flex flex-col items-center gap-3"><button type="button" disabled="" class="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40">Draft the workflow</button><p data-testid="describe-hint" class="text-center text-[13px] text-muted-foreground">You describe the goal — the AI <b class="font-medium text-foreground">drafts the phases</b>, <b class="font-medium text-foreground">sets the strictness</b>, and <b class="font-medium text-foreground">asks about anything it had to guess</b>.</p></div>`
+  `<div class="flex flex-col items-center gap-3"><button type="button" disabled="" class="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40">Write the first draft</button><p data-testid="describe-hint" class="text-center text-[13px] text-muted-foreground">You describe the goal — the AI <b class="font-medium text-foreground">writes the steps</b>, <b class="font-medium text-foreground">sets how strict it is</b>, and <b class="font-medium text-foreground">asks about anything it had to guess</b>.</p></div>`
 
 describe("Builder describe screen, canvas flag OFF — the markup itself is pinned", () => {
   it("matches the captured flag-off describe-screen CTA region byte for byte", async () => {
@@ -409,7 +430,7 @@ describe("Builder describe screen, canvas flag ON — the template door (Req 6)"
 
     const box = screen.getByLabelText("business requirement") as HTMLTextAreaElement
     expect(box.value).toBe("")
-    expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeDisabled()
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeDisabled()
 
     fireEvent.click(screen.getByTestId("starter-door-trigger"))
     const row = await screen.findByTestId("starter-door-row-risk-register")
@@ -422,7 +443,7 @@ describe("Builder describe screen, canvas flag ON — the template door (Req 6)"
     expect(screen.getByTestId("describe-hint")).toBeInTheDocument()
     expect(screen.queryByTestId("builder-grid")).toBeNull()
     // …and the shipped `canDraft` rule did the rest: a non-empty box enables the CTA.
-    expect(screen.getByRole("button", { name: "Draft the workflow" })).toBeEnabled()
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).toBeEnabled()
   })
 
   it("the row with NO business_requirement seeds its NAME — the documented fallback", async () => {

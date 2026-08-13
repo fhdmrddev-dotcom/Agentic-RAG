@@ -165,6 +165,10 @@ import {
 // suite reads the constant rather than a copied literal, so a re-wording cannot leave a
 // green test asserting a sentence the product no longer says.
 import { SAVE_FAILED_SENTENCE } from "@/hooks/useDraftPersistence"
+// Phase 193 fast-fix (AUTH-01): the CTA is queried by its GOVERNED id. These two sites used a
+// case-insensitive REGEX (/draft the workflow/i), which is why this phase's first literal-only
+// sweep did not see them — a sweep for the quoted string cannot find a regex form.
+import { DESCRIBE_CTA } from "@/components/workflows/doorVocabulary"
 import { WorkflowsPage } from "./WorkflowsPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 
@@ -267,7 +271,7 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
 
     // Describe → draft → the drafted editing view.
     await user.type(screen.getByRole("textbox", { name: /business requirement/i }), "vendor risk")
-    await user.click(screen.getByRole("button", { name: /draft the workflow/i }))
+    await user.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
     await screen.findByTestId("spine-node-research")
 
     // First explicit save → CREATE.
@@ -314,7 +318,7 @@ describe("WorkflowBuilderPage session — R6: exactly one POST, then PATCH", () 
       </EffectiveFeaturesProvider>,
     )
     await user.type(screen.getByRole("textbox", { name: /business requirement/i }), "vendor risk")
-    await user.click(screen.getByRole("button", { name: /draft the workflow/i }))
+    await user.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
     await screen.findByTestId("spine-node-research")
 
     const save = screen.getByTestId("builder-save-draft")

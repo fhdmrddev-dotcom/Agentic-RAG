@@ -197,6 +197,20 @@ import {
   type PhaseGovernancePatch,
   type PhaseTypeId,
 } from "@/components/workflows/definitionOps"
+// Phase 193 fast-fix (AUTH-01, operator-approved 2026-08-13) — this page held a SECOND,
+// ungoverned copy of the describe screen's CTA and hint fragments. `193-05` moved the door
+// words into `doorVocabulary.ts` and `193-08` shipped variant D there, but this file was
+// outside both plans' `files_modified` and outside the D-24(a) sweep, so after variant D the
+// loose door read one CTA while this screen still read the pre-D one. Named ids, not literals.
+// ⚠ FOUR literals were expected here and FIVE were found: `DESCRIBE_H1` was duplicated too,
+// and is only in this list because the check was run rather than eyeballed.
+import {
+  DESCRIBE_CTA,
+  DESCRIBE_H1,
+  HINT_FRAG1,
+  HINT_FRAG2,
+  HINT_FRAG3,
+} from "@/components/workflows/doorVocabulary"
 import type { CanvasNode } from "@/components/workflows/canvasModel"
 // TYPE-ONLY, and that is load-bearing: `WorkflowCanvas` is `React.lazy` so the chunk is
 // never requested with the flag off, and a value import of anything from that module
@@ -542,7 +556,7 @@ export interface WorkflowBuilderPageProps {
    *  otherwise silently dropped). Only meaningful for a FRESH build (no `initial`) —
    *  the drafted editing view ignores it. */
   initialDescribe?: string
-  /** Phase 124 CR-01 fix: when true (the loose door's "Draft the workflow" CTA), run
+  /** Phase 124 CR-01 fix: when true (the loose door's `DESCRIBE_CTA` button), run
    *  the EXISTING generate→draft flow ONCE on mount using the seeded `initialDescribe`,
    *  so the fast path actually drafts instead of dead-ending on an empty screen. */
   autoDraft?: boolean
@@ -1267,7 +1281,7 @@ export function WorkflowBuilderPage({
   }, [describe, projectFolderId, store])
 
   // Phase 124 CR-01 fix: when handed off from the loose "Describe & run" door's
-  // "Draft the workflow" CTA (autoDraft), run the EXISTING generate→draft flow ONCE
+  // `DESCRIBE_CTA` button (autoDraft), run the EXISTING generate→draft flow ONCE
   // with the seeded text — so the fast path actually drafts instead of dead-ending on
   // an empty describe screen. Guarded to fire exactly once, fresh-build ("empty") only.
   const autoDraftFiredRef = useRef(false)
@@ -1479,7 +1493,7 @@ export function WorkflowBuilderPage({
               ✎
             </span>
             <h1 className="font-semibold text-foreground" style={{ fontSize: "1.5rem" }}>
-              What recurring work should this automate?
+              {DESCRIBE_H1}
             </h1>
           </div>
 
@@ -1524,13 +1538,13 @@ export function WorkflowBuilderPage({
               onClick={onDraft}
               className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
             >
-              {builderPhase === "composing" ? "Composing…" : "Draft the workflow"}
+              {builderPhase === "composing" ? "Composing…" : DESCRIBE_CTA}
             </button>
 
             <p data-testid="describe-hint" className="text-center text-[13px] text-muted-foreground">
-              You describe the goal — the AI <b className="font-medium text-foreground">drafts the phases</b>,{" "}
-              <b className="font-medium text-foreground">sets the strictness</b>, and{" "}
-              <b className="font-medium text-foreground">asks about anything it had to guess</b>.
+              You describe the goal — the AI <b className="font-medium text-foreground">{HINT_FRAG1}</b>,{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG2}</b>, and{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG3}</b>.
             </p>
             {/* 187-15 (Req 6 / 151-C) — ONE quiet line, gated HERE because `describeScreen` is
                 built on both branches and the picker holds no flag. Still one way in. */}
