@@ -270,7 +270,24 @@ const BASELINE = {
   // positive control (`sameKeySet(["a","b"],["a"])` is false), and the resolver sweep that
   // proves every slug in the string map resolves to a bundled component while an inherited
   // key still floors to null. Read from THIS SCRIPT'S OWN `actual` column, never hand-counted.
-  "soulData.test.ts": 17,
+  // 193-02 (AUTH-03 / D-21 / D-25), pinned by 193-10's sweep: 17 → 33. An EXTENSION, never a
+  // lowering — no `it(` was deleted, renamed or moved out of this file by Phase 193. The +16 are
+  // `templateAdmission()`'s three states entered with REAL cases: the `llm_emit`-without-a-bound-
+  // asset arm that admits, the bound-`assets[kind=="template"]` arm that does NOT (the 16-row
+  // correction D-21 measured against the live DB), the `phases: []` arm that reads `unknown`
+  // rather than a positive no, the five malformed shapes (`undefined` / `null` / `{}` /
+  // non-array `phases` / missing `config`), and the Pydantic-default case — an `llm_emit` phase
+  // with NO `emitter` key still admits, which is the arm the shipped `RunModal.test.tsx` fixtures
+  // at `:70-96` depend on.
+  //
+  // ⚠ WHY THE RAISE IS NOT COSMETIC: `templateAdmission` is consumed by TWO surfaces under
+  // OPPOSITE unknown-fallbacks (the card goes silent, D-15; the Run modal keeps the control,
+  // D-20). The cases proving `unknown` is distinct from `does-not-admit` are the ONLY mechanical
+  // thing preventing a later "tidy" collapsing the union back to a boolean — and a boolean cannot
+  // express D-20. At the old pin of 17 every one of them was deletable with the gate green.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`soulData.test.ts 17 33 +16`), never hand-counted.
+  "soulData.test.ts": 33,
   // 21 → 23: the two end-to-end WIRE fences for CR-R5-01 (a pick whose folder is gone,
   // and a pick that survived a failed re-fetch, each asserting the `project_folder_id`
   // KEY is absent from the request the client actually sends). Both observed RED with
@@ -285,7 +302,22 @@ const BASELINE = {
   // Without this raise the fence would ship UNGUARDED: a later edit deleting all five cases
   // would leave `actual` back at 23 and the gate green, which is precisely the shape 193-03
   // records as "an unpinned covering suite is an unguarded one".
-  "WorkflowDoorSwitch.test.tsx": 28,
+  // 193-09 (AUTH-01 / D-04 / D-22), pinned by 193-10's sweep: 28 → 33. An EXTENSION, never a
+  // lowering — Phase 193 deleted no `it(` from this file; 193-08 re-valued literals inside shipped
+  // cases (re-capture 1 of 2, WORDS) and 193-09 re-valued them again (re-capture 2 of 2,
+  // STRUCTURE), neither of which changes a count. The +5 are the D-22 half of the restack: the
+  // describe band's escape demoted identically to the govern one, asserted by CHILD ORDER with the
+  // length check first, plus the cross-component source equality that PROVES the two demotions
+  // agree — two class strings pulled out of two `?raw` sources and compared, because no single
+  // rendered DOM hosts both bands.
+  //
+  // ⚠ THAT CROSS-COMPONENT CASE IS THE ONLY THING THAT CAN SEE D-22 DRIFT. The two bands live in
+  // two files and never co-render, so a future edit demoting one and not the other typechecks
+  // clean, lints clean and renders fine — exactly the "new inconsistency manufactured by the fix"
+  // D-22 exists to prevent. Unpinned it was deletable at `failed 0`.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowDoorSwitch.test.tsx 28 33 +5`).
+  "WorkflowDoorSwitch.test.tsx": 33,
   // 193-05 (AUTH-01 / D-10 / D-11) — a NEW FILE, pinned in the SAME COMMIT that creates it,
   // for the same reason as the 193-01 entry below: a `BASELINE` key naming a path that does
   // not yet exist makes this gate ERROR (exit 2) rather than fail. No `TARGETS` edit
@@ -297,7 +329,23 @@ const BASELINE = {
   // words — the count, non-emptiness, pairwise distinctness against a DECLARED exception set,
   // the zero-import leaf claim that makes `DoorHeaderStrip`'s import cycle-safe, and the
   // demonstration that containment assertions on this table are vacuous by construction.
-  "doorVocabulary.test.ts": 9,
+  // 193-08 (AUTH-01 / D-01 / D-02 / D-23), pinned by 193-10's sweep: 9 → 39. An EXTENSION, and
+  // the largest single raise of this phase — nothing was deleted, renamed or moved; 193-05's nine
+  // whole-table property cases are all still here and still counted. The +30 are what turned a
+  // shape suite into a FALSIFICATION suite when variant D shipped: the 21 column-D literals
+  // spelled ONCE each and exact-matched (a `toContain` on a fragment is vacuous — this table's own
+  // header rule), five codepoints pinned individually because an en dash is invisible in a diff,
+  // the `STRIP_LABEL_GOVERN: typeof DOOR_B_NAME` literal-type agreement fence (D-23, proved to
+  // fire at 33 → 34 → 33 type errors), and the contract-agreement case that RE-PARSES
+  // `BUILD-CONTRACT.generated.md` at test time and deep-equals it against the suite's own literals.
+  //
+  // ⚠ THE CONTRACT-AGREEMENT CASE IS THE PHASE'S ANTI-DRIFT INSTRUMENT: it is the only thing that
+  // notices the generated acceptance bar and the shipped strings diverging. D-02's whole rule is
+  // that column D is DERIVED and never re-typed; that rule is prose everywhere except in this one
+  // case. At the old pin of 9 it sat in thirty cases of slack, deletable with the gate green.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`doorVocabulary.test.ts 9 39 +30`).
+  "doorVocabulary.test.ts": 39,
   // 193-01 (D-08 / AUTH-01) — a NEW FILE, pinned in the SAME COMMIT that creates it, which is
   // the only commit it CAN be pinned in: a `BASELINE` entry naming a path that does not yet
   // exist makes this gate ERROR (exit 2) rather than fail.
@@ -341,7 +389,23 @@ const BASELINE = {
   // READ FROM THIS SCRIPT'S OWN `actual` COLUMN, never hand-counted from `it(` literals — and
   // note the count is 12 from SEVEN `it()`s, because two are `it.each` over both `inline`
   // values, which is exactly why hand-counting is forbidden here.
-  "DoorHeaderStrip.test.tsx": 12,
+  // 193-09 (AUTH-01 / D-03 / D-04), pinned by 193-10's sweep: 12 → 16. An EXTENSION, never a
+  // lowering — 193-05 NARROWED this suite's 193-03 `not.toMatch(ANY_IMPORT)` leaf claim into an
+  // EQUALITY over a permitted-specifier list plus an import-line count, in place and at an
+  // unchanged case count, so no pin moved then. The +4 are the D-04 shape: the escape carrying no
+  // border class, the borrowed divider sitting between it and the door label, and the four-child
+  // order pin driven at BOTH `inline` values with the judge badge asserted LAST.
+  //
+  // ⚠ THE BADGE-LAST ASSERTION IS AN ABSENCE-SHAPED GUARD ON THE ONE ELEMENT D-04 DELIBERATELY DID
+  // NOT MOVE. `git diff -U0` over the restack matches no line naming it, which proves it today and
+  // proves nothing tomorrow; this case is what makes "the badge keeps the far edge" survive the
+  // next edit. Same for the no-border claim, which is a negative and therefore the easiest kind of
+  // case to delete unnoticed.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`DoorHeaderStrip.test.tsx 12 16 +4`) — and note
+  // 16 comes from fewer than 16 `it()`s, because two are `it.each` over both `inline` values,
+  // which is exactly why hand-counting is forbidden here.
+  "DoorHeaderStrip.test.tsx": 16,
   "PhaseSpine.test.tsx": 11,
   "deriveTier.test.ts": 9,
   "WorkflowSoul.test.tsx": 8,
@@ -998,8 +1062,28 @@ const BASELINE = {
   // printing `WorkflowsPage.test.tsx 48 52 +4` and `librarySubtree.fences.test.ts 116 117 +1`
   // at `total 3436 · failed 0` — never hand-counted from `it(` literals.
   "WorkflowsPage.test.tsx": 52,
-  "RunModal.test.tsx": 32,
-  "RunModal.a11y.test.tsx": 16,
+  // 193-01 + 193-07 (AUTH-03 / D-17 / D-18 / D-19 / D-20), pinned by 193-10's sweep: 32 → 40. An
+  // EXTENSION, never a lowering — Phase 193 deleted no `it(` here. The +8 are the two halves of
+  // the template cut: 193-01's WAVE-0 case, written BEFORE the cut and driven RED, that a launch
+  // failure stays VISIBLE on a workflow that positively cannot fill a template; and 193-07's
+  // four-arm render coverage of `templateAdmission` at the rendered surface, with `unknown` proved
+  // to render IDENTICALLY to `admits` against one shared expected value.
+  //
+  // ⚠ THE LAUNCH-FAILURE CASE IS THE ONE THAT MATTERS AND IT IS PINNED FOR A NAMED REASON.
+  // `launchError` is NOT template-only — `handleRun`'s catch sets it on ANY `onRun` rejection, and
+  // its node lived INSIDE the wrapper D-17 removes. A naive hide makes every non-template launch
+  // failure silent, which is the WR-03 class of defect Phase 192's gap round had to repair on this
+  // exact surface. The case predates the cut by design, so it is a falsification and not a
+  // description; unpinned, the whole guard sat in eight cases of slack.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`RunModal.test.tsx 32 40 +8`).
+  "RunModal.test.tsx": 40,
+  // 193-07 (AUTH-03 / D-18), pinned by 193-10's sweep: 16 → 20. An EXTENSION, never a lowering.
+  // The +4 guard that D-18's `Template to fill` is a TEXT NODE and not a `<label htmlFor>` bound
+  // to a hidden input — the a11y half of naming the control — plus the D-19 provenance sentence
+  // travelling with the block it describes. A `<label>` here would read plausibly and would
+  // silently re-point the accessible name; nothing else in the battery can see that.
+  "RunModal.a11y.test.tsx": 20,
   "PublishedCardDelete.test.tsx": 32,
   // 192-01 Task 2: the FIFTH covering suite. `WorkflowBuilderPage.session.test.tsx` renders
   // the LIVE `WorkflowsPage` three times (`:482`, `:510`, `:768`) and was pinned by nothing —
@@ -1277,7 +1361,27 @@ const BASELINE = {
   // printing `WorkflowCard.test.tsx 39 80 +41` at `total 3408` — never hand-counted from `it(`
   // literals. ⚠ The two runs agreed on every COUNT column and disagreed on `failed` (1, then 0),
   // which is D-192-DEF-01 on this box; both readings are recorded rather than the green one kept.
-  "WorkflowCard.test.tsx": 80,
+  // 193-06 (AUTH-03 / D-13 / D-14 / D-15), pinned by 193-10's sweep: 80 → 90. An EXTENSION, never
+  // a lowering — no `it(` was deleted, renamed or moved by Phase 193. One shipped case changed its
+  // ROW rather than its expectation (the dangling-separator case, so the suite keeps a one-part
+  // identity line), which moves no count. The +10 are the card's template mark: the segment
+  // present at INDEX 0 of `identityParts` on a positive `admits`, the two silent arms asserted
+  // against ONE SHARED expected value so `does-not-admit` and `unknown` are proved
+  // indistinguishable by construction rather than by promise, and the provenance node still at DOM
+  // position 2 by child order.
+  //
+  // ⚠ 193-06's OWN SUMMARY DEFERRED THIS RAISE TO THE SWEEP AND NAMED IT: *"193-11 owns the
+  // count-gate pin sweep — WorkflowCard.test.tsx 80 → 90 is NOT pinned here."* It lands in 193-10
+  // rather than 193-11 because the sweep is 193-10's task and 193-11 is the operator's UAT drive.
+  // The deferral is recorded because a raise owed by a plan that never claims it is exactly how a
+  // suite stays permanently unguarded.
+  //
+  // ⚠ ONE SHARED EXPECTED VALUE IS THE LOAD-BEARING SHAPE. D-15 says the two silent arms must be
+  // DELIBERATELY indistinguishable — absence of the mark may never be readable as an assertion
+  // that no template is needed. Two separate expectations would drift apart without failing.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowCard.test.tsx 80 90 +10`).
+  "WorkflowCard.test.tsx": 90,
   // ── The four RAISES owed by suites Phase 192 GREW ──────────────────────────────────────
   //
   // All four already sat in this map (192-01 adopted them in the phase's first commit). Each
@@ -1606,7 +1710,43 @@ const BASELINE = {
 //   +9, `PhaseTimeline` +4, `WorkflowBuilderPage.canvas` +5, `builderStore` +6). It read +41
 //   mid-plan here only because this plan's own 17 new cases were not yet pinned; after the one
 //   entry above it is exactly 24 again, which is the measurement that closes the question.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3430 (193-01)
+// ⚠ AND BY 193-10 (wave 6, the phase's PIN SWEEP): the pinned total → **3533**, the pinned FILE
+// count UNCHANGED at 67 (READ from this script's own printed footer, `67/67 pinned files present`
+// both before and after — this plan creates no suite; it raises seven that Phase 193 GREW).
+// SEVEN map entries move, every one of them an EXTENSION read off the `actual` column of the run
+// that measured them, and NOT ONE is a lowering — so no plan-authorised deletion needs to ride
+// along. `git diff` over the phase confirms no `it(` was removed from any of the seven:
+//   · doorVocabulary.test.ts          9 → 39  (+30, 193-08 — column D, the codepoints, the fence)
+//   · soulData.test.ts               17 → 33  (+16, 193-02 — templateAdmission's three states)
+//   · WorkflowCard.test.tsx           80 → 90  (+10, 193-06 — the mark's slot and its two silences)
+//   · RunModal.test.tsx               32 → 40   (+8, 193-01 + 193-07 — the launch-error guard)
+//   · WorkflowDoorSwitch.test.tsx     28 → 33   (+5, 193-09 — D-22's cross-component equality)
+//   · DoorHeaderStrip.test.tsx        12 → 16   (+4, 193-09 — the D-04 shape, both `inline` values)
+//   · RunModal.a11y.test.tsx          16 → 20   (+4, 193-07 — D-18's label as a TEXT NODE)
+//   ⚠ THE MARKER WAS STALE AGAIN — THE FOURTEENTH TIME — and by **26**: the line below read
+//   `3430 (193-01)` while an UNMODIFIED tree at this plan's base (`294a2ac8`) printed
+//   `pinned total 3456`. CORRECTED HERE ON MEASUREMENT rather than overwritten in silence, which
+//   is this file's habit. The 26 are Phase 193's own middle waves, each correctly pinned in its own
+//   commit while this reader-facing marker was left behind: 193-03's `DoorHeaderStrip.test.tsx` 12,
+//   193-05's `doorVocabulary.test.ts` 9 and its `WorkflowDoorSwitch.test.tsx` 23 → 28 (+5). The
+//   thirteenth event, three notes above, was recorded by 193-01 — and the marker went stale again
+//   two commits later. That is the fourth consecutive phase in which the habit has lapsed on the
+//   very next commit that moved a pin, which is the argument for DERIVING this line, not a
+//   counterexample to it.
+//   ⚠ A SECOND CORRECTION ON MEASUREMENT, AND IT IS AGAINST THIS PLAN'S OWN PLAN FILE:
+//   `193-10-PLAN.md` § `<interfaces>` states the marker "reads `⚠ 3384 (192.1-06)`" and instructs
+//   this plan to record the THIRTEENTH staleness event. Measured, both are one behind — 193-01 had
+//   already corrected the marker to `3430` and had already recorded the thirteenth. A figure
+//   written into a plan at planning time goes stale on that phase's own first commit, which is the
+//   identical failure the ledger rows in `CLAUDE.md` correct about themselves.
+//   ⚠ THE +24 GAP IS UNCHANGED AND IS STILL NOT THIS PLAN'S DEBT — the same four pre-existing
+//   drifts a TENTH consecutive plan declines for the tenth identical reason (`ExternalActionSection`
+//   +9, `PhaseTimeline` +4, `WorkflowBuilderPage.canvas` +5, `builderStore` +6). Measured at this
+//   HEAD the gate printed `total 3557` against `pinned total 3456`, a gap of +101; after the seven
+//   entries above (+77) it is exactly 24 again, which is the measurement that closes the question.
+//   Re-pinning them HERE would fold unrelated drift into a commit that did not cause it. Owed as
+//   its own edit (T-9), and stated so the decline reads as a decision rather than an oversight.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3533 (193-10)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
