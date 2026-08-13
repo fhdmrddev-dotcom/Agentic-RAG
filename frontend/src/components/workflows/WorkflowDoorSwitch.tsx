@@ -32,6 +32,10 @@
 import { useState } from "react"
 import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
+// Phase 193-03 (D-05 / D-08): the govern door's header strip lives in its own module now —
+// the G-5 extraction, shipped BEFORE the D-04 restack that lands on it. Imported as a VALUE
+// at module scope, which is why `DoorHeaderStrip.tsx` may never import back (D-24(b)).
+import { DoorHeaderStrip } from "@/components/workflows/DoorHeaderStrip"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { type DefShape } from "@/components/workflows/soulData"
 
@@ -142,42 +146,17 @@ export function WorkflowDoorSwitch({
   //    folder-scope / model with live tier recompute + the LOCKED always-on judge
   //    (D-05). ──
   if (door === "govern") {
-    /**
-     * Phase 184.1-01 — the door group, declared ONCE and drawn either in this shell's own
-     * band (today) or in the Builder's merged row (`inline`). `goBoth` never changes hands:
-     * the button keeps closing over this component's state wherever the node is rendered,
-     * which is what makes the merge a re-flow rather than a refactor (D-184.1-02).
-     *
-     * `ml-auto` is dropped ONLY when inline: in this shell's own band it is what pushes the
-     * judge badge to the far edge, but inside the merged row's already-right-aligned trailing
-     * group it would open a gap between the label and the badge. Concatenated so the non-inline
-     * string is character-for-character the class list that shipped.
-     */
-    const doorGroup = (
-      <>
-        <button
-          type="button"
-          data-testid="both-doors"
-          onClick={goBoth}
-          className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
-        >
-          ‹ both doors
-        </button>
-        <span className="text-[13px] font-medium text-foreground">🔧 Author &amp; govern</span>
-        <span
-          data-testid="judge-locked"
-          title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)."
-          className={`${inline ? "" : "ml-auto "}inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet`}
-        >
-          <span aria-hidden="true">🔒</span> judge always-on
-        </span>
-      </>
-    )
-
+    // Phase 193-03 (D-05 / D-08) — the door group moved OUT of this file, byte-for-byte, into
+    // `DoorHeaderStrip.tsx`; its docblock (which explained the `ml-auto` conditional) moved with
+    // it and is not restated here. ONE component serves BOTH variants so they cannot drift, and
+    // `goBoth` still never changes hands: the strip is handed the handler this component owns,
+    // wherever the node is drawn (D-184.1-02, unchanged by the move).
     return (
       <div data-testid="door-govern" className="flex h-full flex-col bg-background">
         {!inline && (
-          <div className="flex items-center gap-3 border-b border-border px-4 py-2">{doorGroup}</div>
+          <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+            <DoorHeaderStrip onBack={goBoth} inline={inline} />
+          </div>
         )}
         <div className="min-h-0 flex-1">
           {/* The govern door IS the existing Builder — its advanced governance
@@ -199,7 +178,10 @@ export function WorkflowDoorSwitch({
             // without `inline` the two slots must be genuinely ABSENT from the element, not
             // present-and-undefined, so the Builder's flag-off branch is reached by a page
             // that was handed nothing at all.
-            {...(inline ? { headerLead, headerTrail: doorGroup } : {})}
+            // ⚠ ONE LINE, and mechanically so: `WorkflowBuilderPage.header.test.tsx:475` greps
+            // this source for `inline ? { headerLead, headerTrail` contiguously. Wrapping it
+            // across lines during the 193-03 move reddened that fence with the DOM unchanged.
+            {...(inline ? { headerLead, headerTrail: <DoorHeaderStrip onBack={goBoth} inline={inline} /> } : {})}
           />
         </div>
       </div>
