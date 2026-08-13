@@ -2374,7 +2374,19 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
     )
   }
 
-  /** Type a requirement and press the shipped CTA — the ONE forward path. */
+  /**
+   * Type a requirement and press the shipped CTA — the ONE forward path.
+   *
+   * ⚠ PHASE 193-08 (2026-08-13) — THIS LITERAL IS **CORRECT AS IT STANDS**, and the check was
+   * run rather than assumed. `193-08` re-worded every governed door string to variant D and
+   * re-captured three suites; this one stayed 128/128 green, unedited. The CTA named here is
+   * `WorkflowBuilderPage.tsx:1527`'s OWN literal — this suite mounts the page DIRECTLY, never
+   * through `WorkflowDoorSwitch` — so it is a genuinely different string from the door's
+   * `DESCRIBE_CTA`, which now reads variant D. Two homes for the same words; only one moved.
+   * Recorded as a deferred item with its trigger in `193-08-SUMMARY.md` § Deferred. Do NOT
+   * "fix" this to the door's wording without moving the page's literal in the same commit —
+   * that would red this row for a reason the page does not have.
+   */
   async function draftIt(text = "summarise the supplier renewals every week") {
     await screen.findByTestId("describe-hint")
     fireEvent.change(screen.getByLabelText("business requirement"), { target: { value: text } })

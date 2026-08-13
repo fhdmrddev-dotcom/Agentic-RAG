@@ -77,8 +77,18 @@ describe("WorkflowDoorSwitch — the 'both' chooser (047-A variant A)", () => {
     expect(screen.getByTestId("workflow-doors")).toBeInTheDocument()
     const describeDoor = screen.getByTestId("door-card-describe")
     const governDoor = screen.getByTestId("door-card-govern")
-    expect(describeDoor).toHaveTextContent(/describe & run/i)
-    expect(governDoor).toHaveTextContent(/author & govern/i)
+    // Phase 193-08 RE-CAPTURE (2026-08-13, words only): these two read `/describe & run/i` and
+    // `/author & govern/i` until variant D landed. They are now READ OFF `doorVocabulary`
+    // rather than re-typed at column D — a literal here would be a second home for the copy
+    // (D-11) and would go stale silently at the next reword.
+    //
+    // ⚠ ASSERTED IN BOTH DIRECTIONS, because a name-only check on a composite card is exactly
+    // the vacuous shape `doorVocabulary.test.ts` rule 2 bans: each card must name ITS OWN door
+    // and must NOT name the other one.
+    expect(describeDoor).toHaveTextContent(doorVocabulary.DOOR_A_NAME)
+    expect(describeDoor).not.toHaveTextContent(doorVocabulary.DOOR_B_NAME)
+    expect(governDoor).toHaveTextContent(doorVocabulary.DOOR_B_NAME)
+    expect(governDoor).not.toHaveTextContent(doorVocabulary.DOOR_A_NAME)
   })
 
   it("defaults to 'both' but honours initialDoor='govern' (Open/Tweak land in govern)", () => {
@@ -95,7 +105,10 @@ describe("WorkflowDoorSwitch — the describe door (loose, D-05)", () => {
     expect(screen.getByTestId("door-describe")).toBeInTheDocument()
     // The one-click `switch-strip` to the strict door (D-05).
     expect(screen.getByTestId("switch-strip")).toBeInTheDocument()
-    expect(screen.getByTestId("switch-to-govern")).toHaveTextContent(/author & govern/i)
+    // Phase 193-08 RE-CAPTURE (2026-08-13, words only): was `/author & govern/i`. Asserted as
+    // the WHOLE string now, not a fragment — `SWITCH_CTA` is `DOOR_B_NAME` plus a chevron, so a
+    // fragment check on the name cannot tell the CTA from the card or from the govern strip.
+    expect(screen.getByTestId("switch-to-govern").textContent).toBe(doorVocabulary.SWITCH_CTA)
     // The soul PREVIEW of the current draft/definition.
     const preview = screen.getByTestId("describe-soul-preview")
     expect(within(preview).getByTestId("workflow-soul").getAttribute("data-scale")).toBe("card")

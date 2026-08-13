@@ -27,6 +27,28 @@
  * start matching a different node after a Tailwind edit, and a pin that quietly moved to
  * another element is worse than no pin.
  *
+ * ── ⚠ PHASE 193-08 (2026-08-13) — THIS SUITE NEEDED **NO** RE-CAPTURE, AND THAT IS A ───
+ *    MEASUREMENT, NOT AN OVERSIGHT.
+ *
+ * `193-08` ships variant D: every governed door word changes, and it re-captured three other
+ * suites to say so. This one was named in the same plan's `files_modified` on the expectation
+ * that it would red too. IT DID NOT — 19/19 green, unedited, with the CTA-region literal
+ * below untouched. The reason is worth writing down, because it is the shape of a real gap:
+ *
+ *   THE WORDS ON THIS SCREEN ARE A **SECOND HOME**. `193-05` moved the door surface's copy
+ *   into `components/workflows/doorVocabulary.ts`, but the strings pinned here are
+ *   `WorkflowBuilderPage.tsx`'s OWN literals — the CTA at `:1527` and the three hint
+ *   fragments at `:1531-1533`. The DOOR renders `describe-draft` from `DESCRIBE_CTA`; this
+ *   page renders a visually identical, textually identical, and completely separate copy.
+ *   No plan in Phase 193 owns `WorkflowBuilderPage.tsx`, so after variant D ships the loose
+ *   door reads "Write the first draft" while the govern door's first screen still reads the
+ *   column-A wording.
+ *
+ * That divergence is REAL, is VISIBLE to a user who opens each door in turn, and is recorded as a
+ * deferred item with its trigger in `193-08-SUMMARY.md` § Deferred rather than fixed inside a
+ * plan whose `files_modified` does not include the page. When someone does move these four
+ * strings into `doorVocabulary`, THIS suite reds — and that red is the correct signal.
+ *
  * ── THE OUTERHTML LITERAL ──────────────────────────────────────────────────────────
  *
  * ONE normalised literal, asserted for the absent-key map, and then the operator-like map

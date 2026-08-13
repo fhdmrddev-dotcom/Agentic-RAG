@@ -21,8 +21,13 @@
  * are not siblings in the DOM — they are contributed at three nesting levels:
  *
  *   WorkflowsPage        `← Workflows` · `Edit · <title>` · `NET-NEW`
- *     WorkflowDoorSwitch `‹ both doors` · `🔧 Author & govern` · `JUDGE ALWAYS-ON`
+ *     WorkflowDoorSwitch STRIP_BACK · STRIP_LABEL_GOVERN · `JUDGE ALWAYS-ON`
  *       WorkflowBuilder  `<slug>` · `draft` · `Save draft` · `◆ Publish…`
+ *
+ * ⚠ The middle row's two words are named by their `doorVocabulary` ids rather than quoted,
+ * as of `193-08`: they are governed COPY and were re-worded to variant D in that plan, so a
+ * quotation here would be a fourth home for a string with one owner. The other rows' labels
+ * are NOT governed copy and stay quoted.
  *
  * So `headerBandsAbove()` walks up from `builder-grid` to the render root and collects
  * every PRECEDING SIBLING at each level. In a column layout that set is exactly the rows
@@ -118,6 +123,11 @@ import type { EffectiveFeatures } from "@/lib/api"
 import builderSource from "./WorkflowBuilderPage?raw"
 import workflowsPageSource from "./WorkflowsPage?raw"
 import doorSwitchSource from "@/components/workflows/WorkflowDoorSwitch?raw"
+// Phase 193-08: the two governed words this suite names, READ off their one home rather than
+// re-typed. A page suite that spells a governed door string is a second home (D-11) and goes
+// stale silently at the next reword — which is precisely what happened to every literal this
+// plan had to re-capture.
+import { STRIP_BACK, STRIP_LABEL_GOVERN } from "@/components/workflows/doorVocabulary"
 
 /** Two steps, hand-authored so `__fixtures__/canvasFixtures.ts` stays untouched
  *  (D-184-17 — that corpus belongs to the snapshot + round-trip suites). */
@@ -246,7 +256,11 @@ describe("Builder header, canvas flag OFF — three separate bands (D-181-01)", 
       const back = screen.getByTestId("builder-back")
       expect(back.textContent).toContain("← Workflows")
       const bothDoors = screen.getByTestId("both-doors")
-      expect(bothDoors.textContent).toContain("‹ both doors")
+      // Phase 193-08 RE-CAPTURE (2026-08-13, words only): the expectation was a literal until
+      // variant D landed. It now READS the word off `doorVocabulary` and compares the WHOLE
+      // string — a governed word re-typed in a page suite is a second home (D-11), and a
+      // fragment check could not tell this control's label from the strip's.
+      expect(bothDoors.textContent).toBe(STRIP_BACK)
       expect(screen.getByTestId("door-govern")).toBeInTheDocument()
       expect(screen.getByTestId("judge-locked")).toBeInTheDocument()
       const saveCluster = screen.getByTestId("builder-save-state")
@@ -294,14 +308,43 @@ describe("Builder header, canvas flag OFF — three separate bands (D-181-01)", 
 // ── MARKUP: the exact flag-off header, so ANY structural change reds with a diff ────
 
 /**
- * The three bands' normalised `outerHTML`, outermost first, captured from the UNMODIFIED
- * page. It is deliberately verbatim rather than a shape assertion: the promise D-181-01
- * makes is about the markup a shipped user receives, and a "looks about right" matcher
- * cannot break when a wrapper is introduced or a band is re-parented.
+ * The three bands' normalised `outerHTML`, outermost first, captured from the page. It is
+ * deliberately verbatim rather than a shape assertion: the promise D-181-01 makes is about
+ * the markup a shipped user receives, and a "looks about right" matcher cannot break when a
+ * wrapper is introduced or a band is re-parented.
+ *
+ * ── ⚠ RE-CAPTURED ONCE, DELIBERATELY, BY PLAN `193-08` ON 2026-08-13 ────────────────────
+ *
+ * This literal was captured in Phase 184.1 and had stood unedited for NINE phases, which is
+ * exactly what made it the strongest instrument Phase 193 had. It is re-captured here, from
+ * the rendered tree via the same `headerMarkup()` driver (twice, agreeing byte for byte), and
+ * NOT hand-edited. The reasons, stated rather than absorbed:
+ *
+ *  • WHY IT IS LEGITIMATE NOW. `193-03` (the `DoorHeaderStrip` extraction) and `193-05` (the
+ *    copy move into `doorVocabulary.ts`) BOTH passed with this literal GREEN AND UNEDITED.
+ *    That is the proof both were verbatim moves, and it could only be collected before a word
+ *    changed. `193-08` is the first plan in the phase that intentionally changes a RENDERED
+ *    WORD (variant D, D-01), so the literal has already discharged its purpose.
+ *
+ *  • WHAT CHANGED: THE WORDS ONLY, measured rather than asserted. Old vs new was compared with
+ *    tags and text separated. ALL THREE BANDS: `structure identical: true` — every tag, class
+ *    list, `data-testid`, the judge badge's `title`, and the `ml-auto` byte-for-byte unchanged.
+ *    TEXT NODES: band 1 → 3/3 with ZERO differences, band 3 → 4/4 with ZERO differences, and
+ *    band 2 → 4/4 with exactly TWO differing nodes:
+ *        "‹ both doors"          ->  "‹ Change how I start"     (`strip.back`)
+ *        "🔧 Author &amp; govern" ->  "Build it myself"          (`strip.labelGovern`, D-23)
+ *    The 🔧 leaving is a CONSEQUENCE of D-23 (the label becomes the door's own name, which
+ *    carries no glyph), not a discretionary choice, and it is routed to UAT row U6.
+ *
+ *  • ⚠ THIS IS RE-CAPTURE **ONE OF TWO**. `193-09`'s D-04/D-22 restack will red this literal
+ *    again — on STRUCTURE rather than on words, which is precisely the distinction this note
+ *    makes checkable for the next author. Both are legitimate; both must be stated. Any
+ *    further re-capture whose diff shows a TAG difference the plan did not name is a
+ *    behaviour change to explain, not a test to update.
  */
 const FLAG_OFF_HEADER_MARKUP = [
   `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="builder-back" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">← Workflows</button><span class="text-[13px] font-medium text-foreground">Edit · Vendor brief v1</span><span data-testid="net-new-flag" title="Net-new surface — only GET /workflows/published + POST /workflows/{id}/publish are live today" class="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet">net-new</span></div>`,
-  `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="both-doors" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">‹ both doors</button><span class="text-[13px] font-medium text-foreground">🔧 Author &amp; govern</span><span data-testid="judge-locked" title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)." class="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"><span aria-hidden="true">🔒</span> judge always-on</span></div>`,
+  `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="both-doors" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">‹ Change how I start</button><span class="text-[13px] font-medium text-foreground">Build it myself</span><span data-testid="judge-locked" title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)." class="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"><span aria-hidden="true">🔒</span> judge always-on</span></div>`,
   `<header class="flex items-center justify-between border-b border-border px-4 py-2.5"><div class="flex min-w-0 items-center gap-2"><span class="min-w-0 truncate text-[14px] font-semibold text-foreground">vendor-brief</span><span class="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">draft</span></div><div class="flex shrink-0 items-center gap-2"><div data-testid="builder-save-state" class="flex items-center gap-2"><button type="button" data-testid="builder-save-draft" class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60">Save draft</button></div><div><button type="button" data-testid="publish-trigger" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90">◆ Publish…</button></div></div></header>`,
 ].join("\n")
 
@@ -349,17 +392,21 @@ describe("Builder header, canvas flag ON — ONE row (D-184.1-01)", () => {
     await openDraftBuilder(FLAG_ON)
 
     expect(screen.getByRole("button", { name: "← Workflows" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "‹ both doors" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: STRIP_BACK })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Save draft" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "◆ Publish…" })).toBeInTheDocument()
 
     // …and every badge and label rides along with them — nothing was dropped to make the
-    // row fit, including the `🔧 Author & govern` label the plan's row sketch omitted.
+    // row fit, including the govern-door label (`strip.labelGovern`) the plan's row sketch
+    // omitted. ⚠ Phase 193-08 RE-CAPTURE (2026-08-13, words only): that label was a glyph plus
+    // the old door name and is now variant D's door name with NO glyph (D-23). The assertion
+    // READS it off `doorVocabulary` and is NOT softened — it still names the exact shipped
+    // label, which is the whole point of the row.
     const bar = screen.getByTestId("builder-header-bar")
     expect(bar).toHaveTextContent("Edit · Vendor brief v1")
     expect(bar).toHaveTextContent("vendor-brief")
     expect(bar).toHaveTextContent("draft")
-    expect(bar).toHaveTextContent("🔧 Author & govern")
+    expect(bar).toHaveTextContent(STRIP_LABEL_GOVERN)
     expect(bar.contains(screen.getByTestId("net-new-flag"))).toBe(true)
     expect(bar.contains(screen.getByTestId("judge-locked"))).toBe(true)
     expect(bar.contains(screen.getByTestId("builder-save-state"))).toBe(true)
@@ -798,7 +845,7 @@ describe("Builder header, canvas flag ON — the merged row also appears on Spin
     expect(bar.contains(screen.getByTestId("net-new-flag"))).toBe(true)
     expect(bar.contains(screen.getByTestId("judge-locked"))).toBe(true)
     expect(screen.getByRole("button", { name: "← Workflows" })).toBeInTheDocument()
-    expect(screen.getByRole("button", { name: "‹ both doors" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: STRIP_BACK })).toBeInTheDocument()
   })
 })
 
