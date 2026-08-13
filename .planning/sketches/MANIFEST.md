@@ -1614,7 +1614,7 @@ Requirements **AUTH-01** (SEED-147) and **AUTH-03** (SEED-110, closed — placem
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 164 | telling-the-doors-apart | Which wording lets someone who has never seen the Builder predict what each door does — before clicking? | **PENDING operator pick (A / B / C)** | phase-193, auth-01, auth-03, doors, naming, copy, template-placement, acceptance-bar, build-contract, anti-drift, g2-sketch-gate |
+| 164 | telling-the-doors-apart | Which wording lets someone who has never seen the Builder predict what each door does — before clicking? | **D — the mix** (2026-08-13): B's door NAMES (`Draft it for me` / `Build it myself`) + C's two TIER labels (`you write one paragraph` / `you decide every setting`), **derived from B and C in `build.cjs`, never re-typed** — audit 18 matched / 0 missed. A·B·C remain on the page as the comparison that produced it, not as live options. **The header-strip restack is IN SCOPE for 193** (structural, no mockup — 193 owes it a CONTEXT.md decision). | phase-193, auth-01, auth-03, doors, naming, copy, template-placement, acceptance-bar, build-contract, anti-drift, g2-sketch-gate |
 
 ### ⚠ 164 CLOSES THE HOLE 163 STILL HAD — the arrow of generation is reversed
 

@@ -41,6 +41,7 @@ const chrome = `
 .s164-badge-b{color:hsl(var(--primary));border-color:hsl(var(--primary)/.45);background:hsl(var(--primary)/.08)}
 .s164-badge-c{color:hsl(var(--accent-violet));border-color:hsl(var(--accent-violet)/.45);background:hsl(var(--accent-violet)/.08)}
 .s164-badge-p{color:hsl(var(--success));border-color:hsl(var(--success)/.45);background:hsl(var(--success)/.08)}
+.s164-badge-d{color:hsl(var(--success));border-color:hsl(var(--success)/.7);background:hsl(var(--success)/.14);font-weight:600}
 .s164-h3{font-size:.95rem;font-weight:600;margin:1.9rem 0 .3rem}
 .s164-note{font-size:.8rem;line-height:1.6;color:hsl(var(--muted-foreground));margin:0 0 .7rem;max-width:88ch}
 .s164-note code,.s164-mech code,.s164-axis code{font-family:ui-monospace,monospace;font-size:.92em;background:hsl(var(--muted));padding:.06rem .3rem;border-radius:.25rem}

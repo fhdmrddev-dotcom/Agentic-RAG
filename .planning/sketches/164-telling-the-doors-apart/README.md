@@ -2,7 +2,7 @@
 sketch: 164
 name: telling-the-doors-apart
 question: "Which wording lets someone who has never seen the Builder predict what each door does — before clicking?"
-winner: "PENDING — awaiting the operator's pick (A / B / C)"
+winner: "D — the mix (2026-08-13, operator). B's door NAMES + C's two TIER labels, derived not re-typed. The header-strip fix is IN SCOPE for 193."
 tags: [phase-193, auth-01, auth-03, doors, naming, copy, template-placement, acceptance-bar, build-contract, anti-drift, g2-sketch-gate]
 ---
 
@@ -112,12 +112,49 @@ control they cannot use, and the ones that do say nothing about it. The proposal
 pick, 2026-08-13): **mark it on the card, name it in the Run modal, and render nothing for
 workflows that do not fill one.**
 
+## ✅ THE OPERATOR'S DECISION — 2026-08-13
+
+Both answers, recorded here because the first attempt to act on them was lost to a laptop
+restart before a single byte reached disk. (Nothing was recoverable: no commit, no file, no
+transcript message, no subagent — the session died with the question still on screen. That is
+why this section exists **before** any planning artifact does.)
+
+**1 · Door wording → VARIANT D, "the mix".** B's door NAMES with C's two uppercase TIER
+labels:
+
+```
+you write one paragraph           you decide every setting
+Draft it for me                   Build it myself
+              ‹ Change how I start
+```
+
+*Why:* B's names answer **who does the work**, which is the question SEED-147's operator
+actually had. C's tiers state **what it costs you** where B's state a benefit — and benefits
+are what made the shipped wording vague. Everything else in D is B verbatim.
+
+**D is DERIVED, never re-typed** (`build.cjs` — `D_FROM_C`): it reads B for every id except
+`doorA.tier` / `doorB.tier`, which read C. A hand-typed D would be a *third* copy of every
+string, free to drift the moment B or C is touched — precisely the failure this sketch's
+generate-from-the-build mechanism exists to prevent. The regenerated substitution audit reports
+**D: 18 matched, zero misses** against the real DOM.
+
+A, B and C stay on the page and in the contract table as the comparison that produced the
+pick. They are **evidence, not live options** — the build ports column D.
+
+**2 · The header strip → IN SCOPE for Phase 193.** See below; this is the half of SEED-147
+that copy provably cannot reach.
+
 ## ⚠ What this sketch deliberately does NOT resolve
 
 1. **The header-strip stacking (suspect #2).** Copy can make the return control *read* as an
    escape; it cannot restack the strip or demote the `🔒 judge always-on` badge. That is a
    structural decision and belongs in `193-CONTEXT.md` on its own, **not** smuggled in as part
-   of a chosen variant.
+   of a chosen variant. **→ The operator ruled it IN SCOPE for 193 on 2026-08-13.** It stays
+   listed here as unresolved *by this sketch* — the sketch shows no mockup of the restack, so
+   193 owes it a design decision in CONTEXT.md, not a copy row. Today the govern strip renders
+   `‹ both doors` · `🔧 Author & govern` · `🔒 judge always-on` as three visual peers; the
+   agreed direction is to demote the return control to a quiet escape and separate the judge
+   badge from the door group.
 2. **The template panel is a PROPOSAL, not a generated dump** — it adds nodes no component has
    yet, so there was nothing real to render. Its contract rows are marked `NEW` / `CHANGE`
    rather than `SHIPPED`. Normal sketch-drift risk applies there and nowhere else on the page.

@@ -77,10 +77,36 @@ const COPY = [
   { id: "soul.label", where: 'testid="describe-soul-preview" — the uppercase label', shipped: "This workflow's soul", B: "What this will do", C: "What this will do" },
 ]
 
+/**
+ * ── VARIANT D — THE OPERATOR'S PICK (2026-08-13) ───────────────────────────
+ *
+ * D is NOT a fourth hand-written set of strings. It is DERIVED: variant B
+ * everywhere, EXCEPT the two uppercase tier labels, which come from C.
+ *
+ * Deriving rather than re-typing is the whole point. A hand-typed D would be a
+ * THIRD copy of every string, free to drift from B and C the moment either is
+ * touched — the exact failure mode this sketch's generate-from-the-build
+ * mechanism exists to make impossible. There is no string below that does not
+ * already appear in the table above.
+ *
+ * The reasoning, recorded so a later reader does not have to reconstruct it:
+ * B's door NAMES answer "who does the work" (`Draft it for me` / `Build it
+ * myself`), which is the question SEED-147's operator actually had. C's TIER
+ * labels state the price concretely (`you write one paragraph` / `you decide
+ * every setting`) where B's state a benefit — and benefits are what made the
+ * shipped wording vague in the first place.
+ */
+const D_FROM_C = new Set(["doorA.tier", "doorB.tier"])
+for (const c of COPY) {
+  const src = D_FROM_C.has(c.id) ? c.C : c.B
+  if (src) c.D = src
+}
+
 const VARIANTS = [
   { key: "A", name: "Today (shipped)", axis: "The baseline. Zero substitutions — this is the real component's real DOM.", tone: "baseline" },
   { key: "B", name: "Plain verbs", axis: "Attacks SEED-147 suspect #1: “govern” is the product's word, not the user's. One plain verb per door, and the return control reads as an escape (“‹ Change how I start”) rather than a noun that looks like a third door.", tone: "b" },
   { key: "C", name: "Name the cost", axis: "Attacks SEED-147 suspect #3 on its real ground: the chooser DOES state a consequence today, but it states it as a FEATURE LIST. This states what YOU have to supply — one paragraph vs every setting.", tone: "c" },
+  { key: "D", name: "THE PICK — plain verbs, named cost", axis: "The operator's pick, 2026-08-13. DERIVED, not re-typed: B everywhere, except the two uppercase tier labels which come from C. B's names say who does the work; C's tiers say what it costs YOU. This is the acceptance bar for Phase 193 — A, B and C remain on the page as the comparison that produced it, not as live options.", tone: "d" },
 ]
 
 const esc = (s) => s.replace(/&/g, "&amp;")
@@ -210,7 +236,7 @@ const contractRows = COPY.filter((c) => c.shipped)
   .map(
     (c) => `<tr><td><code>${c.id}</code></td><td class="s164-where">${c.where}</td><td>${c.shipped
       .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")}</td><td>${(c.B || "—").replace(/&/g, "&amp;")}</td><td>${(c.C || "—").replace(/&/g, "&amp;")}</td></tr>`,
+      .replace(/</g, "&lt;")}</td><td>${(c.B || "—").replace(/&/g, "&amp;")}</td><td>${(c.C || "—").replace(/&/g, "&amp;")}</td><td><strong>${(c.D || "—").replace(/&/g, "&amp;")}</strong>${c.D && D_FROM_C.has(c.id) ? ' <span class="s164-badge s164-badge-c">from C</span>' : ""}</td></tr>`,
   )
   .join("\n")
 
@@ -260,7 +286,7 @@ ${VARIANTS.map(variantSection).join("\n")}
   <h3 class="s164-h3">COPY table — every string this sketch varies</h3>
   <p class="s164-note">The build <strong>ports this table</strong> into a vocabulary module and imports it, mirroring the shipped <code>libraryVocabulary.ts</code> shape. It does not re-type strings out of JSX. A blank cell means the variant inherits the shipped string.</p>
   <table class="s164-table">
-    <thead><tr><th>id</th><th>where</th><th>A · shipped</th><th>B · plain verbs</th><th>C · name the cost</th></tr></thead>
+    <thead><tr><th>id</th><th>where</th><th>A · shipped</th><th>B · plain verbs</th><th>C · name the cost</th><th>D · THE PICK</th></tr></thead>
     <tbody>${contractRows}</tbody>
   </table>
   <h3 class="s164-h3">Substitution audit</h3>
@@ -315,10 +341,14 @@ The build MUST port this table into a vocabulary module and import it (the shipp
 \`libraryVocabulary.ts\` shape), rather than re-typing strings into JSX. A blank variant cell
 means: inherit the shipped string unchanged.
 
-| id | where | A · shipped | B · plain verbs | C · name the cost |
-|---|---|---|---|---|
+**Column D is the one the build ports.** A, B and C are kept beside it as the comparison that
+produced the pick — they are evidence, not live options. A cell marked ⬅ is the one place D
+takes C's string instead of B's.
+
+| id | where | A · shipped | B · plain verbs | C · name the cost | **D · THE PICK** |
+|---|---|---|---|---|---|
 ${COPY.filter((c) => c.shipped)
-  .map((c) => `| \`${c.id}\` | ${c.where} | ${c.shipped} | ${c.B || "*(inherit)*"} | ${c.C || "*(inherit)*"} |`)
+  .map((c) => `| \`${c.id}\` | ${c.where} | ${c.shipped} | ${c.B || "*(inherit)*"} | ${c.C || "*(inherit)*"} | ${c.D ? `**${c.D}**${D_FROM_C.has(c.id) ? " ⬅ from C" : ""}` : "*(inherit)*"} |`)
   .join("\n")}
 
 ### Composed string

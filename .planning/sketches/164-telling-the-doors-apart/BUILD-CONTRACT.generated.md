@@ -24,28 +24,32 @@ The build MUST port this table into a vocabulary module and import it (the shipp
 `libraryVocabulary.ts` shape), rather than re-typing strings into JSX. A blank variant cell
 means: inherit the shipped string unchanged.
 
-| id | where | A · shipped | B · plain verbs | C · name the cost |
-|---|---|---|---|---|
-| `chooser.h1` | WorkflowDoorSwitch.tsx — chooser <h1> | How do you want to build this? | How do you want to start? | Two ways to build this |
-| `chooser.sub` | WorkflowDoorSwitch.tsx — chooser sub-<p> | Pick the fast path or full control — nothing is locked, you can switch anytime. | Both end up in the same place. You can switch between them at any time. | The difference is how much you decide yourself. Nothing is locked either way. |
-| `doorA.tier` | testid="door-card-describe" — uppercase tier <span> | loose · fastest path | quickest · the AI writes the first draft | you write one paragraph |
-| `doorA.name` | testid="door-card-describe" — name <span> | Describe & run | Draft it for me | Describe it |
-| `doorA.desc` | testid="door-card-describe" — description <span> | Say what recurring work this should do — the AI drafts the phases and sets the strictness. | Describe the recurring work in plain language. The AI writes the steps, sets how strict it is, and asks you about anything it had to guess. | Write a paragraph about the recurring work. The AI turns it into steps and picks the settings — then you review what it chose. |
-| `doorA.note` | testid="door-card-describe" — italic footnote <span> | nothing locked — switch to Author & govern anytime | you can open the full editor at any point — nothing is locked in | review and change anything afterwards |
-| `doorB.tier` | testid="door-card-govern" — uppercase tier <span> | power · full control | full control · you set every step | you decide every setting |
-| `doorB.name` | testid="door-card-govern" — name <span> | Author & govern | Build it myself | Set it up yourself |
-| `doorB.desc` | testid="door-card-govern" — description <span> | Open the full Builder — every advanced control, the live strictness tier, the locked judge. | Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step. | Add each step by hand and choose its settings — sources to cite, checks that must pass, model per step. |
-| `doorB.note` | testid="door-card-govern" — italic footnote <span> | citation policy · gate set · per-phase scope & model | what it must cite · required checks · per-step sources & model | for work with rules you already know |
-| `strip.back` | testid="both-doors" — the return control, BOTH open doors | ‹ both doors | ‹ Change how I start | ‹ Back to both options |
-| `strip.label` | describe-door header — the current-door label <span> | ⚡ Describe & run | ⚡ Drafting it for you | ⚡ Describing it |
-| `describe.h1` | describe door — <h1> | What recurring work should this automate? | *(inherit)* | *(inherit)* |
-| `describe.cta` | testid="describe-draft" — the CTA button | Draft the workflow | Write the first draft | Turn this into steps |
-| `hint.frag1` | testid="describe-hint" — <b> #1 | drafts the phases | writes the steps | turns it into steps |
-| `hint.frag2` | testid="describe-hint" — <b> #2 | sets the strictness | sets how strict it is | chooses the settings |
-| `hint.frag3` | testid="describe-hint" — <b> #3 | asks about anything it had to guess | asks about anything it had to guess | tells you what it guessed |
-| `switch.prompt` | testid="switch-strip" — the prompt <span> | Need citation policy, gates, or per-phase scope? | Need to set citations, checks, or per-step sources yourself? | Rather choose the settings yourself? |
-| `switch.cta` | testid="switch-to-govern" — the button | Author & govern › | Build it myself › | Set it up yourself › |
-| `soul.label` | testid="describe-soul-preview" — the uppercase label | This workflow's soul | What this will do | What this will do |
+**Column D is the one the build ports.** A, B and C are kept beside it as the comparison that
+produced the pick — they are evidence, not live options. A cell marked ⬅ is the one place D
+takes C's string instead of B's.
+
+| id | where | A · shipped | B · plain verbs | C · name the cost | **D · THE PICK** |
+|---|---|---|---|---|---|
+| `chooser.h1` | WorkflowDoorSwitch.tsx — chooser <h1> | How do you want to build this? | How do you want to start? | Two ways to build this | **How do you want to start?** |
+| `chooser.sub` | WorkflowDoorSwitch.tsx — chooser sub-<p> | Pick the fast path or full control — nothing is locked, you can switch anytime. | Both end up in the same place. You can switch between them at any time. | The difference is how much you decide yourself. Nothing is locked either way. | **Both end up in the same place. You can switch between them at any time.** |
+| `doorA.tier` | testid="door-card-describe" — uppercase tier <span> | loose · fastest path | quickest · the AI writes the first draft | you write one paragraph | **you write one paragraph** ⬅ from C |
+| `doorA.name` | testid="door-card-describe" — name <span> | Describe & run | Draft it for me | Describe it | **Draft it for me** |
+| `doorA.desc` | testid="door-card-describe" — description <span> | Say what recurring work this should do — the AI drafts the phases and sets the strictness. | Describe the recurring work in plain language. The AI writes the steps, sets how strict it is, and asks you about anything it had to guess. | Write a paragraph about the recurring work. The AI turns it into steps and picks the settings — then you review what it chose. | **Describe the recurring work in plain language. The AI writes the steps, sets how strict it is, and asks you about anything it had to guess.** |
+| `doorA.note` | testid="door-card-describe" — italic footnote <span> | nothing locked — switch to Author & govern anytime | you can open the full editor at any point — nothing is locked in | review and change anything afterwards | **you can open the full editor at any point — nothing is locked in** |
+| `doorB.tier` | testid="door-card-govern" — uppercase tier <span> | power · full control | full control · you set every step | you decide every setting | **you decide every setting** ⬅ from C |
+| `doorB.name` | testid="door-card-govern" — name <span> | Author & govern | Build it myself | Set it up yourself | **Build it myself** |
+| `doorB.desc` | testid="door-card-govern" — description <span> | Open the full Builder — every advanced control, the live strictness tier, the locked judge. | Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step. | Add each step by hand and choose its settings — sources to cite, checks that must pass, model per step. | **Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step.** |
+| `doorB.note` | testid="door-card-govern" — italic footnote <span> | citation policy · gate set · per-phase scope & model | what it must cite · required checks · per-step sources & model | for work with rules you already know | **what it must cite · required checks · per-step sources & model** |
+| `strip.back` | testid="both-doors" — the return control, BOTH open doors | ‹ both doors | ‹ Change how I start | ‹ Back to both options | **‹ Change how I start** |
+| `strip.label` | describe-door header — the current-door label <span> | ⚡ Describe & run | ⚡ Drafting it for you | ⚡ Describing it | **⚡ Drafting it for you** |
+| `describe.h1` | describe door — <h1> | What recurring work should this automate? | *(inherit)* | *(inherit)* | *(inherit)* |
+| `describe.cta` | testid="describe-draft" — the CTA button | Draft the workflow | Write the first draft | Turn this into steps | **Write the first draft** |
+| `hint.frag1` | testid="describe-hint" — <b> #1 | drafts the phases | writes the steps | turns it into steps | **writes the steps** |
+| `hint.frag2` | testid="describe-hint" — <b> #2 | sets the strictness | sets how strict it is | chooses the settings | **sets how strict it is** |
+| `hint.frag3` | testid="describe-hint" — <b> #3 | asks about anything it had to guess | asks about anything it had to guess | tells you what it guessed | **asks about anything it had to guess** |
+| `switch.prompt` | testid="switch-strip" — the prompt <span> | Need citation policy, gates, or per-phase scope? | Need to set citations, checks, or per-step sources yourself? | Rather choose the settings yourself? | **Need to set citations, checks, or per-step sources yourself?** |
+| `switch.cta` | testid="switch-to-govern" — the button | Author & govern › | Build it myself › | Set it up yourself › | **Build it myself ›** |
+| `soul.label` | testid="describe-soul-preview" — the uppercase label | This workflow's soul | What this will do | What this will do | **What this will do** |
 
 ### Composed string
 
@@ -55,6 +59,7 @@ example for each variant, so the build composes rather than guesses:
 - **A** — "You describe the goal — the AI **drafts the phases**, **sets the strictness**, and **asks about anything it had to guess**."
 - **B** — "You describe the goal — the AI **writes the steps**, **sets how strict it is**, and **asks about anything it had to guess**."
 - **C** — "You describe the goal — the AI **turns it into steps**, **chooses the settings**, and **tells you what it guessed**."
+- **D** — "You describe the goal — the AI **writes the steps**, **sets how strict it is**, and **asks about anything it had to guess**."
 
 ## AUTH-03 — the template proposal
 
@@ -74,6 +79,7 @@ definition-side field name at plan time rather than trusting this sentence).
 
 - **Variant B** — 18 substitution(s) matched the real DOM; **zero misses**
 - **Variant C** — 19 substitution(s) matched the real DOM; **zero misses**
+- **Variant D** — 18 substitution(s) matched the real DOM; **zero misses**
 
 ## The open decision this sketch deliberately does NOT resolve
 
