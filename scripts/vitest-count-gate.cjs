@@ -276,6 +276,28 @@ const BASELINE = {
   // KEY is absent from the request the client actually sends). Both observed RED with
   // the picker's single `onChange("")` severed.
   "WorkflowDoorSwitch.test.tsx": 23,
+  // 193-01 (D-08 / AUTH-01) — a NEW FILE, pinned in the SAME COMMIT that creates it, which is
+  // the only commit it CAN be pinned in: a `BASELINE` entry naming a path that does not yet
+  // exist makes this gate ERROR (exit 2) rather than fail.
+  //
+  // ⚠ NO `TARGETS` EDIT ACCOMPANIES IT, and that is MEASURED rather than assumed — the same
+  // check `runVocabulary.test.ts` and `libraryFork.test.ts` above record. The file lives in
+  // `src/components/workflows`, already a DIRECTORY entry in TARGETS, so it RAN the moment it
+  // existed: the gate printed `WorkflowDoorSwitch.baseline.test.tsx — 17 new` before this line
+  // was written. TARGETS decides what RUNS, BASELINE what is GUARDED, and only the second was
+  // missing.
+  //
+  // What would be unguarded without it: the six whole-`innerHTML` characterization captures of
+  // `WorkflowDoorSwitch` taken on the UNMOVED tree at `501b3c14` — the only evidence Phase 193
+  // will have that lifting the govern band into `DoorHeaderStrip.tsx` and the copy into
+  // `doorVocabulary.ts` (both proved nonexistent at that commit, exit 128) changed no pixel.
+  // Half of its rows are ABSENCE assertions and one is the D-05 `ml-auto` pair, which is the
+  // easiest kind of case to delete unnoticed and the whole reason the six-state shape exists.
+  //
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN (`— 17 new`), never hand-counted from `it(`
+  // literals — the house rule this header states twice and `librarySubtree.fences.test.ts`
+  // records five times.
+  "WorkflowDoorSwitch.baseline.test.tsx": 17,
   "PhaseSpine.test.tsx": 11,
   "deriveTier.test.ts": 9,
   "WorkflowSoul.test.tsx": 8,
@@ -1517,7 +1539,30 @@ const BASELINE = {
 //   drifts, now declined by an eighth consecutive plan for the eighth identical reason (T-9). It
 //   read +65 mid-plan here only because this plan's own 41 new cases were not yet pinned; after
 //   the one entry above it is exactly 24 again, which is the measurement that closes the question.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3384 (192.1-06)
+// ⚠ AND BY 193-01 (wave 1, D-08): the pinned total → **3430**, the pinned FILE count 64 → 65
+// (both READ from this script's own printed footer — it said `64/64 pinned files present`
+// before the entry and `65/65` after; the 192.1-06 note above says 63, which was already one
+// behind and is corrected here on measurement rather than inherited).
+// ONE map entry is ADDED (`WorkflowDoorSwitch.baseline.test.tsx` 17, a file created in the same
+// commit); nothing is lowered, nothing is deleted, and no existing pin moves — so no
+// plan-authorised deletion needs to ride along.
+//   ⚠ THE MARKER WAS STALE AGAIN — THE THIRTEENTH TIME — AND BY THE LARGEST MARGIN IN ITS
+//   HISTORY: **29**. The trailing note below read `3384 (192.1-06)` while the gate printed
+//   `pinned total 3413` on an UNMODIFIED tree at this plan's base (`501b3c14`). It is CORRECTED
+//   HERE ON MEASUREMENT rather than overwritten in silence, which is this file's own habit: the
+//   192.1-06 note above it says the marker "was NOT stale this time" and that the habit is what
+//   fixed it — measured now, the habit lapsed on the very next commit that moved a pin. The
+//   drift is invisible to every reader and to every check for the reason stated four times
+//   above: `BASELINE_TOTAL` IS the `reduce`, and this line is prose beside a derived value —
+//   which is the argument for deriving it, not a counterexample to it. Neither 3384 nor 3413 is
+//   this plan's number: `3430` below is READ from this script's own printed `pinned total` after
+//   the entry above was added.
+//   ⚠ THE +24 GAP IS UNCHANGED AND IS STILL NOT THIS PLAN'S DEBT — the same four pre-existing
+//   drifts a ninth consecutive plan declines for the ninth identical reason (`ExternalActionSection`
+//   +9, `PhaseTimeline` +4, `WorkflowBuilderPage.canvas` +5, `builderStore` +6). It read +41
+//   mid-plan here only because this plan's own 17 new cases were not yet pinned; after the one
+//   entry above it is exactly 24 again, which is the measurement that closes the question.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3430 (193-01)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
