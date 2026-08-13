@@ -65,6 +65,23 @@ const COPY = [
 
   // ── The describe door ──────────────────────────────────────────────────────
   { id: "strip.back", where: 'testid="both-doors" — the return control, BOTH open doors', shipped: "‹ both doors", B: "‹ Change how I start", C: "‹ Back to both options" },
+  // ── THE 21st ID, added 2026-08-13 (193-04 / D-23) ──────────────────────────
+  // It was MISSING, and the miss was invisible: `strip.label` above is scoped to the
+  // DESCRIBE door's label, the emitter never rendered the govern door, and so
+  // `dom.generated.json` never held this string for the audit to check. After variant
+  // D ships, `🔧 Author & govern` would be the ONE surviving instance in the product of
+  // the exact wording SEED-147 reports as illegible — sitting on the door whose card now
+  // reads "Build it myself". That is the AUTH-01 failure inverted.
+  //
+  // ⚠ It is DELIBERATELY NOT in `D_FROM_C` below: it takes its B value like every other
+  //   id, which is what keeps variant D derived rather than hand-written (D-02).
+  // ⚠ `C` is deliberately ABSENT, so the contract renders *(inherit)* for column C. The
+  //   operator's ruling was about the shipped→D transition; inventing a C value would be
+  //   exactly the re-typing D-02 forbids.
+  // ⚠ The longest-first sort in `applyVariant` is what makes this safe: `🔧 Author &
+  //   govern` is LONGER than `doorB.name`'s `Author & govern`, so it takes its turn first
+  //   and cannot be clobbered from the inside.
+  { id: "strip.labelGovern", where: "govern-door header — the current-door label <span>", shipped: "🔧 Author & govern", B: "Build it myself" },
   { id: "strip.label", where: "describe-door header — the current-door label <span>", shipped: "⚡ Describe & run", B: "⚡ Drafting it for you", C: "⚡ Describing it" },
   { id: "describe.h1", where: "describe door — <h1>", shipped: "What recurring work should this automate?" },
   { id: "describe.cta", where: 'testid="describe-draft" — the CTA button', shipped: "Draft the workflow", B: "Write the first draft", C: "Turn this into steps" },
@@ -195,10 +212,21 @@ const TEMPLATE_PROPOSAL = [
 //
 // ⚠ THE AUDIT IS AGGREGATED ACROSS DUMPS ON PURPOSE, and the first run of this
 // script is why the comment exists. Most COPY entries live in exactly ONE of the
-// two surfaces — `chooser.h1` is not in the describe door, `switch.cta` is not in
-// the chooser — so a per-dump audit reported 37 "misses" that were nothing of the
-// kind. A real miss is an entry that matched in **no** dump: that, and only that,
-// means the COPY table has drifted away from the component.
+// door surfaces — `chooser.h1` is not in the describe door, `switch.cta` is not in
+// the chooser, `strip.labelGovern` is in neither — so a per-dump audit reported 37
+// "misses" that were nothing of the kind. A real miss is an entry that matched in
+// **no** dump: that, and only that, means the COPY table has drifted away from the
+// component.
+//
+// ⚠ THE GOVERN DUMP IS AUDITED BUT NOT STAGED, and the asymmetry is deliberate rather
+//   than an oversight. `strip.labelGovern` (D-23) exists in NO other dump, so without
+//   auditing `dom.govern` the audit would report a MISS on the very id this change adds
+//   — an audit that cannot see the string it governs is the failure this whole mechanism
+//   exists to prevent. It is not rendered as a page stage because the govern door IS the
+//   whole `WorkflowBuilderPage`: staging it would put a second full app surface on a page
+//   whose question is about WORDS on the doors. Its layout is therefore NOT claimed
+//   drift-proof by this sketch — only the one string is governed. Said in the contract
+//   too, so no reader has to infer it from this comment.
 const panels = {}
 const applyLog = {}
 for (const v of VARIANTS) {
@@ -209,9 +237,11 @@ for (const v of VARIANTS) {
   }
   const c = applyVariant(dom.chooser, v.key)
   const d = applyVariant(dom.describe, v.key)
+  const g = applyVariant(dom.govern, v.key)
   panels[v.key] = { chooser: c.html, describe: d.html }
-  const matched = new Set([...c.applied, ...d.applied].filter((l) => l.ok).map((l) => l.id))
-  const attempted = new Set([...c.applied, ...d.applied].map((l) => l.id))
+  const all = [...c.applied, ...d.applied, ...g.applied]
+  const matched = new Set(all.filter((l) => l.ok).map((l) => l.id))
+  const attempted = new Set(all.map((l) => l.id))
   applyLog[v.key] = [...attempted].map((id) => ({ id, ok: matched.has(id) }))
 }
 
@@ -331,6 +361,7 @@ const md = `# BUILD-CONTRACT — Sketch 164 (Phase 193 · AUTH-01 + AUTH-03)
 |---|---|---|
 | The chooser | real \`WorkflowDoorSwitch\` DOM | **none for layout** — only the words below differ |
 | The describe door | real \`WorkflowDoorSwitch\` DOM | **none for layout** |
+| The govern door | real \`WorkflowDoorSwitch\` DOM — **audited, NOT staged** | ⚠ **layout NOT claimed** — the dump exists so \`strip.labelGovern\` can be verified against a real node (D-23). The door IS the whole Builder, so it is not drawn on the page and this sketch makes no layout claim about it. |
 | The Run modal | real \`library/RunModal\` DOM | **none for layout** |
 | The template signal | **PROPOSAL — nodes that do not exist yet** | ⚠ normal sketch risk; treat the rules below as the spec |
 | Header-strip stacking | **not addressed** — structural, not copy | ⚠ open decision, see below |
