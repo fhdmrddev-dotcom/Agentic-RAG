@@ -910,9 +910,220 @@ describe("RunModal 193-01 — a launch failure is visible on a NON-admitting wor
     // provenance note, i.e. it sits inside the block D-17 conditionally removes. When that cut
     // lands, this relationship is expected to CHANGE (the alert must move out) — and the
     // assertions above are what force it to move rather than vanish.
-    const provenance = within(modal).getByTestId("run-provenance")
-    expect(alert.parentElement).toBe(provenance.parentElement)
+    //
+    // ── AMENDED BY `193-07` ON THE DAY THE CUT LANDED, EXACTLY AS THE PARAGRAPH ABOVE SAID IT
+    //    WOULD BE. The original two lines read:
+    //
+    //        const provenance = within(modal).getByTestId("run-provenance")
+    //        expect(alert.parentElement).toBe(provenance.parentElement)
+    //
+    //    and they are left visible here rather than deleted, because what they measured is the
+    //    whole point of the case. On THIS fixture — a workflow with no `llm_emit` phase, i.e. a
+    //    positive `does-not-admit` — D-17 now removes the upload control AND the provenance note
+    //    that describes it, so `getByTestId("run-provenance")` throws and the old measurement
+    //    cannot be evaluated at all. ⚠ `193-07-PLAN.md` asked for this case to pass UNEDITED and
+    //    that acceptance criterion is FALSE on its own inputs: the co-parent line it required to
+    //    survive is a measurement OF THE LAYOUT THE CUT REMOVES. The criterion's INTENT — the
+    //    alert must MOVE OUT, never VANISH — is what the six assertions above enforce, and all
+    //    six are byte-identical to the day `193-01` wrote them. Only this trailing measurement is
+    //    restated, in the direction its own author predicted.
+    //
+    //    Restated: the provenance note is GONE (the control it describes is gone with it), and
+    //    the alert is still here, still an alert, still carrying the server's words.
+    expect(within(modal).queryByTestId("run-provenance")).toBeNull()
+    expect(within(modal).queryByTestId("run-template-upload")).toBeNull()
+    expect(modal.contains(alert)).toBe(true)
 
+    rendered.unmount()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 193-07 Task 2 (AUTH-03 / D-17 / D-18 / D-20 / D-21) — ALL FOUR ARMS OF THE
+// ADMISSION PREDICATE, READ AT THE RENDERED SURFACE.
+//
+// WHAT IS VERIFIED, AND WHAT IS DELIBERATELY NOT. Every row below reads the DOM the
+// modal produced. NOT ONE of them asserts that `templateAdmission` was CALLED, or
+// spies on it, or re-implements it — that is the `192-10` lesson (verify the
+// PROPERTY, not the patch): a suite that pins the call site stays green through a
+// call site wired to the wrong branch. `templateAdmission` is asserted here in
+// exactly one role — as a NON-VACUITY guard on each fixture, so a definition that
+// later drifts into a different arm reds the row that names it rather than quietly
+// testing the arm next door.
+//
+// ⚠ THE `unknown` ROW AND THE `admits` ROW CALL THE SAME HELPER, ON PURPOSE.
+// D-20 says a definition the wire did not describe renders the control EXACTLY as
+// today — the OPPOSITE fallback from the card's (D-15), because hiding here would
+// remove a shipped capability (WFIN-01) from 110 of the 145 published rows, whose
+// `phases: []` is a stub nobody authored rather than a statement that the workflow
+// cannot fill a template. Two hand-written assertion lists would let those two arms
+// drift apart one careless edit at a time and still read as "covered". One shared
+// helper makes their identical treatment MECHANICAL: a change that weakens `unknown`
+// necessarily weakens `admits` too, and `admits` is the arm nobody would dare weaken.
+//
+// The rows drive `RunModal` DIRECTLY (the `192-06` isolated-render idiom), so no page
+// feed is involved and not one capture row above is disturbed.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** A workflow that ADMITS: one `llm_emit` phase (no `emitter` key → the Pydantic
+ *  `render_template` default, D-25) and NO bound library template. */
+const admittingWf: RunModalPropsT["wf"] = {
+  id: "admits-1",
+  slug: "fills-a-template",
+  name: "Fills a template",
+  definition: {
+    slug: "fills-a-template",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [{ slug: "emit", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft" } }],
+  },
+}
+
+/** UNKNOWN: `phases: []` — the shape 110 of 145 published rows carry. The wire said
+ *  nothing, so nothing may be concluded, so nothing is taken away. */
+const unknownWf: RunModalPropsT["wf"] = {
+  id: "unknown-1",
+  slug: "unauthored-stub",
+  name: "Unauthored stub",
+  definition: {
+    slug: "unauthored-stub",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [],
+  },
+}
+
+/** D-21's BOUND arm: an emit phase that WOULD admit, made a positive no by a bound
+ *  library template. `_exec_llm_emit` resolves `_emit_bound_asset_ref(definition)` first and
+ *  `template_asset_service.py:144` returns UNCONDITIONALLY on that branch — nothing clears the
+ *  ref because a user uploaded something — so the run-time upload here is unreachable code and
+ *  `Template to fill` would promise what the engine discards. This is the arm a suite would
+ *  otherwise never enter: it is invisible to both `admits` and the no-emit-phase no. */
+const boundTemplateWf: RunModalPropsT["wf"] = {
+  id: "bound-1",
+  slug: "binds-a-template",
+  name: "Binds a template",
+  definition: {
+    slug: "binds-a-template",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [{ slug: "emit", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft" } }],
+    assets: [{ kind: "template", asset_id: "asset-xyz" }],
+  },
+}
+
+/** Render one workflow's modal in isolation and hand back its dialog root. */
+async function renderModalFor(wf: RunModalPropsT["wf"]) {
+  const { RunModal } = await import("@/components/workflows/library/RunModal")
+  const rendered = render(
+    <RunModal
+      wf={wf}
+      folders={[]}
+      authorDefaultFolderId={null}
+      kickoff=""
+      submitting={false}
+      onKickoffChange={() => {}}
+      onCancel={() => {}}
+      onRun={async () => {}}
+    />,
+  )
+  const modal = await screen.findByTestId("run-modal")
+  return { modal, rendered }
+}
+
+/**
+ * THE SHARED ASSERTION — what "the control, exactly as today, plus its new label" means.
+ *
+ * Called by BOTH the `admits` row and the `unknown` row and by nothing else, which is what
+ * makes D-20's "exactly as today" a mechanical property of this file rather than a promise in
+ * a comment. The `expect` calls live here, once.
+ */
+function expectTemplateBlockPresent(modal: HTMLElement) {
+  const label = within(modal).getByTestId("run-template-label")
+  // D-18's string, byte-exact — and a TEXT NODE, never a `<label htmlFor>` bound to the
+  // hidden `tabIndex={-1}` input (the tag is pinned in RunModal.a11y.test.tsx).
+  expect(label).toHaveTextContent("Template to fill")
+  expect(within(modal).getByTestId("run-template-upload")).toBeInTheDocument()
+  // D-19, byte-exact and unreworded — the em dash and the terminal full stop included.
+  expect(within(modal).getByTestId("run-provenance")).toHaveTextContent(
+    "Stored untrusted — never run as code, never fed to the fill engine.",
+  )
+  // The label names the control it sits above: it must PRECEDE the upload button in the DOM,
+  // otherwise it labels nothing a reader would connect it to.
+  const upload = within(modal).getByTestId("run-template-upload")
+  expect(label.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+}
+
+/** THE OTHER SIDE — absent, and absent in the strong sense D-17 requires. */
+function expectTemplateBlockAbsent(modal: HTMLElement) {
+  expect(within(modal).queryByTestId("run-template-label")).toBeNull()
+  expect(within(modal).queryByTestId("run-template-upload")).toBeNull()
+  expect(within(modal).queryByTestId("run-provenance")).toBeNull()
+  // ⚠ ABSENT, NOT DISABLED, NOT GREYED (D-17). A disabled control still costs attention and
+  // still cannot be used, so "the block is gone" is not satisfied by a survivor wearing
+  // `disabled` or `aria-disabled`. Swept over the WHOLE dialog rather than over the testids
+  // above, because a greyed survivor would most likely have kept a different testid.
+  expect(modal.querySelector("[data-testid^='run-template']")).toBeNull()
+  expect(modal.querySelector("[aria-disabled='true']")).toBeNull()
+  // …and the modal is still a modal, so this is a hidden control and not a failed render.
+  expect(within(modal).getByTestId("run-confirm")).toBeInTheDocument()
+  expect(within(modal).getByTestId("run-kickoff")).toBeInTheDocument()
+}
+
+describe("RunModal 193-07 — the template block across all three admission states", () => {
+  it("admits (an emit phase, nothing bound) → the labelled control, the button and the provenance line", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    // NON-VACUITY: pin the fixture into the arm this row NAMES. Without it, a later edit to
+    // the definition would move the row to a different arm and it would keep passing.
+    expect(templateAdmission(admittingWf.definition)).toBe("admits")
+
+    const { modal, rendered } = await renderModalFor(admittingWf)
+    expectTemplateBlockPresent(modal)
+    rendered.unmount()
+  })
+
+  it("unknown (phases: []) → the block renders EXACTLY as on admits — the same helper, deliberately", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    expect(templateAdmission(unknownWf.definition)).toBe("unknown")
+
+    const { modal, rendered } = await renderModalFor(unknownWf)
+    // ⚠ THE SAME FUNCTION THE `admits` ROW CALLS. If this line ever calls a weaker helper,
+    // D-20 has been quietly repealed. 110 of 145 published rows land here.
+    expectTemplateBlockPresent(modal)
+    rendered.unmount()
+  })
+
+  it("does-not-admit (no emit phase) → the block is ABSENT, not greyed and not disabled", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    expect(templateAdmission(nonAdmittingWf.definition)).toBe("does-not-admit")
+
+    const { modal, rendered } = await renderModalFor(nonAdmittingWf)
+    expectTemplateBlockAbsent(modal)
+    rendered.unmount()
+  })
+
+  it("does-not-admit by BINDING (D-21) → an emit phase whose template is already bound gets nothing", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    // The arm that separates D-21 from the simpler "has an emit phase" predicate: WITHOUT the
+    // bound-asset clause this fixture would read `admits` and this row would be a duplicate of
+    // the first one. Asserted, so the distinction cannot rot into a coincidence.
+    expect(templateAdmission(boundTemplateWf.definition)).toBe("does-not-admit")
+
+    const { modal, rendered } = await renderModalFor(boundTemplateWf)
+    expectTemplateBlockAbsent(modal)
+    rendered.unmount()
+  })
+
+  it("the label is imported, not spelled — the rendered text IS libraryVocabulary's export", async () => {
+    // A row that only checked for the words "Template to fill" would pass against a component
+    // that hard-codes them, which is the drift `libraryVocabulary.ts` exists to forbid.
+    const { RUN_TEMPLATE_LABEL } = await import("@/components/workflows/library/libraryVocabulary")
+    expect(RUN_TEMPLATE_LABEL.length).toBeGreaterThan(0)
+    const { modal, rendered } = await renderModalFor(admittingWf)
+    expect(within(modal).getByTestId("run-template-label").textContent).toBe(RUN_TEMPLATE_LABEL)
     rendered.unmount()
   })
 })
