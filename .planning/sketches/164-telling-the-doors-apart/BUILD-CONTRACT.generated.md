@@ -14,6 +14,7 @@
 |---|---|---|
 | The chooser | real `WorkflowDoorSwitch` DOM | **none for layout** — only the words below differ |
 | The describe door | real `WorkflowDoorSwitch` DOM | **none for layout** |
+| The govern door | real `WorkflowDoorSwitch` DOM — **audited, NOT staged** | ⚠ **layout NOT claimed** — the dump exists so `strip.labelGovern` can be verified against a real node (D-23). The door IS the whole Builder, so it is not drawn on the page and this sketch makes no layout claim about it. |
 | The Run modal | real `library/RunModal` DOM | **none for layout** |
 | The template signal | **PROPOSAL — nodes that do not exist yet** | ⚠ normal sketch risk; treat the rules below as the spec |
 | Header-strip stacking | **not addressed** — structural, not copy | ⚠ open decision, see below |
@@ -41,6 +42,7 @@ takes C's string instead of B's.
 | `doorB.desc` | testid="door-card-govern" — description <span> | Open the full Builder — every advanced control, the live strictness tier, the locked judge. | Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step. | Add each step by hand and choose its settings — sources to cite, checks that must pass, model per step. | **Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step.** |
 | `doorB.note` | testid="door-card-govern" — italic footnote <span> | citation policy · gate set · per-phase scope & model | what it must cite · required checks · per-step sources & model | for work with rules you already know | **what it must cite · required checks · per-step sources & model** |
 | `strip.back` | testid="both-doors" — the return control, BOTH open doors | ‹ both doors | ‹ Change how I start | ‹ Back to both options | **‹ Change how I start** |
+| `strip.labelGovern` | govern-door header — the current-door label <span> | 🔧 Author & govern | Build it myself | *(inherit)* | **Build it myself** |
 | `strip.label` | describe-door header — the current-door label <span> | ⚡ Describe & run | ⚡ Drafting it for you | ⚡ Describing it | **⚡ Drafting it for you** |
 | `describe.h1` | describe door — <h1> | What recurring work should this automate? | *(inherit)* | *(inherit)* | *(inherit)* |
 | `describe.cta` | testid="describe-draft" — the CTA button | Draft the workflow | Write the first draft | Turn this into steps | **Write the first draft** |
@@ -77,9 +79,9 @@ definition-side field name at plan time rather than trusting this sentence).
 
 ## Substitution audit
 
-- **Variant B** — 18 substitution(s) matched the real DOM; **zero misses**
+- **Variant B** — 19 substitution(s) matched the real DOM; **zero misses**
 - **Variant C** — 19 substitution(s) matched the real DOM; **zero misses**
-- **Variant D** — 18 substitution(s) matched the real DOM; **zero misses**
+- **Variant D** — 19 substitution(s) matched the real DOM; **zero misses**
 
 ## The open decision this sketch deliberately does NOT resolve
 

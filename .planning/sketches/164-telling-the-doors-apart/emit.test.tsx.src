@@ -83,6 +83,24 @@ describe("sketch 164 emitter", () => {
       unmount()
     }
 
+    // ── The GOVERN door — added 2026-08-13 (193-04 / D-23). The reason it is here
+    //    matters more than the block: `🔧 Author & govern` (the govern strip's
+    //    current-door label) was NEVER in the COPY table and was NEVER captured, so
+    //    after variant D ships it would be the one surviving instance in the product
+    //    of the exact wording SEED-147 reports as illegible — on the door whose card
+    //    now reads "Build it myself". A contract cannot govern a string no dump holds.
+    //
+    //    STANDALONE (no `inline`) on purpose: that is the flag-OFF path, the one whose
+    //    bytes `WorkflowBuilderPage.header.test.tsx` already pins, and the only one where
+    //    the current-door label renders inside this shell's OWN band.
+    {
+      const { container, unmount } = render(
+        <WorkflowDoorSwitch def={strictDef} initialDoor="govern" onDescribeDraft={vi.fn()} />,
+      )
+      dumps.govern = container.innerHTML
+      unmount()
+    }
+
     // ── The RUN modal — the shipped template-upload control in its real context.
     {
       const wf = {

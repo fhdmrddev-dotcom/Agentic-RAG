@@ -39,7 +39,7 @@ still the source of truth and could still describe something unbuildable.
 
 | Step | Artifact | What it guarantees |
 |---|---|---|
-| 1 | `emit.test.tsx.src` renders the **real** `WorkflowDoorSwitch` + **real** `library/RunModal` under jsdom | `dom.generated.json` is the actual shipped DOM, not a redraw |
+| 1 | `emit.test.tsx.src` renders the **real** `WorkflowDoorSwitch` (chooser · describe door · **govern door**) + **real** `library/RunModal` under jsdom — **four** dumps since 2026-08-13, not three | `dom.generated.json` is the actual shipped DOM, not a redraw. A string no dump holds cannot be governed by the contract, which is exactly how `strip.labelGovern` went missing — see the dated section at the end. |
 | 2 | `build.cjs` applies the **COPY table** to that DOM | variants differ in *text nodes only* — layout drift is impossible |
 | 3 | the project's own `tailwind.config.js` builds the CSS over the generated HTML | the theme tokens are the app's Deep Midnight values, not an approximation |
 | 4 | `build.cjs` emits `BUILD-CONTRACT.generated.md` from the same COPY table | the contract cannot go stale by being forgotten |
@@ -50,6 +50,12 @@ the COPY table has drifted from the component. Run 1 reported *37 misses*; that 
 comparing every string against *every* dump, when most strings live in exactly one surface.
 Aggregated correctly (a real miss = matched in **no** dump) it reports **37 matched, zero
 missed**. A green audit is therefore evidence, not decoration.
+
+⚠ **That `37` was measured before variant D existed, and is CORRECTED ON MEASUREMENT here
+(2026-08-13, plan `193-04`): it was already `55` at this plan's base** (B 18 + C 19 + D 18), **and it
+is `57` now** (B 19 + C 19 + D 19, with the 21st id and the govern dump). The run-1 *lesson* is
+unchanged and is what the paragraph is for; only its arithmetic went stale — as a figure written at
+one moment always will. See the dated section at the end of this file.
 
 Reproduce the whole chain from a clean checkout:
 
@@ -136,7 +142,8 @@ are what made the shipped wording vague. Everything else in D is B verbatim.
 `doorA.tier` / `doorB.tier`, which read C. A hand-typed D would be a *third* copy of every
 string, free to drift the moment B or C is touched — precisely the failure this sketch's
 generate-from-the-build mechanism exists to prevent. The regenerated substitution audit reports
-**D: 18 matched, zero misses** against the real DOM.
+**D: 18 matched, zero misses** against the real DOM. ⚠ **Now `D: 19 matched, zero misses`** — D-23
+added the 21st id on 2026-08-13. The decision above is unchanged; only its count moved.
 
 A, B and C stay on the page and in the contract table as the comparison that produced the
 pick. They are **evidence, not live options** — the build ports column D.
@@ -161,3 +168,81 @@ that copy provably cannot reach.
 3. **Pixel spacing, Tailwind class choices, hover/focus states.** A human comparison at UAT —
    and the G-4 rows MUST name this file as the reference and be driven **by looking**, never by
    `getElementById` on a known id (D-27, the rule Phase 192's own re-drive broke).
+
+## 2026-08-13 — regenerated: the 21st id, and what this sketch still cannot show (plan `193-04`)
+
+### 1 · `strip.labelGovern` — an id that did not exist when the operator picked variant D
+
+`WorkflowDoorSwitch.tsx:166` renders `🔧 Author &amp; govern` — the current-door label inside the
+**govern** strip. It was never in the COPY table (`strip.label` above is scoped to the *describe*
+door's label), and the emitter never rendered the govern door, so `dom.generated.json` never held
+the string either. **The audit could not have caught this**: a contract cannot govern a string no
+dump contains, and it cannot report a miss on an id nobody declared. It was found at plan time
+(`193-RESEARCH.md` § B.4).
+
+Left alone, `🔧 Author & govern` would after variant D become **the one surviving instance in the
+whole product of the exact wording SEED-147 reports as illegible** — on the door whose card now
+reads *Build it myself*. That is the AUTH-01 failure inverted, not a leftover.
+
+Under **D-23** it is now the 21st governed id: `B` / `D` = **`Build it myself`**, echoing the door
+name so the label confirms the choice in the same words used to make it. `C` is deliberately
+**absent** — the operator ruled on the shipped→D transition, and inventing a C value would be the
+re-typing D-02 forbids, so the contract honestly renders *(inherit)* there.
+
+**D is still DERIVED.** `D_FROM_C` is unchanged at `{doorA.tier, doorB.tier}`; the new id takes its
+B value like every other id, and it entered through `build.cjs` rather than through JSX.
+
+### 2 · The emitter now dumps FOUR surfaces, not three
+
+```
+EMITTED chooser=2079B describe=24089B govern=2172B runModal=2914B
+```
+
+`dom.generated.json` keys: `chooser, describe, govern, runModal`. The govern dump is the
+**standalone** (non-`inline`) door — the flag-OFF path, the only one where the current-door label
+renders inside this shell's own band.
+
+⚠ **The govern dump is AUDITED but NOT STAGED, and that limit is stated rather than implied.** The
+govern door *is* the whole `WorkflowBuilderPage`; drawing it here would put a second full app
+surface on a page whose question is about words on the doors. So this sketch makes **no layout
+claim** about the govern door — only its one string is governed. The generated contract's
+drift-risk table says the same thing, so the limit survives in the artifact and not just here.
+
+### 3 · The regenerated audit, read out of the contract rather than predicted
+
+| | before | after |
+|---|---|---|
+| Variant B | 18 matched, 0 missed | **19 matched, 0 missed** |
+| Variant C | 19 matched, 0 missed | **19 matched, 0 missed** |
+| Variant D | 18 matched, 0 missed | **19 matched, 0 missed** |
+| total | 55 | **57** |
+
+C is unchanged because it declares no value for the new id. The COPY table now renders **21**
+substantive rows; ⚠ `COPY[]` itself holds **22** entries — `describe.hint` carries `shipped: null`
+(a composite descriptor, not a substitutable string) and is filtered out of the table. **The two
+numbers are not the same and neither may be quoted as the other.**
+
+### 4 · ⚠ The `🔧` asymmetry — a consequence, not a choice, and it is routed to **U6**
+
+Under D-23 the govern strip label **loses its `🔧` glyph** (`🔧 Author & govern` → `Build it
+myself`) while the describe strip **keeps its `⚡`** (`⚡ Describe & run` → `⚡ Drafting it for
+you`). That falls directly out of D-23's wording — *"its string becomes variant D's door name"* —
+and was not a discretionary decision made while regenerating. It is recorded rather than smoothed,
+and it is an explicit thing to **look at** on UAT row **U6** (*"Open the govern door after variant D
+lands. Does the header label agree with the door card that opened it?"*). If the operator wants the
+glyph back, that is a one-cell edit to this table and a regenerate — not a code change.
+
+### 5 · ⚠ What this sketch still does NOT cover — three surfaces with no mockup at all
+
+Restated so a later reader does not over-trust the page. This is the SEED-155 exposure in its
+**"draws none"** form rather than its "draws a wrong one" form — and the second form is the one
+that failed U8 in 192.1, so the first deserves at least as much suspicion.
+
+| Surface | Decisions | Mockup | Driven hardest at |
+|---|---|---|---|
+| The **govern** band restack (quiet escape + divider, judge badge unmoved) | D-03 / D-04 | **none, on either `inline` value** | **U3** |
+| The **describe** band restack (demotion only, no divider) | D-22 | **none** — decided at plan time, after this sketch was drawn | **U3b** |
+| AUTH-03: `card.templateMark`, `run.templateLabel`, `run.templateAbsent` | D-13 / D-15 / D-17 | **none — the template panel is a PROPOSAL**; no visual acceptance bar of any kind exists for these three | **U4**, **U5** |
+
+⇒ **Rows U3 / U3b / U4 / U5 are the acceptance bar for everything in this table**, because nothing
+on this page is. They must be driven **by looking**, per D-27.
