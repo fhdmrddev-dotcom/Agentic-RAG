@@ -312,8 +312,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 193-03-PLAN.md — **the G-5 extraction**: `doorGroup` → `DoorHeaderStrip.tsx`, verbatim, with the D-24(b) ESM-cycle fence (D-05/D-06/D-08)
-- [ ] 193-04-PLAN.md — D-23 through the generator: the govern door captured, `strip.labelGovern` added to `build.cjs`, the contract regenerated to 21 rows
+- [x] 193-03-PLAN.md — **the G-5 extraction**: `doorGroup` → `DoorHeaderStrip.tsx`, verbatim, with the D-24(b) ESM-cycle fence (D-05/D-06/D-08)
+- [x] 193-04-PLAN.md — D-23 through the generator: the govern door captured, `strip.labelGovern` added to `build.cjs`, the contract regenerated to 21 rows
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
