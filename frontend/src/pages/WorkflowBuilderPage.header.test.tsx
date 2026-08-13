@@ -341,10 +341,47 @@ describe("Builder header, canvas flag OFF — three separate bands (D-181-01)", 
  *    makes checkable for the next author. Both are legitimate; both must be stated. Any
  *    further re-capture whose diff shows a TAG difference the plan did not name is a
  *    behaviour change to explain, not a test to update.
+ *
+ * ── ⚠ RE-CAPTURED A SECOND AND FINAL TIME BY PLAN `193-09` ON 2026-08-13 ────────────────
+ *
+ * The note above predicted this one and named exactly what it would be, which is the whole
+ * value of having written it down. Re-captured from the rendered tree by the same
+ * `headerMarkup()` driver, run twice and agreeing byte for byte, and substituted by an ENCODER
+ * VALIDATED FIRST — re-encoding all three OLD bands had to reproduce this file's own bytes
+ * before one new byte was written. Nothing was hand-edited.
+ *
+ *  • WHAT CHANGED: THE STRUCTURE ONLY — the exact complement of the words-only note above.
+ *
+ *      | band            | tag deltas                            | non-empty text nodes |
+ *      |-----------------|---------------------------------------|----------------------|
+ *      | 1 (breadcrumb)  | NONE — line byte-identical            | 3 → 3, identical     |
+ *      | 2 (door band)   | 1 class list + 1 INSERTED rule span   | 4 → 4, identical     |
+ *      | 3 (save cluster)| NONE — line byte-identical            | 4 → 4, identical     |
+ *
+ *    `git diff --numstat` on this file for the substitution: **1 changed line, not 3**.
+ *
+ *  • THE TWO DELTAS IN BAND 2, IN FULL, AND THEY ARE THE ONLY TWO:
+ *      - the `both-doors` control's class list loses its rounding and its 1px outline (D-04's
+ *        demotion, applied to the govern strip and mirrored on the describe band by D-22);
+ *      - ONE `<span aria-hidden="true">` rule is INSERTED between that control and the door
+ *        label. Decorative, no testid, empty — `DoorHeaderStrip.test.tsx` asserts it adds not
+ *        one character to the strip's text.
+ *    Every other tag, class list, `data-testid`, the judge badge's `title`, and the `ml-auto`
+ *    conditional are byte-for-byte unchanged, in all three bands.
+ *
+ *  • ⚠ NOT ONE RENDERED WORD MOVED, and it is measured as a SEQUENCE rather than by position.
+ *    Inserting a node shifts every later slot of a naive `split(/<[^>]*>/)` diff, which reports
+ *    8 "changed" text nodes in band 2 — all of them that artefact. Compared as an ordered
+ *    sequence of non-empty text nodes, all three bands are identical element for element.
+ *
+ *  • ⚠ THIS IS RE-CAPTURE **TWO OF TWO**, AND THE PHASE EXPECTS NO THIRD. `193-08` changed the
+ *    words; `193-09` changed the structure. This literal stood unedited for nine phases before
+ *    Phase 193 and is expected to stand again — any further re-capture is a behaviour change
+ *    to explain in its own plan, not a test to update.
  */
 const FLAG_OFF_HEADER_MARKUP = [
   `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="builder-back" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">← Workflows</button><span class="text-[13px] font-medium text-foreground">Edit · Vendor brief v1</span><span data-testid="net-new-flag" title="Net-new surface — only GET /workflows/published + POST /workflows/{id}/publish are live today" class="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet">net-new</span></div>`,
-  `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="both-doors" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">‹ Change how I start</button><span class="text-[13px] font-medium text-foreground">Build it myself</span><span data-testid="judge-locked" title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)." class="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"><span aria-hidden="true">🔒</span> judge always-on</span></div>`,
+  `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="both-doors" class="px-1 py-1 text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-none">‹ Change how I start</button><span aria-hidden="true" class="mx-0.5 h-4 w-px bg-border"></span><span class="text-[13px] font-medium text-foreground">Build it myself</span><span data-testid="judge-locked" title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)." class="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"><span aria-hidden="true">🔒</span> judge always-on</span></div>`,
   `<header class="flex items-center justify-between border-b border-border px-4 py-2.5"><div class="flex min-w-0 items-center gap-2"><span class="min-w-0 truncate text-[14px] font-semibold text-foreground">vendor-brief</span><span class="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">draft</span></div><div class="flex shrink-0 items-center gap-2"><div data-testid="builder-save-state" class="flex items-center gap-2"><button type="button" data-testid="builder-save-draft" class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60">Save draft</button></div><div><button type="button" data-testid="publish-trigger" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90">◆ Publish…</button></div></div></header>`,
 ].join("\n")
 

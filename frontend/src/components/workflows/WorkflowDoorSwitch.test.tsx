@@ -539,3 +539,129 @@ describe("D-24(a) — no governed door word survives as a literal in either comp
     },
   )
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 193-09 (D-22) — THE TWO DOORS AGREE ABOUT THEIR OWN ESCAPE HATCH
+//
+// D-04 demoted the govern strip's return control: the box and the 1px outline went, so the
+// escape stops reading as a peer of the door you are standing in. D-22 extends the DEMOTION —
+// and only the demotion — to this shell's describe band, because demoting one door's escape
+// and not the other's manufactures a NEW inconsistency one click apart.
+//
+// "Identical" is the claim, and the only honest way to hold it is to READ BOTH CLASS STRINGS
+// OUT OF THE TWO SOURCES and compare them. By eye is how two literals drift; a third literal
+// written here would be a third home for the same fact and would go stale silently.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The `both-doors` control's class string, as DECLARED in a component source.
+ *
+ * Anchored on the testid and non-greedy to the next `className`, which in both files is two
+ * attributes later. It is a source-shape read, deliberately: the two controls live in two
+ * different components that never render together, so no single DOM can compare them.
+ */
+const RETURN_CONTROL_CLASS = /data-testid="both-doors"[\s\S]*?className="([^"]+)"/
+
+const returnControlClassOf = (source: string, where: string): string => {
+  const m = RETURN_CONTROL_CLASS.exec(source)
+  if (!m) throw new Error(`${where} no longer declares a both-doors control with a className`)
+  return m[1]
+}
+
+describe("193-09 (D-22) — both doors demote their escape hatch identically", () => {
+  it("the extractor really extracts, both sources are really loaded, and each declares ONE control", () => {
+    // POSITIVE CONTROL, inline and first: an extractor that silently returned "" would make
+    // every equality below pass while comparing nothing (the 192.1 E-2 lesson).
+    expect(
+      returnControlClassOf(
+        '<button type="button" data-testid="both-doors" onClick={x} className="a b c">',
+        "synthetic",
+      ),
+    ).toBe("a b c")
+    // …and a source WITHOUT the control throws rather than returning a silent empty string.
+    expect(() =>
+      returnControlClassOf('<button data-testid="something-else" className="z">', "synthetic"),
+    ).toThrow(/no longer declares/)
+
+    // NON-VACUITY on the two real subjects: a `?raw` import of a moved or renamed module yields
+    // the empty string in some resolvers rather than throwing.
+    expect(doorHeaderStripSource.length).toBeGreaterThan(500)
+    expect(workflowDoorSwitchSource.length).toBeGreaterThan(500)
+
+    // EXACTLY ONE control per source, so the non-greedy match cannot be reading across a second
+    // one into a neighbour's class list — which is precisely how this kind of fence starts
+    // measuring the wrong element without anybody noticing.
+    expect(doorHeaderStripSource.split('data-testid="both-doors"')).toHaveLength(2)
+    expect(workflowDoorSwitchSource.split('data-testid="both-doors"')).toHaveLength(2)
+  })
+
+  it("the two return-control class strings are EQUAL, character for character", () => {
+    const govern = returnControlClassOf(doorHeaderStripSource, "DoorHeaderStrip.tsx")
+    const describeDoor = returnControlClassOf(workflowDoorSwitchSource, "WorkflowDoorSwitch.tsx")
+    expect(describeDoor).toBe(govern)
+
+    // …and BOTH are really demoted. Without this the equality is also satisfied by two
+    // identical BOXES agreeing with each other, which is the state D-22 exists to end.
+    for (const cls of [govern, describeDoor]) {
+      const tokens = cls.split(" ")
+      expect(tokens).not.toContain("border")
+      expect(tokens).not.toContain("border-border")
+      expect(tokens).not.toContain("rounded-md")
+      // POSITIVE half of the same pair — the string is a real class list, not an empty one.
+      expect(tokens).toContain("text-muted-foreground")
+    }
+  })
+
+  it("the describe band carries NO divider — there is nothing on that side to divide", () => {
+    // D-22 is explicit: the demotion is the box drop and the muted treatment, NOTHING else. No
+    // locked-judge badge lives on this door, so a rule here would be a mark dividing one thing
+    // from nothing.
+    render(<WorkflowDoorSwitch def={strictDef} initialDoor="describe" />)
+    const band = screen.getByTestId("door-describe").firstElementChild as HTMLElement
+    const kids = Array.from(band.children)
+    // LENGTH FIRST — [return control] [door label], and nothing between them.
+    expect(kids).toHaveLength(2)
+    expect(kids[0].getAttribute("data-testid")).toBe("both-doors")
+    expect(kids[1].tagName).toBe("SPAN")
+    expect(kids[1].textContent!.length).toBeGreaterThan(0)
+    // No rule node by class, and no decorative node by role — a divider would be both.
+    expect(band.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0)
+    for (const n of kids) {
+      expect(n.className.split(" ")).not.toContain("w-px")
+    }
+  })
+
+  it("POSITIVE CONTROL — the SAME two queries DO find the divider on the govern door", () => {
+    // Without this, the row above passes on a broken band lookup: an element that was never
+    // found has no `aria-hidden` children and no `w-px` token either. The govern band is the
+    // one place in this shell that legitimately carries a rule, so it is the honest control.
+    render(<WorkflowDoorSwitch def={strictDef} initialDoor="govern" />)
+    const band = screen.getByTestId("door-govern").firstElementChild as HTMLElement
+    expect(band.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0)
+    const rules = Array.from(band.children).filter((n) => n.className.split(" ").includes("w-px"))
+    expect(rules).toHaveLength(1)
+    expect(rules[0].getAttribute("aria-hidden")).toBe("true")
+  })
+
+  it("the describe band was NOT folded into the extracted govern strip — a deliberate non-action", () => {
+    // D-05's constraint is one component for the two GOVERN header variants. This band is a
+    // different band, with no badge and its own host-lead slot, so folding it in would be a
+    // structural change with neither a decision nor a mockup behind it. Recorded as an
+    // assertion so the absence reads as a choice rather than as an oversight — and so a later
+    // author who folds it must delete this row and say why.
+    // The region is bounded BY CONTENT — the describe door's root to the describe box that
+    // follows its band — never by a character count. A fixed window silently starts measuring
+    // the wrong span the first time anybody writes a paragraph inside it (measured: it did,
+    // while this very case was being written).
+    const bandStart = workflowDoorSwitchSource.indexOf('data-testid="door-describe"')
+    const bandEnd = workflowDoorSwitchSource.indexOf('data-testid="describe-box"')
+    expect(bandStart).toBeGreaterThan(-1)
+    expect(bandEnd).toBeGreaterThan(bandStart)
+    const bandRegion = workflowDoorSwitchSource.slice(bandStart, bandEnd)
+    expect(bandRegion).toContain('data-testid="both-doors"')
+    expect(bandRegion).not.toContain("<DoorHeaderStrip")
+    // POSITIVE CONTROL: the component IS mounted elsewhere in this file, so the negative above
+    // is about WHERE it is used and not about a component nobody imports.
+    expect(workflowDoorSwitchSource).toContain("<DoorHeaderStrip")
+  })
+})

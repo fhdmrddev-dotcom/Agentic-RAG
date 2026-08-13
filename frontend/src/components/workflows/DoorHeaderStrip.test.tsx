@@ -28,6 +28,28 @@
  * the point of pinning the count now, so the restack has to state its change rather than
  * absorb it.
  *
+ * ── ⚠ 193-09: THE RESTACK LANDED, AND THE PARAGRAPH ABOVE IS KEPT RATHER THAN REWRITTEN ──
+ *
+ * The count it pinned did exactly its job: it went from 3 to 4 IN THE RESTACK'S OWN COMMIT,
+ * so the added node had to be stated. What 193-09 changed here, and nothing else:
+ *
+ *  · the child-order rows now expect FOUR children — [return control] [divider] [door label]
+ *    [judge badge] — with the badge still asserted LAST in BOTH variants, which is D-04's
+ *    "far edge, unchanged" spelled as an assertion rather than as a hope;
+ *  · two new rows: the divider is proved DECORATIVE (aria-hidden, empty, and contributing not
+ *    one character to the strip's own text), and the return control's OWN node is proved to
+ *    carry no border token — asserted on that node, never on the strip, because the app's band
+ *    wrapper legitimately carries a border and a class check aimed at the wrong node passes or
+ *    fails for entirely the wrong reason;
+ *  · ONE pre-existing assertion was corrected, not weakened: the POSITIVE CONTROL below read
+ *    the return control's list for `rounded-md`, which the demotion removes. It now reads
+ *    `text-muted-foreground` — a token the demoted control still carries — so the control
+ *    still proves what it exists to prove (that the reader really reads the named node's own
+ *    list, and that `"".split(" ")` cannot masquerade as a passing absence).
+ *
+ * The `ml-auto` pair and the band-literal equality below were NOT touched: D-05 survives the
+ * restack, and that is the point of leaving them exactly as 193-03 wrote them.
+ *
  * ⚠ THE `doorVocabulary` LEG NOW EXISTS — IN THAT MODULE'S OWN SUITE, NOT HERE. 193-03 left
  * it out because the module did not exist, and `import.meta.glob` contributes the EMPTY STRING
  * for an absent path without ever throwing — the 192.1 E-2 finding, where a fence swept against
@@ -103,28 +125,99 @@ describe("DoorHeaderStrip 193-03 — D-05: one component, both header variants",
     // no "ml-auto" either, and an element that was never found would read as a passing absence.
     const { getByTestId } = render(<DoorHeaderStrip onBack={vi.fn()} inline />)
     expect(getByTestId("judge-locked").className.split(" ")).toContain("inline-flex")
-    expect(getByTestId("both-doors").className.split(" ")).toContain("rounded-md")
+    // ⚠ 193-09: this read `rounded-md` until the D-04 demotion removed the box. The control's
+    // JOB here is unchanged — prove the reader really reads the named node's own list — so it
+    // was re-anchored on a token the demoted control still carries, never deleted. A positive
+    // control that is dropped because the thing it named moved leaves the negative half of its
+    // pair passing on a broken lookup forever.
+    expect(getByTestId("both-doors").className.split(" ")).toContain("text-muted-foreground")
   })
 
   it.each([
     ["standalone", undefined],
     ["inline", true],
-  ])("%s: the strip's children are [return control] [door label] [judge badge], BY CHILD ORDER", (_name, inlineProp) => {
+  ])("%s: the strip's children are [return control] [divider] [door label] [judge badge], BY CHILD ORDER", (_name, inlineProp) => {
     const { container, unmount } = render(<DoorHeaderStrip onBack={vi.fn()} inline={inlineProp} />)
     const kids = Array.from(container.children)
     // LENGTH FIRST, so an absent node reds as an AssertionError with both counts printed rather
     // than as a `getBy*` throw that names only the thing it could not find.
-    // ⚠ 3 is TODAY'S shape. The D-04 restack adds a divider in a later wave; when it does, this
-    // number changes IN THAT PLAN'S COMMIT, which is the whole reason it is pinned here.
-    expect(kids).toHaveLength(3)
+    // ⚠ 4 AS OF 193-09. It was 3, pinned by 193-03 precisely so the D-04 restack would have to
+    // STATE the node it adds in its own commit rather than absorb it. It did; this is that
+    // statement. The next author inherits the same deal.
+    expect(kids).toHaveLength(4)
     // Asserted by ORDER, never by class name (the 192.1 rule) — a class-name lookup would keep
-    // passing if the three nodes were re-arranged.
+    // passing if the four nodes were re-arranged.
     expect(kids[0].getAttribute("data-testid")).toBe("both-doors")
+    // The divider sits BETWEEN the escape and the door label, which is the whole of D-04's
+    // shape: a person reads the way out, then a break, then where they are.
     expect(kids[1].tagName).toBe("SPAN")
+    expect(kids[1].getAttribute("aria-hidden")).toBe("true")
     expect(kids[1].getAttribute("data-testid")).toBeNull()
-    expect(kids[2].getAttribute("data-testid")).toBe("judge-locked")
+    expect(kids[2].tagName).toBe("SPAN")
+    expect(kids[2].getAttribute("data-testid")).toBeNull()
+    // …and the label is NOT the divider: it carries the door's words, the divider carries none.
+    expect(kids[2].textContent!.length).toBeGreaterThan(0)
+    expect(kids[3].getAttribute("data-testid")).toBe("judge-locked")
     // The badge is the LAST child in BOTH variants — the far-edge position D-04 leaves alone.
     expect(kids[kids.length - 1].getAttribute("data-testid")).toBe("judge-locked")
+    unmount()
+  })
+
+  it.each([
+    ["standalone", undefined],
+    ["inline", true],
+  ])("%s: the divider is DECORATIVE — hidden, empty, and worth no character of the strip's text", (_name, inlineProp) => {
+    const { container, unmount } = render(<DoorHeaderStrip onBack={vi.fn()} inline={inlineProp} />)
+    const kids = Array.from(container.children)
+    const divider = kids[1]
+    // A decorative rule that reaches the accessibility tree is read aloud as noise (T-193-37).
+    expect(divider.getAttribute("aria-hidden")).toBe("true")
+    // It is a RULE, not a character: no text `│`, no glyph, no entity. A text divider would
+    // satisfy every positional assertion above while being spoken by a screen reader.
+    expect(divider.textContent).toBe("")
+    expect(divider.childNodes).toHaveLength(0)
+    // …and the strip's OWN text is exactly its other three children's, concatenated in order,
+    // with nothing between them. This is the claim that actually binds: the divider could not
+    // gain a character without reddening here.
+    const withoutDivider = kids
+      .filter((_n, i) => i !== 1)
+      .map((n) => n.textContent)
+      .join("")
+    expect(container.textContent).toBe(withoutDivider)
+    // NON-VACUITY: the equality above is between two REAL strings, not two empties — an
+    // unmounted strip would satisfy `"" === ""` forever (the 192.1 E-2 lesson).
+    expect(withoutDivider.length).toBeGreaterThan(10)
+    unmount()
+  })
+
+  it.each([
+    ["standalone", undefined],
+    ["inline", true],
+  ])("%s: the return control's OWN node lost its box and kept its nature (D-04)", (_name, inlineProp) => {
+    const { getByTestId, container, unmount } = render(
+      <DoorHeaderStrip onBack={vi.fn()} inline={inlineProp} />,
+    )
+    const back = getByTestId("both-doors")
+    const tokens = back.className.split(" ")
+    // ⚠ ASSERTED ON THE CONTROL'S OWN NODE, NEVER ON THE STRIP. In the app the band WRAPPER
+    // legitimately carries a bottom border, so the same check aimed one level up would pass or
+    // fail for entirely the wrong reason — which is exactly how a class assertion becomes a
+    // sentence about nothing.
+    expect(tokens).not.toContain("border")
+    expect(tokens).not.toContain("border-border")
+    expect(tokens).not.toContain("rounded-md")
+    // POSITIVE CONTROL on the SAME node through the SAME reader: `"".split(" ")` contains none
+    // of the three above either, so an element that was never found would read as a passing
+    // absence.
+    expect(tokens).toContain("text-muted-foreground")
+    // The box went; the BUTTON did not (T-193-36). An escape hatch that quietly became a
+    // `<span>` would be unreachable by keyboard and unreachable by role.
+    expect(back.tagName).toBe("BUTTON")
+    expect(back.getAttribute("type")).toBe("button")
+    // …and it is a different node from the divider, so neither row above is describing the
+    // other one by accident.
+    expect(container.children[1]).not.toBe(back)
+    expect(container.children[0]).toBe(back)
     unmount()
   })
 
