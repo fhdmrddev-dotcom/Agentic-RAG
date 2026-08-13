@@ -12,13 +12,16 @@ itself is a pure read (no writes).
 from __future__ import annotations
 
 import logging
+import re
 from typing import Annotated, Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
+from supabase import Client
 
 from app.config import settings
 from app.dependencies import (
@@ -27,6 +30,7 @@ from app.dependencies import (
     get_pg_pool,
     get_redis,
     get_supabase,
+    get_user_supabase_client,
     require_canvas,
     require_visible,
 )
@@ -65,6 +69,15 @@ from app.services.operator_service import write_operator_audit
 # Imported at module level exactly as folders.py / kb.py do it; folder_utils is cycle-safe
 # (it imports only app.utils.db).
 from app.utils.folder_utils import _null_foreign_global_owner
+# Phase 193 (AUTH-03) — the author-time template door REUSES the shipped upload gate
+# rather than re-implementing it: ``validate_upload`` is the magic-byte/content
+# validator (Phase 100 D-12, widened in 151 D-09) and ``MAX_FILE_SIZE`` / ``BUCKET_NAME``
+# are the size cap and the Storage bucket the CONSUMER already reads from
+# (``template_asset_service.resolve_template_source`` Branch 1). Importing the
+# validator from ``app.api.workspace`` introduces no cycle — that module imports only
+# db/dependencies/services/utils, never an api module.
+from app.api.workspace import validate_upload
+from app.services.workspace_service import BUCKET_NAME, MAX_FILE_SIZE
 
 logger = logging.getLogger(__name__)
 
@@ -1570,3 +1583,137 @@ async def generate_workflow(
         template_placeholders=body.template_placeholders,
     )
     return result
+
+
+# ── Phase 193 (AUTH-03, corrected wording) — author-time template binding ─────
+# THE GAP: ``resolve_template_source`` Branch 1 (template_asset_service.py:145-180) has
+# always been able to CONSUME a library ``asset_ref`` — {asset_id, filename, mime} naming
+# a Storage path in the ``workspace-files`` bucket — and route those bytes down the
+# TRUSTED docxtpl/Jinja path (``provenance="library"``). Nothing could ever PRODUCE one:
+# the 10 published workflows that bind a template were seeded straight into the DB, and
+# WorkflowBuilderPage.tsx:667 only READS ``assets.find(a => a.kind === "template")`` to
+# show a filename. This route is the missing producer for a consumer that already exists.
+#
+# IT DOES NOT WRITE THE DEFINITION, DELIBERATELY. It returns the descriptor; the Builder
+# writes it into ``definition.assets[]`` through the existing PATCH /workflows/{id} draft
+# save. That keeps ONE writer on the definition JSONB — a second server-side writer would
+# race the draft-save path and its Phase-186 If-Match concurrency token.
+#
+# NARROWER THAN THE CHAT-TIME DOOR, ON PURPOSE. ``POST /threads/{id}/workspace/files``
+# accepts the widened 151/D-09 allowlist (text, scripts, images) because those are skill
+# assets the agent reads. A workflow template is a document to FILL and its bytes reach
+# the docxtpl/Jinja render engine, so this door accepts the OOXML three ONLY.
+_TEMPLATE_MIME_BY_EXT = {
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+# Spelled out rather than derived from ``mimetypes.guess_type`` (workspace_service:99):
+# the stdlib map has no OOXML entries and falls back to the Windows registry, so the
+# guessed value varies by machine. The mime is persisted INTO the definition and read
+# back by the render path — it must be identical on every box.
+
+
+class TemplateAssetRef(BaseModel):
+    """The four keys ``resolve_template_source`` Branch 1 reads off an ``AssetRef``.
+
+    Field-for-field identical to ``app.models.harness.AssetRef`` (models/harness.py:512)
+    so the Builder can drop this object straight into ``definition.assets[]`` and the
+    ``extra='forbid'`` WorkflowDefinition will accept it unchanged. ``kind`` is a
+    single-value Literal — this door mints templates, never ``reference`` assets.
+    """
+
+    kind: Literal["template"] = "template"
+    asset_id: str
+    filename: str
+    mime: str
+
+
+@router.post(
+    "/{definition_id}/template",
+    response_model=TemplateAssetRef,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def upload_workflow_template(
+    definition_id: UUID,
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+    # The per-request user-JWT client (ANON key + Bearer), NOT the service role. The
+    # ``workspace_storage_insert_own`` policy (migration 054:91) requires the first path
+    # segment to equal ``auth.uid()``, so Storage RLS is a SECOND, database-enforced
+    # boundary underneath the owner-gate below — a service-role client would bypass it.
+    supabase: Client = Depends(get_user_supabase_client),
+) -> TemplateAssetRef:
+    """Upload a template and store it durably against a workflow the caller OWNS.
+
+    The order of the gates is load-bearing and each one is a decision:
+
+      1. **Owner-gate first** — ``_owned_slug_or_404`` is the SAME owner-scoped
+         ``created_by`` WHERE the delete/preview routes use, and its 404 is deliberately
+         indistinguishable from not-found: a 403 would confirm that a workflow exists
+         (no existence oracle). The workflow cluster reads through a service-role pool
+         which bypasses RLS, so this WHERE is the route's authorization boundary.
+      2. **The DECLARED part size, before the body is materialised** (workspace.py:250,
+         the WR-04 fix) — uvicorn/FastAPI impose no body cap, so ``.read()`` of a
+         multi-GB part would buffer it all in RAM.
+      3. **The extension**, before the body is read at all — a ``.png`` costs nothing.
+      4. **The magic bytes** via the shipped ``validate_upload`` — a renamed binary
+         wearing a ``.docx`` name never reaches Storage.
+
+    Nothing is persisted on any refusal: the single write is the LAST statement before
+    the return. The blocking supabase-py upload is ``run_in_threadpool``-wrapped
+    (CLAUDE.md / D-v2.5-01).
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    await _owned_slug_or_404(pool, definition_id, user_id)  # 404 on non-owner / unknown
+
+    if file.size is not None and file.size > MAX_FILE_SIZE:  # WR-04 — before .read()
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+
+    original = file.filename or ""
+    ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if ext not in _TEMPLATE_MIME_BY_EXT:
+        raise HTTPException(
+            422,
+            "A workflow template must be a .docx, .pptx or .xlsx document "
+            f"(got {ext or 'a file with no extension'}).",
+        )
+
+    raw = await file.read()
+    if len(raw) == 0:
+        raise HTTPException(422, "File is empty")
+    if len(raw) > MAX_FILE_SIZE:  # a lying/absent declared size does not get past this
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+    validate_upload(original, raw)  # magic-byte / OOXML-container gate -> 422
+
+    # WR-05 (100-REVIEW) sanitisation, same shape as workspace.py:265 — ordinary names
+    # ("Q3 Report (final).docx", "P&L 2026.xlsx") must not 422 at a user who never typed
+    # a path, while '/' and '..' are stripped so the object can only ever land under the
+    # user-keyed prefix built below.
+    safe_name = re.sub(r"[^a-zA-Z0-9._\- ]", "_", original)
+    safe_name = re.sub(r"\.{2,}", ".", safe_name).strip() or f"template{ext}"
+    mime = _TEMPLATE_MIME_BY_EXT[ext]
+    # The layout the seeded library fixtures already use and Branch 1 already reads
+    # (RESEARCH Q1): {user_id}/_library/{workflow}/{uuid8}-{name}. The uuid8 makes a
+    # re-upload of the same filename a NEW object rather than an overwrite, so a draft
+    # still pointing at the old asset_id keeps rendering.
+    asset_id = f"{user_id}/_library/{definition_id}/{uuid4().hex[:8]}-{safe_name}"
+    try:
+        await run_in_threadpool(
+            supabase.storage.from_(BUCKET_NAME).upload,
+            asset_id,
+            raw,
+            {"content-type": mime, "upsert": "true"},
+        )
+    except Exception:
+        # Never surface a raw storage traceback (the D-05 clean-relay posture).
+        logger.warning(
+            "Workflow template upload failed for definition=%s (relaying clean error)",
+            definition_id,
+            exc_info=True,
+        )
+        raise HTTPException(502, "The template could not be stored. Please try again.")
+
+    return TemplateAssetRef(asset_id=asset_id, filename=safe_name, mime=mime)
