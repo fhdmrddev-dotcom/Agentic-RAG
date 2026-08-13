@@ -66,6 +66,52 @@
  * `ReferenceError` in whichever module a caller reached first — the shape 188.1 proved on
  * `WorkflowCanvas`. That fence was observed RED against two real plants in this file, one per
  * spelling, and this file restored md5-identical after each.
+ *
+ * ── 193-09 (D-03 / D-04) — THE RESTACK. WHAT CHANGED AND WHY ────────────────────────────
+ *
+ * Before this plan the return control, the current-door label and the locked-judge badge
+ * rendered as THREE VISUAL PEERS: the escape hatch carried a rounded box and a 1px outline,
+ * so it read with the same weight as the door you are standing in. SEED-147's operator could
+ * not name "the other one", and that peer reading is the half of suspect #2 that COPY
+ * PROVABLY CANNOT REACH — 193-08 re-worded every governed string on this surface and the
+ * three still weighed the same. Hence D-03 putting a structural change in scope at all.
+ *
+ * D-04's shape, and it is now what this file renders:
+ *
+ *     ‹ escape  │  <current door>                       [locked-judge badge]
+ *     └ no box, muted   └ primary            └ far edge, UNTOUCHED
+ *
+ * THREE PROPERTIES, each deliberate:
+ *
+ *  1. THE RETURN CONTROL LOST ITS BOX, NOT ITS NATURE. It is still a real focusable
+ *     `<button type="button">` carrying the same testid and the same handler; only the
+ *     rounding and the 1px outline are gone. It gains an underline-on-hover/focus-visible
+ *     treatment borrowed from the shipped quiet text button on the Builder's own describe
+ *     screen (`starter-door-trigger`), so removing the outline does not remove the focus
+ *     affordance with it.
+ *
+ *  2. THE DIVIDER IS BORROWED, NOT INVENTED. It is `CanvasToolbar.tsx:212`'s decorative rule,
+ *     verbatim — already in the token vocabulary, already `aria-hidden`, already used to
+ *     separate groups in a toolbar strip. It carries NO testid on purpose: it is decoration,
+ *     so it must contribute nothing to any accessible name. The suite asserts exactly that.
+ *
+ *  3. THE BADGE IS BYTE-UNTOUCHED — position, class conditional, `title` and text. D-04 is
+ *     explicit that moving it is unnecessary: it is the one element already in the right
+ *     place, and spending change budget on it would put the D-05 conditional at risk for
+ *     nothing. The plan's own gate was a `git diff -U0` over this file matching NO line that
+ *     names the badge, its testid, or the far-edge push class — which is also why the three
+ *     paragraphs above name none of them either. ⚠ A criterion that greps a file for a token
+ *     makes that token unusable in the file's OWN prose (the 187-24 trap, fired four times in
+ *     this phase); the honest repair is to word around it and say so, never to weaken the gate.
+ *
+ * ⚠ THE SKETCH DRAWS NO MOCKUP OF THIS BAND, on either door. The pixel choices above are
+ * Claude's discretion under CONTEXT, so the acceptance bar is UAT rows U3 (this strip) and
+ * U3b (the describe door's band, demoted identically under D-22) — a human comparison, not a
+ * generated contract. This is where sketch→build drift survives in Phase 193.
+ *
+ * ⚠ D-06 STAYS REJECTED. The return control did NOT move into the host-band slot that renders
+ * only when `inline` is true — the standalone band would then have no way back at all, and an
+ * author stranded on a screen is a worse defect than a busy strip (the 184.1 reasoning).
  */
 import { STRIP_BACK, STRIP_LABEL_GOVERN } from "@/components/workflows/doorVocabulary"
 
@@ -99,10 +145,14 @@ export function DoorHeaderStrip({ onBack: goBoth, inline }: DoorHeaderStripProps
           type="button"
           data-testid="both-doors"
           onClick={goBoth}
-          className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
+          className="px-1 py-1 text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-none"
         >
           {STRIP_BACK}
         </button>
+        {/* 193-09 (D-04): the divider, taken VERBATIM from `CanvasToolbar.tsx:212`. Decorative
+            and hidden from assistive tech, and deliberately given no testid — it separates the
+            escape from the current door and must contribute nothing to any accessible name. */}
+        <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-border" />
         <span className="text-[13px] font-medium text-foreground">{STRIP_LABEL_GOVERN}</span>
         <span
           data-testid="judge-locked"
