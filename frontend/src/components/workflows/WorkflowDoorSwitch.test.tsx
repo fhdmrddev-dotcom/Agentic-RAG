@@ -24,6 +24,9 @@ import workflowDoorSwitchSource from "./WorkflowDoorSwitch?raw"
 // table, so it must enumerate it rather than name 21 identifiers it would then have to keep
 // in step by hand.
 import doorHeaderStripSource from "./DoorHeaderStrip?raw"
+// 193 REVIEW WR-01: the THIRD `doorVocabulary` consumer. It was outside the sweep while it held
+// the ungoverned copy the phase had to fix — see the note on SWEPT_SOURCES below.
+import builderPageSource from "@/pages/WorkflowBuilderPage?raw"
 import * as doorVocabulary from "./doorVocabulary"
 
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
@@ -468,10 +471,24 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
 // comment there, the answer is to name its identifier, never to weaken this sweep.
 // ══════════════════════════════════════════════════════════════════════════════════
 
-/** The two component sources this fence is about. Paths are labels for the failure message. */
+/**
+ * The component sources this fence is about. Paths are labels for the failure message.
+ *
+ * ⚠ **THE THIRD ENTRY IS THE WHOLE POINT, AND IT WAS ADDED LATE — 193 REVIEW WR-01.**
+ * This list held exactly TWO files while `WorkflowBuilderPage.tsx` sat outside it holding a
+ * SECOND, ungoverned copy of five governed ids. That gap is Phase 193's own headline defect
+ * (fixed in `294a2ac8`), and the fence could not have caught it, because **a fence cannot see a
+ * file that is not in its list** — the same structural blindness that let `WorkflowsPage.tsx`
+ * escape G-5 for ten consecutive phases. Re-typing `"Write the first draft"` onto the page
+ * would have reproduced the defect with this suite green.
+ *
+ * So: **any file that imports from `doorVocabulary` belongs here.** Adding the import without
+ * adding the entry re-opens the exact hole this list exists to close.
+ */
 const SWEPT_SOURCES: { path: string; source: string }[] = [
   { path: "./WorkflowDoorSwitch.tsx", source: workflowDoorSwitchSource },
   { path: "./DoorHeaderStrip.tsx", source: doorHeaderStripSource },
+  { path: "@/pages/WorkflowBuilderPage.tsx", source: builderPageSource },
 ]
 
 /**
@@ -496,13 +513,13 @@ const hitsIn = (source: string): string[] =>
   NEEDLES.filter((n) => source.includes(n.text)).map((n) => `${n.id}/${n.spelling}`)
 
 describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 E-2 lesson)", () => {
-  it("both swept sources really loaded, and every needle is a real non-empty string", () => {
+  it("all three swept sources really loaded, and every needle is a real non-empty string", () => {
     // NON-VACUITY FIRST, BEFORE ANY NEGATIVE. A `?raw` import of a moved or renamed module
     // yields the EMPTY STRING in some resolvers rather than throwing, and `"".includes(x)` is
     // false for every x — so the whole fence would pass green while defending nothing. This
     // is the exact defect `/gsd:secure-phase 192.1` found: a fence swept against the empty
     // string, with the property holding and NOTHING guarding it.
-    expect(SWEPT_SOURCES).toHaveLength(2)
+    expect(SWEPT_SOURCES).toHaveLength(3)
     for (const { path, source } of SWEPT_SOURCES) {
       expect(source.length, `${path} did not load`).toBeGreaterThan(1000)
     }

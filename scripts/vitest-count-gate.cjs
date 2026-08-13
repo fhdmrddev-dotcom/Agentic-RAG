@@ -317,7 +317,13 @@ const BASELINE = {
   // D-22 exists to prevent. Unpinned it was deletable at `failed 0`.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowDoorSwitch.test.tsx 28 33 +5`).
-  "WorkflowDoorSwitch.test.tsx": 33,
+  // 193 REVIEW WR-01 (2026-08-14): 33 → 34. ONE new `it.each` row, because the D-24(a) copy
+  // fence gained its THIRD swept source — `@/pages/WorkflowBuilderPage.tsx`, the file that held
+  // the ungoverned copy this phase had to fix and that the fence could not see. The new row was
+  // driven RED against a re-typed `DESCRIBE_CTA` literal (`expected [ 'DESCRIBE_CTA/plain' ] to
+  // deeply equal []`) and the plant restored md5-identical, so this pin guards a fence that is
+  // PROVED to fire rather than one assumed to.
+  "WorkflowDoorSwitch.test.tsx": 34,
   // 193-05 (AUTH-01 / D-10 / D-11) — a NEW FILE, pinned in the SAME COMMIT that creates it,
   // for the same reason as the 193-01 entry below: a `BASELINE` key naming a path that does
   // not yet exist makes this gate ERROR (exit 2) rather than fail. No `TARGETS` edit
