@@ -220,6 +220,110 @@ MANIFEST. They are **inputs to this phase, not open questions.**
   must not silently strip the feature. **This asymmetry is a decision, not an oversight — do not
   "fix" it into consistency.**
 
+### AMENDED AT PLAN TIME — 2026-08-13, after `193-RESEARCH.md` (operator answers to the research escalation)
+
+⚠ **These five decisions POST-DATE the twenty above and OVERRIDE them where they conflict. The
+original text is left standing rather than rewritten** — this project corrects in the open, so a
+later reader can see what was believed and what measurement changed it.
+
+**The measurement that forced the amendment** (`193-RESEARCH.md` §A, HIGH confidence, 223 live rows):
+the BUILD-CONTRACT, the sketch README and this file's `<canonical_refs>` all describe the fill signal
+as *"admits `render_template` in the phase tool whitelist"*. Measured against the live DB, **ZERO of
+223 definitions carry `render_template` in `phases[].config.available_tools`.** A predicate written to
+the contract's letter marks nothing at all. The live signal is `phases[].config.phase_type ==
+"llm_emit"` (79 phases). ⚠ The jsonb string-scalar trap fired during that census and is reported in
+§A.2 — 194 of 223 `definition` values are JSON **string scalars**, so `definition->'phases'` silently
+returns nothing; every count was taken after normalizing with `(definition #>> '{}')::jsonb`.
+
+- **D-21: The predicate is P2 WITH THE UNKNOWN ARM** — a workflow admits a template when it has an
+  `llm_emit` phase **AND** binds no library template in `definition.assets[kind == "template"]`; a
+  definition with `phases: []` reads **`unknown`**, never a positive no.
+
+  | Predicate result | Published rows | Card (D-15) | Run modal (D-20) |
+  |---|---|---|---|
+  | `admits` | **1** | `· needs a template` | labelled control |
+  | `does-not-admit` | **34** | *(nothing)* | *(absent)* |
+  | `unknown` (`phases: []`) | **110** | *(nothing)* | **control, exactly as today** |
+
+  *Rationale — measured, not preferred:* `_exec_llm_emit` calls `resolve_template_source` with
+  `_emit_bound_asset_ref(definition)`, and `template_asset_service.py:144` **returns unconditionally
+  on Branch 1** when that ref is non-`None`. There is no override path — nothing clears `asset_ref`
+  because a user uploaded something. So on the 16 published rows that bind a library template, the
+  run-time upload is **unreachable code**: `Template to fill` would promise what the engine discards
+  and `· needs a template` would be **false**. AUTH-03's own wording is *"where to **supply** a
+  template"*, and P2 is the only predicate that answers that question honestly on all 145 rows.
+  **P1′ was rejected for a second, independent reason:** it is byte-for-byte
+  `soulDeliverable(def).kind === "file"` (`soulData.ts:161-171`), which already drives the shipped
+  ***Makes a file*** chip at `libraryFilter.ts:173` — under P1′ the new mark would be a second word
+  for a fact this exact surface already states, against SC#2. A two-state *needs / fills* variant was
+  offered and rejected for the same duplication.
+
+  ⚠ **THE COST IS STATED, NOT SMOOTHED: the card mark is visible on exactly ONE published row in the
+  local library** — `ephemeral-template-fill-101uat`. **SC#3's G-4 UAT row MUST be driven against
+  that slug**; a scoreboard that drives any other row cannot see this feature at all. `phases: []`
+  being 110 of 145 (76 %) is why the unknown arm is load-bearing: without it D-17 would strip a
+  shipped capability from three-quarters of the library on the strength of a stub nobody authored.
+
+- **D-22: The D-04 restack applies to BOTH bands — the describe door's too, return-control demotion
+  only.** The describe band (`WorkflowDoorSwitch.tsx:214-231`) carries an identically-classed
+  `‹ both doors`. No judge badge lives there, so **no divider is added on that side** — the demotion
+  is the border/box drop and the muted treatment, nothing else.
+  *Rationale:* demoting one and not the other makes the two doors disagree about their own escape
+  hatch — a new inconsistency manufactured by the fix. ⚠ **Neither band has a mockup**, so both are
+  human comparisons at UAT; this widens the no-mockup surface D-03 already flagged.
+
+- **D-23: `strip.labelGovern` becomes the 21st governed COPY id, and its string becomes variant D's
+  door name — `Build it myself`.** Add the id to `.planning/sketches/164-telling-the-doors-apart/build.cjs`,
+  re-run `node build.cjs && node assemble.cjs`, and port it from the regenerated contract like every
+  other id.
+  *Rationale:* `🔧 Author & govern` (`WorkflowDoorSwitch.tsx:166`) was never in the COPY table and
+  `dom.generated.json` never captured it. After variant D ships it becomes **the one surviving
+  instance of the exact wording SEED-147 reports as illegible**, sitting on the door whose card now
+  reads *Build it myself*. Echoing the door name confirms the choice in the same words used to make
+  it. ⚠ **This makes the id count 21, not 20 — D-11's "ALL 20 ids" is superseded to ALL 21**, and
+  D-02's derived-never-re-typed property is preserved precisely because the id goes through
+  `build.cjs` rather than being typed into JSX.
+
+- **D-24: The new modules ship WITH FENCES.** Two, each driven RED against a real plant in a real
+  file before it is trusted: (a) **no door COPY literal may appear outside `doorVocabulary.ts`**, and
+  (b) **`DoorHeaderStrip.tsx` may not import back from `WorkflowDoorSwitch.tsx`** (the ESM-cycle
+  shape 188.1 proved on `WorkflowCanvas`). Nothing sweeps `components/workflows/*.ts` today, so
+  without this the new modules ship undefended.
+  ⚠ **Verify each fence's SCOPE — *could it fire?*** — per the 192.1 security finding where a fence
+  swept against the empty string passed green while defending nothing.
+
+- **D-25: The predicate lives in `frontend/src/components/workflows/soulData.ts`, immediately after
+  `soulDeliverable`, exported as a THREE-STATE function.**
+
+  ```ts
+  export type TemplateAdmission = "admits" | "does-not-admit" | "unknown"
+  export function templateAdmission(def: DefShape | null | undefined): TemplateAdmission
+  ```
+
+  Both consumers already import from that module (`RunModal.tsx:60`; `libraryRow.ts` takes `DefShape`
+  from it), fence F4 does not reach it, it is a `.ts` leaf so `react-refresh/only-export-components`
+  cannot fire, and `soulData.test.ts` already exists pinned at **17**. ⚠ **Do NOT model this as a
+  boolean with a `?? true` at one call site** — `soulDeliverable` is the cautionary precedent
+  directly above it, collapsing `null` and `{phases: []}` into one answer, which is right for a
+  deliverable label and a D-20 violation here.
+  ⚠ **An absent `config.emitter` on an `llm_emit` phase counts as `render_template`** (the Pydantic
+  default, `models/harness.py:156`). The shipped `RunModal.test.tsx` fixtures at `:70-96` omit it — a
+  predicate requiring it explicitly would read them as non-admitting and blow up all six
+  whole-`innerHTML` baselines.
+
+### Two inherited claims measured FALSE by research — corrected here, not silently
+
+- ⚠ **The 188.2 two-badge ceiling is on the CANVAS `PhaseNodeCard`, not `library/WorkflowCard.tsx`.**
+  D-13 cites an `@ts-expect-error` control as the mechanical guard forbidding a third badge on the
+  library card. That control guards a different component; **there is no badge ceiling of any kind
+  under `library/`.** **D-13's plain-text ruling still STANDS** — on SEED-155 / U8 grounds, which is
+  the reason that actually applies — but no plan may claim a typecheck enforces it.
+- ⚠ **`launchError` is NOT template-only** (`RunModal.tsx`). `handleRun`'s catch sets it on **any**
+  `onRun` rejection, and its node lives inside the wrapper D-17 removes. Hiding the block naively
+  makes **launch failures silent** on every non-template workflow — the same class of defect as WR-03,
+  which Phase 192's gap round had to repair on this very surface. The render condition must cut around
+  it.
+
 ### Claude's Discretion
 
 - The exact Tailwind classes for the demoted return control and the divider (D-04), within the
