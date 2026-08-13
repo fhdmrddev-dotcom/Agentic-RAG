@@ -5,19 +5,25 @@
  *
  * The shell holds ONE piece of local door state (`"both" | "describe" | "govern"`,
  * default `"both"`) and forks the authoring entry into two doors:
- *   - "Describe & run" (LOOSE, fastest path): the describe-box lineage descended
+ *   - the LOOSE door (`DOOR_A_NAME`, fastest path): the describe-box lineage descended
  *     from WorkflowBuilderPage's empty screen (a textarea labelled for the business
  *     requirement + a draft CTA + an honest hint) PLUS a <WorkflowSoul scale="card">
- *     soul PREVIEW of the current draft/definition PLUS a visible
- *     "switch to Author & govern ›" strip (D-05 — nothing lost by picking fast).
- *   - "Author & govern" (STRICT, full control): mounts the EXISTING
+ *     soul PREVIEW of the current draft/definition PLUS a visible switch strip
+ *     (`SWITCH_PROMPT` + `SWITCH_CTA`) — D-05, nothing lost by picking fast.
+ *   - the STRICT door (`DOOR_B_NAME`, full control): mounts the EXISTING
  *     `WorkflowBuilderPage` (drafted/govern view) whose form panel already owns the
  *     citation-policy picker / gate chips / folder-scope / model with LIVE tier
  *     recompute and a LOCKED-always-on judge (`llm_judge_rubric`). The advanced
  *     controls are DELEGATED, never re-implemented here (D-05).
  *
- * A persistent "‹ both doors" control returns from either open door to the "both"
+ * A persistent return control (`STRIP_BACK`) leaves either open door for the "both"
  * chooser (D-05).
+ *
+ * ⚠ THE DOORS' WORDS ARE NAMED HERE BY IDENTIFIER AND NEVER QUOTED (193-05, D-24(a)).
+ * Every governed string lives in `doorVocabulary.ts` and reaches the JSX below as an
+ * imported constant. Prose that spelled a word out would be a SECOND HOME for it, and it
+ * would silently read false the moment `193-08` swaps the shipped strings for the build
+ * contract's column D — which is the exact drift the vocabulary module exists to remove.
  *
  * RED LINES this shell holds:
  *  - D-01: the library-card Run path (doRun → createThread → postMessage →
@@ -36,6 +42,34 @@ import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
 // the G-5 extraction, shipped BEFORE the D-04 restack that lands on it. Imported as a VALUE
 // at module scope, which is why `DoorHeaderStrip.tsx` may never import back (D-24(b)).
 import { DoorHeaderStrip } from "@/components/workflows/DoorHeaderStrip"
+// Phase 193-05 (D-10 / D-11 / D-23): every governed word on this surface, from the one home.
+// A NAMED-IMPORT LIST, never a namespace import — the shipped convention in this directory,
+// and the thing that makes an unused or a renamed id a typecheck error rather than a blank.
+// ⚠ `STRIP_LABEL_GOVERN` is deliberately ABSENT: it belongs to `DoorHeaderStrip.tsx`, which
+// imports it directly. One id, one consumer — routing it through here would re-create the
+// coupling the 193-03 cut removed.
+import {
+  CHOOSER_H1,
+  CHOOSER_SUB,
+  DESCRIBE_CTA,
+  DESCRIBE_H1,
+  DOOR_A_DESC,
+  DOOR_A_NAME,
+  DOOR_A_NOTE,
+  DOOR_A_TIER,
+  DOOR_B_DESC,
+  DOOR_B_NAME,
+  DOOR_B_NOTE,
+  DOOR_B_TIER,
+  HINT_FRAG1,
+  HINT_FRAG2,
+  HINT_FRAG3,
+  SOUL_LABEL,
+  STRIP_BACK,
+  STRIP_LABEL,
+  SWITCH_CTA,
+  SWITCH_PROMPT,
+} from "@/components/workflows/doorVocabulary"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { type DefShape } from "@/components/workflows/soulData"
 
@@ -45,7 +79,7 @@ export interface WorkflowDoorSwitchProps {
   /** The current draft/definition for the soul preview (undefined for a true fresh
    *  build with nothing described yet). Loose read-shape — display only. */
   def?: DefShape | null
-  /** The existing definition + row id for "Author & govern a draft" (Open/Tweak);
+  /** The existing definition + row id for the strict door's Open/Tweak-a-draft entry;
    *  absent for a fresh build. Passed straight through to the Builder's `initial`. */
   initial?: BuilderInitial
   /** The Builder's publish-gauntlet render seam — passed straight through to the
@@ -109,7 +143,7 @@ export function WorkflowDoorSwitch({
 }: WorkflowDoorSwitchProps) {
   const [door, setDoor] = useState<DoorState>(initialDoor)
   const [describe, setDescribe] = useState("")
-  // Phase 124 CR-01 fix: the loose "Draft the workflow" CTA hands the typed text to
+  // Phase 124 CR-01 fix: the loose door's draft CTA (`DESCRIBE_CTA`) hands the typed text to
   // the govern-door Builder AND asks it to auto-run the draft. Sticky until the user
   // returns to the chooser (goBoth) so a Builder remount can't re-fire the generate.
   const [handoffDraft, setHandoffDraft] = useState(false)
@@ -162,8 +196,8 @@ export function WorkflowDoorSwitch({
           {/* The govern door IS the existing Builder — its advanced governance
               controls are delegated, with live tier recompute + the locked judge.
               CR-01 fix: seed the typed describe text + (when arriving via the loose
-              "Draft the workflow" CTA) auto-run the draft, so the fast path never
-              dead-ends and the user's requirement is never dropped. */}
+              draft CTA) auto-run the draft, so the fast path never dead-ends and the
+              user's requirement is never dropped. */}
           <WorkflowBuilderPage
             initial={initial}
             renderPublish={renderPublish}
@@ -189,7 +223,7 @@ export function WorkflowDoorSwitch({
   }
 
   // ── DESCRIBE DOOR — the 018-A describe-box lineage + a soul preview + the
-  //    one-click "switch to Author & govern ›" strip (D-05). ──
+  //    one-click switch strip to the strict door (D-05). ──
   if (door === "describe") {
     return (
       <div data-testid="door-describe" className="flex h-full flex-col bg-background">
@@ -201,15 +235,19 @@ export function WorkflowDoorSwitch({
               never simply disappear — an author with no way back is a worse defect than a
               tall header. */}
           {inline && headerLead}
+          {/* ⚠ THE SECOND `strip.back` SITE. `DoorHeaderStrip.tsx` holds the first, with an
+              identical class list; both render `STRIP_BACK`. That duplication is precisely
+              the drift `doorVocabulary.ts` removes, and the D-24(a) fence sweeps BOTH
+              sources so a future edit cannot re-type one of them (193-05, RESEARCH § H-1). */}
           <button
             type="button"
             data-testid="both-doors"
             onClick={goBoth}
             className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
           >
-            ‹ both doors
+            {STRIP_BACK}
           </button>
-          <span className="text-[13px] font-medium text-foreground">⚡ Describe &amp; run</span>
+          <span className="text-[13px] font-medium text-foreground">{STRIP_LABEL}</span>
         </div>
         <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[1fr_320px]">
           {/* The describe box (descends from WorkflowBuilderPage's empty screen). */}
@@ -218,9 +256,7 @@ export function WorkflowDoorSwitch({
               <span aria-hidden="true" className="text-3xl">
                 ✎
               </span>
-              <h1 className="text-[1.4rem] font-semibold text-foreground">
-                What recurring work should this automate?
-              </h1>
+              <h1 className="text-[1.4rem] font-semibold text-foreground">{DESCRIBE_H1}</h1>
             </div>
             <textarea
               aria-label="business requirement"
@@ -255,13 +291,19 @@ export function WorkflowDoorSwitch({
                 }}
                 className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
               >
-                Draft the workflow
+                {DESCRIBE_CTA}
               </button>
+              {/* ⚠ D-12: the hint is a SENTENCE, not a string. Only the three bold fragments
+                  are data; this component keeps the `<b>` markup AND the non-bold connective
+                  text, so no template language and no parser enter a vocabulary leaf. The
+                  `{" "}` separators are load-bearing — JSX would otherwise drop the space
+                  before each `<b>`, and the byte-exact captures in
+                  `WorkflowBuilderPage.describe.test.tsx` hold that spacing. */}
               <p data-testid="describe-hint" className="text-center text-[13px] text-muted-foreground">
                 You describe the goal — the AI{" "}
-                <b className="font-medium text-foreground">drafts the phases</b>,{" "}
-                <b className="font-medium text-foreground">sets the strictness</b>, and{" "}
-                <b className="font-medium text-foreground">asks about anything it had to guess</b>.
+                <b className="font-medium text-foreground">{HINT_FRAG1}</b>,{" "}
+                <b className="font-medium text-foreground">{HINT_FRAG2}</b>, and{" "}
+                <b className="font-medium text-foreground">{HINT_FRAG3}</b>.
               </p>
             </div>
             {/* D-05: nothing lost by picking fast — advanced is one click away. */}
@@ -270,21 +312,21 @@ export function WorkflowDoorSwitch({
               className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-violet/30 bg-accent-violet/5 px-3 py-2 text-[12px] text-muted-foreground"
             >
               <span aria-hidden="true">🔧</span>
-              <span>Need citation policy, gates, or per-phase scope?</span>
+              <span>{SWITCH_PROMPT}</span>
               <button
                 type="button"
                 data-testid="switch-to-govern"
                 onClick={() => setDoor("govern")}
                 className="ml-auto rounded-md border border-accent-violet/40 px-2.5 py-1 text-[12px] font-medium text-accent-violet hover:bg-accent-violet/10"
               >
-                Author &amp; govern ›
+                {SWITCH_CTA}
               </button>
             </div>
           </div>
           {/* The soul PREVIEW of the current draft/definition (D-05). */}
           <aside data-testid="describe-soul-preview" className="rounded-lg border border-border bg-card/40 p-4">
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-              This workflow's soul
+              {SOUL_LABEL}
             </p>
             <WorkflowSoul def={previewDef} scale="card" />
           </aside>
@@ -304,13 +346,11 @@ export function WorkflowDoorSwitch({
         <div className="flex items-center gap-3 border-b border-border px-4 py-2">{headerLead}</div>
       )}
       <div className="flex flex-col gap-1 border-b border-border px-6 py-4">
-        <h1 className="text-[18px] font-semibold text-foreground">How do you want to build this?</h1>
-        <p className="text-[13px] text-muted-foreground">
-          Pick the fast path or full control — nothing is locked, you can switch anytime.
-        </p>
+        <h1 className="text-[18px] font-semibold text-foreground">{CHOOSER_H1}</h1>
+        <p className="text-[13px] text-muted-foreground">{CHOOSER_SUB}</p>
       </div>
       <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-6 py-6 md:grid-cols-2">
-        {/* Door A — Describe & run (loose). */}
+        {/* Door A — the loose door (`DOOR_A_*`). */}
         <button
           type="button"
           data-testid="door-card-describe"
@@ -321,21 +361,20 @@ export function WorkflowDoorSwitch({
             ⚡
           </span>
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            loose · fastest path
+            {DOOR_A_TIER}
           </span>
-          <span className="text-[16px] font-semibold text-foreground">Describe &amp; run</span>
-          <span className="text-[13px] text-muted-foreground">
-            Say what recurring work this should do — the AI drafts the phases and sets the strictness.
-          </span>
+          <span className="text-[16px] font-semibold text-foreground">{DOOR_A_NAME}</span>
+          <span className="text-[13px] text-muted-foreground">{DOOR_A_DESC}</span>
+          {/* `Open ›` is NOT a governed id — the build contract's COPY table does not
+              carry it, so it stays a literal here rather than travelling to the
+              vocabulary module on a guess (193-05: port the table, not the surface). */}
           <span className="mt-1 text-[13px] font-medium text-primary">
             Open <span aria-hidden="true">›</span>
           </span>
-          <span className="mt-1 text-[11px] italic text-muted-foreground">
-            nothing locked — switch to Author &amp; govern anytime
-          </span>
+          <span className="mt-1 text-[11px] italic text-muted-foreground">{DOOR_A_NOTE}</span>
         </button>
 
-        {/* Door B — Author & govern (strict). */}
+        {/* Door B — the strict door (`DOOR_B_*`). */}
         <button
           type="button"
           data-testid="door-card-govern"
@@ -346,18 +385,14 @@ export function WorkflowDoorSwitch({
             🔧
           </span>
           <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            power · full control
+            {DOOR_B_TIER}
           </span>
-          <span className="text-[16px] font-semibold text-foreground">Author &amp; govern</span>
-          <span className="text-[13px] text-muted-foreground">
-            Open the full Builder — every advanced control, the live strictness tier, the locked judge.
-          </span>
+          <span className="text-[16px] font-semibold text-foreground">{DOOR_B_NAME}</span>
+          <span className="text-[13px] text-muted-foreground">{DOOR_B_DESC}</span>
           <span className="mt-1 text-[13px] font-medium text-accent-violet">
             Open <span aria-hidden="true">›</span>
           </span>
-          <span className="mt-1 text-[11px] italic text-muted-foreground">
-            citation policy · gate set · per-phase scope &amp; model
-          </span>
+          <span className="mt-1 text-[11px] italic text-muted-foreground">{DOOR_B_NOTE}</span>
         </button>
       </div>
     </div>

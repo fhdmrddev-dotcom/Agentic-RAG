@@ -1,11 +1,11 @@
 /**
  * Phase 193-03 Task 1 (D-05 / D-08) — DoorHeaderStrip.
  *
- * THE GOVERN DOOR'S HEADER STRIP: the `‹ both doors` return control, the door label, and the
- * `🔒 judge always-on` badge. TWO props in, one callback out: it owns no state, fetches
- * nothing, reads no context and closes over nothing at module scope — which is why the
- * fragment could be lifted out of the door shell at all, and the property the next author has
- * to keep true.
+ * THE GOVERN DOOR'S HEADER STRIP: the return control (`STRIP_BACK`), the current-door
+ * label (`STRIP_LABEL_GOVERN`), and the judge badge. TWO props in, one callback out: it
+ * owns no state, fetches nothing, reads no context and closes over nothing at module
+ * scope — which is why the fragment could be lifted out of the door shell at all, and the
+ * property the next author has to keep true.
  *
  * STATE OF THE EXTRACTION — read this literally, it is not a claim about the future:
  * the docblock and the `doorGroup` fragment below were CUT out of `WorkflowDoorSwitch.tsx`
@@ -19,9 +19,17 @@
  * asserted: the span `sed`'d out of the pre-move blob and the same span `sed`'d out of this
  * file `diff` EMPTY.
  *
- * ⚠ THAT PROOF IS WHY THE BODY BELOW CARRIES THE INDENTATION IT HAD INSIDE THE `if` BLOCK
- * rather than the one a fresh file would give it. Re-indenting is the single tidy that would
- * have made the diff non-empty, so it was not done. Not a style to copy into new code.
+ * ⚠ THAT BYTE-IDENTITY IS A FACT ABOUT COMMIT `2dbcd9f8`, NOT A LIVE PROPERTY OF THIS FILE.
+ * `193-05` replaced this strip's two governed COPY literals with imports from
+ * `doorVocabulary.ts` (D-10 / D-24(a)), so re-running that `sed`+`diff` today will NOT come
+ * back empty and is not supposed to. The paragraph above is kept because it records how the
+ * cut was verified when it was made; the move-proof that still binds LIVE is the DOM one —
+ * `193-01`'s six whole-`innerHTML` captures and `WorkflowBuilderPage.header.test.tsx`'s
+ * byte-exact band literal, both of which passed the 193-05 rewire with ZERO edits.
+ *
+ * ⚠ THE BODY BELOW STILL CARRIES THE INDENTATION IT HAD INSIDE THE `if` BLOCK rather than the
+ * one a fresh file would give it. Re-indenting was the single tidy that would have made the
+ * 193-03 diff non-empty, so it was not done. Not a style to copy into new code.
  *
  * ⚠ THE REFERENCES INSIDE THE MOVED DOCBLOCK POINT AT THE PRE-MOVE FILE, not at this one: it
  * speaks of "this shell's own band" and "the merged row", which are `WorkflowDoorSwitch.tsx`
@@ -38,9 +46,15 @@
  * THIS FILE EXPORTS THE COMPONENT AND ITS PROPS TYPE AND NO RUNTIME VALUE OF ANY KIND.
  * `react-refresh/only-export-components` is an ACTIVE error in this repo (`FlowEdge.tsx:135`
  * still carries one), so a component module may not export a shared runtime value. That is the
- * mechanical reason the door COPY goes to a `.ts` leaf in `193-05` (D-10) rather than to a
+ * mechanical reason the door COPY went to a `.ts` leaf in `193-05` (D-10) rather than to a
  * `STRIP_COPY` const here — and adding one would put `eslint src/components/workflows/` back
  * where it started.
+ *
+ * ⚠ IT IS NO LONGER A ZERO-IMPORT LEAF, AND THAT IS THE 193-05 DESIGN RATHER THAN A SLIP.
+ * It imports EXACTLY ONE module — `doorVocabulary.ts`, which itself imports NOTHING — so the
+ * edge it adds is one hop into a data leaf and can never close a cycle. Its suite pins that
+ * exact shape: the permitted import list is asserted as an EQUALITY, so a second import (or a
+ * component sibling, or React) reds rather than slipping in behind a relaxed rule.
  *
  * These paragraphs are kept honest by machine, not by habit. `DoorHeaderStrip.test.tsx` reads
  * this file's SOURCE through Vite's `?raw` loader and forbids it from naming a
@@ -53,6 +67,7 @@
  * `WorkflowCanvas`. That fence was observed RED against two real plants in this file, one per
  * spelling, and this file restored md5-identical after each.
  */
+import { STRIP_BACK, STRIP_LABEL_GOVERN } from "@/components/workflows/doorVocabulary"
 
 export interface DoorHeaderStripProps {
   /** Return to the "both doors" chooser. This is the shell's own `goBoth` — the handler never
@@ -77,15 +92,18 @@ export function DoorHeaderStrip({ onBack: goBoth, inline }: DoorHeaderStripProps
      */
     const doorGroup = (
       <>
+        {/* ⚠ THE FIRST OF THE TWO `strip.back` SITES — the describe door's own band in
+            `WorkflowDoorSwitch.tsx` carries the second, with an identical class list. Both
+            render `STRIP_BACK`, and the D-24(a) fence sweeps BOTH sources (193-05). */}
         <button
           type="button"
           data-testid="both-doors"
           onClick={goBoth}
           className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground"
         >
-          ‹ both doors
+          {STRIP_BACK}
         </button>
-        <span className="text-[13px] font-medium text-foreground">🔧 Author &amp; govern</span>
+        <span className="text-[13px] font-medium text-foreground">{STRIP_LABEL_GOVERN}</span>
         <span
           data-testid="judge-locked"
           title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)."
