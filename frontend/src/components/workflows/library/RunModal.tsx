@@ -57,7 +57,8 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Upload, Check, X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { entryInputKeys, type DefShape } from "@/components/workflows/soulData"
+import { entryInputKeys, templateAdmission, type DefShape } from "@/components/workflows/soulData"
+import { RUN_TEMPLATE_LABEL } from "./libraryVocabulary"
 import { useCanvasGate } from "@/pages/WorkflowBuilderPage"
 import type { PublishedWorkflow } from "@/lib/api"
 import type { Folder } from "@/types"
@@ -89,6 +90,22 @@ export function RunModal({
 }) {
   const def = wf.definition as DefShape | undefined
   const keys = entryInputKeys(def)
+  // ── Phase 193-07 (AUTH-03 / D-17 / D-20): does this workflow get the template control? ──
+  //
+  // HIDE ONLY ON A POSITIVE NO. `templateAdmission` is THREE-state and this comparison is
+  // `!==` against `"does-not-admit"` on purpose: `"unknown"` renders the control EXACTLY as
+  // it renders today.
+  //
+  // ⚠ THIS IS THE OPPOSITE FALLBACK FROM THE CARD'S (`WorkflowCard`, D-15:
+  // `templateAdmission(row.def) === "admits"`), AND THE ASYMMETRY IS A DECISION, NOT AN
+  // OVERSIGHT — do not "fix" the two into consistency. On the card a missing mark costs
+  // nothing: the row is simply quiet. Here, hiding on `unknown` would REMOVE A SHIPPED
+  // CAPABILITY (WFIN-01) from a person who may genuinely need it, with no way left to
+  // discover it ever existed. And `unknown` is not an edge case: measured over the live
+  // library it is 110 of 145 published rows (`phases: []` — a stub nobody authored) against
+  // 1 `admits` / 34 `does-not-admit`. A backend hiccup, or a frontend deployed ahead of its
+  // backend, must not silently strip the feature from three-quarters of the library.
+  const showTemplate = templateAdmission(def) !== "does-not-admit"
   // F4: read the SAME gate `doRun` reads, so the destination line cannot drift from the
   // destination. Called here rather than threaded as a prop — one reader, no new surface.
   const canvasEnabled = useCanvasGate()
@@ -303,7 +320,51 @@ export function RunModal({
               the launched thread, Landmine 8). Idle → validated-file card ({name} ✓ ✕)
               OR the inline 422 error (server message verbatim, role="alert"). Beneath it,
               the honest provenance note. */}
+          {/* Phase 193-07 (AUTH-03 / D-17 / D-18 / D-19 / D-20) — WHO SEES THIS BLOCK, AND WHY
+              THE ERROR NODE IS NOT GATED WITH IT.
+
+              ⚠ `launchError` IS NOT TEMPLATE-ONLY. `handleRun`'s catch (`:198`) sets it on ANY
+              `onRun` rejection — a scope failure, a network failure, a thread-creation failure —
+              and the comment beside its state declaration describes the upload 422 only because
+              that is its COMMONEST cause. Reading that comment as the whole story is the trap.
+              Leaving `run-upload-error` inside the wrapper D-17 removes would make LAUNCH
+              FAILURES SILENT on every non-template workflow: the run simply would not start and
+              the modal would say nothing. That is the WR-03 class of defect Phase 192's gap round
+              already had to repair on this same surface, and it is recorded in 193-CONTEXT.md as
+              one of two inherited claims research measured FALSE.
+
+              So the cut goes AROUND the error node, not through it: `showTemplate` gates the
+              label, the hidden input, the staged-file card / upload button and the provenance
+              line — and NOTHING else. The error `<p>` is gated by `launchError` ALONE. The outer
+              disjunction only decides whether this wrapper has a reason to exist at all (an
+              always-rendered empty `<div>` would still cost a `gap-3` row of whitespace on a row
+              whose control is supposed to be ABSENT); it can only ever ADD the error node's home,
+              never take it away, because `launchError` alone is sufficient for it. `193-01`
+              captured the non-admitting launch-failure case BEFORE this cut existed, precisely so
+              a naive wrapping would red a test that predates it.
+
+              ⚠ THE INDENTATION INSIDE THESE GATES IS DELIBERATELY LEFT AT ITS PRE-193 DEPTH.
+              Re-indenting would put D-19's security sentence into this commit's diff, and the
+              claim "the provenance line was not touched" is worth being able to CHECK
+              mechanically — grep this file's own `git diff -U0` for the provenance sentence's
+              opening words and expect zero hits — rather than eyeball. That check is a RAW
+              substring match, so prose that merely SPELLS the sentence trips it; this paragraph
+              deliberately does not (the same discipline `librarySubtree.fences.test.ts`'s
+              T-192-04 note keeps about the prop IT forbids). Please do not tidy the indentation. */}
+          {(showTemplate || launchError) && (
           <div className="flex flex-col gap-1.5">
+            {showTemplate && (
+            <>
+            {/* D-18: the naming half of AUTH-03. A TEXT NODE, never a `<label htmlFor>` — the
+                input below is `className="hidden" tabIndex={-1}`, and a label bound to a control
+                that cannot be focused is a promise the DOM does not keep (RESEARCH §C.3). The
+                string is imported from ./libraryVocabulary, never spelled here. */}
+            <p
+              data-testid="run-template-label"
+              className="px-0.5 text-[13px] font-medium text-foreground"
+            >
+              {RUN_TEMPLATE_LABEL}
+            </p>
             <input
               ref={fileInputRef}
               type="file"
@@ -350,15 +411,26 @@ export function RunModal({
                 {submitting ? "Uploading…" : "Upload template"}
               </button>
             )}
+            </>
+            )}
             {launchError && (
               <p data-testid="run-upload-error" role="alert" className="px-0.5 text-[11px] text-destructive">
                 {launchError}
               </p>
             )}
+            {/* D-19: BYTE-EXACT, and moved not one character. This is Phase 152's threat-modelled
+                SSTI honesty — a `template_input` file is NEVER routed to the Jinja engine — and
+                rewording it to read better under D-18's new label was OFFERED AND REJECTED:
+                rewording a security claim to improve its cadence is how such claims quietly
+                weaken. It travels WITH the control (where there is no upload there is nothing to
+                describe), which is why it sits inside the same gate. */}
+            {showTemplate && (
             <p data-testid="run-provenance" className="px-0.5 text-[12px] text-muted-foreground">
               Stored untrusted — never run as code, never fed to the fill engine.
             </p>
+            )}
           </div>
+          )}
           {/* Declared input_keys → a HINT line only (never fake structured fields). */}
           <p data-testid="run-hint" className="text-[12px] text-muted-foreground">
             This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>

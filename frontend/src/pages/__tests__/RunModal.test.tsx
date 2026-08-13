@@ -357,6 +357,52 @@ describe("RunModal — A4 author-subtree containment (ancestor override not offe
 /** The capture commit, recorded so the proof above is re-runnable rather than believed. */
 const CAPTURE_SHA = "14b309b4bd3b04ad5718caa821c24ddb613e2d3f"
 
+/**
+ * ── 2026-08-13 · Plan `193-07` Task 3 — THE ONE DELIBERATE RE-CAPTURE, AND WHY IT IS
+ *    LEGITIMATE HERE WHEN THE HEADER ABOVE SAYS IT NEVER IS. ──
+ *
+ * The block above is emphatic: *"re-capturing to make it green deletes the only evidence the
+ * modal still renders what it rendered."* That sentence is right, and it is about a MOVE. A
+ * capture defends the claim "nothing changed"; when a commit's whole purpose is that nothing
+ * changed, re-capturing is circular and destroys the evidence. `192-03`'s captures and
+ * `192-06`'s cut are exactly that case, and those baselines DID their job: they passed green
+ * and UNEDITED through the cut, and through this phase's waves 1–3.
+ *
+ * `193-07` is the opposite kind of commit — the FIRST one that intentionally changes what this
+ * modal renders. D-18 adds a label above the upload control. A capture cannot both record the
+ * old render and ratify a deliberate new one, so it is re-taken ONCE, on purpose, with the
+ * delta measured rather than asserted:
+ *
+ *   · WHAT CHANGED, per capture: ONE inserted node,
+ *     `<p data-testid="run-template-label" class="px-0.5 text-[13px] font-medium
+ *     text-foreground">Template to fill</p>` — +111 bytes in every one of the six, and after
+ *     removing that single node each string is BYTE-IDENTICAL to the `192-03` capture it
+ *     replaces. Verified per row before substitution (the six summaries are in
+ *     193-07-SUMMARY.md); a difference anywhere else would have stopped the plan as a real
+ *     regression rather than a re-capture.
+ *   · WHY ALL SIX STILL SHOW THE BLOCK AT ALL: `boundPublished` and `unboundPublished` declare
+ *     `config: { phase_type: "llm_emit", citation_policy: "draft" }` with NO `emitter` key, and
+ *     an absent `emitter` IS `render_template` (the Pydantic default, D-25). So all six rows
+ *     `admit`; D-17 removes nothing here. ⚠ Under a predicate demanding an explicit `emitter`
+ *     all six would have read `does-not-admit` and every capture would have lost its whole
+ *     template block — including TEMPLATE_STAGED and LAUNCH_ERROR, whose entire subject lives
+ *     inside it. That is the concrete reason the default rule is load-bearing.
+ *   · HOW: through `runModalCapture` above — the same helper the assertions call — dumped to a
+ *     file and substituted by SCRIPT. Not one character was hand-edited, for the reason
+ *     `188.1-02`, `188.2-03` and `192-03` all recorded: a hand-edit turns a capture back into
+ *     an expectation recording what its author believed the change did. Observed TWICE, and the
+ *     two runs agreed byte for byte.
+ *   · ⚠ `LAUNCH_ERROR` IS THE ROW THAT PROVES THE CUT WENT AROUND THE ERROR NODE. `run-upload-
+ *     error` keeps its exact DOM position — same parent, still between the control and the
+ *     provenance line — because `showTemplate` gates the control and the provenance line and
+ *     NOTHING else. Had the error node been re-homed as a sibling of the wrapper, this capture
+ *     would have differed beyond the label and the check above would have refused it.
+ *
+ * The ORIGINAL `CAPTURE_SHA` stays above, unaltered. This repo corrects in the open: a later
+ * reader can see both what was captured and when it was legitimately re-taken.
+ */
+const RECAPTURE_SHA_193_07 = "87889e13b6e7731edbc80cd4a296c14365e65d95"
+
 type WorkflowsPageProps = Parameters<typeof WorkflowsPage>[0]
 type LaunchFn = WorkflowsPageProps["onLaunch"]
 
@@ -539,12 +585,12 @@ const RUN_DESTINATION_ROWS: Record<string, CaptureRow> = {
  * evidence of drift. A diff against the strings below is.
  */
 const RUN_MODAL_HTML_BASELINE: Record<string, string> = {
-  BOUND_WITH_FOLDERS: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
-  UNBOUND_NO_PROJECT: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Open scan</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">All documents</option><option value=\"folder-aaa\">📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
-  NO_FOLDERS_SCOPE_HIDDEN: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
-  TEMPLATE_STAGED: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><div data-testid=\"run-template-file\" class=\"flex items-center gap-2 self-start rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[12px]\"><span class=\"text-foreground\">template.docx</span><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-check h-3.5 w-3.5 text-success\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"></path></svg><button type=\"button\" aria-label=\"Remove template\" class=\"text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-x h-3 w-3\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"></path><path d=\"m6 6 12 12\"></path></svg></button></div><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
-  LAUNCH_ERROR: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-upload-error\" role=\"alert\" class=\"px-0.5 text-[11px] text-destructive\">Template too large — 25 MB max</p><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
-  SUBMITTING: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\" disabled=\"\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Uploading…</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\" disabled=\"\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\" disabled=\"\">Running…</button></div></div></div>",
+  BOUND_WITH_FOLDERS: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><p data-testid=\"run-template-label\" class=\"px-0.5 text-[13px] font-medium text-foreground\">Template to fill</p><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
+  UNBOUND_NO_PROJECT: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Open scan</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">All documents</option><option value=\"folder-aaa\">📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><p data-testid=\"run-template-label\" class=\"px-0.5 text-[13px] font-medium text-foreground\">Template to fill</p><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
+  NO_FOLDERS_SCOPE_HIDDEN: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><p data-testid=\"run-template-label\" class=\"px-0.5 text-[13px] font-medium text-foreground\">Template to fill</p><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
+  TEMPLATE_STAGED: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><p data-testid=\"run-template-label\" class=\"px-0.5 text-[13px] font-medium text-foreground\">Template to fill</p><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><div data-testid=\"run-template-file\" class=\"flex items-center gap-2 self-start rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-[12px]\"><span class=\"text-foreground\">template.docx</span><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-check h-3.5 w-3.5 text-success\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"></path></svg><button type=\"button\" aria-label=\"Remove template\" class=\"text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-x h-3 w-3\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"></path><path d=\"m6 6 12 12\"></path></svg></button></div><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
+  LAUNCH_ERROR: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><p data-testid=\"run-template-label\" class=\"px-0.5 text-[13px] font-medium text-foreground\">Template to fill</p><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Upload template</button><p data-testid=\"run-upload-error\" role=\"alert\" class=\"px-0.5 text-[11px] text-destructive\">Template too large — 25 MB max</p><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\">▶ Run workflow</button></div></div></div>",
+  SUBMITTING: "<div class=\"w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg\"><div class=\"flex items-center gap-2 border-b border-border px-4 py-3\"><span aria-hidden=\"true\">📄</span><span class=\"text-[15px] font-semibold text-foreground\">Vendor-risk review</span></div><div class=\"flex flex-col gap-3 px-4 py-4\"><label data-testid=\"run-scope\" class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">Knowledge base:</span><select data-testid=\"run-scope-select\" class=\"rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30\"><option value=\"\">Workflow default — 📁 DBA Chapters</option><option value=\"folder-bbb\">📁 Contracts</option></select></label><label class=\"flex flex-col gap-1.5\"><span class=\"text-[13px] font-medium text-foreground\">What should this run work on?</span><textarea data-testid=\"run-kickoff\" rows=\"3\" placeholder=\"Describe the task for this run…\" class=\"w-full resize-y rounded-md border border-border bg-background px-3 py-2 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary\"></textarea></label><div class=\"flex flex-col gap-1.5\"><p data-testid=\"run-template-label\" class=\"px-0.5 text-[13px] font-medium text-foreground\">Template to fill</p><input accept=\".docx,.pptx,.xlsx,.md,.json,.csv,.txt,.py,.js,.sh,.png,.jpg,.jpeg,.gif,.webp\" aria-label=\"Upload template file\" tabindex=\"-1\" class=\"hidden\" type=\"file\"><button type=\"button\" data-testid=\"run-template-upload\" class=\"flex items-center gap-1.5 self-start rounded-md border border-border px-2.5 py-1.5 text-[12px] font-medium text-foreground/80 transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50\" disabled=\"\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"lucide lucide-upload h-3.5 w-3.5\" aria-hidden=\"true\"><path d=\"M12 3v12\"></path><path d=\"m17 8-5-5-5 5\"></path><path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"></path></svg>Uploading…</button><p data-testid=\"run-provenance\" class=\"px-0.5 text-[12px] text-muted-foreground\">Stored untrusted — never run as code, never fed to the fill engine.</p></div><p data-testid=\"run-hint\" class=\"text-[12px] text-muted-foreground\">This workflow expects: <span class=\"font-mono text-foreground\">kickoff_prompt</span></p></div><div class=\"flex items-center justify-between border-t border-border px-4 py-3\"><span class=\"text-[12px] text-muted-foreground\" data-testid=\"run-destination\">Run opens a <b class=\"text-foreground\">new chat thread</b> and streams there.</span><div class=\"flex items-center gap-2\"><button type=\"button\" class=\"rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50\" disabled=\"\">Cancel</button><button type=\"button\" data-testid=\"run-confirm\" class=\"rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60\" disabled=\"\">Running…</button></div></div></div>",
 }
 
 /** Same discipline, same provenance — read out of the DOM, never typed. */
@@ -559,6 +605,13 @@ describe("RunModal 192-03 — the pre-move rendered DOM, byte for byte", () => {
     // and their verbatim output) and in 192-03-SUMMARY.md. This pins the SHA those commands
     // were run at, so a later reader can re-run them rather than take the claim on trust.
     expect(CAPTURE_SHA).toMatch(/^[0-9a-f]{40}$/)
+  })
+
+  it("the 193-07 re-capture commit is recorded BESIDE the original, not instead of it", () => {
+    // Both SHAs live in the file, so the history of these six strings is readable rather than
+    // overwritten: taken at CAPTURE_SHA, re-taken once at RECAPTURE_SHA_193_07 for D-18's label.
+    expect(RECAPTURE_SHA_193_07).toMatch(/^[0-9a-f]{40}$/)
+    expect(RECAPTURE_SHA_193_07).not.toBe(CAPTURE_SHA)
   })
 
   for (const row of Object.keys(RUN_MODAL_HTML_ROWS)) {
@@ -586,12 +639,19 @@ describe("RunModal 192-03 — the pre-move rendered DOM, byte for byte", () => {
   // COMMITTED baseline strings, not a fresh render — the claim being pinned is about what
   // was captured.
 
-  it("BOUND_WITH_FOLDERS captured the whole modal body — scope, kickoff, upload, provenance, hint, destination", () => {
+  // ── 193-07: `run-template-label` JOINS THE MARKER ROWS. D-18's node is added to the states
+  //    that carry it (every state here — all six fixtures `admit`), so the new node is covered
+  //    by the "byte-identity cannot ratify a blank render" guard instead of living outside it.
+  //    A future edit that dropped the label while the baselines were re-captured from that
+  //    silence would pass byte-identity and fail here, which is the whole job of these rows.
+
+  it("BOUND_WITH_FOLDERS captured the whole modal body — scope, kickoff, LABEL, upload, provenance, hint, destination", () => {
     const html = RUN_MODAL_HTML_BASELINE.BOUND_WITH_FOLDERS
     for (const testId of [
       "run-scope",
       "run-scope-select",
       "run-kickoff",
+      "run-template-label",
       "run-template-upload",
       "run-provenance",
       "run-hint",
@@ -606,6 +666,32 @@ describe("RunModal 192-03 — the pre-move rendered DOM, byte for byte", () => {
     // Idle: no staged file card and no launch error.
     expect(html).not.toContain('data-testid="run-template-file"')
     expect(html).not.toContain('data-testid="run-upload-error"')
+    // D-18's label carries its words, not just its testid — an empty label is a label that
+    // names nothing, and byte-identity would happily ratify one.
+    expect(html).toContain(">Template to fill</p>")
+  })
+
+  it("EVERY captured state carries the LABEL and the provenance line — all six fixtures admit", () => {
+    // The six fixtures all declare an `llm_emit` phase with no `emitter` key, so under D-25's
+    // default rule every one of them ADMITS and D-17 hides nothing in any capture. Stated as a
+    // row rather than as prose: if a later edit made any fixture read `does-not-admit`, its
+    // capture would lose the whole block and this is what would say so.
+    for (const [state, html] of Object.entries(RUN_MODAL_HTML_BASELINE)) {
+      expect(html, state).toContain('data-testid="run-template-label"')
+      expect(html, state).toContain("Template to fill")
+      expect(html, state).toContain('data-testid="run-provenance"')
+      expect(html, state).toContain(
+        "Stored untrusted — never run as code, never fed to the fill engine.",
+      )
+      // The label precedes the control it names, in every state.
+      const labelAt = html.indexOf('data-testid="run-template-label"')
+      const controlAt = Math.max(
+        html.indexOf('data-testid="run-template-upload"'),
+        html.indexOf('data-testid="run-template-file"'),
+      )
+      expect(labelAt, state).toBeGreaterThan(-1)
+      expect(controlAt, state).toBeGreaterThan(labelAt)
+    }
   })
 
   it("UNBOUND_NO_PROJECT captured the honest whole-KB label — the other side of the WR-05 branch", () => {
@@ -910,9 +996,220 @@ describe("RunModal 193-01 — a launch failure is visible on a NON-admitting wor
     // provenance note, i.e. it sits inside the block D-17 conditionally removes. When that cut
     // lands, this relationship is expected to CHANGE (the alert must move out) — and the
     // assertions above are what force it to move rather than vanish.
-    const provenance = within(modal).getByTestId("run-provenance")
-    expect(alert.parentElement).toBe(provenance.parentElement)
+    //
+    // ── AMENDED BY `193-07` ON THE DAY THE CUT LANDED, EXACTLY AS THE PARAGRAPH ABOVE SAID IT
+    //    WOULD BE. The original two lines read:
+    //
+    //        const provenance = within(modal).getByTestId("run-provenance")
+    //        expect(alert.parentElement).toBe(provenance.parentElement)
+    //
+    //    and they are left visible here rather than deleted, because what they measured is the
+    //    whole point of the case. On THIS fixture — a workflow with no `llm_emit` phase, i.e. a
+    //    positive `does-not-admit` — D-17 now removes the upload control AND the provenance note
+    //    that describes it, so `getByTestId("run-provenance")` throws and the old measurement
+    //    cannot be evaluated at all. ⚠ `193-07-PLAN.md` asked for this case to pass UNEDITED and
+    //    that acceptance criterion is FALSE on its own inputs: the co-parent line it required to
+    //    survive is a measurement OF THE LAYOUT THE CUT REMOVES. The criterion's INTENT — the
+    //    alert must MOVE OUT, never VANISH — is what the six assertions above enforce, and all
+    //    six are byte-identical to the day `193-01` wrote them. Only this trailing measurement is
+    //    restated, in the direction its own author predicted.
+    //
+    //    Restated: the provenance note is GONE (the control it describes is gone with it), and
+    //    the alert is still here, still an alert, still carrying the server's words.
+    expect(within(modal).queryByTestId("run-provenance")).toBeNull()
+    expect(within(modal).queryByTestId("run-template-upload")).toBeNull()
+    expect(modal.contains(alert)).toBe(true)
 
+    rendered.unmount()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 193-07 Task 2 (AUTH-03 / D-17 / D-18 / D-20 / D-21) — ALL FOUR ARMS OF THE
+// ADMISSION PREDICATE, READ AT THE RENDERED SURFACE.
+//
+// WHAT IS VERIFIED, AND WHAT IS DELIBERATELY NOT. Every row below reads the DOM the
+// modal produced. NOT ONE of them asserts that `templateAdmission` was CALLED, or
+// spies on it, or re-implements it — that is the `192-10` lesson (verify the
+// PROPERTY, not the patch): a suite that pins the call site stays green through a
+// call site wired to the wrong branch. `templateAdmission` is asserted here in
+// exactly one role — as a NON-VACUITY guard on each fixture, so a definition that
+// later drifts into a different arm reds the row that names it rather than quietly
+// testing the arm next door.
+//
+// ⚠ THE `unknown` ROW AND THE `admits` ROW CALL THE SAME HELPER, ON PURPOSE.
+// D-20 says a definition the wire did not describe renders the control EXACTLY as
+// today — the OPPOSITE fallback from the card's (D-15), because hiding here would
+// remove a shipped capability (WFIN-01) from 110 of the 145 published rows, whose
+// `phases: []` is a stub nobody authored rather than a statement that the workflow
+// cannot fill a template. Two hand-written assertion lists would let those two arms
+// drift apart one careless edit at a time and still read as "covered". One shared
+// helper makes their identical treatment MECHANICAL: a change that weakens `unknown`
+// necessarily weakens `admits` too, and `admits` is the arm nobody would dare weaken.
+//
+// The rows drive `RunModal` DIRECTLY (the `192-06` isolated-render idiom), so no page
+// feed is involved and not one capture row above is disturbed.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** A workflow that ADMITS: one `llm_emit` phase (no `emitter` key → the Pydantic
+ *  `render_template` default, D-25) and NO bound library template. */
+const admittingWf: RunModalPropsT["wf"] = {
+  id: "admits-1",
+  slug: "fills-a-template",
+  name: "Fills a template",
+  definition: {
+    slug: "fills-a-template",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [{ slug: "emit", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft" } }],
+  },
+}
+
+/** UNKNOWN: `phases: []` — the shape 110 of 145 published rows carry. The wire said
+ *  nothing, so nothing may be concluded, so nothing is taken away. */
+const unknownWf: RunModalPropsT["wf"] = {
+  id: "unknown-1",
+  slug: "unauthored-stub",
+  name: "Unauthored stub",
+  definition: {
+    slug: "unauthored-stub",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [],
+  },
+}
+
+/** D-21's BOUND arm: an emit phase that WOULD admit, made a positive no by a bound
+ *  library template. `_exec_llm_emit` resolves `_emit_bound_asset_ref(definition)` first and
+ *  `template_asset_service.py:144` returns UNCONDITIONALLY on that branch — nothing clears the
+ *  ref because a user uploaded something — so the run-time upload here is unreachable code and
+ *  `Template to fill` would promise what the engine discards. This is the arm a suite would
+ *  otherwise never enter: it is invisible to both `admits` and the no-emit-phase no. */
+const boundTemplateWf: RunModalPropsT["wf"] = {
+  id: "bound-1",
+  slug: "binds-a-template",
+  name: "Binds a template",
+  definition: {
+    slug: "binds-a-template",
+    version: 1,
+    project_folder_id: null,
+    inputs: [{ key: "kickoff_prompt" }],
+    phases: [{ slug: "emit", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "draft" } }],
+    assets: [{ kind: "template", asset_id: "asset-xyz" }],
+  },
+}
+
+/** Render one workflow's modal in isolation and hand back its dialog root. */
+async function renderModalFor(wf: RunModalPropsT["wf"]) {
+  const { RunModal } = await import("@/components/workflows/library/RunModal")
+  const rendered = render(
+    <RunModal
+      wf={wf}
+      folders={[]}
+      authorDefaultFolderId={null}
+      kickoff=""
+      submitting={false}
+      onKickoffChange={() => {}}
+      onCancel={() => {}}
+      onRun={async () => {}}
+    />,
+  )
+  const modal = await screen.findByTestId("run-modal")
+  return { modal, rendered }
+}
+
+/**
+ * THE SHARED ASSERTION — what "the control, exactly as today, plus its new label" means.
+ *
+ * Called by BOTH the `admits` row and the `unknown` row and by nothing else, which is what
+ * makes D-20's "exactly as today" a mechanical property of this file rather than a promise in
+ * a comment. The `expect` calls live here, once.
+ */
+function expectTemplateBlockPresent(modal: HTMLElement) {
+  const label = within(modal).getByTestId("run-template-label")
+  // D-18's string, byte-exact — and a TEXT NODE, never a `<label htmlFor>` bound to the
+  // hidden `tabIndex={-1}` input (the tag is pinned in RunModal.a11y.test.tsx).
+  expect(label).toHaveTextContent("Template to fill")
+  expect(within(modal).getByTestId("run-template-upload")).toBeInTheDocument()
+  // D-19, byte-exact and unreworded — the em dash and the terminal full stop included.
+  expect(within(modal).getByTestId("run-provenance")).toHaveTextContent(
+    "Stored untrusted — never run as code, never fed to the fill engine.",
+  )
+  // The label names the control it sits above: it must PRECEDE the upload button in the DOM,
+  // otherwise it labels nothing a reader would connect it to.
+  const upload = within(modal).getByTestId("run-template-upload")
+  expect(label.compareDocumentPosition(upload) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+}
+
+/** THE OTHER SIDE — absent, and absent in the strong sense D-17 requires. */
+function expectTemplateBlockAbsent(modal: HTMLElement) {
+  expect(within(modal).queryByTestId("run-template-label")).toBeNull()
+  expect(within(modal).queryByTestId("run-template-upload")).toBeNull()
+  expect(within(modal).queryByTestId("run-provenance")).toBeNull()
+  // ⚠ ABSENT, NOT DISABLED, NOT GREYED (D-17). A disabled control still costs attention and
+  // still cannot be used, so "the block is gone" is not satisfied by a survivor wearing
+  // `disabled` or `aria-disabled`. Swept over the WHOLE dialog rather than over the testids
+  // above, because a greyed survivor would most likely have kept a different testid.
+  expect(modal.querySelector("[data-testid^='run-template']")).toBeNull()
+  expect(modal.querySelector("[aria-disabled='true']")).toBeNull()
+  // …and the modal is still a modal, so this is a hidden control and not a failed render.
+  expect(within(modal).getByTestId("run-confirm")).toBeInTheDocument()
+  expect(within(modal).getByTestId("run-kickoff")).toBeInTheDocument()
+}
+
+describe("RunModal 193-07 — the template block across all three admission states", () => {
+  it("admits (an emit phase, nothing bound) → the labelled control, the button and the provenance line", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    // NON-VACUITY: pin the fixture into the arm this row NAMES. Without it, a later edit to
+    // the definition would move the row to a different arm and it would keep passing.
+    expect(templateAdmission(admittingWf.definition)).toBe("admits")
+
+    const { modal, rendered } = await renderModalFor(admittingWf)
+    expectTemplateBlockPresent(modal)
+    rendered.unmount()
+  })
+
+  it("unknown (phases: []) → the block renders EXACTLY as on admits — the same helper, deliberately", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    expect(templateAdmission(unknownWf.definition)).toBe("unknown")
+
+    const { modal, rendered } = await renderModalFor(unknownWf)
+    // ⚠ THE SAME FUNCTION THE `admits` ROW CALLS. If this line ever calls a weaker helper,
+    // D-20 has been quietly repealed. 110 of 145 published rows land here.
+    expectTemplateBlockPresent(modal)
+    rendered.unmount()
+  })
+
+  it("does-not-admit (no emit phase) → the block is ABSENT, not greyed and not disabled", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    expect(templateAdmission(nonAdmittingWf.definition)).toBe("does-not-admit")
+
+    const { modal, rendered } = await renderModalFor(nonAdmittingWf)
+    expectTemplateBlockAbsent(modal)
+    rendered.unmount()
+  })
+
+  it("does-not-admit by BINDING (D-21) → an emit phase whose template is already bound gets nothing", async () => {
+    const { templateAdmission } = await import("@/components/workflows/soulData")
+    // The arm that separates D-21 from the simpler "has an emit phase" predicate: WITHOUT the
+    // bound-asset clause this fixture would read `admits` and this row would be a duplicate of
+    // the first one. Asserted, so the distinction cannot rot into a coincidence.
+    expect(templateAdmission(boundTemplateWf.definition)).toBe("does-not-admit")
+
+    const { modal, rendered } = await renderModalFor(boundTemplateWf)
+    expectTemplateBlockAbsent(modal)
+    rendered.unmount()
+  })
+
+  it("the label is imported, not spelled — the rendered text IS libraryVocabulary's export", async () => {
+    // A row that only checked for the words "Template to fill" would pass against a component
+    // that hard-codes them, which is the drift `libraryVocabulary.ts` exists to forbid.
+    const { RUN_TEMPLATE_LABEL } = await import("@/components/workflows/library/libraryVocabulary")
+    expect(RUN_TEMPLATE_LABEL.length).toBeGreaterThan(0)
+    const { modal, rendered } = await renderModalFor(admittingWf)
+    expect(within(modal).getByTestId("run-template-label").textContent).toBe(RUN_TEMPLATE_LABEL)
     rendered.unmount()
   })
 })

@@ -396,3 +396,93 @@ describe("RunModal 192-03 — the pre-move dialog + focus CONTRACT (behaviour, n
     expect(document.activeElement).toBe(middle)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Plan 193-07 Task 3 (AUTH-03 / D-18) — THE NEW LABEL IS A TEXT NODE, NOT A BINDING.
+//
+// Appended as a PURE INSERTION: nothing above was edited, renamed or re-described, and
+// no import line was widened.
+//
+// ⚠ WHY THIS NEEDS A GUARD AT ALL. D-18 adds the words `Template to fill` above the
+// upload control, and the obvious HTML for "words that name a form control" is a
+// `<label htmlFor>`. Here that would be a REGRESSION, not good practice: the control it
+// would name is `className="hidden" tabIndex={-1}` (the shipped accessible-hidden-input
+// + visible-proxy-button pattern this file already pins at `:141-169`). A label bound to
+// a control that cannot be focused is a promise the DOM does not keep — clicking the
+// label would open the OS file dialog with no visible focus change, and assistive tech
+// would be told a hidden control is the labelled one. The real interactive element is
+// the proxy `<button>`, which carries its own accessible name.
+//
+// So the label must be inert: a text node with no `for` binding, adding nothing to the
+// focus order the four rows above pin. That is a constraint on HOW the words are
+// rendered, invisible to every `innerHTML` capture in `RunModal.test.tsx` (a capture
+// records the tag it found — it does not object to it), which is why it lives here.
+//
+// Driven RED against a real `<label htmlFor>` plant in
+// `components/workflows/library/RunModal.tsx`, then restored md5-identical; the observed
+// failure is recorded in 193-07-SUMMARY.md rather than asserted here.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("RunModal 193-07 a11y — D-18's label is inert (a text node, never a binding)", () => {
+  it("run-template-label is NOT a <label>, and carries no for/htmlFor binding", async () => {
+    const { modal } = await openRunModal()
+    const label = within(modal).getByTestId("run-template-label")
+
+    // NON-VACUITY: the node exists and carries the words. `boundPublished` declares an
+    // `llm_emit` phase with no `emitter` key, so it ADMITS (D-25) and the block renders.
+    expect(label).toHaveTextContent("Template to fill")
+
+    // The tag itself. `<p>` today; the assertion is on what it must NOT be, so a future
+    // `<span>`/`<div>` is fine and a `<label>` is not.
+    expect(label.tagName).not.toBe("LABEL")
+    expect(label.hasAttribute("for")).toBe(false)
+    expect(label.hasAttribute("htmlFor")).toBe(false)
+  })
+
+  it("NOTHING in the dialog binds a label to the hidden file input", async () => {
+    const { modal } = await openRunModal()
+    const input = within(modal).getByLabelText("Upload template file") as HTMLInputElement
+
+    // The shipped pattern, re-stated as the precondition it is: the input is hidden and
+    // out of the tab order, which is exactly why binding a label to it would be wrong.
+    expect(input.getAttribute("tabindex")).toBe("-1")
+    expect(input.className).toContain("hidden")
+
+    // POSITIVE CONTROL for the query below — the dialog genuinely DOES contain `<label>`
+    // elements (the KB-scope and kickoff fields, which WRAP their controls rather than
+    // binding by id). Without this, `querySelectorAll("label[for]") === 0` would also be
+    // satisfied by a dialog that rendered no labels at all, or by a broken query.
+    expect(modal.querySelectorAll("label").length).toBeGreaterThan(0)
+
+    // No id-binding of any kind exists in this dialog, so none can point at the input.
+    expect(modal.querySelectorAll("label[for]").length).toBe(0)
+    // …and the input offers nothing to bind TO, which is the other half of the same claim:
+    // an id added here later is the first step toward the regression this row forbids.
+    expect(input.hasAttribute("id")).toBe(false)
+  })
+
+  it("the new label changed NOTHING about the focus order", async () => {
+    const { modal } = await openRunModal()
+    const focusables = Array.from(
+      modal.querySelectorAll<HTMLElement>(SHIPPED_FOCUSABLE_SELECTOR),
+    )
+    expect(focusables.length).toBeGreaterThan(1)
+
+    // The same shipped cycle the 192-03 contract above pins: the KB-scope <select> opens it
+    // and the "▶ Run workflow" button closes it. A label that had become focusable — or a
+    // binding that pulled the hidden input into the cycle — would move one of these.
+    expect(focusables[0]).toBe(within(modal).getByTestId("run-scope-select"))
+    expect(focusables[focusables.length - 1]).toBe(within(modal).getByTestId("run-confirm"))
+
+    // The label itself is not in the cycle at all.
+    const label = within(modal).getByTestId("run-template-label")
+    expect(focusables).not.toContain(label)
+    expect(label.hasAttribute("tabindex")).toBe(false)
+  })
+
+  it("no aXe structural violations with the labelled control rendered", async () => {
+    const { modal } = await openRunModal()
+    within(modal).getByTestId("run-template-label")
+    expect(await axe(modal)).toHaveNoViolations()
+  })
+})
