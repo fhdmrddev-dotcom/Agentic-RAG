@@ -2389,6 +2389,22 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
    * Recorded as a deferred item with its trigger in `193-08-SUMMARY.md` § Deferred. Do NOT
    * "fix" this to the door's wording without moving the page's literal in the same commit —
    * that would red this row for a reason the page does not have.
+   *
+   * ── ✅ CLOSED SAME DAY (`294a2ac8`, operator-approved) — 193 REVIEW WR-03 ─────────────────
+   *
+   * **The condition the paragraph above set was met exactly.** The operator took the fix rather
+   * than the deferral, and the page's own literal MOVED — so this query moved with it *in the
+   * same commit*, which is precisely what that paragraph required before anyone touched it.
+   *
+   * What is true now: there is **no literal here and no second home**. The query below reads
+   * `DESCRIBE_CTA` from `doorVocabulary`, the page renders the same id, and the deferral in
+   * `193-08-SUMMARY.md` § Deferred is **spent**.
+   *
+   * ⚠ The paragraph above is kept rather than rewritten because its REASONING is still the rule:
+   * a literal here and a literal on the page are two homes for one string, and moving either
+   * alone reds this row for a reason the page does not have. The guard that now makes that
+   * impossible is the D-24(a) copy fence, which gained `WorkflowBuilderPage.tsx` as its third
+   * swept source (193 REVIEW WR-01) — a re-typed governed word in the page reds there first.
    */
   async function draftIt(text = "summarise the supplier renewals every week") {
     await screen.findByTestId("describe-hint")

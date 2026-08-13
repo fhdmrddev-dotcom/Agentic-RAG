@@ -284,6 +284,10 @@ const DOOR_HTML_ROWS: Record<string, CaptureRow> = {
  *    column-A words, because `WorkflowBuilderPage.tsx` holds a SECOND, UNGOVERNED copy of the
  *    CTA and the three hint fragments that `193-05` never moved and no plan in this phase owns.
  *    It is visible right here in `GOVERN_STANDALONE`. See `193-08-SUMMARY.md` § Deferred.
+ *    ⚠⚠ **THIS BULLET IS NOW FALSE OF THE LITERALS BELOW — 193 REVIEW WR-02.** It is kept, not
+ *    deleted, because it is the RECORD OF WHY the third re-capture happened. The operator took
+ *    the fix (`294a2ac8`): the page now renders `DESCRIBE_CTA` / `DESCRIBE_H1` / `HINT_FRAG1-3`
+ *    by id, so both GOVERN rows read variant D end to end and there is no second home left.
  *
  * ── ⚠ RE-CAPTURED A SECOND AND FINAL TIME BY PLAN `193-09` ON 2026-08-13 ────────────────
  *
@@ -321,6 +325,30 @@ const DOOR_HTML_ROWS: Record<string, CaptureRow> = {
  *    words; `193-09` changed the structure. Any further re-capture of these six is a behaviour
  *    change to explain in its own plan, not a test to update — and the two notes above now give
  *    the next author a worked example of what "explain" has to look like.
+ *
+ * ── ⚠ RE-CAPTURED A **THIRD** TIME BY THE 193 FAST-FIX (`294a2ac8`) — 193 REVIEW WR-02 ──────
+ *
+ * The note directly above said the phase expected no third. **It got one.** This is the
+ * explanation that note demanded, added after the fact because the fast-fix made the edit
+ * SILENTLY — which is the actual defect. The instrument's entire value is that a re-capture
+ * must be stated; an unstated one turns a proof into a habit.
+ *
+ *  • WHAT CHANGED: **THE WORDS ONLY**, and only in the two GOVERN rows. Measured with whole TAG
+ *    TOKENS (attributes included) and text nodes separated: tags **40/40 and 54/54 IDENTICAL**,
+ *    text nodes 14/14 and 16/16 with exactly **THREE differing each** — the page's CTA and its
+ *    two hint fragments moving to column D. The four other literals were not rewritten at all.
+ *
+ *  • WHY IT HAPPENED: the bullet in the FIRST note records that `WorkflowBuilderPage.tsx` held a
+ *    second, ungoverned copy of those strings. The operator chose fix-now over defer, so the page
+ *    now renders them by id and both GOVERN rows read variant D end to end. **That earlier bullet
+ *    is now false of the literals below and is marked as such in place, not deleted** — it is the
+ *    record of the cause.
+ *
+ *  • ⚠ SO THE CONTRACT IS RESTATED, NOT ABANDONED: this is re-capture **THREE OF THREE**, and a
+ *    FOURTH is a behaviour change to explain in its own plan. The lesson the third one teaches is
+ *    narrower and worth more than the count: **a re-capture made inside a commit whose stated
+ *    claim is "words only" must still say so HERE**, because this docblock — not the commit
+ *    message — is what the next author reads.
  */
 const DOOR_HTML_BASELINE: Record<string, string> = {
   CHOOSER_STANDALONE: "<div data-testid=\"workflow-doors\" class=\"flex h-full flex-col bg-background\"><div class=\"flex flex-col gap-1 border-b border-border px-6 py-4\"><h1 class=\"text-[18px] font-semibold text-foreground\">How do you want to start?</h1><p class=\"text-[13px] text-muted-foreground\">Both end up in the same place. You can switch between them at any time.</p></div><div class=\"grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-6 py-6 md:grid-cols-2\"><button type=\"button\" data-testid=\"door-card-describe\" class=\"flex flex-col gap-2 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/60\"><span aria-hidden=\"true\" class=\"text-3xl\">⚡</span><span class=\"font-mono text-[10px] uppercase tracking-wider text-muted-foreground\">you write one paragraph</span><span class=\"text-[16px] font-semibold text-foreground\">Draft it for me</span><span class=\"text-[13px] text-muted-foreground\">Describe the recurring work in plain language. The AI writes the steps, sets how strict it is, and asks you about anything it had to guess.</span><span class=\"mt-1 text-[13px] font-medium text-primary\">Open <span aria-hidden=\"true\">›</span></span><span class=\"mt-1 text-[11px] italic text-muted-foreground\">you can open the full editor at any point — nothing is locked in</span></button><button type=\"button\" data-testid=\"door-card-govern\" class=\"flex flex-col gap-2 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-accent-violet/60\"><span aria-hidden=\"true\" class=\"text-3xl\">🔧</span><span class=\"font-mono text-[10px] uppercase tracking-wider text-muted-foreground\">you decide every setting</span><span class=\"text-[16px] font-semibold text-foreground\">Build it myself</span><span class=\"text-[13px] text-muted-foreground\">Open the editor and set each step yourself — what it must cite, which checks have to pass, and which model runs each step.</span><span class=\"mt-1 text-[13px] font-medium text-accent-violet\">Open <span aria-hidden=\"true\">›</span></span><span class=\"mt-1 text-[11px] italic text-muted-foreground\">what it must cite · required checks · per-step sources &amp; model</span></button></div></div>",

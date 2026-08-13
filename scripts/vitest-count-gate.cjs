@@ -276,9 +276,17 @@ const BASELINE = {
   // asset arm that admits, the bound-`assets[kind=="template"]` arm that does NOT (the 16-row
   // correction D-21 measured against the live DB), the `phases: []` arm that reads `unknown`
   // rather than a positive no, the five malformed shapes (`undefined` / `null` / `{}` /
-  // non-array `phases` / missing `config`), and the Pydantic-default case — an `llm_emit` phase
+  // `phases: null` / non-array `phases`), and the Pydantic-default case — an `llm_emit` phase
   // with NO `emitter` key still admits, which is the arm the shipped `RunModal.test.tsx` fixtures
   // at `:70-96` depend on.
+  //
+  // ⚠ CORRECTED ON MEASUREMENT (193 REVIEW WR-05): this enumeration previously listed
+  // "missing `config`" as the fifth malformed shape. `ADMISSION_CASES` contains NO case whose
+  // phase entry omits `config` — every phase in the table declares one — so that arm was
+  // documented as guarded while being unguarded. The real fifth shape is `phases: null`. The
+  // CODE half of WR-05 (a `config`-less phase list currently returns a POSITIVE
+  // `does-not-admit`, where D-20's rule argues for `unknown`) is a behaviour question and is
+  // deliberately NOT changed here — see `193-REVIEW.md` WR-05.
   //
   // ⚠ WHY THE RAISE IS NOT COSMETIC: `templateAdmission` is consumed by TWO surfaces under
   // OPPOSITE unknown-fallbacks (the card goes silent, D-15; the Run modal keeps the control,

@@ -351,8 +351,12 @@ export const NO_PROJECT = "No project"
  * too — an unlabelled glyph is the same discoverability failure AUTH-03 exists to fix.
  *
  * Slot (D-14): after provenance, before recency — *whose it is · what it needs · when it
- * changed*. It is declared here, immediately before `CHANGED_PREFIX`, for that reason. It
- * must NOT go first: 192.1 asserts the provenance node at DOM position 2 BY CHILD ORDER,
+ * changed*. It is declared here in the identity-line block and ahead of `CHANGED_PREFIX`
+ * (`:383`) for that reason; `RUN_TEMPLATE_LABEL` (`:376`) sits between them because both
+ * template words arrived in one wave. ⚠ Corrected on measurement (193 REVIEW IN-01) — this
+ * read "immediately before `CHANGED_PREFIX`", which the file's own line numbers contradict,
+ * and a slot argument that rests on declaration order has to survive someone checking it.
+ * It must NOT go first: 192.1 asserts the provenance node at DOM position 2 BY CHILD ORDER,
  * and the point of asserting by child order was that it does not move.
  */
 export const CARD_TEMPLATE_MARK = "needs a template"

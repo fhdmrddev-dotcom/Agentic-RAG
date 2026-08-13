@@ -216,9 +216,21 @@ export function soulDeliverable(def: DefShape | null | undefined): SoulDeliverab
  * THE COST, STATED NOT SMOOTHED — D-21's live scoring over the 145 published rows is
  * **1 admits / 34 does-not-admit / 110 unknown**, and the single admitting slug is
  * `ephemeral-template-fill-101uat`. The card mark is therefore visible on exactly ONE
- * published row locally. The 110 are `phases: []` (76 % of the library — an unauthored
- * stub), and routing them to `unknown` is precisely what stops D-17 stripping a shipped
- * capability from three-quarters of the library.
+ * published row locally. Routing the 110 to `unknown` is precisely what stops D-17 stripping a
+ * shipped capability from three-quarters of the library.
+ *
+ * ⚠ **CORRECTED ON MEASUREMENT (193 REVIEW WR-07): the CAUSE of those 110 was mis-attributed.**
+ * This sentence used to read "the 110 are `phases: []` (an unauthored stub)". That is an
+ * unearned causal claim. `definition` is a jsonb **STRING SCALAR on 194 of 223 rows**
+ * (`CLAUDE.md` § jsonb string-scalar trap) and `libraryFilter`'s `defOf` casts it through
+ * **unparsed**, so at runtime `def` is very often a `string`, not an object — and a string
+ * answers `unknown` at the step-(1) shape guard, never reaching the `phases: []` step at all.
+ * **The honest statement: the 110 reach `unknown` through the shape guard — some as
+ * `phases: []`, most likely as an unparsed jsonb string scalar; the split was NOT measured.**
+ * The verdict is unaffected either way, which is why this is a correction to the prose and not
+ * to the code. ⚠ Nothing pins the string-scalar shape in `ADMISSION_CASES` — a future "tidy"
+ * of step (1) could move the dominant live shape into a different arm with the suite green.
+ * That test gap is left open and named in `193-REVIEW.md` WR-07.
  *
  * WHY NOT THE SIMPLER "has an emit phase" (P1′): it is byte-for-byte
  * `soulDeliverable(def).kind === "file"`, which ALREADY drives the shipped *Makes a file*

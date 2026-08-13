@@ -102,9 +102,14 @@ export function RunModal({
   // nothing: the row is simply quiet. Here, hiding on `unknown` would REMOVE A SHIPPED
   // CAPABILITY (WFIN-01) from a person who may genuinely need it, with no way left to
   // discover it ever existed. And `unknown` is not an edge case: measured over the live
-  // library it is 110 of 145 published rows (`phases: []` — a stub nobody authored) against
-  // 1 `admits` / 34 `does-not-admit`. A backend hiccup, or a frontend deployed ahead of its
-  // backend, must not silently strip the feature from three-quarters of the library.
+  // library it is 110 of 145 published rows against 1 `admits` / 34 `does-not-admit`. A backend
+  // hiccup, or a frontend deployed ahead of its backend, must not silently strip the feature
+  // from three-quarters of the library.
+  // ⚠ CORRECTED (193 REVIEW WR-07): this comment used to attribute all 110 to `phases: []`
+  // ("a stub nobody authored"). That cause was never measured. `definition` is a jsonb STRING
+  // SCALAR on 194 of 223 rows and reaches this predicate unparsed, so most of the 110 likely
+  // answer `unknown` at the shape guard rather than at the empty-phases step. The COUNT is
+  // measured; the CAUSE is not, and is no longer asserted here.
   const showTemplate = templateAdmission(def) !== "does-not-admit"
   // F4: read the SAME gate `doRun` reads, so the destination line cannot drift from the
   // destination. Called here rather than threaded as a prop — one reader, no new surface.
