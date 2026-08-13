@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: "v3.7"
 milestone_name: "Workflow Product Completion"
 status: in-progress
-last_updated: 2026-08-13T21:30:00.000Z
+last_updated: 2026-08-14T00:30:00.000Z
 last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
 stopped_at: "2026-08-13 — **Phase 193 Authoring Doors + Template Placement: PLANNED (`68e6a173`) — 11 plans in 7 waves, plan-checker VERIFICATION PASSED, 0 blockers. NEXT = `/gsd:execute-phase 193`.** ⚠ **RESEARCH OVERTURNED AUTH-03's PREMISE and the operator re-decided it at plan time (D-21…D-25, in CONTEXT.md's dated amendment section).** The contract's `render_template`-in-`available_tools` signal is on **ZERO of 223 live definitions**; the live signal is `phase_type == \"llm_emit\"`. And `resolve_template_source` **returns unconditionally on Branch 1** when a definition binds a library template, so on 16 of 17 rows the run-time upload is **unreachable code**. ⇒ the predicate is **P2 + an unknown arm** (1 admits / 34 no / 110 unknown). ⚠ **The card mark is visible on exactly ONE published row — `ephemeral-template-fill-101uat` — so UAT rows U4/U5 MUST be driven against that slug or they cannot see the feature.** ⚠ **TEN inherited claims measured FALSE**, four of which would each have cost a wave: `runVocabulary.ts` is the analog, not `libraryVocabulary.ts`; **the 188.2 two-badge ceiling guards the CANVAS `PhaseNodeCard`, not `library/WorkflowCard.tsx`** (D-13 stands on SEED-155 grounds — no plan may claim a typecheck enforces it); `launchError` is not template-only and lives INSIDE the wrapper D-17 removes (WR-03 all over again); `definition` is a jsonb **string scalar on 194 of 223 rows**. ⚠ **The landmine CONTEXT never named:** `WorkflowBuilderPage.header.test.tsx:304` holds a byte-exact `innerHTML` of the whole `doorGroup` band — waves 2–3 keep it green with ZERO edits (a stronger move-proof than any baseline 193 could author), waves 4 and 5 red it once each, both labelled. ⚠ **The decision-coverage gate returned a VACUOUS PASS** (`skipped — no trackable decisions`) and was re-run by hand: **25/25 covered**. G-5 fires on `WorkflowDoorSwitch.tsx` and is **honoured by construction**, no override. UI-SPEC gate skipped by operator decision, audited in the guardrail table. **Prior:** CONTEXT CAPTURED (`48ad67fd`) — 20 decisions. G-2 SATISFIED: sketch 164 is the acceptance bar and the operator picked **variant D — the mix** (B's door NAMES + C's two TIER labels), committed at `20ca7cf7` with the ruling that the **header-strip restack is IN SCOPE**. D is DERIVED in `build.cjs` (`D_FROM_C`), never re-typed — audit 18 matched / 0 missed against the real `WorkflowDoorSwitch` DOM. ⚠ **G-5 FIRES on `WorkflowDoorSwitch.tsx` and the file was ABSENT from the CLAUDE.md hot-file ledger** — measured 8 commits / 6 phases (124, 155, 184, 184.1, 186, 187) / 385 L; the identical failure to `WorkflowsPage.tsx` escaping G-5 for ten phases, because the audit scans `files_modified` AGAINST the table and a file missing from the table is invisible to its own guardrail. **193 owes it a ledger row at close.** HONOURED BY CONSTRUCTION, not waived — the sketch's build contract already requires the vocabulary module, so wave 1 is a pure move with baselines captured on the UNMOVED tree (188.1: a baseline only proves something if it PREDATES the change) and wave 2+ applies variant D + the restack. NO override recorded. ⚠ **AUTH-03 needs NO backend change — measured, not assumed:** `definition` is already projected on the wire (`backend/app/db/workflows.py`) and the card already derives its tier from it — the OPPOSITE of Phase 192's D-04 surprise. ⚠ **The two unknown-fallbacks are OPPOSITE ON PURPOSE (D-15 vs D-20):** the card renders NOTHING on an absent `definition` (absence must never read as a claim); the Run modal renders the control EXACTLY AS TODAY (hiding on unknown would silently strip shipped WFIN-01) ⇒ **the predicate must be THREE-STATE, not boolean.** Do not \"fix\" this into consistency. **The card mark is PLAIN TEXT, never a chip** — a third badge is a typecheck error (188.2) and `SEED-155` exists because sketch 163 drew a chip the card could not render. ⚠ **This discussion was the SECOND attempt — the first was lost ENTIRELY to a laptop restart:** the session died on the sketch's `AskUserQuestion` and nothing reached disk (no commit, no file, no transcript message, no subagent dir). Nine recovery angles searched; the work was NEVER WRITTEN, not deleted. The two operator answers were therefore committed BEFORE the discussion re-ran — the durability lesson applied rather than noted. **Ledger drift found while measuring:** the `WorkflowCard.tsx` row reads 6 commits / 721 L; measured **7 / 747**, and 193 makes it the card's 3rd phase, arming G-5 for the phase after. Reported-bugs cross-check: BUG-260813-01 (canvas hardcodes `colorMode`) left OPEN, routed to `/gsd:fast` under G-3, NOT folded. `todo.match-phase` returned one 0.6 match (`spike-nl-workflow-authoring`) which is STALE — its own routing note closes it on Phase 152, which shipped; recommended for closure, deliberately not edited here. **Prior: Phase 192.1 Workflow Identity ✅ CLOSED 2026-08-13** (8/8 plans, 7 waves, LIB-05 satisfied, UAT 9/9 driven — 7 pass / 2 fail, U7 fixed same-day under G-3, U8 accepted → `SEED-155`; `threats_open: 0`; ⚠ no `192.1-VERIFICATION.md` exists; ⚠ 192.1 was ABSENT from the ROADMAP checklist until its own close, exactly as 188.2 was at the v3.6 close). Full 192 / 192.1 detail lives in § Current Position below and in `git log`, no longer duplicated here."
 resume_file: null
@@ -32,9 +32,87 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
-**Phase:** **193 Authoring Doors + Template Placement — PLANNED 2026-08-13** (`68e6a173`)
-**Plan:** **11 plans in 7 waves** — plan-checker **VERIFICATION PASSED**, 0 blockers
-**Status:** Ready to execute. **NEXT = `/gsd:execute-phase 193`.**
+**Phase:** **193 Authoring Doors + Template Placement — EXECUTED 2026-08-14, NOT YET COMPLETE**
+**Plan:** **10 of 11 plans have a SUMMARY.** `193-11` (the operator UAT checkpoint) is PART-DONE: its Task 1 and Task 3 are written, its Task 2 is 6 of 8 rows.
+**Status:** ⏸ **Blocked on human evidence, not on code.** Every automated gate is green — `tsc -p tsconfig.app.json` **33 (baseline, unmoved)** and the count gate **exit 0 · total 3557 · failed 0 · 67/67 pinned** — but **only 1 of the 3 ROADMAP success criteria is verified.**
+**NEXT = drive UAT rows U1 then U2** with a person who has not used the Builder (`193-UAT.md`). Then `/gsd:code-review 193` → `/gsd:verify-work 193` → `/gsd:secure-phase 193`.
+
+### ⚠ Phase 193 — why it is NOT complete, stated so a later reader cannot mistake green gates for a delivered phase
+
+**SC#1 and SC#2 are NOT verified, and nothing in the repository can verify them.**
+
+| SC | What must be TRUE | Decided by | Status |
+|---|---|---|---|
+| SC#1 | a person who has not seen the Builder can predict what each door does before clicking | **U1** | ⏸ **owed** |
+| SC#2 | the number of perceived choices does not increase | **U2** | ⏸ **owed** |
+| SC#3 | a user with a template to fill can find where to supply it | **U4** pass (+U5) | ✅ verified |
+
+Both open criteria are, by their own wording, properties of *a person's* prediction and *a person's*
+count. **3557 passing frontend cases cannot stand in for either.** The phase's headline claim — the
+two doors are tellable apart — is therefore **not yet evidenced**, and six other rows passing does
+not change that.
+
+**UAT tally: 6 driven · 5 pass · 1 partial · 0 fail · 2 owed** (`193-UAT.md`, commits `18404fe5`,
+`cd94618b`). Driven in Chrome against the operator's real library at `eb7f7e5e` — 107 identity lines
+rendered, 145 published / 78 draft.
+
+- ✅ **U3** — driven at **BOTH** `visual_workflow_canvas` values, and D-05's conditional is proved in
+  **both directions**: `ml-auto` is **absent** on the badge in the merged row and **present** in the
+  standalone band (gap label→badge 95 px vs **937 px**). Driving only one value would have reported a
+  pass while half the shipped behaviour went unmeasured. The flag was flipped through the Control Room
+  UI (not SQL — the settings sync-cache has no staleness check) and **restored to its exact recorded
+  pre-test value** `{"roles": [], "groups": [], "audience": "everyone"}`.
+- ✅ **U3b** — the describe band's escape classes are **byte-identical** to the govern band's;
+  `dividerCount: 0` where there is no third peer to divide from.
+- ✅ **U4** — both halves. The provenance sentence matched **byte-for-byte** against
+  `RunModal.tsx:429`. The non-admitting modal has `fileInputCount: 0` and `orphanSeparators: 0` —
+  shorter, not damaged, so D-17's claim holds at the surface.
+- ✅ **U6** — the card says `Build it myself`, the strip says `Build it myself`.
+- ✅ **U7** — a blocked `POST /threads` produced a **visible `role="alert"`** on a workflow with **no
+  template control at all**. This is the WR-03 class defect Phase 192 had to repair on this very
+  surface; a naive hide would have silenced every non-template launch failure. It does not.
+- ◐ **U5** — structure/placement/treatment pass and are proved (`<span>needs a template</span>` with
+  **no class attribute**, index 2 per D-14, 5 of 107 rows). Its verdict turns on whether it reads as a
+  **requirement of you**; that is a reader's property. Becomes a fail if a reader concludes the
+  unmarked rows definitely need no template — D-15 failing at the surface though it holds in code.
+- ⏸ **U1, U2** — structurally not the assistant's to drive. Scoring them from an agent that has read
+  the source would be the check-that-cannot-fail `193-UAT.md` exists to prevent.
+
+**G-7: CLEAR** — `node scripts/check-gap-closure-rounds.cjs 193` → `plans: 11 total · 0 gap-closure`,
+exit `0`. **Zero fails to route, so no gap-closure round is warranted and none was opened.**
+
+**Guardrail overrides: NONE recorded for Phase 193.** G-5 fired on `WorkflowDoorSwitch.tsx` and was
+**honoured by construction** (the extraction `193-03` shipped BEFORE the feature that needed it), so
+no override was required and D-09 declined to record one.
+
+**Hot-file ledger, re-derived at close by `193-10` (do not quote — re-derive):**
+- `WorkflowDoorSwitch.tsx` — **11 commits / 7 phases / 426 L.** The row G-5 never had: this file was
+  ABSENT from the `CLAUDE.md` ledger for six phases, which is why the guardrail never fired on it.
+- `library/WorkflowCard.tsx` — **8 commits / 3 phases / 818 L. G-5 now FIRES.** The next phase to
+  touch it owes a refactor recommendation FIRST.
+
+**⚠ One operator-approved change landed mid-phase that no plan owned** (`294a2ac8`): `193-08` found a
+SECOND, ungoverned copy of the describe screen's words in `WorkflowBuilderPage.tsx`. Four strings were
+predicted; **five were found** (`DESCRIBE_H1` too, caught only by sweeping the page programmatically
+against all 21 governed values). It redded **24 cases across five suites** — a red `193-08` had
+PREDICTED IN WRITING in `WorkflowBuilderPage.describe.test.tsx`'s docblock, which is the only reason
+those reds could be trusted as the fix working. **A literal-only sweep cannot see a regex query**: the
+first sweep missed two sites querying `/draft the workflow/i`. This change is the least-reviewed code
+in the phase and is the reason `/gsd:code-review 193` matters.
+
+**⚠ Environmental finding for the next phase — the vitest worker cap is now wrong in `CLAUDE.md`.**
+`GSD_VITEST_MAX_WORKERS=4` was calibrated at ~3400 gated cases for TWO concurrent agents; the gate now
+executes **3557**. On one identical commit it reported, in order: cap 4 → **17, 4, 3** failures;
+UNCAPPED → **11**; **cap 2 → 0 and 0**. Every failure was `STACK_TRACE_ERROR` (a timeout, never an
+assertion), in files no plan touched, each passing IN ISOLATION at full green counts. **Use
+`GSD_VITEST_MAX_WORKERS=2`.** The gate remains non-deterministic under load on
+`WorkflowsPage.test.tsx` — worth a seed, not a phase defect.
+
+**Deferred triggers checked at close:** BUG-260813-01 **not fired** (still `open`, routed to
+`/gsd:fast`); D-06 breadcrumb move **not fired**; `WorkflowCard.tsx` refactor **FIRED** (now armed for
+the next phase); D-10 vocabulary merge **FIRED and SPENT** — `doorVocabulary.ts` is confirmed the
+**fourth** `*Vocabulary` module (`door`, `library`, `phase`, `run`), and the deferral was still judged
+right because merging them mid-phase would have put a shared module under a words-only proof.
 
 ### Phase 193 — PLANNED (2026-08-13): the four things a later reader should not re-derive
 
