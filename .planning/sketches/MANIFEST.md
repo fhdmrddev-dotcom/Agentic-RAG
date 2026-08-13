@@ -1603,3 +1603,60 @@ actual implementation — the final shape after we finish."** That is true, and 
 hover/focus states. Those stay a human comparison at UAT — **and the G-4 rows must name the sketch
 file as the reference**, driven the way a person drives it (**by looking**, never by
 `getElementById` on a known UUID — the verification lesson Phase 192 banked about its own re-drive).
+
+---
+
+## Session: Phase 193 — Authoring Doors + Template Placement (2026-08-13)
+
+G-2 sketch, BEFORE plan-phase. **Phase 192 shipped the library and 192.1 gave its rows an
+identity; 193 is about the two doors you reach from it, and where a template goes.**
+Requirements **AUTH-01** (SEED-147) and **AUTH-03** (SEED-110, closed — placement only).
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 164 | telling-the-doors-apart | Which wording lets someone who has never seen the Builder predict what each door does — before clicking? | **PENDING operator pick (A / B / C)** | phase-193, auth-01, auth-03, doors, naming, copy, template-placement, acceptance-bar, build-contract, anti-drift, g2-sketch-gate |
+
+### ⚠ 164 CLOSES THE HOLE 163 STILL HAD — the arrow of generation is reversed
+
+163 shipped all three anti-drift artifacts and **U8 still failed**, because
+`BUILD-CONTRACT.generated.md` was emitted *from the running sketch*. The sketch stayed the
+source of truth, so it could still draw an atom the card structurally cannot render (SEED-155).
+
+**164 generates FROM THE BUILD.** `emit.test.tsx.src` renders the *real* `WorkflowDoorSwitch`
+and the *real* `library/RunModal` under jsdom; `dom.generated.json` is that actual DOM; the
+variants are the same DOM with **nothing changed but text nodes** from the COPY table; and the
+CSS is built by the project's own `tailwind.config.js`. **Layout drift is impossible for the
+doors panel, because the sketch's layout IS the build's layout.**
+
+Its substitution audit exits non-zero on any string that fails to match the real DOM — i.e. a
+COPY table that has drifted from the component fails the build. **It caught its own bug on run
+1** (37 false "misses" from per-dump rather than aggregated matching); corrected, it reports
+**37 matched / 0 missed**. A green audit is evidence, not decoration.
+
+**What is still ordinary sketch risk, stated rather than implied:** the AUTH-03 template panel
+is a **proposal** (it adds nodes no component has yet, so there was nothing to render), and the
+header-strip *stacking* problem is structural — copy cannot restack a strip, so that stays an
+open CONTEXT.md decision instead of riding along inside a chosen variant.
+
+### ⚠ THREE MEASURED CORRECTIONS TO SEED-147 — the seed said "none yet measured", and nobody had
+
+| Suspect | Verdict |
+|---|---|
+| #1 "Author & govern" is two verbs, one of them jargon | **STANDS** — unchanged since Phase 124. What B and C attack. |
+| #2 the return control reads as a peer of the two doors | **STANDS, and it is STRUCTURAL** — in the govern door the strip is `‹ both doors` + the door label + `🔒 judge always-on`: three visual peers. That is the *"other one"* the operator could not name. |
+| #3 "nothing states the consequence of the choice" | **FALSE as written** — each door card already carries an icon, a tier label, a consequence sentence and an italic footnote, under a heading that says *"nothing is locked, you can switch anytime"*. |
+
+**And the chooser is REACHABLE**, which nothing had verified: `onCreate={openBuilderFresh}` →
+`builderInitial=null` → `initialDoor="both"`. The operator *did* see a chooser. ⇒ The phase is
+therefore **not** "add a consequence line" — it is that the consequence is stated as a
+**feature list in the product's own vocabulary**. Variant C attacks precisely that by naming
+what *you* must supply (one paragraph vs every setting).
+
+### AUTH-03 — the finding that makes it more than copy
+
+**The signal is derivable.** A fill phase admits `render_template` in its phase tool whitelist
+(`backend/app/services/harness/phase_types.py:388`), so *"does this workflow want a template?"*
+is a question the app can honestly answer. Today it never asks: the `Upload template` control
+renders on **every** workflow, quiet and unlabelled — noise on the ~100 rows that will never
+use it, and silent on the ones that need it. Operator pick (2026-08-13): **mark it on the card,
+name it in the Run modal, render nothing for workflows that do not fill one.**
