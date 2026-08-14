@@ -149,6 +149,7 @@ import { useStore } from "zustand"
 import { listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
+import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
 // 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
 // interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
 import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
@@ -574,6 +575,26 @@ export interface WorkflowBuilderPageProps {
    *  ABSENT ⇒ the describe screen is byte-identical to today (D-181-01). */
   initialProjectFolderId?: string
   /**
+   * 193.1-08 (D-24) — the document the author supplied on the LOOSE door, and its
+   * ALREADY-COMPLETED reading, carried across the hand-off.
+   *
+   * ⚠ THE PRECEDENT IS `initialProjectFolderId` DIRECTLY ABOVE, AND THAT IS THE WHOLE
+   * MECHANISM — no store, no context, no global. `187-26` added that prop for the identical
+   * problem: pre-draft state chosen on the door that only this page can spend. This pair is
+   * the same shape, one wave later, for a different pre-draft choice.
+   *
+   * ⚠ THEY TRAVEL AS A PAIR OR NOT AT ALL, and the door passes them from ONE spread for
+   * exactly that reason: a file arriving WITHOUT its answer is the only shape that could make
+   * this page re-read, and a re-read returns the reading to `loading` at the instant the
+   * one-shot auto-draft fires — the blind-draft race D-07 exists to make impossible. SEED,
+   * DO NOT RE-READ. The seed is installed only for the `File` it names, so a mismatched pair
+   * is ignored rather than trusted.
+   *
+   * BOTH ABSENT ⇒ this page behaves exactly as it does without them.
+   */
+  initialTemplateFile?: File | null
+  initialTemplateRead?: TemplateReadAnswer | null
+  /**
    * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's registration seam.
    *
    * THERE IS NO ROUTER. Navigation in this app is a `useState<ActiveView>` switch, so
@@ -611,6 +632,8 @@ export function WorkflowBuilderPage({
   initialDescribe,
   autoDraft,
   initialProjectFolderId,
+  initialTemplateFile,
+  initialTemplateRead,
   registerCanLeave,
   headerLead,
   headerTrail,
@@ -721,6 +744,11 @@ export function WorkflowBuilderPage({
     initialDescribe,
     autoDraft,
     initialProjectFolderId,
+    // 193.1-08 (D-24) — straight through to the hook, which SEEDS its reading with them.
+    // Undefined on every mount that supplies nothing, which is every shipped call site but
+    // the loose door's.
+    initialTemplateFile,
+    initialTemplateRead,
     initialDefinitionFolderId: initial?.definition.project_folder_id,
     onDraftStarted: () => {
       setSelectedSlug(null)

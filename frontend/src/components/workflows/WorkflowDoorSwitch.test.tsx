@@ -42,10 +42,21 @@ import * as doorVocabulary from "./doorVocabulary"
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
 // on mount (103-ux name maps) and owns the generate→draft flow. Mock the api seam so
 // the unit render is offline; the generate mock backstops the CR-01 auto-draft path.
-const { mockGenerateWorkflow, mockListFolders, mockListSkills } = vi.hoisted(() => ({
+const {
+  mockGenerateWorkflow,
+  mockListFolders,
+  mockListSkills,
+  // 193.1-08: the two seams the pre-draft row's hosts reach. The FIRST is the one this
+  // plan's zero-request claim is measured on — it must be a real spy so its call COUNT is
+  // observable, not merely its effect.
+  mockReadPlaceholders,
+  mockUploadTemplate,
+} = vi.hoisted(() => ({
   mockGenerateWorkflow: vi.fn(),
   mockListFolders: vi.fn(),
   mockListSkills: vi.fn(),
+  mockReadPlaceholders: vi.fn(),
+  mockUploadTemplate: vi.fn(),
 }))
 vi.mock("@/lib/api", () => ({
   generateWorkflow: mockGenerateWorkflow,
@@ -53,6 +64,8 @@ vi.mock("@/lib/api", () => ({
   updateWorkflowDraft: vi.fn(),
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  readTemplatePlaceholdersFromFile: mockReadPlaceholders,
+  uploadWorkflowTemplate: mockUploadTemplate,
 }))
 
 import { WorkflowDoorSwitch } from "./WorkflowDoorSwitch"
@@ -740,5 +753,192 @@ describe("193-09 (D-22) — both doors demote their escape hatch identically", (
     // POSITIVE CONTROL: the component IS mounted elsewhere in this file, so the negative above
     // is about WHERE it is used and not about a component nobody imports.
     expect(workflowDoorSwitchSource).toContain("<DoorHeaderStrip")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 193.1-08 (D-24 / SC#1 / SC#4 / D-07) — THE PRE-DRAFT ATTACH ROW ON **THIS
+// FILE'S** DESCRIBE DOOR, AND THE READING THAT CROSSES THE HAND-OFF.
+//
+// ⚠ EVERY CASE NAMES THIS FILE IN ITS TITLE AND ASSERTS A NODE ONLY THIS SURFACE HAS.
+// There are two near-identical pre-draft describe screens and the splice anchor
+// `<div className="flex flex-col items-center gap-3">` occurs in BOTH of them — it was
+// unique only inside sketch 165's DUMP, which is all its build script ever asserted. A
+// case that said "the row is on the describe screen" would pass against the wrong
+// component. `switch-strip` exists in `WorkflowDoorSwitch.tsx` and nowhere else, so it
+// is the discriminator; `door-describe` is the second.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/** A held document, in the shape the row's native picker hands over. */
+function docxFile(name = "weekly-status.docx"): File {
+  return new File(["PK"], name, {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  })
+}
+
+/** Open the loose door and pick a document through the row's own input. */
+function openDescribeAndPick(file: File) {
+  fireEvent.click(screen.getByTestId("door-card-describe"))
+  fireEvent.change(screen.getByTestId("describe-template-input"), { target: { files: [file] } })
+}
+
+describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door", () => {
+  it("WorkflowDoorSwitch.tsx: the row renders on THIS door, between its KB picker and its CTA group", () => {
+    render(<WorkflowDoorSwitch def={strictDef} initialDoor="describe" />)
+
+    // The surface, first — this is the door switch's screen and not the Builder's.
+    expect(screen.getByTestId("switch-strip")).toBeInTheDocument()
+    expect(screen.getByTestId("door-describe")).toBeInTheDocument()
+
+    const row = screen.getByTestId("describe-template-row")
+    const cta = screen.getByTestId("describe-draft")
+    const ctaGroup = cta.parentElement!
+    // OUTSIDE the CTA group — the sketch's own splice puts the block BEFORE it, never in it.
+    expect(ctaGroup.contains(row)).toBe(false)
+    // …and in document order: KB picker, then the row, then the CTA group.
+    const column = row.parentElement!
+    const order = Array.from(column.children).map((n) => n.getAttribute("data-testid"))
+    const iRow = order.indexOf("describe-template-row")
+    expect(iRow).toBeGreaterThan(-1)
+    // The picker's own state marker is this door's KB control (`DescribeKbPicker`), and it
+    // sits ABOVE the row exactly as the govern door's `<select>` does above its own mount.
+    expect(order.indexOf("describe-kb-state")).toBeLessThan(iRow)
+    expect(order.indexOf("switch-strip")).toBeGreaterThan(iRow)
+  })
+
+  it("WorkflowDoorSwitch.tsx: SC#4 — with no document held the door is exactly as it was", () => {
+    render(<WorkflowDoorSwitch def={strictDef} initialDoor="describe" />)
+
+    // The reading is `idle`, so no reading block, no footing, no clear control…
+    expect(screen.queryByTestId("describe-template-fields-region")).toBeNull()
+    expect(screen.queryByTestId("describe-template-footing")).toBeNull()
+    // …and NOT ONE request. D-08 is the absence of a read, not a read that answers quickly.
+    expect(mockReadPlaceholders).toHaveBeenCalledTimes(0)
+
+    // The shipped CTA rule is untouched: empty box disabled, typed box enabled.
+    expect(screen.getByTestId("describe-draft")).toBeDisabled()
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    expect(screen.getByTestId("describe-draft")).toBeEnabled()
+  })
+
+  it("WorkflowDoorSwitch.tsx: the CTA is DISABLED while the read is in flight — the hand-off cannot fire mid-read (D-07)", async () => {
+    // A read that never settles, so the in-flight arm is observed rather than raced.
+    mockReadPlaceholders.mockImplementation(() => new Promise(() => {}))
+    render(<WorkflowDoorSwitch def={strictDef} initialDoor="describe" />)
+
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    // Enabled on text alone FIRST, so the disable below is attributable to the read.
+    expect(screen.getByTestId("describe-draft")).toBeEnabled()
+
+    fireEvent.change(screen.getByTestId("describe-template-input"), {
+      target: { files: [docxFile()] },
+    })
+
+    await waitFor(() => expect(mockReadPlaceholders).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByTestId("describe-draft")).toBeDisabled())
+    // ⚠ THIS DOOR'S CTA MAKES NO NETWORK CALL — it hands off and arms the Builder's one-shot.
+    // So the proof that the blind draft is impossible is that we are still on this door and
+    // the Builder was never mounted, rather than that `/generate` was not called.
+    expect(screen.getByTestId("door-describe")).toBeInTheDocument()
+    expect(screen.queryByTestId("door-govern")).toBeNull()
+    expect(mockGenerateWorkflow).toHaveBeenCalledTimes(0)
+  })
+
+  it("WorkflowDoorSwitch.tsx: the reading CROSSES the hand-off — ZERO further reads, and the first `/generate` carries the fields", async () => {
+    /**
+     * ⚠ THE ZERO IS THE ASSERTION, not a nicety. The Builder auto-fires `onDraft()` ONCE on
+     * hand-off; if it re-read the document its reading would be `loading` at that instant and
+     * the fields would be missing from the only `/generate` call the fast path ever makes —
+     * a blind draft arriving through the door the row was supposed to close. The seed is what
+     * makes that unreachable, and this case measures the seed rather than trusting it.
+     */
+    mockReadPlaceholders.mockResolvedValue({
+      read: "ok",
+      placeholders: ["project_name", "overall_rag_status"],
+    })
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+
+    openDescribeAndPick(docxFile())
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    await screen.findByTestId("describe-template-fields")
+    expect(mockReadPlaceholders).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    // The Builder mounted and its one-shot fired.
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    // ⚠ STILL ONE. The Builder SEEDED its reading; it did not re-read.
+    expect(mockReadPlaceholders).toHaveBeenCalledTimes(1)
+    // …and the very first body carries the fields of the document the author supplied on
+    // the OTHER screen, which is the whole of D-24's crossing.
+    expect(mockGenerateWorkflow.mock.calls[0][0]).toMatchObject({
+      template_placeholders: ["project_name", "overall_rag_status"],
+    })
+  })
+
+  it("WorkflowDoorSwitch.tsx: with NO document the hand-off is byte-identical to today — no key, no read", async () => {
+    render(<WorkflowDoorSwitch def={strictDef} onDescribeDraft={vi.fn()} />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    fireEvent.change(screen.getByTestId("describe-box"), {
+      target: { value: "Summarise supplier risk every Monday." },
+    })
+    fireEvent.click(screen.getByTestId("describe-draft"))
+
+    await waitFor(() => expect(mockGenerateWorkflow).toHaveBeenCalledTimes(1))
+    expect(mockReadPlaceholders).toHaveBeenCalledTimes(0)
+    // The KEY SET, not merely the absence of a value: `template_placeholders: undefined`
+    // would satisfy a `toBeUndefined` and would still be a changed body on the wire.
+    expect(Object.keys(mockGenerateWorkflow.mock.calls[0][0]).sort()).toEqual(["describe"])
+  })
+
+  it("WorkflowDoorSwitch.tsx: the two crossing props are genuinely ABSENT when nothing is supplied — a spread-conditional, not a default", () => {
+    /**
+     * The shape, asserted at the source. `initialTemplateFile={x}` with `x` undefined would
+     * satisfy every behavioural case above and would still hand the Builder a present key —
+     * the exact distinction the `headerLead` / `headerTrail` idiom in this file exists for.
+     */
+    const i = workflowDoorSwitchSource.indexOf("initialTemplateFile")
+    expect(i).toBeGreaterThan(-1)
+    // The occurrence sits inside a spread-conditional…
+    const window = workflowDoorSwitchSource.slice(Math.max(0, i - 200), i + 200)
+    expect(window).toMatch(/\{\.\.\.\(\s*templateAnswer/)
+    // …and there is no bare always-present form of either prop anywhere in the file.
+    expect(workflowDoorSwitchSource).not.toMatch(/\n\s*initialTemplateFile=\{/)
+    expect(workflowDoorSwitchSource).not.toMatch(/\n\s*initialTemplateRead=\{/)
+    // POSITIVE CONTROL — the needle above really does find that shape when it exists.
+    expect(`\n            initialTemplateFile={templateFile}`).toMatch(
+      /\n\s*initialTemplateFile=\{/,
+    )
+  })
+
+  it("WorkflowDoorSwitch.tsx: `goBoth` does NOT drop the held document — the shipped `kbFolderId` rule, followed", async () => {
+    /**
+     * `kbFolderId` is deliberately not cleared by `goBoth` (`WorkflowDoorSwitch.tsx:160-166`):
+     * the hand-off is a one-shot and must not re-fire, but a considered pick is not undone by
+     * looking around. The held document follows that rule rather than acquiring a second one.
+     */
+    mockReadPlaceholders.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    render(<WorkflowDoorSwitch def={strictDef} initialDoor="describe" />)
+
+    fireEvent.change(screen.getByTestId("describe-template-input"), {
+      target: { files: [docxFile()] },
+    })
+    await screen.findByTestId("describe-template-fields")
+
+    // Back to the chooser and in again.
+    fireEvent.click(screen.getByTestId("both-doors"))
+    expect(screen.getByTestId("workflow-doors")).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+
+    // Still held, still answered, and NOT re-read.
+    expect(screen.getByTestId("describe-template-filename")).toHaveTextContent("weekly-status.docx")
+    expect(within(screen.getByTestId("describe-template-fields")).getByText("project_name")).toBeInTheDocument()
+    expect(mockReadPlaceholders).toHaveBeenCalledTimes(1)
   })
 })
