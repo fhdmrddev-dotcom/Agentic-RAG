@@ -965,6 +965,28 @@ const BASELINE = {
   // reverted before this pin moved. Read from this script's own `actual` column across two
   // agreeing runs, same as every other extension in this map.
   "WorkflowBuilderPage.header.test.tsx": 32,
+  // 193 AUTH-03 piece 2 — NET-NEW: the author-time template door's suite, pinned in THE
+  // COMMIT THAT CREATES IT, the rule `ExternalActionSection.test.tsx:12` states verbatim.
+  // ⚠ NO `TARGETS` EDIT ACCOMPANIES THIS PIN, and the omission is measured rather than
+  // assumed, exactly as its 189-14 / 190-12 neighbours measured their own:
+  // `src/components/workflows` is already a TARGETS **directory** entry, so this file RAN
+  // and printed as `new` in the gate run BEFORE this line existed — which is how the number
+  // was read, out of this script's own `actual` column, and never hand-counted from `it(`.
+  //
+  // What would be unguarded without it: the three claims a template door can most easily
+  // break silently — that a REFUSAL says what was wrong in words (a whole-container sweep
+  // asserts NO bare `404`/`422`/`502`/`500` ever reaches the DOM), that the control keeps NO
+  // local mirror of the filename (so it can never claim an attachment the DEFINITION does
+  // not carry), and that `setTemplateAsset` REPLACES rather than appends — `.find(a => a.kind
+  // === "template")` is the read on both sides of this circuit, so a second entry leaves the
+  // surface and the run engine both pinned to the OLD file forever.
+  //
+  // TWO plants were applied to real production source and both observed RED before this pin
+  // existed — the append-instead-of-replace filter removed from `builderStore.ts` (2 failures)
+  // and the 404 branch relaying the server's terse detail instead of the both-causes sentence
+  // (1 failure) — with both files restored (`TemplateAttachSection.tsx` md5-identical at
+  // `0414bf98…`). Recorded in `AUTH-03-FRONTEND-SUMMARY.md`.
+  "TemplateAttachSection.test.tsx": 25,
   "FlowEdge.test.tsx": 22,
   // 188.1-01: 19 → 20. EXTENDED — the same move-invariant subtree-fence control, carried
   // here as well because this suite re-scopes its own five negatives and a control living in

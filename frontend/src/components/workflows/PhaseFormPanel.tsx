@@ -56,6 +56,7 @@
 import { useId } from "react"
 import { ExternalActionSection } from "./ExternalActionSection"
 import { GovernanceSection } from "./GovernanceSection"
+import { TemplateAttachSection } from "./TemplateAttachSection"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 /** A partial config patch the form emits on each edit. */
@@ -151,6 +152,29 @@ export interface PhaseFormPanelProps {
    *  only write seam (`onChange`) patches `config`. ABSENT ⇒ the section renders READ-ONLY
    *  rather than disappearing, so a dropped wiring is visible on screen, not silent. */
   onGovernanceChange?: (patch: { grounding_escalated?: boolean; action_risk_armed?: boolean }) => void
+  /**
+   * Phase 193 (AUTH-03) — the DEFINITION-level template binding for the deliverable step.
+   *
+   * Caller-owned for the third time in this file's history and for the same reason
+   * `PhaseGateRow.onRemove` and `onGovernanceChange` are: the descriptor is a sibling of
+   * `phases` in `definition.assets[]`, and this panel's only write seam (`onChange`) patches
+   * `config`. Routing it through `onChange` would bury a definition-level fact inside one
+   * step's config, where the run engine's `resolve_template_source` would never look for it.
+   *
+   * ABSENT ⇒ NOTHING RENDERS, which keeps every existing mount of this panel — including the
+   * flag-off Spine surface — exactly as it is. The control itself, its upload, its refusals
+   * and every sentence it says live in `TemplateAttachSection.tsx`, per the standing G-5
+   * order on this file: the next surface that needs the panel gets its own component and one
+   * gated line.
+   */
+  template?: {
+    /** The saved draft's row id, or `null` when the draft has never been saved. */
+    definitionId: string | null
+    /** The attached template's filename, resolved by the caller off `definition.assets[]`. */
+    filename?: string
+    /** The returned descriptor, handed up — the caller appends and saves. */
+    onAttached: (asset: { kind: "template"; asset_id: string; filename: string; mime: string }) => void
+  }
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -705,6 +729,7 @@ export function PhaseFormPanel({
   onClose,
   rails,
   onGovernanceChange,
+  template,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -1054,6 +1079,10 @@ export function PhaseFormPanel({
           )}
         </div>
 
+        {/* 193 (AUTH-03) — the deliverable's template, its OWN component and ONE gated line
+            (the standing G-5 order on this file). Gated on `llm_emit` because that is the
+            only type whose executor resolves a bound template. */}
+        {template && pt === "llm_emit" && <TemplateAttachSection {...template} />}
         {rails && <GovernanceSection phaseType={pt} availableTools={asList(cfg.available_tools)} kbTools={rails.kbTools ?? []}
           citationPolicy={asStr(cfg.citation_policy)} groundingEscalated={phase.grounding_escalated === true}
           actionRiskArmed={phase.action_risk_armed === true} onGovernanceChange={onGovernanceChange} />}

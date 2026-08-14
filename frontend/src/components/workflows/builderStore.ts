@@ -179,6 +179,32 @@ export type DefinitionMeta = {
   [K in keyof BuilderDefinition as K extends "phases" ? never : K]: BuilderDefinition[K]
 }
 
+/**
+ * Phase 193 (AUTH-03) — one entry of the definition's `assets[]`, as the template door mints
+ * it (`backend/app/api/workflows.py`'s `TemplateAssetRef`, itself field-for-field
+ * `app.models.harness.AssetRef`).
+ *
+ * ⚠ DECLARED HERE RATHER THAN IMPORTED FROM THE API CLIENT, and that is a fence obeyed, not
+ * an oversight: this module may not name the API client in ANY import form —
+ * `builderStore.test.ts` sweeps this source for that specifier, and a type-only import
+ * matches its regex exactly like a value one.
+ *
+ * ⚠ AND THE FENCE IS STRICTER THAN IT LOOKS: the sweep reads the RAW source, so it fires on
+ * PROSE too. An earlier draft of this very docblock quoted the import form it was explaining
+ * and turned the fence RED — the same shape 192-05 hit with its `title=` sweep. Do not spell
+ * the specifier here, in any comment, even to describe it.
+ *
+ * The two declarations are structurally identical, so a drift between them is a typecheck
+ * error at the one call site that carries a value across (`WorkflowBuilderPage`'s
+ * `onTemplateAttached`), not a silent divergence.
+ */
+export interface TemplateAssetDescriptor {
+  kind: "template"
+  asset_id: string
+  filename: string
+  mime: string
+}
+
 export interface BuilderStoreState extends TrackedSlice {
   /**
    * The working definition MINUS `phases` — slug, version, business_requirement,
@@ -269,6 +295,10 @@ export interface BuilderStoreState extends TrackedSlice {
    *  (BUG-260809-02). Untracked, and arms `dirty` itself for the same reason
    *  `setProjectFolder` does; see its implementation docblock in the factory below. */
   setBusinessRequirement: (text: string) => void
+  /** Attach (or replace) the workflow's template in `meta.assets[]` — the definition-level
+   *  write Phase 193's authoring door needs. Untracked, and arms `dirty` itself for the
+   *  same reason its two `meta`-writing siblings do; see its implementation docblock. */
+  setTemplateAsset: (asset: TemplateAssetDescriptor) => void
   /** The ONLY thing that clears `dirty`. Never writes anything. */
   markSaved: () => void
   /** Commit a coalescing run of config edits NOW (a field blur, a view change). */
@@ -639,6 +669,39 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
           const s = get()
           if (s.builderPhase !== "drafted") return
           set({ meta: { ...s.meta, business_requirement: text }, dirty: true })
+        },
+
+        /**
+         * Phase 193 (AUTH-03, piece 2) — attach or REPLACE the workflow's template.
+         *
+         * A THIRD STRUCTURAL MIRROR of `setProjectFolder` / `setBusinessRequirement` above,
+         * deliberately: same field class (`meta`), same failure shape, same three reasons —
+         * it sets `dirty` in the SAME `set()` (the subscription below arms `dirty` on a
+         * change to the **`phases`** reference and on nothing else, so a `meta`-only write
+         * would otherwise be a real definition change the leave guard never noticed), it is
+         * UNTRACKED (`partialize` narrows the undo stack to `phases`, so `⌘Z` restores steps
+         * and never the workflow's identity — a template is undone by attaching another),
+         * and it bails outside `drafted` where `meta` is deliberately empty.
+         *
+         * ⚠ IT REPLACES THE TEMPLATE ENTRY AND PRESERVES EVERY OTHER ASSET. `assets[]` is a
+         * mixed list — the run engine's `AssetRef` also carries `reference` assets — and the
+         * one thing this door mints is the single `kind === "template"` entry that
+         * `resolve_template_source` Branch 1 and `WorkflowBuilderPage`'s `nameContext` both
+         * read with `.find(…)`. Appending blindly would leave TWO template entries with
+         * `.find` silently picking the older one, which is the defect shape where a person
+         * attaches a new file and the surface keeps showing the old name.
+         *
+         * A NON-ARRAY OR ABSENT `assets` IS TREATED AS EMPTY, never spread: the field arrives
+         * from server JSONB and the page already reads it defensively for the same reason.
+         */
+        setTemplateAsset: (asset) => {
+          const s = get()
+          if (s.builderPhase !== "drafted") return
+          const prior = Array.isArray(s.meta.assets) ? (s.meta.assets as unknown[]) : []
+          const others = prior.filter(
+            (a) => !(typeof a === "object" && a !== null && (a as { kind?: unknown }).kind === "template"),
+          )
+          set({ meta: { ...s.meta, assets: [...others, asset] }, dirty: true })
         },
 
         markSaved: () => set({ dirty: false }),

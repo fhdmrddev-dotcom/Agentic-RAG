@@ -3485,6 +3485,91 @@ export class WorkflowDraftUnreadableError extends Error {
   }
 }
 
+/**
+ * Phase 193 (AUTH-03, piece 2) — the descriptor `POST /workflows/{id}/template` returns.
+ *
+ * FIELD-FOR-FIELD the backend's `TemplateAssetRef` (`workflows.py:1617`), which is itself
+ * field-for-field `app.models.harness.AssetRef`. That identity is the whole contract: the
+ * object goes STRAIGHT into `definition.assets[]` and the `extra='forbid'` WorkflowDefinition
+ * accepts it unchanged, so no client-side re-shaping exists to drift.
+ *
+ * `kind` is the single-value literal, not `string` — this door mints templates and never
+ * `reference` assets, and typing it wide would let a caller write an asset the run engine's
+ * `resolve_template_source` Branch 1 would silently skip.
+ */
+export interface WorkflowTemplateAsset {
+  kind: "template"
+  asset_id: string
+  filename: string
+  mime: string
+}
+
+/**
+ * Phase 193 (AUTH-03) — `POST /workflows/{id}/template` refused, or never arrived.
+ *
+ * It carries the STATUS and the server's `detail` sentence SEPARATELY rather than one
+ * pre-worded message, because the three refusals mean three different things to the person
+ * looking at the panel and only the caller knows which surface is asking:
+ *   • `404` — the workflow is gone or is not theirs (deliberately indistinguishable
+ *     server-side, so the client must not invent a distinction either).
+ *   • `422` — the FILE was refused. The backend's detail is a plain, actionable sentence by
+ *     contract ("A workflow template must be a .docx, .pptx or .xlsx document (got .png).",
+ *     "File too large. Maximum size is 10 MB.") and is safe to show verbatim.
+ *   • `502` — Storage write failed. Also a clean sentence, never a traceback.
+ * `"network"` is the request that never got an answer at all.
+ *
+ * `detail` is `null` whenever the body was missing or unreadable — a caller must therefore
+ * always have a fallback sentence and can never render `null` at a person.
+ */
+export class WorkflowTemplateUploadError extends Error {
+  readonly status: number | "network"
+  readonly detail: string | null
+  constructor(status: number | "network", detail: string | null) {
+    super(detail ?? `workflow template upload failed (${status})`)
+    this.name = "WorkflowTemplateUploadError"
+    this.status = status
+    this.detail = detail
+  }
+}
+
+/**
+ * Phase 193 (AUTH-03, piece 2) — attach a template to a workflow AT AUTHORING TIME.
+ *
+ * Mirrors `uploadWorkspaceTemplate`'s FormData + Bearer shape (see its comment): the
+ * NO-`Content-Type` detail is load-bearing so the browser writes the multipart boundary
+ * itself, and the single part is named `file` because that is the part name the route
+ * declares.
+ *
+ * ⚠ THIS DOES NOT WRITE THE DEFINITION, and that is the backend's deliberate contract
+ * (`AUTH-03-BACKEND-SUMMARY.md`): it returns the descriptor and stops. The caller appends it
+ * to `definition.assets[]` and saves through the EXISTING draft-save path, which keeps
+ * exactly ONE writer on the `definition` JSONB and off Phase 186's `If-Match` token.
+ */
+export async function uploadWorkflowTemplate(
+  definitionId: string,
+  file: File,
+): Promise<WorkflowTemplateAsset> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/workflows/${definitionId}/template`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+      body: formData,
+    })
+  } catch {
+    throw new WorkflowTemplateUploadError("network", null)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    const detail = typeof body?.detail === "string" ? body.detail : null
+    throw new WorkflowTemplateUploadError(res.status, detail)
+  }
+  return (await res.json()) as WorkflowTemplateAsset
+}
+
 /** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
  *  token seeds the session, because three of the Builder's four entry routes create). */
 export async function createWorkflowDraft(

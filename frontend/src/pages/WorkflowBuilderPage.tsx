@@ -165,6 +165,7 @@ import {
   createBuilderStore,
   selectDefinition,
   SAVED_STILL_A_DRAFT,
+  type TemplateAssetDescriptor,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
 import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseSlugContext"
@@ -1325,6 +1326,35 @@ export function WorkflowBuilderPage({
   )
 
   /**
+   * Phase 193 (AUTH-03, piece 2) — a template was attached to this workflow.
+   *
+   * IN `onGovernanceChange`'s EXACT SHAPE and for a related reason: the descriptor is a
+   * DEFINITION-level fact (a sibling of `phases` in `assets[]`), and `PhaseFormPanel`'s only
+   * write seam patches one step's `config`. So the panel forwards the descriptor and this
+   * page performs the write, through a store action, exactly as the two `meta`-writing
+   * siblings `setProjectFolder` and `setBusinessRequirement` are reached.
+   *
+   * ⚠ IT SAVES IMMEDIATELY, AND UNCONDITIONALLY. Every other write on this surface is a
+   * keystroke that can be re-typed; this one is not — the bytes are ALREADY in Storage under
+   * an id only this definition will ever reference, so a session that ends before the next
+   * autosave beat leaves an orphaned object and an author who was told the template was
+   * attached. `saveNow` bypasses the debounce and the dirty gate but never the hold or the
+   * single-flight rule, and it reads `store.getState()` at FIRE time (`performWrite`'s
+   * docblock), so the descriptor written one statement earlier is in the payload — this is
+   * NOT a closure over a stale rendered value.
+   *
+   * It is deliberately NOT `onFieldCommit`'s dirty-checked shape: `setTemplateAsset` arms
+   * `dirty` in the same `set()`, so the check would be answering a question it just asked.
+   */
+  const onTemplateAttached = useCallback(
+    (asset: TemplateAssetDescriptor) => {
+      store.getState().setTemplateAsset(asset)
+      void persistence.saveNow()
+    },
+    [store, persistence],
+  )
+
+  /**
    * The panel's blur commit — `saveNow` behind a `dirty` check, and the check is the point.
    * `saveNow` bypasses the loop's dirty gate because a person who presses Save means it,
    * but a blur is not a press: every field is CONTROLLED, so the value already reached the
@@ -2000,6 +2030,19 @@ export function WorkflowBuilderPage({
           // on `rails`, so a handler passed without it could never fire — and adding an
           // always-on governance prop would leak the canvas contract into the Spine view,
           // which is precisely what D-181-01's byte-identity promise forbids.
+          // Phase 193 (AUTH-03) — UNCONDITIONAL, unlike the two canvas-gated props above,
+          // and the difference is deliberate. `rails` / `onGovernanceChange` ride the flag
+          // because they ARE the canvas contract and D-181-01 promises a flag-off surface
+          // identical to the shipped one. A template binding is not a canvas idea: it is the
+          // only way any author can attach the file their deliverable fills in, on either
+          // view, and gating it would leave the shipped Spine — the surface most authors are
+          // actually on — with no door at all. The panel renders nothing for it on any step
+          // that is not `llm_emit`, so the cost elsewhere is zero.
+          template={{
+            definitionId: draftId,
+            filename: nameContext.templateFilename,
+            onAttached: onTemplateAttached,
+          }}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
         />
       </div>
