@@ -242,24 +242,53 @@ def _render_folder_tree(folders: list[dict]) -> str:
     return "\n".join(lines) if lines else "(no folders)"
 
 
-async def _resolve_template_placeholders(
+async def resolve_template_placeholders(
     *,
     supabase,
     pool,
     user_id: str,
     template_asset_id: str | None,
     template_placeholders: list[str] | None,
-) -> list[str]:
+) -> tuple[list[str], str]:
     """OPTIONAL template grounding (D-103-3 / D-103-CONF-2). ``template_placeholders`` is
     used directly; ``template_asset_id`` resolves a LIBRARY asset
     (``resolve_template_source`` Branch 1, which keys on ``asset_id`` as the storage path
     and never touches ``thread_id``) then parses its docx placeholder vocabulary. A
     resolution miss degrades to no placeholders (template grounding is optional) — never
-    a hard failure of the whole generate."""
+    a hard failure of the whole generate.
+
+    RETURNS ``(names, read)`` where ``read`` is one of ``"ok" | "unreadable" |
+    "not_requested"`` (quick task 260814-q5r). **The list alone was ambiguous THREE ways
+    and the function collapsed all three into ``[]``**: an exception (storage miss,
+    deleted object, auth failure — swallowed below with only a log), no bytes, and a
+    genuinely field-less document. At HTTP 200 a caller could not tell *"we read it and
+    it has none"* from *"we never read it"* — so an author whose template failed to
+    resolve was told, in the same words, that their template has no fill-in fields. That
+    is a lie the author acts on, and the second element is the whole fix.
+
+    The mapping, arm by arm — **no control flow changed, only what each arm returns**:
+
+      * supplied ``template_placeholders``  -> ``"ok"`` (the caller already read it)
+      * no ``template_asset_id``            -> ``"not_requested"`` (we were not asked)
+      * ``except``                          -> ``"unreadable"``
+      * no bytes                            -> ``"unreadable"`` (no bytes IS never-read)
+      * parser returned nothing             -> ``"ok"`` with ``[]`` — **the arm that makes
+        the honest empty state possible: we DID open the document and it carries no tokens**
+      * parsed names                        -> ``"ok"``
+
+    ⚠ Renamed from ``_resolve_template_placeholders`` (it has a second caller now: the
+    owner-gated ``GET /workflows/{id}/template/placeholders`` read route). The
+    ``GroundingBundle`` dataclass, its ``degraded`` set and every existing consumer are
+    BYTE-UNAFFECTED — ``assemble_grounding_bundle`` unpacks and discards the status. A
+    template axis deliberately does NOT enter ``degraded``: that set is consumed by
+    ``/validate``'s ``grounding_unavailable_finding`` and by the publish gauntlet, so
+    putting an unreadable template into it would turn a document-read blip into a
+    validation finding and change publish behaviour far outside this concern.
+    """
     if template_placeholders:
-        return list(template_placeholders)
+        return list(template_placeholders), "ok"
     if not template_asset_id:
-        return []
+        return [], "not_requested"
     try:
         from app.models.harness import AssetRef  # function-local
         from app.services.template_asset_service import resolve_template_source
@@ -280,17 +309,21 @@ async def _resolve_template_placeholders(
         )
         data = resolved.get("bytes")
         if not data:
-            return []
+            # No bytes is NEVER-READ, not read-and-empty. Reporting "ok" here would be
+            # the exact lie this three-state exists to prevent.
+            return [], "unreadable"
         parsed = parse_docx_template_variables(data)
         if not parsed:
-            return []
+            # We DID open the document and the parser found no tokens in it. This is the
+            # ONLY arm that may honestly answer "ok" with an empty list.
+            return [], "ok"
         names: list[str] = list(parsed.get("scalars") or [])
         for col_keys in (parsed.get("columns") or {}).values():
             names.extend(col_keys)
-        return sorted(set(names))
+        return sorted(set(names)), "ok"
     except Exception:  # noqa: BLE001 — optional grounding: a miss is no placeholders, not a crash
         logger.warning("grounding: template placeholder resolution failed; skipping")
-        return []
+        return [], "unreadable"
 
 
 def _grounding_failed(detail: str) -> dict:
@@ -468,7 +501,10 @@ async def assemble_grounding_bundle(
         degraded.add("skills")
 
     skill_ids = {str(s["id"]) for s in skills}
-    placeholders = await _resolve_template_placeholders(
+    # The read status is DISCARDED here on purpose (quick task 260814-q5r): the bundle's
+    # shape, its consumers and its ``degraded`` set are unchanged by that task. The status
+    # is consumed only by the dedicated owner-gated placeholders route.
+    placeholders, _read = await resolve_template_placeholders(
         supabase=supabase,
         pool=pool,
         user_id=user_id,

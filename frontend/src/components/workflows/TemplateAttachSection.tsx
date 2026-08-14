@@ -51,6 +51,7 @@
  */
 import { useCallback, useId, useState } from "react"
 
+import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { uploadWorkflowTemplate, WorkflowTemplateUploadError } from "@/lib/api"
 import type { WorkflowTemplateAsset } from "@/lib/api"
 
@@ -105,6 +106,55 @@ export const TEMPLATE_NETWORK_ERROR =
  *  gate, and a renamed binary gets past this attribute and is refused there. */
 export const TEMPLATE_ACCEPT = ".docx,.pptx,.xlsx"
 
+/* ── Quick task 260814-q5r: what the attached template ASKS FOR ────────────────────────
+ *
+ * Until now this section said a file is attached, by NAME, and nothing more — so an author
+ * could not tell what the document would ask the step to fill in, and found out at run time
+ * or never. Four readings are added, and the ONE rule binding them is that `none` and
+ * `unavailable` may never share a node or a sentence: an author who is told "no fields"
+ * about a template we never opened ships a workflow that fills nothing.
+ *
+ * ⚠ NO NEW VISUAL LANGUAGE. All four use this file's existing `NOTE_CLASSES`. The amber
+ * `REFUSAL_CLASSES` block is reserved for refusals this panel OWNS — a degraded read is not
+ * a refusal and dressing it as one would overstate it. No colour, no chip, no badge.
+ */
+
+/** Heading for the list. Says what the fields ARE to the author, not what they are called
+ *  in the document's XML ("placeholders" is our word, not theirs). */
+export const TEMPLATE_FIELDS_HEADING = "What this template asks for"
+
+/** In flight. The fields settle after the filename does, so this is a real reading rather
+ *  than a flash — and it never implies the answer is empty while it is merely absent. */
+export const TEMPLATE_FIELDS_LOADING = "Reading this template…"
+
+/**
+ * We opened the document and it carries no fill-in fields. States what we DID and what we
+ * FOUND, rather than making a claim about the document — and it must never be reworded
+ * into `TEMPLATE_FIELDS_UNAVAILABLE`'s shape, or the distinction dies in the copy.
+ */
+export const TEMPLATE_FIELDS_NONE = "We read this template and found no fill-in fields in it."
+
+/**
+ * We could not read it. Explicitly DISCLAIMS the reading, because the whole defect being
+ * prevented is an author concluding their template is field-less when we never opened it.
+ * It also says the attachment survives — a failed read is not a failed attach.
+ */
+export const TEMPLATE_FIELDS_UNAVAILABLE =
+  "We could not read this template's fields. It is still attached — this says nothing about what is in it."
+
+/**
+ * The parser reads `word/document.xml` and its headers/footers ONLY, yet the upload door
+ * accepts `.pptx` and `.xlsx` too — so two of the three accepted types would otherwise be
+ * told they have no fields, which is a flat lie.
+ *
+ * ⚠ GATED ON EMPTINESS, which is what makes it drift-safe rather than a second copy of a
+ * server predicate (the D-182-06 red line). It renders only when the server answered `ok`
+ * with ZERO fields AND the filename is not `.docx`. If the backend ever learns `.pptx`, the
+ * fields render and this sentence can never appear — it cannot go stale.
+ */
+export const TEMPLATE_FIELDS_NOT_WORD =
+  "Fields can only be read from Word (.docx) templates, so we cannot say what this one asks for."
+
 /**
  * Turn a thrown upload failure into the one sentence to show. The mapping IS the honesty
  * requirement: a status code shown at a person is not a failure state they can act on. 422
@@ -142,6 +192,12 @@ export interface TemplateAttachSectionProps {
    */
   filename?: string
   /**
+   * The attached template's `asset_id`, resolved by the caller off `definition.assets[]` —
+   * the SAME place `filename` comes from, so the two can never disagree about which document
+   * is on screen. Absent when nothing is attached, which asks the server nothing.
+   */
+  assetId?: string
+  /**
    * The descriptor the server returned, handed straight up. The caller appends it to
    * `definition.assets[]` and saves; this component performs no definition write and no save
    * (see the docblock: one writer on the JSONB).
@@ -164,6 +220,7 @@ const REFUSAL_CLASSES = [
 export function TemplateAttachSection({
   definitionId,
   filename,
+  assetId,
   onAttached,
 }: TemplateAttachSectionProps) {
   const inputId = useId()
@@ -194,6 +251,19 @@ export function TemplateAttachSection({
 
   const attached = typeof filename === "string" && filename.length > 0
 
+  // No attached template means no question to ask. The hook issues zero requests when
+  // either argument is absent, so this is a real gate rather than a wasted round trip.
+  const fieldsState = useTemplatePlaceholders(
+    attached ? definitionId : null,
+    attached ? assetId : undefined,
+  )
+
+  // D-7 — gated on EMPTINESS, never on the extension alone. A `.pptx` that somehow DID
+  // yield fields renders its fields; this sentence exists only for the empty case, so it
+  // can never become a stale second copy of the server's parser predicate.
+  const notWord =
+    fieldsState.kind === "none" && !(filename ?? "").toLowerCase().endsWith(".docx")
+
   return (
     <section
       data-rail="template"
@@ -212,6 +282,60 @@ export function TemplateAttachSection({
         <p data-testid="template-none" className={NOTE_CLASSES}>
           {TEMPLATE_NONE_NOTE}
         </p>
+      )}
+
+      {/* The fields belong to the file named directly above, so they sit directly below it.
+          ONE stable wrapper with a live role — the correct aria pattern for a late-settling
+          fact, and it means one role rather than four competing announcements. The wrapper
+          is present whenever a template is attached, even while the reading is `loading`,
+          so assistive tech observes a change INSIDE a node it is already watching. */}
+      {attached && (
+        <div data-testid="template-fields-region" role="status">
+          {fieldsState.kind === "loading" && (
+            <p data-testid="template-fields-loading" className={NOTE_CLASSES}>
+              {TEMPLATE_FIELDS_LOADING}
+            </p>
+          )}
+
+          {fieldsState.kind === "fields" && (
+            <>
+              <p data-testid="template-fields-heading" className={NOTE_CLASSES}>
+                {TEMPLATE_FIELDS_HEADING}
+              </p>
+              {/* Names are ordinary React text children — escaped by construction. They
+                  originate in a user-uploaded document and nothing here goes near
+                  `dangerouslySetInnerHTML`. Rendered in the SERVER'S order, not re-sorted:
+                  the order is part of the answer. */}
+              <ul data-testid="template-fields" className={`${NOTE_CLASSES} list-disc pl-4`}>
+                {fieldsState.fields.map((name) => (
+                  <li key={name} className="break-all">
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+
+          {/* ⚠ THE TWO SENTENCES THAT MAY NEVER MERGE. `none` means we opened it and found
+              nothing; `unavailable` means we never opened it. Different nodes, different
+              words — a plant that renders one for the other turns a test red. */}
+          {fieldsState.kind === "none" &&
+            (notWord ? (
+              <p data-testid="template-fields-not-word" className={NOTE_CLASSES}>
+                {TEMPLATE_FIELDS_NOT_WORD}
+              </p>
+            ) : (
+              <p data-testid="template-fields-none" className={NOTE_CLASSES}>
+                {TEMPLATE_FIELDS_NONE}
+              </p>
+            ))}
+
+          {fieldsState.kind === "unavailable" && (
+            <p data-testid="template-fields-unavailable" className={NOTE_CLASSES}>
+              {TEMPLATE_FIELDS_UNAVAILABLE}
+            </p>
+          )}
+        </div>
       )}
 
       {definitionId === null ? (
