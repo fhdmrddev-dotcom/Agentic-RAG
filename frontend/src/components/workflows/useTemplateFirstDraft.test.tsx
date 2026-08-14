@@ -370,6 +370,9 @@ describe("useTemplateFirstDraft — the loose door's one-shot auto-draft", () =>
         initialDescribe: "seeded",
         onDraftStarted: () => {},
         onDrafted: () => {},
+        // 193.1-07: REQUIRED, so the typechecker enumerated this second call site rather
+        // than a default hiding it — which is exactly why it is required.
+        onTemplateBound: () => {},
       }),
     )
     await waitFor(() => expect(mockedGenerate).not.toHaveBeenCalled())
@@ -882,7 +885,7 @@ describe("useTemplateFirstDraft — the wire", () => {
     let resolveRead: (v: { read: "ok"; placeholders: string[] }) => void = () => {}
     mockedRead.mockImplementation(() => new Promise((res) => (resolveRead = res)))
     const held = fileNamed("status.docx")
-    const { view } = mountHook({
+    mountHook({
       autoDraft: true,
       initialDescribe: "seeded from the fast door",
       initialTemplateFile: held,

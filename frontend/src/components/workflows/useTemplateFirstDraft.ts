@@ -112,8 +112,12 @@
  * never by its words.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
-import { generateWorkflow, readTemplatePlaceholdersFromFile } from "@/lib/api"
-import type { BuilderPhase, BuilderStore } from "./builderStore"
+import {
+  generateWorkflow,
+  readTemplatePlaceholdersFromFile,
+  uploadWorkflowTemplate,
+} from "@/lib/api"
+import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
 import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
 
 /**
@@ -202,7 +206,15 @@ export function useTemplateRead(
   // that had already been answered — noise that reads exactly like a staleness bug.
   const answerRef = useRef<TemplateReadAnswer | null>(seed ?? null)
   const seedRef = useRef<TemplateReadAnswer | null>(seed ?? null)
-  seedRef.current = seed ?? null
+  // ⚠ MIRRORED IN AN EFFECT, NOT ASSIGNED DURING RENDER — this module's own shipped idiom for
+  // the callback refs below, and `react-hooks/refs` enforces it. Declaration order is what
+  // makes it correct rather than merely legal: effects run in declaration order within a
+  // commit, so this one has already run by the time the read effect below consults the ref on
+  // the same commit. On the FIRST render the `useRef` initialiser has already done the job,
+  // which is the path the handoff actually takes.
+  useEffect(() => {
+    seedRef.current = seed ?? null
+  })
 
   const install = useCallback((next: TemplateReadAnswer) => {
     answerRef.current = next
@@ -308,6 +320,18 @@ export interface TemplateFirstDraftArgs {
    */
   onDrafted: (definition: TemplateFirstDefinition) => void
   /**
+   * 193.1-07 (D-06) — the bind's descriptor, handed to the host's SINGLE writer.
+   *
+   * ⚠ REQUIRED, not optional, and the reason is the 192.1 rule: a required member makes the
+   * typechecker enumerate the call sites where a default would let one hide. This module
+   * writes NOTHING to the definition itself — the host passes its shipped attach handler
+   * here, so that handler's `setTemplateAsset` + `saveNow` stay the ONE writer on the
+   * definition JSONB and the bind introduces no second sequencing machinery. The write is
+   * serialised against the create that triggered it by `performWrite`'s own single-flight
+   * guard and supersession drain, not by anything this module does.
+   */
+  onTemplateBound: (asset: TemplateAssetDescriptor) => void
+  /**
    * 193.1-07 / Plan 08 — the document picked on the OTHER describe screen, carried across the
    * handoff. Absent for a fresh build. The precedent is `initialProjectFolderId` (187-26):
    * pre-draft state chosen on the other door that only this host can spend.
@@ -343,6 +367,34 @@ export interface TemplateFirstDraft {
   onPickTemplateFile: (file: File) => void
   /** The author removed it — one press undoes a mis-pick, and the reading returns to `idle`. */
   onClearTemplateFile: () => void
+  /**
+   * D-06's bind. Uploads the held document to the definition that now exists and hands the
+   * returned descriptor to `onTemplateBound`.
+   *
+   * ⚠ **IT CATCHES EVERYTHING AND NEVER REJECTS, AND THAT IS THE WHOLE GUARD.** Its one caller
+   * is the write loop's created-id callback, which is invoked from INSIDE that loop's own
+   * `try`. A synchronous throw out of the callback is therefore rendered as a FAILED SAVE for
+   * a row that WAS created, and for a terminal-shaped error it sets the loop's halt flag —
+   * which nothing in the session ever clears. An `async` function converts a synchronous
+   * throw into a rejection, and the internal `catch` converts the rejection into state. Both
+   * layers are load-bearing: the suite asserts the RETURNED PROMISE resolves, not merely that
+   * the state is right, because a `void`-ed call that rejects has nowhere to be caught.
+   */
+  bindHeldTemplate: (definitionId: string) => Promise<void>
+  /**
+   * The bind's own failure, held until the next attempt.
+   *
+   * ⚠ IT CARRIES A FILENAME AND NOTHING ELSE — a shape that structurally cannot hold server
+   * prose, a status code or an id (`library/useWorkflowFork.ts:205`'s posture). The raw error
+   * goes to `console.error` at the boundary, where the developer's evidence and the person's
+   * sentence stay two different things and neither replaces the other.
+   *
+   * ⚠ The plan specifies a "two-field" object. That was descriptive of the analog, whose
+   * second field selects a branch in ITS sentence; this sentence takes a filename only, so a
+   * second field would be data with no reader. ONE field ships, which satisfies the
+   * disclosure property strictly more than two would — and the suite asserts the key list.
+   */
+  bindFailed: { filename: string } | null
 }
 
 export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFirstDraft {
@@ -355,6 +407,7 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     initialDefinitionFolderId,
     onDraftStarted,
     onDrafted,
+    onTemplateBound,
     initialTemplateFile,
     initialTemplateRead,
   } = args
@@ -400,6 +453,43 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
   const onPickTemplateFile = useCallback((file: File) => setTemplateFile(file), [])
   const onClearTemplateFile = useCallback(() => setTemplateFile(null), [])
 
+  // ── 193.1-07 (D-06) — THE BIND ─────────────────────────────────────────────────────────
+  //
+  // The held document is read through a REF rather than the dependency list, and the reason
+  // is the same one the callback refs above record: `bindHeldTemplate` must keep a stable
+  // identity, because the host installs it inside a callback the write loop mirrors once per
+  // render. Reading the file at FIRE time is also the correct semantics — the bind runs when
+  // the row is created, which is strictly after the pick.
+  const templateFileRef = useRef<File | null>(templateFile)
+  const onTemplateBoundRef = useRef(onTemplateBound)
+  // Mirrored in an effect for the reason recorded on the two callback refs above, and safe
+  // here for a stronger one: the ONLY reader is the async bind, which cannot run until a row
+  // exists — long after every effect on the commit that held the pick has flushed.
+  useEffect(() => {
+    templateFileRef.current = templateFile
+    onTemplateBoundRef.current = onTemplateBound
+  })
+
+  const [bindFailed, setBindFailed] = useState<{ filename: string } | null>(null)
+
+  const bindHeldTemplate = useCallback(async (definitionId: string) => {
+    const file = templateFileRef.current
+    // NO DOCUMENT, NO ACT. SC#4's fast path is untouched by construction rather than by a
+    // flag: a session that supplied nothing performs no upload and can raise no failure.
+    if (!file) return
+    try {
+      const asset = await uploadWorkflowTemplate(definitionId, file)
+      setBindFailed(null)
+      // The host's single writer. This module appends nothing to `assets[]` itself.
+      onTemplateBoundRef.current(asset)
+    } catch (err) {
+      // The developer's evidence, at the boundary, in full.
+      console.error(err)
+      // …and the person's, which cannot carry any of it.
+      setBindFailed({ filename: file.name })
+    }
+  }, [])
+
   const onDraft = useCallback(async () => {
     const text = describe.trim()
     if (text.length === 0) return
@@ -416,6 +506,26 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         // Phase 103-ux: bind the generated workflow to the chosen project (KB). The
         // backend GenerateRequest accepts project_folder_id; omit when none picked.
         ...(projectFolderId ? { project_folder_id: projectFolderId } : {}),
+        // ── 193.1-07 (SC#1 / D-19) — THE FIELDS THE SUPPLIED DOCUMENT ACTUALLY ASKS FOR ──
+        //
+        // ⚠ THIS IS NOT A HINT. Measured across four hops: the value is rendered into the
+        // authoring grounding, and the authoring prompt's deliverable rule branches on that
+        // section — so sending it FLIPS A BRANCH rather than adding colour. `193.1-11`
+        // measured the branch firing 3 of 3 with key coverage 8/8, against 0 of 3 before.
+        //
+        // ⚠ SENT ONLY ON THE `fields` ARM, AND AN EMPTY ARRAY IS NEVER SENT. The prompt
+        // renders the list with a join, so `[]` and an absent key are two DIFFERENT
+        // statements to the model — "this document asks for nothing" versus "no document was
+        // supplied". The four other readings all mean the second one, including the two that
+        // failed for our reasons rather than the document's.
+        //
+        // ⚠ AND IT IS INDIVISIBLE FROM THE BIND BELOW (D-19). A deliverable step written to
+        // fill a document that was never attached is TERMINAL at run and can never publish —
+        // strictly worse than the blind draft it replaces. The two ship together or not at
+        // all, which is why both live in this one callback's module.
+        ...(templateRead.kind === "fields"
+          ? { template_placeholders: templateRead.fields }
+          : {}),
       })
       if (result.ok) {
         // SINGLE STATE TRANSITION: commit the complete definition + "drafted" in
@@ -440,7 +550,11 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         e instanceof Error ? e.message : undefined,
       )
     }
-  }, [describe, projectFolderId, store])
+    // ⚠ `templateRead` JOINS THE DEPENDENCY LIST, which is why the reading and the wire must
+    // live in ONE module: a reading held on the host would either be stale in this closure or
+    // would re-create this callback on every render. The two waiting readings are frozen at
+    // module scope precisely so this list does not churn — see `READ_IDLE` / `READ_LOADING`.
+  }, [describe, projectFolderId, store, templateRead])
 
   // Phase 124 CR-01 fix: when handed off from the loose door's `DESCRIBE_CTA` button
   // (autoDraft), run the EXISTING generate→draft flow ONCE with the seeded text — so the fast
@@ -475,5 +589,7 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     templateRead,
     onPickTemplateFile,
     onClearTemplateFile,
+    bindHeldTemplate,
+    bindFailed,
   }
 }
