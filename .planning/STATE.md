@@ -453,7 +453,9 @@ plain. Do not verify a behaviour that does not exist.
 
 **Next action:** `/gsd:verify-work 192` when you want the owed rows driven — or proceed knowing they
 are owed. Downstream MUST read `192-CONTEXT.md` (**18** decisions) and `192-RESEARCH.md`, which **corrects six CONTEXT.md line numbers** measured at `HEAD = a0795512` — re-derive every line number, HEAD has moved.
-**Last activity:** 2026-08-10 — **Phase 192 wave 1 executed and merged** (`5178100e`). `192-01`: five `WorkflowsPage`-covering suites adopted into BOTH count-gate knobs (pinned files 51 → 56, pinned total 2838 → 2910), zero source changed. `192-02`: D-04 ownership — `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, raw `created_by` fenced off the wire. Post-merge gate green: `tsc -p tsconfig.app.json` unmoved at **33**, count gate exit 0 / `failed 0`, new backend suite 17/17.
+**Last activity:** 2026-08-14 — **Quick task `260814-q5r` completed and merged** (`22244732`): a template's placeholders now show on the authoring panel when one is attached. The brief's premise was refuted by measurement (the shipped palette route's `template_asset_id` is typed `UUID`; the Phase-193 upload door mints a Storage **path** → 422), and widening it would have opened a **cross-tenant read** on a service-role Storage client — so a dedicated owner-gated route shipped instead. **Post-merge gates verified independently by the orchestrator on the merged tree, not inherited from the executor:** `tsc -p tsconfig.app.json` unmoved at **33**, count gate **exit 0 / failed 0** (`GSD_VITEST_MAX_WORKERS=2`, total 3604, pin 25 → 43), new backend suite **14/14**. ⚠ **D-5's live user-JWT Storage read is UNDETERMINED — see the owed-UAT note under Quick Tasks Completed; it is the one check that can invalidate the feature.**
+
+**Prior activity:** 2026-08-10 — **Phase 192 wave 1 executed and merged** (`5178100e`). `192-01`: five `WorkflowsPage`-covering suites adopted into BOTH count-gate knobs (pinned files 51 → 56, pinned total 2838 → 2910), zero source changed. `192-02`: D-04 ownership — `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, raw `created_by` fenced off the wire. Post-merge gate green: `tsc -p tsconfig.app.json` unmoved at **33**, count gate exit 0 / `failed 0`, new backend suite 17/17.
 
 ### Wave 1 — three measured findings not to re-derive
 
@@ -925,6 +927,18 @@ the 11 seeds are intentionally dormant.
 |---|-------------|------|--------|-----------|
 | 260809-klo | fix BUG-260809-02 — add a `business_requirement` input to the canvas Builder | 2026-08-09 | `da668c96` + `1c58a3fb` | [260809-klo-…](./quick/260809-klo-fix-bug-260809-02-add-a-business-require/) |
 | 260813-e12 | `/gsd:fast` — close **E-1** and **E-2** from `192.1-SECURITY.md`: the identity memo's `[rows]`-only key had NO assertion despite its register claiming one, and the subtree non-vacuity guard proved only 3 of 12 modules load. Both driven RED against real plants; E-2's plant showed the four `it.each` sweeps passing green against the empty string — the Phase-190 CR-01 shape. E-3 (INFO) left to the next phase touching `useWorkflowFork.ts`. | 2026-08-13 | `15472e7c` | — (inline, no plan dir) |
+| 260814-q5r | Show a template's placeholders when it is attached. **The brief's premise was refuted by measurement:** the shipped `/workflows/grounding-bundle?template_asset_id=` types that param `UUID`, while the Phase-193 upload door mints a Storage **path** — a real asset id is a **422** at offset 37, so the seam was not merely unwired but unwirable. And widening it would have opened a **cross-tenant read** (`resolve_template_source` Branch 1 does not scope by `user_id`, and that route injects the **service-role** client — the `UUID` coercion was the only guard, accidentally). Shipped instead: an owner-gated `GET /workflows/{id}/template/placeholders` (user-JWT client, prefix + `..` traversal fences), a `(names, read)` three-state that splits "we read it and found none" from "we never read it", a leaf `useTemplatePlaceholders` hook, and four non-collapsible readings on `TemplateAttachSection` (incl. the Word-only sentence — the parser reads `word/document.xml` only, so `.pptx`/`.xlsx` templates would otherwise be told they have no fields). RED-1…RED-4 each observed failing against real plants. | 2026-08-14 | `22244732` (merge) · `19b94a1a` `ce9d6f74` `9521dfb6` | [260814-q5r-…](./quick/260814-q5r-show-a-template-s-placeholders-when-it-i/) |
+
+⚠ **`260814-q5r` — D-5 is UNDETERMINED, not passed, and it is the one thing that can invalidate
+the feature.** Every test monkeypatches `resolve_template_source`; **no live Storage probe was
+run.** If the user-JWT read (`get_user_supabase_client`, chosen so `workspace_storage_select_own`
+is a second DB-enforced boundary) is refused live, every template renders *"We could not read this
+template's fields"* — an honest sentence and a useless product. **Owed manual UAT (run this
+first):** attach a real `.docx` carrying `{{ … }}` tokens in the Builder, confirm the field names
+appear without a reload, then **reload and confirm they survive** (the re-opened-draft reading is
+what makes the feature worth having); then attach a `.pptx` and confirm the Word-only sentence,
+not the no-fields sentence. If the live read is refused, the fallback is `get_supabase` — and the
+plan says record that fallback as a decision, never silently.
 
 ⚠ **`BUG-260809-02` is deliberately still `open`.** The unit suite proves the typed sentence reaches
 the recorded `updateWorkflowDraft` argument; it cannot prove the live gauntlet accepts it. The plan
