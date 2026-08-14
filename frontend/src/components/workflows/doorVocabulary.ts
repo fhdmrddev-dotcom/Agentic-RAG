@@ -228,6 +228,41 @@ export const DESCRIBE_H1 = "What recurring work should this automate?"
 /** `describe.cta` — the `describe-draft` button. */
 export const DESCRIBE_CTA = "Write the first draft"
 
+/**
+ * `ctrl.label` — the pre-draft attach control's prompt, directly below the KB picker's label.
+ *
+ * ⚠ THE 22nd GOVERNED ID, AND THE FIRST ONE THIS TABLE HAS GAINED SINCE THE CONTRACT WAS
+ * GENERATED. Every id above is column D of `__contracts__/doors-copy.generated.md`; this one
+ * is not in that contract and cannot be, because it belongs to a DIFFERENT acceptance bar —
+ * sketch 165's `ctrl.label` slot, as ruled by D-28. `doorVocabulary.test.ts` therefore carries
+ * TWO governed sets and asserts their union is this module's export set, rather than widening
+ * the contract parse to a row the contract does not have.
+ *
+ * ── WHY THE SKETCH'S OWN WORDS ARE NOT WHAT SHIPS (D-21 → D-28) ──────────────────────────
+ * Sketch 165 proposed *"Filling in a template?"*. On the Builder's describe screen that lands
+ * roughly two inches from the shipped, governed, byte-pinned `STARTER_DOOR_LINE`
+ * (`definitionOps.ts`), which seeds the describe box from a curated starter WORKFLOW — two
+ * meanings for one word on one screen. D-21 ruled that the NEW control is reworded and the
+ * SHIPPED line is not touched: this string is unshipped, ungoverned-by-any-pin and rendered
+ * nowhere today, so it is the cheapest thing on the screen to change, whereas rewording the
+ * shipped line would reopen a governed literal Phase 187 settled — exactly what D-13 and the
+ * 166-C precedent already declined.
+ *
+ * ── WHY THESE WORDS (D-28) ───────────────────────────────────────────────────────────────
+ * It is a QUESTION, not a noun. The KB picker directly above already asks one, and a bare noun
+ * label would read as a third field to FILL rather than an optional branch to ignore — SC#4
+ * says the fast door stays fast. That is the sketch contract's own stated rule for this slot,
+ * which is why the rationale survives the reword intact.
+ *
+ * ⚠ THE COLLIDING WORD IS STILL ON THIS SCREEN, BY DESIGN, AND THAT IS RECORDED RATHER THAN
+ * SMOOTHED. D-21 removed it from the LABEL only. The control's button is deliberately the
+ * shipped `TEMPLATE_ATTACH_LABEL`, character for character, so that two doors onto one act do
+ * not acquire two names — and that string, plus the note beside it, still carry the word. UAT
+ * row U2 is the instrument for whatever collision remains, and it must be driven by someone
+ * who has not read this file.
+ */
+export const DESCRIBE_ATTACH_PROMPT = "Have a document to fill in?"
+
 // ── The describe hint — THREE FRAGMENTS, composed in JSX (D-12) ──────────────────────
 //
 // The hint is NOT one string. The component owns the `<b>` markup and the non-bold

@@ -9,8 +9,13 @@
  *    them the moment it is added. `runVocabulary.test.ts:40-44` puts it exactly: *a
  *    property stated only about the row being added is a property the next row can break in
  *    silence.* Nothing here hand-lists an identifier; `ALL_DOOR_WORDS` is
- *    `Object.entries(doorVocabulary)`, and `COLUMN_D`'s key set is asserted to be the SAME
- *    SET — so a value added to one and not the other is a failure rather than a gap.
+ *    `Object.entries(doorVocabulary)`, and the governed literals' key set is asserted to be
+ *    the SAME SET — so a value added to one and not the other is a failure rather than a gap.
+ *
+ *    ⚠ THE 22nd ID ARRIVED (193.1-06, D-28) AND IT PROVED THIS RULE RATHER THAN STRAINING IT.
+ *    Every property in this file picked it up with no edit; the ONLY case that needed one is
+ *    the contract-agreement case, because that id comes from a different acceptance bar and
+ *    the generated contract has no row for it. See `GOVERNED_ID_COUNT` / `CONTRACT_ID_COUNT`.
  *
  * 2. ⚠ EXACT MATCH, NEVER A CONTAINMENT ASSERTION — AND ON THIS TABLE THAT IS ARITHMETIC
  *    RATHER THAN CAUTION. Collisions are not a risk here, they are already the case:
@@ -34,7 +39,8 @@
  *    deliberately had NONE: that wave was a pure MOVE at the shipped values, its proof was
  *    `193-01`'s six whole-`innerHTML` DOM captures, and a source-level comparison would have
  *    reported an ampersand-entity difference the rendered surface did not have. In `193-08`
- *    the WORDS ARE THE SUBJECT, so `COLUMN_D` spells all 21 as literals HERE, exactly once
+ *    the WORDS ARE THE SUBJECT, so `COLUMN_D` spells the contract's 21 as literals HERE
+ *    (and `POST_CONTRACT_COPY` the 22nd, under its own bar), exactly once
  *    in this repository, and the module is compared against them. The literal living in the
  *    TEST is what makes the assertion a FALSIFICATION of the table rather than a copy of it
  *    (`runVocabulary.test.ts:64-72`).
@@ -86,8 +92,25 @@ import buildContractSource from "./__contracts__/doors-copy.generated.md?raw"
  */
 const ALL_DOOR_WORDS = Object.entries(doorVocabulary) as [string, string][]
 
-/** The id count the build contract governs: 20 from D-11, plus the 21st D-23 added. */
-const GOVERNED_ID_COUNT = 21
+/**
+ * Every id the module owns: 20 from D-11, the 21st D-23 added, and the 22nd from 193.1 (D-28).
+ *
+ * ⚠ THIS NUMBER AND `CONTRACT_ID_COUNT` BELOW ARE NO LONGER THE SAME NUMBER, AND THE SPLIT IS
+ * THE POINT. Until 193.1 every governed word came from ONE acceptance bar — column D of
+ * `doors-copy.generated.md` — so one count served both the table and the contract. D-28's
+ * `DESCRIBE_ATTACH_PROMPT` comes from a DIFFERENT bar (sketch 165's `ctrl.label` slot, reworded
+ * by D-21/D-28), and that contract has no row for it and never will.
+ *
+ * The alternative shape — widening the contract parse until it "found" 22 — would have made the
+ * anti-drift instrument report on a row its source file does not contain, which is a fence
+ * measuring nothing. So the two bars are declared separately, their UNION is asserted to be the
+ * module's export set, and the contract case additionally asserts the new id is ABSENT from the
+ * parsed contract, so the split cannot silently absorb a future id that should have been in it.
+ */
+const GOVERNED_ID_COUNT = 22
+
+/** How many of those ids the GENERATED doors-copy contract governs — every one except D-28's. */
+const CONTRACT_ID_COUNT = 21
 
 /**
  * ⚠ COLUMN D OF THE REGENERATED BUILD CONTRACT, SPELLED AS LITERALS EXACTLY ONCE IN THIS
@@ -125,6 +148,24 @@ const COLUMN_D: Record<string, string> = {
   SWITCH_CTA: "Build it myself ›",
   SOUL_LABEL: "What this will do",
 }
+
+/**
+ * ⚠ THE GOVERNED IDS THAT POSTDATE THE GENERATED CONTRACT — spelled here as literals for
+ * exactly the same falsification reason `COLUMN_D` is (rule 3), and kept in a SEPARATE object
+ * so that the one thing this file must not lose stays visible: which strings a generated
+ * acceptance bar can still falsify, and which are governed only by a recorded decision.
+ *
+ * `DESCRIBE_ATTACH_PROMPT` is D-28's exact ruling on sketch 165's `ctrl.label` slot, after D-21
+ * rejected the sketch's own words for colliding with the shipped `STARTER_DOOR_LINE`. It is
+ * NOT in `doors-copy.generated.md` — asserted below, not assumed — so it gets every whole-table
+ * property in this file and none of the contract-parse one.
+ */
+const POST_CONTRACT_COPY: Record<string, string> = {
+  DESCRIBE_ATTACH_PROMPT: "Have a document to fill in?",
+}
+
+/** Both bars together — what the module's export set must equal, exactly. */
+const ALL_GOVERNED_COPY: Record<string, string> = { ...COLUMN_D, ...POST_CONTRACT_COPY }
 
 /**
  * Pairs of ids the contract DELIBERATELY gives the same string.
@@ -218,11 +259,18 @@ describe("doorVocabulary — the table itself", () => {
     expect(ALL_DOOR_WORDS.map(([id]) => id).includes("STRIP_BACK")).toBe(true)
   })
 
-  it("the module's export set and COLUMN_D's key set are the SAME SET (rule 1)", () => {
+  it("the module's export set and the UNION of both governed sets are the SAME SET (rule 1)", () => {
     // A value added to one and not the other is a failure, not a gap — which is what stops
-    // the exact-match loop below from quietly covering twenty of twenty-one ids.
-    expect(Object.keys(COLUMN_D).sort()).toEqual(ALL_DOOR_WORDS.map(([id]) => id).sort())
-    expect(Object.keys(COLUMN_D)).toHaveLength(GOVERNED_ID_COUNT)
+    // the exact-match loop below from quietly covering twenty-one of twenty-two ids.
+    expect(Object.keys(ALL_GOVERNED_COPY).sort()).toEqual(ALL_DOOR_WORDS.map(([id]) => id).sort())
+    expect(Object.keys(ALL_GOVERNED_COPY)).toHaveLength(GOVERNED_ID_COUNT)
+    // …and the two bars really are DISJOINT, so the spread above cannot be silently shadowing
+    // a contract row with a post-contract literal — which would take a governed word out of
+    // the generated bar's reach while every count below still read 22.
+    const overlap = Object.keys(POST_CONTRACT_COPY).filter((id) => id in COLUMN_D)
+    expect(overlap).toEqual([])
+    expect(Object.keys(COLUMN_D)).toHaveLength(CONTRACT_ID_COUNT)
+    expect(Object.keys(POST_CONTRACT_COPY).length).toBeGreaterThan(0)
   })
 
   it("every value is non-empty and carries no stray leading or trailing whitespace", () => {
@@ -283,13 +331,14 @@ describe("doorVocabulary — the table itself", () => {
   })
 })
 
-describe("doorVocabulary 193-08 — every word is EXACTLY column D (D-01 / D-02, rule 3)", () => {
+describe("doorVocabulary 193-08 — every word is EXACTLY its governed literal (D-01 / D-02, rule 3)", () => {
   // One case per id, named by id, so a failure names the word rather than an index. The loop
-  // is over COLUMN_D's keys — hand-listing them here would reintroduce the very second home
-  // this module exists to remove.
-  for (const id of Object.keys(COLUMN_D)) {
-    it(`${id} is byte-exactly column D`, () => {
-      expect((doorVocabulary as Record<string, string>)[id]).toBe(COLUMN_D[id])
+  // is over the UNION's keys — hand-listing them here would reintroduce the very second home
+  // this module exists to remove, and looping over COLUMN_D alone would leave D-28's id with
+  // no exact-match case at all.
+  for (const id of Object.keys(ALL_GOVERNED_COPY)) {
+    it(`${id} is byte-exactly its governed literal`, () => {
+      expect((doorVocabulary as Record<string, string>)[id]).toBe(ALL_GOVERNED_COPY[id])
     })
   }
 
@@ -328,9 +377,29 @@ describe("doorVocabulary 193-08 — the generated contract IS the acceptance bar
     expect(buildContractSource).toMatch(/GENERATED by `build\.cjs`/)
 
     const parsed = parseColumnD(buildContractSource)
-    // The parse found the whole table, not a prefix of it.
-    expect(Object.keys(parsed)).toHaveLength(GOVERNED_ID_COUNT)
+    // The parse found the whole CONTRACT table, not a prefix of it. ⚠ Scoped to
+    // `CONTRACT_ID_COUNT`, not `GOVERNED_ID_COUNT`, since 193.1 (D-28) — see their docblocks.
+    // This is a RE-SCOPE across a seam, never a weakening: the contract still governs every id
+    // it ever governed, byte for byte, and the case below proves the seam is real.
+    expect(Object.keys(parsed)).toHaveLength(CONTRACT_ID_COUNT)
     expect(parsed).toEqual(COLUMN_D)
+  })
+
+  it("⚠ the post-contract ids are ABSENT from the generated bar — the seam is real, not an excuse", () => {
+    // Without this, `POST_CONTRACT_COPY` would be a place to quietly park any id someone did
+    // not want the generated contract to check. Every entry in it must ACTUALLY be missing
+    // from the contract, in BOTH the parsed table and the raw source — an id the generator
+    // does emit belongs in COLUMN_D, where a regeneration can falsify it.
+    const parsed = parseColumnD(buildContractSource)
+    for (const [id, value] of Object.entries(POST_CONTRACT_COPY)) {
+      expect(parsed[id], `${id} IS in the generated contract — it belongs in COLUMN_D`).toBeUndefined()
+      expect(buildContractSource.includes(value), `${id}'s words are in the contract`).toBe(false)
+    }
+    // NON-VACUITY, both halves: the parse really produced a populated table, and the raw
+    // source really is loaded — otherwise every `toBeUndefined()` above is trivially true and
+    // `"".includes(x)` is trivially false (the 192.1 E-2 lesson, one seam later).
+    expect(Object.keys(parsed).length).toBe(CONTRACT_ID_COUNT)
+    expect(buildContractSource.includes(COLUMN_D.DESCRIBE_CTA)).toBe(true)
   })
 
   it("POSITIVE CONTROL — the parser really reads the D cell, and really resolves an inherit", () => {
