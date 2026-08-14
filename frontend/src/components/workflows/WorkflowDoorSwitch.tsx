@@ -42,6 +42,16 @@ import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
 // the G-5 extraction, shipped BEFORE the D-04 restack that lands on it. Imported as a VALUE
 // at module scope, which is why `DoorHeaderStrip.tsx` may never import back (D-24(b)).
 import { DoorHeaderStrip } from "@/components/workflows/DoorHeaderStrip"
+// 193.1-08 (D-24): the SAME row this shell's govern door renders one level down, and the
+// leaf that reads a held document. ONE component and ONE hook serve both describe screens —
+// two implementations of one control is how the two doors would start answering differently
+// to the same document.
+import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
+import {
+  useTemplateRead,
+  type TemplateReadAnswer,
+  type TemplateReadState,
+} from "@/components/workflows/useTemplateFirstDraft"
 // Phase 193-05 (D-10 / D-11 / D-23): every governed word on this surface, from the one home.
 // A NAMED-IMPORT LIST, never a namespace import — the shipped convention in this directory,
 // and the thing that makes an unused or a renamed id a typecheck error rather than a blank.
@@ -74,6 +84,28 @@ import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { type DefShape } from "@/components/workflows/soulData"
 
 type DoorState = "both" | "describe" | "govern"
+
+/**
+ * 193.1-08 (D-24) — the held document PLUS its finished reading, or `null` while there is
+ * nothing complete to carry.
+ *
+ * ⚠ A FUNCTION RATHER THAN AN INLINE TERNARY, AND THE REASON IS THE PAIR INVARIANT. The two
+ * props cross the hand-off from ONE spread, so the Builder can never receive a document
+ * without the answer that goes with it — which is the only shape that could make it RE-READ,
+ * and a re-read returns the reading to `loading` at the instant its one-shot auto-draft
+ * fires. Excluding the two waiting arms (rather than listing the three settled ones) is what
+ * makes that exhaustive: a sixth arm added later lands on the SETTLED side by default, which
+ * is the safe default for this particular question — a settled arm carried across costs
+ * nothing, while an unsettled one carried across is the race.
+ */
+function completedTemplateAnswer(
+  file: File | null,
+  state: TemplateReadState,
+): TemplateReadAnswer | null {
+  if (!file) return null
+  if (state.kind === "idle" || state.kind === "loading") return null
+  return { file, state }
+}
 
 export interface WorkflowDoorSwitchProps {
   /** The current draft/definition for the soul preview (undefined for a true fresh
@@ -159,7 +191,30 @@ export function WorkflowDoorSwitch({
    * `onDescribeDraft` — that is a parent OBSERVER hook, not a channel into the Builder.
    */
   const [kbFolderId, setKbFolderId] = useState("")
-  const canDraft = describe.trim().length > 0
+  /**
+   * 193.1-08 (D-24) — the document the author supplied BEFORE describing, and its reading.
+   *
+   * It lives beside `describe` and `kbFolderId` and, like `kbFolderId`, is deliberately NOT
+   * cleared by `goBoth`: the hand-off is a one-shot and must not re-fire, but a considered
+   * pick is not undone by looking around. That is the shipped rule (`:160-166`), followed
+   * rather than a second one invented for this control.
+   */
+  const [templateFile, setTemplateFile] = useState<File | null>(null)
+  const templateRead = useTemplateRead(templateFile)
+  const templateAnswer = completedTemplateAnswer(templateFile, templateRead)
+  /**
+   * ⚠ ONE NEW `&&` TERM, THE SAME SHAPE AND THE SAME REASON AS THE BUILDER'S (D-07 / D-08).
+   * This door's CTA makes no network call — it is a HAND-OFF that arms the Builder's one-shot
+   * auto-draft — so a gate that lived only on the Builder's own button would leave THIS path
+   * firing `/generate` mid-read: the blind draft the phase exists to prevent, on the screen
+   * that just said a document was attached.
+   *
+   * NO `templateFile !== null` TERM, deliberately. With nothing held the reading is `idle`,
+   * never `loading`, so the absence of a read IS the absence of a gate (D-08 by construction).
+   * A second conditional here could be got wrong and would read green against every behaviour
+   * a suite drives.
+   */
+  const canDraft = describe.trim().length > 0 && templateRead.kind !== "loading"
 
   // Return to the "both" chooser AND clear the one-shot draft hand-off (so re-entering
   // the govern door later doesn't re-trigger a generate).
@@ -208,6 +263,25 @@ export function WorkflowDoorSwitch({
             // picked) leaves the Builder's own initializer at exactly today's value.
             initialProjectFolderId={kbFolderId}
             registerCanLeave={registerCanLeave}
+            // 193.1-08 (D-24) — the supplied document and its FINISHED reading, crossing the
+            // hand-off. The precedent is `initialProjectFolderId` directly above (187-26):
+            // pre-draft state chosen on this door that only the Builder can spend. This is
+            // that mechanism reused, not a new one — no store, no context, no global.
+            //
+            // SPREAD-CONDITIONAL, the idiom this file already uses for `headerLead` /
+            // `headerTrail` below: with nothing supplied both props are genuinely ABSENT from
+            // the element rather than present-and-undefined, so the Builder is handed exactly
+            // what every other mount hands it.
+            //
+            // ⚠ ONE SPREAD, NOT TWO, AND THAT IS THE SEED-DO-NOT-RE-READ RULE MADE
+            // STRUCTURAL. A document arriving without its answer is the only shape that could
+            // make the Builder issue its own read, and a read in flight when the one-shot
+            // auto-draft fires is the blind draft D-07 removes. Here the pair cannot come
+            // apart: `completedTemplateAnswer` returns null until the reading has settled, and
+            // until then this door's own CTA is disabled anyway.
+            {...(templateAnswer
+              ? { initialTemplateFile: templateAnswer.file, initialTemplateRead: templateAnswer }
+              : {})}
             // SPREAD-CONDITIONAL, the D-14 idiom this file's sibling `rails` prop uses:
             // without `inline` the two slots must be genuinely ABSENT from the element, not
             // present-and-undefined, so the Builder's flag-off branch is reached by a page
@@ -297,6 +371,28 @@ export function WorkflowDoorSwitch({
                 today's behaviour exactly. Its own file, so this shell gains a mount and
                 not a surface (the D-187-14 shape). */}
             <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
+            {/* ── 193.1-08 (D-24 / SC#1) — THE PRE-DRAFT ATTACH ROW, ON THE **LOOSE** DOOR ──
+                ⚠ THIS IS `WorkflowDoorSwitch.tsx`'s `door-describe` — the screen sketch 165
+                actually rendered (`build.cjs:6-7`; its anchor assertions name `switch-strip`,
+                which exists only in this file). The govern door's near-identical screen lives
+                in `WorkflowBuilderPage.tsx` and carries its own mount; the splice anchor below
+                occurs in BOTH files, so the class string cannot tell them apart and every
+                assertion about this mount names this file.
+
+                IMMEDIATELY AFTER THE KB PICKER AND BEFORE THE CTA GROUP — the sketch's own
+                splice (`165/build.cjs:269` inserts the block BEFORE the CTA group, never in
+                it), and the same relative position the govern door's mount takes, so the two
+                screens read the same way rather than merely containing the same control.
+
+                It renders the SAME component the Builder mounts. Ignore it and this door
+                behaves exactly as it did (SC#4): no document ⇒ the reading is `idle` ⇒ no
+                request, no reading block, and `canDraft` above gains nothing. */}
+            <DescribeTemplateRow
+              state={templateRead}
+              filename={templateFile?.name}
+              onPickFile={setTemplateFile}
+              onClear={() => setTemplateFile(null)}
+            />
             <div className="flex flex-col items-center gap-3">
               <button
                 type="button"

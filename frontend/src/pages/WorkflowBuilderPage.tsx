@@ -149,9 +149,14 @@ import { useStore } from "zustand"
 import { listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
+import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
 // 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
 // interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
 import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
+// 193.1-08 (D-24) — the pre-draft attach row, mounted on THIS screen and on the loose door's.
+// ONE component, two mounts: the marginal cost of the second is a mount and a prop, and the
+// alternative is two surfaces that drift. See the mount below for WHERE it lands and why.
+import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
@@ -570,6 +575,26 @@ export interface WorkflowBuilderPageProps {
    *  ABSENT ⇒ the describe screen is byte-identical to today (D-181-01). */
   initialProjectFolderId?: string
   /**
+   * 193.1-08 (D-24) — the document the author supplied on the LOOSE door, and its
+   * ALREADY-COMPLETED reading, carried across the hand-off.
+   *
+   * ⚠ THE PRECEDENT IS `initialProjectFolderId` DIRECTLY ABOVE, AND THAT IS THE WHOLE
+   * MECHANISM — no store, no context, no global. `187-26` added that prop for the identical
+   * problem: pre-draft state chosen on the door that only this page can spend. This pair is
+   * the same shape, one wave later, for a different pre-draft choice.
+   *
+   * ⚠ THEY TRAVEL AS A PAIR OR NOT AT ALL, and the door passes them from ONE spread for
+   * exactly that reason: a file arriving WITHOUT its answer is the only shape that could make
+   * this page re-read, and a re-read returns the reading to `loading` at the instant the
+   * one-shot auto-draft fires — the blind-draft race D-07 exists to make impossible. SEED,
+   * DO NOT RE-READ. The seed is installed only for the `File` it names, so a mismatched pair
+   * is ignored rather than trusted.
+   *
+   * BOTH ABSENT ⇒ this page behaves exactly as it does without them.
+   */
+  initialTemplateFile?: File | null
+  initialTemplateRead?: TemplateReadAnswer | null
+  /**
    * Phase 184-11 (D-184-16 debt 1) — the unsaved-work leave guard's registration seam.
    *
    * THERE IS NO ROUTER. Navigation in this app is a `useState<ActiveView>` switch, so
@@ -607,6 +632,8 @@ export function WorkflowBuilderPage({
   initialDescribe,
   autoDraft,
   initialProjectFolderId,
+  initialTemplateFile,
+  initialTemplateRead,
   registerCanLeave,
   headerLead,
   headerTrail,
@@ -702,6 +729,13 @@ export function WorkflowBuilderPage({
     setProjectFolderId,
     canDraft,
     onDraft,
+    // 193.1-08 (D-24) — the four values the pre-draft row renders from. The page computes
+    // NOTHING about documents: it forwards the hook's own state and the hook's own writers,
+    // the panel-prop discipline (`PhaseFormPanel.tsx:155-169`) applied one screen up.
+    templateFile,
+    templateRead,
+    onPickTemplateFile,
+    onClearTemplateFile,
     bindHeldTemplate,
     bindFailed,
   } = useTemplateFirstDraft({
@@ -710,6 +744,11 @@ export function WorkflowBuilderPage({
     initialDescribe,
     autoDraft,
     initialProjectFolderId,
+    // 193.1-08 (D-24) — straight through to the hook, which SEEDS its reading with them.
+    // Undefined on every mount that supplies nothing, which is every shipped call site but
+    // the loose door's.
+    initialTemplateFile,
+    initialTemplateRead,
     initialDefinitionFolderId: initial?.definition.project_folder_id,
     onDraftStarted: () => {
       setSelectedSlug(null)
@@ -1601,6 +1640,37 @@ export function WorkflowBuilderPage({
               </select>
             </label>
           )}
+
+          {/* ── 193.1-08 (D-24 / SC#1) — THE PRE-DRAFT ATTACH ROW, ON THE GOVERN DOOR ──────
+              ⚠ THIS IS `WorkflowBuilderPage.tsx`'s `describeScreen`, NOT `WorkflowDoorSwitch`'s
+              `door-describe`. The two screens are near-identical and the splice anchor below
+              (`flex flex-col items-center gap-3`) occurs in BOTH files, so the class string
+              cannot tell them apart — every assertion about this mount names this file
+              (`193.1-PATTERNS.md` §C-1). Both mounts exist because a fast-door author never
+              touches this screen (their CTA hands off and auto-fires the draft), while a
+              govern-door author never touches theirs and calls `/generate` directly.
+
+              ⚠ IT LANDS **BEFORE** THE CTA GROUP, AND THE PLACEMENT IS LOAD-BEARING RATHER
+              THAN aesthetic. Two independent byte-exact pins are scoped to that group alone —
+              they resolve it by walking UP from `describe-hint`, so a sibling above it is
+              outside both: `FLAG_OFF_DESCRIBE_MARKUP` (`describe.test.tsx:307`, captured in
+              Phase 187 wave 1) and the `/template|starter/i` word guard (`:324`). A mount
+              INSIDE the group would red TWO assertions, not one. It is also the sketch's own
+              splice — `165/build.cjs:269` inserts the block BEFORE the CTA group, never in it.
+
+              ⚠ RENDERED UNCONDITIONALLY — deliberately NOT behind `canvasEnabled`. Gating it
+              would inherit the flag-off escape hatch that let `StarterTemplatePicker` ship
+              inside the pinned region without reddening it, and AUTH-03 is not a canvas
+              feature: the flag-off Spine is the surface most authors are actually on. With no
+              document held the row's reading is `idle`, so it renders its control and NOTHING
+              else new, and the CTA is enabled exactly when it is today (D-08, by construction
+              — no document ⇒ nothing to wait for ⇒ no gate, and no second conditional). */}
+          <DescribeTemplateRow
+            state={templateRead}
+            filename={templateFile?.name}
+            onPickFile={onPickTemplateFile}
+            onClear={onClearTemplateFile}
+          />
 
           <div className="flex flex-col items-center gap-3">
             <button

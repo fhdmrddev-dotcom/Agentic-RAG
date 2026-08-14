@@ -257,7 +257,17 @@ const BASELINE = {
   "canvasModel.test.ts": 52,
   "PublishGauntlet.test.tsx": 46,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
-  "WorkflowBuilderPage.describe.test.tsx": 19,
+  // ⚠ 193.1-08 (D-24): 19 → 30 (+11). Read from THIS SCRIPT'S OWN `actual` column
+  // (`WorkflowBuilderPage.describe.test.tsx 19 30 +11`), never counted by hand.
+  //
+  // The eleven cases mount the AUTH-03 pre-draft row on the GOVERN door's describe screen and
+  // pin the SURFACE, not just the behaviour: there are two near-identical pre-draft describe
+  // screens and the splice anchor occurs in both, so every case names its file in its title and
+  // asserts a node only this one has. ⚠ AND NOTHING WAS RE-PINNED DOWNWARD TO GET HERE: this
+  // suite's diff is `214 0` — ZERO deletions — so `FLAG_OFF_DESCRIBE_MARKUP` and the
+  // `/template|starter/i` CTA-region guard are untouched, which is the mount's placement
+  // argument rather than a lucky outcome.
+  "WorkflowBuilderPage.describe.test.tsx": 30,
   // 193.1-01 (D-01 / D-02) — a NEW FILE, pinned in the SAME COMMIT that adds its `TARGETS`
   // entry, because a `BASELINE` key naming a path this gate does not EXECUTE would pin a
   // number nothing produces.
@@ -412,8 +422,22 @@ const BASELINE = {
   // working file — `git checkout` applies CRLF normalization on this box, so an on-disk md5
   // comparison after a restore is measuring the line endings, not the content).
   //
-  // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowDoorSwitch.test.tsx 35 37 +2`).
-  "WorkflowDoorSwitch.test.tsx": 37,
+  // ⚠ 193.1-08 (D-24): 37 → 44 (+7). Read from THIS SCRIPT'S OWN `actual` column
+  // (`WorkflowDoorSwitch.test.tsx 37 44 +7`).
+  //
+  // Seven cases for the row's OTHER mount — the loose door's, which is the screen sketch 165
+  // actually rendered. Two of them were driven RED against real plants in production source
+  // before being trusted: dropping the seed from the crossing spread turned the zero-request
+  // case red (`expected "vi.fn()" to be called 1 times, but got 2 times`), and dropping the
+  // `loading` term from this file's `canDraft` turned the D-07 gate case red. Both plants were
+  // restored to the identical BLOB (`git hash-object` → `d5955076…`, compared as a blob rather
+  // than an on-disk md5 because `git checkout` normalizes CRLF on this box).
+  //
+  // ⚠ `SWEPT_SOURCES` DOES **NOT** MOVE, and that is checked rather than assumed: this plan
+  // creates NO module. Both of its mounts land in files the D-24(a) fence already sweeps
+  // (`WorkflowDoorSwitch.tsx` and `WorkflowBuilderPage.tsx`), so the list stays at SIX and the
+  // `toHaveLength(6)` assertion is untouched.
+  "WorkflowDoorSwitch.test.tsx": 44,
   // ── 193.1-06 (AUTH-03 / D-04 / D-09 / D-14) — TWO NEW FILES, each pinned in the SAME ──
   // ── COMMIT that creates it, because a `BASELINE` key naming a path that does not yet ──
   // ── exist makes this gate ERROR (exit 2) rather than fail. ────────────────────────────
@@ -1996,6 +2020,15 @@ const BASELINE = {
 // re-pinning them here would fold unrelated drift into a commit that did not cause it.
 // Measured twice at `GSD_VITEST_MAX_WORKERS=2` on 2026-08-15, both runs agreeing exactly
 // (`total 3811 · failed 0`, identical per-file columns).
+// ⚠ 3805 (193.1-08), against a run total of 3829 — kept in step in the commit that moves it.
+// The +18 over 193.1-07's 3787 is EXACTLY this plan's two knob moves and nothing else:
+// `WorkflowBuilderPage.describe.test.tsx` 19 → 30 (+11, the govern door's mount) and
+// `WorkflowDoorSwitch.test.tsx` 37 → 44 (+7, the loose door's mount and the crossing). ⚠ The
+// two BASELINE suites this plan re-captured did NOT move — `WorkflowDoorSwitch.baseline` stays
+// 17 and `WorkflowBuilderPage.preDraft.baseline` stays 22, because a declared re-capture changes
+// LITERALS, never the number of assertions; a movement there would have meant an assertion was
+// added or dropped to make a capture pass. The 24-case gap is UNCHANGED and is still the same
+// four pre-existing drifts a twelfth consecutive plan declines for the same reason.
 const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
