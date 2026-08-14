@@ -274,12 +274,47 @@ async def test_a_container_just_under_the_cap_still_reads():
 
 
 # ── 4. The fences ─────────────────────────────────────────────────────────────
+#: The symbols that would re-open the ``260814-q5r`` cross-tenant class if any of them
+#: ever appeared in this handler's CODE.
+_FORBIDDEN_IN_HANDLER = (
+    "get_user_supabase_client",
+    "get_supabase",
+    "get_pg_pool",
+    "_owned_slug_or_404",
+    "_coerce_user_id",
+    "safe_name",
+)
+
+
+def _code_without_prose(fn) -> str:
+    """The handler's CODE with its docstring and comments removed.
+
+    ⚠ THE SCOPE IS THE DECISION HERE, so it is stated rather than assumed. A RAW sweep
+    over ``inspect.getsource`` is the right shape for Phase 193's D-24(a) copy fence,
+    where a docblock QUOTING a governed word is itself the leak. It is the WRONG shape
+    here: the property is *the handler does not USE a database credential*, and a
+    docblock that names ``get_supabase`` in order to explain why the route must never
+    take one is documentation, not a use. A raw sweep would pressure the next author into
+    deleting the explanation to keep the fence green. ``ast.unparse`` of the function with
+    its docstring dropped keeps every statement and discards every comment.
+
+    ``test_the_no_client_fence_can_actually_fire`` is the positive control: a fence
+    nobody has seen fire is a fence nobody knows is connected (193's WR-01)."""
+    import ast
+    import textwrap
+
+    node = ast.parse(textwrap.dedent(inspect.getsource(fn))).body[0]
+    if ast.get_docstring(node) is not None:
+        node.body = node.body[1:]
+    return ast.unparse(node)
+
+
 def test_handler_injects_no_client_and_no_pool():
     """⚠ THE SECURITY PROPERTY OF THIS PLAN, asserted rather than described.
 
     ``260814-q5r`` had to write an owner-prefix check and a ``..`` traversal check
     because its route reads Storage through a client on a service-role pool. This route
-    injects NEITHER, so that whole class has nothing to attach to. The BODY is swept as
+    injects NEITHER, so that whole class has nothing to attach to. The CODE is swept as
     well as the signature: a signature-only fence would sail past a
     ``pool = await get_pg_pool()`` on line one."""
     from app.api import workflows as wf_api
@@ -287,16 +322,23 @@ def test_handler_injects_no_client_and_no_pool():
     params = set(inspect.signature(wf_api.read_template_placeholders).parameters)
     assert not ({"supabase", "pool", "definition_id", "asset_id"} & params), params
 
-    src = inspect.getsource(wf_api.read_template_placeholders)
-    for forbidden in (
-        "get_user_supabase_client",
-        "get_supabase",
-        "get_pg_pool",
-        "_owned_slug_or_404",
-        "_coerce_user_id",
-        "safe_name",
-    ):
-        assert forbidden not in src, forbidden
+    code = _code_without_prose(wf_api.read_template_placeholders)
+    for forbidden in _FORBIDDEN_IN_HANDLER:
+        assert forbidden not in code, forbidden
+
+
+def test_the_no_client_fence_can_actually_fire():
+    """The positive control for the sweep above — the plant is a REAL function, so the
+    fence is shown connected rather than asserted to be."""
+
+    async def _planted(file, current_user):
+        """A docblock is prose and must NOT trip the fence."""
+        pool = await get_pg_pool()  # noqa: F821 — never called, only parsed
+        return pool
+
+    code = _code_without_prose(_planted)
+    assert "get_pg_pool" in code
+    assert "docblock is prose" not in code  # the docstring really was dropped
 
 
 def test_route_carries_the_authoring_gate_and_requires_a_user():
