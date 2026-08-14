@@ -72,6 +72,37 @@
  * `useTemplateFirstDraft.test.tsx` fences every import form in both suffix spellings against
  * BOTH hosts, and each fence has been observed RED against a real plant in this file.
  *
+ * ── ⚠ THE SUBTREE DELTA, MEASURED — STATED RATHER THAN SMOOTHED ─────────────────────────
+ *
+ * Recorded HERE as well as in the SUMMARY, for 188.2's and 192.1's stated reason: a later
+ * reader must not be able to mistake this growth for a regression, and the figure has to live
+ * where the growth is. Same named line classifier (blank / comment / code, every line exactly
+ * one of the three, JSX comment blocks counted as comment), RE-VALIDATED before any figure
+ * below was trusted — run against 188.2's published known-good, the pre-cut `PhaseNodeCard.tsx`
+ * at `95a4c915`, it reproduced `797 / 518 / 249 / 30` exactly.
+ *
+ *   PAGE      2073 → 2045   (−1.4 %)    CODE 835 → 809   (−3.1 %)
+ *   SUBTREE   page + this module  2073 → 2324  (**+12.1 %**)   CODE 835 → 894  (+7.1 %)
+ *
+ * **COMMENT is again the dominant term — 1146 → 1328 (+182 L), which is 73 % of the +251.**
+ * CODE grew just +59: the two exported interfaces, the derived definition type, the import
+ * block, the hook wrapper, the callback refs and the host's two inline callbacks — the
+ * irreducible cost of a seam.
+ *
+ * ⚠ **THIS IS THE SMALLEST GROWTH OF THE FIVE CUTS THIS PROJECT HAS DONE, and the reason is
+ * structural rather than virtuous.** 188.2 measured +67.1 %, Phase 192 +126.2 %, 192.1 +52.7 %
+ * and Phase 193 +124.2 %. Two of those REWROTE while they moved, and every one of them landed
+ * in FIVE OR MORE destination modules, each carrying its own header, imports and props type.
+ * This is a MOVE of ONE self-contained concern into ONE module, so exactly one header's worth
+ * of prose was minted.
+ *
+ * ⚠ AND THE PAGE FELL BY 28 LINES WHILE 85 CODE LINES LANDED HERE, WHICH IS STATED RATHER THAN
+ * SMOOTHED: the cut left receipt prose at each site it emptied, in this project's own recorded
+ * habit. Pretending the delta is the span is how the next estimate goes wrong.
+ * Re-derive: `wc -l` on the page and on this file; `git show 99a6cc14:<page> | wc -l` for the
+ * before column. ⚠ THE FIGURES INCLUDE THIS DOCBLOCK — measured, written, then RE-measured,
+ * and only the digits were corrected so the line count could not move again.
+ *
  * ── NAMING ─────────────────────────────────────────────────────────────────────────────
  *
  * ⚠ This file NAMES NO GOVERNED DOOR WORD, in code or in prose. It is swept RAW by the
