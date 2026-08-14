@@ -18,7 +18,7 @@ from uuid import UUID, uuid4
 
 import asyncpg
 import redis.asyncio as aioredis
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
@@ -1629,6 +1629,25 @@ class TemplateAssetRef(BaseModel):
     mime: str
 
 
+class TemplatePlaceholdersResponse(BaseModel):
+    """What a bound template asks the step to fill in — and whether we could read it.
+
+    ``read`` is the whole point of the model. An empty ``placeholders`` list is
+    ambiguous on its own: it could mean *we opened the document and it carries no
+    fill-in fields*, or *we never opened it at all*. Collapsing those two into one
+    wire shape lets an author conclude their template is field-less when the read
+    simply failed — and they then ship a workflow that fills nothing. The two
+    states are therefore carried separately and rendered as different sentences on
+    different nodes by the client.
+
+    ``"not_requested"`` is deliberately NOT in this Literal: the route always
+    supplies an ``asset_id``, so that arm of the resolver is unreachable here.
+    """
+
+    read: Literal["ok", "unreadable"]
+    placeholders: list[str] = Field(default_factory=list)
+
+
 @router.post(
     "/{definition_id}/template",
     response_model=TemplateAssetRef,
@@ -1717,3 +1736,78 @@ async def upload_workflow_template(
         raise HTTPException(502, "The template could not be stored. Please try again.")
 
     return TemplateAssetRef(asset_id=asset_id, filename=safe_name, mime=mime)
+
+
+@router.get(
+    "/{definition_id}/template/placeholders",
+    response_model=TemplatePlaceholdersResponse,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def get_workflow_template_placeholders(
+    definition_id: UUID,
+    asset_id: str = Query(..., max_length=512),
+    current_user: dict = Depends(get_current_user),
+    # The per-request user-JWT client, NOT the service role — see gate 3 below.
+    supabase: Client = Depends(get_user_supabase_client),
+) -> TemplatePlaceholdersResponse:
+    """Read the fill-in fields of a template the caller OWNS (quick task 260814-q5r).
+
+    WHY THIS ROUTE EXISTS AT ALL, rather than a widened ``?template_asset_id=`` on
+    ``GET /workflows/grounding-bundle``. That parameter is typed ``UUID | None``, while
+    this feature's asset ids are Storage PATHS (``{user_id}/_library/{definition_id}/…``)
+    — so passing a real one is a **422 before the handler runs**, measured. The seam is
+    not merely unwired, it is unwirable as typed. And widening it would be worse than
+    useless: ``resolve_template_source`` Branch 1 does not scope by ``user_id`` at all,
+    and that route injects the **service-role** client, so the ``UUID`` coercion is
+    today's ONLY thing standing between a caller and any object in the bucket. Relaxing
+    an accidental guard into a hand-written one on a service-role Storage read is the
+    exact shape of a prior credential-exposure defect in this codebase. Two further
+    reasons: the palette route is ``require_canvas()``-gated, so placeholders would be
+    invisible on the Spine view (the surface most authors are on), and it would refetch
+    the whole palette — folder tree, skill registry, tool list — to read one document.
+
+    ⚠ **The asset is NOT required to be bound in the persisted definition, and that is a
+    decision, not an oversight.** The Builder writes a freshly-uploaded descriptor into
+    its store one statement before ``saveNow()``; requiring the binding would make this
+    fetch race that round trip and answer about the OLD template, or about none.
+    Ownership is proved by the gates below, never by the binding.
+
+    THE GATES, in order, each one load-bearing:
+
+      1. **Owner-gate on the definition** — ``_owned_slug_or_404``, the SAME owner-scoped
+         ``created_by`` WHERE the upload/delete/preview routes use. Its 404 is deliberately
+         indistinguishable from not-found: a 403 would confirm a workflow exists.
+      2. **Owner-prefix on the asset id** — it must start with ``{user_id}/``. The pool is
+         service-role and bypasses RLS, and gate 1 proves nothing about an asset id that
+         arrived in the query string, so without this a caller could pass their OWN
+         definition id and SOMEONE ELSE'S asset path.
+      3. **No ``..`` segment.** This is NOT belt-and-braces. ``workspace_storage_select_own``
+         (``supabase/migrations/054_workspace_files.sql:83-89``) keys on
+         ``(storage.foldername(name))[1]`` — the FIRST path segment — so
+         ``{uid}/../someone-else/x.docx`` satisfies gate 2 AND passes the database policy.
+         The traversal check is the only thing that stops it.
+
+    Both refusals raise the SAME 404 wording as a missing workflow — no existence oracle
+    for objects either.
+
+    The Storage read goes through the user-JWT client so ``workspace_storage_select_own``
+    is a second, database-enforced boundary underneath gate 2, exactly as the sibling
+    upload door documents for its write. A service-role client would silently remove it.
+    """
+    pool = await get_pg_pool()
+    user_id = _coerce_user_id(current_user)
+    await _owned_slug_or_404(pool, definition_id, user_id)  # 404 on non-owner / unknown
+
+    if not asset_id.startswith(f"{user_id}/") or ".." in asset_id.split("/"):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="template not found")
+
+    placeholders, read = await grounding.resolve_template_placeholders(
+        supabase=supabase,
+        pool=pool,
+        user_id=str(user_id),
+        template_asset_id=asset_id,
+        template_placeholders=None,
+    )
+    # ``read`` can only be "ok" or "unreadable" here — "not_requested" is unreachable
+    # because an ``asset_id`` is always supplied (it is a required query param).
+    return TemplatePlaceholdersResponse(read=read, placeholders=placeholders)
