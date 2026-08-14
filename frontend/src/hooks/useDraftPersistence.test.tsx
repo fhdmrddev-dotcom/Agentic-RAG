@@ -175,6 +175,14 @@ function harness(
      * site of this harness is unchanged.
      */
     onReceipt?: (store: ReturnType<typeof createBuilderStore>) => void
+    /**
+     * 193.1-07 (D-06, threat T-193.1-07-01) — the created-id callback itself.
+     *
+     * Defaulted to the recording `vi.fn()` below, so every pre-existing call site of this
+     * harness is unchanged. Supplied only by the cases that need this callback to MISBEHAVE
+     * — which is a shape no shipped test has ever driven.
+     */
+    onDraftCreated?: (id: string) => void
   } = {},
 ) {
   const store = createBuilderStore(draft())
@@ -210,7 +218,15 @@ function harness(
         store,
         publishInFlight: p.publishInFlight,
         validationCause: p.validationCause,
-        onDraftCreated: created,
+        // ⚠ THE RETURN VALUE IS PASSED THROUGH, and that is load-bearing rather than tidy.
+        // A wrapper that swallowed it would make the "a rejected promise is IGNORED" case
+        // below prove a property of THIS HARNESS instead of one of the hook — measured, not
+        // supposed: with the value discarded, that case stayed GREEN against a planted
+        // `await` at the real call site, i.e. it defended nothing.
+        onDraftCreated: (id) => {
+          created(id)
+          return opts.onDraftCreated?.(id)
+        },
       }),
     { initialProps },
   )
@@ -2012,5 +2028,155 @@ describe("useDraftPersistence — saveNow, the deliberate commit-now", () => {
     expect(ok).toBe(false)
     expect(mockedUpdate).not.toHaveBeenCalled()
     expect(stateOf(h.view)).toEqual({ kind: "held", sentence: HOLD_PUBLISHING })
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════
+// 193.1-07 Task 3 (D-06 rule 1, threat T-193.1-07-01) — `onDraftCreated` IS NOT
+// A FIRE-AND-FORGET NOTIFICATION, AND NO SHIPPED TEST COVERS THAT.
+//
+// It LOOKS like one. It is not: it is invoked at `useDraftPersistence.ts:645`,
+// INSIDE the create branch's `try`, whose `catch` at `:656` runs `refusalOf(err)`
+// and `setState(refusal)` — and for a stale-token or terminal-shaped error also
+// sets `haltedRef`, which `:971` records that NOTHING in the session clears. So
+// anything thrown out of this callback is rendered as a FAILED SAVE for a row
+// that WAS successfully created, and in the worst case freezes autosave outright.
+//
+// Phase 193.1 makes that reachable for the first time: D-06 binds a held document
+// to the definition the instant this callback fires. The three cases below are
+// the hazard and its guard, driven at the seam where the failure actually lives
+// rather than at the page that composes around it.
+//
+// ⚠ THIS SUITE WAS IN NEITHER KNOB OF `scripts/vitest-count-gate.cjs` UNTIL THIS
+// PLAN — no `src/hooks` entry in `TARGETS`, no key in `BASELINE` — so the gate did
+// not EXECUTE it at all. A test that does not run has falsified nothing
+// (verbatim Phase 187's round-5 "verification truth 14"). Both knobs are set in
+// the same commit as these cases.
+//
+// ⚠ ONE CORRECTION TO THE INHERITED CLAIM, MEASURED AND STATED BESIDE IT rather
+// than silently fixed. The plan, CONTEXT's amendment and PATTERNS §9 all say a
+// synchronous throw here "can trip `haltedRef`". Measured below: an ORDINARY
+// `Error` does NOT — `refusalOf` falls through to the generic arm and only
+// `WorkflowStaleTokenError` / the terminal predicate set the flag. The hazard is
+// therefore REAL but SMALLER than stated on the common path: a false save-error,
+// not a frozen session. Both facts are pinned so neither can be quoted as the
+// other, and the guard is unchanged — a false save-error is already a lie.
+// ══════════════════════════════════════════════════════════════════════════════
+
+describe("useDraftPersistence — 193.1-07: a misbehaving `onDraftCreated`", () => {
+  /** Drive one first-save create with the given callback, and report what happened. */
+  async function createWith(onDraftCreated: (id: string) => void) {
+    mockedCreate.mockResolvedValue({ id: "new-draft", version: 1, token: "T-created" })
+    mockedUpdate.mockResolvedValue(write("T-after"))
+
+    const h = harness({ draftId: null, token: null, onDraftCreated })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    return h
+  }
+
+  it("THE HAZARD, CHARACTERIZED — a SYNCHRONOUS throw is rendered as a failed save", async () => {
+    // The reason the page's composition has to be deliberate. This is what the naive
+    // spelling — `onDraftCreated: (id) => { setDraftId(id); doTheBind(id) }` with a bind
+    // that can throw — actually produces, and it is a lie: the row exists.
+    const h = await createWith(() => {
+      throw new Error("the bind threw")
+    })
+
+    expect(mockedCreate).toHaveBeenCalledTimes(1)
+    expect(stateOf(h.view)).toEqual({ kind: "error", sentence: SAVE_FAILED_SENTENCE })
+
+    // …and TWO facts that bound the blast radius, both measured rather than assumed:
+    // the id IS installed (it is assigned before the callback runs), and the loop is NOT
+    // halted for an ordinary Error — a later write still issues.
+    expect(h.view.result.current.draftId).toBe("new-draft")
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalled()
+    expect(mockedUpdate.mock.calls[0][0]).toBe("new-draft")
+  })
+
+  it("THE GUARD — the shipped composition (async + internally caught + `void`-ed) is CLEAN", async () => {
+    // EXACTLY the shape `WorkflowBuilderPage.tsx` installs: the setter, then a `void`-ed
+    // call into an async function that catches everything. The inner function throws
+    // SYNCHRONOUSLY, which is the harder case — `async` is what converts it to a rejection,
+    // and the internal `catch` is what stops the rejection escaping.
+    const failures: string[] = []
+    const bind = async (id: string) => {
+      try {
+        throw new Error(`the bind threw for ${id}`)
+      } catch (e) {
+        failures.push(String(e))
+      }
+    }
+    const setDraftIdOnThePage = vi.fn()
+
+    const h = await createWith((id) => {
+      setDraftIdOnThePage(id)
+      void bind(id)
+    })
+
+    // (a) the row's id is installed, on the page and in the hook
+    expect(setDraftIdOnThePage).toHaveBeenCalledWith("new-draft")
+    expect(h.view.result.current.draftId).toBe("new-draft")
+    // (b) the persist state is NOT an error or a refusal — it is the receipt the write earned
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+    expect(h.markSaved).toHaveBeenCalledTimes(1)
+    // (c) the loop is not halted — a subsequent write still issues
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+    // …and the bind's own failure was handled in the bind's own place.
+    expect(failures).toHaveLength(1)
+  })
+
+  it("A REJECTED PROMISE returned from the callback is IGNORED — the same three properties", async () => {
+    // The other half of the guard's claim: the write loop does not await this callback's
+    // return value, so a callback that returns a rejected promise cannot reach the `catch`
+    // either. Asserted rather than assumed, because "it is not awaited" is a property of
+    // code that a future edit could quietly change.
+    const rejected = Promise.reject(new Error("async bind failure"))
+    // Attached immediately so this test cannot itself emit an unhandled rejection — the
+    // claim is about the HOOK's behaviour, not about vitest's.
+    rejected.catch(() => {})
+
+    const h = await createWith(() => rejected as unknown as void)
+
+    expect(h.view.result.current.draftId).toBe("new-draft")
+    expect(stateOf(h.view)).toEqual({ kind: "saved", at: expect.any(Number) })
+    h.edit()
+    await advance(AUTOSAVE_DEBOUNCE_MS)
+    await flush()
+    expect(mockedUpdate).toHaveBeenCalledTimes(1)
+  })
+
+  it("SOURCE FENCE — the callback really is invoked INSIDE the create branch's `try`", async () => {
+    // The three cases above are only interesting if the call site is where this comment
+    // says it is. A future refactor that moved the call OUT of the `try` would make them
+    // pass for a new reason and quietly retire the hazard they document — so the structural
+    // claim is asserted, not narrated.
+    const source = (await import("./useDraftPersistence?raw")).default as string
+    expect(source.length).toBeGreaterThan(500) // non-vacuity FIRST
+    // From the `try` that opens the write to the `catch` that turns anything thrown inside
+    // it into a refusal. The whole point is that the callback's call site lies BETWEEN them.
+    //
+    // ⚠ CRLF-TOLERANT, and that is a measurement rather than caution: this repo's files are
+    // checked out with `\r\n`, and Vite's `?raw` loader hands them over UNNORMALISED. A
+    // multi-line source fence anchored on a bare `\n` matches NOTHING here and reports as an
+    // empty extraction — which is why the non-vacuity floor below is asserted before any
+    // claim about the contents.
+    const createBranch =
+      source.match(/try \{\s*if \(draftIdRef\.current === null\)[\s\S]*?\} catch \(err\) \{/)?.[0] ??
+      ""
+    expect(createBranch.length).toBeGreaterThan(120) // the extractor really extracted
+    expect(createBranch).toContain("onDraftCreatedRef.current(created.id)")
+    expect(createBranch).toContain("createWorkflowDraft(def)")
+    // …and the callback's result is NOT awaited, which is what case 3 rests on.
+    expect(createBranch).not.toMatch(/await\s+onDraftCreatedRef/)
+    // POSITIVE CONTROL — the forbidden shape really is caught.
+    expect("await onDraftCreatedRef.current(created.id)").toMatch(/await\s+onDraftCreatedRef/)
   })
 })

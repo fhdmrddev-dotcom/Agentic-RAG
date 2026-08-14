@@ -281,7 +281,25 @@ const BASELINE = {
   //
   // READ FROM THIS SCRIPT'S OWN `actual` COLUMN (`WorkflowBuilderPage.preDraft.baseline.test.tsx
   // — 16 new`) on the run that first executed the file, never hand-counted from `it(` literals.
-  "WorkflowBuilderPage.preDraft.baseline.test.tsx": 16,
+  // 193.1-07: 16 → 22. An EXTENSION — nothing deleted, nothing lowered, and in particular the
+  // six captures and BOTH key-set literals above are byte-untouched (`git diff --numstat` on
+  // that file for this plan is `120 0`, zero deletions).
+  //
+  // ⚠ AND THE +6 CORRECTS THE COMMENT DIRECTLY ABOVE, WHICH IS LEFT STANDING RATHER THAN
+  // OVERWRITTEN. It says the two KEY-SET assertions' *"whole value is that they must MOVE in
+  // the commit that changes the wire"*. Measured when that commit arrived: **they must NOT
+  // move.** Both drive the page with no document supplied, and this screen has no way to
+  // supply one until Plan 08 mounts the control — so their key sets are identical after the
+  // wire and before it. That is not a missing feature, it is D-08 / SC#4 asserted at the page
+  // level: a session that supplies nothing is untouched by construction. The six new cases pin
+  // exactly that (the two key sets re-asserted AFTER the wire shipped, the CTA proved not
+  // disabled, a source fence proving the page derives no key of its own, and two on D-06's
+  // failure line being one `role="status"` node routed through NEITHER the save's refusal nor
+  // the canvas notice). The mechanical evidence that the wire changed lives where the wire
+  // lives — `useTemplateFirstDraft.test.tsx` §10, pinned above.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`preDraft.baseline 16 22 +6`).
+  "WorkflowBuilderPage.preDraft.baseline.test.tsx": 22,
   "PhaseFormPanel.test.tsx": 19,
   "WorkflowBuilderPage.test.tsx": 15,
   // 188-12: 14 → 20, inherited stale-low pin.
@@ -419,6 +437,21 @@ const BASELINE = {
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`DescribeTemplateRow.test.tsx — 42 new`).
   "DescribeTemplateRow.test.tsx": 42,
+  // 193.1-07 (D-06 / D-25) — a FIRST PIN on a suite that has shipped since Phase 186 and that
+  // this gate has NEVER EXECUTED. ⚠ Unlike every other entry in this map it needs BOTH knobs:
+  // there is no `src/hooks` entry anywhere in `TARGETS`, so the accompanying `TARGETS` line is
+  // what makes this number reachable at all. The full reasoning — and what the four new cases
+  // guard — is recorded beside that entry rather than duplicated here.
+  //
+  // ⚠ AN ADOPTION, and MEASURED FIRST exactly as 188-10 requires of one: the suite ran
+  // `1 passed (1) / 59 passed (59)` under plain vitest at cap 2 on 2026-08-15, i.e. ZERO
+  // pre-existing failures, so it imports no rot into a gate that requires 0 failing forever.
+  // 55 of those 59 are Phase 186's shipped autosave estate — the single-flight rule, the
+  // receipt-names-what-it-wrote property, the halt taxonomy, the hold/release path and the
+  // flag-off promise — every one of which has been deletable with the gate green until now.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column, never hand-counted from `it(` literals.
+  "useDraftPersistence.test.tsx": 59,
   // What would be unguarded without this entry: the whole-table properties of the template-first
   // surface's words — non-emptiness, pairwise distinctness, the zero-import leaf claim, and the
   // two that carry this phase's honesty requirements. (a) The three no-fields footings are
@@ -447,7 +480,18 @@ const BASELINE = {
   //
   // READ FROM THIS SCRIPT'S OWN `actual` COLUMN (`useTemplateFirstDraft.test.tsx — 29 new`),
   // never hand-counted from `it(` literals.
-  "useTemplateFirstDraft.test.tsx": 29,
+  // 193.1-07 (D-19 / D-07 / D-08 / D-06): 29 → 58. An EXTENSION — nothing was deleted,
+  // renamed or lowered; 193.1-05's 29 moved-behaviour and cycle-fence cases are all still here
+  // and still counted. The +29 are the read state machine's five arms keyed on `File` OBJECT
+  // identity (including the SAME-NAME / different-object case, which no shipped hook proves and
+  // which a name-keyed implementation passes every other case of), the abort-is-silent arm with
+  // its positive control, the seed's ZERO-REQUEST property that carries a completed read across
+  // the door handoff, the D-07 gate on all four arms PLUS a SOURCE fence forbidding a second
+  // "has a template" conditional (driven against a planted forbidden shape), the wire as a
+  // sorted KEY SET on all five readings, and D-06's bind — whose central case asserts the
+  // RETURNED PROMISE resolves on a SYNCHRONOUS throw, because a `void`-ed rejection has nowhere
+  // to be caught. Read from THIS SCRIPT'S OWN `actual` column.
+  "useTemplateFirstDraft.test.tsx": 58,
   // 193-05 (AUTH-01 / D-10 / D-11) — a NEW FILE, pinned in the SAME COMMIT that creates it,
   // for the same reason as the 193-01 entry below: a `BASELINE` key naming a path that does
   // not yet exist makes this gate ERROR (exit 2) rather than fail. No `TARGETS` edit
@@ -1943,6 +1987,15 @@ const BASELINE = {
 // `total 3717 · pinned total 3693` on the run that set the four 193.1-06 pins; the 24-case gap
 // is files inside TARGETS that carry no pin. Quoting the run total here would be quoting a
 // different number for the same name, which is how an annotation goes stale on its own commit.
+// ⚠ 3787 (193.1-07), against a run total of 3811 — kept in step in the commit that moves it,
+// which is the whole point of the correction above. The +94 over 193.1-06's 3717 is: this
+// plan's 29 new hook cases, its 6 new page cases, and **59 cases that already existed and
+// which this gate had never once executed** — `useDraftPersistence.test.tsx` was in NEITHER
+// knob until now (see its two entries below). The 24-case gap is UNCHANGED and is still the
+// same four pre-existing drifts an eleventh consecutive plan declines for the same reason:
+// re-pinning them here would fold unrelated drift into a commit that did not cause it.
+// Measured twice at `GSD_VITEST_MAX_WORKERS=2` on 2026-08-15, both runs agreeing exactly
+// (`total 3811 · failed 0`, identical per-file columns).
 const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
@@ -2098,6 +2151,36 @@ const TARGETS = [
   // 31 shipped + 8 added here that 188-10 predicted, but the pin is the MEASUREMENT, not
   // the prediction it happens to agree with.
   "src/components/panel/__tests__/WorkspacePanel.test.tsx",
+  // ── Added in 193.1-07 (D-06 / D-25, threat T-193.1-07-01), in the SAME COMMIT as its ──
+  // ── BASELINE pin — the SEVENTH occurrence of the two-knob trap the entries above ──────
+  // ── state as a rule, and the FIRST one on `src/hooks/`, which is covered by NOTHING. ──
+  //
+  // MEASURED BEFORE THIS LINE WAS WRITTEN, not assumed: a grep for that directory name over
+  // this whole script returned NOTHING, and `useDraftPersistence.test.tsx` appeared in neither
+  // the `TARGETS` array nor the `BASELINE` map. **The gate did not EXECUTE this suite at
+  // all** —
+  // 55 shipped cases, none of them ever run by the gate, guarding Phase 186's entire autosave
+  // estate. A test that does not run has falsified nothing (verbatim Phase 187's round-5
+  // "verification truth 14"), and this is by some distance the largest such file the gate has
+  // been blind to since 188-12 closed the last five.
+  //
+  // What would be unguarded without it, from THIS plan alone: `onDraftCreated` LOOKS like a
+  // fire-and-forget notification and is not — it is invoked INSIDE the create branch's `try`,
+  // whose `catch` turns anything thrown into a save REFUSAL and, for a terminal-shaped error,
+  // sets a halt flag nothing in the session clears. Phase 193.1 makes that reachable for the
+  // first time by binding a held document there (D-06). The four new cases are the hazard
+  // CHARACTERIZED (a synchronous throw really does produce a false save-error for a row that
+  // WAS created), the shipped guard proved clean on all three properties, the not-awaited
+  // property, and a source fence over the call site — the last two OBSERVED RED against a real
+  // planted `await` at `:645`, restored to the identical blob.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/hooks` — the same reasoning recorded
+  // for `src/components/panel/__tests__`, `src/lib`, `src/pages` and `src/components/layout`
+  // above. That directory holds dozens of suites this phase does not read, and adopting them
+  // would make this phase the owner of their future rot; the gate requires 0 failing forever.
+  // A later phase that wants them inside the gate should adopt them deliberately, with its own
+  // measured number.
+  "src/hooks/useDraftPersistence.test.tsx",
   // Added in 190-16, in the SAME COMMIT that creates the file — the SIXTH occurrence of
   // the two-knob trap the entries above state as a rule, and the first one on
   // `src/components/settings/`, which is covered by NOTHING above: the directory entries

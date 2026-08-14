@@ -497,3 +497,123 @@ describe("WorkflowBuilderPage 193.1-01 — the pre-change `/generate` wire", () 
     expect(Object.keys(tomorrow).sort()).toEqual(["describe", "template_placeholders"])
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// Plan 193.1-07 Task 2 — THE WIRE IS LIVE, AND THE TWO LITERALS ABOVE DID NOT MOVE.
+//
+// ⚠ **A MEASURED CORRECTION TO PLAN 193.1-07, DATED 2026-08-15, STATED BESIDE THE INSTRUCTION
+// RATHER THAN OVER IT.** The plan's Task 2 says: *"MOVE Plan 01's two key-set literals to
+// their new values in this file … That movement is this phase's mechanical evidence that the
+// wire changed."* **They were examined and they must NOT move, and the reason is the feature
+// working rather than the feature missing.**
+//
+// Both cases above drive the page with NO DOCUMENT SUPPLIED — and on this screen there is not
+// yet any way to supply one: the control that holds a file is mounted by **Plan 08**, which
+// declares that mount in its own `files_modified`. `template_placeholders` is sent on the
+// `fields` arm ALONE, and a session that supplies nothing never leaves `idle`. So the shipped
+// key sets for those two journeys are `["describe"]` and `["describe","project_folder_id"]`
+// AFTER the wire exactly as before it — which is not an absence of evidence, it is **D-08 /
+// SC#4 asserted at the page level**: the fast path is untouched by construction.
+//
+// Moving the literals would therefore have recorded a change that did not happen, and would
+// have RED-ed the moment anyone ran them. The mechanical evidence that the wire changed lives
+// where the wire lives — `useTemplateFirstDraft.test.tsx` §10 drives the real callback with a
+// real held file through the real read and asserts the three-key set — and the cases below
+// pin the OTHER half of the same claim here, on the page, where the two literals sit.
+//
+// The six BASELINE captures are untouched by this plan: `git diff --numstat` on this file
+// shows additions only, and zero deletions.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 193.1-07 — the wire is live, and an unsupplied document is silent", () => {
+  it("NO DOCUMENT SUPPLIED ⇒ the key set is STILL EXACTLY [describe] — D-08 at the page level", async () => {
+    await mountPreDraft(false)
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: DESCRIBE_TEXT },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+
+    await waitFor(() => expect(WIRE.state.generateBodies).toHaveLength(1))
+    // The SAME literal as the pre-change case above, asserted again AFTER the wire shipped.
+    // An empty array is not sent, because `(none)` and `[]` are different statements to the
+    // authoring prompt — and the four non-`fields` readings all mean the first one.
+    expect(Object.keys(WIRE.state.generateBodies[0]).sort()).toEqual(["describe"])
+    expect("template_placeholders" in WIRE.state.generateBodies[0]).toBe(false)
+  })
+
+  it("…and with a knowledge base picked it is STILL EXACTLY [describe, project_folder_id]", async () => {
+    await mountPreDraft(false)
+    fireEvent.change(screen.getByTestId("project-folder-picker"), {
+      target: { value: WIRE.FOLDERS[1].id },
+    })
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: DESCRIBE_TEXT },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+
+    await waitFor(() => expect(WIRE.state.generateBodies).toHaveLength(1))
+    expect(Object.keys(WIRE.state.generateBodies[0]).sort()).toEqual([
+      "describe",
+      "project_folder_id",
+    ])
+  })
+
+  it("THE CTA IS NOT DISABLED WHEN NO DOCUMENT IS HELD — the gate is unreachable, not false", async () => {
+    // D-08's claim in the form a person would notice. The gate term reads the in-flight arm,
+    // which a session holding no document never enters, so there is no conditional here that
+    // could be got wrong — and no second one to forget.
+    await mountPreDraft(false)
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: DESCRIBE_TEXT },
+    })
+    expect(screen.getByRole("button", { name: DESCRIBE_CTA })).not.toBeDisabled()
+  })
+
+  it("THE PAGE ITSELF DERIVES NOTHING ABOUT DOCUMENTS — the wire's home is the hook", async () => {
+    // The source claim behind the two literals staying put: this page contributes no key to
+    // the generate body. Were it to grow its own spread, the literals above would go stale
+    // silently — a page-level derivation is exactly the drift this fence forbids.
+    const pageSource = (await import("./WorkflowBuilderPage?raw")).default as string
+    expect(pageSource.length).toBeGreaterThan(500) // non-vacuity FIRST
+    expect(pageSource).not.toContain("template_placeholders")
+    // POSITIVE CONTROL — the matcher really would fire on the forbidden shape.
+    expect("...(x ? { template_placeholders: names } : {})").toContain("template_placeholders")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// Plan 193.1-07 Task 2 — D-06's FAILURE LINE: ONE NODE, ITS OWN LINE, AND ABSENT BY DEFAULT.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 193.1-07 — the bind's honest line", () => {
+  it("renders NOTHING when nothing failed — the drafted DOM is unchanged for every other session", async () => {
+    const pageSource = (await import("./WorkflowBuilderPage?raw")).default as string
+    expect(pageSource.length).toBeGreaterThan(500)
+    // Gated on the failure state, so the node cannot exist without one.
+    expect(pageSource).toMatch(/\{bindFailed && \(/)
+  })
+
+  it("is EXACTLY ONE NODE, and it is NOT routed through the save's reading (D-06 rule 2)", async () => {
+    const pageSource = (await import("./WorkflowBuilderPage?raw")).default as string
+    // Exactly one, by count: two nodes carrying one testid is a selector that throws rather
+    // than a surface that reports twice.
+    expect((pageSource.match(/data-testid="template-bind-failed"/g) ?? []).length).toBe(1)
+    // `role="status"`, which is what makes a line appearing after an act announced.
+    expect(pageSource).toMatch(
+      /data-testid="template-bind-failed"\s*\n\s*role="status"/,
+    )
+    // The forbidden homes, asserted as ABSENT from the block itself rather than from the file
+    // (both identifiers legitimately exist elsewhere on this page).
+    const block =
+      pageSource.match(/\{bindFailed && \([\s\S]*?\n {6}\)\}/)?.[0] ?? ""
+    expect(block.length).toBeGreaterThan(80) // the extractor really extracted
+    expect(block).toContain("templateBindFailedMessage")
+    expect(block).not.toContain("saveRefusalSentence")
+    expect(block).not.toContain("canvasNotice")
+    // POSITIVE CONTROLS — both needles really would fire inside a block of this shape.
+    expect("{bindFailed && (\n  <p>{saveRefusalSentence}</p>\n)}").toContain(
+      "saveRefusalSentence",
+    )
+    expect("{bindFailed && (\n  <p>{canvasNotice}</p>\n)}").toContain("canvasNotice")
+  })
+})

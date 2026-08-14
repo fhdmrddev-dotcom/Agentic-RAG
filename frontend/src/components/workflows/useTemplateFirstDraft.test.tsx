@@ -49,14 +49,43 @@ import { useTemplateFirstDraft, type TemplateFirstDefinition } from "./useTempla
 // scope fence (`canvasModel.purity.test.ts:14-17`, `DoorHeaderStrip.test.tsx:250-256`).
 import templateFirstDraftSource from "./useTemplateFirstDraft?raw"
 import { createBuilderStore, type BuilderPhase, type BuilderStore } from "./builderStore"
-import { generateWorkflow, type GenerateResult } from "@/lib/api"
+import {
+  generateWorkflow,
+  readTemplatePlaceholdersFromFile,
+  uploadWorkflowTemplate,
+  type GenerateResult,
+  type WorkflowTemplateAsset,
+} from "@/lib/api"
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api")
-  return { ...actual, generateWorkflow: vi.fn() }
+  return {
+    ...actual,
+    generateWorkflow: vi.fn(),
+    // 193.1-07: the two seams this plan adds. The READ is the pre-draft state machine's
+    // only network call; the UPLOAD is D-06's bind. Both are mocked here rather than at a
+    // `fetch` level so a test can drive a REJECTION, an ABORT and a slow answer separately
+    // — the three shapes the five arms and the fire-and-forget guard are made of.
+    readTemplatePlaceholdersFromFile: vi.fn(),
+    uploadWorkflowTemplate: vi.fn(),
+  }
 })
 
 const mockedGenerate = vi.mocked(generateWorkflow)
+const mockedRead = vi.mocked(readTemplatePlaceholdersFromFile)
+const mockedUpload = vi.mocked(uploadWorkflowTemplate)
+
+/** A real `File`. The subject of the read is the OBJECT, never its name — see §8. */
+function fileNamed(name: string): File {
+  return new File(["irrelevant bytes"], name, {
+    type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  })
+}
+
+/** A descriptor in the shape `POST /workflows/{id}/template` returns. */
+function descriptorFor(filename: string): WorkflowTemplateAsset {
+  return { kind: "template", asset_id: `assets/${filename}`, filename, mime: "application/docx" }
+}
 
 /** A minimal but REAL definition, in the shape `setDrafted` accepts. */
 function definitionOf(over: Record<string, unknown> = {}): TemplateFirstDefinition {
@@ -81,6 +110,10 @@ function mountHook(
 ) {
   const started: number[] = []
   const drafted: TemplateFirstDefinition[] = []
+  // 193.1-07 (D-06): the descriptors the bind handed back. On the real page this callback IS
+  // the shipped `onTemplateAttached`, so recording it here records exactly what reaches the
+  // store's single writer.
+  const bound: WorkflowTemplateAsset[] = []
   // ⚠ The prop type is spelled ONCE and WIDE. `{ builderPhase: "empty" as const }` would
   // narrow `initialProps` to the literal `"empty"`, and every `rerender` into another arm
   // would then be a TYPE error rather than the thing under test.
@@ -92,15 +125,18 @@ function mountHook(
         builderPhase: props.builderPhase,
         onDraftStarted: () => started.push(1),
         onDrafted: (def) => drafted.push(def),
+        onTemplateBound: (asset) => bound.push(asset),
         ...args,
       }),
     { initialProps },
   )
-  return { view, store, started, drafted }
+  return { view, store, started, drafted, bound }
 }
 
 beforeEach(() => {
   mockedGenerate.mockReset()
+  mockedRead.mockReset()
+  mockedUpload.mockReset()
 })
 
 // ══════════════════════════════════════════════════════════════════════════════════════
@@ -334,6 +370,9 @@ describe("useTemplateFirstDraft — the loose door's one-shot auto-draft", () =>
         initialDescribe: "seeded",
         onDraftStarted: () => {},
         onDrafted: () => {},
+        // 193.1-07: REQUIRED, so the typechecker enumerated this second call site rather
+        // than a default hiding it — which is exactly why it is required.
+        onTemplateBound: () => {},
       }),
     )
     await waitFor(() => expect(mockedGenerate).not.toHaveBeenCalled())
@@ -476,5 +515,503 @@ describe("useTemplateFirstDraft D-24(b) — the extracted module cannot import e
     expect(templateFirstDraftSource).not.toMatch(/setSelectedSlug/)
     expect(templateFirstDraftSource).not.toMatch(/setShowReceipt/)
     expect(templateFirstDraftSource).not.toMatch(/setReceiptPhases/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 8 — 193.1-07 Task 1: THE PRE-DRAFT READ. Five arms, keyed on the held `File` OBJECT.
+//
+// ⚠ THE SUBJECT IS OBJECT IDENTITY, NOT `file.name`, and no shipped hook proves it — the
+// analog (`useTemplatePlaceholders.ts:145-147`) keys on an `assetId` STRING, where identity
+// and equality coincide. Two different documents can carry one name, so the same-name case
+// below is the whole reason this section exists rather than being inherited.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/** A read that never settles — the in-flight arm, held open for as long as a test needs. */
+function pendingRead() {
+  return new Promise<never>(() => {})
+}
+
+describe("useTemplateFirstDraft — the pre-draft read, all five arms", () => {
+  it("NO FILE HELD ⇒ `idle`, and NEVER `loading` — D-08's entire mechanism", () => {
+    const { view } = mountHook()
+    expect(view.result.current.templateRead).toEqual({ kind: "idle" })
+    expect(mockedRead).not.toHaveBeenCalled()
+  })
+
+  it("a file just picked, answer outstanding ⇒ `loading` — DERIVED, never stored", async () => {
+    mockedRead.mockImplementation(() => pendingRead())
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    expect(view.result.current.templateRead).toEqual({ kind: "loading" })
+    expect(mockedRead).toHaveBeenCalledTimes(1)
+  })
+
+  it("{read:'ok', placeholders:[…]} ⇒ `fields`, IN THE SERVER'S ORDER", async () => {
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name", "risks_blockers"] })
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() =>
+      expect(view.result.current.templateRead).toEqual({
+        kind: "fields",
+        fields: ["project_name", "risks_blockers"],
+      }),
+    )
+  })
+
+  it("{read:'ok', placeholders:[]} ⇒ `none` — NON-EMPTY BY CONTRACT, never `fields` with []", async () => {
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: [] })
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() => expect(view.result.current.templateRead).toEqual({ kind: "none" }))
+  })
+
+  it("an EMPTY ok read on a .pptx is ALSO `none`, and the held name is what separates them", async () => {
+    // ⚠ THIS CASE RECORDS A MEASURED CORRECTION TO THIS PLAN, stated rather than smoothed.
+    // The plan's Task 1 asks for a SIXTH arm, `notWord`, derived in this module "so the row
+    // stays purely presentational". Measured at HEAD, the row is NOT purely presentational
+    // and cannot be made so by this plan: `DescribeTemplateRow.tsx:153` derives `notWord`
+    // ITSELF from `state.kind === "none"` plus the filename, its `state` prop is typed on the
+    // SHARED five-arm union imported from the rail's hook, and its own docblock requires
+    // exactly that ("imported rather than re-declared: one wire shape for both doors means
+    // the two surfaces cannot derive different arms from the same server answer").
+    // `DescribeTemplateRow.tsx` is NOT in this plan's `files_modified`, and Plan 08 feeds it
+    // `state` + `filename` straight from this hook — so a sixth arm here would be a value the
+    // shipped component cannot accept. The union therefore stays FIVE, the derivation keeps
+    // its single home in the row, and this hook supplies the row's other input instead.
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: [] })
+    const { view } = mountHook()
+    const deck = fileNamed("deck.pptx")
+    await act(async () => {
+      view.result.current.onPickTemplateFile(deck)
+    })
+    await waitFor(() => expect(view.result.current.templateRead).toEqual({ kind: "none" }))
+    // The input the row's own predicate needs, exposed rather than duplicated here.
+    expect(view.result.current.templateFile).toBe(deck)
+    expect(view.result.current.templateFile?.name).toBe("deck.pptx")
+  })
+
+  it("{read:'unreadable'} ⇒ `unavailable{unreadable}` — a 200 that admits the read failed", async () => {
+    mockedRead.mockResolvedValue({ read: "unreadable", placeholders: [] })
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("locked.docx"))
+    })
+    await waitFor(() =>
+      expect(view.result.current.templateRead).toEqual({
+        kind: "unavailable",
+        reason: "unreadable",
+      }),
+    )
+  })
+
+  it("a REJECTED read ⇒ `unavailable{unreachable}` — no answer at all is its own fact", async () => {
+    mockedRead.mockRejectedValue(new Error("boom"))
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() =>
+      expect(view.result.current.templateRead).toEqual({
+        kind: "unavailable",
+        reason: "unreachable",
+      }),
+    )
+  })
+
+  it("an AbortError is SILENT — neither arm, and the reading stays in flight", async () => {
+    const aborted = new Error("aborted")
+    aborted.name = "AbortError"
+    mockedRead.mockRejectedValue(aborted)
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await act(async () => {})
+    expect(view.result.current.templateRead).toEqual({ kind: "loading" })
+  })
+
+  it("POSITIVE CONTROL — a rejection that is NOT an abort really does reach the failed arm", async () => {
+    // Without this, the silence above is satisfiable by a hook that swallows every rejection.
+    const notAbort = new Error("aborted")
+    notAbort.name = "TypeError"
+    mockedRead.mockRejectedValue(notAbort)
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() =>
+      expect(view.result.current.templateRead).toEqual({
+        kind: "unavailable",
+        reason: "unreachable",
+      }),
+    )
+  })
+
+  it("REPLACING the held file while A's answer is outstanding reads `loading`, never A's answer", async () => {
+    const a = fileNamed("first.docx")
+    const b = fileNamed("second.docx")
+    let resolveA: (v: { read: "ok"; placeholders: string[] }) => void = () => {}
+    mockedRead
+      .mockImplementationOnce(() => new Promise((res) => (resolveA = res)))
+      .mockImplementationOnce(() => pendingRead())
+
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(a)
+    })
+    await act(async () => {
+      view.result.current.onPickTemplateFile(b)
+    })
+    // A's answer arrives AFTER the replacement. It answered for a different subject.
+    await act(async () => {
+      resolveA({ read: "ok", placeholders: ["from_the_first_document"] })
+    })
+    expect(view.result.current.templateRead).toEqual({ kind: "loading" })
+    expect(JSON.stringify(view.result.current.templateRead)).not.toContain(
+      "from_the_first_document",
+    )
+  })
+
+  it("TWO `File` OBJECTS WITH THE SAME NAME ARE DIFFERENT SUBJECTS — the identity rule", async () => {
+    // The case no shipped hook proves. A name-keyed hook passes every test above and fails
+    // this one: it would treat B as already answered and show A's fields under B's document.
+    const a = fileNamed("status.docx")
+    const b = fileNamed("status.docx")
+    expect(a).not.toBe(b)
+    expect(a.name).toBe(b.name)
+
+    mockedRead
+      .mockResolvedValueOnce({ read: "ok", placeholders: ["from_document_a"] })
+      .mockImplementationOnce(() => pendingRead())
+
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(a)
+    })
+    await waitFor(() =>
+      expect(view.result.current.templateRead).toEqual({ kind: "fields", fields: ["from_document_a"] }),
+    )
+
+    await act(async () => {
+      view.result.current.onPickTemplateFile(b)
+    })
+    // A SECOND request was issued, and A's answer does NOT satisfy B.
+    expect(mockedRead).toHaveBeenCalledTimes(2)
+    expect(view.result.current.templateRead).toEqual({ kind: "loading" })
+  })
+
+  it("CLEARING the held file returns the reading to `idle` and holds no stale answer", async () => {
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() => expect(view.result.current.templateRead.kind).toBe("fields"))
+    await act(async () => {
+      view.result.current.onClearTemplateFile()
+    })
+    expect(view.result.current.templateRead).toEqual({ kind: "idle" })
+    expect(view.result.current.templateFile).toBeNull()
+  })
+
+  it("A SEEDED ANSWER resolves IMMEDIATELY and issues ZERO requests — the handoff mechanism", async () => {
+    // This is what carries the fast door's already-completed read across to the Builder
+    // (Plan 08). A re-read would return the reading to `loading` at the exact instant the
+    // auto-draft one-shot fires, which is the blind-draft race D-07 exists to make impossible.
+    const seeded = fileNamed("status.docx")
+    const { view } = mountHook({
+      initialTemplateFile: seeded,
+      initialTemplateRead: {
+        file: seeded,
+        state: { kind: "fields", fields: ["project_name", "risks_blockers"] },
+      },
+    })
+    expect(view.result.current.templateRead).toEqual({
+      kind: "fields",
+      fields: ["project_name", "risks_blockers"],
+    })
+    await act(async () => {})
+    expect(mockedRead).not.toHaveBeenCalled()
+  })
+
+  it("a seed for a DIFFERENT file does not answer the held one — the subject rule survives seeding", async () => {
+    mockedRead.mockImplementation(() => pendingRead())
+    const held = fileNamed("status.docx")
+    const other = fileNamed("status.docx")
+    const { view } = mountHook({
+      initialTemplateFile: held,
+      initialTemplateRead: { file: other, state: { kind: "fields", fields: ["stale"] } },
+    })
+    await act(async () => {})
+    expect(view.result.current.templateRead).toEqual({ kind: "loading" })
+    expect(mockedRead).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 9 — 193.1-07 Task 1: D-07 / D-08, the CTA gate. ONE `&&` term, and it is unreachable
+//     when no file is held — so there is no second conditional to get wrong.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("useTemplateFirstDraft — the D-07 gate", () => {
+  it("is FALSE while the read is in flight, even with text — the blind draft is IMPOSSIBLE", async () => {
+    mockedRead.mockImplementation(() => pendingRead())
+    const { view } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    expect(view.result.current.canDraft).toBe(true)
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    expect(view.result.current.templateRead.kind).toBe("loading")
+    expect(view.result.current.canDraft).toBe(false)
+  })
+
+  it("RE-ENABLES the moment the read resolves — the gate is a wait, not a refusal", async () => {
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() => expect(view.result.current.canDraft).toBe(true))
+  })
+
+  it("D-08 — with NO file held the gate is UNREACHABLE, on every arm of the shipped rule", () => {
+    const { view } = mountHook()
+    expect(view.result.current.canDraft).toBe(false)
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    expect(view.result.current.canDraft).toBe(true)
+    // …and the reading that could disable it is not merely false, it is not the state at all.
+    expect(view.result.current.templateRead.kind).toBe("idle")
+  })
+
+  it("SOURCE FENCE — the gate is ONE term against `loading`, never a 'has a template' test", () => {
+    // D-08's whole claim is that the absence of a read IS the absence of a gate. A second
+    // conditional — `templateFile !== null && …` — would be one that can be got wrong, and
+    // it would read green against every behaviour above. So the SHAPE is asserted, not only
+    // the outcome.
+    const gate = templateFirstDraftSource.match(/const canDraft =[^\n]*(\n[^\n]*)?/)?.[0] ?? ""
+    expect(gate).toContain("describe.trim().length > 0")
+    expect(gate).toContain('builderPhase !== "composing"')
+    expect(gate).toMatch(/!==\s*"loading"/)
+    expect(gate).not.toMatch(/templateFile\s*(!==|===)/)
+    // POSITIVE CONTROL — the forbidden shape really is caught by the matcher above.
+    expect('const canDraft = templateFile !== null && x').toMatch(/templateFile\s*(!==|===)/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 10 — 193.1-07 Task 2: THE WIRE. `template_placeholders` on the real `/generate` call.
+//
+// ⚠ SORTED KEY-SET DEEP-EQUALITY, never `toMatchObject` — the 193.1-01 rule, inherited: the
+// three loose matchers are all satisfied by a body carrying EXTRA keys, and both the arrival
+// of this key AND its ABSENCE on the other four arms are the claims under test.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("useTemplateFirstDraft — the wire", () => {
+  async function draftWithRead(
+    answer: Awaited<ReturnType<typeof readTemplatePlaceholdersFromFile>>,
+    filename = "status.docx",
+  ) {
+    mockedGenerate.mockResolvedValue({ ok: true, definition: definitionOf() } as GenerateResult)
+    mockedRead.mockResolvedValue(answer)
+    const { view } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed(filename))
+    })
+    await waitFor(() => expect(view.result.current.templateRead.kind).not.toBe("loading"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    return mockedGenerate.mock.calls[0][0]
+  }
+
+  it("a resolved `fields` read ⇒ the key set is EXACTLY ['describe','template_placeholders']", async () => {
+    const body = await draftWithRead({ read: "ok", placeholders: ["project_name", "risks_blockers"] })
+    expect(Object.keys(body).sort()).toEqual(["describe", "template_placeholders"])
+    // …and the VALUES are the read's own names, in the server's order — not a re-derivation.
+    expect(body.template_placeholders).toEqual(["project_name", "risks_blockers"])
+  })
+
+  it("sends NO key at all on `none` — `(none)` and `[]` are different facts to the prompt", async () => {
+    const body = await draftWithRead({ read: "ok", placeholders: [] })
+    expect(Object.keys(body).sort()).toEqual(["describe"])
+  })
+
+  it("sends NO key on `unavailable` — a failed read may never read as a field-less document", async () => {
+    const body = await draftWithRead({ read: "unreadable", placeholders: [] })
+    expect(Object.keys(body).sort()).toEqual(["describe"])
+  })
+
+  it("sends NO key when a NON-WORD document yields nothing", async () => {
+    const body = await draftWithRead({ read: "ok", placeholders: [] }, "deck.pptx")
+    expect(Object.keys(body).sort()).toEqual(["describe"])
+  })
+
+  it("carries the knowledge base AND the fields together — three keys, no interaction", async () => {
+    mockedGenerate.mockResolvedValue({ ok: true, definition: definitionOf() } as GenerateResult)
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view } = mountHook()
+    act(() => {
+      view.result.current.setDescribe("a weekly status report")
+      view.result.current.setProjectFolderId("folder-1")
+    })
+    await act(async () => {
+      view.result.current.onPickTemplateFile(fileNamed("status.docx"))
+    })
+    await waitFor(() => expect(view.result.current.templateRead.kind).toBe("fields"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(Object.keys(mockedGenerate.mock.calls[0][0]).sort()).toEqual([
+      "describe",
+      "project_folder_id",
+      "template_placeholders",
+    ])
+  })
+
+  it("the AUTO-DRAFT one-shot refuses to fire while the read is in flight (D-07, the fast path)", async () => {
+    // The fast door's handoff auto-fires exactly once. Without this term the one-shot would
+    // race the read it was just handed and send the blind body the phase exists to remove.
+    mockedGenerate.mockResolvedValue({ ok: true, definition: definitionOf() } as GenerateResult)
+    let resolveRead: (v: { read: "ok"; placeholders: string[] }) => void = () => {}
+    mockedRead.mockImplementation(() => new Promise((res) => (resolveRead = res)))
+    const held = fileNamed("status.docx")
+    mountHook({
+      autoDraft: true,
+      initialDescribe: "seeded from the fast door",
+      initialTemplateFile: held,
+    })
+    await act(async () => {})
+    expect(mockedGenerate).not.toHaveBeenCalled()
+
+    await act(async () => {
+      resolveRead({ read: "ok", placeholders: ["project_name"] })
+    })
+    await waitFor(() => expect(mockedGenerate).toHaveBeenCalledTimes(1))
+    expect(Object.keys(mockedGenerate.mock.calls[0][0]).sort()).toEqual([
+      "describe",
+      "template_placeholders",
+    ])
+    // …and STILL exactly once, which is the one-shot's own contract.
+    await act(async () => {})
+    expect(mockedGenerate).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 11 — 193.1-07 Task 2: THE BIND. D-06, and the two rules that make it safe.
+//
+// ⚠ RULE 1 — a throwing bind can NEVER produce a save-error state and can NEVER trip
+//    `haltedRef`. The bind is called from INSIDE the write's `try` (`:645`), so this is not
+//    natural in the current code: it is bought by the bind being an `async` function that
+//    catches everything internally, `void`-ed at the call site.
+// ⚠ RULE 2 — the failure has its OWN honest line, never the save's.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("useTemplateFirstDraft — D-06's bind", () => {
+  it("uploads the held file EXACTLY ONCE and hands the descriptor to the page's writer", async () => {
+    const held = fileNamed("status.docx")
+    mockedUpload.mockResolvedValue(descriptorFor("status.docx"))
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view, bound } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(held)
+    })
+    await act(async () => {
+      await view.result.current.bindHeldTemplate("draft-1")
+    })
+    expect(mockedUpload).toHaveBeenCalledTimes(1)
+    expect(mockedUpload.mock.calls[0][0]).toBe("draft-1")
+    expect(mockedUpload.mock.calls[0][1]).toBe(held)
+    expect(bound).toEqual([descriptorFor("status.docx")])
+    expect(view.result.current.bindFailed).toBeNull()
+  })
+
+  it("does NOTHING and reports NOTHING when no file is held — SC#4 stays true by construction", async () => {
+    const { view, bound } = mountHook()
+    await act(async () => {
+      await view.result.current.bindHeldTemplate("draft-1")
+    })
+    expect(mockedUpload).not.toHaveBeenCalled()
+    expect(bound).toEqual([])
+    expect(view.result.current.bindFailed).toBeNull()
+  })
+
+  it("NEVER REJECTS — a synchronously-throwing upload resolves, which is what makes `void` safe", async () => {
+    const held = fileNamed("status.docx")
+    mockedUpload.mockImplementation(() => {
+      throw new Error("synchronous boom")
+    })
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(held)
+    })
+    // The claim is the RETURNED PROMISE, not merely the state: a `void`-ed call that rejects
+    // is an unhandled rejection, and the page has nowhere to catch it.
+    let settled: "resolved" | "rejected" = "rejected"
+    await act(async () => {
+      await view.result.current.bindHeldTemplate("draft-1").then(
+        () => (settled = "resolved"),
+        () => (settled = "rejected"),
+      )
+    })
+    expect(settled).toBe("resolved")
+    expect(view.result.current.bindFailed).toEqual({ filename: "status.docx" })
+  })
+
+  it("NEVER REJECTS on an ASYNC rejection either, and names the file in its own state", async () => {
+    const held = fileNamed("status.docx")
+    mockedUpload.mockRejectedValue(new Error("502 from storage"))
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view, bound } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(held)
+    })
+    let settled: "resolved" | "rejected" = "rejected"
+    await act(async () => {
+      await view.result.current.bindHeldTemplate("draft-1").then(
+        () => (settled = "resolved"),
+        () => (settled = "rejected"),
+      )
+    })
+    expect(settled).toBe("resolved")
+    expect(view.result.current.bindFailed).toEqual({ filename: "status.docx" })
+    // The page's single writer is NEVER reached on a failure — no half-attached descriptor.
+    expect(bound).toEqual([])
+  })
+
+  it("THE FAILURE STATE CANNOT CARRY SERVER PROSE, A STATUS CODE OR AN ID", async () => {
+    // The `useWorkflowFork.ts:205` posture. The shape is the disclosure guard, not a habit of
+    // being careful at the call site — so the assertion is over what the state CAN hold.
+    const held = fileNamed("status.docx")
+    mockedUpload.mockRejectedValue(
+      Object.assign(new Error("row 41 of table secrets is not permitted for user 9e3f"), {
+        status: 403,
+        detail: "row 41 of table secrets is not permitted for user 9e3f",
+      }),
+    )
+    mockedRead.mockResolvedValue({ read: "ok", placeholders: ["project_name"] })
+    const { view } = mountHook()
+    await act(async () => {
+      view.result.current.onPickTemplateFile(held)
+    })
+    await act(async () => {
+      await view.result.current.bindHeldTemplate("draft-1")
+    })
+    const failed = view.result.current.bindFailed
+    expect(Object.keys(failed ?? {})).toEqual(["filename"])
+    expect(JSON.stringify(failed)).not.toContain("secrets")
+    expect(JSON.stringify(failed)).not.toContain("403")
+    expect(JSON.stringify(failed)).not.toContain("9e3f")
   })
 })

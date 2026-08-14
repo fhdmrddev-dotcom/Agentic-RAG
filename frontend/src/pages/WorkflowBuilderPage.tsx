@@ -149,6 +149,9 @@ import { useStore } from "zustand"
 import { listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
+// 193.1-07 (D-06 rule 2) — the bind's own sentence. Authored in its module, never here: an
+// interpolating string is a function in a `.ts` vocabulary file, and the filename is DATA.
+import { templateBindFailedMessage } from "@/components/workflows/templateFirstVocabulary"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
@@ -692,23 +695,39 @@ export function WorkflowBuilderPage({
    * contract, shared by both graph views). Each reaches the hook as a callback — see its
    * header for why the two pre-flight resets are ONE call rather than two.
    */
-  const { describe, setDescribe, projectFolderId, setProjectFolderId, canDraft, onDraft } =
-    useTemplateFirstDraft({
-      store,
-      builderPhase,
-      initialDescribe,
-      autoDraft,
-      initialProjectFolderId,
-      initialDefinitionFolderId: initial?.definition.project_folder_id,
-      onDraftStarted: () => {
-        setSelectedSlug(null)
-        setDraftId(null)
-      },
-      onDrafted: (def) => {
-        setShowReceipt(true)
-        setReceiptPhases(def.phases)
-      },
-    })
+  const {
+    describe,
+    setDescribe,
+    projectFolderId,
+    setProjectFolderId,
+    canDraft,
+    onDraft,
+    bindHeldTemplate,
+    bindFailed,
+  } = useTemplateFirstDraft({
+    store,
+    builderPhase,
+    initialDescribe,
+    autoDraft,
+    initialProjectFolderId,
+    initialDefinitionFolderId: initial?.definition.project_folder_id,
+    onDraftStarted: () => {
+      setSelectedSlug(null)
+      setDraftId(null)
+    },
+    onDrafted: (def) => {
+      setShowReceipt(true)
+      setReceiptPhases(def.phases)
+    },
+    // ⚠ 193.1-07 (D-06 / S-3) — THE SHIPPED ATTACH HANDLER, REACHED THROUGH AN ARROW, and
+    // the arrow is load-bearing rather than stylistic. `onTemplateAttached` is declared far
+    // BELOW this call (it needs the write loop, which needs the callback this hook returns),
+    // so naming it directly here would read an uninitialised `const` during render. An arrow
+    // created here and invoked only from an async bind runs long after the whole body has
+    // evaluated. Passing THIS handler rather than a second copy of it is what keeps
+    // `setTemplateAsset` + `saveNow` the ONE writer on the definition JSONB.
+    onTemplateBound: (asset) => onTemplateAttached(asset),
+  })
 
   const panelOpen = selectedSlug !== null
 
@@ -943,7 +962,42 @@ export function WorkflowBuilderPage({
     store,
     publishInFlight,
     validationCause,
-    onDraftCreated: setDraftId,
+    /**
+     * ── 193.1-07 (D-06 / D-25, threat T-193.1-07-01) — THE ROW EXISTS, SO BIND THE BYTES ──
+     *
+     * The held document is uploaded at the FIRST INSTANT a `definition_id` exists, which is
+     * exactly here: this callback is reached only from the write loop's create branch, and
+     * that branch is guarded against re-entry, so "first save" is distinguished by CONTROL
+     * FLOW and needs no flag.
+     *
+     * ⚠ **THE SHAPE OF THIS COMPOSITION IS THE GUARD, AND IT IS NOT NATURAL IN THE CODE THAT
+     * CALLS IT.** The write loop invokes this from INSIDE its own `try`, whose `catch` turns
+     * anything thrown into a save REFUSAL — and for a terminal-shaped refusal sets a halt flag
+     * that nothing in the session ever clears. So a bind that threw would report a failed save
+     * for a row that was successfully created, and could freeze autosave outright. Two things
+     * prevent it: the bind is an `async` function (which converts a synchronous throw into a
+     * rejection) that catches everything internally (so the rejection never escapes), and it
+     * is `void`-ed here so nothing is awaited inside the loop's turn. Its suite asserts the
+     * RETURNED PROMISE resolves — not merely that the state is right — because a `void`-ed
+     * rejection has nowhere to be caught. The persistence hook itself is UNCHANGED by this
+     * plan: `git diff --numstat` on it is empty, deliberately (D-25).
+     *
+     * ⚠ AND A STORAGE BLIP MAY NOT COST THE AUTHOR THEIR DRAFT. The save is the more
+     * consequential of the two acts and it has already succeeded by the time this runs; the
+     * upload is a follow-up that reports its own failure in its own place — the one
+     * `role="status"` line in the drafted view below, gated on the bind's own state — and
+     * never through the save's reading.
+     *
+     * ⚠ THAT LINE IS REFERRED TO BY ROLE RATHER THAN BY ITS TESTID, DELIBERATELY. The plan's
+     * own acceptance check is a raw `grep -c` for that id expecting exactly ONE, so a docblock
+     * spelling it would make the crude check read 2 and the constraint would stop being
+     * checkable by eye. Same property, same reason, as the extracted hook's header naming
+     * neither of its hosts. The suite asserts the `data-testid` occurs exactly once.
+     */
+    onDraftCreated: (id) => {
+      setDraftId(id)
+      void bindHeldTemplate(id)
+    },
   })
   const persistState: PersistState = persistence.state
 
@@ -1985,6 +2039,45 @@ export function WorkflowBuilderPage({
           <div className="flex min-w-0 items-center gap-2">{identityGroup}</div>
           <div className="flex shrink-0 items-center gap-2">{actionGroup}</div>
         </header>
+      )}
+
+      {/* ── 193.1-07 (D-06 rule 2, threat T-193.1-07-02) — THE BIND FAILED, SAID OUT LOUD ──
+          The 192 `library-fork-failed` shape, transplanted whole: STATE IN THE HOOK, JSX ON
+          THE HOST, sentence from a `.ts` vocabulary module, `role="status"`, EXACTLY ONE
+          NODE. `role="status"` is what makes a line that appears after an act announced
+          rather than merely present. There is no toast library in this repo — zero `sonner`
+          imports, no `ui/toast` — and this is not the place to acquire one.
+
+          ⚠ WHY IT IS BUILT RATHER THAN ROUTED THROUGH SOMETHING THAT EXISTS. All three
+          candidates were measured and all three refused:
+            • the pre-draft generate-error block is gated on the `error` phase, and by bind
+              time the phase is `drafted`;
+            • the save's own refusal sentence in the toolbar is FORBIDDEN by D-06 rule 2 —
+              this is a silent write the person never pressed a button for, and folding it
+              into the save's reading is precisely the lie the rule exists to prevent;
+            • the canvas notice is retired on a history step, and a failure that vanishes on
+              an undo is a failure nobody saw.
+
+          ⚠ THE PLACEMENT IS OUTSIDE THE GRID, NOT INSIDE IT, and that is the reason it sits
+          here rather than one line lower: `FLAG_OFF_HEADER_MARKUP` pins the three drafted
+          header bands and this node is below them, while the grid's own first child is
+          asserted by the canvas suite. Rendering nothing when `bindFailed` is null keeps the
+          drafted DOM byte-identical for every session that did not hit this failure — which
+          is all of them but one.
+
+          ⚠ AND THE SENTENCE CARRIES THE CONSEQUENCE, NOT THE FACT. A deliverable step written
+          to fill a document that is not attached fails at RUN time and can never publish, so
+          "attaching failed" would leave the author with a workflow that dies at the worst
+          possible moment. The wording lives in `templateFirstVocabulary.ts` and names the one
+          place the fix lives; this page authors none of it. */}
+      {bindFailed && (
+        <p
+          data-testid="template-bind-failed"
+          role="status"
+          className="border-b border-warning/30 bg-warning/5 px-4 py-2 text-[12.5px] text-muted-foreground"
+        >
+          {templateBindFailedMessage(bindFailed.filename)}
+        </p>
       )}
 
       <div
