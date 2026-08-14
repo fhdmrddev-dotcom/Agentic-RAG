@@ -248,3 +248,42 @@ dependency (T-q5r-SC honoured — nothing was installed).
 ## Self-Check: PASSED
 
 All created files present; all three commits present on `worktree-agent-a2738175c818d691c`.
+
+## ⬛ THE OWED MANUAL UAT — DRIVEN 2026-08-14, ALL FOUR READINGS PASSED
+
+This SUMMARY shipped saying **D-5 is UNDETERMINED** and naming the live user-JWT Storage read as
+the one thing that could invalidate the feature. It was driven by the operator the same day.
+**D-5 is CLOSED — the live read works and no fallback to `get_supabase` was needed.**
+
+Driven on a seeded draft fixture (`0143b84f`, since deleted) cloning `286a2428`, binding
+`d8a54002-…/_library/risk-register-101uat.docx`:
+
+| # | Reading | Result |
+|---|---|---|
+| 1 | (b) a draft OPENED with a template already bound, no upload | ✅ all **11** names |
+| 2 | (a) a fresh in-session upload | ✅ 11 → the correct **4**, so the refetch-on-replace fires |
+| 3 | honest empty (a real `.docx`, zero tokens) | ✅ the read-and-found-none sentence |
+| 4 | Word-only (a real `.pptx`) | ✅ the Word-only sentence, NOT the no-fields one |
+
+**Reading 1 is proof rather than a green screen:** the 11 names exist nowhere in the frontend. They
+were derived BEFORE the test by downloading the stored object with the service role and running the
+real `parse_docx_template_variables` over it — so only a server-side fetch-under-caller-JWT + parse
+can put them on screen. Corroborated after: all three UAT uploads are in `storage.objects` under
+`d8a54002-…/_library/0143b84f-…/`.
+
+**Also measured before the test, and it is why the UAT did not produce a false alarm:** the
+`workspace_storage_select_own` policy was simulated in SQL under `set local role authenticated`
+with `request.jwt.claims.sub = d8a54002…` — the row was visible, so D-5 was predicted to pass at
+the DB layer before a single click.
+
+⚠ **NOT driven, stated rather than implied:** the **owner fence** (another author's `asset_id` →
+404) rests on unit test RED-1 alone. It was deliberately not driven through the UI because a fenced
+read renders the SAME sentence as a genuine failure — a live pass would prove less than the unit
+test already does.
+
+⚠ **A trap for whoever tests this next:** three of the operator's workflows (`e7c68d09`,
+`f77e72a0`, `84c45250`) bind templates under the **seed user's** prefix `00000000-…/_library/`, so
+the fence correctly 404s them and they render *"We could not read this template's fields"*. That is
+the fence working, not a defect. The fixture generator for the three test documents lives at
+`scratchpad/make_uat_templates.py` — it self-checks against the real upload gate and the real
+parser before writing.

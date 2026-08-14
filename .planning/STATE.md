@@ -929,16 +929,37 @@ the 11 seeds are intentionally dormant.
 | 260813-e12 | `/gsd:fast` — close **E-1** and **E-2** from `192.1-SECURITY.md`: the identity memo's `[rows]`-only key had NO assertion despite its register claiming one, and the subtree non-vacuity guard proved only 3 of 12 modules load. Both driven RED against real plants; E-2's plant showed the four `it.each` sweeps passing green against the empty string — the Phase-190 CR-01 shape. E-3 (INFO) left to the next phase touching `useWorkflowFork.ts`. | 2026-08-13 | `15472e7c` | — (inline, no plan dir) |
 | 260814-q5r | Show a template's placeholders when it is attached. **The brief's premise was refuted by measurement:** the shipped `/workflows/grounding-bundle?template_asset_id=` types that param `UUID`, while the Phase-193 upload door mints a Storage **path** — a real asset id is a **422** at offset 37, so the seam was not merely unwired but unwirable. And widening it would have opened a **cross-tenant read** (`resolve_template_source` Branch 1 does not scope by `user_id`, and that route injects the **service-role** client — the `UUID` coercion was the only guard, accidentally). Shipped instead: an owner-gated `GET /workflows/{id}/template/placeholders` (user-JWT client, prefix + `..` traversal fences), a `(names, read)` three-state that splits "we read it and found none" from "we never read it", a leaf `useTemplatePlaceholders` hook, and four non-collapsible readings on `TemplateAttachSection` (incl. the Word-only sentence — the parser reads `word/document.xml` only, so `.pptx`/`.xlsx` templates would otherwise be told they have no fields). RED-1…RED-4 each observed failing against real plants. | 2026-08-14 | `22244732` (merge) · `19b94a1a` `ce9d6f74` `9521dfb6` | [260814-q5r-…](./quick/260814-q5r-show-a-template-s-placeholders-when-it-i/) |
 
-⚠ **`260814-q5r` — D-5 is UNDETERMINED, not passed, and it is the one thing that can invalidate
-the feature.** Every test monkeypatches `resolve_template_source`; **no live Storage probe was
-run.** If the user-JWT read (`get_user_supabase_client`, chosen so `workspace_storage_select_own`
-is a second DB-enforced boundary) is refused live, every template renders *"We could not read this
-template's fields"* — an honest sentence and a useless product. **Owed manual UAT (run this
-first):** attach a real `.docx` carrying `{{ … }}` tokens in the Builder, confirm the field names
-appear without a reload, then **reload and confirm they survive** (the re-opened-draft reading is
-what makes the feature worth having); then attach a `.pptx` and confirm the Word-only sentence,
-not the no-fields sentence. If the live read is refused, the fallback is `get_supabase` — and the
-plan says record that fallback as a decision, never silently.
+✅ **`260814-q5r` — THE OWED MANUAL UAT WAS DRIVEN 2026-08-14 AND ALL FOUR READINGS PASSED. D-5 is
+CLOSED: the live user-JWT Storage read WORKS and no fallback to `get_supabase` was needed.** The
+note this replaces said D-5 was UNDETERMINED and was the one thing that could invalidate the
+feature — it is kept in the git history rather than in this file, because the risk is now measured
+rather than open.
+
+**What was driven, by the operator in the live app, on a seeded draft fixture** (`0143b84f`, since
+deleted — a clone of `286a2428` binding `d8a54002/_library/risk-register-101uat.docx`):
+
+| # | Reading | Result |
+|---|---|---|
+| 1 | **(b) a draft OPENED with a template already bound — no upload** | ✅ all **11** names (`cause · effect · event · impact · owner · probability · project_name · report_date · response_strategy · risk_id · status`) |
+| 2 | **(a) a fresh upload in-session** (`q5r-template-with-fields.docx`) | ✅ list changed 11 → the correct **4** (`client_name · owner · project_name · risk_id`) — proving the refetch-on-replace, not a stale list |
+| 3 | **honest empty** — a real `.docx` with zero tokens | ✅ *"We read this template and found no fill-in fields in it."*, NOT the unreadable sentence |
+| 4 | **Word-only** — a real `.pptx` | ✅ *"Fields can only be read from Word (.docx) templates…"*, NOT the no-fields sentence |
+
+**Why reading 1 is proof and not just a green screen:** those 11 names appear NOWHERE in the
+frontend. They were obtained independently before the test by downloading the stored object with
+the service role and running the real `parse_docx_template_variables` over it — so the only path
+that puts them on screen is the server fetching the bytes under the caller's JWT and parsing them.
+Corroborated server-side afterwards: all three UAT uploads are present in `storage.objects` under
+`d8a54002-…/_library/0143b84f-…/`, so the upload path really ran.
+
+⚠ **Two things were NOT driven live and are stated rather than implied.** (a) The **owner fence**
+(another author's `asset_id` → 404) is covered by unit test RED-1 only — it was deliberately not
+driven through the UI because a fenced read renders the SAME sentence as a genuine failure, so a
+live pass would prove nothing a unit test does not prove better. (b) A trap worth inheriting: **three
+of this operator's workflows** (`e7c68d09` Slack Connector UAT, `f77e72a0` + `84c45250` the SC10
+probes) bind templates under the **seed user's** prefix `00000000-…/_library/`, so the fence
+correctly 404s them and they render *"We could not read this template's fields"*. That is the fence
+working, NOT a defect — do not test this feature with those three.
 
 ⚠ **`BUG-260809-02` is deliberately still `open`.** The unit suite proves the typed sentence reaches
 the recorded `updateWorkflowDraft` argument; it cannot prove the live gauntlet accepts it. The plan
