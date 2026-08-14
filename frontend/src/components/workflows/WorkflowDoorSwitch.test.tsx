@@ -31,6 +31,12 @@ import builderPageSource from "@/pages/WorkflowBuilderPage?raw"
 // module — see the note on SWEPT_SOURCES below for why a new module on this surface joins the
 // list even though it imports nothing from `doorVocabulary` today.
 import templateFirstDraftSource from "./useTemplateFirstDraft?raw"
+// 193.1-06 (D-14): the FIFTH and SIXTH swept sources, both added in the SAME COMMIT that
+// creates them. The component is a real `doorVocabulary` CONSUMER — it renders the 22nd
+// governed id — so it would join this list under the WR-01 rule alone. The vocabulary module
+// joins it for a reason stated on `SWEPT_SOURCES` below, and it is the higher-risk of the two.
+import describeTemplateRowSource from "./DescribeTemplateRow?raw"
+import templateFirstVocabularySource from "./templateFirstVocabulary?raw"
 import * as doorVocabulary from "./doorVocabulary"
 
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
@@ -505,12 +511,33 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
  *      in the same phase that widens this list is the cheapest possible moment to close it.
  *
  * The entry was driven RED against a real planted literal in that file before being trusted.
+ *
+ * ⚠ **THE FIFTH AND SIXTH ENTRIES (193.1-06, D-14), AND THE SIXTH IS A CORRECTION TO THE PLAN
+ * THAT COMMISSIONED IT — STATED HERE RATHER THAN SMOOTHED.** `193.1-06`'s acceptance criterion
+ * says this list goes to FIVE: the plan counted `DescribeTemplateRow.tsx` and did not count
+ * `templateFirstVocabulary.ts`, which the same plan creates in the same wave. Measured against
+ * the rule two paragraphs up — *any new module on this surface, whether or not it imports
+ * `doorVocabulary` yet* — that leaves the HIGHER-RISK of the two files outside the sweep:
+ *
+ *   • `DescribeTemplateRow.tsx` is a genuine consumer (it renders the 22nd governed id) and
+ *     joins under the WR-01 rule with nothing to argue about.
+ *   • `templateFirstVocabulary.ts` is a VOCABULARY MODULE — the single most likely place in
+ *     this repository for a governed sentence to be re-typed, because re-typing strings is
+ *     literally what the file is for. A copy fence that sweeps the component rendering the
+ *     words and skips the module DECLARING them is the WR-01 shape exactly: the fence swept
+ *     the files someone thought of, and the defect landed in the one they did not.
+ *
+ * Going to six is therefore a STRENGTHENING of the plan's stated criterion, never a departure
+ * from its intent, and both new entries were driven RED against a real planted literal in
+ * their own file before being trusted. Six is the honest count and the count is asserted below.
  */
 const SWEPT_SOURCES: { path: string; source: string }[] = [
   { path: "./WorkflowDoorSwitch.tsx", source: workflowDoorSwitchSource },
   { path: "./DoorHeaderStrip.tsx", source: doorHeaderStripSource },
   { path: "@/pages/WorkflowBuilderPage.tsx", source: builderPageSource },
   { path: "./useTemplateFirstDraft.ts", source: templateFirstDraftSource },
+  { path: "./DescribeTemplateRow.tsx", source: describeTemplateRowSource },
+  { path: "./templateFirstVocabulary.ts", source: templateFirstVocabularySource },
 ]
 
 /**
@@ -535,25 +562,30 @@ const hitsIn = (source: string): string[] =>
   NEEDLES.filter((n) => source.includes(n.text)).map((n) => `${n.id}/${n.spelling}`)
 
 describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 E-2 lesson)", () => {
-  it("all four swept sources really loaded, and every needle is a real non-empty string", () => {
+  it("all six swept sources really loaded, and every needle is a real non-empty string", () => {
     // NON-VACUITY FIRST, BEFORE ANY NEGATIVE. A `?raw` import of a moved or renamed module
     // yields the EMPTY STRING in some resolvers rather than throwing, and `"".includes(x)` is
     // false for every x — so the whole fence would pass green while defending nothing. This
     // is the exact defect `/gsd:secure-phase 192.1` found: a fence swept against the empty
     // string, with the property holding and NOTHING guarding it.
-    // 193.1-05 (D-14): 3 → 4. Bumped DELIBERATELY, in the same commit as the entry — a count
-    // that moved on its own is a list nobody checked.
-    expect(SWEPT_SOURCES).toHaveLength(4)
+    // 193.1-05 (D-14): 3 → 4. 193.1-06 (D-14): 4 → 6. Bumped DELIBERATELY, in the same commit
+    // as the entries — a count that moved on its own is a list nobody checked.
+    expect(SWEPT_SOURCES).toHaveLength(6)
     for (const { path, source } of SWEPT_SOURCES) {
       // ⚠ The 1000-CHARACTER FLOOR IS A REAL CONSTRAINT ON A NEW ENTRY, and it was MEASURED
       // before the fourth was added rather than assumed: `wc -c useTemplateFirstDraft.ts` →
       // 14062. A thin module would red here, and the answer would be to say so, never to
-      // quietly lower the floor.
+      // quietly lower the floor. Measured again before the fifth and sixth:
+      // `DescribeTemplateRow.tsx` → 13323, `templateFirstVocabulary.ts` → 10508. Both clear it
+      // comfortably, and both are dominated by the docblocks recording WHY each string is the
+      // string it is — which is the same prose the RAW sweep below reads.
       expect(source.length, `${path} did not load`).toBeGreaterThan(1000)
     }
     // …and the needle list covers every governed id, so a partially-populated namespace
-    // cannot shrink the sweep silently.
-    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(21)
+    // cannot shrink the sweep silently. 193.1-06 (D-21 / D-28): 21 → 22, moved in the SAME
+    // COMMIT as `GOVERNED_ID_COUNT` in `doorVocabulary.test.ts`, since the two numbers are the
+    // same fact read from two files.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(22)
     for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
     // …and the SECOND spelling is not a no-op: at least one id really differs between the
     // two, which is the only thing that makes sweeping twice worth the line.
@@ -578,7 +610,7 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
 
 describe("D-24(a) — no governed door word survives as a literal in any swept module", () => {
   it.each(SWEPT_SOURCES.map((f) => [f.path, f.source] as const))(
-    "%s carries none of the 21 governed words, in either spelling",
+    "%s carries none of the 22 governed words, in either spelling",
     (_path, source) => {
       expect(hitsIn(source)).toEqual([])
     },
