@@ -172,6 +172,7 @@ export interface PhaseFormPanelProps {
     definitionId: string | null
     /** The attached template's filename, resolved by the caller off `definition.assets[]`. */
     filename?: string
+    assetId?: string  // its `asset_id`, from the SAME descriptor as `filename` (260814-q5r)
     /** The returned descriptor, handed up — the caller appends and saves. */
     onAttached: (asset: { kind: "template"; asset_id: string; filename: string; mime: string }) => void
   }

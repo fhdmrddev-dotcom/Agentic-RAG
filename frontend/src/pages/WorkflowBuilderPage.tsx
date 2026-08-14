@@ -663,11 +663,26 @@ export function WorkflowBuilderPage({
   // ACCEPTED: the maps land asynchronously, so derived faces SETTLE when the mount fetch
   // resolves, exactly as `PhaseFormPanel` already behaves. Rejected: holding the tier until
   // the maps are non-empty (a late canvas for a cosmetic reason). Never: a placeholder.
-  const nameContext = useMemo<NameContext>(() => {
+  // 260814-q5r — the descriptor has ONE home. This `.find()` used to live inside
+  // `nameContext` and produced only a filename; the authoring panel now also needs the
+  // `asset_id` to ask what the template asks for. Hoisted rather than duplicated: two
+  // `.find()` calls over the same array could drift, and a fields list shown under a
+  // filename resolved by a DIFFERENT lookup is exactly the lie this feature prevents.
+  // The defensive `typeof === "string"` coercion is kept for BOTH fields — `meta.assets`
+  // may be absent, null or not an array, and its entries are untyped JSONB.
+  const templateAsset = useMemo(() => {
     const assets = Array.isArray(meta.assets) ? (meta.assets as Array<Record<string, unknown>>) : []
-    const filename = assets.find((a) => a?.kind === "template")?.filename
-    return { folderNames, skillNames, templateFilename: typeof filename === "string" ? filename : undefined }
-  }, [folderNames, skillNames, meta])
+    const found = assets.find((a) => a?.kind === "template")
+    if (!found) return undefined
+    const filename = typeof found.filename === "string" ? found.filename : undefined
+    const assetId = typeof found.asset_id === "string" ? found.asset_id : undefined
+    return { filename, assetId }
+  }, [meta])
+
+  const nameContext = useMemo<NameContext>(
+    () => ({ folderNames, skillNames, templateFilename: templateAsset?.filename }),
+    [folderNames, skillNames, templateAsset],
+  )
 
   const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
   const panelOpen = selectedSlug !== null
@@ -2040,7 +2055,10 @@ export function WorkflowBuilderPage({
           // that is not `llm_emit`, so the cost elsewhere is zero.
           template={{
             definitionId: draftId,
-            filename: nameContext.templateFilename,
+            // Both read off the ONE `templateAsset` memo, so the filename on screen and the
+            // asset the fields were read from are the same descriptor by construction.
+            filename: templateAsset?.filename,
+            assetId: templateAsset?.assetId,
             onAttached: onTemplateAttached,
           }}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}

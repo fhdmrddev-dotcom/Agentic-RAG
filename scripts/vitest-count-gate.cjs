@@ -986,7 +986,18 @@ const BASELINE = {
   // and the 404 branch relaying the server's terse detail instead of the both-causes sentence
   // (1 failure) — with both files restored (`TemplateAttachSection.tsx` md5-identical at
   // `0414bf98…`). Recorded in `AUTH-03-FRONTEND-SUMMARY.md`.
-  "TemplateAttachSection.test.tsx": 25,
+  //
+  // 260814-q5r: 25 → 43 (+18). The section now shows WHAT the attached template asks for,
+  // and the eighteen new cases exist because an empty field list is ambiguous: "we read it
+  // and found nothing" and "we never read it" are different facts, and merging them tells an
+  // author their template is field-less when the read simply failed. RED-4 planted exactly
+  // that merge — the `unavailable` branch rendered `TEMPLATE_FIELDS_NONE` under the
+  // `template-fields-none` testid — and observed **5 failed | 38 passed**, headed by
+  // `TestingLibraryElementError: Unable to find an element by:
+  // [data-testid="template-fields-unavailable"]` with a full DOM dump, NOT a bare timeout.
+  // Source restored md5-identical at `37181e61…`. The number below is the gate's OWN reported
+  // actual, read off its output, never a predicted one.
+  "TemplateAttachSection.test.tsx": 43,
   "FlowEdge.test.tsx": 22,
   // 188.1-01: 19 → 20. EXTENDED — the same move-invariant subtree-fence control, carried
   // here as well because this suite re-scopes its own five negatives and a control living in
