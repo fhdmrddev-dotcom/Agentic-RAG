@@ -57,7 +57,11 @@ import { useId } from "react"
 import { ExternalActionSection } from "./ExternalActionSection"
 import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
+import { TemplateNameCheck } from "./TemplateNameCheck"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
+// TYPE-ONLY, and erased at build. The child declares its OWN props; this panel exports no
+// props type for it, exactly as it exports none for the two sections above.
+import type { TemplateNameClassification } from "./templateNameBuckets"
 
 /** A partial config patch the form emits on each edit. */
 export type PhaseConfigPatch = Record<string, unknown>
@@ -175,6 +179,28 @@ export interface PhaseFormPanelProps {
     assetId?: string  // its `asset_id`, from the SAME descriptor as `filename` (260814-q5r)
     /** The returned descriptor, handed up — the caller appends and saves. */
     onAttached: (asset: { kind: "template"; asset_id: string; filename: string; mime: string }) => void
+  }
+  /**
+   * Phase 193.1 (AUTH-03 / SC#3) — which of the attached template's fields the draft's own
+   * steps NAME, already classified by the caller.
+   *
+   * Caller-owned for the FOURTH time in this file's history and for the identical reason the
+   * three props above are: the answer is derived from `definition.inputs[]` and the phase
+   * slugs — siblings of `phases` — while this panel's only write seam patches `config`. The
+   * panel therefore COMPUTES NOTHING here: it receives a finished answer and forwards it.
+   *
+   * ABSENT ⇒ NOTHING RENDERS, which is what keeps every other mount of this panel — including
+   * the flag-off Spine surface — byte-identical by construction rather than by review.
+   *
+   * ⚠ ONE GATED LINE, BY STANDING ORDER (G-5 / D-22). This file measures 15 commits across 7
+   * phases and 1136 lines, so G-5 fires on it, and its hot-file ledger row closes with an
+   * instruction rather than a status: *"the next surface that needs the panel gets its own
+   * component and one gated line."* Phase 185 honoured it, Phase 193 honoured it again at the
+   * mount below, and this is the third. A name check written inline here would turn an
+   * honoured guardrail into a violated one. **No override is recorded for Phase 193.1.**
+   */
+  nameCheck?: {
+    classification: TemplateNameClassification
   }
 }
 
@@ -731,6 +757,7 @@ export function PhaseFormPanel({
   rails,
   onGovernanceChange,
   template,
+  nameCheck,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -1083,6 +1110,10 @@ export function PhaseFormPanel({
         {/* 193 (AUTH-03) — the deliverable's template, its OWN component and ONE gated line
             (the standing G-5 order on this file). Gated on `llm_emit` because that is the
             only type whose executor resolves a bound template. */}
+        {/* 193.1 (AUTH-03 / SC#3 / D-22) — the name check, its OWN component and ONE gated
+            line, ABOVE the attach section as sketch 167 places it. Same `llm_emit` gate for
+            the same reason, and the same absent-renders-nothing rule. */}
+        {nameCheck && pt === "llm_emit" && <TemplateNameCheck {...nameCheck} />}
         {template && pt === "llm_emit" && <TemplateAttachSection {...template} />}
         {rails && <GovernanceSection phaseType={pt} availableTools={asList(cfg.available_tools)} kbTools={rails.kbTools ?? []}
           citationPolicy={asStr(cfg.citation_policy)} groundingEscalated={phase.grounding_escalated === true}

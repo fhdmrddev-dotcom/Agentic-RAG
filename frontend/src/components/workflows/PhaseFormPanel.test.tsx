@@ -398,3 +398,92 @@ describe("PhaseFormPanel — dismissal (183-09 / GAP-1)", () => {
     expect(screen.queryByTestId("phase-form-close")).not.toBeInTheDocument()
   })
 })
+
+/**
+ * Phase 193.1-09 (AUTH-03 / SC#3 — D-22) — THE NAME-CHECK MOUNT IS ONE GATED LINE.
+ *
+ * Two properties, and the first is the load-bearing one: **absent ⇒ nothing renders**. That
+ * is what keeps every OTHER mount of this panel — including the flag-off Spine surface, which
+ * passes no such prop — byte-identical by construction rather than by review. The second is
+ * the type gate: the check is about the file a deliverable step fills in, so it belongs to
+ * the one phase type whose executor resolves a bound template, exactly as the attach section
+ * beside it already does.
+ */
+describe("PhaseFormPanel — the 193.1 name-check mount (D-22)", () => {
+  const CLASSIFICATION = { produced: ["retrieve"], runInput: [], nowhere: ["project_name"] }
+
+  it("ABSENT ⇒ nothing renders, on a non-emit step AND on an llm_emit step", () => {
+    for (const phase_type of ["llm_single", "llm_emit"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+        />,
+      )
+      expect(screen.queryByTestId("name-check")).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("PRESENT but NOT llm_emit ⇒ still nothing renders — the gate is the phase type", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        nameCheck={{ classification: CLASSIFICATION }}
+      />,
+    )
+    expect(screen.queryByTestId("name-check")).not.toBeInTheDocument()
+  })
+
+  it("PRESENT and llm_emit ⇒ it mounts, and the panel added no computation to do it", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_emit", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        nameCheck={{ classification: CLASSIFICATION }}
+      />,
+    )
+    expect(screen.getByTestId("name-check")).toBeInTheDocument()
+    // The names came from the PROP, unchanged — the panel derives nothing about slugs.
+    expect(screen.getByTestId("name-check-bucket-produced")).toHaveTextContent("retrieve")
+    expect(screen.getByTestId("name-check-bucket-nowhere")).toHaveTextContent("project_name")
+  })
+
+  it("it sits ABOVE the attach section, as sketch 167 places it", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_emit", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        nameCheck={{ classification: CLASSIFICATION }}
+        template={{ definitionId: null, onAttached: noop }}
+      />,
+    )
+    const check = screen.getByTestId("name-check")
+    const attach = screen.getByTestId("rail-template")
+    // Document order, asserted through the DOM rather than by reading the source.
+    expect(check.compareDocumentPosition(attach) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("SOURCE — the mount really is ONE gated line and the panel computes nothing for it", () => {
+    // The G-5 shape this file's ledger row demands, asserted rather than described. The whole
+    // cost of this surface in this file is an import, a prop, a destructure and one line.
+    const mounts = phaseFormPanelSource.split("\n").filter((line) => line.includes("<TemplateNameCheck"))
+    expect(mounts).toHaveLength(1)
+    expect(mounts[0]).toContain('pt === "llm_emit"')
+    // …and it forwards the prop whole rather than picking it apart here.
+    expect(mounts[0]).toContain("{...nameCheck}")
+  })
+})
