@@ -372,7 +372,63 @@ const BASELINE = {
   // (`expected [ 'DESCRIBE_CTA/plain' ] to deeply equal []`), and the plant was restored to a
   // content-identical blob. Read from THIS SCRIPT'S OWN `actual` column
   // (`WorkflowDoorSwitch.test.tsx 34 35 +1`).
-  "WorkflowDoorSwitch.test.tsx": 35,
+  // 193.1-06 (D-14 / D-21 / D-28): 35 → 37. TWO new `it.each` rows, because the D-24(a) copy
+  // fence gained its FIFTH and SIXTH swept sources in the wave that creates them —
+  // `./DescribeTemplateRow.tsx` and `./templateFirstVocabulary.ts`.
+  //
+  // ⚠ THE SIXTH IS A DELIBERATE STRENGTHENING OF THE PLAN'S OWN ACCEPTANCE CRITERION, which
+  // said this list goes to FIVE. The plan counted the component and did not count the
+  // vocabulary module it creates in the same wave — leaving the HIGHER-RISK file outside the
+  // sweep, because a vocabulary module is the single most likely place in this repository for a
+  // governed sentence to be re-typed: re-typing strings is what the file is FOR. Sweeping the
+  // component that renders the words while skipping the module that declares them is the WR-01
+  // shape exactly.
+  //
+  // Both were driven RED against a real planted literal in their OWN file, the value READ OFF
+  // the vocabulary module at plant time rather than re-typed:
+  //   • `DescribeTemplateRow.tsx` → `expected [ 'DESCRIBE_CTA/plain' ] to deeply equal []`
+  //   • `templateFirstVocabulary.ts` → `expected [ 'DESCRIBE_ATTACH_PROMPT/plain' ] to deeply
+  //     equal []` — which additionally proves the 21 → 22 needle bump on the same line is
+  //     CONNECTED, since that id did not exist in the needle set before this wave.
+  // Both plants restored to byte-identical BLOBS (compared with `git show :<path>`, not the
+  // working file — `git checkout` applies CRLF normalization on this box, so an on-disk md5
+  // comparison after a restore is measuring the line endings, not the content).
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowDoorSwitch.test.tsx 35 37 +2`).
+  "WorkflowDoorSwitch.test.tsx": 37,
+  // ── 193.1-06 (AUTH-03 / D-04 / D-09 / D-14) — TWO NEW FILES, each pinned in the SAME ──
+  // ── COMMIT that creates it, because a `BASELINE` key naming a path that does not yet ──
+  // ── exist makes this gate ERROR (exit 2) rather than fail. ────────────────────────────
+  //
+  // NO `TARGETS` EDIT ACCOMPANIES EITHER, and that is CHECKED rather than assumed — the fifth
+  // and sixth time this map records the same check: both live in `src/components/workflows`,
+  // already a DIRECTORY entry in the `TARGETS` array below, so they RAN the moment they
+  // existed and the gate printed `— 42 new` and `— 21 new` before these lines were written.
+  // TARGETS decides what RUNS, BASELINE what is GUARDED, and only the second was missing.
+  //
+  // What would be unguarded without this entry: the 20 ORDERED ARM PAIRS. That loop is the
+  // mechanised form of the inherited rule *these sentences may never merge* — a surface that
+  // says "we read it and found no fields" about a document nobody opened is the exact defect
+  // AUTH-03 was re-opened to remove. Every one of those 20 is an ABSENCE assertion, the easiest
+  // kind to delete unnoticed, and each carries an INLINE positive control proving the arm
+  // rendered its OWN nodes first (without it, an arm that rendered nothing would satisfy all
+  // 20). Also here: the derived-count cases, asserted against `querySelectorAll("li").length`
+  // rather than against the fixture, and OBSERVED RED against a planted hardcoded `8` (3 cases
+  // failed, including the one named for a 5-field document); plus two injection cases proving
+  // attacker-supplied placeholder names render as TEXT and create no element.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`DescribeTemplateRow.test.tsx — 42 new`).
+  "DescribeTemplateRow.test.tsx": 42,
+  // What would be unguarded without this entry: the whole-table properties of the template-first
+  // surface's words — non-emptiness, pairwise distinctness, the zero-import leaf claim, and the
+  // two that carry this phase's honesty requirements. (a) The three no-fields footings are
+  // asserted pairwise distinct BY NAME *and* non-substring, restating one level down the shipped
+  // rule that a fact about the DOCUMENT and a fact about US may never merge. (b) EVERY message
+  // function is proved to change with its argument and to interpolate the number it was given —
+  // the mechanical statement of *no count is ever hardcoded*, which is what SC#2 rides on.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`templateFirstVocabulary.test.ts — 21 new`).
+  "templateFirstVocabulary.test.ts": 21,
   // 193.1-05 (D-01 / D-24(b)) — a NEW FILE, pinned in the SAME COMMIT that creates its fence
   // widening, because a `BASELINE` key naming a path that does not yet exist makes this gate
   // ERROR (exit 2) rather than fail.
@@ -419,7 +475,24 @@ const BASELINE = {
   // case. At the old pin of 9 it sat in thirty cases of slack, deletable with the gate green.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`doorVocabulary.test.ts 9 39 +30`).
-  "doorVocabulary.test.ts": 39,
+  //
+  // 193.1-06 (AUTH-03 / D-21 / D-28), re-pinned 39 → 41. An EXTENSION again — nothing deleted,
+  // renamed or weakened. The +2 are the 22nd governed id's own exact-match case (the loop runs
+  // over the UNION of the two governed sets, so the id inherited it automatically) plus ONE new
+  // case that is the interesting one:
+  //
+  // ⚠ THE CONTRACT-AGREEMENT CASE HAD TO BE RE-SCOPED, AND THE NEW CASE IS WHAT KEEPS THAT
+  // HONEST. `DESCRIBE_ATTACH_PROMPT` comes from a DIFFERENT acceptance bar (sketch 165's slot,
+  // reworded by D-21/D-28); the generated doors-copy contract has no row for it and never will.
+  // Widening the parse until it "found" 22 would have made this file's anti-drift instrument
+  // report on a row its own source does not contain. So the contract case is scoped to
+  // `CONTRACT_ID_COUNT` (21) and a NEW case asserts every post-contract id is genuinely ABSENT
+  // from the contract, in both the parsed table and the raw source — which is what stops
+  // `POST_CONTRACT_COPY` becoming a place to park any id someone would rather the generator did
+  // not check. Without that pin the new case sits in slack and is deletable with the gate green.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`doorVocabulary.test.ts 39 41 +2`).
+  "doorVocabulary.test.ts": 41,
   // 193-01 (D-08 / AUTH-01) — a NEW FILE, pinned in the SAME COMMIT that creates it, which is
   // the only commit it CAN be pinned in: a `BASELINE` entry naming a path that does not yet
   // exist makes this gate ERROR (exit 2) rather than fail.
@@ -1866,7 +1939,11 @@ const BASELINE = {
 // `WorkflowDoorSwitch.test.tsx` 34 → 35 (+1, the fourth swept source's `it.each` row) and
 // `useTemplateFirstDraft.test.tsx` 29 (new). The annotation is kept in step in the same commit
 // that moves it, which is the whole point of the correction recorded above.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3626 (193.1-05)
+// ⚠ 3693 (193.1-06) — the PINNED sum, which is NOT the run total. The gate printed
+// `total 3717 · pinned total 3693` on the run that set the four 193.1-06 pins; the 24-case gap
+// is files inside TARGETS that carry no pin. Quoting the run total here would be quoting a
+// different number for the same name, which is how an annotation goes stale on its own commit.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [

@@ -3614,6 +3614,69 @@ export async function getWorkflowTemplatePlaceholders(
   return (await res.json()) as WorkflowTemplatePlaceholders
 }
 
+/**
+ * Phase 193.1 (AUTH-03, D-05) — POST /workflows/template/placeholders: WHAT A DOCUMENT ASKS
+ * FOR, READ FROM BYTES ALONE, BEFORE ANY WORKFLOW EXISTS.
+ *
+ * ── WHAT THIS IS FOR, AND WHAT IT DELIBERATELY IS NOT ────────────────────────────────────
+ * It takes bytes and returns names. **It persists NOTHING** — no definition row, no Storage
+ * object, no draft, not even a temporary one. That is the whole reason it needs no
+ * `definitionId`: there is no row to key on because nothing is being written, which is what
+ * makes it usable on the pre-draft describe screen where neither an id nor a saved asset
+ * exists yet.
+ *
+ * ── ITS BOUND-TEMPLATE SIBLING, NAMED SO NOBODY HAS TO GUESS WHY THERE ARE TWO ───────────
+ * `getWorkflowTemplatePlaceholders` above answers the same question about a document ALREADY
+ * BOUND to a saved workflow, and is keyed on `(definitionId, assetId)` for exactly that
+ * reason. Both return `WorkflowTemplatePlaceholders`, and the shared return type is a decision
+ * rather than a convenience: ONE wire shape for both doors means a caller derives the SAME
+ * reading arms from either, so the pre-draft screen and the deliverable step's rail can never
+ * disagree about what an answer means.
+ *
+ * ── THE SHAPE, AND THE ONE DETAIL THAT IS LOAD-BEARING ───────────────────────────────────
+ * `uploadWorkflowTemplate`'s body — FormData, a single part named `file` because that is the
+ * part name the route declares, `Authorization: Bearer`, and **NO `Content-Type`** so the
+ * browser writes the multipart boundary itself. Setting that header by hand produces a request
+ * with no boundary and the server rejects it. Plus the abortable tail its sibling has and the
+ * upload lacks: a pre-draft read is racing an author who may replace the file, so the caller
+ * needs to cancel a read that has been overtaken.
+ *
+ * ⚠ NOTHING ABOUT THE CALLER IS SENT BEYOND THE TOKEN — no id, no path, no filename. The route
+ * accepts no path and owns no row, so the cross-tenant class that required an owner-prefix
+ * check on the bound-template door has nothing here to attach to. That is elimination by
+ * construction, not a guard that could be removed.
+ *
+ * ── REFUSALS ARE RELAYED, NOT RE-WORDED ──────────────────────────────────────────────────
+ * Throws `WorkflowTemplateUploadError` carrying `status: number | "network"` and the server's
+ * own `detail` when the body has one, so a caller can show a 422's own actionable sentence
+ * rather than inventing a second copy of a rule the server owns and can drift from.
+ */
+export async function readTemplatePlaceholdersFromFile(
+  file: File,
+  signal?: AbortSignal,
+): Promise<WorkflowTemplatePlaceholders> {
+  const token = await getAuthToken()
+  const formData = new FormData()
+  formData.append("file", file)
+  let res: Response
+  try {
+    res = await fetch(`${API_BASE}/workflows/template/placeholders`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },  // NO Content-Type — browser sets the boundary
+      body: formData,
+      signal,
+    })
+  } catch {
+    throw new WorkflowTemplateUploadError("network", null)
+  }
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { detail?: unknown } | null
+    const detail = typeof body?.detail === "string" ? body.detail : null
+    throw new WorkflowTemplateUploadError(res.status, detail)
+  }
+  return (await res.json()) as WorkflowTemplatePlaceholders
+}
+
 /** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
  *  token seeds the session, because three of the Builder's four entry routes create). */
 export async function createWorkflowDraft(
