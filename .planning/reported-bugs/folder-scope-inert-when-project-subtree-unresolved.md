@@ -1,130 +1,101 @@
 ---
 id: BUG-260814-01
-title: A phase's declared folder_scope is silently INERT when the project subtree is unresolved — retrieval reads the whole KB
+title: REFUTED — "folder_scope silently inert" was an analysis error; the run had NO declared scope to ignore
 reported: 2026-08-14
 surface: Agentic-RAG
-severity: major
-status: open
+severity: info
+status: closed
 affected_areas: [workflow-runs, harness/phase_types, grounding, retrieval, governance]
 folded_into: null
 verified_closed_by: null
-related_seeds: [SEED-157, SEED-161]
-re_open_trigger: null
+related_seeds: [SEED-159, SEED-162]
+re_open_trigger: >
+  An authoring flow that can produce a definition with project_folder_id = NULL AND a non-empty
+  per-phase folder_scope (measured 0 of 223 on 2026-08-14). That shape is the ONLY one where the
+  flagged branch could silently drop a declared scope — see "The residual" below.
 reproduces_on:
   branch: develop
   commit: 852cc546
   date: 2026-08-14
 ---
 
-# BUG-260814-01: a declared `folder_scope` can be silently ignored
+# BUG-260814-01: REFUTED BY MEASUREMENT — kept as a record, not as a defect
 
-## What we observed
+⚠ **This report was filed as `major/open` on 2026-08-14 and REFUTED the same day, by the very
+measurements it asked for. There is no defect. It is kept rather than deleted because a wrong
+report that quietly vanishes teaches nothing, and because the residual at the bottom is real.**
 
-A **real run**, driven by the operator through the live UI on 2026-08-14 (`workflow_runs.id =
-26b5a898-c0ca-4fbb-ae35-ed488bbf2eb2`, 68 s, `status=completed`).
+## What the report originally claimed
 
-Workflow: **Weekly Status Report** (`00000000-0000-0000-0000-0000001040a0`, slug
-`pm-weekly-status-report` v1), which declares:
+That workflow run `26b5a898-c0ca-4fbb-ae35-ed488bbf2eb2` retrieved outside its declared
+`folder_scope` — 3 of 8 emitted fields citing a document whose `folder_id` is NULL, while both
+phases declared `folder_scope = ['1564da7e…' (PM Demo Project)]`.
 
-```
-definition.project_folder_id      = 1564da7e-2348-4237-b7a1-ec17c5ea8f4b   ("PM Demo Project")
-phase 0 retrieve .folder_scope    = ['1564da7e-2348-4237-b7a1-ec17c5ea8f4b']
-phase 1 emit     .folder_scope    = ['1564da7e-2348-4237-b7a1-ec17c5ea8f4b']
-```
+## Why it is wrong — the root error
 
-That folder contains exactly 5 documents: `risk-log.md`, `weekly-meeting-notes-week8.md`,
-`weekly-meeting-notes-week9.md`, `sprint-task-log.md`, `project-charter-source.md`.
+**The definition inspected was NOT the definition that ran.** Two published workflows share the
+display name *"Weekly Status Report"*:
 
-**3 of the 8 emitted fields were sourced from a document that is NOT in that folder:**
+| definition_id | slug | owner | `project_folder_id` | per-phase `folder_scope` |
+|---|---|---|---|---|
+| `…0000001040a0` | `pm-weekly-status-report` | `d8a54002` (operator) | `1564da7e…` | `['1564da7e…']` |
+| **`…00000000c2`** | **`weekly-status-report`** | **`00000000…0001` (seed)** | **NULL** | **NULL** |
 
-| field | cited chunk | source document | folder |
-|---|---|---|---|
-| `project_name` | `d407080c…#0` | `weekly-status-report.docx` | **NULL** |
-| `reporting_period` | `d407080c…#0` | `weekly-status-report.docx` | **NULL** |
-| `risks_blockers` | `d407080c…#1` | `weekly-status-report.docx` | **NULL** |
+`workflow_runs.definition_id` for run `26b5a898` is **`00000000-0000-0000-0000-0000000000c2`** —
+the second row. I selected the first by `name`, never checked the run's own `definition_id`, and
+built the entire analysis on it.
 
-`select d.filename, f.name from documents d left join folders f on f.id = d.folder_id where
-d.id = 'd407080c-e698-49e2-9282-a2927e44221d'` → `('weekly-status-report.docx', None)`.
+**So the run declared no scope at all.** An unbound workflow searching the whole KB is correct and
+documented behaviour (`harness_engine.py:2108` — *"An unbound workflow (None) skips → whole-KB"*).
+There was nothing to ignore, and `folder_scope` was never inert.
 
-⚠ **The citations are NOT invented — that is what makes this dangerous.** All 8 cited chunk ids
-were verified present in the emit phase's own `retrieved_ids` (41 ids). The document really was
-retrieved; it simply should not have been reachable. Every downstream honesty check
-(`check_coverage`'s `invented_citation_count`, the uncited-value count) passes clean.
+## The three measurements the report asked for, answered
 
-## Why it matters
+1. **Was `ctx.folder_subtree_ids` `None`?** Yes — and *correctly*, because
+   `definition.project_folder_id` is NULL. `resolve_run_scope_root` had nothing to resolve, and
+   `workflow_runs.inputs` carries only `{"kickoff_prompt": "generate report\n"}` — no folder
+   override. The `_effective = _proj` fallback returned `None` because both inputs were `None`,
+   which is the designed path, not the flagged one.
+2. **Can a run start unbound on a workflow whose definition binds a project?** Not demonstrated,
+   and not needed — this definition binds no project.
+3. **Is `search_documents` the only reader?** `folder_subtree_ids` is consumed in
+   `tool_dispatcher.py` (the shared search path, gated on `is not None`) and threaded by
+   `agent_loop.py` / `task_service.py` / `phase_types.py`. No bypass was found, and no bypass was
+   needed to explain the observation.
 
-**Severity: major.** Three compounding reasons:
+## The residual — real, unreachable today, and worth a guard
 
-1. **`folder_scope` is a governance control, and it failed open.** The graded-governance surface
-   (Phase 185) sells "this step can only read what it declared". A control that silently does
-   nothing is worse than an absent one, because the canvas still renders the step as scoped.
-2. **The output is plausible and wrong in a way review will not catch.** The retrieved document
-   is a *prior status report* (or the template ingested as KB, added 2026-06-19). So the new
-   weekly report partly **copies last week's report** instead of deriving from the meeting notes
-   and risk log. Reports drift from reality while looking perfectly cited. This is the exact
-   failure a cited-RAG product exists to prevent.
-3. **It is invisible at every gate.** Publish passes, the run completes, coverage is clean,
-   citations resolve. Only a hand-check of `source_doc` against the declared scope reveals it —
-   which is how it was found.
-
-## Hypothesized cause
-
-**Hypothesis, not yet confirmed by a test.** `backend/app/services/harness/phase_types.py:436-441`
-builds the per-phase tool context:
+The branch at `backend/app/services/harness/phase_types.py:436-441` still has this property:
 
 ```python
-_proj = getattr(ctx, "folder_subtree_ids", None)            # resolved project subtree, or None
-_phase_scope = getattr(phase.config, "folder_scope", None)  # the phase's declared list
 _effective = (
-    [f for f in _proj if f in set(map(str, _phase_scope))]  # narrow-only ∩
-    if _proj is not None and _phase_scope else _proj
+    [f for f in _proj if f in set(map(str, _phase_scope))]
+    if _proj is not None and _phase_scope else _proj      # <-- _proj is None -> None
 )
 ```
 
-The narrowing is an **intersection with the resolved project subtree**, and the fallback is
-`_proj`. So when `_proj is None` — the project subtree was not resolved at run start — the
-expression yields `None`, meaning **no narrowing at all**, and `folder_scope` is discarded
-entirely rather than applied on its own.
+If a definition ever carries **`project_folder_id = NULL` AND a non-empty per-phase
+`folder_scope`**, the declared scope is discarded rather than applied on its own — a declared
+control failing open.
 
-The comment above it states the intent plainly: *"None project subtree (unbound / Deep) → None (no
-narrowing)"*. That is deliberate for an unbound/Deep run. The defect is that a phase which
-**declared** a scope inherits the unbound behaviour instead of its own declaration.
+**Measured 2026-08-14: 0 of 223 live definitions have that shape** (17 carry a project binding).
+So it is unreachable today, which is why this is `info/closed` and not a defect. It becomes real
+the moment an authoring flow can produce that combination — hence the `re_open_trigger`.
 
-**What still needs measuring before this is a finding rather than a hypothesis:**
-- Was `ctx.folder_subtree_ids` actually `None` on this run, or non-null and simply not containing
-  the out-of-folder doc? (If non-null, the cause is elsewhere and this analysis is wrong.)
-- Does the Run modal pass the project binding, or can a run start unbound on a workflow whose
-  definition binds a project?
-- Is `search_documents` the only reader of `folder_subtree_ids`, or can another tool bypass it?
+## What survived the refutation, and is genuinely worth acting on
 
-## Surface classification
+The run **did** cite `weekly-status-report.docx` (a KB document with `folder_id` NULL, ingested
+2026-06-19) for `project_name`, `reporting_period` and `risks_blockers`. That is not a scope
+violation — but it does mean **the new weekly report partly derived from a prior status report /
+the template itself rather than from the meeting notes and risk log**. Filed separately as
+`SEED-162`, where it belongs: a KB-hygiene and retrieval-quality concern, not a governance defect.
 
-`Agentic-RAG` — this app's own run engine. Routing candidate at the four GSD touchpoints.
+## The lesson, recorded so it does not recur
 
-## Suggested routing
+**A display name is not an identity.** The run row carries `definition_id`; the analysis must
+start there. Two rows sharing a `name` is not an edge case in this database — `libraryVocabulary.ts`
+already records that **18 slugs carry more than one version**.
 
-- **Fold into in-flight phase:** n/a (no phase in flight on the run engine)
-- **Defer to future phase / milestone:** a v3.7 run-correctness phase — this is a **correctness**
-  bug, not a UX one, and should not wait behind the authoring work
-- **Plant as seed:** n/a — this is a defect with a live reproduction, not a cross-milestone concern
-- **External — note only:** no
-
-## Workarounds
-
-None reliable today. A user cannot see that scope was ignored — the run surface reports success and
-the citations resolve. The only detection is manual: compare each emitted field's `source_doc`
-against the phase's declared `folder_scope`.
-
-Partial mitigation: keep the KB free of unfiled documents (`folder_id IS NULL`), since those are
-what an unnarrowed search reaches. This is a housekeeping dodge, not a fix.
-
-## Reference / evidence links
-
-- Run: `workflow_runs.id = 26b5a898-c0ca-4fbb-ae35-ed488bbf2eb2` (2026-08-14 16:16 UTC)
-- Emit output: `workflow_phases.output` where `slug='emit'` — carries `field_map`,
-  `retrieved_ids` (41) and `placeholder_keys` (8)
-- Code: `backend/app/services/harness/phase_types.py:436-441` (the ∩ and its `_proj` fallback)
-- Produced artifact: `/weekly-status-report.docx`, 37585 bytes, `opened: true`,
-  `residual_clean: true`
-- Found during the `260814-q5r` end-to-end verification, at the operator's request that the
-  feature be proven by a real run rather than by a panel rendering
+Second: the report was written with a hypothesis section that listed exactly the three
+measurements needed to promote it to a finding, and it was labelled a hypothesis throughout. That
+discipline is what made the refutation cheap — it took one query. Keep it.

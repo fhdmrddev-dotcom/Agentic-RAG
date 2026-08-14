@@ -74,4 +74,9 @@ did not execute. The defect is read off the code and the docstring, not off a fa
 action when this seed is picked up: force a null** (run against a KB folder lacking one field's
 evidence) and capture what the produced document actually shows.
 
-Related: [[SEED-157]], [[BUG-260814-01]] (the same run, a different defect).
+Related: [[SEED-157]], [[SEED-162]] (the same run — a produced report citing a PRIOR report).
+
+Note: an earlier draft of this seed pointed at `BUG-260814-01` as "the same run, a different
+defect". That report was **refuted** the same day — the analysis had used the wrong
+`definition_id`, selecting a workflow by display name when two rows share it. [[SEED-162]] is what
+survived the refutation.
