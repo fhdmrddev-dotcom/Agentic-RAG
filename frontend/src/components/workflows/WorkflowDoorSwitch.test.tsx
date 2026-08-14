@@ -27,6 +27,10 @@ import doorHeaderStripSource from "./DoorHeaderStrip?raw"
 // 193 REVIEW WR-01: the THIRD `doorVocabulary` consumer. It was outside the sweep while it held
 // the ungoverned copy the phase had to fix — see the note on SWEPT_SOURCES below.
 import builderPageSource from "@/pages/WorkflowBuilderPage?raw"
+// 193.1-05 (D-14): the FOURTH swept source. It is added in the SAME COMMIT that creates the
+// module — see the note on SWEPT_SOURCES below for why a new module on this surface joins the
+// list even though it imports nothing from `doorVocabulary` today.
+import templateFirstDraftSource from "./useTemplateFirstDraft?raw"
 import * as doorVocabulary from "./doorVocabulary"
 
 // The govern door mounts the real WorkflowBuilderPage, which fetches folders + skills
@@ -484,11 +488,29 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
  *
  * So: **any file that imports from `doorVocabulary` belongs here.** Adding the import without
  * adding the entry re-opens the exact hole this list exists to close.
+ *
+ * ⚠ **AND SO DOES ANY NEW MODULE ON THIS SURFACE, WHETHER OR NOT IT IMPORTS `doorVocabulary`
+ * YET — which is what the FOURTH entry is (193.1-05, D-14).** `useTemplateFirstDraft.ts` is the
+ * pre-draft describe→generate concern, cut off the Builder page under G-5; it imports NOTHING
+ * from `doorVocabulary` today, and it is swept anyway. Two reasons, both measured rather than
+ * cautious:
+ *
+ *   1. **The sweep is RAW, so prose counts.** That module's docblocks discuss the CTA and the
+ *      describe screen at length. Naming one of those words instead of `DESCRIBE_CTA` would
+ *      put a second home for a governed string one directory away from the module that owns
+ *      them — the same defect as a re-typed JSX literal, in a comment.
+ *   2. **WR-01 proved the list is the fence.** The entry above this one was added LATE, after
+ *      a file had quietly become a third consumer while sitting outside the sweep. Waiting for
+ *      the import to appear is exactly the policy that produced that gap, and a module created
+ *      in the same phase that widens this list is the cheapest possible moment to close it.
+ *
+ * The entry was driven RED against a real planted literal in that file before being trusted.
  */
 const SWEPT_SOURCES: { path: string; source: string }[] = [
   { path: "./WorkflowDoorSwitch.tsx", source: workflowDoorSwitchSource },
   { path: "./DoorHeaderStrip.tsx", source: doorHeaderStripSource },
   { path: "@/pages/WorkflowBuilderPage.tsx", source: builderPageSource },
+  { path: "./useTemplateFirstDraft.ts", source: templateFirstDraftSource },
 ]
 
 /**
@@ -513,14 +535,20 @@ const hitsIn = (source: string): string[] =>
   NEEDLES.filter((n) => source.includes(n.text)).map((n) => `${n.id}/${n.spelling}`)
 
 describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 E-2 lesson)", () => {
-  it("all three swept sources really loaded, and every needle is a real non-empty string", () => {
+  it("all four swept sources really loaded, and every needle is a real non-empty string", () => {
     // NON-VACUITY FIRST, BEFORE ANY NEGATIVE. A `?raw` import of a moved or renamed module
     // yields the EMPTY STRING in some resolvers rather than throwing, and `"".includes(x)` is
     // false for every x — so the whole fence would pass green while defending nothing. This
     // is the exact defect `/gsd:secure-phase 192.1` found: a fence swept against the empty
     // string, with the property holding and NOTHING guarding it.
-    expect(SWEPT_SOURCES).toHaveLength(3)
+    // 193.1-05 (D-14): 3 → 4. Bumped DELIBERATELY, in the same commit as the entry — a count
+    // that moved on its own is a list nobody checked.
+    expect(SWEPT_SOURCES).toHaveLength(4)
     for (const { path, source } of SWEPT_SOURCES) {
+      // ⚠ The 1000-CHARACTER FLOOR IS A REAL CONSTRAINT ON A NEW ENTRY, and it was MEASURED
+      // before the fourth was added rather than assumed: `wc -c useTemplateFirstDraft.ts` →
+      // 14062. A thin module would red here, and the answer would be to say so, never to
+      // quietly lower the floor.
       expect(source.length, `${path} did not load`).toBeGreaterThan(1000)
     }
     // …and the needle list covers every governed id, so a partially-populated namespace
@@ -548,7 +576,7 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
   })
 })
 
-describe("D-24(a) — no governed door word survives as a literal in either component", () => {
+describe("D-24(a) — no governed door word survives as a literal in any swept module", () => {
   it.each(SWEPT_SOURCES.map((f) => [f.path, f.source] as const))(
     "%s carries none of the 21 governed words, in either spelling",
     (_path, source) => {

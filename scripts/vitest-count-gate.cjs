@@ -361,7 +361,37 @@ const BASELINE = {
   // driven RED against a re-typed `DESCRIBE_CTA` literal (`expected [ 'DESCRIBE_CTA/plain' ] to
   // deeply equal []`) and the plant restored md5-identical, so this pin guards a fence that is
   // PROVED to fire rather than one assumed to.
-  "WorkflowDoorSwitch.test.tsx": 34,
+  // 193.1-05 (D-14 / AUTH-03): 34 → 35. ONE new `it.each` row, because the D-24(a) copy fence
+  // gained its FOURTH swept source — `./useTemplateFirstDraft.ts`, the pre-draft
+  // describe→generate concern cut off the Builder page under G-5 in this same wave. It imports
+  // nothing from `doorVocabulary` today and is swept anyway: the sweep is RAW, that module's
+  // docblocks discuss the CTA, and WR-01 is the standing proof that waiting for the import to
+  // appear is the policy that produced the last gap. Driven RED against a real planted
+  // `DESCRIBE_CTA` literal in that file — the value READ OFF the vocabulary module at plant
+  // time rather than re-typed — which failed exactly as WR-01's fix recorded
+  // (`expected [ 'DESCRIBE_CTA/plain' ] to deeply equal []`), and the plant was restored to a
+  // content-identical blob. Read from THIS SCRIPT'S OWN `actual` column
+  // (`WorkflowDoorSwitch.test.tsx 34 35 +1`).
+  "WorkflowDoorSwitch.test.tsx": 35,
+  // 193.1-05 (D-01 / D-24(b)) — a NEW FILE, pinned in the SAME COMMIT that creates its fence
+  // widening, because a `BASELINE` key naming a path that does not yet exist makes this gate
+  // ERROR (exit 2) rather than fail.
+  //
+  // NO `TARGETS` EDIT ACCOMPANIES IT, and that is CHECKED rather than assumed:
+  // `src/components/workflows` is already a DIRECTORY entry in the `TARGETS` array below, so
+  // the gate printed `useTemplateFirstDraft.test.tsx — 29 new` before this line was written.
+  // TARGETS decides what RUNS, BASELINE what is GUARDED.
+  //
+  // What would be unguarded without it: the behaviour of the moved pre-draft concern (the
+  // `canDraft` rule's three arms, the `/generate` body as a sorted KEY SET in two folder
+  // states, the stamp-only-if-unbound rule, both honest-failure paths and the 124 CR-01
+  // one-shot), plus the D-24(b) ESM-cycle fence over BOTH hosts in four import forms × two
+  // suffix spellings — the only thing standing between this module and a TDZ cycle that
+  // typechecks clean, lints clean and fails at runtime.
+  //
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN (`useTemplateFirstDraft.test.tsx — 29 new`),
+  // never hand-counted from `it(` literals.
+  "useTemplateFirstDraft.test.tsx": 29,
   // 193-05 (AUTH-01 / D-10 / D-11) — a NEW FILE, pinned in the SAME COMMIT that creates it,
   // for the same reason as the 193-01 entry below: a `BASELINE` key naming a path that does
   // not yet exist makes this gate ERROR (exit 2) rather than fail. No `TARGETS` edit
@@ -1832,7 +1862,11 @@ const BASELINE = {
 // a reader could check against, which is exactly why it is worth correcting rather than deleting.
 // Re-derive with: `node -e "const s=require('./scripts/vitest-count-gate.cjs')"` — or simply read
 // the `pinned total` this script prints on any run.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3596 (193.1-01)
+// 193.1-05: 3596 → **3626**. The +30 is this plan's two knob moves and nothing else —
+// `WorkflowDoorSwitch.test.tsx` 34 → 35 (+1, the fourth swept source's `it.each` row) and
+// `useTemplateFirstDraft.test.tsx` 29 (new). The annotation is kept in step in the same commit
+// that moves it, which is the whole point of the correction recorded above.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3626 (193.1-05)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
