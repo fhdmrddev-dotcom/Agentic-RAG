@@ -436,3 +436,64 @@ describe("WorkflowBuilderPage 193.1-01 — the harness is not vacuous", () => {
   })
 })
 
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// Plan 193.1-01 Task 2 — THE `/generate` REQUEST BODY, AS A KEY SET, BEFORE THE WIRE GROWS.
+//
+// WHY THIS EXISTS. `POST /workflows/generate` has accepted `template_placeholders` since Phase
+// 103 and this frontend has NEVER sent it (`SEED-157`): `WorkflowBuilderPage.tsx:1267-1272`
+// sends `{describe}` plus a conditional `project_folder_id` spread, and nothing else. Measured
+// consequence (D-19): the authoring prompt's DELIVERABLE RULE branches on that grounding
+// section, so today every draft is actively steered AWAY from templates. The absent key is the
+// mechanism, not a missing nicety.
+//
+// ⚠ ASSERTED AS A SORTED KEY-SET DEEP-EQUALITY, never `toMatchObject` / `toContain` /
+// `expect.objectContaining`. Those three are all satisfiable by a body carrying EXTRA keys —
+// and the whole point here is that a key which is ABSENT today must be VISIBLE when it arrives.
+//
+// A later plan adds `template_placeholders` to this payload and MUST move the two literals
+// below in the same commit. That movement is this phase's mechanical evidence that the wire
+// changed, and it is the reason these two cases are worth more than the feature test that will
+// replace them.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 193.1-01 — the pre-change `/generate` wire", () => {
+  it("no knowledge base picked ⇒ the body's key set is EXACTLY [describe]", async () => {
+    await mountPreDraft(false)
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: DESCRIBE_TEXT },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+
+    await waitFor(() => expect(WIRE.state.generateBodies).toHaveLength(1))
+    expect(Object.keys(WIRE.state.generateBodies[0]).sort()).toEqual(["describe"])
+    // …and the one key it does send carries the TRIMMED text, which is what the page promises.
+    expect(WIRE.state.generateBodies[0].describe).toBe(DESCRIBE_TEXT)
+  })
+
+  it("a knowledge base picked ⇒ the key set is EXACTLY [describe, project_folder_id]", async () => {
+    await mountPreDraft(false)
+    fireEvent.change(screen.getByTestId("project-folder-picker"), {
+      target: { value: WIRE.FOLDERS[1].id },
+    })
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: DESCRIBE_TEXT },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+
+    await waitFor(() => expect(WIRE.state.generateBodies).toHaveLength(1))
+    expect(Object.keys(WIRE.state.generateBodies[0]).sort()).toEqual([
+      "describe",
+      "project_folder_id",
+    ])
+    expect(WIRE.state.generateBodies[0].project_folder_id).toBe(WIRE.FOLDERS[1].id)
+  })
+
+  it("POSITIVE CONTROL — the key-set assertion really fails on an extra key", () => {
+    // A pin that has only ever been seen green is a pin nobody has watched fail. The extra key
+    // cannot be planted in the page (this plan is deliberately source-free — the capture's whole
+    // credibility rests on that), so the plant is made on the SHAPE the later wave will send.
+    const tomorrow = { describe: DESCRIBE_TEXT, template_placeholders: ["project_name"] }
+    expect(Object.keys(tomorrow).sort()).not.toEqual(["describe"])
+    expect(Object.keys(tomorrow).sort()).toEqual(["describe", "template_placeholders"])
+  })
+})
