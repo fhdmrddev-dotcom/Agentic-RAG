@@ -364,11 +364,11 @@ because `DoorHeaderStrip.tsx` and `doorVocabulary.ts` are the files nearly every
 **Plans**: 10 plans in 7 waves — planned 2026-08-14. G-5 fired on **three** files (`WorkflowBuilderPage.tsx`, `backend/app/api/workflows.py`, and `PhaseFormPanel.tsx` — the third named only at plan time, its ledger cell wrong in both directions) and **all three were honoured, none waived**: the page's concern is EXTRACTED first (Wave 2, before the feature it makes room for — the 192.1 D-01 order), the API module gains a third door in the template block it already owns, and the name check ships as its own component behind one gated line. **No guardrail override is recorded for this phase.** ⚠ The wire (`template_placeholders`) and the bind (auto-attach on first save) sit in ONE plan and cannot merge apart: the field flips the DELIVERABLE RULE's branch, so an unbound `render_template` draft is terminal at run (`no_template_bound`) and strictly worse than the blind draft it replaces. ⚠ SC#2's real `/generate` call is a Wave-1 checkpoint, not a phase-gate afterthought.
 
 Plans:
-- [ ] 193.1-01-PLAN.md — Wave 0 characterization baselines on the UNMOVED tree (flag ON/OFF × three `builderPhase` arms) + the `/generate` key-set pin
-- [ ] 193.1-02-PLAN.md — the stateless read route (`POST /workflows/template/placeholders`), one shared name assembly, no client and no pool
-- [ ] 193.1-03-PLAN.md — the grounding wire pinned mechanically: the names reach the prompt, the DELIVERABLE RULE's two branches, and `degraded` proved template-free
-- [ ] 193.1-04-PLAN.md — ⏸ checkpoint: the real `/generate` call with real keys, recorded raw; plus the ruling on two 167-C strings a measurement invalidated
-- [ ] 193.1-05-PLAN.md — the G-5 cut: `useTemplateFirstDraft.ts`, ESM-cycle fence, copy fence widened 3 → 4, baselines held with ZERO re-capture
+- [x] 193.1-01-PLAN.md — Wave 0 characterization baselines on the UNMOVED tree (flag ON/OFF × three `builderPhase` arms) + the `/generate` key-set pin
+- [x] 193.1-02-PLAN.md — the stateless read route (`POST /workflows/template/placeholders`), one shared name assembly, no client and no pool
+- [x] 193.1-03-PLAN.md — the grounding wire pinned mechanically: the names reach the prompt, the DELIVERABLE RULE's two branches, and `degraded` proved template-free
+- [x] 193.1-04-PLAN.md — ⏸ checkpoint: the real `/generate` call with real keys, recorded raw; plus the ruling on two 167-C strings a measurement invalidated
+- [x] 193.1-05-PLAN.md — the G-5 cut: `useTemplateFirstDraft.ts`, ESM-cycle fence, copy fence widened 3 → 4, baselines held with ZERO re-capture
 - [ ] 193.1-06-PLAN.md — the words, the row component and the client; one new governed id (21 → 22); `hint.withTemplate` declined
 - [ ] 193.1-07-PLAN.md — the wire AND the bind, indivisible; the CTA gate; the throwing-bind case in a suite the gate did not previously run
 - [ ] 193.1-08-PLAN.md — the mounts on BOTH describe screens, the handoff crossing, and two DECLARED re-captures
