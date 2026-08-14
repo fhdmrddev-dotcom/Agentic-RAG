@@ -1660,3 +1660,117 @@ is a question the app can honestly answer. Today it never asks: the `Upload temp
 renders on **every** workflow, quiet and unlabelled — noise on the ~100 rows that will never
 use it, and silent on the ones that need it. Operator pick (2026-08-13): **mark it on the card,
 name it in the Run modal, render nothing for workflows that do not fill one.**
+
+---
+
+## Session: Phase 193.1 — Template-First Authoring (2026-08-14)
+
+G-2 sketch, BEFORE discuss-phase. **AUTH-03's RE-OPENED half.** `REQUIREMENTS.md` records the
+requirement as *"ANSWERED WRONGLY, not delivered"*: Phase 193 shipped the **draft-then-attach**
+path (and quick task `260814-q5r` added the placeholder read on top of it), but a user who
+describes a workflow still gets a draft built **blind to the template it will have to fill**
+(`SEED-157`). A coverage tick here must mean *the workflow knows its template at draft time* —
+not *the user can find where to supply one*.
+
+**Measured before drawing anything:** `POST /workflows/generate` has accepted
+`template_placeholders` since **Phase 103**; the frontend has **never sent it**
+(`WorkflowBuilderPage.tsx` sends `{describe, project_folder_id?}` only). Its sibling
+`template_asset_id` is typed `UUID` while asset ids are Storage **paths** — a measured 422, so
+that channel is unwirable as typed and only `template_placeholders: list[str]` actually works.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 165 | the-template-lands-first | Where does "I have a template" live on the pre-draft screen, and how do its fields become a spec the author can see the draft aimed at — without slowing the person who has no template? | *pending* | phase-193.1, auth-03, template-first, describe-door, pre-draft, generated-from-build, g2-sketch-gate, seed-157 |
+| 166 | when-there-are-no-eight-fields | The read came back and it wasn't a list. Does the screen still let the author believe their draft is built to their template — and where should the truth live? | *pending* | phase-193.1, auth-03, honesty, seed-157, seed-158, seed-159 |
+| 167 | the-template-arrives-late | A template is attached to an already-drafted workflow. What does the app say about the mismatch — and what is it actually entitled to claim? | *pending* | phase-193.1, auth-03, sc3, reconcile, honesty, seed-159 |
+
+### Two operator decisions taken at intake (2026-08-14), before any variant was drawn
+
+1. **Entry shape → an optional affordance on the describe screen**, under the KB picker — *not*
+   a second pre-draft chooser and *not* a third top-level door. **Why:** SC#4 (the fast door
+   stays fast) is then satisfied *by construction* — ignore the row and today's behaviour is
+   byte-identical — and it adds no third door to a chooser `SEED-156` says cannot tell its first
+   two apart. **The cost, on record:** template-first never becomes the *default* `SEED-157`
+   proposes.
+2. **Fields shown → the fields ARE the visible spec**, not a quiet "8 fields found" receipt.
+   **Why:** SC#2 becomes visible to the author rather than merely true in the payload. **The
+   cost, on record:** it breaks MANIFEST decision #12's *"3-second read at rest"* on this one
+   screen.
+
+### ⚠ 165–167 GO ONE STEP FURTHER THAN 164 — the central surface is no longer a proposal
+
+164's arrow (generate the sketch **from** the build) is inherited unchanged. What changed is what
+that arrow can now reach:
+
+**164's template panel was a pure PROPOSAL** — it drew nodes no component had, and said so.
+**165–167's central surface is not.** `TemplateAttachSection.tsx` **shipped** in Phase 193 and
+grew its *"What this template asks for"* list in quick task `260814-q5r`. So the fields region on
+these three pages is that component **mounted**, with its four honest arms, its exported
+sentences and the **real eight keys of `pm-weekly-status-report.docx`** — and the keys are
+**parsed out of the dump by `build.cjs`**, never re-typed, so no page can display a field the
+shipped component did not render.
+
+That is the `SEED-155` discipline in its strongest available form: *if a sketch depicts a surface
+consuming an existing component, it must RENDER it, not redraw it.*
+
+| region | source | drift risk |
+|---|---|---|
+| the describe door; the attach section, its fields, its four failure sentences | real rendered DOM | **none — it *is* the build** |
+| the attach control on the pre-draft screen (165) | proposed `NEW` | ordinary |
+| variant C's re-scaled type (165); the reconcile blocks (167) | proposed `NEW`/`CHANGE` | ordinary |
+| the stateless-read route every filled state assumes | **does not exist** | a scope decision — 165's warning tab |
+
+### Each build asserts before it draws — and 166's fence was driven RED
+
+A splice into an anchor that is not there fails **silently** and yields a variant that quietly
+equals the baseline: a green-looking sketch showing nothing. So each `build.cjs` asserts its
+anchors present **and unique**, asserts the eight keys were parsed rather than typed, and asserts
+**every stage actually differs from the shipped DOM** — exiting non-zero otherwise.
+**165: 12 assertions · 166: 22 · 167: 8 — all passing.**
+
+**166's pairwise fence was proved rather than asserted.** It checks that each of the five reading
+arms renders its own node and **none of the other four** — the mechanised form of the shipped
+docblock's rule that *"these two sentences may never merge"*. Planting
+`template-fields-unavailable` inside the `none` dump produced `ASSERTION FAILURE ... found 1`,
+`EXIT=1`, and the dump was restored to green. *A fence nobody has seen fire is a fence nobody
+knows is connected* (the 192.1 lesson: three fences held with nothing defending them).
+
+### ⚠ THE MEASUREMENT THAT CONSTRAINS SC#3 — no variant may claim coverage
+
+**Nothing in the app can compute a coverage verdict at attach time.** `check_coverage`
+(`template_render_service.py:416-460`) is the real computation and runs at **run** time over an
+actual emitted field map; at attach time there are no values. All that exists is a comparison of
+**names** — a heuristic, never a guarantee.
+
+167 is built so that is visible rather than buried: its fixture makes the heuristic **cry wolf on
+purpose**. Two of the eight fields (`project_name`, `reporting_period`) are legitimately supplied
+as **run inputs** — nothing produces them and nothing should — so a naive two-bucket "nothing
+produces this" check flags two perfectly correct fields. Hence **three buckets, never two**, and
+hence `reconcile.disclaim` is load-bearing rather than decorative.
+
+### Three open questions these sketches deliberately do NOT settle
+
+They belong in `193.1-CONTEXT.md` as decisions, never smuggled inside a chosen variant:
+
+1. **The chicken-and-egg route shape.** The shipped upload route requires a saved workflow, and at
+   describe time none exists — so `TemplateAttachSection` mounted there renders its amber
+   `TEMPLATE_UNSAVED_REFUSAL` and **no file input at all**. That dead end is drawn on 165's
+   **wall** tab rather than argued in prose. Every filled state on 165/166 assumes the
+   **stateless read** (the ROADMAP's recommendation); if planning picks *create an empty draft up
+   front* instead, those states change.
+2. **The `loading` race** (166). Nothing stops the author pressing Draft while the read is in
+   flight — producing the blind draft this phase exists to prevent, on a screen that just told
+   them a template was attached. Disable while reading / let the draft wait / let it through and
+   reconcile after: none is drawn.
+3. **Where a LARGE reconcile lives** (167). Every stage puts it on the 320 px rail because that is
+   where the template arrives, but the changes are about the *canvas*. Four rows fit; fifteen do
+   not.
+
+### ⚠ G-5 fires on two files and is a DISCUSS-PHASE obligation, not a sketch one
+
+`frontend/src/pages/WorkflowBuilderPage.tsx` (33 commits / **10 phases** / 2055 L) and
+`backend/app/api/workflows.py` (32 commits / **16 phases** / 1813 L) were both added to the
+hot-file ledger on 2026-08-14 and both are certain to be touched here.
+**`/gsd:discuss-phase 193.1` owes a refactor recommendation as its FIRST option, before the
+planned feature.** Sketching first is correct — it is the G-2 gate — but the refactor call comes
+before planning, not after.

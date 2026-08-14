@@ -1,0 +1,183 @@
+/**
+ * SKETCH 166 EMITTER — THROWAWAY. Deleted immediately after it runs.
+ *
+ * Renders the REAL `WorkflowDoorSwitch` (describe door) and the REAL
+ * `TemplateAttachSection` in EVERY ONE of its five reading states, and writes the
+ * actual `innerHTML` to
+ * `.planning/sketches/166-when-there-are-no-eight-fields/dom.generated.json`.
+ *
+ * ── WHY ALL FIVE, AND WHY THE COMPONENT RATHER THAN A DRAWING ────────────────────────
+ * The five arms are not hypothetical UI states someone invented for a mockup. Each is a
+ * distinct branch of `useTemplatePlaceholders` that ALREADY SHIPS, each with its own
+ * exported sentence and its own testid, and the component's own docblock calls two of
+ * them "THE TWO SENTENCES THAT MAY NEVER MERGE":
+ *
+ *   fields      — we opened it and found these keys
+ *   none        — we opened it and it has no fill-in fields          (SEED-158's case)
+ *   not-word    — `none` AND the filename is not .docx               (a .pptx / .xlsx)
+ *   unavailable — we never opened it; this says NOTHING about it     (the read failed)
+ *   loading     — we are still opening it
+ *
+ * A sketch that redrew these would be free to blur `none` into `unavailable`, which is
+ * precisely the distinction the shipped code exists to protect. So it renders them.
+ *
+ * ⚠ THE QUESTION THIS SKETCH ASKS IS NOT ABOUT THESE FIVE SENTENCES. They are honest
+ *   about the TEMPLATE and they are not being redesigned. The question is what the
+ *   *DRAFT* says about itself on the four arms where there are no eight fields — because
+ *   today the answer is "nothing", and a silent fall back to a blind draft is SEED-157
+ *   recurring with a control on screen.
+ */
+import { describe, it, vi, beforeEach } from "vitest"
+import { render, fireEvent, act } from "@testing-library/react"
+import fs from "node:fs"
+import path from "node:path"
+
+const { mockGenerateWorkflow, mockListFolders, mockListSkills, mockUseTemplatePlaceholders } =
+  vi.hoisted(() => ({
+    mockGenerateWorkflow: vi.fn(),
+    mockListFolders: vi.fn(),
+    mockListSkills: vi.fn(),
+    mockUseTemplatePlaceholders: vi.fn(),
+  }))
+
+vi.mock("@/lib/api", () => ({
+  generateWorkflow: mockGenerateWorkflow,
+  createWorkflowDraft: vi.fn(),
+  updateWorkflowDraft: vi.fn(),
+  listFolders: mockListFolders,
+  listSkills: mockListSkills,
+  uploadWorkflowTemplate: vi.fn(),
+  WorkflowTemplateUploadError: class extends Error {},
+}))
+
+vi.mock("@/hooks/useTemplatePlaceholders", () => ({
+  useTemplatePlaceholders: (...args: unknown[]) => mockUseTemplatePlaceholders(...args),
+}))
+
+import { WorkflowDoorSwitch } from "./WorkflowDoorSwitch"
+import { TemplateAttachSection } from "./TemplateAttachSection"
+
+/** The real eight, parsed from `pm-weekly-status-report.docx` during quick task 260814-q5r. */
+const PM_WEEKLY_FIELDS = [
+  "accomplishments",
+  "milestones",
+  "overall_rag_status",
+  "planned_next",
+  "project_name",
+  "reporting_period",
+  "risks_blockers",
+  "summary",
+]
+
+const strictDef = {
+  slug: "vendor-risk",
+  version: 2,
+  name: "Vendor-risk review",
+  business_requirement: "Review a vendor's risk posture and produce a cited report.",
+  input_keys: ["vendor_name", "review_period"],
+  phases: [
+    { slug: "pull", phase_index: 0, name: "Pull", config: { phase_type: "programmatic" } },
+    {
+      slug: "emit",
+      phase_index: 1,
+      name: "Render report",
+      config: { phase_type: "llm_emit", citation_policy: "strict" },
+      validators: [{ kind: "citations_required" }, { kind: "llm_judge_rubric" }],
+    },
+  ],
+}
+
+const FOLDERS = [
+  { id: "f1", name: "Client deliverables", parent_id: null },
+  { id: "f2", name: "Project Atlas", parent_id: null },
+  { id: "f3", name: "Weekly reporting", parent_id: null },
+]
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  mockListFolders.mockResolvedValue(FOLDERS)
+  mockListSkills.mockResolvedValue([])
+  mockGenerateWorkflow.mockResolvedValue({ ok: true, definition: { slug: "vendor-risk", phases: [] } })
+})
+
+const OUT = path.resolve(
+  __dirname,
+  "../../../../.planning/sketches/166-when-there-are-no-eight-fields/dom.generated.json",
+)
+
+function dumpFields(state: unknown, filename: string): string {
+  mockUseTemplatePlaceholders.mockReturnValue(state)
+  const { container, unmount } = render(
+    <TemplateAttachSection
+      definitionId="b7c1f2a4-0000-4000-8000-000000000001"
+      filename={filename}
+      assetId="u1/_library/d1/abc12345-template"
+      onAttached={vi.fn()}
+    />,
+  )
+  const html = container.innerHTML
+  unmount()
+  return html
+}
+
+describe("sketch 166 emitter", () => {
+  it("dumps every reading state of the real component", async () => {
+    const dumps: Record<string, string> = {}
+
+    // The describe door, with a real requirement typed in — the splice target.
+    {
+      mockUseTemplatePlaceholders.mockReturnValue({ kind: "idle" })
+      const { container, unmount } = render(
+        <WorkflowDoorSwitch def={strictDef} initialDoor="describe" onDescribeDraft={vi.fn()} />,
+      )
+      await act(async () => {
+        await Promise.resolve()
+        await Promise.resolve()
+      })
+      const box = container.querySelector('[data-testid="describe-box"]') as HTMLTextAreaElement
+      act(() => {
+        fireEvent.change(box, {
+          target: {
+            value:
+              "Every Monday, pull last week's project updates from the Weekly reporting folder and write the client status report.",
+          },
+        })
+      })
+      dumps.describe = container.innerHTML
+      unmount()
+    }
+
+    // ── THE FIVE ARMS ────────────────────────────────────────────────────────────
+    dumps.armFields = dumpFields(
+      { kind: "fields", fields: PM_WEEKLY_FIELDS },
+      "pm-weekly-status-report.docx",
+    )
+    dumps.armLoading = dumpFields({ kind: "loading" }, "pm-weekly-status-report.docx")
+
+    // ⚠ SEED-158's case, and the reason it is the most important arm on this page: a real
+    //   client template written in plain language, with no {{ }} tokens anywhere. The
+    //   server answered `ok` with an empty list — we DID read it, it DOES have no fields.
+    dumps.armNone = dumpFields({ kind: "none" }, "weekly-report-blank.docx")
+
+    // ⚠ The SAME `none` state with a NON-.docx filename. `TemplateAttachSection` derives
+    //   `notWord` from emptiness AND the extension, so this is a different sentence
+    //   reached by the same server answer — the branch a redraw would most likely miss.
+    dumps.armNotWord = dumpFields({ kind: "none" }, "qbr-deck.pptx")
+
+    // ⚠ The one that must NEVER be worded like `armNone`: we never opened it.
+    dumps.armUnavailable = dumpFields(
+      { kind: "unavailable", reason: "unreadable" },
+      "pm-weekly-status-report.docx",
+    )
+
+    fs.mkdirSync(path.dirname(OUT), { recursive: true })
+    fs.writeFileSync(OUT, JSON.stringify(dumps, null, 2), "utf8")
+    // eslint-disable-next-line no-console
+    console.log(
+      "EMITTED",
+      Object.entries(dumps)
+        .map(([k, v]) => `${k}=${v.length}B`)
+        .join(" "),
+    )
+  })
+})
