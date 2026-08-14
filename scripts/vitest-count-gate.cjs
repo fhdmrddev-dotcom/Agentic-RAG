@@ -258,6 +258,30 @@ const BASELINE = {
   "PublishGauntlet.test.tsx": 46,
   "WorkflowBuilderPage.canvas.test.tsx": 128,
   "WorkflowBuilderPage.describe.test.tsx": 19,
+  // 193.1-01 (D-01 / D-02) — a NEW FILE, pinned in the SAME COMMIT that adds its `TARGETS`
+  // entry, because a `BASELINE` key naming a path this gate does not EXECUTE would pin a
+  // number nothing produces.
+  //
+  // ⚠ THIS ONE NEEDED **BOTH** KNOBS, AND THAT IS THE DIFFERENCE FROM THE THREE 193 ENTRIES
+  // BELOW — measured, not assumed. `193-01`, `193-03` and `193-05` each record "NO `TARGETS`
+  // EDIT ACCOMPANIES IT" because their files live under `src/components/workflows`, a
+  // DIRECTORY entry, so the gate ran them the moment they existed. This file lives under
+  // `src/pages`, which this array reaches by NAMED FILES ONLY — there is no `src/pages`
+  // directory entry anywhere in `TARGETS`. So the gate would never have executed it, and a
+  // file the gate never runs has falsified nothing. TARGETS decides what RUNS, BASELINE what
+  // is GUARDED; here BOTH were missing.
+  //
+  // What would be unguarded without it: six whole-`innerHTML` characterization captures of
+  // the pre-draft describe screen — flag ON and flag OFF × the three `builderPhase` arms —
+  // taken on the UNMOVED tree at `5333518b`, where both modules Phase 193.1's later waves
+  // create answer `does not exist in 'HEAD'` (exit 128). They are the only evidence the phase
+  // will have that D-01's cut changed no pixel. Plus the two `/generate` KEY-SET assertions
+  // that pin the wire BEFORE `template_placeholders` joins it (`SEED-157`), whose whole value
+  // is that they must MOVE in the commit that changes the wire.
+  //
+  // READ FROM THIS SCRIPT'S OWN `actual` COLUMN (`WorkflowBuilderPage.preDraft.baseline.test.tsx
+  // — 16 new`) on the run that first executed the file, never hand-counted from `it(` literals.
+  "WorkflowBuilderPage.preDraft.baseline.test.tsx": 16,
   "PhaseFormPanel.test.tsx": 19,
   "WorkflowBuilderPage.test.tsx": 15,
   // 188-12: 14 → 20, inherited stale-low pin.
@@ -1799,7 +1823,16 @@ const BASELINE = {
 //   entries above (+77) it is exactly 24 again, which is the measurement that closes the question.
 //   Re-pinning them HERE would fold unrelated drift into a commit that did not cause it. Owed as
 //   its own edit (T-9), and stated so the decline reads as a decision rather than an oversight.
-const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3533 (193-10)
+// ⚠ THE ANNOTATION ON THIS LINE WAS STALE BEFORE 193.1 OPENED, and it is corrected BESIDE the
+// claimed value rather than over it — this repository's habit for a figure that rots.
+// It read `3533 (193-10)`. Measured at 193.1-01's base `5333518b`, BEFORE this plan's own pin,
+// this script printed `pinned total 3580` — already +47, from pins landed after 193-10 wrote the
+// number. With 193.1-01's `+16` it prints **3596**. The value itself is DERIVED (the `reduce`
+// above), so nothing behavioural ever depended on the annotation; what rotted is the only figure
+// a reader could check against, which is exactly why it is worth correcting rather than deleting.
+// Re-derive with: `node -e "const s=require('./scripts/vitest-count-gate.cjs')"` — or simply read
+// the `pinned total` this script prints on any run.
+const BASELINE_TOTAL = Object.values(BASELINE).reduce((a, b) => a + b, 0) // ⚠ 3596 (193.1-01)
 
 // ── The Wave-0 blast radius (184-VALIDATION.md § "quick run command"). ──
 const TARGETS = [
@@ -1822,6 +1855,29 @@ const TARGETS = [
   // end-to-end wire fence unguarded — this file was never even EXECUTED by the gate. That
   // is round-3's WR-16 recurring, so the fix is the entry, not another comment about it.
   "src/pages/WorkflowBuilderPage.describe.test.tsx",
+  // ── Added in 193.1-01 (Wave 1, D-01/D-02) — and it needs BOTH knobs, which is the ────
+  // ── difference from 193-01's entry and is MEASURED rather than assumed. ──────────────
+  //
+  // `193-01` created `WorkflowDoorSwitch.baseline.test.tsx` and needed a BASELINE entry
+  // ONLY: it lives under `src/components/workflows`, which is a DIRECTORY entry at the top
+  // of this list, so the gate executed it the moment it existed and printed
+  // `— 17 new`. This file is the same KIND of suite and needs BOTH, because `src/pages` is
+  // reached here by NAMED FILES ONLY — `WorkflowBuilderPage.test.tsx`, `.canvas.test.tsx`,
+  // `.header.test.tsx`, `.describe.test.tsx`, `.session.test.tsx`, `WorkflowsPage.test.tsx`,
+  // `WorkflowRunPage.test.tsx` — and there is NO `src/pages` directory entry anywhere in
+  // this array. Verified by reading the array, not by belief: a new page-level suite is not
+  // executed by this gate at all until it is named here, and **a file the gate never runs
+  // has falsified nothing.**
+  //
+  // What would be unguarded without it: the SIX whole-`innerHTML` characterization captures
+  // of the pre-draft describe screen (flag ON and OFF × `empty`/`composing`/`error`) taken
+  // on the UNMOVED tree at `5333518b` — the only evidence Phase 193.1 will have that cutting
+  // the pre-draft template-read concern out of `WorkflowBuilderPage.tsx` (both destination
+  // modules proved nonexistent at that commit, exit 128) changed no pixel — plus the two
+  // `/generate` KEY-SET assertions that pin the wire BEFORE `template_placeholders` is added
+  // to it. Half of those rows are ABSENCE assertions, which is the easiest kind of case to
+  // delete unnoticed.
+  "src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx",
   // Added in 188-01 (Wave 0), for the same two-knob reason spelled out directly above and
   // for one more: `src/components/panel/__tests__/` lands outside BOTH knobs by default —
   // the directory entries above cover only `src/components/workflows` and three named
