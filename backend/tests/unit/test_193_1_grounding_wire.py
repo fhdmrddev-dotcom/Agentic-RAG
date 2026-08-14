@@ -72,13 +72,47 @@ import pytest
 _USER = "3f2b0a11-1111-4c1e-9a00-00000000beef"
 _ASSET = "00000000-0000-4000-8000-000000000001"
 
-# ── The heading literal, spelled EXACTLY ONCE in this file (plan 03, task 1) ──────────
-# One spelling on purpose: a second copy in a docblock or a second assertion would make the
-# `rendered.count(_HEADING) == 1` fence below read as a coincidence rather than a property.
-# A SECOND grounding section in the rendered prompt is a silent duplication — the model would
-# see two answers to "what template fields exist", and the DELIVERABLE RULE branches on that
-# section. Hence the count, not merely the presence.
-_HEADING = "### Template placeholder fields (if the workflow must fill a template)"
+# ── The heading literals, each spelled EXACTLY ONCE in this file ──────────────────────
+#
+# One spelling apiece on purpose: a second copy in a docblock or a second assertion would
+# make the exactly-once fence below read as a coincidence rather than a property. A SECOND
+# grounding section in the rendered prompt is a silent duplication — the model would see two
+# answers to "what template fields exist", and the DELIVERABLE RULE branches on that section.
+# Hence the count, not merely the presence.
+#
+# ⚠ DECLARED RE-CAPTURE, 1 of 1 — 2026-08-14, plan `193.1-11`, decision **D-26**.
+#
+# Until this commit there was ONE constant here:
+#
+#   "### Template placeholder fields (if the workflow must fill a template)"
+#
+# and it served BOTH meanings — the arm where a template exists and the arm where it does
+# not. **That was the defect, not merely the pin's subject.** Plan `193.1-04` drove six real
+# `/generate` calls and measured the hedge buying nothing: with the names sent under it, a
+# `render_template` deliverable appeared **0 times out of 3**; with an explicit statement of
+# provision, **2 out of 2** (`193.1-UAT.md` row U1). `render_grounding_prompt` now branches,
+# so the pin branches with it.
+#
+# ⚠ THE GUARD NOTICED, WHICH IS THE MECHANISM WORKING. On the pre-edit run — the source
+# already changed, this file untouched — FOUR cases RED'd, every one of them heading-derived
+# because `_section_line` applies the count fence on every read (the same coupling
+# `193.1-03-SUMMARY.md` recorded when its plant-3 duplication RED'd three cases at once):
+# `test_every_supplied_name_reaches_the_prompt`,
+# `test_the_section_heading_appears_exactly_once`,
+# `test_an_empty_list_renders_the_literal_none_and_no_name_anywhere` and
+# `test_a_name_carrying_injection_text_is_rendered_verbatim`. **Nothing else moved** — the
+# DELIVERABLE RULE fence, the terminal-failure fence, the supplied-list short circuit, the
+# two `degraded` membership cases and the `degraded` positive control all stayed green.
+_HEADING_PRESENT = (
+    "### Template placeholder fields — the user HAS attached a template document to this "
+    "workflow; the final deliverable MUST therefore be an `llm_emit` phase with "
+    "`emitter: 'render_template'` that fills EXACTLY the fields named on the next line"
+)
+_HEADING_ABSENT = (
+    "### Template placeholder fields — NO template document was provided with this "
+    "workflow; the final deliverable MUST therefore be PLAIN TEXT / markdown, and a "
+    "`render_template` emit phase is FORBIDDEN because it would fail at run time"
+)
 
 # The eight REAL field names, parsed from `pm-weekly-status-report.docx` during quick task
 # 260814-q5r. Real placeholders are NOUNS (real phase slugs are verbs) — using the real set
@@ -121,11 +155,14 @@ def _section_line(rendered: str) -> str:
     section would pass a whole-prompt containment check while being invisible to the rule
     that branches on this one.
     """
-    assert rendered.count(_HEADING) == 1, (
+    n_present = rendered.count(_HEADING_PRESENT)
+    n_absent = rendered.count(_HEADING_ABSENT)
+    assert n_present + n_absent == 1, (
         "the grounding section heading must appear EXACTLY once in the rendered prompt; "
-        f"found {rendered.count(_HEADING)}"
+        f"found {n_present} present-arm and {n_absent} absent-arm headings"
     )
-    return rendered.split(_HEADING, 1)[1].lstrip("\n").split("\n")[0]
+    heading = _HEADING_PRESENT if n_present else _HEADING_ABSENT
+    return rendered.split(heading, 1)[1].lstrip("\n").split("\n")[0]
 
 
 def _rendered_names(rendered: str) -> list[str]:
@@ -146,9 +183,21 @@ def test_every_supplied_name_reaches_the_prompt():
 
 
 def test_the_section_heading_appears_exactly_once():
-    """Asserted on BOTH arms, because a duplicated section is equally wrong when empty."""
-    assert _render(_EIGHT_NAMES).count(_HEADING) == 1
-    assert _render([]).count(_HEADING) == 1
+    """Asserted on BOTH arms, because a duplicated section is equally wrong when empty.
+
+    ⚠ Re-pinned at D-26 and STRICTLY STRONGER than the assertion it replaces. The old form
+    counted ONE constant, so a render that emitted two DIFFERENT template sections — the
+    exact shape a careless two-arm branch produces — would have counted 1 and passed. The
+    fence is now over the SUM of both arms, and each arm is additionally asserted to carry
+    its own heading and NOT the other's.
+    """
+    present = _render(_EIGHT_NAMES)
+    absent = _render([])
+
+    assert present.count(_HEADING_PRESENT) == 1
+    assert present.count(_HEADING_ABSENT) == 0
+    assert absent.count(_HEADING_ABSENT) == 1
+    assert absent.count(_HEADING_PRESENT) == 0
 
 
 def test_an_empty_list_renders_the_literal_none_and_no_name_anywhere():
@@ -164,6 +213,64 @@ def test_an_empty_list_renders_the_literal_none_and_no_name_anywhere():
         assert name not in rendered, (
             f"{name!r} appeared in a prompt built from an EMPTY placeholder list"
         )
+
+
+def test_the_two_arms_assert_opposite_facts_and_share_no_sentence():
+    """⚠ THE CASE THE OLD SUITE COULD NOT HAVE HAD, and the one that pins **D-26** itself.
+
+    Before 2026-08-14 ONE string served both meanings — *"### Template placeholder fields
+    (if the workflow must fill a template)"* — so there was no distinction to assert. That
+    was measured to be the defect: with the names sent under that hedge, a
+    ``render_template`` deliverable appeared **0 times out of 3** on real ``/generate``
+    calls, and **2 out of 2** once provision was stated outright (``193.1-UAT.md`` row U1).
+    A suite that pinned only the present arm would let the two collapse back into one
+    string and never notice.
+
+    Three properties, and each is a different way the regression could arrive:
+
+      1. **The present arm asserts PROVISION and licenses the branch.** Not merely that the
+         names render — the model was already getting the names and declining anyway.
+      2. **The absent arm asserts ABSENCE and forbids the branch.** ⚠ This one is a
+         correctness requirement, not symmetry: a ``render_template`` phase with no
+         template bound is TERMINAL at run (``no_template_bound``,
+         ``phase_types.py:1271``) and can NEVER publish, so an absent arm weakened toward
+         templates trades a slow deliverable for an impossible one. SC#4 (*the fast door
+         stays fast*) and D-08 both rest on this arm, and Call A measured it already
+         behaving correctly — this pin is what keeps it that way.
+      3. **They share no sentence.** Segment-wise, not merely "the strings differ": one
+         string that could be read as either meaning is exactly what D-26 removed.
+    """
+    present = _render(_EIGHT_NAMES)
+    absent = _render([])
+
+    # 1. the present arm states a file EXISTS and names the deliverable it licenses
+    assert "HAS attached a template document" in present
+    assert "`emitter: 'render_template'`" in present
+    assert "fills EXACTLY the fields" in present
+
+    # 2. the absent arm states the opposite and FORBIDS the branch
+    assert "NO template document was provided" in absent
+    assert "PLAIN TEXT / markdown" in absent
+    assert "FORBIDDEN" in absent
+
+    # neither arm may leak the other's claim
+    assert "HAS attached a template document" not in absent
+    assert "NO template document was provided" not in present
+    assert "render_template" not in _section_line(absent)
+
+    # 3. no shared SENTENCE — segments split on the separators the two headings use
+    def _segments(text: str) -> set[str]:
+        line = [ln for ln in text.splitlines() if ln.startswith("### Template")][0]
+        parts: list[str] = []
+        for chunk in line.split(";"):
+            parts.extend(chunk.split(". "))
+        return {p.strip() for p in parts if p.strip()}
+
+    shared = _segments(present) & _segments(absent)
+    assert shared == set(), (
+        "the two template arms share a sentence, so one could be mistaken for the other — "
+        f"which is the D-26 defect this case exists to prevent: {sorted(shared)!r}"
+    )
 
 
 @pytest.mark.asyncio
