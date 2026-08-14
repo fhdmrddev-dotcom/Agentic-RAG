@@ -112,8 +112,154 @@
  * never by its words.
  */
 import { useCallback, useEffect, useRef, useState } from "react"
-import { generateWorkflow } from "@/lib/api"
+import { generateWorkflow, readTemplatePlaceholdersFromFile } from "@/lib/api"
 import type { BuilderPhase, BuilderStore } from "./builderStore"
+import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
+
+/**
+ * ── 193.1-07 (D-07 / D-08 / D-25) — THE PRE-DRAFT READ, AND WHY ITS UNION IS IMPORTED ──
+ *
+ * The five honest readings are `useTemplatePlaceholders.ts`'s, imported rather than
+ * re-declared, and that is a constraint rather than a convenience. The row that renders
+ * them types its `state` prop on THAT union and says why in its own docblock: *one wire
+ * shape for both doors means the two surfaces cannot derive different arms from the same
+ * server answer.* A second, structurally-similar union declared here would typecheck at
+ * every site except the one that matters and would let the two doors drift.
+ *
+ * ⚠ **A MEASURED CORRECTION TO THIS PLAN, RECORDED BESIDE THE CLAIM RATHER THAN OVER IT.**
+ * The plan asks for a SIXTH arm — `notWord` — derived here "so the union is the whole answer
+ * and the row stays purely presentational". Measured at HEAD that premise is false: the row
+ * ALREADY derives `notWord` itself, from `none` plus the held filename, gated on EMPTINESS
+ * rather than on the extension alone so a deck that somehow did yield fields still renders
+ * them. That derivation has one home, the row is not in this plan's `files_modified`, and a
+ * sixth arm would be a value the shipped component cannot accept. So the union stays FIVE and
+ * this hook supplies the row's OTHER input — the held file — instead of a second predicate.
+ */
+export type TemplateReadState = TemplatePlaceholdersState
+
+/**
+ * The server's answer PLUS THE SUBJECT IT ANSWERED FOR.
+ *
+ * ⚠ THE SUBJECT IS THE `File` OBJECT, COMPARED BY IDENTITY — never `file.name`. The analog
+ * keys on an asset id, a STRING, where identity and equality coincide; here two different
+ * documents can carry one name, and a name-keyed hook would show the first document's fields
+ * under the second document's filename. **No shipped hook proves `File`-identity keying**, so
+ * the suite asserts it directly, including the same-name / different-object case.
+ *
+ * Exported because Plan 08 carries a COMPLETED answer across the door handoff as a seed.
+ */
+export type TemplateReadAnswer = {
+  file: File
+  state: Extract<
+    TemplateReadState,
+    { kind: "fields" } | { kind: "none" } | { kind: "unavailable" }
+  >
+}
+
+/**
+ * The two readings the server has not authored, FROZEN AT MODULE SCOPE.
+ *
+ * ⚠ THIS IS LOAD-BEARING HERE FOR A REASON THE ANALOG DOES NOT HAVE. `onDraft`'s dependency
+ * array gains the reading, and the one-shot auto-draft effect depends on `onDraft`'s
+ * identity — so a fresh `{kind:"idle"}` object each render would re-create the callback, and
+ * re-running that effect is how a one-shot becomes a loop.
+ */
+const READ_IDLE: TemplateReadState = { kind: "idle" }
+const READ_LOADING: TemplateReadState = { kind: "loading" }
+
+/** The shipped `usePanelReconcile.ts:84-92` double-shaped check — an abort is not a failure. */
+function isAbortError(err: unknown): boolean {
+  if (err instanceof Error && err.name === "AbortError") return true
+  if (err && typeof err === "object" && "name" in err && (err as { name: string }).name === "AbortError")
+    return true
+  return false
+}
+
+/**
+ * Read a held document's fill-in fields, once per `File` OBJECT.
+ *
+ * A LEAF, exported separately because BOTH describe screens need it and only one of them
+ * hosts the rest of this module's concern (the other never calls `/generate` at all — its
+ * CTA is a handoff). Plan 08 mounts it on the second door directly.
+ *
+ * @param file The held document, or `null` when none is held. `null` ⇒ `idle` and ZERO
+ *             requests — which is the whole of D-08: no document ⇒ nothing to wait for ⇒ the
+ *             CTA is never disabled, with no second conditional to get wrong.
+ * @param seed A COMPLETED answer carried across the door handoff. It is installed only for
+ *             the exact `File` it answered for, so a seed that does not match the held
+ *             document is ignored rather than trusted.
+ */
+export function useTemplateRead(
+  file: File | null,
+  seed?: TemplateReadAnswer | null,
+): TemplateReadState {
+  // ⚠ The seed is read as an INITIAL value AND re-checked in the effect below. The handoff
+  // mounts a fresh host, so the initial read is the live path; the effect's check is what
+  // makes a seed arriving one render later still cost zero requests.
+  const [answer, setAnswer] = useState<TemplateReadAnswer | null>(seed ?? null)
+  // The effect reads the answer through a ref so it can stay keyed on `[file]` ALONE. With
+  // `answer` in the key, installing an answer would re-run the effect and abort a request
+  // that had already been answered — noise that reads exactly like a staleness bug.
+  const answerRef = useRef<TemplateReadAnswer | null>(seed ?? null)
+  const seedRef = useRef<TemplateReadAnswer | null>(seed ?? null)
+  seedRef.current = seed ?? null
+
+  const install = useCallback((next: TemplateReadAnswer) => {
+    answerRef.current = next
+    setAnswer(next)
+  }, [])
+
+  useEffect(() => {
+    if (!file) return
+    // Already answered for THIS document — nothing to ask.
+    if (answerRef.current && answerRef.current.file === file) return
+    // The handoff's completed read. Installing it is what keeps the reading out of `loading`
+    // at the exact instant the auto-draft one-shot fires — the blind-draft race D-07 closes.
+    const carried = seedRef.current
+    if (carried && carried.file === file) {
+      install(carried)
+      return
+    }
+
+    const controller = new AbortController()
+    readTemplatePlaceholdersFromFile(file, controller.signal)
+      .then((res) => {
+        if (controller.signal.aborted) return
+        // ⚠ COMPARE POSITIVELY. `read !== "unreadable"` would wave through `undefined` from
+        // an older server or a shape change; TypeScript types the field as a two-value union
+        // and will NOT protect you at runtime.
+        if (res.read !== "ok") {
+          install({ file, state: { kind: "unavailable", reason: "unreadable" } })
+          return
+        }
+        const fields = res.placeholders ?? []
+        // NON-EMPTY BY CONTRACT: an empty read is `none`, never `fields` with `[]`. "A
+        // document with no fields presented as a document with fields" is therefore not a
+        // state a caller can construct.
+        install(
+          fields.length > 0
+            ? { file, state: { kind: "fields", fields } }
+            : { file, state: { kind: "none" } },
+        )
+      })
+      .catch((err: unknown) => {
+        // An abort caused by unmount or by a replaced document is silent by design.
+        if (isAbortError(err)) return
+        if (controller.signal.aborted) return
+        install({ file, state: { kind: "unavailable", reason: "unreachable" } })
+      })
+
+    return () => controller.abort()
+    // Keyed on the FILE OBJECT — the change detector. Replacing one document with another of
+    // the same name is a new subject, and the previous answer must not survive it.
+  }, [file, install])
+
+  // The waiting readings are DERIVED, never stored. An answer about a different document
+  // reads as `loading`, not as its own stale self.
+  if (!file) return READ_IDLE
+  if (!answer || answer.file !== file) return READ_LOADING
+  return answer.state
+}
 
 /**
  * The definition shape the store's own `setDrafted` accepts — see the D-24(b) block above for
@@ -161,6 +307,18 @@ export interface TemplateFirstDraftArgs {
    * generation, with the definition as it was committed to the store.
    */
   onDrafted: (definition: TemplateFirstDefinition) => void
+  /**
+   * 193.1-07 / Plan 08 — the document picked on the OTHER describe screen, carried across the
+   * handoff. Absent for a fresh build. The precedent is `initialProjectFolderId` (187-26):
+   * pre-draft state chosen on the other door that only this host can spend.
+   */
+  initialTemplateFile?: File | null
+  /**
+   * …and its ALREADY-COMPLETED reading. ⚠ SEED, DO NOT RE-READ: a re-read returns the
+   * reading to `loading` at the exact instant the one-shot auto-draft fires, which is the
+   * blind-draft race D-07 exists to make impossible. Installed only for the `File` it names.
+   */
+  initialTemplateRead?: TemplateReadAnswer | null
 }
 
 export interface TemplateFirstDraft {
@@ -172,10 +330,19 @@ export interface TemplateFirstDraft {
   projectFolderId: string
   /** The picker's writer. */
   setProjectFolderId: (id: string) => void
-  /** Whether the CTA is enabled: some text, and not mid-composition. */
+  /** Whether the CTA is enabled: some text, not mid-composition, and no read in flight. */
   canDraft: boolean
   /** The one `/generate` call in the app. Idempotent on empty text (it returns without a call). */
   onDraft: () => Promise<void>
+  /** The held document, or `null`. The row's filename comes from HERE, so the name on screen
+   *  and the reading below it answer for the same object. */
+  templateFile: File | null
+  /** The reading, as one of five honest arms. */
+  templateRead: TemplateReadState
+  /** The author picked a document. */
+  onPickTemplateFile: (file: File) => void
+  /** The author removed it — one press undoes a mis-pick, and the reading returns to `idle`. */
+  onClearTemplateFile: () => void
 }
 
 export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFirstDraft {
@@ -188,6 +355,8 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     initialDefinitionFolderId,
     onDraftStarted,
     onDrafted,
+    initialTemplateFile,
+    initialTemplateRead,
   } = args
 
   const [describe, setDescribe] = useState(initialDescribe ?? "")
@@ -200,7 +369,17 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     typeof initialDefinitionFolderId === "string" ? initialDefinitionFolderId : (initialProjectFolderId ?? ""),
   )
 
-  const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
+  // 193.1-07 (D-06 / D-07) — the held document and its reading.
+  const [templateFile, setTemplateFile] = useState<File | null>(initialTemplateFile ?? null)
+  const templateRead = useTemplateRead(templateFile, initialTemplateRead)
+
+  // ⚠ ONE `&&` TERM, AND D-08 IS WHY THERE IS NO SECOND ONE. The reading is `idle` — never
+  // `loading` — whenever no document is held, so the absence of a read IS the absence of a
+  // gate. A `templateFile !== null &&` guard would be a second conditional that can be got
+  // wrong, and it would read green against every behaviour the suite drives. The suite fences
+  // this expression's SHAPE for exactly that reason, not only its outcome.
+  const canDraft =
+    describe.trim().length > 0 && builderPhase !== "composing" && templateRead.kind !== "loading"
 
   // ⚠ THE CALLBACKS ARE READ THROUGH REFS, and the reason is a measurement rather than a
   // style: `onDraft`'s dependency list on the page was `[describe, projectFolderId, store]`,
@@ -215,6 +394,11 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
     onDraftStartedRef.current = onDraftStarted
     onDraftedRef.current = onDrafted
   })
+
+  // The two writers of the held document. Stable identities, so the row does not re-render
+  // on every keystroke in the describe box.
+  const onPickTemplateFile = useCallback((file: File) => setTemplateFile(file), [])
+  const onClearTemplateFile = useCallback(() => setTemplateFile(null), [])
 
   const onDraft = useCallback(async () => {
     const text = describe.trim()
@@ -268,12 +452,28 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
       autoDraft &&
       !autoDraftFiredRef.current &&
       (initialDescribe ?? "").trim().length > 0 &&
-      builderPhase === "empty"
+      builderPhase === "empty" &&
+      // 193.1-07 (D-07) — THE SAME REFUSAL THE CTA CARRIES, on the path that has no CTA.
+      // The other door's hand-off fires this once, automatically, so a gate that lived only
+      // on a button would leave the fast path sending the blind body. When the reading is
+      // seeded (Plan 08) this term is already false at mount and costs a fire nothing.
+      templateRead.kind !== "loading"
     ) {
       autoDraftFiredRef.current = true
       void onDraft()
     }
-  }, [autoDraft, initialDescribe, builderPhase, onDraft])
+  }, [autoDraft, initialDescribe, builderPhase, onDraft, templateRead])
 
-  return { describe, setDescribe, projectFolderId, setProjectFolderId, canDraft, onDraft }
+  return {
+    describe,
+    setDescribe,
+    projectFolderId,
+    setProjectFolderId,
+    canDraft,
+    onDraft,
+    templateFile,
+    templateRead,
+    onPickTemplateFile,
+    onClearTemplateFile,
+  }
 }
