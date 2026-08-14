@@ -556,6 +556,13 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
     ``bundle.tools``, the narrow half, so the NL grounding prose is the same string it was
     before 189. The capabilities are absent from it for the same reason they are absent
     from the rail: they are not names a model may be told to whitelist freely.
+
+    ⚠ **AMENDED at Phase 193.1 (D-26), 2026-08-14 — and the byte-identical claim above is
+    now TRUE OF EVERY SECTION EXCEPT THE TEMPLATE ONE.** That is stated here rather than
+    left for a reader to discover: the template placeholder section was deliberately
+    rewritten from one hedged heading into two ASSERTIVE arms (see the block comment above
+    ``template_section`` below). The tool / skill / folder / project sections are untouched
+    and remain byte-identical to the Phase 182 extraction.
     """
     folder_tree = _render_folder_tree(bundle.folders)
     skill_lines = (
@@ -568,6 +575,62 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
         if project_folder_id
         else "The workflow is NOT bound to a project folder (whole-KB).\n"
     )
+
+    # ── The template section — TWO ASSERTIVE ARMS, not one hedged heading (D-26) ──────
+    #
+    # ⚠ THE WORDING IS ASSERTIVE BY MEASUREMENT, NOT BY TASTE. Until 2026-08-14 this was a
+    # single conditional heading — ``### Template placeholder fields (if the workflow must
+    # fill a template)`` — followed by the names or ``(none)``. Plan ``193.1-04`` drove six
+    # real ``POST /workflows/generate`` calls on ``claude-opus-4-8`` / ``anthropic`` and
+    # measured what that phrasing actually buys (``193.1-UAT.md`` row U1):
+    #
+    #   | call                                   | render_template phase | keys in draft |
+    #   |----------------------------------------|-----------------------|---------------|
+    #   | A control — no placeholders sent       | 0                     | 1/8           |
+    #   | B ×3 — placeholders sent, hedged header | **0 / 0 / 0**        | 3–4/8         |
+    #   | C ×2 — the SAME payload, plus a describe|                       |               |
+    #   |        sentence saying a template IS    | **1 / 1**             | **8/8**       |
+    #   |        attached                         |                       |               |
+    #
+    # The wire was never broken: all eight names reached the prompt on every B run, proved
+    # without a provider call (``test_193_1_grounding_wire.py``). What failed was the
+    # INFERENCE. ``AUTHORING_SYSTEM_PROMPT``'s DELIVERABLE RULE
+    # (``workflow_authoring.py:82-91``) licenses ``render_template`` *"ONLY when the
+    # grounding explicitly lists template placeholders (i.e. the user provided a
+    # .docx/.pptx/.xlsx template to fill)"* and closes *"reach for a template only when one
+    # is actually provided"* — so its condition is PROVISION, and a list under an ``if``
+    # heading asserts no such thing. Three runs out of three, the model read the hedge and
+    # declined the branch.
+    #
+    # ⚠ THE RULE ITSELF IS DELIBERATELY NOT EDITED. One home per concern: the rule states
+    # the policy, the grounding states the FACTS the policy reads. Changing both at once
+    # would have left neither attributable when the fix was re-driven.
+    #
+    # ⚠ THE ABSENT ARM IS DELIBERATELY NO WEAKER — it is STRONGER, and that is a
+    # correctness requirement rather than symmetry. Call A proved the no-template path
+    # already behaves correctly, and SC#4 (*the fast door stays fast*) and D-08 both rest
+    # on it. A ``render_template`` phase with no template bound is TERMINAL at run
+    # (``no_template_bound``, ``phase_types.py:1271``) and can NEVER publish, so softening
+    # this arm would trade a slow deliverable for an impossible one.
+    #
+    # The two arms share no sentence: each states which of the two worlds this call is in,
+    # and the D-26 defect was precisely that ONE string served BOTH meanings.
+    if bundle.placeholders:
+        template_section = (
+            "### Template placeholder fields — the user HAS attached a template document "
+            "to this workflow; the final deliverable MUST therefore be an `llm_emit` phase "
+            "with `emitter: 'render_template'` that fills EXACTLY the fields named on the "
+            "next line\n"
+            f"{', '.join(bundle.placeholders)}\n"
+        )
+    else:
+        template_section = (
+            "### Template placeholder fields — NO template document was provided with this "
+            "workflow; the final deliverable MUST therefore be PLAIN TEXT / markdown, and a "
+            "`render_template` emit phase is FORBIDDEN because it would fail at run time\n"
+            "(none)\n"
+        )
+
     return (
         "## Grounding (use ONLY these ids / names)\n\n"
         f"{project_line}\n"
@@ -577,8 +640,7 @@ def render_grounding_prompt(bundle: GroundingBundle, project_folder_id: str | No
         f"{', '.join(bundle.tools) or '(none)'}\n\n"
         "### Skill registry (enabled; owner + global) — ids eligible for `skill_ref`\n"
         f"{skill_lines}\n\n"
-        "### Template placeholder fields (if the workflow must fill a template)\n"
-        f"{', '.join(bundle.placeholders) if bundle.placeholders else '(none)'}\n"
+        f"{template_section}"
     )
 
 
