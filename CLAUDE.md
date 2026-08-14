@@ -65,12 +65,27 @@ fresh worktree false-failed every plan:
    It is idempotent and fails loudly. A worktree that skipped it will report green typechecks and
    red tests for reasons that look like the plan's fault.
 
-2. **Cap vitest workers in every parallel run: `GSD_VITEST_MAX_WORKERS=4`.** Measured on this
-   16-core box: two UNCAPPED concurrent vitest runs spawn ~16 workers each, and the
-   oversubscription surfaces as bare timeouts in suites the plan never touched — `failed 6` and
-   `failed 5` against a serial baseline of `failed 0`. **Capped at 4 each, two concurrent runs
-   agree exactly** (9 files / 23 tests failing, the known SEED-056 rot set, on both).
-   `scripts/vitest-count-gate.cjs` reads this env var; absent, single-run behaviour is unchanged.
+2. **Cap vitest workers in every run: `GSD_VITEST_MAX_WORKERS=2`.** ⚠ **This rule said `4` until
+   2026-08-14, and the 4 was not wrong when written — it ROTTED, because the right cap is a
+   function of how many test cases the gate executes, not a constant.** Both figures are kept so
+   the drift is visible rather than overwritten.
+
+   - **Why 4 was right at ~3400 gated cases:** two UNCAPPED concurrent vitest runs spawn ~16
+     workers each on this 16-core box, and the oversubscription surfaces as bare timeouts in
+     suites the plan never touched — `failed 6` and `failed 5` against a serial baseline of
+     `failed 0`. Capped at 4 each, two concurrent runs agreed exactly (9 files / 23 tests
+     failing, the known SEED-056 rot set, on both).
+   - **Why 4 is wrong at 3600.** Phase 193 measured, on **one identical commit** (`STATE.md:136-140`):
+     cap 4 → `failed` **17**, then **4**, then **3**; UNCAPPED → **11**; **cap 2 → 0 and 0.** Every
+     failure was a `STACK_TRACE_ERROR` timeout in a file no plan had touched — the signature of
+     oversubscription, never of a real defect. Confirmed independently by quick task `260814-q5r`:
+     a single run at cap 2 → **exit 0, `failed 0`, total 3604**.
+
+   **So: use 2, and RE-MEASURE when the gated total grows again** rather than trusting this number
+   the way this rule asked you to trust the last one. `scripts/vitest-count-gate.cjs` reads the env
+   var; absent, single-run behaviour is unchanged. The cap now matters on a SINGLE run too, not
+   only on parallel ones — that is what changed. Also still true: at THREE concurrent test-running
+   agents the gate goes non-deterministic regardless of cap, so keep it to ≤ 2.
    This is very likely what Phases 190-16/17/18 saw and misattributed to `userEvent` delay.
 
 3. **NEVER `rm -rf` a bootstrapped worktree, and never let git do it either.** A recursive delete
