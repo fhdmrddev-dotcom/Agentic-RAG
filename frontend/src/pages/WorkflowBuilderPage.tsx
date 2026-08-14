@@ -144,9 +144,11 @@
  * already had (141-B's operator correction), so this plan adds NO band anywhere: what
  * the page adds is the props those two rows render from.
  */
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react"
 import { useStore } from "zustand"
-import { generateWorkflow, listFolders, listSkills } from "@/lib/api"
+import { listFolders, listSkills } from "@/lib/api"
+// 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
+import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
 import { PhaseSpineGraph } from "@/components/workflows/PhaseSpineGraph"
 import {
   groundingCauseOf,
@@ -606,7 +608,6 @@ export function WorkflowBuilderPage({
   headerLead,
   headerTrail,
 }: WorkflowBuilderPageProps) {
-  const [describe, setDescribe] = useState(initialDescribe ?? "")
   // Phase 184-04 (D-184-01): the definition's home. Created LAZILY so the factory
   // runs exactly once per mount, and never at module scope — a singleton would carry
   // one workflow's undo history into the next workflow opened in the same tab.
@@ -626,14 +627,6 @@ export function WorkflowBuilderPage({
   // Phase 183-07 (D-183-02): which graph the column shows. SESSION state only — it
   // cold-starts on "spine" on every mount and is persisted nowhere.
   const [graphView, setGraphView] = useState<"spine" | "canvas">("spine")
-  // Phase 103-ux: the project (knowledge base) the generated workflow binds to.
-  // Chosen at the describe step (ONE calm dropdown), passed to generate, and shown
-  // by name in the draft header afterwards. When opening an existing definition,
-  // seed it from that definition's own binding so the header shows the bound KB.
-  // Phase 187-26 (GAP A): the loose door may now have bound one before generate ran.
-  const [projectFolderId, setProjectFolderId] = useState<string>(
-    typeof initial?.definition.project_folder_id === "string" ? initial.definition.project_folder_id : (initialProjectFolderId ?? ""),
-  )
   // Phase 103-ux: id→name maps so the form panel renders folder + skill NAMES (never
   // UUIDs). Fetched once on mount; failures degrade to showing the raw id.
   const [folderNames, setFolderNames] = useState<IdNameMap>({})
@@ -684,7 +677,39 @@ export function WorkflowBuilderPage({
     [folderNames, skillNames, templateAsset],
   )
 
-  const canDraft = describe.trim().length > 0 && builderPhase !== "composing"
+  /**
+   * Phase 193.1-05 (D-01 / D-25) — THE PRE-DRAFT DESCRIBE→GENERATE CONCERN, NO LONGER HERE.
+   *
+   * G-5 fired on this file (10 phases, 34 commits at the cut), and 193.1 adds a pre-draft
+   * TEMPLATE READ STATE MACHINE to the same screen — a genuinely second concern on the seam
+   * `CLAUDE.md`'s ledger row already named. So the extraction shipped FIRST, in its own wave,
+   * before the feature it makes room for (the 192.1 order). No waiver was taken.
+   *
+   * The describe text, the pre-draft KB choice, the CTA rule, the `/generate` call and the
+   * loose door's one-shot auto-draft all live in `useTemplateFirstDraft` now. What stays here
+   * is what was never that concern's: `draftId` (read across the drafted view), the seed
+   * receipt pair (a DRAFTED-view surface), and `selectedSlug` (the page's one selection
+   * contract, shared by both graph views). Each reaches the hook as a callback — see its
+   * header for why the two pre-flight resets are ONE call rather than two.
+   */
+  const { describe, setDescribe, projectFolderId, setProjectFolderId, canDraft, onDraft } =
+    useTemplateFirstDraft({
+      store,
+      builderPhase,
+      initialDescribe,
+      autoDraft,
+      initialProjectFolderId,
+      initialDefinitionFolderId: initial?.definition.project_folder_id,
+      onDraftStarted: () => {
+        setSelectedSlug(null)
+        setDraftId(null)
+      },
+      onDrafted: (def) => {
+        setShowReceipt(true)
+        setReceiptPhases(def.phases)
+      },
+    })
+
   const panelOpen = selectedSlug !== null
 
   // Phase 183-07 (D-183-03) — the three-part fail-closed gate, now read through the ONE
@@ -1253,65 +1278,12 @@ export function WorkflowBuilderPage({
     [boundFolderId, folderNames],
   )
 
-  const onDraft = useCallback(async () => {
-    const text = describe.trim()
-    if (text.length === 0) return
-    store.getState().setComposing()
-    setSelectedSlug(null)
-    // 186-07: only the RENDERED id resets. The loop's own mirror needs none — this callback
-    // is reachable only from the describe screen, which a session can be on only before any
-    // row exists (a save requires the drafted view, and the sole way back is a generate
-    // failure, which creates nothing).
-    setDraftId(null)
-    try {
-      const result = await generateWorkflow({
-        describe: text,
-        // Phase 103-ux: bind the generated workflow to the chosen project (KB). The
-        // backend GenerateRequest accepts project_folder_id; omit when none picked.
-        ...(projectFolderId ? { project_folder_id: projectFolderId } : {}),
-      })
-      if (result.ok) {
-        // SINGLE STATE TRANSITION: commit the complete definition + "drafted" in
-        // ONE store set. The graph renders whole, in one DOM batch (no timed reveal).
-        // Stamp the chosen project_folder_id onto the definition if the generator
-        // didn't already bind one (so the draft + later publish carry the binding).
-        const def = result.definition as unknown as BuilderDefinition
-        if (projectFolderId && !def.project_folder_id) def.project_folder_id = projectFolderId
-        store.getState().setDrafted(def)
-        // 187-15 — beside the SINGLE transition, so the receipt lands in the SAME DOM batch
-        // as the graph. `autoDraft` funnels through here too, deliberately (D-187-14).
-        setShowReceipt(true)
-        // 187-22 — REPLACED per generation, never frozen for the session, so a second draft
-        // gets a second receipt rather than the first one's numbers (D-187-09).
-        setReceiptPhases(def.phases)
-      } else {
-        // ok:false is an HONEST failure — never a renderable broken draft.
-        store.getState().setErrorState(result.error, result.detail)
-      }
-    } catch (e) {
-      store.getState().setErrorState(
-        "Couldn't generate the workflow.",
-        e instanceof Error ? e.message : undefined,
-      )
-    }
-  }, [describe, projectFolderId, store])
-
-  // Phase 124 CR-01 fix: when handed off from the loose "Describe & run" door's
-  // `DESCRIBE_CTA` button (autoDraft), run the EXISTING generate→draft flow ONCE
-  // with the seeded text — so the fast path actually drafts instead of dead-ending on
-  // an empty describe screen. Guarded to fire exactly once, fresh-build ("empty") only.
-  const autoDraftFiredRef = useRef(false)
-  useEffect(() => {
-    if (
-      autoDraft &&
-      !autoDraftFiredRef.current &&
-      (initialDescribe ?? "").trim().length > 0 &&
-      builderPhase === "empty"
-    ) {
-      autoDraftFiredRef.current = true
-      void onDraft()
-    }
-  }, [autoDraft, initialDescribe, builderPhase, onDraft])
+  // 193.1-05 (D-01) — `onDraft`, its `/generate` call, the `project_folder_id` stamp, the
+  // SINGLE STATE TRANSITION and the 124 CR-01 one-shot auto-draft effect all moved to
+  // `useTemplateFirstDraft` with their comments. `onDraft` above is the hook's, and the two
+  // page states the moved body used to write (`draftId`, the receipt pair) reach it as the
+  // `onDraftStarted` / `onDrafted` callbacks. Nothing about the flow changed — the six
+  // pre-draft captures `193.1-01` took on the unmoved tree hold with zero re-capture.
 
   // Merge a phase-form patch into the selected phase's config. The immutable merge
   // itself now lives in `definitionOps.patchPhaseConfig`, reached through the store's

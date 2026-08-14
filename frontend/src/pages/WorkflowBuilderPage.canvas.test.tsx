@@ -114,6 +114,10 @@ vi.mock("@/components/workflows/PhaseSpineGraph", async () => {
 // The component SOURCE via Vite's ?raw loader — the idiomatic way to make a scope
 // fence machine-checkable (the `PhaseSpineGraph.test.tsx:20-22` precedent).
 import builderSource from "./WorkflowBuilderPage?raw"
+// 193.1-05 (D-01) — the SECOND half of the 187-22 adjacency fence's subject. `setDrafted(def)`
+// left this page for `useTemplateFirstDraft` under G-5, so a fence that reads ONE source can no
+// longer see the property it guards; it is RE-SCOPED to the seam rather than deleted or weakened.
+import templateFirstDraftSource from "@/components/workflows/useTemplateFirstDraft?raw"
 // Phase 193 fast-fix (AUTH-01): the CTA is queried by its GOVERNED id, never by a literal —
 // a hard-coded name here is what let the page's copy go stale without any suite reddening.
 import { DESCRIBE_CTA } from "@/components/workflows/doorVocabulary"
@@ -2742,15 +2746,41 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
 
     // …and the snapshot is taken in `onDraft`'s success branch, beside the SINGLE state
     // transition — not in an effect that could observe an already-edited store.
-    const atTransition = builderSource.indexOf(TRANSITION)
+    //
+    // ⚠ 193.1-05 (D-01) — THE FENCE IS RE-SCOPED, NOT WEAKENED, AND THE REASON IS THE WHOLE
+    // POINT OF RE-SCOPING IT. `onDraft` and its `setDrafted(def)` transition moved to
+    // `useTemplateFirstDraft` when G-5 was honoured on this page, so `builderSource.indexOf`
+    // returned **-1** and this assertion failed loudly — which is the fence working. It could
+    // have been "fixed" by deleting the adjacency half, and that would have retired the only
+    // guard against the snapshot drifting into an effect. Instead the property is restated
+    // ACROSS the seam, in the two places its two halves now live:
+    //
+    //   in the HOOK — the raise happens beside the transition, in the same batch;
+    //   on the PAGE — the raise IS the snapshot write, and there is exactly one of it.
+    //
+    // A fence whose subject moved and which was not re-scoped is the WR-01 failure one
+    // surface over: it keeps passing, against nothing.
+    const RAISE = ["onDrafted", "Ref.current(def)"].join("")
+    const atTransition = templateFirstDraftSource.indexOf(TRANSITION)
     expect(atTransition).toBeGreaterThan(-1)
-    // 500 chars is "the next few lines, comments included" — measured, not guessed: the two
-    // shipped comment blocks between the transition and the setter run to ~370 characters
-    // on their own. Wide enough to survive a re-worded comment, far too narrow to reach
-    // another function.
-    expect(builderSource.slice(atTransition, atTransition + 500)).toContain(SETTER)
-    // Exactly one write, so no second site can quietly re-snapshot a later state.
+    // 500 chars is "the next few lines, comments included" — measured, not guessed: the
+    // shipped comment block between the transition and the raise runs to ~330 characters on
+    // its own. Wide enough to survive a re-worded comment, far too narrow to reach another
+    // function.
+    expect(templateFirstDraftSource.slice(atTransition, atTransition + 500)).toContain(RAISE)
+    // POSITIVE CONTROL — the window really can miss, so the pass above is a measurement
+    // rather than an artefact of an over-wide slice.
+    expect(templateFirstDraftSource.slice(atTransition, atTransition + 20)).not.toContain(RAISE)
+    // Exactly one raise, so no second site can hand the page a later state…
+    expect(
+      templateFirstDraftSource.match(new RegExp(RAISE.replace(/[().]/g, "\\$&"), "g")) ?? [],
+    ).toHaveLength(1)
+    // …and exactly one write on the page, inside the callback that raise reaches.
     expect(builderSource.match(new RegExp(SETTER.replace(/[().]/g, "\\$&"), "g")) ?? []).toHaveLength(1)
+    const CALLBACK = ["onDrafted", ": (def) => {"].join("")
+    const atCallback = builderSource.indexOf(CALLBACK)
+    expect(atCallback).toBeGreaterThan(-1)
+    expect(builderSource.slice(atCallback, atCallback + 200)).toContain(SETTER)
   })
 })
 
