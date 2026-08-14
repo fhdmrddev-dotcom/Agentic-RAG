@@ -3570,6 +3570,50 @@ export async function uploadWorkflowTemplate(
   return (await res.json()) as WorkflowTemplateAsset
 }
 
+/**
+ * What a bound template asks the step to fill in, and whether we could read it.
+ *
+ * `read` is not decoration. An empty `placeholders` list is ambiguous on its own —
+ * it could mean *we opened the document and it carries no fill-in fields*, or *we
+ * never opened it at all*. Rendering those two as the same sentence lets an author
+ * conclude their template is field-less when the read simply failed, and they then
+ * ship a workflow that fills nothing. The server therefore carries them separately.
+ */
+export interface WorkflowTemplatePlaceholders {
+  read: "ok" | "unreadable"
+  placeholders: string[]
+}
+
+/**
+ * GET /workflows/{id}/template/placeholders — the fields a bound template expects.
+ *
+ * Sited HERE, beside `uploadWorkflowTemplate`, rather than beside `getGroundingBundle`:
+ * it shares that function's concern (the template a workflow binds) and its gate
+ * (`require_visible("workflow_authoring")`), not the palette's `require_canvas()`.
+ *
+ * ⚠ WHY THIS IS NOT `getGroundingBundle(assetId)`, recorded here because the older seam
+ * next door looks like it should already do this job. `getGroundingBundle`'s
+ * `templateAssetId` parameter feeds a backend query param typed `UUID | None`, while
+ * every asset id this app mints is a Storage PATH (`{user_id}/_library/{definition_id}/…`)
+ * — so passing a real one is a **measured 422** (`uuid_parsing`, before the handler
+ * runs). That parameter, and the `GroundingBundle.template_placeholders` field it
+ * populates, therefore remain **unused by the app**. They are left in place rather than
+ * deleted: removing a shipped typed seam is a separate decision from adding this one.
+ */
+export async function getWorkflowTemplatePlaceholders(
+  definitionId: string,
+  assetId: string,
+  signal?: AbortSignal,
+): Promise<WorkflowTemplatePlaceholders> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(
+    `${API_BASE}/workflows/${definitionId}/template/placeholders?asset_id=${encodeURIComponent(assetId)}`,
+    { headers, signal },
+  )
+  if (!res.ok) throw new Error(`Failed to read the template's fields (status ${res.status})`)
+  return (await res.json()) as WorkflowTemplatePlaceholders
+}
+
 /** POST /workflows — create a draft. Returns {id, version, token} (Phase 186: the
  *  token seeds the session, because three of the Builder's four entry routes create). */
 export async function createWorkflowDraft(
