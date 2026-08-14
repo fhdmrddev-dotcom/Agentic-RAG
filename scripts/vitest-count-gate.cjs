@@ -310,7 +310,43 @@ const BASELINE = {
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`preDraft.baseline 16 22 +6`).
   "WorkflowBuilderPage.preDraft.baseline.test.tsx": 22,
-  "PhaseFormPanel.test.tsx": 19,
+  // 193.1-09 (AUTH-03 / SC#3 / D-22): 19 → 24. An EXTENSION — nothing was deleted, renamed or
+  // lowered; all 19 shipped cases are still here and still counted. The +5 pin the name-check
+  // mount as the ONE GATED LINE this file's G-5 ledger row demands: absent-renders-nothing on
+  // BOTH a non-emit and an emit step (the property that keeps every other mount of this panel,
+  // including the flag-off Spine, byte-identical by construction), present-but-wrong-type
+  // renders nothing, present-and-emit mounts and forwards the prop UNCHANGED (so the panel is
+  // proved to derive nothing), the DOM-order assertion that it sits ABOVE the attach section,
+  // and a SOURCE fence asserting the mount is exactly one line carrying both the type gate and
+  // the whole-prop spread. Without that last one the "one gated line" claim is prose.
+  // Read from THIS SCRIPT'S OWN `actual` column (`PhaseFormPanel.test.tsx 19 24 +5`).
+  "PhaseFormPanel.test.tsx": 24,
+  // 193.1-09 (AUTH-03 / SC#3) — TWO NEW FILES, pinned in the SAME COMMIT that creates them,
+  // because a `BASELINE` key naming a path that does not yet exist makes this gate ERROR
+  // (exit 2) rather than fail.
+  //
+  // NO `TARGETS` EDIT ACCOMPANIES EITHER, and that is CHECKED rather than assumed:
+  // `src/components/workflows` is already a DIRECTORY entry in the `TARGETS` array below, so
+  // the gate printed both as `— 29 new` before these lines were written. TARGETS decides what
+  // RUNS, BASELINE what is GUARDED, and only the second was missing.
+  //
+  // What would be unguarded without them:
+  //   • `templateNameBuckets.test.ts` — the exactly-once property over a REAL definition shape
+  //     read out of the live corpus (not sketch 167's invented one), the declared precedence
+  //     that makes the run-input bucket outrank a slug coincidence, all six defensive
+  //     untyped-JSONB read shapes, and the SOURCE fence proving the module names neither of
+  //     the two config keys D-20 measured as non-existent or category-wrong. That fence is the
+  //     only thing stopping someone "fixing" the omission back in.
+  //   • `TemplateNameCheck.test.tsx` — the degenerate render (8 of 8 named nowhere, the
+  //     MEASURED common case) swept for alarm words; both empty-bucket arms compared against
+  //     ONE SHARED expected value, which is what makes an empty bucket unable to become a
+  //     claim; the disclaiming sentence on every non-empty render; D-11's cap proved to expand
+  //     in the SAME DOM node; the D-12 write-callback sweep; and the D-14 fence-scope guard in
+  //     three import spellings. Both of the last two were driven RED against real plants.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column, never hand-counted from `it(` literals.
+  "templateNameBuckets.test.ts": 29,
+  "TemplateNameCheck.test.tsx": 29,
   "WorkflowBuilderPage.test.tsx": 15,
   // 188-12: 14 → 20, inherited stale-low pin.
   "PhaseSpineGraph.test.tsx": 20,

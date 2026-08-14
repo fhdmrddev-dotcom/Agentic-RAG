@@ -178,6 +178,8 @@ import {
   type TemplateAssetDescriptor,
 } from "@/components/workflows/builderStore"
 import { BuilderStoreProvider } from "@/components/workflows/BuilderStoreProvider"
+import { classifyTemplateNames } from "@/components/workflows/templateNameBuckets"
+import { useTemplatePlaceholders } from "@/hooks/useTemplatePlaceholders"
 import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseSlugContext"
 // 186-07 (G-5): the header's save region — four sentences and three controls — has its own
 // file, so composing autosave into this page did not grow it.
@@ -905,6 +907,41 @@ export function WorkflowBuilderPage({
     () => (builderPhase === "drafted" ? selectDefinition({ meta, phases }) : null),
     [builderPhase, meta, phases],
   )
+
+  /**
+   * Phase 193.1-09 (AUTH-03 / SC#3 — D-10 / D-20 / D-22) — WHICH OF THE ATTACHED TEMPLATE'S
+   * FIELDS THE DRAFT'S OWN STEPS NAME.
+   *
+   * Computed HERE and handed down finished, because the rail panel's standing rule is that a
+   * definition-level fact is caller-owned: this reads `definition.inputs[]` and the phase
+   * slugs, both siblings of `phases`, while that panel's only write seam patches `config`.
+   * The panel gains one optional prop and one gated line and computes nothing.
+   *
+   * The asset id comes from the ONE `templateAsset` memo — the same descriptor whose filename
+   * is already on screen — so the fields shown and the file named can never disagree. The
+   * definition comes from the ONE `selectDefinition` memo above, for the same reason.
+   *
+   * ⚠ THE COST, STATED HERE RATHER THAN LEFT TO BE FOUND: this is a SECOND call to the
+   * placeholders route for the same asset — the attach section makes its own. Two calls to one
+   * pure route with identical arguments cannot disagree about content, so this is a duplicate
+   * READ, not a second oracle, and the route persists nothing. The alternative — hoisting the
+   * read up and passing the fields down as props — was REJECTED: it changes the data contract
+   * of a component that shipped three weeks ago with a 43-case pinned suite, to save one GET.
+   * A future phase that wants a single read should hoist it DELIBERATELY, as its own change.
+   *
+   * ⚠ AND THE HONEST EXPECTATION IS THE DEGENERATE ONE. Measured across all 74 template-binding
+   * definitions, zero phase slugs match any known placeholder name, and the definition-level
+   * input list stayed empty on 6 of 6 post-fix generations — so the usual answer is *every
+   * field named nowhere*. That is not a defect and the surface does not render it as one.
+   */
+  const templateFields = useTemplatePlaceholders(draftId, templateAsset?.assetId)
+  const nameCheck = useMemo(() => {
+    // Only a resolved, NON-EMPTY field list produces a check. `fields` carries a non-empty
+    // list by that hook's own contract, so an unread, unreadable or field-less template
+    // renders nothing at all rather than an empty check that would read as an answer.
+    if (templateFields.kind !== "fields") return undefined
+    return { classification: classifyTemplateNames(templateFields.fields, definition) }
+  }, [templateFields, definition])
 
   const selectedPhase = useMemo<PhaseSpecJSON | null>(() => {
     if (builderPhase !== "drafted" || selectedSlug === null) return null
@@ -2196,6 +2233,13 @@ export function WorkflowBuilderPage({
             assetId: templateAsset?.assetId,
             onAttached: onTemplateAttached,
           }}
+          // 193.1-09 (SC#3) — SPREAD-CONDITIONAL, the `rails` shape below rather than the
+          // `template` shape above, and the difference is deliberate: `template` is a control
+          // that must exist on every deliverable step, while this is an ANSWER that either
+          // exists or does not. Genuinely absent when there is nothing to say, so the panel's
+          // "ABSENT ⇒ NOTHING RENDERS" contract is honoured literally rather than by a falsy
+          // value that happens to render the same.
+          {...(nameCheck ? { nameCheck } : {})}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
         />
       </div>
