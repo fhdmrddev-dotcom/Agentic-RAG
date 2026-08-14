@@ -270,3 +270,120 @@ def test_a_name_carrying_injection_text_is_rendered_verbatim():
     rendered = _render([_INJECTION_NAME, "project_name"])
 
     assert _rendered_names(rendered) == [_INJECTION_NAME, "project_name"]
+
+
+# ── 4. A template-read failure may NEVER enter ``degraded`` ───────────────────────────
+#
+# ⚠ A CORRECTION STATED BESIDE THE ORIGINAL, NOT OVER IT.
+#
+# The shipped pin is ``test_grounding_bundle_has_no_template_read_axis``
+# (``tests/unit/test_q5r_template_placeholders.py:324-335``). It is CREDITED — in that test's
+# own docblock, in ``resolve_template_placeholders``'s docblock (``grounding.py:279-286``) and
+# in this project's ``CLAUDE.md`` hot-file row for ``grounding.py`` — with defending the rule
+# *"a template-read failure must NEVER enter ``degraded``"*.
+#
+# **It does not defend that rule.** Measured: it asserts the ABSENCE OF FIELDS
+# (``template_read`` / ``read``) on the ``GroundingBundle`` DATACLASS. A future
+# ``degraded.add("template")`` inside ``assemble_grounding_bundle`` adds no field to the
+# dataclass, so that test stays GREEN through exactly the change it is quoted as preventing.
+# The original assertion is CORRECT about what it checks and is left untouched and still
+# green; the two cases below add the membership property it never covered.
+#
+# WHY IT MATTERS — the consumers, named so a reader can see what a template code would do:
+# ``bundle.degraded`` feeds ``grounding_unavailable_finding`` (``grounding.py:615``), which is
+# emitted by ``POST /workflows/validate`` AND by the publish gauntlet. A document-read blip
+# would therefore become a VALIDATION FINDING and change PUBLISH behaviour — far outside the
+# template concern, on a definition that is actually correct. That is the WR-01 failure shape
+# (a vacuously-false membership test read by the author as a factual accusation), which is the
+# whole reason ``degraded`` suppresses the fidelity rules rather than reporting them.
+
+# Substrings that would make a degraded code template-shaped. The check is over the WHOLE SET
+# and over the WORD SHAPE — not equality against one guessed code — because the defect this
+# guards is a future author adding *some* template code, not the specific one we imagined.
+_TEMPLATE_WORDS = ("template", "placeholder", "docx", "asset")
+
+
+def _template_offenders(degraded) -> list[str]:
+    return sorted(c for c in degraded if any(w in str(c).lower() for w in _TEMPLATE_WORDS))
+
+
+def _assert_no_template_code(degraded) -> None:
+    offenders = _template_offenders(degraded)
+    assert offenders == [], (
+        "a template-read axis entered bundle.degraded: "
+        f"{offenders!r} (whole set: {sorted(degraded)!r}). That set feeds "
+        "grounding_unavailable_finding, consumed by POST /workflows/validate and by the "
+        "publish gauntlet — a document-read blip must never become a validation finding."
+    )
+
+
+def test_the_degraded_predicate_itself_fires_on_a_template_shaped_code():
+    """⚠ THE POSITIVE CONTROL, and it is load-bearing rather than decorative.
+
+    MEASURED at this commit: under the offline ``MagicMock`` posture the two guarded reads in
+    ``assemble_grounding_bundle`` do NOT raise, so ``bundle.degraded`` comes back **EMPTY** in
+    both cases below. An "is empty of template codes" assertion over an empty set is
+    vacuously true, and a fence that can only ever be true is not a fence.
+
+    Two things fix that, and both were done rather than one:
+      * this control, which pins the PREDICATE against a synthetic set and therefore keeps
+        firing forever (a typo in ``_TEMPLATE_WORDS`` would red HERE); and
+      * a one-time RED plant of ``degraded.add("template")`` inside
+        ``assemble_grounding_bundle``, observed failing and then restored byte-identical —
+        recorded in ``193.1-03-SUMMARY.md``, because a fence nobody has seen fire is a fence
+        nobody knows is connected.
+
+    Stating the vacuity rather than hiding it is the point: the next reader must not inherit
+    "the degraded cases are green" as though it meant "a template code would have been caught".
+    """
+    assert _template_offenders(frozenset({"folders", "skills"})) == []
+    assert _template_offenders(frozenset({"folders", "template"})) == ["template"]
+    assert _template_offenders(frozenset({"template_read"})) == ["template_read"]
+    assert _template_offenders(frozenset({"placeholders"})) == ["placeholders"]
+
+
+@pytest.mark.asyncio
+async def test_a_SUCCESSFUL_template_read_puts_no_template_code_in_degraded():
+    """The supplied-list arm — ``read == "ok"`` — carried through the real assembler.
+
+    ``bundle.placeholders`` is asserted first as anti-vacuity: it proves the template axis was
+    actually exercised on this call, so the empty-offender result below is a statement about
+    ``degraded`` rather than about a code path that never ran.
+    """
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    bundle = await assemble_grounding_bundle(
+        supabase=MagicMock(),
+        user_id=_USER,
+        template_placeholders=_EIGHT_NAMES,
+    )
+
+    assert bundle.placeholders == _EIGHT_NAMES  # anti-vacuity: the template axis really ran
+    _assert_no_template_code(bundle.degraded)
+
+
+@pytest.mark.asyncio
+async def test_a_FAILED_template_read_puts_no_template_code_in_degraded(monkeypatch):
+    """The arm that matters: the Storage read RAISES, the resolver answers ``"unreadable"``,
+    and ``degraded`` still carries nothing template-shaped.
+
+    ``assemble_grounding_bundle`` unpacks the status and discards it (``grounding.py:504-513``,
+    with the comment saying so). This is the case that would RED on a
+    ``degraded.add("template")`` and that the shipped dataclass-field pin cannot see.
+    """
+    import app.services.template_asset_service as tas
+    from app.services.harness.grounding import assemble_grounding_bundle
+
+    async def _explode(**kwargs):
+        raise RuntimeError("storage object is gone")
+
+    monkeypatch.setattr(tas, "resolve_template_source", _explode)
+
+    bundle = await assemble_grounding_bundle(
+        supabase=MagicMock(),
+        user_id=_USER,
+        template_asset_id=_ASSET,
+    )
+
+    assert bundle.placeholders == []  # anti-vacuity: the read really did fail
+    _assert_no_template_code(bundle.degraded)
