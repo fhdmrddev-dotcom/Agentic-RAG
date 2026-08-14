@@ -282,13 +282,33 @@ for (const arm of ARMS) {
    THE PAGE
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * ✅ THE OPERATOR'S PICK — 2026-08-14: VARIANT B, the footing line.
+ *
+ * Recorded with its two rejections, because both are reasons rather than preferences:
+ *
+ *   A was rejected because silence is `SEED-157` recurring WITH A CONTROL ON SCREEN,
+ *   which is strictly worse than having no control — the author has been shown a
+ *   sentence about their file and has no way to learn the draft ignored it.
+ *
+ *   C was rejected on COST, not on clarity. It reopens `Write the first draft`, a
+ *   string the operator settled three weeks ago as variant D of sketch 164, and it
+ *   makes a button's rendered width depend on a number read out of an uploaded
+ *   document. B buys most of C's honesty for five new strings and touches nothing
+ *   governed.
+ *
+ * A and C STAY ON THE PAGE as the comparison that produced the pick — evidence, not
+ * live options.
+ */
+const WINNER = "b"
+
 const TABS = [
   { id: "a", label: "A · Silence (what you get free)", badge: "baseline" },
   { id: "b", label: "B · The draft states its footing", badge: "b" },
   { id: "c", label: "C · The button says it", badge: "c" },
   { id: "five", label: "The five shipped sentences", badge: "p" },
   { id: "contract", label: "The contract", badge: "p" },
-]
+].map((t) => (t.id === WINNER ? { ...t, label: `★ ${t.label}`, won: true } : t))
 
 function stage(html, tall = true) {
   return `<div class="s166-stage${tall ? " s166-stage-tall" : ""}">${html}</div>`
@@ -368,12 +388,16 @@ const body = `
     </div>
   </header>
 
+  <div class="s166-winner"><strong>★ Winner — variant B, the footing line</strong> <span>operator, 2026-08-14</span><p><strong>A was rejected</strong> because silence is <code>SEED-157</code> recurring <em>with a control on screen</em> — worse than no control, since the author has been shown a sentence about their file and cannot learn the draft ignored it. <strong>C was rejected on cost, not on clarity</strong>: it reopens <code>Write the first draft</code>, settled three weeks ago as variant D of sketch 164, and makes a button’s width depend on a number read out of an uploaded document. A and C stay on this page as the comparison that produced the pick — <strong>evidence, not live options</strong>.</p></div>
+
   <nav class="s166-tabs">${TABS.map(
     (t) =>
-      `<button class="s166-tab${t.id === "a" ? " s166-tab-on" : ""}" data-tab="${t.id}">${esc(t.label)}</button>`,
+      `<button class="s166-tab${t.id === WINNER ? " s166-tab-on" : ""}${
+        t.won ? " s166-tab-won" : ""
+      }" data-tab="${t.id}">${esc(t.label)}</button>`,
   ).join("")}</nav>
 
-  <section class="s166-panel" data-panel="a">
+  <section class="s166-panel" data-panel="a" hidden>
     <div class="s166-axis"><span class="s166-badge s166-badge-baseline">A · silence</span><div><strong>The template speaks; the draft does not.</strong><p>Every arm renders its honest sentence about the document, and nothing anywhere says what will now be generated. The button reads <code>${esc(
       SHIPPED_CTA,
     )}</code> in all five states, and it means something different in each of them.</p></div></div>
@@ -385,7 +409,7 @@ const body = `
     ${stage(V.a.none)}
   </section>
 
-  <section class="s166-panel" data-panel="b" hidden>
+  <section class="s166-panel" data-panel="b">
     <div class="s166-axis"><span class="s166-badge s166-badge-b">B · the footing</span><div><strong>One line, always present, that says what the draft will be built from.</strong><p>It sits under the fields region and takes a different value on every arm — never merging the two that may not merge. The button is untouched, so nothing governed by sketch 164’s settled variant D moves.</p></div></div>
     <h3 class="s166-h3">All five arms, side by side</h3>
     <p class="s166-note">Read the added line in each cell. The two that matter most are <code>none</code> — which must say the draft falls back — and <code>unavailable</code>, whose consequence is identical but whose <em>cause</em> is not, and so must not borrow the other’s words.</p>

@@ -52,6 +52,17 @@ const chrome = `
 .s167-status-runinput{color:hsl(var(--muted-foreground));background:hsl(var(--muted))}
 .s167-status-unnamed{color:hsl(38 92% 70%);background:hsl(38 92% 60%/.12)}
 .s167-status-shipped{color:hsl(var(--muted-foreground));background:hsl(var(--muted))}
+
+/* ── The winner banner + the starred tab. The pick is stated ON the page rather than
+      only in README frontmatter, because a page that opens on the winning variant with
+      no explanation reads as though the others were never drawn. ── */
+.s167-winner{border:1px solid hsl(var(--success)/.45);border-left:3px solid hsl(var(--success));border-radius:.5rem;background:hsl(var(--success)/.06);padding:.8rem 1rem;margin:1.5rem 0 0;font-size:.86rem;line-height:1.6}
+.s167-winner strong{color:hsl(var(--success))}
+.s167-winner>span{font-family:ui-monospace,monospace;font-size:.7rem;color:hsl(var(--muted-foreground));margin-left:.5rem}
+.s167-winner p{margin:.45rem 0 0;color:hsl(var(--muted-foreground));max-width:92ch}
+.s167-winner code{font-family:ui-monospace,monospace;font-size:.92em;background:hsl(var(--muted));padding:.06rem .3rem;border-radius:.25rem}
+.s167-tab-won{border-color:hsl(var(--success));background:hsl(var(--success));color:hsl(var(--background))}
+.s167-tab-won:hover{color:hsl(var(--background));border-color:hsl(var(--success))}
 `
 
 const out = `<!doctype html>

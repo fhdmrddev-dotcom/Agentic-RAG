@@ -327,13 +327,42 @@ for (const [k, v] of Object.entries(STAGES)) {
    THE PAGE
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * ✅ THE OPERATOR'S PICK — 2026-08-14: VARIANT C, the name check.
+ *
+ * ⚠ AND THE REJECTION OF B IS RECORDED AT LENGTH, BECAUSE B IS THE STRONGER IDEA AND
+ *   WAS NOT REJECTED FOR BEING WRONG.
+ *
+ * B — showing the model the draft AND the placeholders and letting it propose a diff —
+ * is the shape that matches this phase's own thesis. `SEED-157`'s complaint is that the
+ * AI drafts blind; B is the AI reading both and proposing the repair. Its `KEEP` row
+ * (declining to flag `project_name` / `reporting_period` because the workflow already
+ * asks for them at run time) is judgement that comes FREE in B and that C must be
+ * hand-taught not to get wrong. That is not a small difference.
+ *
+ * It was rejected on SIZE: a second model call, a diff surface, an accept/reject path,
+ * and a new failure mode (a reconcile proposing nonsense on a draft the author was
+ * happy with) is a substantial build for what is, in this phase, a SAFETY NET rather
+ * than the headline feature. C satisfies SC#3 — the bind stops being silent — from data
+ * the page already holds, with no model call.
+ *
+ * ⚠ NO SEED WAS PLANTED. The "C now, B as a later phase" option was offered explicitly
+ *   and DECLINED, so recording B as deferred work would be inventing a commitment the
+ *   operator did not make. What is recorded instead is the CONDITION that would reopen
+ *   it, stated here and in the MANIFEST: if C's false-alarm rate proves annoying in
+ *   lived use — an author dismissing the panel because it keeps flagging correct
+ *   workflows — that is the evidence that C's heuristic is not enough and B is the
+ *   answer. B stays on this page in full so nobody has to re-derive it.
+ */
+const WINNER = "c"
+
 const TABS = [
   { id: "a", label: "A · Bind silently (today)", badge: "baseline" },
   { id: "b", label: "B · Ask the AI to reconcile", badge: "b" },
   { id: "c", label: "C · Name check, no claim", badge: "c" },
   { id: "why", label: "⚠ Why a verdict is impossible", badge: "p" },
   { id: "contract", label: "The contract", badge: "p" },
-]
+].map((t) => (t.id === WINNER ? { ...t, label: `★ ${t.label}`, won: true } : t))
 
 function draftTable() {
   return `<table class="s167-table"><thead><tr><th>phase</th><th>type</th><th>declares</th></tr></thead><tbody>${DRAFT.phases
@@ -402,12 +431,16 @@ const body = `
     </div>
   </header>
 
+  <div class="s167-winner"><strong>★ Winner — variant C, the name check</strong> <span>operator, 2026-08-14</span><p><strong>⚠ B was not rejected for being wrong — it is the stronger idea, and it was rejected on SIZE.</strong> B matches this phase’s own thesis (the AI reads both and proposes the repair), and its <code>KEEP</code> row is judgement that comes free there and must be hand-taught into C. But a second model call, a diff surface, an accept/reject path and a new failure mode is a substantial build for what is here a <em>safety net</em> rather than the headline feature. C satisfies SC#3 from data the page already holds.<br><strong>No seed was planted</strong> — “C now, B as a later phase” was offered and declined, so recording B as deferred work would invent a commitment nobody made. <strong>The re-open condition is recorded instead:</strong> if C’s false-alarm rate proves annoying in lived use — an author dismissing the panel because it keeps flagging correct workflows — that is the evidence C’s heuristic is not enough. B stays on this page in full so nobody has to re-derive it.</p></div>
+
   <nav class="s167-tabs">${TABS.map(
     (t) =>
-      `<button class="s167-tab${t.id === "a" ? " s167-tab-on" : ""}" data-tab="${t.id}">${esc(t.label)}</button>`,
+      `<button class="s167-tab${t.id === WINNER ? " s167-tab-on" : ""}${
+        t.won ? " s167-tab-won" : ""
+      }" data-tab="${t.id}">${esc(t.label)}</button>`,
   ).join("")}</nav>
 
-  <section class="s167-panel" data-panel="a">
+  <section class="s167-panel" data-panel="a" hidden>
     <div class="s167-axis"><span class="s167-badge s167-badge-baseline">A · today</span><div><strong>It binds, and says nothing.</strong><p>This is the shipped behaviour, rendered. The attach succeeds, the eight fields are listed honestly — and not one thing on this rail relates them to the three steps sitting on the canvas beside it. <strong>SC#3 is unmet by exactly this much.</strong></p></div></div>
     <h3 class="s167-h3">Before, and after</h3>
     <p class="s167-note">Left: the drafted workflow’s emit step with nothing attached. Right: the same step after the client’s template arrives. Everything that changed is a fact about the <em>document</em>; nothing changed about the <em>workflow</em>.</p>
@@ -424,7 +457,7 @@ const body = `
     <div class="s167-pair">${STAGES.bIdle}${STAGES.bResult}</div>
   </section>
 
-  <section class="s167-panel" data-panel="c" hidden>
+  <section class="s167-panel" data-panel="c">
     <div class="s167-axis"><span class="s167-badge s167-badge-c">C · name check</span><div><strong>Compare names, and say plainly that is all it is.</strong><p>Cheap and immediate — no model call, computed from the definition the page already holds. <strong>Three buckets, never two:</strong> produced by a step · supplied as a run input · named nowhere. And a disclaimer that is load-bearing rather than decorative, because without it the panel asserts a coverage verdict it cannot compute.<br><strong>The risk, made visible rather than described:</strong> in this fixture ${
       COUNTS.runInput
     } of the ${

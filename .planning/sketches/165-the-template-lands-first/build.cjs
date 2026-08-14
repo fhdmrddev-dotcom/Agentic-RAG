@@ -299,13 +299,29 @@ for (const [name, html] of Object.entries(STAGES)) {
    THE PAGE
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/**
+ * ✅ THE OPERATOR'S PICK — 2026-08-14: VARIANT C, the spec block.
+ *
+ * The deciding reason is recorded because it is not the obvious one: B is cheaper and is
+ * the path of least resistance, and it was rejected on a MEASUREMENT rather than a taste.
+ * At intake — before a single variant existed — the operator chose "the fields ARE the
+ * visible spec" over a quiet "8 fields found" receipt. B renders those fields at 10.5 px
+ * under a 14 px knowledge-base picker (measured in the browser, not estimated), which
+ * makes the most consequential thing on the screen also the quietest. B does not
+ * contradict C on style; it contradicts the decision that produced the sketch.
+ *
+ * A and B STAY ON THE PAGE. They are the comparison that produced the pick — evidence,
+ * not live options — and B in particular is the record of what "just mount it" costs.
+ */
+const WINNER = "c"
+
 const TABS = [
   { id: "a", label: "A · Today (shipped)", badge: "baseline" },
   { id: "b", label: "B · Mount the shipped section", badge: "b" },
   { id: "c", label: "C · The spec block", badge: "c" },
   { id: "wall", label: "⚠ The wall", badge: "w" },
   { id: "contract", label: "The contract", badge: "p" },
-]
+].map((t) => (t.id === WINNER ? { ...t, label: `★ ${t.label}`, won: true } : t))
 
 function stage(html, tall = true) {
   return `<div class="s165-stage${tall ? " s165-stage-tall" : ""}">${html}</div>`
@@ -349,12 +365,16 @@ const body = `
     </div>
   </header>
 
+  <div class="s165-winner"><strong>★ Winner — variant C, the spec block</strong> <span>operator, 2026-08-14</span><p>Chosen over the cheaper B on a <em>measurement</em>, not a taste: at intake — before any variant existed — the decision was that <strong>the fields ARE the visible spec</strong>, and B renders them at <strong>10.5 px under a 14 px picker</strong>, making the most consequential thing on the screen also the quietest. A and B stay on this page as the comparison that produced the pick — <strong>evidence, not live options</strong>. B in particular is the record of what “just mount it” costs.</p></div>
+
   <nav class="s165-tabs">${TABS.map(
     (t) =>
-      `<button class="s165-tab${t.id === "a" ? " s165-tab-on" : ""}" data-tab="${t.id}">${esc(t.label)}</button>`,
+      `<button class="s165-tab${t.id === WINNER ? " s165-tab-on" : ""}${
+        t.won ? " s165-tab-won" : ""
+      }" data-tab="${t.id}">${esc(t.label)}</button>`,
   ).join("")}</nav>
 
-  <section class="s165-panel" data-panel="a">
+  <section class="s165-panel" data-panel="a" hidden>
     <div class="s165-axis"><span class="s165-badge s165-badge-baseline">baseline</span><div><strong>Today, byte-identical.</strong><p>The shipped describe door with a real requirement typed in and real folders loaded. There is no template control anywhere on this screen, and none behind it either: the draft call sends <code>{describe, project_folder_id?}</code> and nothing else. A person whose deliverable is a fixed client format has no way to say so — and gets a workflow designed to answer a different question. That is <code>SEED-157</code>, and it is invisible: nothing fails.</p></div></div>
     ${stage(STAGES.a)}
   </section>
@@ -369,7 +389,7 @@ const body = `
     ${stage(STAGES.bFilled)}
   </section>
 
-  <section class="s165-panel" data-panel="c" hidden>
+  <section class="s165-panel" data-panel="c">
     <div class="s165-axis"><span class="s165-badge s165-badge-c">C · the spec block</span><div><strong>The same data, at this screen’s scale, framed as a contract.</strong><p>The fields stop being a note under a file picker and become the thing the draft is measured against — two columns, monospace keys, a rule above the promise line. The field strings are still the real eight, parsed from the same dump B renders.<br><strong>The cost, stated:</strong> this needs a <code>scale</code> prop on the shipped component (or a second presentation of one list, which is two homes and two homes drift). It is a real change to a file that shipped three weeks ago, not a mount.</p></div></div>
     <h3 class="s165-h3">Before a template is attached</h3>
     <p class="s165-note">A dashed, quiet affordance — deliberately lighter than the KB picker above it, because it branches rather than configures. <strong>SC#4 lives here:</strong> if this row makes the no-template author hesitate, C has failed regardless of how good the filled state looks.</p>

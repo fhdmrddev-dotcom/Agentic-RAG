@@ -2,7 +2,7 @@
 sketch: 166
 name: when-there-are-no-eight-fields
 question: "The read came back and it wasn't a list. Does the screen still let the author believe their draft is built to their template — and where should the truth live?"
-winner: null
+winner: "B — the footing line (2026-08-14, operator). A rejected because silence is SEED-157 recurring WITH a control on screen; C rejected on COST, not clarity — it reopens the CTA settled three weeks ago as variant D of sketch 164. A and C stay as evidence."
 tags: [phase-193.1, auth-03, template-first, honesty, seed-157, seed-158, seed-159, generated-from-build]
 ---
 

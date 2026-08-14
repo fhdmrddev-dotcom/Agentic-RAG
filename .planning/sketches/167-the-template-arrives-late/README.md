@@ -2,7 +2,7 @@
 sketch: 167
 name: the-template-arrives-late
 question: "A template is attached to an already-drafted workflow. What does the app say about the mismatch — and what is it actually entitled to claim?"
-winner: null
+winner: "C — name check, no claim (2026-08-14, operator). ⚠ B was NOT rejected for being wrong — it is the stronger idea, rejected on SIZE for what is a safety net rather than the headline feature. NO SEED PLANTED (that option was offered and declined); the re-open CONDITION is recorded instead."
 tags: [phase-193.1, auth-03, sc3, reconcile, honesty, seed-157, seed-159, generated-from-build]
 ---
 

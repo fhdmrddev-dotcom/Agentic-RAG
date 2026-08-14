@@ -1680,9 +1680,9 @@ that channel is unwirable as typed and only `template_placeholders: list[str]` a
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 165 | the-template-lands-first | Where does "I have a template" live on the pre-draft screen, and how do its fields become a spec the author can see the draft aimed at — without slowing the person who has no template? | *pending* | phase-193.1, auth-03, template-first, describe-door, pre-draft, generated-from-build, g2-sketch-gate, seed-157 |
-| 166 | when-there-are-no-eight-fields | The read came back and it wasn't a list. Does the screen still let the author believe their draft is built to their template — and where should the truth live? | *pending* | phase-193.1, auth-03, honesty, seed-157, seed-158, seed-159 |
-| 167 | the-template-arrives-late | A template is attached to an already-drafted workflow. What does the app say about the mismatch — and what is it actually entitled to claim? | *pending* | phase-193.1, auth-03, sc3, reconcile, honesty, seed-159 |
+| 165 | the-template-lands-first | Where does "I have a template" live on the pre-draft screen, and how do its fields become a spec the author can see the draft aimed at — without slowing the person who has no template? | **C — the spec block** (2026-08-14). B rejected on a MEASUREMENT: it renders the fields at **10.5 px under a 14 px picker**, contradicting the intake decision that the fields ARE the visible spec. A and B stay as evidence. | phase-193.1, auth-03, template-first, describe-door, pre-draft, generated-from-build, g2-sketch-gate, seed-157 |
+| 166 | when-there-are-no-eight-fields | The read came back and it wasn't a list. Does the screen still let the author believe their draft is built to their template — and where should the truth live? | **B — the footing line** (2026-08-14). A rejected: silence is SEED-157 recurring WITH a control on screen. C rejected on COST — it reopens the CTA settled as 164's variant D. A and C stay as evidence. | phase-193.1, auth-03, honesty, seed-157, seed-158, seed-159 |
+| 167 | the-template-arrives-late | A template is attached to an already-drafted workflow. What does the app say about the mismatch — and what is it actually entitled to claim? | **C — name check, no claim** (2026-08-14). ⚠ B was NOT rejected for being wrong — it is the stronger idea, rejected on SIZE. NO seed planted (offered and declined); the re-open condition is recorded instead. | phase-193.1, auth-03, sc3, reconcile, honesty, seed-159 |
 
 ### Two operator decisions taken at intake (2026-08-14), before any variant was drawn
 
@@ -1774,3 +1774,57 @@ hot-file ledger on 2026-08-14 and both are certain to be touched here.
 **`/gsd:discuss-phase 193.1` owes a refactor recommendation as its FIRST option, before the
 planned feature.** Sketching first is correct — it is the G-2 gate — but the refactor call comes
 before planning, not after.
+
+### ✅ WINNERS (operator, 2026-08-14) — and the one shape they add up to
+
+| # | Winner | Why, in one line |
+|---|---|---|
+| **165** | **C — the spec block** | B was rejected on a **measurement**, not a taste: at intake the decision was *"the fields ARE the visible spec"*, and B renders them at **10.5 px under a 14 px picker** — the most consequential thing on the screen would also be the quietest. C costs a `scale` prop on a component that shipped three weeks ago. |
+| **166** | **B — the footing line** | **A** was rejected because silence is `SEED-157` recurring **with a control on screen** — worse than no control. **C** was rejected on **cost, not clarity**: it reopens `Write the first draft`, settled three weeks ago as variant D of sketch 164, and makes a button's width depend on a number read out of an uploaded document. |
+| **167** | **C — name check, no claim** | ⚠ **B was not rejected for being wrong.** It is the stronger idea and matches the phase's thesis — but a second model call, a diff surface, an accept/reject path and a new failure mode is a substantial build for what is here a **safety net**, not the headline feature. |
+
+**In every case the losing variants stay on their page.** They are the comparison that
+produced the pick — **evidence, not live options** — and 165's B in particular is the
+standing record of what *"just mount the shipped component"* actually costs.
+
+### The one shape the three winners add up to
+
+The pre-draft describe screen gains **one optional row** under the knowledge-base picker.
+Ignore it and today's behaviour is byte-identical (SC#4 by construction). Use it and the
+template's fields render **at the screen's own scale, as the spec the draft is aimed at**
+(165-C) — with **one line underneath that always says what the draft will be built from**,
+taking a different value on each of the five reading arms and never merging *"we looked and
+it has none"* with *"we never looked"* (166-B). On an already-drafted workflow the rail
+gains a **three-bucket name check that explicitly disclaims being a coverage check**
+(167-C).
+
+### ⚠ THREE THINGS THE PICKS DO NOT SETTLE — carry them into `193.1-CONTEXT.md` as decisions
+
+Recorded here because a decision that lives only inside a chosen variant is a decision
+nobody made:
+
+1. **The chicken-and-egg route shape.** 165-C's filled states assume the **stateless read**.
+   If planning picks *create an empty draft up front*, those states change. 165's **wall**
+   tab renders the shipped `TEMPLATE_UNSAVED_REFUSAL` — *"Save this draft first"* — with
+   **no file input at all**, which is the dead end that route exists to remove.
+2. **The `loading` race** (166). Nothing stops the author pressing Draft mid-read, which
+   sends a generate call with no `template_placeholders` — the blind draft this phase exists
+   to prevent, on a screen that just told them a template was attached.
+3. **Where a LARGE reconcile lives** (167). Four rows fit on a 320 px rail; fifteen do not.
+
+### ⚠ 167-B — NO SEED WAS PLANTED, and the re-open condition is recorded instead
+
+The *"C now, B as a later phase (plant a seed)"* option was offered **explicitly** and
+**declined**, so writing B up as deferred work would invent a commitment nobody made. What
+is recorded instead is the **condition that would reopen it**, so a later reader can
+recognise the evidence when they see it:
+
+> **If C's false-alarm rate proves annoying in lived use** — an author dismissing the
+> reconcile panel because it keeps flagging correct workflows — that is the evidence C's
+> name heuristic is not enough, and B is the answer. B's full mockup, its `KEEP`-the-run-
+> inputs judgement and its cost breakdown stay on sketch 167's page so nobody has to
+> re-derive them.
+
+`SEED-158` (authoring placeholders into a plain template) and `SEED-159` (a null field
+rendering as a blank cell that lies) are **untouched and remain open** — both were named on
+the sketch pages precisely so nobody solves them inside this phase by accident.

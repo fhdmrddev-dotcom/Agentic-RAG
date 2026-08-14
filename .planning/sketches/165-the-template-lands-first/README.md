@@ -2,7 +2,7 @@
 sketch: 165
 name: the-template-lands-first
 question: "Where does 'I have a template' live on the pre-draft screen, and how do its fields become a spec the author can see the draft aimed at — without slowing the person who has no template?"
-winner: null
+winner: "C — the spec block (2026-08-14, operator). Chosen over the cheaper B on a MEASUREMENT: at intake the decision was that the fields ARE the visible spec, and B renders them at 10.5px under a 14px picker. A and B stay on the page as evidence, not live options."
 tags: [phase-193.1, auth-03, template-first, describe-door, pre-draft, generated-from-build, g2-sketch-gate, seed-157]
 ---
 
