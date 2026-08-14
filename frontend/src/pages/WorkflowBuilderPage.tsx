@@ -984,8 +984,15 @@ export function WorkflowBuilderPage({
      *
      * ⚠ AND A STORAGE BLIP MAY NOT COST THE AUTHOR THEIR DRAFT. The save is the more
      * consequential of the two acts and it has already succeeded by the time this runs; the
-     * upload is a follow-up that reports its own failure in its own place (see the
-     * `template-bind-failed` line in the drafted view), never through the save's reading.
+     * upload is a follow-up that reports its own failure in its own place — the one
+     * `role="status"` line in the drafted view below, gated on the bind's own state — and
+     * never through the save's reading.
+     *
+     * ⚠ THAT LINE IS REFERRED TO BY ROLE RATHER THAN BY ITS TESTID, DELIBERATELY. The plan's
+     * own acceptance check is a raw `grep -c` for that id expecting exactly ONE, so a docblock
+     * spelling it would make the crude check read 2 and the constraint would stop being
+     * checkable by eye. Same property, same reason, as the extracted hook's header naming
+     * neither of its hosts. The suite asserts the `data-testid` occurs exactly once.
      */
     onDraftCreated: (id) => {
       setDraftId(id)
