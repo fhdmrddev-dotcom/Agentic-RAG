@@ -292,7 +292,12 @@ async def resolve_template_placeholders(
     try:
         from app.models.harness import AssetRef  # function-local
         from app.services.template_asset_service import resolve_template_source
-        from app.services.template_render_service import parse_docx_template_variables
+        # Imported as a MODULE (Phase 193.1) so the shared name assembly and the parser
+        # arrive on one line: this function is no longer the only place that turns a
+        # parsed template into field names — the stateless author-time door
+        # (``POST /workflows/template/placeholders``) is the second caller, and the two
+        # may never disagree about the same document.
+        from app.services import template_render_service as _tmpl
 
         asset_ref = AssetRef(
             asset_id=str(template_asset_id),
@@ -312,15 +317,14 @@ async def resolve_template_placeholders(
             # No bytes is NEVER-READ, not read-and-empty. Reporting "ok" here would be
             # the exact lie this three-state exists to prevent.
             return [], "unreadable"
-        parsed = parse_docx_template_variables(data)
+        parsed = _tmpl.parse_docx_template_variables(data)
         if not parsed:
             # We DID open the document and the parser found no tokens in it. This is the
             # ONLY arm that may honestly answer "ok" with an empty list.
             return [], "ok"
-        names: list[str] = list(parsed.get("scalars") or [])
-        for col_keys in (parsed.get("columns") or {}).values():
-            names.extend(col_keys)
-        return sorted(set(names)), "ok"
+        # LIFTED, not changed (193.1-02): scalars PLUS every loop column, EXCLUDING
+        # ``collections``, deduped and sorted — identical behaviour, one home.
+        return _tmpl.placeholder_names_from_parsed(parsed), "ok"
     except Exception:  # noqa: BLE001 — optional grounding: a miss is no placeholders, not a crash
         logger.warning("grounding: template placeholder resolution failed; skipping")
         return [], "unreadable"

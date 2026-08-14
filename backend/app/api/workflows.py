@@ -11,8 +11,10 @@ itself is a pure read (no writes).
 """
 from __future__ import annotations
 
+import io
 import logging
 import re
+import zipfile
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
@@ -78,6 +80,16 @@ from app.utils.folder_utils import _null_foreign_global_owner
 # db/dependencies/services/utils, never an api module.
 from app.api.workspace import validate_upload
 from app.services.workspace_service import BUCKET_NAME, MAX_FILE_SIZE
+# Phase 193.1 (AUTH-03, D-05) — the stateless author-time read. Both symbols are PURE
+# bytes/dict -> names (no DB, no Storage, no user scope), which is what makes a route
+# that persists nothing cheap. ``placeholder_names_from_parsed`` is the SHARED assembly
+# ``grounding.resolve_template_placeholders`` also calls, so the bound-template door and
+# this one can never disagree about the same document. No cycle:
+# ``template_render_service`` imports only re/typing/pydantic.
+from app.services.template_render_service import (
+    parse_docx_template_variables,
+    placeholder_names_from_parsed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1646,6 +1658,132 @@ class TemplatePlaceholdersResponse(BaseModel):
 
     read: Literal["ok", "unreadable"]
     placeholders: list[str] = Field(default_factory=list)
+
+
+# Phase 193.1 (AUTH-03, D-05) — the uncompressed-size cap the SHIPPED doors do not have.
+# ``zipfile.ZipFile.read()`` decompresses without a bound: ``parse_docx_template_variables``
+# (``template_render_service.py:387``) calls ``zf.read(n)`` on ``word/document.xml`` plus
+# every header/footer, so a 10 MB OOXML container declaring a multi-GB ``document.xml``
+# passes BOTH size gates above and then materialises in RAM. 50 MB is ~5x the compressed
+# cap — far beyond any real brief, far below a bomb.
+_TEMPLATE_MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024
+
+
+@router.post(
+    "/template/placeholders",
+    response_model=TemplatePlaceholdersResponse,
+    dependencies=[Depends(require_visible("workflow_authoring"))],  # Phase 148 (VIS-01) — authoring gate
+)
+async def read_template_placeholders(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user),
+) -> TemplatePlaceholdersResponse:
+    """Read a template's fill-in fields from the BYTES, persisting nothing (D-05).
+
+    WHY THIS ROUTE EXISTS. The sibling upload door needs a saved workflow
+    (``POST /{definition_id}/template``), and at describe time there is no workflow yet
+    — so an author who wants the draft built to fit their template has a chicken-and-egg
+    problem. This door takes the bytes straight off their disk and answers with the field
+    names. **No row, no Storage object, no draft.** Rejected alternatives, recorded so the
+    shape reads as a decision: minting an empty draft up front (library rows the user
+    never asked for, and a second writer against Phase 186's concurrency token), and
+    stashing to a scratch Storage path (an orphan-cleanup problem nobody owns, on bytes
+    that are RLS-sensitive).
+
+    ⚠ **IT INJECTS NO SUPABASE CLIENT AND NO POOL, AND THAT IS A CLASS ELIMINATION
+    RATHER THAN A STYLE CHOICE.** Quick task ``260814-q5r`` had to write an owner-prefix
+    check AND a ``..`` traversal check on its read door, because that route resolves a
+    caller-supplied Storage PATH through a client sitting on a service-role pool which
+    bypasses RLS — a hand-written guard in front of a service-role read is the exact
+    shape of a prior credential-exposure defect in this codebase. This route accepts no
+    path and owns no row, so there is nothing for that class to attach to. Adding
+    ``supabase=Depends(get_supabase)`` "for symmetry" would REINTRODUCE it; the fence in
+    ``tests/unit/test_193_1_stateless_placeholders.py`` sweeps the body as well as the
+    signature so that edit reds.
+
+    THE GATES, in the sibling's exact order — each one load-bearing:
+
+      1. **The DECLARED part size, before the body is materialised** (the WR-04 fix) —
+         uvicorn/FastAPI impose no body cap, so ``.read()`` of a multi-GB part would
+         buffer it all in RAM.
+      2. **The extension**, before the body is read at all — a ``.png`` costs nothing.
+      3. **Empty / oversized actual body** — a lying or absent declared size stops here.
+      4. **The magic bytes** via the shipped ``validate_upload`` — ZIP EOCD +
+         ``[Content_Types].xml`` + a per-extension part marker, so a renamed binary
+         wearing a ``.docx`` name never reaches the parser.
+      5. **The uncompressed-total cap** — see ``_TEMPLATE_MAX_UNCOMPRESSED_BYTES``.
+         ⚠ This one is NOT inherited: gates 1-4 come from the shipped doors and do NOT
+         cover a zip bomb, so they must not be presented as though they did. Capping it
+         here does NOT close it on ``POST /{id}/template`` or on the q5r read door — the
+         exposure is inherited, flagged, and deliberately not widened. It caps the
+         DECLARED uncompressed total; a central directory that UNDER-declares its sizes
+         would still get past it, and closing that needs a bounded read inside the
+         shipped parser, which is out of this door's scope.
+
+    WHY THE ORDER IS THE HONESTY MECHANISM. ``parse_docx_template_variables`` returns
+    ``None`` for TWO different facts — *not a zip / corrupt / not a docx* (:390-391) and
+    *a real docx carrying no tokens* (:407-408). Here the bytes come straight off a
+    user's disk, so the ambiguity is live. With gate 4 ahead of the parse, a document
+    that never opened is a **422 refusal**, and ``read="ok"`` with ``[]`` can only ever
+    mean *we opened it and it carries no fill-in fields*. Those two facts may never merge
+    (``TemplateAttachSection.tsx:130-143`` carries the same warning on the client).
+
+    ⚠ ``read="unreadable"`` is UNREACHABLE on this route — the same idiom
+    ``TemplatePlaceholdersResponse`` already uses for ``"not_requested"``. A document that
+    cannot be opened is a refusal, not a degraded read. The field is kept for shape parity
+    with the bound-template door so the client derives its arms from ONE wire shape.
+
+    The response echoes NOTHING from the upload — no filename, no extension, no size —
+    which is why the sibling's WR-05 ``safe_name`` sanitisation is not carried across.
+    """
+    if file.size is not None and file.size > MAX_FILE_SIZE:  # WR-04 — before .read()
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+
+    original = file.filename or ""
+    ext = "." + original.rsplit(".", 1)[-1].lower() if "." in original else ""
+    if ext not in _TEMPLATE_MIME_BY_EXT:
+        raise HTTPException(
+            422,
+            "A workflow template must be a .docx, .pptx or .xlsx document "
+            f"(got {ext or 'a file with no extension'}).",
+        )
+
+    raw = await file.read()
+    if len(raw) == 0:
+        raise HTTPException(422, "File is empty")
+    if len(raw) > MAX_FILE_SIZE:  # a lying/absent declared size does not get past this
+        raise HTTPException(422, "File too large. Maximum size is 10 MB.")
+    validate_upload(original, raw)  # magic-byte / OOXML-container gate -> 422
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+            uncompressed = sum(zi.file_size for zi in zf.infolist())
+    except Exception:  # noqa: BLE001 — gate 4 already proved it is a container
+        raise HTTPException(422, "File is not a valid Office document (its archive could not be read).")
+    if uncompressed > _TEMPLATE_MAX_UNCOMPRESSED_BYTES:
+        raise HTTPException(
+            422,
+            "This document expands to more than "
+            f"{_TEMPLATE_MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB when opened and "
+            "was not read.",
+        )
+
+    try:
+        # CLAUDE.md / D-v2.5-01 — the parse is sync CPU work (zip inflate + regex over
+        # stripped XML). Bounded by the gates above, but it is user-triggerable, so it
+        # goes off the event loop exactly as the sibling wraps its Storage call (:1723).
+        parsed = await run_in_threadpool(parse_docx_template_variables, raw)
+    except Exception:
+        # Clean relay, never a traceback (the sibling's :1729-1736 posture).
+        logger.warning("Stateless template placeholder read failed (relaying clean error)", exc_info=True)
+        raise HTTPException(422, "The document could not be read.")
+
+    # ``parsed is None`` HERE — past gate 4 — is the honest empty state, not a failure.
+    # The assembly is the SHARED one so this door and the bound-template door can never
+    # show two different field lists for the same document.
+    return TemplatePlaceholdersResponse(
+        read="ok", placeholders=placeholder_names_from_parsed(parsed)
+    )
 
 
 @router.post(
