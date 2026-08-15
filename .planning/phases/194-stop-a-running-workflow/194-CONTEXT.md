@@ -130,8 +130,10 @@ criteria. See `<code_context>` § *The three gaps*.
      assistant message with `runStatus === "streaming"`, which that stuck state may defeat.
   3. **The `ActiveRunsTray` row.** Already has per-run Stop + Stop-all routed through `stopThread`;
      a workflow run should be stoppable from outside its thread without navigating in.
-  4. **The Workflows page row — the LIVE half only.** A *running* workflow's library row gets a Stop
-     using a run id the library already has. **No new history surface** (D-15).
+  4. ~~**The Workflows page row — the LIVE half only.** A *running* workflow's library row gets a Stop
+     using a run id the library already has. **No new history surface** (D-15).~~
+     ⚠ **DESCOPED AT PLAN TIME — SEE D-16. The strikethrough text is kept because its FALSE PREMISE
+     is the reason for the descope, and overwriting it would hide that.**
 
 ### The run that nobody can stop (SC#2)
 
@@ -191,6 +193,52 @@ criteria. See `<code_context>` § *The three gaps*.
   cancel arm shields `_expire_pending_ask_user`. ⚠ **Scope fence:** 194 covers **stopping a run that
   is waiting at an approval**, not redesigning where approval lives. If planning finds the fix needs
   the approval surface moved off chat, that is a phase, not a task — defer it with a trigger.
+
+### Plan-time amendments (2026-08-16, after `194-RESEARCH.md`)
+
+⚠ **These three are OPERATOR RULINGS made at plan time, on measurements that refuted the discuss-time
+premises. Each names the claim it overturns; the originals above are struck through, never deleted.**
+
+- **D-16 — MOUNT 4 IS DESCOPED, AND THE PREMISE IT RESTED ON WAS MEASURED FALSE.** D-08 mount 4 said
+  the library row gets a Stop *"using a run id the library already has"*. **There is no such id.**
+  `LibraryRow` (`components/workflows/library/libraryRow.ts`) carries `id / slug / provenance / …`
+  and **no run field of any kind**; all three feeds (`/workflows/published`, `/workflows/starters`,
+  `/workflows/drafts`) are **definition** feeds; `grep -rE "runId|run_id|running|activeRun"` across
+  the whole `library/` directory returns **one** hit and it is prose inside a docblock. Delivering it
+  needs a new backend live-runs read **plus** a new `LibraryRow` field **plus** a poll or
+  subscription — a genuinely **SECOND concern** on `WorkflowsPage.tsx`, whose ledger row already owes
+  a G-5 refactor recommendation FIRST (inheriting `34 / 12 / 1176`).
+  **Ruling: descoped with a written trigger** — `re_open_trigger: "the first phase that puts any
+  live-run state on the library row"`. ⚠ **SC#1 is NOT weakened by this, and the reason is measured
+  rather than argued: mount 3 (`ActiveRunsTray`) ALREADY ships per-run Stop + Stop-all
+  (`ActiveRunsTray.tsx:114-136`), which delivers the *"stoppable from outside its thread without
+  navigating in"* property mount 4 was reached for.** A plan may NOT quietly reinstate mount 4 as a
+  wiring task; doing so is the second concern, and the refactor recommendation is owed first.
+
+- **D-17 — THE TWO ORPHAN `workflow_phases` ROWS ARE HEALED TOO. D-12's receipt covers FOUR rows, not
+  two.** Research found, beyond D-12's two stuck **run** rows, **two `workflow_phases` rows stuck
+  `active` under runs that have already `failed`** (both `confirm` phases, stamped 2026-07-18) — which
+  is **SC#3's exact failure mode already sitting in the live data**. Leaving a known orphan `active`
+  phase row unhealed while shipping the fix that prevents new ones is precisely the inconsistency this
+  phase exists to remove. **All four rows get ONE recorded before/after receipt** (row ids, `thread_id`,
+  `created_at`, status before, status after), because *a data repair with no receipt is
+  indistinguishable from a claim* (D-12). ⚠ **One of the two stuck run rows is `is_golden_run = True`**
+  — a publish-validation artifact, permanently unresumable since Phase 190's A4 gate. It is healed like
+  the others; if it needs distinguishing from a user-stopped run that is an `error`/audit note,
+  **NEVER a new status literal** (that would be a second migration for a one-off).
+
+- **D-18 — THE BANNER FIX SHIPS AND CROSSES PANEL-09 WITH THE COST STATED.** `BUG-260815-04`'s
+  mechanism is named and it is not the copy: `hasAnyTools = tool_calls.length > 0`, a harness run
+  writes **no** `tool_calls`, so `MessageItem.tsx:635` holds the pre-tools banner for the entire run.
+  The advancing data is already inside a hook that same component already calls — **no backend change**
+  — but consuming it crosses **PANEL-09**, a deliberate panel-only demux with a measured perf reason.
+  **Ruling: accept the cost and state it explicitly.** The justification is that the re-render is
+  **per-PHASE, not per-token** — a workflow run has a handful of phases, so the cost PANEL-09 was
+  protecting against (token-rate re-renders) is **not the cost being incurred**. The plan MUST record
+  the accepted cost **and the measured re-render count** beside PANEL-09's original reasoning, not over
+  it. ⚠ **D-13's byte pin still binds: the `"Starting workflow…"` string is NOT edited.** The fix is
+  the advancing mechanism; a plan that touches the copy has fixed nothing and broken a nine-phase-old
+  pin.
 
 ### Claude's Discretion
 
@@ -345,6 +393,12 @@ criteria. See `<code_context>` § *The three gaps*.
   first pass and un-folded on measurement** — marking it `folded_into: 194` would have put a bug in
   the "claimed" state that the phase cannot address, which is the bookkeeping failure this project's
   ROADMAP keeps catching after the fact.
+- **D-16 — The Workflows-page library-row Stop (former D-08 mount 4).** Descoped at plan time on a
+  measured-false premise (there is no run id on the row or on the wire). **Trigger: *"the first phase
+  that puts any live-run state on the library row"*.** Whichever phase takes it inherits
+  `WorkflowsPage.tsx`'s standing G-5 obligation (`34 / 12 / 1176`) and owes the refactor
+  recommendation FIRST.
+
 - **The approval surface's home** — `BUG-260808-02` is folded only for *stopping a run waiting at an
   approval*. Moving approval off chat is a phase. Trigger: any plan whose fix requires relocating the
   approval checkpoint.
