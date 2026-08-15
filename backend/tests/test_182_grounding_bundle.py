@@ -129,10 +129,28 @@ def test_grounding_bundle_returns_server_sourced_palette(client, monkeypatch):
     # `degraded` joined the contract in the round-3 gap closure (CR-02): the palette must be
     # able to say "we could not READ your folders/skills" rather than serve an outage as an
     # empty tree. A healthy read reports `[]` — see the assertion below.
-    assert set(body) == {"tools", "folders", "skills", "template_placeholders", "degraded"}
+    # ⚠ SUPERSEDED 2026-08-15. This set read, from Phase 182 until Phase 185:
+    #     {"tools", "folders", "skills", "template_placeholders", "degraded"}
+    # Phase 185-02 (`04d475d4`, GOVERN-01 / D-185-09) added `kb_tools` to `GroundingBundle`
+    # and projected it at `workflows.py:1014`, so this exact-set assertion has been RED ever
+    # since — EIGHT phases, unnoticed, because this file lives in `backend/tests/` and not
+    # `backend/tests/unit/`, which is the only path any gate command names (SEED-165).
+    # The old value is kept rather than overwritten so the drift stays auditable.
+    assert set(body) == {
+        "tools", "folders", "skills", "template_placeholders", "degraded", "kb_tools",
+    }
     assert isinstance(body["tools"], list) and body["tools"]
     assert "search_documents" in body["tools"]  # the genuine registry, not a literal
     assert body["tools"] == sorted(body["tools"])
+    # `kb_tools` is the safety-DEFINING KB-reading list, not a per-caller registry read: it
+    # is populated UNCONDITIONALLY from `KB_TOOLS_SORTED` — including on the `degraded` path
+    # — because "we could not read your palette" must never silently un-mark a locked step.
+    # Pinned against the constant itself, so widening `KB_TOOLS` without widening the wire
+    # (or vice versa) fails HERE rather than in review.
+    from app.services.harness.grounding import KB_TOOLS_SORTED
+
+    assert body["kb_tools"] == KB_TOOLS_SORTED
+    assert body["kb_tools"] and body["kb_tools"] == sorted(body["kb_tools"])
     assert isinstance(body["folders"], list)
     assert isinstance(body["skills"], list)
     # placeholders are PER-TEMPLATE: absent ?template_asset_id= -> [] (RESEARCH A3)
@@ -199,6 +217,15 @@ def test_grounding_bundle_fields_come_from_the_bundle(client, monkeypatch):
             ],
             skill_ids={skill_id},
             placeholders=["project_name", "report_date"],
+            # ⚠ DELIBERATELY NOT the real `KB_TOOLS_SORTED`, and not left to the `[]`
+            # default either. `GroundingBundle.kb_tools`' own docblock states the design
+            # intent this pins: it is carried ON THE BUNDLE "so the palette route
+            # serializes a FIELD rather than reaching for the constant itself". A route
+            # that ignored the bundle and inlined `KB_TOOLS_SORTED` would pass against
+            # either the default or the real value — both are indistinguishable from a
+            # correct projection. A distinctive value is the only one that can tell them
+            # apart, which is the same reason this suite fakes distinctive tools/folders.
+            kb_tools=["kb_alpha_tool", "kb_beta_tool"],
         )
 
     monkeypatch.setattr(g, "assemble_grounding_bundle", _fake_assemble)
@@ -212,6 +239,12 @@ def test_grounding_bundle_fields_come_from_the_bundle(client, monkeypatch):
         # Mapped off `GroundingBundle.degraded` exactly like every field above it — this fake
         # bundle resolved cleanly, so the honest answer is the empty list (round-3 CR-02).
         "degraded": [],
+        # ⚠ ADDED 2026-08-15. Projected off `GroundingBundle.kb_tools` since Phase 185-02
+        # (`04d475d4`); this dict has been RED ever since, unseen for eight phases because
+        # nothing gates `backend/tests/` outside `unit/` (SEED-165). The value is the fake's
+        # distinctive one, NOT `KB_TOOLS_SORTED` — see the fake for why that distinction is
+        # the whole point of the assertion.
+        "kb_tools": ["kb_alpha_tool", "kb_beta_tool"],
     }
     # CR-02 stated as a negative, so a widened model fails HERE and not in review: neither the
     # tenant id nor the seeding owner may appear ANYWHERE in the serialized palette.
