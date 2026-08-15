@@ -569,8 +569,39 @@ def _is_transient_provider_error(e: APIError) -> bool:
 
     Checks status code, structured body (OpenRouter puts real code in e.body),
     and message text. Never retries auth, billing, or parameter errors.
+
+    BUG-260815-09 — ``status_code`` MUST be read with ``getattr``, never as an
+    attribute. ``openai.APIError`` is the SDK's BASE class and does NOT define
+    ``status_code``; only the ``APIStatusError`` subclasses (BadRequestError,
+    RateLimitError, ...) do. Verified against the pinned SDK:
+        openai.APIError('x', request=None, body=None).status_code
+        -> AttributeError: 'APIError' object has no attribute 'status_code'
+
+    A bare ``APIError`` is exactly what an OpenAI-COMPATIBLE server raises when
+    it fails MID-STREAM, because the failure arrives inside the SSE body rather
+    than as an HTTP status. Measured 2026-08-15 against LM Studio on :1234 —
+    a context overflow ("n_keep: 120081 >= n_ctx: 33280") surfaced as a plain
+    ``openai.APIError``, with no status code anywhere.
+
+    The consequence was not a crash but a LIE. This helper is called from the
+    ``except (APIError, AnthropicAPIError)`` handler; raising AttributeError
+    INSIDE that handler escapes it, unwinds past every per-provider
+    classification branch, and lands in the generic ``except Exception``, which
+    renders "An unexpected error occurred (AttributeError). Please try again."
+    The provider's real, actionable message -- telling the user their context
+    window was too small -- was discarded on the way. Every local
+    OpenAI-compatible backend (LM Studio, llama.cpp, vLLM, Ollama's compat
+    endpoint) is affected, and so is any hosted provider that reports a
+    mid-stream failure this way.
+
+    Note the two CALL SITES already read this attribute defensively
+    (``getattr(provider_err, "status_code", None)`` at the request-too-large
+    check and in the retry log), and the ``e.body`` access just below is inside
+    an ``except (AttributeError, TypeError)``. This one line was the only
+    unguarded read on the path -- which is why it survived: the pattern was
+    understood, it just was not applied here.
     """
-    if e.status_code in (502, 503, 529):
+    if getattr(e, "status_code", None) in (502, 503, 529):
         return True
     try:
         code = e.body.get("error", {}).get("code")
