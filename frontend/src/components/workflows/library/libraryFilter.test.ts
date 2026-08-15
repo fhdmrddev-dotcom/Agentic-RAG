@@ -744,6 +744,26 @@ describe("193.2 / SC#3 — where a freshly-published row actually lands", () => 
 // `193.2-04-SUMMARY.md`. Phase 193.1 found FOUR fences that could not fire and every one was
 // caught by planting, none by reading.
 //
+// ⚠ AND PART 4 WAS STILL NOT ENOUGH, WHICH IS THE 2026-08-15 `WR-04` LESSON — recorded here
+// rather than only in the review, because the paragraph above reads as a completeness claim
+// and was not one. Both arms WERE planted, and both plants used the MUTATING `rows.sort(` /
+// `visibleRows.sort(` shape — the one form the needle already caught. Planting only the shape
+// the needle was written for proves the fence is aimed at the right FILE and nothing at all
+// about its coverage of the RULE. The seven-shape table the reviewer executed found six
+// escapes. **A plant must be chosen to falsify the needle, not to confirm it.**
+//
+// The `WR-04` re-drive: TEN plants, one shape at a time, each in production source, each
+// restored to an EMPTY `git diff --numstat` before the next — the seven shapes from the
+// review's own table (`rows.sort(` · `[...rows].sort(` · `[...visibleRows].sort(` ·
+// `visibleRows.slice().sort(` · `Array.from(rows).sort(` · `visibleRows.toSorted(` ·
+// `[...rows].reverse()`), landed in whichever of the two modules binds that receiver, plus
+// three more against `rowIdentity.ts` for the second home of this fence. All ten observed RED.
+// ⚠ AND THE COUNTER-MEASUREMENT, which is what proves the old fence was blind rather than
+// merely narrow: under the IDENTICAL plants, the PRE-`WR-04` fence reported **132 passed (132)
+// — fully green** for `visibleRows.toSorted(` and for `[...rows].reverse()`, and for
+// `[...rows].sort(` only the corpus check fired while the needle itself stayed silent.
+// Measured, not inferred.
+//
 // ⚠ THE SHIPPED `rowIdentity.test.ts:167` FENCE IS NOT EDITED, WEAKENED OR DUPLICATED. It
 // stays green and unchanged; this block adds coverage beside it, over different modules.
 
@@ -764,9 +784,60 @@ const workflowsPageCode = stripComments(workflowsPageSource)
  * modules actually use for it. Deliberately NOT a bare `.sort(` — a sort that names a narrow
  * thing it sorts (a slug's version numbers, a row's candidate axes) is legal and is what
  * `rowIdentity.ts` does twice.
+ *
+ * ⚠ WIDENED 2026-08-15 (code review `WR-04`). WHAT THIS NEEDLE WAS UNTIL THEN IS RECORDED HERE
+ * VERBATIM RATHER THAN DELETED, because the shape it had is the finding:
+ *
+ *     /\brows\.sort\(|\bvisibleRows\.sort\(|\bmerged\.sort\(|\bfamily\.sort\(|\blist\.sort\(/
+ *
+ * It matched the RECEIVER NAME immediately followed by `.sort(` — i.e. **only the MUTATING
+ * form, the one a React developer already avoids.** Executed by the reviewer in `node` against
+ * seven realistic shapes, it caught `rows.sort(` and missed all six others: `[...rows].sort(`,
+ * `[...visibleRows].sort(`, `visibleRows.slice().sort(`, `Array.from(rows).sort(`,
+ * `visibleRows.toSorted(` and `[...rows].reverse()`. `Array.prototype.sort` MUTATES, so someone
+ * re-ordering a memoised list will write `[...visibleRows].sort(...)` — the needle was blind to
+ * exactly what would be written. **That idiom is not hypothetical in this repository:** a sweep
+ * of all 318 non-test modules under `frontend/src` finds `[...list].sort((a, b) =>` shipping
+ * today in `SkillEvalSection.tsx:54` and `EvalsTab.tsx:51`. Neither is in this fence's scope —
+ * they are the evidence that the missed shape is the NATURAL one, not a contrived evasion.
+ *
+ * The rule is now the SHAPE, in four named arms, rather than one hard-coded punctuation
+ * sequence — and it covers the non-mutating `toSorted` / `reverse` / `toReversed` siblings that
+ * escaped both this needle AND the corpus assertion below:
+ *
+ *   (a) direct        `rows.sort(`  ·  `visibleRows.toSorted(`  ·  `merged.reverse()`
+ *   (b) spread copy   `[...rows].sort(`  ·  `[...starters, ...merged].toReversed(`
+ *   (c) `Array.from`  `Array.from(rows).sort(`  ·  `Array.from(new Set(rows)).reverse(`
+ *   (d) method copy   `rows.slice().sort(`  ·  `visibleRows.filter(p).toSorted(`
+ *
+ * ⚠ AND THE OPPOSITE FAILURE IS FENCED TOO, because a regex broad enough to catch `.toSorted(`
+ * is broad enough to red legitimate code. The arms are anchored on a row-list receiver rather
+ * than on a free gap — an earlier draft used `NAME …{0,40}? [\])] . REORDER(` and was measured
+ * FALSE-POSITIVE on `if (rows.length) return items.map(f).sort(g)`, which is why (b)/(c)/(d)
+ * are spelled out instead. Swept over the three files this fence actually reads AND over the
+ * whole 13-module `library/` subtree: **ZERO hits**, with `rowIdentity.ts`'s two legal narrow
+ * sorts (`[...new Set(versions)].sort(` and `candidates.sort(`) untouched by all four arms.
+ *
+ * ⚠ THIS NEEDLE HAS A SECOND HOME AND THEY MOVE TOGETHER: `rowIdentity.test.ts`'s T-7 / P-4
+ * case carries the same rule over a THIRD module (`rowIdentity.ts`) and had the identical blind
+ * spot. It was widened in the same commit. A cross-reference is kept in both files because the
+ * two fences read different sources and neither may import the other's `?raw` scope.
  */
-const FORBIDDEN_ROW_SORT =
-  /\brows\.sort\(|\bvisibleRows\.sort\(|\bmerged\.sort\(|\bfamily\.sort\(|\blist\.sort\(/
+const ROW_LIST = "(?:rows|visibleRows|merged|family|list)"
+const REORDER = "(?:sort|toSorted|reverse|toReversed)"
+const COPY = "(?:slice|concat|filter|map|flat|flatMap|toSpliced|with)"
+const DOT = "\\s*\\.\\s*"
+const FORBIDDEN_ROW_SORT = new RegExp(
+  [
+    `\\b${ROW_LIST}${DOT}${REORDER}\\s*\\(`,
+    `\\[[^\\]\\n]*\\.\\.\\.\\s*${ROW_LIST}\\b[^\\]\\n]*\\]${DOT}${REORDER}\\s*\\(`,
+    `\\bArray${DOT}from\\s*\\([^;\\n]{0,60}?\\b${ROW_LIST}\\b[^;\\n]{0,40}?\\)${DOT}${REORDER}\\s*\\(`,
+    `\\b${ROW_LIST}${DOT}${COPY}\\s*\\([^;\\n]{0,60}?\\)${DOT}${REORDER}\\s*\\(`,
+  ].join("|"),
+)
+
+/** Every non-mutating sibling of `.sort(`, for the corpus assertion — `WR-04`'s other half. */
+const ANY_REORDER_CALL = /\.\s*(?:sort|toSorted|reverse|toReversed)\s*\(/
 
 const SWEPT = [
   ["libraryFilter.ts", libraryFilterCode],
@@ -807,7 +878,7 @@ describe("F-7 extended — no client sort on the merged list (D-17)", () => {
     expect(workflowsPageCode).toContain("visibleRows.map(")
   })
 
-  it("NON-VACUITY — the swept corpus is EMPTY today: neither module contains any `.sort(` at all", () => {
+  it("NON-VACUITY — the swept corpus is EMPTY today: neither module re-orders anything at all", () => {
     // ⚠ STATED RATHER THAN GLOSSED. `rowIdentity.test.ts:173` can assert
     // `sorts.length > 0` because that module really does sort two narrow things. These two
     // modules sort NOTHING, so the equivalent guard here is the opposite assertion: the
@@ -815,24 +886,68 @@ describe("F-7 extended — no client sort on the merged list (D-17)", () => {
     // TODAY. That is a true statement about a clean tree, not a fence passing by accident —
     // and the real-plant RED runs recorded in `193.2-04-SUMMARY.md` are what prove the fence
     // starts seeing lines the moment one is written.
+    //
+    // ⚠ WIDENED FROM `.includes(".sort(")` TO EVERY REORDER SIBLING (`WR-04`, 2026-08-15).
+    // The review's table found `.toSorted(` and `.reverse()` escaping BOTH this corpus check
+    // and the needle — so on the two shapes a developer is MOST likely to write, the property
+    // rested on nothing at all. This assertion is the totalising half of the pair: it never
+    // looks at a receiver name, so no evasion by renaming is possible while it holds.
     for (const [name, code] of SWEPT) {
-      const sorts = code.split("\n").filter((line) => line.includes(".sort("))
-      expect(sorts, name).toHaveLength(0)
+      const reorders = code.split("\n").filter((line) => ANY_REORDER_CALL.test(line))
+      expect(reorders, name).toHaveLength(0)
     }
   })
 
-  it("INLINE PLANT — the needle really catches the shapes it forbids", () => {
+  it("INLINE PLANT — the needle really catches the shapes it forbids, mutating AND not", () => {
     // Kept permanently in the file, exactly as `rowIdentity.test.ts:169-172` keeps its own.
-    expect("const shown = rows.sort((a, b) => a.name.localeCompare(b.name))").toMatch(
-      FORBIDDEN_ROW_SORT,
-    )
-    expect("  const ordered = visibleRows.sort(byUpdatedAtDesc)").toMatch(FORBIDDEN_ROW_SORT)
-    expect("  return merged.sort((a, b) => b.updatedAt - a.updatedAt)").toMatch(FORBIDDEN_ROW_SORT)
+    //
+    // ⚠ ALL SEVEN OF THE REVIEW'S OWN `WR-04` SHAPES ARE HERE, INDIVIDUALLY. Six of them were
+    // MEASURED escaping the pre-2026-08-15 needle; a fence that catches six of seven is the
+    // same finding again, so each shape is spelled out rather than represented by a sample.
+    for (const forbidden of [
+      "const shown = rows.sort(cmp)", //                   caught before AND after
+      "const shown = [...rows].sort(cmp)", //              ← escaped
+      "const shown = [...visibleRows].sort(cmp)", //       ← escaped
+      "const shown = visibleRows.slice().sort(cmp)", //    ← escaped
+      "const shown = Array.from(rows).sort(cmp)", //       ← escaped
+      "const shown = visibleRows.toSorted(cmp)", //        ← escaped (and the corpus check too)
+      "const shown = [...rows].reverse()", //              ← escaped (and the corpus check too)
+      // …and the same evasions on the other three receiver names this needle governs.
+      "return merged.toSorted(byUpdatedAtDesc)",
+      "return [...merged].reverse()",
+      "const x = family.toReversed()",
+      "const y = [...list].sort(byName)",
+      "const z = list.slice().toSorted(byName)",
+      "const w = visibleRows.filter(Boolean).sort(cmp)",
+      "const v = Array.from(visibleRows).toSorted(cmp)",
+      "  const ordered = visibleRows.sort(byUpdatedAtDesc)",
+      "  return merged.sort((a, b) => b.updatedAt - a.updatedAt)",
+    ]) {
+      expect(forbidden, forbidden).toMatch(FORBIDDEN_ROW_SORT)
+    }
 
     // …and the legal shapes are NOT caught, or the absence assertion would be unsatisfiable
     // the day either module legitimately sorts something narrow of its own.
-    expect("versions.sort((a, b) => a - b)").not.toMatch(FORBIDDEN_ROW_SORT)
-    expect("candidates.sort(byRank)").not.toMatch(FORBIDDEN_ROW_SORT)
+    //
+    // ⚠ THE OPPOSITE FAILURE IS AS REAL AS THE ONE BEING FIXED, and these rows are what keep
+    // the widening honest. The first four are `rowIdentity.ts`'s ACTUAL shipped lines — a
+    // needle that redded them would break a green module. The `rows.length … items.map(f)`
+    // row is not decorative: an earlier draft of this needle used a free character gap and was
+    // measured FALSE-POSITIVE on exactly it.
+    for (const legal of [
+      "const ascending = [...new Set(versions)].sort((a, b) => a - b)",
+      "candidates.sort((a, b) => a.narrowed - b.narrowed || a.priority - b.priority)",
+      "versions.sort((a, b) => a - b)",
+      "candidates.sort(byRank)",
+      "chips.sort()",
+      "Object.keys(byId).sort()",
+      "if (rows.length) return items.map(f).sort(g)",
+      "const n = rows.length; return versions.sort(g)",
+      "const listed = names.toSorted()",
+      "segments.reverse()",
+    ]) {
+      expect(legal, legal).not.toMatch(FORBIDDEN_ROW_SORT)
+    }
   })
 
   it("ABSENCE — no line in either stripped source re-orders the merged row list", () => {

@@ -165,14 +165,73 @@ describe("the module's own source keeps the promises no test can see", () => {
   })
 
   it("T-7 / P-4 — the ROW LIST is never re-ordered, and every sort says what it sorts", () => {
-    const sorts = code.split("\n").filter((l) => l.includes(".sort("))
-    // POSITIVE CONTROL — the needle catches the shape 163/index.html:557 ships and this must not.
-    expect("const shown = rows.sort((a, b) => a.name.localeCompare(b.name))").toMatch(
-      /\brows\.sort\(|\bfamily\.sort\(|\blist\.sort\(/,
+    // ⚠ WIDENED 2026-08-15 (code review `WR-04`) — THE SECOND HOME OF THAT FENCE. The finding
+    // was raised against `libraryFilter.test.ts`'s `FORBIDDEN_ROW_SORT`; this case carried the
+    // IDENTICAL blind spot over a THIRD module, and a fix applied only to the first hit would
+    // have left it. WHAT THIS ASSERTED UNTIL THEN IS RECORDED VERBATIM RATHER THAN DELETED:
+    //
+    //     /\brows\.sort\(|\bfamily\.sort\(|\blist\.sort\(/
+    //
+    // — the receiver name immediately followed by `.sort(`, i.e. only the MUTATING form.
+    // `[...rows].sort(`, `rows.slice().sort(`, `Array.from(rows).sort(`, `rows.toSorted(` and
+    // `[...rows].reverse()` all walked through it, and those are the forms a React developer
+    // actually writes, because `Array.prototype.sort` mutates. The rule is now the SHAPE, in
+    // four arms (direct · spread copy · `Array.from` copy · method copy) over four reorder
+    // methods (`sort` · `toSorted` · `reverse` · `toReversed`).
+    //
+    // ⚠ IT IS DUPLICATED, DELIBERATELY, AND THE TWO COPIES MOVE TOGETHER. The sibling lives in
+    // `libraryFilter.test.ts` (swept over `libraryFilter.ts` + `WorkflowsPage.tsx`); this one
+    // is swept over `rowIdentity.ts`. Neither may read the other's `?raw` scope, and the fuller
+    // derivation — including the four-arm rationale and the false-positive measurement that
+    // rejected a free-gap draft — is recorded beside that copy.
+    //
+    // ⚠ AND THIS MODULE IS THE FALSE-POSITIVE TEST CASE FOR THE WIDENING, which is why the
+    // widened needle was swept here BEFORE it was written: `rowIdentity.ts` legitimately sorts
+    // two narrow things, `[...new Set(versions)].sort(` at :386 and `candidates.sort(` at :471.
+    // The first is a `].sort(` shape, so the obvious widening (`|\]\.sort\(`) would have redded
+    // a green module. Measured: all four arms find ZERO lines here.
+    const ROW_LIST = "(?:rows|family|list)"
+    const REORDER = "(?:sort|toSorted|reverse|toReversed)"
+    const COPY = "(?:slice|concat|filter|map|flat|flatMap|toSpliced|with)"
+    const DOT = "\\s*\\.\\s*"
+    const FORBIDDEN_ROW_SORT = new RegExp(
+      [
+        `\\b${ROW_LIST}${DOT}${REORDER}\\s*\\(`,
+        `\\[[^\\]\\n]*\\.\\.\\.\\s*${ROW_LIST}\\b[^\\]\\n]*\\]${DOT}${REORDER}\\s*\\(`,
+        `\\bArray${DOT}from\\s*\\([^;\\n]{0,60}?\\b${ROW_LIST}\\b[^;\\n]{0,40}?\\)${DOT}${REORDER}\\s*\\(`,
+        `\\b${ROW_LIST}${DOT}${COPY}\\s*\\([^;\\n]{0,60}?\\)${DOT}${REORDER}\\s*\\(`,
+      ].join("|"),
     )
+
+    const sorts = code
+      .split("\n")
+      .filter((l) => /\.\s*(?:sort|toSorted|reverse|toReversed)\s*\(/.test(l))
+    // POSITIVE CONTROL — the needle catches the shape 163/index.html:557 ships and this must
+    // not, plus every non-mutating evasion of it that the pre-`WR-04` needle let through.
+    for (const forbidden of [
+      "const shown = rows.sort((a, b) => a.name.localeCompare(b.name))",
+      "const shown = [...rows].sort(cmp)",
+      "const shown = rows.slice().sort(cmp)",
+      "const shown = Array.from(rows).sort(cmp)",
+      "const shown = rows.toSorted(cmp)",
+      "const shown = [...rows].reverse()",
+      "const shown = family.toReversed()",
+      "const shown = [...list].sort(byName)",
+    ]) {
+      expect(forbidden, forbidden).toMatch(FORBIDDEN_ROW_SORT)
+    }
+    // NEGATIVE CONTROL — this module's OWN two shipped sorts, spelled out. If the widening
+    // ever reds one of them it reds here, in a case that names them, rather than in a plan.
+    for (const legal of [
+      "const ascending = [...new Set(versions)].sort((a, b) => a - b)",
+      "candidates.sort((a, b) => a.narrowed - b.narrowed || a.priority - b.priority)",
+    ]) {
+      expect(legal, legal).not.toMatch(FORBIDDEN_ROW_SORT)
+    }
+
     expect(sorts.length).toBeGreaterThan(0) // non-vacuity: there ARE sorts to judge
     for (const line of sorts) {
-      expect(line).not.toMatch(/\brows\.sort\(|\bfamily\.sort\(|\blist\.sort\(/)
+      expect(line, line.trim()).not.toMatch(FORBIDDEN_ROW_SORT)
     }
     // …and each one is annotated as such, in the prose the stripper removed.
     expect((source.match(/NEVER THE ROW LIST/g) ?? []).length).toBeGreaterThanOrEqual(2)
