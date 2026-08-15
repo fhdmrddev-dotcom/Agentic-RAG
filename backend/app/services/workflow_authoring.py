@@ -64,8 +64,20 @@ AUTHORING_SYSTEM_PROMPT = (
     "- llm_single: one LLM completion with a `prompt` (no tools).\n"
     "- llm_agent: an autonomous agent with a `prompt` and an `available_tools` whitelist.\n"
     "- llm_batch_agents: a fan-out of parallel agents over a `prompt` + `available_tools`.\n"
-    "- llm_human_input: PAUSE and ask the human (`prompt`, optional `options`) — use for "
-    "any 'confirm before finalizing' step.\n"
+    # 193.2 (D-11) — SHORTENED, and length is the whole point. MEASURED from this literal
+    # at runtime, not hand-counted: this bullet was **121** characters, the LONGEST of the
+    # seven and 45% above the six-bullet median of exactly **83.5**; it is now **74**.
+    # The rule being obeyed is the one the `external_action` block below already records
+    # about itself — an over-long bullet is a NUDGE, and a nudge in a generator prompt
+    # skews composition toward the type it describes. What made this one a nudge was not
+    # only its length but its tail: it ENDED with an active invitation ("use for any
+    # 'confirm before finalizing' step"), recommending the ONE phase type the synchronous
+    # publish gate categorically refuses (`publish_service._interactive_phase_failures`).
+    # `BUG-260815-01` measured that composition 2 for 2 with a bound template. What the
+    # type IS stays truthful and complete — it pauses and asks the human, it takes a
+    # `prompt` and optional `options`; only the invitation is gone. The upper precedent
+    # for this band is the `external_action` bullet at 104 characters (F-8 enforces it).
+    "- llm_human_input: PAUSE and ask the human (`prompt`, optional `options`).\n"
     "- llm_emit: a sealed forced emission that produces a typed deliverable (`emitter`).\n"
     # 189 CONN-01 (D-01) — the 7th type. Without this bullet the AI-seed path (Phase 187)
     # can never emit an external_action node and the type is reachable only by hand.
@@ -88,7 +100,50 @@ AUTHORING_SYSTEM_PROMPT = (
     "directly. NEVER create a `render_template` emit phase without a provided template — "
     "at run time it fails with `no_template_bound` and the workflow can NEVER publish. "
     "Default to a simple, publishable text deliverable; reach for a template only when one "
-    "is actually provided.\n\n"
+    "is actually provided.\n"
+    # 193.2 (D-11) — the interactive case joins the DELIVERABLE RULE in the rule's OWN
+    # voice, because it has the same consequence the rule is already labelled for: a
+    # wrong choice makes the workflow unpublishable. One home per concern — the rule
+    # states the POLICY, the grounding states the FACTS the policy reads
+    # (`harness/grounding.py:605-607`); the D-26 arms there are deliberately untouched.
+    #
+    # PROPORTIONALITY, and WHICH BASELINE IT WAS MEASURED AGAINST (D-11). The 83.5-char
+    # median belongs to the phase-type bullet list above, NOT here: this block measured
+    # **769** characters before this clause — already ~9x that median — and RE-MEASURED
+    # from the literal after the edit it is **1202**, so the clause is **433**, roughly
+    # half the single template clause it sits beside. It is proportionate to THIS block,
+    # which is the only comparison that means anything. (Both figures are re-derivable:
+    # split the literal on newlines, take the lines from `DELIVERABLE RULE` to the next
+    # blank one, and join them — the same derivation F-8 uses for the bullets.)
+    #
+    # It states the CONSEQUENCE rather than an unexplained prohibition, deliberately: an
+    # unexplained prohibition in a generator prompt is a rule the model can trade away
+    # against a competing instruction, and `BUG-260815-01` is exactly that trade — told
+    # it MUST fill N named template fields the grounding could not supply, the reasonable
+    # composition was "add a step that asks the human".
+    #
+    # It tells the model what to do INSTEAD, in the same register as the template clause
+    # above, and it explicitly does NOT license inventing data — an unfound fact is
+    # reported as unfound (`SEED-159`: a blank that lies is not an improvement).
+    #
+    # D-14 — it promises NOTHING. A workflow that deliberately pauses for a person and
+    # can still be published is a real capability the operator has named, and it is NOT
+    # scheduled (`SEED-164` exists precisely because a docblock calling something "the
+    # DEFERRED Phase-103 rework" made unscheduled work read like a plan for a year).
+    # This clause states what is true NOW and names nothing that is not on the roadmap.
+    # D-25 — this SUPPRESSES an unwanted step; it does not deliver that capability.
+    #
+    # ⚠ THE PUBLISH GATE STAYS (D-11). A prompt clause reduces how often the model
+    # composes such a step; it can never guarantee absence, so nothing downstream may be
+    # relaxed on the strength of these words. Frequency is measured as k/N by
+    # `backend/tests/integration/test_193_2_authoring_frequency.py` — the phase's claim
+    # is a REDUCTION, never an absence (D-08).
+    "- Do NOT add a step that pauses to ask the human (`llm_human_input`, or a validator "
+    "whose `on_failure` is `ask_user`): publishing VALIDATES a workflow by running it, "
+    "and a run waiting on a person cannot finish — so a workflow containing one cannot "
+    "be published at all. When a fact might be missing, have the step gather it with the "
+    "tools it is given, and have the deliverable say plainly that it could not be found. "
+    "Never invent it.\n\n"
     "Rules — these are HARD constraints enforced after you emit:\n"
     "- `available_tools` may ONLY contain tool names from the provided tool registry.\n"
     "- `skill_ref`, if set, MUST be a skill id from the provided skill registry.\n"
@@ -100,8 +155,30 @@ AUTHORING_SYSTEM_PROMPT = (
     "short, specific, plain-language `name` saying what THAT step does rather than what "
     "its type does — write \"Pull the renewal history\", not \"LLM step\". This per-phase "
     "`name` is what a non-coder reads on the canvas, and it is SEPARATE from the "
-    "definition-level `name` below. Set the definition `slug`, `version` (1), `name`, and "
-    "`status` ('draft')."
+    "definition-level `name` below. "
+    # 193.2 (D-07 / SEED-163) — `business_requirement` joins the SAME sentence that
+    # already names the definition-level fields to set. Measured at HEAD:
+    # `grep -c business_requirement backend/app/services/workflow_authoring.py` → **0**,
+    # while `WF_SCHEMA` (= `WorkflowDefinition.model_json_schema()`) ALREADY advertises
+    # the field (`app/models/harness.py:538`). The schema was never the gap; the prompt
+    # was — so this is one field on one existing sentence, and D-09 holds: no schema
+    # change, `business_requirement` stays OUT of the schema's `required` list.
+    #
+    # The DURABILITY clause is not decoration (D-07, carried verbatim from `SEED-163`'s
+    # "What NOT to do"). `describe` is ONE RUN's task instruction ("produce a QBR for
+    # Northwind covering Q3"); the requirement is what the workflow must deliver for ANY
+    # run ("produce a client-ready QBR for a named account from our own records"). A
+    # verbatim copy of the describe text bakes one run's parameters into the workflow's
+    # definition of done — and the publish gauntlet's later stages read this field,
+    # including the judge's `answers_business_requirement` criterion.
+    #
+    # ⚠ NON-DETERMINISTIC BY DESIGN (D-08). When the model emits nothing here the
+    # behaviour is byte-identical to today's: the field stays None and the author fills
+    # it, exactly as before. Nothing in this module asserts it is always populated.
+    "Set the definition `slug`, `version` (1), `name`, `status` ('draft'), and "
+    "`business_requirement` — ONE line saying what this workflow must deliver on ANY "
+    "run, phrased so it stays true for the next run and the one after, NOT a restatement "
+    "of the particular request described below."
 )
 
 
