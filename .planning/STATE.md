@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: "v3.7"
 milestone_name: "Workflow Product Completion"
 status: in-progress
-last_updated: 2026-08-14T21:00:00.000Z
+last_updated: 2026-08-15T00:00:00.000Z
 last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "2026-08-15 — **Phase 193.1 ✅ CLOSED, AUTH-03 satisfied on a real end-to-end run. Phase 193.2 From Authored to Runnable INSERTED — NEXT = /gsd:discuss-phase 193.2.** 193.2 bundles three items the operator hit in ONE sitting on 193.1s own headline path: SEED-163 (the AI leaves business_requirement blank), BUG-260815-01 (BLOCKING — the draft grows an llm_human_input step the publish gate refuses; caused by 193.1s OWN D-26 fix, measured 2 for 2), BUG-260815-02 (BLOCKING — a just-published workflow is unfindable; ORDER BY name at three call sites, no recency anywhere, position 129 of 146). ⚠ **I routed all three to 197 and the operator OVERRULED it; the original reasoning is left visible rather than overwritten.** They are one phase because they share one root: authoring makes decisions the author is never shown and does not know what publish requires. ⚠ G-2 fires on the library half and must NOT absorb the sort bug. ⚠ G-1 does not fire but a THIRD 193.x would trip it. Also filed and routed to 194: BUG-260815-03 (run history unreachable from canvas) and BUG-260815-04 (chat stuck on Starting workflow — the string is DELIBERATE and pinned, do not reword). ⚠ Phase 193 still owes U1/U2; 193.1 closed with U2/U3/U4 owed by decision."
-resume_file: .planning/ROADMAP.md
+stopped_at: "2026-08-15 — **Phase 193.2 CONTEXT GATHERED (`4d1d9374`) — NEXT = /gsd:plan-phase 193.2.** 26 decisions locked in `193.2-CONTEXT.md`. ⚠ Two scouting findings reshaped the phase and both are recorded as DELIVERABLES rather than assumptions: (1) `/validate` ALREADY mints an `interactive_phase` verdict, it is registered route-assigned + incomplete, it ALREADY greys the Publish control with the server message verbatim, and there is a PINNED test — so the operator could not have clicked Publish and got a 400, and Wave 1 must establish which of those two facts is false on the live path (D-10); (2) the post-publish Run CTA ALREADY names the workflow and offers Run (`WorkflowsPage.tsx:897-908`), so 'the product never told me the name' is at least partly already closed and the operator was still lost (D-19). ⚠ **G-5 fires on SIX files and THREE are ABSENT from the `CLAUDE.md` hot-file ledger** — `db/workflows.py` **30 commits / 16 phases**, `publish_service.py` 16/6, `workflow_authoring.py` 9/5 — the same invisibility failure `WorkflowsPage.tsx` had for 10 phases. Honoured by construction; writing the three missing ledger rows is a phase deliverable (D-01/D-03). ⚠ **A G-5 override was OFFERED AND DECLINED for the THIRD consecutive phase, so this file records NO guardrail override for 193.2 — that absence is a measurement.** ⚠ `WorkflowsPage.tsx`'s ledger cell measured STALE for the 4th time (`33/12/1160` → **34/12/1176**). Prior: **Phase 193.1 ✅ CLOSED, AUTH-03 satisfied on a real end-to-end run.** 193.2 bundles three items the operator hit in ONE sitting on 193.1s own headline path: SEED-163 (the AI leaves business_requirement blank), BUG-260815-01 (BLOCKING — the draft grows an llm_human_input step the publish gate refuses; caused by 193.1s OWN D-26 fix, measured 2 for 2), BUG-260815-02 (BLOCKING — a just-published workflow is unfindable; ORDER BY name at three call sites, no recency anywhere, position 129 of 146). ⚠ **I routed all three to 197 and the operator OVERRULED it; the original reasoning is left visible rather than overwritten.** They are one phase because they share one root: authoring makes decisions the author is never shown and does not know what publish requires. ⚠ G-2 fires on the library half and must NOT absorb the sort bug. ⚠ G-1 does not fire but a THIRD 193.x would trip it. Also filed and routed to 194: BUG-260815-03 (run history unreachable from canvas) and BUG-260815-04 (chat stuck on Starting workflow — the string is DELIBERATE and pinned, do not reword). ⚠ Phase 193 still owes U1/U2; 193.1 closed with U2/U3/U4 owed by decision."
+resume_file: .planning/phases/193.2-from-authored-to-runnable/193.2-CONTEXT.md
 ---
 
 # Project State
@@ -42,9 +42,50 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ⚠ **One quality observation, seeded nowhere yet by decision:** the model grounded Marcus Feld's quote and **stripped his name** — content kept, attribution lost. Fine internally; a downgrade for a client-facing document. Hold until it recurs.
 
-**NEXT = `/gsd:discuss-phase 193.2`.**
+**NEXT = `/gsd:plan-phase 193.2`** — context gathered 2026-08-15 (`4d1d9374`).
 
-### Phase 193.2 — INSERTED 2026-08-15, on an operator instruction that overruled my routing
+### Phase 193.2 — CONTEXT GATHERED 2026-08-15 · inserted on an operator instruction that overruled my routing
+
+**Context:** `.planning/phases/193.2-from-authored-to-runnable/193.2-CONTEXT.md` — 26 decisions.
+
+⚠ **Two shipped surfaces are treated as SUSPECTS, not scenery, and measuring them is a
+deliverable rather than a preamble.** Both should already have covered half of this phase:
+
+1. **D-10** — `/validate` already mints an `interactive_phase` verdict on every canvas edit
+   (`backend/app/api/workflows.py:895-903`), it is registered in BOTH `_ROUTE_ASSIGNED_CODES`
+   (`:686`) and `_INCOMPLETE_CODES` (`:700`), `blockedReason` already renders the server's
+   message **verbatim** (`WorkflowBuilderPage.tsx:1341`), and a test pins it
+   (*"187-28 — a route-assigned verdict GATES the Publish control"*). **If the control was
+   greyed, the operator could not have clicked Publish and received a 400.** One of those two
+   facts is false on the live path. Wave 1 establishes which, before anything is built.
+2. **D-19** — the post-publish Run CTA already renders *"Published **{name}** v{n}. Ready to
+   run it."* with a Run button (`WorkflowsPage.tsx:897-908`, set on gauntlet PASS). So *"the
+   product never told me the name"* is at least partly already closed **and the operator was
+   still lost.** Measure it before building a second hand-off beside it.
+
+⚠ **G-5 FIRES ON SIX FILES AND THREE ARE ABSENT FROM THE `CLAUDE.md` HOT-FILE LEDGER**, so the
+guardrail has never fired on them once — the identical invisibility failure `WorkflowsPage.tsx`
+suffered for ten phases and `WorkflowDoorSwitch.tsx` for six. Hotness was **derived with
+`git log`**, not read off the table:
+
+| File | Measured 2026-08-15 | On the ledger? |
+|---|---|---|
+| `backend/app/db/workflows.py` | **30 commits / 16 phases / 1296 L** | ❌ ABSENT — 2nd-hottest backend file in the tree |
+| `backend/app/services/harness/publish_service.py` | 16 / 6 / 1047 | ❌ ABSENT |
+| `backend/app/services/workflow_authoring.py` | 9 / 5 / 389 | ❌ ABSENT |
+| `backend/app/api/workflows.py` | 34 / 17 / 1951 | ✅ obligation inherited |
+| `frontend/src/pages/WorkflowsPage.tsx` | **34 / 12 / 1176** | ✅ ⚠ cell says `33/12/1160` — **STALE, 4th time** |
+| `.../library/WorkflowCard.tsx` | 8 / 3 / 818 | ✅ next phase naming it owes a refactor rec FIRST |
+
+**Honoured by construction (D-01/D-02), and writing the three missing ledger rows is a phase
+deliverable (D-03).** `WorkflowCard.tsx` should not be touched at all (D-04).
+
+### Guardrail overrides
+
+⚠ **NONE for Phase 193.2. A G-5 override was OFFERED AND DECLINED — the THIRD consecutive phase
+(193, 193.1, 193.2) to decline one. That absence is a measurement, not an omission.**
+
+### Phase 193.2 — the three items, unchanged
 
 **From Authored to Runnable** — everything between *"the AI wrote my workflow"* and *"I can run
 it and find it again"*. Three items, **all found by the operator in ONE sitting**, on Phase
