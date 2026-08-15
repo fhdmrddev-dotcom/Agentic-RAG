@@ -51,7 +51,9 @@ INSERT/UPDATE/DELETE and is safe to run concurrently with other worktrees (CLAUD
 
 from __future__ import annotations
 
+import ast
 import inspect
+import textwrap
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -307,15 +309,177 @@ def test_draft_predicate_is_byte_identical_to_what_shipped():
     assert "WHERE status = 'draft' AND created_by = $1 " in _draft_source()
 
 
-def test_no_feed_orders_by_updated_at():
-    """CONTEXT is explicit that 160-C (recency ORDERING) LOST. ``ORDER BY name`` stands.
+# ── F-1 — the D-16 ORDER BY divergence (Phase 193.2 / BUG-260815-02) ──────────────────
+#
+# ⚠ THE FENCE BELOW IS VERIFIED OVER NON-COMMENT CODE, and that is this repository's own
+# recorded resolution rather than a convenience. **The 187-24 trap: a module that DOCUMENTS a
+# clause reds a raw grep for it.** It is live on this exact file pair —
+# ``193.2-BASELINE.md`` §1 measured
+# ``git show HEAD:backend/app/db/workflows.py | grep -c "ORDER BY name"`` = **4**, not the 3
+# call sites, because ``list_starter_workflows``' own docblock QUOTES the clause. That
+# docblock is inside ``_starter_source()``, which is precisely the accessor this fence reads.
+# A raw ``in`` here would judge a comment instead of a query. (Prior instances of the same
+# trap: ``rowIdentity.test.ts:99`` and ``libraryFilter.test.ts:461-468`` both strip comments
+# for the identical reason; 192.1-03 hit it on three greps at once.)
 
-    SC#3 is met by the "changed <rel>" segment on the card, never by re-ordering the list —
-    so a future "obvious improvement" here is a scope-fence violation, and this says so.
+
+def _code_only(source: str) -> str:
+    """The executable half of a ``inspect.getsource`` blob — comments and docstring removed.
+
+    Parsed rather than regexed: ``ast`` cannot mistake a ``#`` inside a SQL string literal
+    for a comment, and ``ast.unparse`` re-emits only the tree, so every ``#`` line and the
+    function docstring are gone by construction. Implicitly-concatenated SQL fragments are
+    joined into one literal, which is what a reader means by "the query text".
     """
-    for source in (_published_source(), _starter_source(), _draft_source()):
-        assert "ORDER BY name" in source
-        assert "ORDER BY updated_at" not in source
+    tree = ast.parse(textwrap.dedent(source))
+    fn = tree.body[0]
+    body = getattr(fn, "body", [])
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        fn.body = body[1:]
+    return ast.unparse(tree)
+
+
+def test_the_code_stripper_keeps_the_query_and_drops_the_prose():
+    """NON-VACUITY FOR THE STRIPPER ITSELF. Without this, F-1 could pass by returning "".
+
+    The pairing is the whole point: ``D-16`` is written into all three feeds as a COMMENT
+    (asserted by ``test_the_d16_divergence_is_recorded_at_all_three_sites``), so it must be
+    visible in the raw source and invisible in the stripped code. If it survived the strip,
+    the stripper is not stripping; if the query text did not, it is stripping too much.
+    """
+    for accessor, needle in (
+        (_published_source, "list_published_workflows"),
+        (_starter_source, "list_starter_workflows"),
+        (_draft_source, "list_draft_workflows"),
+    ):
+        source = accessor()
+        code = _code_only(source)
+
+        assert len(source) > 500, needle
+        assert needle in source
+        assert needle in code, f"the stripper ate the function itself: {needle}"
+        assert "SELECT id, slug" in code, needle
+        # PROSE goes, CODE stays — the ``rowIdentity.test.ts:113-114`` idiom exactly.
+        assert "D-16" in source, needle
+        assert "D-16" not in code, f"the stripper left prose behind: {needle}"
+
+
+def test_the_two_author_feeds_order_by_recency_and_starters_stay_alphabetical():
+    """F-1 — Phase 193.2, D-15 / D-16. Formerly ``test_no_feed_orders_by_updated_at``.
+
+    ⚠ **SUPERSEDED — the 192.1 reasoning this fence carried until 2026-08-15 is recorded
+    here VERBATIM rather than deleted, because a fence whose history is erased cannot be
+    audited.** What it said, in full:
+
+        "CONTEXT is explicit that 160-C (recency ORDERING) LOST. ``ORDER BY name`` stands.
+
+        SC#3 is met by the "changed <rel>" segment on the card, never by re-ordering the
+        list — so a future "obvious improvement" here is a scope-fence violation, and this
+        says so."
+
+    **Superseding authority: ``BUG-260815-02`` (severity `blocking`), folded into Phase
+    193.2 as D-15 / D-16.** A just-published workflow was unfindable — the AI names it, all
+    three feeds sorted ``ORDER BY name``, and nothing anywhere sorted by recency.
+
+    **Why the supersession is legitimate and not a fence being argued away:** the sentence
+    above was a Phase 192.1 **SCOPE** fence — its job was to stop *that* phase widening from
+    an additive projection into an ordering change — never a correctness rule about what the
+    right order IS. 192.1 could not have known the ordering was the defect; the blocking
+    report is what learned it. The fence is therefore rewritten in place, keeping its
+    identity in ``git log -S "test_no_feed_orders_by_updated_at"``, and it now guards the
+    DIVERGENCE instead of the uniformity.
+
+    **What it guards now — a three-way split, not a global flip:**
+
+      • ``list_published_workflows`` → ``ORDER BY updated_at DESC``. On this feed that IS
+        ``ORDER BY publish-time DESC``: the publish flip is an ``UPDATE`` and
+        ``workflow_definitions_set_updated_at`` is an unconditional ``BEFORE UPDATE``
+        trigger, after which ``workflow_definitions_block_published`` freezes the row.
+      • ``list_draft_workflows`` → ``ORDER BY updated_at DESC``. The author's own work.
+      • ``list_starter_workflows`` → **still ``ORDER BY name``** (D-16). "Most recently
+        updated starter" is meaningless to someone browsing a curated catalogue they did
+        not write. ``BUG-260815-02`` warns *"change them together or the feeds disagree"*
+        and this deliberately does not — accepted with eyes open, on the recorded condition
+        that the divergence lives in the code, which the sibling case below asserts.
+
+    ⚠ The starter's ABSENCE needle is scoped to ``ORDER BY updated_at``, never to the bare
+    token ``updated_at`` — that feed legitimately PROJECTS the column in its SELECT list, so
+    a bare ``not in`` would be red on a correct tree. Same scoping error, different shape.
+    """
+    published = _code_only(_published_source())
+    starter = _code_only(_starter_source())
+    draft = _code_only(_draft_source())
+
+    # NON-VACUITY — a broken ``inspect.getsource`` returning "" must not read as a pass.
+    for name, code in (
+        ("list_published_workflows", published),
+        ("list_starter_workflows", starter),
+        ("list_draft_workflows", draft),
+    ):
+        assert code, f"empty source for {name}"
+        assert name in code, f"{name} is not its own source"
+
+    # POSITIVE CONTROLS — both needles really do catch the shapes they judge.
+    assert "ORDER BY updated_at DESC" in 'sql += " ORDER BY updated_at DESC"'
+    assert "ORDER BY name" in 'sql += " ORDER BY name"'
+
+    # The two feeds holding the author's OWN work: recency, and no trace of the old clause.
+    for name, code in (("published", published), ("draft", draft)):
+        assert "ORDER BY updated_at DESC" in code, name
+        assert "ORDER BY name" not in code, name
+
+    # The curated shelf: alphabetical, and NOT re-ordered by recency (D-16).
+    assert "ORDER BY name" in starter
+    assert "ORDER BY updated_at" not in starter
+    # …but it still PROJECTS the column, which is why the needle above is scoped to the
+    # clause. This assertion is what makes that scoping honest rather than convenient.
+    assert "updated_at" in starter
+
+
+def test_the_d16_divergence_is_recorded_at_all_three_sites():
+    """The divergence is written into the code, at every site, as a recorded decision.
+
+    Pinned as source prose for the same reason as
+    ``test_d17_is_recorded_at_the_published_builder`` below: the alternative failure is a
+    later reader "tidying" the inconsistency back into uniformity — restoring exactly the
+    defect ``BUG-260815-02`` reports — and that is a design regression no behavioural test
+    would catch. Two feeds sorting one way and a third sorting another looks like a bug
+    unless the code says it is not.
+
+    ⚠ **THE BARE ``D-16`` NEEDLE IS VACUOUS ON ONE OF THE THREE FEEDS, AND THAT WAS
+    MEASURED RATHER THAN REASONED ABOUT.** ``193.2-03-PLAN.md`` specifies this case as
+    *"assert each of the three sources contains the literal token ``D-16``"* — but the
+    clause-by-clause RED probe run before the SQL changed reported ``'D-16' in draft
+    source`` **already PASSING**. ``list_draft_workflows`` has carried a
+    *"⚠ D-16 IS A FENCE, NOT ADVICE"* docblock since Phase **192.1**, where ``D-16`` names
+    an entirely different decision — *the opaque concurrency token is not the timestamp*.
+    **Two phases reused one decision id on one function.** So on that feed the specified
+    needle would have been satisfied by a comment about something else, and one third of
+    this fence could never have fired.
+
+    The specified clause is KEPT (it is what the plan asks for and it is true), and a
+    disambiguating clause is asserted BESIDE it: ``BUG-260815-02`` is unique to this
+    supersession and appears nowhere in 192.1's vocabulary. That pairing is what makes the
+    draft arm mean the ordering decision rather than the token one.
+    """
+    for name, accessor, extra in (
+        ("list_published_workflows", _published_source, "D-15"),
+        ("list_starter_workflows", _starter_source, None),
+        ("list_draft_workflows", _draft_source, "D-15"),
+    ):
+        source = accessor()
+        # The clause the plan specifies…
+        assert "D-16" in source, name
+        # …and the clauses that stop it passing for 192.1's unrelated ``D-16``.
+        assert "BUG-260815-02" in source, name
+        assert "193.2" in source, name
+        if extra:
+            assert extra in source, name
 
 
 # ── D-16: the token and the timestamp are two fields, and stay two ────────────────────
