@@ -45,7 +45,9 @@ const useDerivedPanel = vi.fn()
 // useStreamActions to mount its run-level Stop. A missing key throws the whole file.
 // The stub is inert on purpose — the Stop's behaviour is measured next door (V-04);
 // what this file measures is the derived-panel gate, which the Stop must not disturb.
-const useStreamActions = vi.fn(() => ({ stopThread: vi.fn() }))
+// (the rest parameter is load-bearing: the mock below SPREADS its args into this fn,
+// and a zero-arity stub is a TS2556 spread-argument error, not merely untidy.)
+const useStreamActions = vi.fn((..._a: unknown[]) => ({ stopThread: vi.fn() }))
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),

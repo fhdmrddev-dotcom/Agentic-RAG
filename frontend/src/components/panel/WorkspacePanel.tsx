@@ -29,7 +29,7 @@
  * respects prefers-reduced-motion (the grid transition lives on ChatLayout).
  */
 import { useEffect, useMemo, useState } from "react"
-import { PanelRightClose, X } from "lucide-react"
+import { PanelRightClose, Square, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   useTodos,
@@ -40,6 +40,10 @@ import {
   useTasks,
   useWorkflowLockForThread,
   useDerivedPanel,
+  // Phase 194 Plan 03 (RUN-01 / SC#1) — the NINTH import from a module this file
+  // already imports eight from. It buys the panel's run-level Stop and nothing else:
+  // no new fetch, no new prop, no new store slice, no new state. See the mount below.
+  useStreamActions,
 } from "@/providers/StreamsProvider"
 import type { Thread, WorkspaceFile } from "@/types"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -247,6 +251,60 @@ function RunSeam({
   )
 }
 
+/**
+ * Phase 194 Plan 03 (RUN-01 / SC#1, validation row V-04) — THE PRIMARY STOP.
+ *
+ * This panel is where a user WATCHES a workflow run — the Phase 094/103 decision that
+ * the panel owns the meaningful phase spine while chat carries a thin run receipt.
+ * Until this plan the panel had **no Stop control of any kind**: every shipped Stop
+ * keys off a streaming assistant message in the CHAT bucket, so a user watching the
+ * spine had to leave the surface they were watching in order to stop it.
+ *
+ * ⚠ THE ID TYPE IS THE WHOLE POINT, AND IT IS A MEASURED LANDMINE RATHER THAN A STYLE
+ * PREFERENCE. `WorkflowLock.runId` carries TWO id types across its write sites — two
+ * store a `workflow_runs.id`, two store a producer `runs.run_id` — while its JSDoc
+ * asserts only the first. `DELETE /runs/{id}` accepts only the producer id, and the
+ * client's delete wrapper swallows 404 DELIBERATELY. Compose those three facts and a
+ * Stop wired to the lock **silently succeeds while doing nothing**, roughly half the
+ * time. That is the exact dishonesty this phase exists to remove, so this control
+ * resolves through the thread-scoped `stopThread` resolver, handing it the THREAD id
+ * and nothing else — the resolver then finds the streaming message's own runId (the
+ * producer id, the correct type) and owns the single cancel call site.
+ *
+ * ⚠ The call below is written ONCE and no comment in this file spells it, for the same
+ * 187-24 reason the receipt's label constant is not spelled: the acceptance fence
+ * COUNTS that call in this file, and a docblock quoting it would turn a measurement of
+ * the wiring into a measurement of the prose. (Caught by running the count, not by
+ * reading it — the first draft of this block quoted the call and the grep read 2.)
+ *
+ * The file already recorded half of this at RunSeam's docblock above: *"Both ids are
+ * bare uuids, so a swap typechecks and then resolves nothing."* This control is the
+ * other half of that lesson, applied to the destructive direction.
+ *
+ * ADDITIVE SIBLING — the same G-5 red line the run soul and the run receipt observe:
+ * it reads no PhaseTimeline internal, adds a prop to neither neighbour, owns NO state
+ * and performs NO fetch, and it sits inside the SAME harness gate as its siblings, so
+ * a Deep / no-run thread sees nothing new (the D-08 discipline).
+ *
+ * ⛔ It must NEVER acquire a run id of its own. RunSeam's `useState` above holds a
+ * `workflow_runs.id` — the WRONG type for a cancel — and copying that acquisition
+ * would be new state ownership, i.e. a SECOND concern on a file G-5 already fires on.
+ *
+ * MARK: the lucide `Square` is a REUSE, not a choice. It is the shipped Stop-CONTROL
+ * mark at two sites already (the composer and the active-runs tray), so the panel
+ * becomes the third occurrence of one mark for one concept. `⏹` is refused (net-new,
+ * absent from `icon-convention.md` §4's table, owes a flagged proposal) and `■` is
+ * refused too — that is RunCard's cancelled-STATE glyph, a state and not a control.
+ *
+ * ⚠ The visible words are written ONCE, in the two constants below, and no comment
+ * here spells them — a comment that did would turn a measurement of the rendered
+ * control into a measurement of the prose (the 187-24 lesson, kept by RunSeam above).
+ */
+const PANEL_STOP_LEAD = "This run"
+const PANEL_STOP_LABEL = "Stop"
+/** Names what is stopped: the RUN, never a phase or a step (the D-13 honesty rule). */
+const PANEL_STOP_ARIA = "Stop this workflow run"
+
 export interface WorkspacePanelProps {
   selectedThread: Thread | null
   /** Controlled panel state — owned by ChatLayout (Plan 06 hoist). */
@@ -288,6 +346,9 @@ export function WorkspacePanel({
   // chat re-render — PANEL-06 preserved). `derived.length > 0` is the correct
   // "earns a derived panel" signal; do NOT re-derive the gate here.
   const derived = useDerivedPanel(threadId)
+  // Phase 194 Plan 03 (RUN-01 / SC#1): the one durable cancel path. Read here, beside
+  // the other hook calls, and consumed by exactly one control — see PANEL_STOP_LABEL.
+  const streamActions = useStreamActions()
   const workflowLock = useWorkflowLockForThread(threadId)
   const isHarness = workflowLock != null
   const showTimeline = isHarness || phases.length > 0
@@ -380,6 +441,32 @@ export function WorkspacePanel({
               See the component's docblock for why the id comes from the thread anchor
               and never from the panel's lock. */}
           {showTimeline && <RunSeam threadId={threadId} onOpenRun={onOpenRun} />}
+
+          {/* Phase 194 Plan 03 (RUN-01 / SC#1): the panel's run-level Stop — an
+              ADDITIVE SIBLING line under the SAME harness gate as the run soul and the
+              run receipt above it, so Deep / no-run threads stay byte-identical. It is
+              mounted at RUN level and deliberately NOT inside or beside any individual
+              phase row, so it can never be misread as skipping a step. See the block
+              above the constants for why the argument is the THREAD id and never the
+              lock's run id. The `threadId &&` clause is a type narrowing, not a second
+              gate — showTimeline is already unreachable without a viewed thread. */}
+          {showTimeline && threadId && (
+            <div className="flex items-center gap-2 border-b border-border/40 px-3 py-2">
+              <span className="text-[10px] uppercase tracking-wider text-panel-muted-foreground">
+                {PANEL_STOP_LEAD}
+              </span>
+              <button
+                type="button"
+                data-testid="panel-stop-run"
+                onClick={() => void streamActions.stopThread(threadId)}
+                aria-label={PANEL_STOP_ARIA}
+                className="ml-auto flex shrink-0 items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-destructive transition-colors hover:bg-destructive/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />{" "}
+                {PANEL_STOP_LABEL}
+              </button>
+            </div>
+          )}
 
           {/* Phase 094 (PANEL-08): the harness phase-timeline — the 5th section,
               mounted only for a harness run (server-truth lock) OR when phases
