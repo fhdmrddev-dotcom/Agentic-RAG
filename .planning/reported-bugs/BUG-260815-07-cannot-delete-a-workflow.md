@@ -4,12 +4,12 @@ title: Deleting a workflow fails with an error — the three known refusal condi
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [workflows/library, backend/api/workflows, frontend/workflows]
-folded_into: null
+folded_into: 194
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "⚠ ONLY THE REPRODUCIBLE HALF IS FOLDED. Phase 194 (D-09/D-12) claims the stuck-active-runs clause — the two workflow_runs rows active since 2026-06-14 and 2026-08-01 that are a permanent delete blocker — because that is measurably the same gap as RUN-01's zombie arm: run_lifecycle._cancel_run_internals Step 3b heals only the runs row, never workflow_runs, so with WORKER_COUNT=2 and a per-process RUN_TASKS a Stop landing on the wrong worker wedges the thread forever. THE ONE-OFF DELETE FAILURE ITSELF IS NOT CLAIMED AND STAYS OPEN — it was explicitly recorded as NOT reproducible, and folding this report must not be read as closing that clause. Re-open the unclaimed half on a second sighting of a delete failure whose three known refusal conditions are all ruled out."
 reproduces_on:
   branch: develop
   commit: d3a74202

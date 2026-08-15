@@ -4,12 +4,12 @@ title: While a workflow runs, the chat area keeps a duplicate assistant icon and
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/chat, frontend/streaming, workflow/run-surface]
-folded_into: null
+folded_into: 194
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "⚠ FOLDED AT /gsd:discuss-phase 194 (2026-08-16) — STATE.md had recorded the routing since 2026-08-15 but this frontmatter still read folded_into: null, which is why the routing was invisible to every audit that reads frontmatter. It blocks SC#1 directly: if the chat surface never leaves its pre-tools state a user cannot tell a run is running, let alone reach a Stop — and it may be what defeats stopThread's `runStatus === \"streaming\"` scan (StreamsProvider.tsx:2400-2416), which is how three of the four Stop mounts find their run id. ⚠⚠ THE STRING IS DELIBERATE AND BYTE-PINNED — DO NOT REWORD IT (toolMeta.ts:92, pinned by toolMeta.test.ts:30 as a D-14 decision). The defect is that the surface never ADVANCES out of the pre-tools condition while workflow_phases rows are being written throughout. The duplicate-assistant-icon symptom is kept SEPARATE and may have a different cause. Re-open if 194 closes only the banner-advance half."
 reproduces_on:
   branch: develop
   commit: 1dc4d509

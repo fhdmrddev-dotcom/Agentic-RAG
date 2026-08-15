@@ -4,12 +4,12 @@ title: A workflow run's history is visible in chat but unreachable from the canv
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: major
-status: open
+status: deferred
 affected_areas: [workflow/run-surface, workflow/canvas, frontend/chat]
 folded_into: null
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: "the first phase that renders a completed workflow run's phases outside the chat thread — Phase 195 (Show the Deliverable, RUN-02/RUN-03) is the named home, because it must read a completed run's outputs from the run surface anyway. ⚠ ROUTING HISTORY, RECORDED RATHER THAN OVERWRITTEN: STATE.md routed this to 194 on 2026-08-15, and at /gsd:discuss-phase 194 (2026-08-16) it was FOLDED in the first pass and UN-FOLDED on measurement. Phase 194 gives a running workflow's library row a Stop, which makes a LIVE run actionable — but the operator's complaint was about a COMPLETED run's history after reopening the thread, which 194 structurally cannot close. Marking it folded_into: 194 would have put this report in the 'claimed' state against a phase that cannot address it. Building the history surface inside 194 was offered with its cost stated (roughly doubles the phase; new UI with zero prior review cycles) and DECLINED."
 reproduces_on:
   branch: develop
   commit: 1dc4d509

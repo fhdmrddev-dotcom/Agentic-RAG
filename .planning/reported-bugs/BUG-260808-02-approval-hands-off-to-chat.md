@@ -4,12 +4,12 @@ title: A workflow that pauses for approval gives the run surface no way to answe
 reported: 2026-08-08
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [frontend/workflow-run-surface, frontend/approval-checkpoint, frontend/chat-panel-seam, information-architecture]
-folded_into: null
+folded_into: 194
 verified_closed_by: null
 related_seeds: [SEED-139, SEED-136, SEED-140]
-re_open_trigger: "The next workflow-surface phase, or the v3.7 milestone kickoff — whichever comes first. Raise as a candidate REQ-ID at that kickoff, bundled with SEED-139 (run threads indistinguishable in the chat list) and SEED-140 (no stop control on the run surface): all three are the same question — what does the run surface own, and what is chat for? Reviewed and DEFERRED at /gsd:discuss-phase 190 (2026-08-08): 190 raises the stakes (after it, the approval you must leave the run surface to give is the one that actually SENDS), but folding a run-surface IA rebuild into a phase gated on threats_open:0 is the capability-smuggling G-7 names, and the operator said explicitly on 2026-08-08 not to fold it. See 190-CONTEXT.md <deferred>."
+re_open_trigger: "⚠ FOLDED AT /gsd:discuss-phase 194 (2026-08-16) — AND ITS OWN TRIGGER BELOW IS WHAT FIRED: that trigger names 'the next workflow-surface phase' and bundles SEED-140 (no stop control on the run surface), which IS RUN-01, this phase's requirement. ⚠ A SCOPE FENCE BINDS THE FOLD: 194 claims STOPPING A RUN THAT IS WAITING AT AN APPROVAL — the cancel path is already inside the approval checkpoint (Step 3a PUBLISHes the ask_user cancel sentinel BEFORE task.cancel() per D-085-04, and harness_engine.py:1615-1644 shields _expire_pending_ask_user) — and does NOT claim redesigning where approval lives. If a 194 plan finds its fix requires relocating the approval checkpoint off chat, that is a phase, not a task: defer it with this trigger intact. The original 190-era reasoning is preserved verbatim below rather than overwritten. ORIGINAL TRIGGER: The next workflow-surface phase, or the v3.7 milestone kickoff — whichever comes first. Raise as a candidate REQ-ID at that kickoff, bundled with SEED-139 (run threads indistinguishable in the chat list) and SEED-140 (no stop control on the run surface): all three are the same question — what does the run surface own, and what is chat for? Reviewed and DEFERRED at /gsd:discuss-phase 190 (2026-08-08): 190 raises the stakes (after it, the approval you must leave the run surface to give is the one that actually SENDS), but folding a run-surface IA rebuild into a phase gated on threats_open:0 is the capability-smuggling G-7 names, and the operator said explicitly on 2026-08-08 not to fold it. See 190-CONTEXT.md <deferred>."
 reproduces_on:
   branch: develop
   commit: HEAD at the 189-16 owed-rows UAT session (post 690ead48)
