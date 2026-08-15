@@ -106,3 +106,26 @@ inside a closure round is exactly what **G-7** forbids. The natural home is **19
 (*deepen the fast door*), alongside `SEED-163`, which is the second half of the same story: **two
 consecutive publish blockers on the authoring path, both because authoring does not know what
 publish requires.**
+
+---
+
+## ⚠ RE-ROUTED 2026-08-15 — OPERATOR INSTRUCTION. This does NOT wait for 197.
+
+> *"the two that we documented for business requirement and also the stop-and-ask-user are
+> blocking actually and we should include in the earliest phase possible."*
+
+The original routing sent this to **197 / AUTH-02** on the grounds that it is the phase already
+scoped to the authoring surface. **That reasoning was about tidiness of scope, not about the
+user's ability to use the product**, and the operator has overruled it after hitting both walls
+in a single sitting on the phase's own headline path.
+
+**The corrected routing: earliest available phase.** These two, together with `BUG-260815-02`
+(a just-published workflow is unfindable), form one coherent piece of work — **everything
+between "the AI wrote my workflow" and "I can actually run it and find it again"**. They
+share a single root, which is the reason to fix them together rather than in three places:
+**the authoring path makes decisions the author is never shown, and does not know what the
+publish gate requires.**
+
+⚠ **Sequencing note for whoever plans it:** 197 / AUTH-02 (*deepen the fast door*) remains the
+right home for the BIGGER authoring redesign. Moving these three out does not empty 197 — it
+removes the blockers from in front of it, so 197 can be about depth rather than repair.
