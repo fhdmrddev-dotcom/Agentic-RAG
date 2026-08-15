@@ -2383,7 +2383,18 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             .reverse()
             .find((m) => m.role === "assistant" && m.runStatus === "streaming")
           const runId = streamingMsg?.runId
-          if (!runId) return
+          // ── Phase 194-08 (T-194-08-01): the PRE-STAMP WINDOW ──────────────
+          // Was a bare `if (!runId) return`. See stopThread below for the full
+          // reasoning, the rejected alternative and its re-open trigger; this
+          // arm is its exact mirror so the two resolvers cannot drift.
+          if (!runId) {
+            console.warn(
+              "Stop did nothing: no run id yet for thread",
+              stid,
+              "— the run had not finished registering (the pre-stamp window). Nothing was cancelled; press Stop again in a moment.",
+            )
+            return
+          }
           stoppedByUserRef.current = true
           try {
             await cancelRun(runId)
@@ -2405,7 +2416,55 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             .reverse()
             .find((m) => m.role === "assistant" && m.runStatus === "streaming")
           const runId = streamingMsg?.runId
-          if (!runId) return
+          // ── Phase 194-08 (T-194-08-01): the PRE-STAMP WINDOW ──────────────
+          // Was a bare `if (!runId) return`, and that return was a SILENT
+          // no-op. `sendMessage` inserts the optimistic assistant placeholder
+          // with `runStatus: "streaming"` and NO `runId` (:1926-1936), and only
+          // stamps `runId: run_id` once the kickoff POST resolves (:2031).
+          // A Stop pressed between those two points matched the scan, read an
+          // undefined id, and returned having done nothing — with no evidence
+          // in the console, in a log capture, or on the surface.
+          //
+          // The window is ONE kickoff round trip, but the silence compounds
+          // with the server side: `api.ts::cancelRun` deliberately swallows 404
+          // (correct for its own purpose — a run another tab already
+          // cancelled), so the neighbouring failure mode is silent too. In a
+          // phase whose subject is an HONEST Stop, a silent success is worse
+          // than a visible failure.
+          //
+          // The GUARD IS UNCHANGED — `cancelRun` is still never called with a
+          // falsy id. Only the silence is removed. The wording is deliberately
+          // distinct from the "Stop failed:" catch below so the two conditions
+          // are separable in a log; it names the thread id and the condition
+          // and NOTHING ELSE (T-194-08-04: no message content, no auth header,
+          // no run output).
+          //
+          // ⚠ REJECTED ALTERNATIVE, recorded so a future reader finds a
+          // decision rather than an omission. 194-RESEARCH § B offered a second
+          // option: DISABLE the Stop control until the id lands. It was
+          // rejected as out of proportion — it reaches into the composer's
+          // shipped `disabled` logic and changes a control's behaviour during a
+          // one-RTT window on EVERY run, Deep included, to close a gap measured
+          // in one round trip. RE-OPEN TRIGGER: a second sighting of a Stop
+          // lost in the pre-stamp window (a UAT row, a bug report, or this warn
+          // appearing in a real log capture). At that point disabling the
+          // control — or queueing the intent until the stamp lands — becomes
+          // the proportionate fix and this comment is its starting point.
+          if (!runId) {
+            console.warn(
+              "Stop did nothing: no run id yet for thread",
+              threadId,
+              "— the run had not finished registering (the pre-stamp window). Nothing was cancelled; press Stop again in a moment.",
+            )
+            return
+          }
+          // ⚠ `stoppedByUserRef` is set only BELOW the guard, and that ordering
+          // is load-bearing rather than incidental: the ref is what makes
+          // onTerminal stamp `stopped: true` and render "Response stopped"
+          // (:2333-2364). Setting it on a path that cancelled nothing would be
+          // the same lie one layer up — the surface would claim the user
+          // stopped a run that ran to completion. Verified at HEAD: the shipped
+          // order was already correct, so this is a pin, not a fix.
           stoppedByUserRef.current = true
           try {
             await cancelRun(runId)

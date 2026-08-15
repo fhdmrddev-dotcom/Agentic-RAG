@@ -370,3 +370,188 @@ describe("V-06 — composer Stop during a harness run resolves the producer runs
     expect(onStop).toHaveBeenCalledTimes(1)
   })
 })
+
+// =============================================================================
+// T-194-08-01 — the PRE-STAMP WINDOW. A Stop that did nothing must not be
+//               silent, and must not leave the surface claiming the user
+//               stopped the run.
+// =============================================================================
+/**
+ * The window is real and narrow. `sendMessage` writes the optimistic assistant
+ * placeholder with `runStatus: "streaming"` and NO `runId`
+ * (`StreamsProvider.tsx:1926-1936`), and only stamps `runId` once the kickoff
+ * POST resolves (`:2031`). Between those two points both resolvers hit
+ * `if (!runId) return` — `:2386` in `stopStream`, `:2408` in `stopThread`.
+ *
+ * ⚠ Client-side silence COMPOUNDS with server-side silence here, which is why
+ * this is worth fixing for a one-RTT window: `api.ts::cancelRun` swallows 404
+ * by design, so on the OTHER side of this guard a wrong id is silent too. A
+ * phase about honest Stop cannot ship a Stop whose most likely failure mode
+ * produces no evidence anywhere.
+ */
+describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a silent no-op", () => {
+  it("stopThread with a streaming assistant that has NO runId warns AND cancels nothing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { result } = renderProvider()
+    seedBucket("thread-P", [
+      assistant({ id: "pre-stamp", thread_id: "thread-P", runStatus: "streaming" }),
+    ])
+
+    await act(async () => {
+      await result.current.stopThread("thread-P")
+    })
+
+    // Both halves, in one case: the guard still holds (no bogus cancel) AND the
+    // no-op is now visible.
+    expect(mockCancelRun).toHaveBeenCalledTimes(0)
+    expect(warn).toHaveBeenCalled()
+    const said = warn.mock.calls.map((c) => c.map(String).join(" ")).join("\n")
+    expect(said).toMatch(/Stop did nothing/i)
+    expect(said).toContain("thread-P")
+    expect(said).toMatch(/pre-stamp/i)
+  })
+
+  it("stopStream in the same condition behaves identically", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread("thread-P")
+    })
+    seedBucket("thread-P", [
+      assistant({ id: "pre-stamp", thread_id: "thread-P", runStatus: "streaming" }),
+    ])
+
+    await act(async () => {
+      await result.current.stopStream()
+    })
+
+    expect(mockCancelRun).toHaveBeenCalledTimes(0)
+    expect(warn).toHaveBeenCalled()
+    const said = warn.mock.calls.map((c) => c.map(String).join(" ")).join("\n")
+    expect(said).toMatch(/Stop did nothing/i)
+    expect(said).toContain("thread-P")
+  })
+
+  it("the HAPPY paths stay silent — otherwise the signal cannot tell silence from noise", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread("thread-P")
+    })
+    seedBucket("thread-P", [
+      assistant({
+        id: "stamped",
+        thread_id: "thread-P",
+        runId: "producer-run-happy",
+        runStatus: "streaming",
+      }),
+    ])
+
+    await act(async () => {
+      await result.current.stopThread("thread-P")
+    })
+    await act(async () => {
+      await result.current.stopStream()
+    })
+
+    expect(mockCancelRun).toHaveBeenCalledTimes(2)
+    expect(mockCancelRun).toHaveBeenCalledWith("producer-run-happy")
+    // NOT "warn was called fewer times" — ZERO. A signal that also fires on the
+    // happy path is noise, and noise is what makes an operator stop reading logs.
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it("stoppedByUserRef is NOT set on the early-return path — the message never reads 'stopped'", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    const recorder = makeSseRecorder()
+
+    // Hold the kickoff POST open so the test can act INSIDE the real pre-stamp
+    // window rather than simulating it.
+    let resolveKickoff!: (v: { run_id: string; message_id: string }) => void
+    mockPostMessage.mockReturnValueOnce(
+      new Promise<{ run_id: string; message_id: string }>((res) => {
+        resolveKickoff = res
+      }),
+    )
+
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread("thread-W")
+    })
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage("thread-W", "go", {
+        workflowDefinitionId: "wf-def-1",
+      })
+    })
+
+    // We are genuinely in the window: streaming placeholder, no runId yet.
+    const inWindow =
+      (useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []).filter(
+        (m) => m.role === "assistant" && m.runStatus === "streaming",
+      )
+    expect(inWindow).toHaveLength(1)
+    expect(inWindow[0].runId).toBeUndefined()
+
+    await act(async () => {
+      await result.current.stopThread("thread-W")
+    })
+    expect(mockCancelRun).toHaveBeenCalledTimes(0)
+
+    // Let the run register and then finish normally.
+    await act(async () => {
+      resolveKickoff({ run_id: "producer-run-late", message_id: "user-msg-late" })
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+    const cb = recorder.forRun("producer-run-late") as StreamCallbacks
+    expect(cb).toBeTruthy()
+    await act(async () => {
+      await cb.onTerminal("done")
+    })
+
+    // The run ended on its own. A Stop that cancelled NOTHING must not have
+    // marked it stopped-by-user.
+    const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []
+    const asst = bucket.find((m) => m.role === "assistant")
+    expect(asst?.stopped).not.toBe(true)
+    void sendPromise
+  })
+
+  it("POSITIVE CONTROL: a Stop AFTER the stamp DOES mark the message stopped", async () => {
+    // Without this the case above proves nothing — `stopped` could be a field
+    // nothing ever sets in this harness, and the assertion would be vacuous.
+    const recorder = makeSseRecorder()
+    mockPostMessage.mockResolvedValueOnce({
+      run_id: "producer-run-marked",
+      message_id: "user-msg-marked",
+    })
+
+    const { result } = renderProvider()
+    await act(async () => {
+      result.current.setViewingThread("thread-W")
+    })
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage("thread-W", "go", {
+        workflowDefinitionId: "wf-def-1",
+      })
+    })
+    await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
+
+    await act(async () => {
+      await result.current.stopThread("thread-W")
+    })
+    expect(mockCancelRun).toHaveBeenCalledWith("producer-run-marked")
+
+    const cb = recorder.forRun("producer-run-marked") as StreamCallbacks
+    await act(async () => {
+      await cb.onTerminal("cancelled")
+    })
+
+    const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []
+    const asst = bucket.find((m) => m.role === "assistant")
+    expect(asst?.stopped).toBe(true)
+    void sendPromise
+  })
+})
