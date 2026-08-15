@@ -829,6 +829,155 @@ describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
   })
 })
 
+// ── Phase 194 Plan 03 Task 2 (validation row V-05, fence F-1) — NO MOUNT RESOLVES A
+//    CANCEL THROUGH THE WORKFLOW LOCK'S ID.
+//
+// THE DEFECT THIS FENCE EXISTS FOR, stated as a measurement rather than a worry:
+//   · `WorkflowLock.runId` has FOUR write sites and carries TWO id types — two store a
+//     `workflow_runs.id` (the mount reconcile, the banner path), two store a producer
+//     `runs.run_id` (the kickoff seed, the Continue re-subscribe). Its JSDoc
+//     (`streamsStore.ts:51-59`) asserts only the first.
+//   · `DELETE /runs/{id}` accepts only the producer id.
+//   · `cancelRun` swallows 404 DELIBERATELY (`api.ts:1259-1269`).
+// Compose those and a Stop wired to the lock is a SILENT SUCCESS THAT DOES NOTHING,
+// roughly half the time — worse than a visible failure, in a phase about honesty.
+//
+// ⚠ THE SCOPE IS THE UNION OF THE MOUNT DIRECTORIES, NOT `panel/` ALONE, and that is
+// the single most important line in this fence. A fence that swept only this directory
+// would report green about a Stop that later lands in `chat/` or `workflows/` — the
+// exact failure mode of Phase 192.1, which shipped a fence that swept a RENAMED module
+// against the empty string and passed green. Each directory is globbed SEPARATELY and
+// each is proved non-empty by a NAMED file it must contain, so a wrong glob for one
+// directory cannot hide behind another directory's files.
+//
+// ⚠ THE SWEEP IS RAW, NOT COMMENT-STRIPPED. That is deliberate and it is the Phase 193
+// D-24(a) precedent: a docblock QUOTING a forbidden call is caught too. It is only
+// affordable because the union today contains ZERO occurrences of `cancelRun` in any
+// form — measured, not assumed, and asserted below. Anyone who needs to DISCUSS the
+// forbidden call in a union docblock writes it without its parenthesis.
+//
+// The carve-out is PROVED rather than assumed: `MessageItem.tsx` legitimately reads
+// `workflowLock.runId` and hands it to `continueRun`, which is correct because
+// `/continue` is the one route with the dual-id fallback. A fence that forbade the
+// identifier outright would red on shipped, correct code and would be rewritten to
+// uselessness on its first run.
+// ⚠ The options object MUST be an inline literal at each call — Vite's glob transform
+// is STATIC and rejects a shared `const` with "Expected the second argument to be an
+// object literal, but got Identifier". The repetition below is required, not sloppy.
+const PANEL_GLOB = import.meta.glob<string>("../**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+const CHAT_GLOB = import.meta.glob<string>("../../chat/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+const WORKFLOWS_GLOB = import.meta.glob<string>("../../workflows/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+
+/** Production source only — a fence that swept its own test files would red on itself. */
+function productionOnly(mod: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(mod).filter(
+      ([p]) => !p.includes("__tests__") && !/\.test\.tsx?$/.test(p),
+    ),
+  )
+}
+
+const PANEL_SRC = productionOnly(PANEL_GLOB)
+const CHAT_SRC = productionOnly(CHAT_GLOB)
+const WORKFLOWS_SRC = productionOnly(WORKFLOWS_GLOB)
+const UNION_SRC = { ...PANEL_SRC, ...CHAT_SRC, ...WORKFLOWS_SRC }
+
+/** Every spelling of "the workflow lock's run id" that a naive wiring would reach for. */
+const LOCK_RUN_ID = /(?:workflowLock|lock)\s*\??\.\s*runId/
+/** The DESTRUCTIVE calls. `continueRun` is deliberately absent — see the carve-out above. */
+const CANCEL_CALL = /\b(?:cancelRun|stopThread|stopStream)\s*\(/
+
+describe("F-1 / V-05 — no Stop mount resolves a cancel through the workflow lock's id", () => {
+  // ── The empty-sweep guard, MECHANISED rather than promised (the 192.1 lesson). An
+  //    absence assertion over zero files is vacuously true, so the sweep must first
+  //    prove it can SEE the files it claims to protect — by NAME, not by count alone.
+  it("sweeps a non-empty set of production files in EACH mount directory", () => {
+    expect(Object.keys(PANEL_SRC).length).toBeGreaterThan(0)
+    expect(Object.keys(CHAT_SRC).length).toBeGreaterThan(0)
+    expect(Object.keys(WORKFLOWS_SRC).length).toBeGreaterThan(0)
+    // A count can be non-zero and still miss the file that matters. Name one per
+    // directory — each is a real, currently-shipped module.
+    const named = (src: Record<string, string>, file: string) =>
+      Object.keys(src).some((p) => p.endsWith(file))
+    expect(named(PANEL_SRC, "/WorkspacePanel.tsx")).toBe(true)
+    expect(named(CHAT_SRC, "/MessageItem.tsx")).toBe(true)
+    expect(named(CHAT_SRC, "/ActiveRunsTray.tsx")).toBe(true)
+    expect(named(WORKFLOWS_SRC, "/WorkflowCanvas.tsx")).toBe(true)
+    // And the sweep must carry real CONTENT, not empty strings — the precise shape of
+    // the 192.1 failure, where a renamed module was swept against "" and passed green.
+    for (const [path, src] of Object.entries(UNION_SRC)) {
+      expect(src.length, `${path} swept as an empty string`).toBeGreaterThan(0)
+    }
+  })
+
+  it("(a) no module in the union calls cancelRun — every Stop routes through the ONE resolver", () => {
+    const offenders = Object.entries(UNION_SRC)
+      .filter(([, src]) => /\bcancelRun\s*\(/.test(src))
+      .map(([p]) => p)
+    expect(
+      offenders,
+      "cancelRun has exactly TWO production call sites, both inside StreamsProvider " +
+        "(stopStream and stopThread). A third one in a mount directory is a second " +
+        "cancel path, and it is the path that takes the WRONG id.",
+    ).toEqual([])
+  })
+
+  it("(b) no module in the union hands the lock's runId to a cancel call", () => {
+    const offenders: string[] = []
+    for (const [path, src] of Object.entries(UNION_SRC)) {
+      src.split("\n").forEach((line, i) => {
+        if (CANCEL_CALL.test(line) && LOCK_RUN_ID.test(line)) {
+          offenders.push(`${path}:${i + 1}  ${line.trim()}`)
+        }
+      })
+    }
+    expect(
+      offenders,
+      "A cancel keyed on the lock's runId 404s roughly half the time and cancelRun " +
+        "swallows 404 — so it reports success and stops nothing.",
+    ).toEqual([])
+  })
+
+  it("PERMITS the one legitimate shipped read — continueRun(workflowLock.runId)", () => {
+    const messageItem = Object.entries(UNION_SRC).find(([p]) =>
+      p.endsWith("/MessageItem.tsx"),
+    )
+    expect(messageItem, "MessageItem.tsx is not in the sweep").toBeDefined()
+    const src = messageItem![1]
+    // The carve-out is a MEASUREMENT: the shipped line exists, it names the lock's id,
+    // and the fence above is green with it in the tree. `/continue` is the one route
+    // with the dual-id fallback, which is why this read is correct and a cancel is not.
+    expect(src).toMatch(/continueRun\(workflowLock\.runId\)/)
+    expect(CANCEL_CALL.test("const res = await continueRun(workflowLock.runId)")).toBe(false)
+  })
+
+  it("the fence's own needles are live — each matches a planted string and not the tree", () => {
+    // Positive controls for the two regexes, so a typo that made either unmatchable
+    // could never read as "the tree is clean". Both spellings of the optional chain.
+    expect(LOCK_RUN_ID.test("cancelRun(workflowLock.runId)")).toBe(true)
+    expect(LOCK_RUN_ID.test("cancelRun(workflowLock?.runId)")).toBe(true)
+    expect(LOCK_RUN_ID.test("cancelRun(lock.runId)")).toBe(true)
+    expect(CANCEL_CALL.test("void cancelRun(x)")).toBe(true)
+    expect(CANCEL_CALL.test("void streamActions.stopThread(threadId)")).toBe(true)
+    expect(CANCEL_CALL.test("void streamActions.stopStream()")).toBe(true)
+    // …and the needles do NOT match the innocent neighbours they sit beside.
+    expect(LOCK_RUN_ID.test("msg.runId")).toBe(false)
+    expect(CANCEL_CALL.test("await continueRun(workflowLock.runId)")).toBe(false)
+  })
+})
+
 /** The panel source with its comments removed — see the G-5 fence above for why. */
 function codeOf(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
