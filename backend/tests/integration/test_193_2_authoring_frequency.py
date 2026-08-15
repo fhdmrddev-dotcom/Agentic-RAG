@@ -23,7 +23,29 @@ WHAT THIS PROVES, AND THE ONLY SHAPE IN WHICH IT MAY BE STATED
     ``backend/tests/unit/test_workflow_authoring_requirement.py``. **Frequency is an
     ARTIFACT, not an assertion.** The single hard assertion permitted over driven output
     is the SC#4 control, and it is expressed as a FLOOR against 193.1's measured 3/3 —
-    never against 100%. See ``_SC4_FLOOR_DESCRIPTION``.
+    never against 100%. See ``_SC4_FLOOR_DESCRIPTION`` and the long note beside it.
+
+TWO ARMS PER ROW — AND THE SECOND ONE EXISTS BECAUSE THE PLAN'S PREMISE WAS HALF FALSE
+    ``193.2-08-PLAN.md`` says to reuse the 193.1 UAT kit's ten-field ``.docx`` *"so SC#2
+    and SC#4 measure the same artefact"*. **Measured at plan time, that is FALSE, and it
+    is recorded rather than smoothed:** 193.1's ``render_template`` **3/3** figure was
+    driven on a DIFFERENT placeholder set — the eight-key *weekly project status* list
+    (``193.1-UAT.md``, rows A/B/C) with its own describe string. Same kit folder,
+    different artefact. A ten-field QBR arm therefore cannot be compared to 3/3 as an
+    equality; only as a floor.
+
+    The operator authorized a SECOND arm on that basis (checkpoint, 2026-08-15). So each
+    driven row is measured TWICE:
+
+      - **ARM ``kit10``** — the kit's ten-field ``Northwind-QBR-Template.docx``, parsed
+        with the shipped parser, plus a QBR describe. What the plan asked for.
+      - **ARM ``uat8``** — 193.1's exact eight keys and 193.1's exact describe string, so
+        figure 3 is a **LIKE-FOR-LIKE comparison against its measured 3/3** and a
+        3/3 -> 2/3 shaped degradation is DETECTABLE rather than silently clearing a
+        strict-majority floor.
+
+    ⚠ **If the two arms DISAGREE on figure 3, that disagreement is itself the finding.
+    State it; never average it away.**
 
 THE ROSTER IS NARROWED TO TWO, AND THE OTHER SIX ARE RECORDED — NEVER DROPPED (D-20)
     ``CLAUDE.md`` §"UAT scoreboard recipe" requires the full native roster plus
@@ -45,7 +67,7 @@ THE ROSTER IS NARROWED TO TWO, AND THE OTHER SIX ARE RECORDED — NEVER DROPPED 
     scoreboard; one that silently omits rows is worse.
 
 WHAT IS COUNTED — FOUR FIGURES, AND THE FOURTH IS NOT IN THE PLAN
-    Per driven row, over N calls:
+    Per driven row, per arm, over N calls:
 
       1. ``business_requirement`` non-empty                     — k/N  (SC#1)
       2. an ``llm_human_input`` phase present                   — k/N  (SC#2)
@@ -78,25 +100,27 @@ ZERO GLOBAL MUTATION
     there is no way for one row to contaminate the next or to leave the operator's
     environment altered. This is copied verbatim from the 187 analog's device.
 
-THE TEMPLATE IS THE REAL ARTEFACT, PARSED — NOT A HAND-TYPED NAME LIST
+THE TEMPLATE IS THE REAL ARTEFACT, PARSED — NOT A HAND-TYPED NAME LIST (arm ``kit10``)
     ``BUG-260815-01`` measured the interactive composition **2 for 2 with a bound
-    template**, so a describe alone would not reproduce the condition under test. The ten
-    placeholder names are read out of the 193.1 UAT kit's own ``.docx`` with the SHIPPED
-    parser (``parse_docx_template_variables`` -> ``placeholder_names_from_parsed``), the
-    same assembly both product doors use. A hand-typed list would be a second copy of the
-    document's contents, free to drift from it.
+    template**, so a describe alone would not reproduce the condition under test. Arm
+    ``kit10``'s ten placeholder names are read out of the 193.1 UAT kit's own ``.docx``
+    with the SHIPPED parser (``parse_docx_template_variables`` ->
+    ``placeholder_names_from_parsed``), the same assembly both product doors use. A
+    hand-typed list would be a second copy of the document's contents, free to drift.
 
-    ⚠ **AND THE COMPARISON IS NOT LIKE-FOR-LIKE — stated here rather than discovered
-    later.** 193.1's ``render_template`` **3/3** figure was measured on a DIFFERENT
-    artefact: an eight-key weekly-project-status placeholder set with its own describe
-    string (``193.1-UAT.md``, rows A/B/C). The kit ``.docx`` this file drives carries
-    **ten** fields and a QBR describe. Same kit, different placeholder set. The SC#4 floor
-    below is therefore phrased as a floor, not as an equality against 3/3.
+    ⚠ Arm ``uat8``'s eight names ARE hand-copied, deliberately and with its reason: they
+    are transcribed verbatim from ``193.1-UAT.md`` — the RECORD OF WHAT WAS DRIVEN — and
+    the source document that produced them is not identified in the kit, so there is
+    nothing to re-parse. For a like-for-like re-drive the measurement record is the
+    correct source; for arm ``kit10`` the document is.
 
-    ⚠ **The describe deliberately OMITS the kit README's sentence "Do not add a step that
-    asks me for input."** That sentence is UAT guidance for a human operator; including it
-    here would suppress the very thing SC#2 exists to measure and would make figure 2
-    meaningless.
+    ⚠ **Both describes deliberately OMIT the kit README's sentence "Do not add a step
+    that asks me for input."** That sentence is UAT guidance for a human operator;
+    including it would suppress the very thing SC#2 exists to measure and would make
+    figure 2 a measurement of the INSTRUMENT rather than of the prompt change. It is an
+    instrument choice, not an oversight, and it is guarded by
+    ``test_no_driven_describe_pre_answers_the_measurement`` — which runs free, with no
+    opt-in, on every describe constant in this file.
 
 RUNNING IT (opt-in — this file makes REAL, PAID provider calls)
     The driven rows are gated on ``RUN_193_2_AUTHORING=1`` AND a reachable Supabase AND a
@@ -107,11 +131,15 @@ RUNNING IT (opt-in — this file makes REAL, PAID provider calls)
         RUN_193_2_AUTHORING=1 ./venv/Scripts/python.exe -m pytest \
             tests/integration/test_193_2_authoring_frequency.py -q -s
 
-    Knobs: ``FREQ_193_2_N`` (calls per driven row, default 5, the plan's N >= 5),
+    ⚠ **COST CAP (operator-authorized, checkpoint 2026-08-15): 2 rows x 2 arms x N=5 =
+    20 generations, worst case 40 provider calls** with the service's single retry. Do
+    not exceed it without returning to the checkpoint.
+
+    Knobs: ``FREQ_193_2_N`` (calls per row PER ARM, default 5, the plan's N >= 5),
     ``FREQ_193_2_USER_ID`` (else the first ``profiles`` row), ``FREQ_193_2_TIMEOUT``
     (per-call wall-clock ceiling, default 300 s), ``FREQ_193_2_OUT`` (scoreboard path),
-    ``FREQ_193_2_TEMPLATE`` (the kit ``.docx``), ``FREQ_193_2_RAW`` (optional path for the
-    raw emitted definitions — write it OUTSIDE the watched tree).
+    ``FREQ_193_2_TEMPLATE`` (the kit ``.docx``), ``FREQ_193_2_RAW`` (optional DIRECTORY
+    for the raw emitted definitions — point it OUTSIDE the watched tree).
 
 SKIP DESIGN — copied from the analog, and the reason is copied with it
     The gate is applied **per row INSIDE the test**, never as a module ``pytestmark``. A
@@ -124,7 +152,9 @@ SECRETS (T-193.2-08-A, the analog's T-187-07-01 rule copied verbatim)
     Provider keys are read through the shipped settings object and are never logged,
     printed, or written to the scoreboard. Key presence is recorded as a BOOLEAN only —
     ``key_configured=bool(getattr(settings, f"{provider}_api_key", ""))``. The key VALUE
-    never leaves that expression.
+    never leaves that expression. ``CallOutcome`` carries counters and the requirement's
+    LENGTH, never its text, so grounded KB content cannot reach a committed artifact
+    through the scoreboard.
 """
 
 from __future__ import annotations
@@ -166,37 +196,97 @@ OUT_ENV = "FREQ_193_2_OUT"
 TEMPLATE_ENV = "FREQ_193_2_TEMPLATE"
 RAW_OUT_ENV = "FREQ_193_2_RAW"
 
-DEFAULT_N = 5  # the plan's floor: N >= 5 per driven row
+DEFAULT_N = 5  # the plan's floor: N >= 5 per driven row, PER ARM
 DEFAULT_CALL_TIMEOUT_S = 300.0
 
-# The 193.1 UAT kit's template — the artefact SC#2 and SC#4 are asked to measure.
+# The 193.1 UAT kit's template — arm ``kit10``'s artefact.
 DEFAULT_TEMPLATE_PATH = r"C:\Users\fhdmr\Desktop\uat-193.1-qbr\template\Northwind-QBR-Template.docx"
 
-# The describe. Taken from the 193.1 UAT kit README step 2, MINUS its final sentence
-# ("Do not add a step that asks me for input.") — see the module docstring. It names no
-# skill and no folder, so the measurement is about the PROMPT and the grounding, not about
-# grounding fidelity.
-DESCRIBE = (
+# ── Arm ``kit10`` ──────────────────────────────────────────────────────────────
+# Taken from the 193.1 UAT kit README step 2, MINUS its final sentence ("Do not add a
+# step that asks me for input.") — see the module docstring. It names no skill and no
+# folder, so the measurement is about the PROMPT and the grounding, not about grounding
+# fidelity.
+DESCRIBE_KIT10 = (
     "Produce a quarterly business review for our customer Northwind Logistics, covering "
     "Q3 2026. Use our knowledge base for their usage data, support history, meeting notes "
     "and commercial position."
 )
+
+# ── Arm ``uat8`` — 193.1's EXACT shape, so figure 3 is like-for-like ────────────
+# Transcribed verbatim from ``193.1-UAT.md``: the describe used for its Calls A and B
+# (deliberately SILENT about a template — post-D-26 the GROUNDING asserts provision, and
+# that is precisely what 193.1-11 re-drove to 3/3), and the eight placeholder keys that
+# drive produced. See the module docstring for why these are copied rather than parsed.
+DESCRIBE_UAT8 = (
+    "Produce a weekly project status report for stakeholders, built from our knowledge "
+    "base. Gather the current status, risks and upcoming work, then produce the finished "
+    "report document."
+)
+PLACEHOLDERS_UAT8: tuple[str, ...] = (
+    "accomplishments",
+    "milestones",
+    "overall_rag_status",
+    "planned_next",
+    "project_name",
+    "reporting_period",
+    "risks_blockers",
+    "summary",
+)
+
+
+@dataclass(frozen=True)
+class Arm:
+    """One measured condition. Two arms per driven row (see the module docstring)."""
+
+    key: str
+    describe: str
+    label: str
+    like_for_like_with_193_1: bool
+
+
+ARMS: tuple[Arm, ...] = (
+    Arm(
+        key="kit10",
+        describe=DESCRIBE_KIT10,
+        label="the kit's 10-field Northwind-QBR-Template.docx (parsed) + a QBR describe",
+        like_for_like_with_193_1=False,
+    ),
+    Arm(
+        key="uat8",
+        describe=DESCRIBE_UAT8,
+        label="193.1's exact 8 keys + 193.1's exact describe — LIKE-FOR-LIKE with its 3/3",
+        like_for_like_with_193_1=True,
+    ),
+)
+
 
 # ── The SC#4 control's floor, and the reasoning that sets it ────────────────────
 # 193.1 measured ``render_template`` present on **3 of 3** post-fix runs (and 6 of 6
 # counting its declared accidental second triplet); its PRE-fix state was **0 of 3**.
 # Those two are the only states ever measured on this branch. A STRICT MAJORITY separates
 # them with margin: the pre-fix state fails it by construction, the post-fix state clears
-# it. It is deliberately NOT phrased as 100% — D-08 forbids claiming a language model
-# always does anything, and this figure is a control against REGRESSION, not a guarantee.
+# it.
+#
+# ⚠ WHY THE HARD ASSERTION IS NOT SET AT 100%, AND WHY THAT IS NOT A LOOPHOLE.
+# D-08 forbids turning a language model's frequency into a pass/fail gate: a 4-of-5 arm
+# would then RED on ordinary sampling noise and manufacture a regression that is not
+# there — the exact dishonesty this file exists to prevent, only pointed the other way.
+# So the ASSERTION is the floor, and the DETECTION the operator asked for is carried by
+# the REPORT: the like-for-like arm's rate is compared against 193.1's 100% and any
+# shortfall is flagged ``SC#4-DEGRADED`` in the row's evidence, in the emitted scoreboard
+# and in ``193.2-FREQUENCY.md``. A 3/3 -> 2/3 shaped drop is therefore VISIBLE rather
+# than silently clearing the floor — which is what "detectable" requires — without a
+# stochastic test becoming a stochastic gate.
 _SC4_FLOOR_DESCRIPTION = (
-    "a strict majority of N (k*2 >= N) — 193.1 measured 3/3 post-fix against 0/3 pre-fix; "
-    "this floor separates those two measured states and is NOT a claim of 100%"
+    "a strict majority of the successful calls (k*2 >= n) — 193.1 measured 3/3 post-fix "
+    "against 0/3 pre-fix; this floor separates those two measured states and is NOT a "
+    "claim of 100%"
 )
 
 
 def _sc4_floor_met(k: int, n: int) -> bool:
-    """The SC#4 control floor: a strict majority of the driven calls."""
+    """The SC#4 control floor: a strict majority of the successful calls."""
     return k * 2 >= n
 
 
@@ -251,9 +341,9 @@ _NA_ROWS: tuple[tuple[str, str], ...] = (
     ("openrouter", _NOT_A_CANDIDATE + " (`native_tools: False` — the non-native tool path)"),
 )
 
-# The two ids ``resolve_authoring_model`` can actually return. They are NOT re-typed:
-# the tuple below is read straight out of the shipped resolver's fallback list, and the
-# registry guard asserts each resolves ``capability_source == 'registry'``.
+# The two ids ``resolve_authoring_model`` can actually return, read straight off the
+# shipped resolver's fallback list. The registry guard asserts each resolves
+# ``capability_source == 'registry'`` with a truthy ``forced_emission``.
 _DRIVE_MODEL_IDS: tuple[str, ...] = ("claude-opus-4-8", "gpt-5.5")
 
 
@@ -297,6 +387,14 @@ def build_roster() -> list[RosterRow]:
 
 ROSTER: list[RosterRow] = build_roster()
 
+# The (row, arm) pairs actually driven, plus the six N/A rows, as pytest parameters.
+_PARAMS: list[tuple[RosterRow, Arm | None]] = [
+    (row, arm) for row in ROSTER if row.drive for arm in ARMS
+] + [(row, None) for row in ROSTER if not row.drive]
+_PARAM_IDS: list[str] = [
+    f"{row.provider}-{arm.key}" if arm else row.provider for row, arm in _PARAMS
+]
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # The scoreboard — every row lands here BEFORE it can pass, fail, block or hang
@@ -326,25 +424,58 @@ class CallOutcome:
 
 
 @dataclass
-class RowResult:
+class ArmResult:
     verdict: str  # "✅" | "❌" | "⛔"
-    code: str  # machine-readable: ok / opt-in / no-key / supabase-unreachable / n-a / ...
+    code: str
     evidence: str
     calls: list[CallOutcome] = field(default_factory=list)
 
 
+@dataclass
+class RowResult:
+    verdict: str  # "✅" | "❌" | "⛔"
+    code: str  # machine-readable: ok / opt-in / no-key / supabase-unreachable / n-a / ...
+    evidence: str
+
+
+# The eight-row board (D-20) and the per-arm detail. Both are seeded at module IMPORT.
 _RESULTS: dict[str, RowResult] = {}
+_ARM_RESULTS: dict[tuple[str, str], ArmResult] = {}
 
 
-def _record(row: RosterRow, verdict: str, code: str, evidence: str, calls=None) -> None:
-    _RESULTS[row.provider] = RowResult(
+def _kn(k: int, n: int) -> str:
+    return f"{k}/{n}"
+
+
+def _record_arm(row: RosterRow, arm: Arm, verdict: str, code: str, evidence: str,
+                calls=None) -> None:
+    _ARM_RESULTS[(row.provider, arm.key)] = ArmResult(
         verdict=verdict, code=code, evidence=evidence, calls=list(calls or [])
     )
+    _refresh_row(row)
 
 
-def _block(row: RosterRow, code: str, reason: str) -> None:
+def _record_row(row: RosterRow, verdict: str, code: str, evidence: str) -> None:
+    _RESULTS[row.provider] = RowResult(verdict=verdict, code=code, evidence=evidence)
+
+
+def _refresh_row(row: RosterRow) -> None:
+    """Recompute a DRIVE row's board verdict from its arms — worst verdict wins, and
+    every arm's code appears, so a row can never read green while an arm is blocked."""
+    arms = [(a, _ARM_RESULTS.get((row.provider, a.key))) for a in ARMS]
+    verdicts = [r.verdict for _, r in arms if r]
+    verdict = "⛔" if "⛔" in verdicts else ("❌" if "❌" in verdicts else "✅")
+    codes = " · ".join(f"{a.key}: {r.code}" for a, r in arms if r)
+    evidence = " ‖ ".join(f"[{a.key}] {r.evidence}" for a, r in arms if r)
+    _record_row(row, verdict, codes, evidence)
+
+
+def _block_arm(row: RosterRow, arm: Arm | None, code: str, reason: str) -> None:
     """Record ⛔ with the reason, THEN skip. Never silently omitted."""
-    _record(row, "⛔", code, reason)
+    if arm is None:
+        _record_row(row, "⛔", code, reason)
+    else:
+        _record_arm(row, arm, "⛔", code, reason)
     pytest.skip(f"[{code}] {reason}")
 
 
@@ -354,15 +485,13 @@ def _block(row: RosterRow, code: str, reason: str) -> None:
 # skips everything. "Record all eight; never drop six" cannot depend on a test executing.
 for _row in ROSTER:
     if _row.drive:
-        _RESULTS[_row.provider] = RowResult(
-            "⛔", "not-run", "row was not executed in this session"
-        )
+        for _arm in ARMS:
+            _ARM_RESULTS[(_row.provider, _arm.key)] = ArmResult(
+                "⛔", "not-run", "arm was not executed in this session"
+            )
+        _refresh_row(_row)
     else:
-        _RESULTS[_row.provider] = RowResult("⛔", "n-a", _row.na_reason)
-
-
-def _kn(k: int, n: int) -> str:
-    return f"{k}/{n}"
+        _record_row(_row, "⛔", "n-a", _row.na_reason)
 
 
 def _scoreboard_markdown() -> str:
@@ -394,57 +523,68 @@ def _scoreboard_markdown() -> str:
         "the fallback is today's exact behaviour, so the publish gate stays."
     )
 
-    # Per-call detail for any row that actually drove.
     for row in ROSTER:
-        res = _RESULTS.get(row.provider)
-        if not (res and res.calls):
-            continue
-        n = len(res.calls)
-        ok_calls = [c for c in res.calls if c.ok]
-        lines.append("")
-        lines.append(f"### {row.provider} — `{row.model_id}` · N = {n}")
-        lines.append("")
-        lines.append(
-            "| Figure | k/N | Pre-fix baseline |",
-        )
-        lines.append("|---|---|---|")
-        lines.append(
-            f"| `business_requirement` non-empty (SC#1) | "
-            f"**{_kn(sum(1 for c in ok_calls if c.requirement_present), n)}** | 0/N |"
-        )
-        lines.append(
-            f"| `business_requirement_seeded_by_ai` stamped (193.2-07) | "
-            f"**{_kn(sum(1 for c in ok_calls if c.requirement_seeded_by_ai), n)}** | n/a (field is new) |"
-        )
-        lines.append(
-            f"| an `llm_human_input` phase present (SC#2) | "
-            f"**{_kn(sum(1 for c in ok_calls if c.llm_human_input), n)}** | 2/2 with a template; 4/6 overall |"
-        )
-        lines.append(
-            f"| an `ask_user` validator present (the gate's 2nd shape) | "
-            f"**{_kn(sum(1 for c in ok_calls if c.ask_user_validators), n)}** | not measured pre-fix |"
-        )
-        lines.append(
-            f"| a `render_template` phase present (SC#4 CONTROL) | "
-            f"**{_kn(sum(1 for c in ok_calls if c.render_template), n)}** | 193.1 measured 3/3 post-D-26 |"
-        )
-        lines.append(
-            f"| an `external_action` phase present (DISPLACEMENT — NOT a publish failure) | "
-            f"**{_kn(sum(1 for c in ok_calls if c.external_action), n)}** | not measured pre-fix |"
-        )
-        lines.append(
-            f"| the call returned `ok` | **{_kn(len(ok_calls), n)}** | — |"
-        )
-        lines.append("")
-        lines.append("| call | ok | req chars | seeded | human_input | ask_user | render_template | external_action | phase types |")
-        lines.append("|---|---|---|---|---|---|---|---|---|")
-        for c in res.calls:
+        for arm in ARMS:
+            res = _ARM_RESULTS.get((row.provider, arm.key))
+            if not (res and res.calls):
+                continue
+            n = len(res.calls)
+            ok_calls = [c for c in res.calls if c.ok]
+            lines.append("")
             lines.append(
-                f"| {c.index} | {'✅' if c.ok else '❌ ' + c.error} | {c.requirement_chars} | "
-                f"{c.requirement_seeded_by_ai} | {c.llm_human_input} | {c.ask_user_validators} | "
-                f"{c.render_template} | {c.external_action} | "
-                f"`{', '.join(c.phase_types) or '—'}` |"
+                f"### {row.provider} — `{row.model_id}` · arm `{arm.key}` · N = {n}"
             )
+            lines.append("")
+            lines.append(f"_{arm.label}_")
+            lines.append("")
+            lines.append("| Figure | k/N | Pre-fix baseline |")
+            lines.append("|---|---|---|")
+            lines.append(
+                f"| `business_requirement` non-empty (SC#1) | "
+                f"**{_kn(sum(1 for c in ok_calls if c.requirement_present), n)}** | 0/N |"
+            )
+            lines.append(
+                f"| `business_requirement_seeded_by_ai` stamped (193.2-07) | "
+                f"**{_kn(sum(1 for c in ok_calls if c.requirement_seeded_by_ai), n)}** | "
+                "n/a — the field is new in this phase |"
+            )
+            lines.append(
+                f"| an `llm_human_input` phase present (SC#2) | "
+                f"**{_kn(sum(1 for c in ok_calls if c.llm_human_input), n)}** | "
+                "2/2 with a template; 4/6 overall |"
+            )
+            lines.append(
+                f"| an `ask_user` validator present (the gate's 2nd shape) | "
+                f"**{_kn(sum(1 for c in ok_calls if c.ask_user_validators), n)}** | "
+                "not measured pre-fix |"
+            )
+            lines.append(
+                f"| a `render_template` phase present (SC#4 CONTROL) | "
+                f"**{_kn(sum(1 for c in ok_calls if c.render_template), n)}** | "
+                + ("193.1 measured **3/3** — LIKE-FOR-LIKE |"
+                   if arm.like_for_like_with_193_1
+                   else "193.1's 3/3 was a DIFFERENT artefact — floor only |")
+            )
+            lines.append(
+                f"| an `external_action` phase present (DISPLACEMENT — **NOT** a publish "
+                f"failure) | **{_kn(sum(1 for c in ok_calls if c.external_action), n)}** | "
+                "not measured pre-fix |"
+            )
+            lines.append(f"| the call returned `ok` | **{_kn(len(ok_calls), n)}** | — |")
+            lines.append("")
+            lines.append(
+                "| call | ok | req chars | seeded | human_input | ask_user | "
+                "render_template | external_action | phase types |"
+            )
+            lines.append("|---|---|---|---|---|---|---|---|---|")
+            for c in res.calls:
+                lines.append(
+                    f"| {c.index} | {'✅' if c.ok else '❌ ' + c.error} | "
+                    f"{c.requirement_chars} | {c.requirement_seeded_by_ai} | "
+                    f"{c.llm_human_input} | {c.ask_user_validators} | "
+                    f"{c.render_template} | {c.external_action} | "
+                    f"`{', '.join(c.phase_types) or '—'}` |"
+                )
     return "\n".join(lines)
 
 
@@ -524,9 +664,9 @@ def _template_path() -> Path:
 
 
 def read_template_placeholders() -> list[str]:
-    """The ten field names, PARSED out of the real kit ``.docx`` with the shipped
-    assembly both product doors use. Returns ``[]`` when the file is unreadable — the
-    caller records that as a ⛔ block rather than driving a measurement that could not
+    """Arm ``kit10``'s ten field names, PARSED out of the real kit ``.docx`` with the
+    shipped assembly both product doors use. Returns ``[]`` when the file is unreadable —
+    the caller records that as a ⛔ block rather than driving a measurement that could not
     reproduce the condition under test."""
     from app.services.template_render_service import (
         parse_docx_template_variables,
@@ -539,6 +679,13 @@ def read_template_placeholders() -> list[str]:
     except OSError:
         return []
     return list(placeholder_names_from_parsed(parse_docx_template_variables(data)) or [])
+
+
+def arm_placeholders(arm: Arm) -> list[str]:
+    """The placeholder names for an arm: parsed for ``kit10``, transcribed for ``uat8``."""
+    if arm.key == "uat8":
+        return list(PLACEHOLDERS_UAT8)
+    return read_template_placeholders()
 
 
 def _count(wd) -> dict:
@@ -644,52 +791,86 @@ def test_both_driven_rows_are_registry_backed() -> None:
         )
 
 
-def test_the_driven_describe_does_not_pre_answer_the_measurement() -> None:
+def test_no_driven_describe_pre_answers_the_measurement() -> None:
     """A guard on the INSTRUMENT, not on the model. Runs always, costs nothing.
 
     The 193.1 UAT kit's README tells a human operator to add *"Do not add a step that asks
     me for input."* to the describe. A describe carrying that sentence would suppress the
     very composition SC#2 measures, and figure 2 would then be a measurement of the
-    instrument rather than of the prompt change. It is also why this file does not simply
-    paste the README's step-2 text.
+    instrument rather than of the prompt change. Every arm's describe is swept, so a third
+    arm added later inherits the guard instead of re-deriving it.
+
+    ⚠ The ``not in`` below is asserted over a CONSTANT DEFINED IN THIS FILE, never over
+    model output. It is not an absence claim about a language model, which D-08 forbids.
     """
-    lowered = DESCRIBE.lower()
-    for banned in ("do not add a step", "asks me for input", "llm_human_input", "human input"):
-        assert banned not in lowered, (
-            f"the driven describe contains {banned!r} — it would pre-answer SC#2's "
-            "measurement. Frequency must be measured against a NEUTRAL describe."
-        )
+    for arm in ARMS:
+        lowered = arm.describe.lower()
+        for banned in (
+            "do not add a step",
+            "asks me for input",
+            "llm_human_input",
+            "human input",
+        ):
+            assert banned not in lowered, (
+                f"arm {arm.key!r}'s describe contains {banned!r} — it would pre-answer "
+                "SC#2's measurement. Frequency must be measured against a NEUTRAL "
+                "describe."
+            )
 
 
-@pytest.mark.parametrize("row", ROSTER, ids=[r.provider for r in ROSTER])
-async def test_authoring_frequency(row: RosterRow) -> None:
-    """N real generations per DRIVE row; four k/N figures recorded, never asserted.
+def test_the_two_arms_are_a_real_comparison() -> None:
+    """Non-vacuity on the arms themselves. Free, no opt-in.
+
+    Exactly one arm may claim to be like-for-like with 193.1's 3/3, and the two arms must
+    differ in BOTH variables (describe and placeholder set) — otherwise the "the arms
+    disagree" finding the operator asked for could not exist, and the like-for-like claim
+    would be decoration. The 193.1 key list is also pinned at eight, because that is the
+    number its 3/3 was measured with.
+    """
+    assert len(ARMS) == 2
+    assert sum(1 for a in ARMS if a.like_for_like_with_193_1) == 1, (
+        "exactly one arm is the like-for-like re-drive of 193.1's 3/3"
+    )
+    assert ARMS[0].describe != ARMS[1].describe, "the two arms share a describe"
+    assert len(PLACEHOLDERS_UAT8) == 8, (
+        "193.1's measured 3/3 was driven on EIGHT keys (193.1-UAT.md); a different count "
+        "here would silently stop being like-for-like."
+    )
+    assert len(set(PLACEHOLDERS_UAT8)) == 8, "duplicate key in the 193.1 transcription"
+
+
+@pytest.mark.parametrize("row,arm", _PARAMS, ids=_PARAM_IDS)
+async def test_authoring_frequency(row: RosterRow, arm: Arm | None) -> None:
+    """N real generations per DRIVE row PER ARM; four k/N figures recorded, never asserted.
 
     ``settings`` is a stub scoped to this row (zero global mutation, zero contamination).
-    Every gate below RECORDS the row before it skips, so a blocked row appears on the
+    Every gate below RECORDS the row/arm before it skips, so a blocked one appears on the
     board with its reason instead of vanishing.
     """
-    if not row.drive:
-        _block(row, "n-a", row.na_reason)
+    if arm is None:
+        _block_arm(row, None, "n-a", row.na_reason)
     if not os.environ.get(OPT_IN_ENV):
-        _block(row, "opt-in", f"{OPT_IN_ENV} not set — live paid provider calls are opt-in")
+        _block_arm(row, arm, "opt-in", f"{OPT_IN_ENV} not set — live paid provider calls are opt-in")
     if not row.key_configured:
-        _block(row, "no-key", f"no {row.provider}_api_key configured in this environment")
+        _block_arm(row, arm, "no-key", f"no {row.provider}_api_key configured in this environment")
     if not _supabase_reachable():
-        _block(
+        _block_arm(
             row,
+            arm,
             "supabase-unreachable",
             f"SUPABASE_URL from {_ENV_FILE.name} is unset or unreachable — grounding "
             "assembly would degrade to an empty folder/skill registry",
         )
-    placeholders = read_template_placeholders()
+    placeholders = arm_placeholders(arm)
     if not placeholders:
-        _block(
+        _block_arm(
             row,
+            arm,
             "template-unreadable",
-            f"the bound template at {_template_path()} could not be read for placeholder "
-            "names — BUG-260815-01 measured the interactive composition 2-for-2 WITH a "
-            "template, so a describe alone would not reproduce the condition under test",
+            f"arm {arm.key!r} resolved no placeholder names (template path "
+            f"{_template_path()}) — BUG-260815-01 measured the interactive composition "
+            "2-for-2 WITH a template, so a describe alone would not reproduce the "
+            "condition under test",
         )
 
     from app.models.harness import WorkflowDefinition
@@ -707,7 +888,7 @@ async def test_authoring_frequency(row: RosterRow) -> None:
         try:
             result = await asyncio.wait_for(
                 generate_workflow_definition(
-                    describe=DESCRIBE,
+                    describe=arm.describe,
                     supabase=supabase,
                     user_id=user_id,
                     template_placeholders=placeholders,
@@ -721,11 +902,11 @@ async def test_authoring_frequency(row: RosterRow) -> None:
             )
         except asyncio.TimeoutError:
             calls.append(CallOutcome(index=i, ok=False, error="timeout"))
-            _record(row, "❌", "timeout", f"call {i} exceeded {timeout:.0f}s", calls)
+            _record_arm(row, arm, "❌", "timeout", f"call {i} exceeded {timeout:.0f}s", calls)
             continue
         except Exception as exc:  # noqa: BLE001 — an honest failure is a recorded verdict
             calls.append(CallOutcome(index=i, ok=False, error=type(exc).__name__))
-            _record(row, "❌", "raised", f"call {i}: {type(exc).__name__}", calls)
+            _record_arm(row, arm, "❌", "raised", f"call {i}: {type(exc).__name__}", calls)
             continue
 
         if result.get("ok"):
@@ -739,9 +920,9 @@ async def test_authoring_frequency(row: RosterRow) -> None:
             calls.append(
                 CallOutcome(index=i, ok=False, error=str(result.get("error") or "not_ok"))
             )
-        # RECORD BEFORE VERDICT — after every call, so a crash mid-row still leaves the
+        # RECORD BEFORE VERDICT — after every call, so a crash mid-arm still leaves the
         # calls so far on the board.
-        _record(row, "…", "in-progress", f"{len(calls)}/{n} calls made", calls)
+        _record_arm(row, arm, "…", "in-progress", f"{len(calls)}/{n} calls made", calls)
 
     ok_calls = [c for c in calls if c.ok]
     k_requirement = sum(1 for c in ok_calls if c.requirement_present)
@@ -751,20 +932,41 @@ async def test_authoring_frequency(row: RosterRow) -> None:
     k_template = sum(1 for c in ok_calls if c.render_template)
     k_external = sum(1 for c in ok_calls if c.external_action)
 
+    # ⚠ THE DETECTION HALF OF SC#4, which the FLOOR alone cannot give (see
+    # `_SC4_FLOOR_DESCRIPTION`). On the like-for-like arm, 193.1's measured rate is 3 of
+    # 3 — so ANY shortfall against 100% of the successful calls is flagged in the
+    # evidence, in the emitted scoreboard and in `193.2-FREQUENCY.md`, making a
+    # 3/3 -> 2/3 shaped drop visible rather than silently clearing a majority floor.
+    degraded = ""
+    if arm.like_for_like_with_193_1 and ok_calls and k_template < len(ok_calls):
+        degraded = (
+            f" ⚠ SC#4-DEGRADED: like-for-like with 193.1's measured 3/3 (100%), this arm "
+            f"measured {_kn(k_template, len(ok_calls))} of its successful calls"
+        )
+
     evidence = (
         f"N={n} · ok {_kn(len(ok_calls), n)} · business_requirement {_kn(k_requirement, n)} "
         f"(seeded_by_ai {_kn(k_seeded, n)}) · llm_human_input {_kn(k_human, n)} "
         f"(ask_user validators {_kn(k_askuser, n)}) · render_template {_kn(k_template, n)} "
         f"[SC#4 control] · external_action {_kn(k_external, n)} [displacement, NOT a "
-        f"publish failure] — D-08: a reduction, never an absence"
+        f"publish failure] — D-08: a reduction, never an absence{degraded}"
     )
-    _record(row, "✅" if ok_calls else "❌", "ok" if ok_calls else "no-successful-call",
-            evidence, calls)
+    _record_arm(
+        row,
+        arm,
+        "✅" if ok_calls else "❌",
+        "ok" if ok_calls else "no-successful-call",
+        evidence,
+        calls,
+    )
 
-    raw_out = os.environ.get(RAW_OUT_ENV)
-    if raw_out and raw:
+    raw_dir = os.environ.get(RAW_OUT_ENV)
+    if raw_dir and raw:
         try:
-            Path(raw_out).write_text(json.dumps(raw, indent=2), encoding="utf-8")
+            Path(raw_dir).mkdir(parents=True, exist_ok=True)
+            (Path(raw_dir) / f"{row.provider}-{arm.key}.json").write_text(
+                json.dumps(raw, indent=2), encoding="utf-8"
+            )
         except OSError:  # pragma: no cover — never fail a run over the artifact
             pass
 
@@ -782,23 +984,26 @@ async def test_authoring_frequency(row: RosterRow) -> None:
     # SC#4 is different in kind. It is a NO-REGRESSION CONTROL on a branch that was
     # already measured working: a prompt change that reduced `llm_human_input` by
     # BREAKING the template branch would be a regression dressed as a fix, and this is
-    # the only figure that can see it. It is expressed as a floor against 193.1's
-    # measured 3/3 (never against 100%) — see `_SC4_FLOOR_DESCRIPTION`.
+    # the only figure that can see it. The ASSERTION is the floor; the DETECTION of a
+    # smaller drop is the `SC#4-DEGRADED` flag above, which is reported rather than
+    # thrown — see the long note at `_SC4_FLOOR_DESCRIPTION` for why a 100% assertion
+    # would itself be dishonest.
     #
     # A row where NO call succeeded is a different failure and says so in its own words:
     # reporting it as "the SC#4 control fell" would blame the template branch for an
     # outage that never reached it.
     if len(ok_calls) == 0:
         pytest.fail(
-            f"{row.provider} ({row.model_id}): {n} of {n} calls failed — "
-            f"{[c.error for c in calls]}. No frequency was measured for this row; the "
+            f"{row.provider} ({row.model_id}) arm {arm.key!r}: {n} of {n} calls failed — "
+            f"{[c.error for c in calls]}. No frequency was measured for this arm; the "
             "SC#4 control was not reached and must not be read as having fallen."
         )
     assert _sc4_floor_met(k_template, len(ok_calls)), (
         f"SC#4 CONTROL FELL: a `render_template` phase was present on only "
         f"{_kn(k_template, len(ok_calls))} of the successful calls for "
-        f"{row.provider} ({row.model_id}). The floor is {_SC4_FLOOR_DESCRIPTION}. "
-        "193.1 measured 3/3 post-D-26 with a bound template; a prompt change that "
-        "reduced `llm_human_input` by breaking the template branch is a regression "
-        "dressed as a fix, and the D-26 grounding arms must NOT be weakened to buy it."
+        f"{row.provider} ({row.model_id}) on arm {arm.key!r} ({arm.label}). The floor is "
+        f"{_SC4_FLOOR_DESCRIPTION}. 193.1 measured 3/3 post-D-26 with a bound template; "
+        "a prompt change that reduced `llm_human_input` by breaking the template branch "
+        "is a regression dressed as a fix, and the D-26 grounding arms must NOT be "
+        "weakened to buy it."
     )
