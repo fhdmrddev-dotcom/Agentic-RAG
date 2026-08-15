@@ -140,6 +140,48 @@ function makeSseRecorder() {
   return { forRun: (runId: string) => callbacksByRunId.get(runId) }
 }
 
+/**
+ * A run whose SSE subscription the test can END on demand.
+ *
+ * ⚠ Why this exists, recorded because the obvious harness is WRONG and this
+ * suite shipped the wrong one for one commit before a plant caught it.
+ * `makeSseRecorder` above returns a promise that NEVER resolves, which is right
+ * for delta-routing tests but fatal for anything reading `stoppedByUserRef`:
+ * the `wasStoppedByUser` → `stopped: true` stamp lives in `sendMessage`'s
+ * **`finally`** (`StreamsProvider.tsx:2352-2364`), reached only once
+ * `await subscribeToRun(...)` RESOLVES. Under a never-resolving mock that
+ * finally never runs, so `stopped` is never written and an assertion of
+ * `stopped !== true` passes no matter what the ref holds.
+ *
+ * ⚠ And the second half of the same trap: `onTerminal("cancelled")` stamps
+ * `stopped: true` UNCONDITIONALLY at `:2138` off the terminal KIND, with no
+ * reference to `stoppedByUserRef` at all. A "positive control" built on
+ * `cancelled` therefore proves the `kind` branch works and says nothing about
+ * the ref. Both cases below use kind `"done"` on purpose, so the ONLY thing
+ * that can write `stopped` is the ref.
+ */
+function makeControllableRun() {
+  const captured: { cb: StreamCallbacks | null; resolve: (() => void) | null } = {
+    cb: null,
+    resolve: null,
+  }
+  mockSubscribeToRun.mockImplementation(
+    async (_runId: string, _since: string, callbacks: StreamCallbacks) => {
+      captured.cb = callbacks
+      return new Promise<void>((res) => {
+        captured.resolve = res
+      })
+    },
+  )
+  return {
+    /** Fire a NORMAL terminal, then let `sendMessage`'s finally run. */
+    async finishNormally() {
+      await captured.cb!.onTerminal("done")
+      captured.resolve!()
+    },
+  }
+}
+
 function renderProvider() {
   return renderHook(() => useStreamActions(), {
     wrapper: ({ children }: { children: ReactNode }) => (
@@ -463,9 +505,9 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
 
   it("stoppedByUserRef is NOT set on the early-return path — the message never reads 'stopped'", async () => {
     vi.spyOn(console, "warn").mockImplementation(() => {})
-    const recorder = makeSseRecorder()
+    const run = makeControllableRun()
 
-    // Hold the kickoff POST open so the test can act INSIDE the real pre-stamp
+    // Hold the kickoff POST open so the test acts INSIDE the real pre-stamp
     // window rather than simulating it.
     let resolveKickoff!: (v: { run_id: string; message_id: string }) => void
     mockPostMessage.mockReturnValueOnce(
@@ -498,30 +540,34 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
     })
     expect(mockCancelRun).toHaveBeenCalledTimes(0)
 
-    // Let the run register and then finish normally.
+    // Let the run register, then END NORMALLY (kind "done" — so the only thing
+    // that can write `stopped` is `stoppedByUserRef`, never the `:2138` kind
+    // branch) and let sendMessage's finally run.
     await act(async () => {
       resolveKickoff({ run_id: "producer-run-late", message_id: "user-msg-late" })
       await Promise.resolve()
     })
     await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
-    const cb = recorder.forRun("producer-run-late") as StreamCallbacks
-    expect(cb).toBeTruthy()
     await act(async () => {
-      await cb.onTerminal("done")
+      await run.finishNormally()
+      await sendPromise
     })
 
     // The run ended on its own. A Stop that cancelled NOTHING must not have
     // marked it stopped-by-user.
     const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []
     const asst = bucket.find((m) => m.role === "assistant")
+    expect(asst?.runStatus).toBe("completed") // the finally really ran
     expect(asst?.stopped).not.toBe(true)
-    void sendPromise
   })
 
-  it("POSITIVE CONTROL: a Stop AFTER the stamp DOES mark the message stopped", async () => {
-    // Without this the case above proves nothing — `stopped` could be a field
-    // nothing ever sets in this harness, and the assertion would be vacuous.
-    const recorder = makeSseRecorder()
+  it("POSITIVE CONTROL: a Stop AFTER the stamp DOES mark the same message stopped, on the same 'done' terminal", async () => {
+    // Without this the case above proves nothing. It must exercise the SAME
+    // mechanism: kind "done", so `stopped` can only come from
+    // `wasStoppedByUser`. (An earlier draft of this control used kind
+    // "cancelled" and was VACUOUS — `:2138` stamps `stopped: true` off the kind
+    // alone, with no reference to the ref.)
+    const run = makeControllableRun()
     mockPostMessage.mockResolvedValueOnce({
       run_id: "producer-run-marked",
       message_id: "user-msg-marked",
@@ -544,14 +590,13 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
     })
     expect(mockCancelRun).toHaveBeenCalledWith("producer-run-marked")
 
-    const cb = recorder.forRun("producer-run-marked") as StreamCallbacks
     await act(async () => {
-      await cb.onTerminal("cancelled")
+      await run.finishNormally()
+      await sendPromise
     })
 
     const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []
     const asst = bucket.find((m) => m.role === "assistant")
     expect(asst?.stopped).toBe(true)
-    void sendPromise
   })
 })
