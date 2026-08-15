@@ -1406,7 +1406,42 @@ async def advance_current_phase(
 
 
 async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
-    """Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2).
+    """Terminal run status write (``completed`` / ``failed`` / ``cancelled``) + lock-clear (SC#2).
+
+    ⚠ CORRECTED (Phase 194). This docstring's first line previously read, verbatim:
+    "Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2)." — and
+    it is quoted here rather than deleted, because it was NARROWER THAN THE FUNCTION and
+    a reader who trusted it drew exactly the wrong conclusion. It never restricted
+    ``status``; it merely failed to mention the third value two shipped callers have been
+    passing for a year:
+      * ``backend/app/services/run_producer.py:262`` — the F2 harness-failure terminalize
+        has passed ``"cancelled"`` since the v2.8 cancel-honesty fix, whenever the
+        producer's ``terminal_status`` is ``cancelled`` (a user Stop).
+      * ``backend/app/api/workflows.py:1518`` — ``delete_workflow_cascade`` passes
+        ``"cancelled"`` for every in-flight run it tears down.
+    And the schema has admitted it from the beginning: ``workflow_runs_status_check`` was
+    created with ``cancelled`` in ``supabase/migrations/057_workflow_runs.sql:19`` and
+    re-asserted in ``063_dual_mode_continue.sql:55-57`` when ``cap_paused`` was added.
+    ⇒ THE CORRECTED CONTRACT: a terminal ``workflow_runs`` status write for ``completed``,
+    ``failed`` OR ``cancelled``, plus the thread anchor clear, in ONE transaction,
+    idempotent on a re-run. Phase 194 adds new callers on the cancel path and the old
+    first line would have read as a refusal to serve them.
+
+    ⚠ THE CROSS-WORKER INTERLEAVE — NAMED HERE RATHER THAN GUARDED, because a caller is
+    who needs to know. A Stop landing on worker A (``_cancel_run_internals`` Step 3b →
+    ``finish_run``) while worker B's producer is mid-F2 can interleave two
+    ``UPDATE workflow_runs SET status = $2 WHERE id = $1`` writes against the same row.
+    That is safe today for one reason only, and the reason is worth stating precisely:
+    the interleave is BENIGN BY VALUE-IDENTITY, NOT BY EXCLUSION — both writes carry the SAME VALUE, row-level locking serialises them, and the anchor clear is idempotent (it finds 0 rows on the second pass).
+    THE ONE THING A CALLER MUST NEVER DO IS MAKE THE TWO WRITES DISAGREE — e.g. one passing 'failed' while the other passes 'cancelled'. That prohibition IS the whole guard.
+    Nothing here serialises the two workers, and adding a lock would be the wrong fix: the
+    value-identity property is cheaper and it is what the shipped paths already satisfy.
+
+    ⚠ THIS FUNCTION WRITES NO ``workflow_phases`` ROW, AND MUST NOT LEARN TO. It is
+    called on the ``completed`` path (``harness_engine.py``'s success arm) and by the
+    delete cascade; a phase write here would change behaviour on paths Phase 194 must not
+    touch. The cancel path's phase terminalize lives in ``cancel_phase`` /
+    ``cancel_active_phases`` above, called from the two cancel sites (194 / D-07).
 
     workflow_runs table, keyed by its own ``id``. Mirror ``_shielded_finalize``:
     this durable UPDATE happens BEFORE the terminal SSE sentinel.
