@@ -839,6 +839,115 @@ def test_the_two_arms_are_a_real_comparison() -> None:
     assert len(set(PLACEHOLDERS_UAT8)) == 8, "duplicate key in the 193.1 transcription"
 
 
+def test_positive_control_every_counter_can_actually_fire() -> None:
+    """⚠ THE CONTROL THAT MAKES A ZERO READABLE. Free, no opt-in, no network.
+
+    This file's headline results are ZEROES — ``llm_human_input`` 0/5,
+    ``external_action`` 0/5, ``ask_user`` 0/5. **A zero from a blind counter and a zero
+    from a model that did not compose the shape are indistinguishable in the artifact**,
+    and this project's standing lesson is that a fence never driven RED has never been
+    shown to see anything (193.1 found four such fences; all four were caught by PLANTING,
+    none by reading). So ``_count`` is driven against a definition that PLANTS every shape
+    it claims to see, and against the shape the real runs actually produced.
+
+    It also pins the discrimination that matters: ``render_template`` counts the
+    ``emitter``, NOT merely an ``llm_emit`` phase. A counter keyed on the phase type would
+    report a healthy SC#4 control for a workflow emitting something else entirely.
+    """
+    from app.models.harness import WorkflowDefinition
+
+    def _emit(emitter: str, index: int) -> dict:
+        return {
+            "slug": f"emit{index}",
+            "phase_index": index,
+            "config": {"phase_type": "llm_emit", "prompt": "fill it", "emitter": emitter},
+        }
+
+    gather = {
+        "slug": "gather",
+        "phase_index": 0,
+        "config": {"phase_type": "llm_agent", "prompt": "x", "available_tools": []},
+    }
+    base = {"slug": "plant", "version": 1, "name": "plant", "status": "draft"}
+
+    planted = _count(
+        WorkflowDefinition.model_validate(
+            {
+                **base,
+                # whitespace-only: the requirement counter must read this as ABSENT
+                "business_requirement": "   ",
+                "phases": [
+                    gather,
+                    {
+                        "slug": "confirm",
+                        "phase_index": 1,
+                        "config": {"phase_type": "llm_human_input", "prompt": "ok?"},
+                    },
+                    _emit("render_template", 2),
+                    {
+                        "slug": "act",
+                        "phase_index": 3,
+                        "config": {
+                            "phase_type": "external_action",
+                            "capability": "send_email",
+                        },
+                    },
+                    {
+                        "slug": "check",
+                        "phase_index": 4,
+                        "config": {"phase_type": "llm_single", "prompt": "y"},
+                        "validators": [
+                            {
+                                "kind": "regex_match",
+                                "config": {"pattern": "X"},
+                                "on_failure": "ask_user",
+                            }
+                        ],
+                    },
+                ],
+            }
+        )
+    )
+    assert planted["llm_human_input"] == 1, "the SC#2 counter cannot see a planted step"
+    assert planted["render_template"] == 1, "the SC#4 control counter cannot see a plant"
+    assert planted["external_action"] == 1, "the displacement counter cannot see a plant"
+    assert planted["ask_user_validators"] == 1, "the ask_user counter cannot see a plant"
+    assert planted["requirement_present"] is False, (
+        "a whitespace-only requirement must read ABSENT — otherwise SC#1's k/N would "
+        "count a blank as a success"
+    )
+    assert planted["requirement_chars"] == 0
+
+    # The NEGATIVE half: the shape the 20 real calls produced. Both halves are needed —
+    # a counter that always returns 1 would pass the plants above and prove nothing.
+    shipped = _count(
+        WorkflowDefinition.model_validate(
+            {
+                **base,
+                "business_requirement": "Deliver a client-ready QBR from our records.",
+                "phases": [gather, _emit("render_template", 1)],
+            }
+        )
+    )
+    assert shipped["llm_human_input"] == 0
+    assert shipped["external_action"] == 0
+    assert shipped["ask_user_validators"] == 0
+    assert shipped["render_template"] == 1
+    assert shipped["requirement_present"] is True
+
+    # ``render_template`` keys on the EMITTER, never on the phase type.
+    other = _count(
+        WorkflowDefinition.model_validate(
+            {**base, "phases": [gather, _emit("generic_docx", 1)]}
+        )
+    )
+    assert other["render_template"] == 0, (
+        "the SC#4 control counted an `llm_emit` phase whose emitter is NOT "
+        "`render_template` — it would report a healthy template branch for a workflow "
+        "that emits something else."
+    )
+
+
 @pytest.mark.parametrize("row,arm", _PARAMS, ids=_PARAM_IDS)
 async def test_authoring_frequency(row: RosterRow, arm: Arm | None) -> None:
     """N real generations per DRIVE row PER ARM; four k/N figures recorded, never asserted.
