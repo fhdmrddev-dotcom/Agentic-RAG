@@ -73,11 +73,35 @@ source to the phase base was attempted and correctly refused as destructive):
    org-scoping change (the one-way RLS door); these callers were never updated.
 3. **1 case** — the 192.1 projection widening above. Plus assorted single-file rot.
 
-⚠ **`test_182_grounding_bundle.py`'s 2 failures are very likely the SAME defect Phase 193.2 just
+⚠ ~~**`test_182_grounding_bundle.py`'s 2 failures are very likely the SAME defect Phase 193.2 just
 fixed in `test_182_extraction_parity.py`** — a golden literal still pinning 193.1's *superseded*
 hedged template header (`### Template placeholder fields (if the workflow must fill a template)`),
 which D-26 replaced with two assertive arms at `grounding.py:618-632`. **Check that first; it may be
-a two-line fix and it is the highest-confidence item in the list.**
+a two-line fix and it is the highest-confidence item in the list.**~~
+
+⚠ **THAT PREDICTION WAS WRONG, AND IT WAS FIXED THE SAME DAY — the correction is stated beside the
+guess rather than replacing it, because the way it was wrong is the useful part.** `93a...`/`138568dd`
+(2026-08-15) measured the actual cause: **`kb_tools`**. Phase **185-02** (`04d475d4`, GOVERN-01 /
+D-185-09) added the field to `GroundingBundle` and projected it at `workflows.py:1014`; the
+set-equality at `:132` and the whole-body dict at `:207` are **exact-shape** assertions that predate
+it. Nothing to do with 193.1's header.
+
+**The lesson: "same file prefix, same era, therefore same cause" is a guess, and this seed published
+it as a near-certainty.** Both suites are named `test_182_*`, both touch grounding, and both went red
+in the invisible directory — and they are two unrelated defects, **eight phases apart**. Treat every
+remaining item in the table above as un-diagnosed until it is *run*, not until it is *recognised*.
+
+**What the fix did, since it is the template for the rest:** the shape assertions were widened AND
+the projection pin was made stronger than the failure required. The faked bundle now carries a
+**distinctive** `kb_tools` rather than the `[]` default, because the field's own docblock says it
+rides the bundle so the route *"serializes a field rather than reaching for the constant itself"* —
+and a route that inlined `KB_TOOLS_SORTED` would pass against **both** the default and the real
+value. Driven RED against exactly that plant, restored to an empty `numstat`. The healthy-path case
+additionally pins the wire field against the constant, so widening `KB_TOOLS` without widening the
+wire now fails there rather than in review.
+
+**Two of the 54 are therefore closed. 52 remain, and the blindness that hid them is untouched** —
+which is still what this seed is for.
 
 ---
 
