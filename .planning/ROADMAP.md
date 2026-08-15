@@ -350,6 +350,7 @@ because `DoorHeaderStrip.tsx` and `doorVocabulary.ts` are the files nearly every
 **Depends on**: Phase 193 (the doors are legible and the draft-then-attach half shipped) and quick task `260814-q5r` (`GET /workflows/{id}/template/placeholders` — the producer of the list `/generate` already consumes).
 **Requirements**: AUTH-03
 **Flags**:
+
   - ⚠ **AUTH-03 is the RE-OPENED half.** `REQUIREMENTS.md` carries a dated correction note recording that the requirement was written wrong, that Phase 193 built to it literally, and that a coverage tick here must mean *the workflow knows its template at draft time* — not *the user can find where to supply one*. Read that note before scoping.
   - **G-5 FIRES ON TWO FILES, both added to the ledger on 2026-08-14 and both certain to be touched here** — `frontend/src/pages/WorkflowBuilderPage.tsx` and `backend/app/api/workflows.py`. ⚠ **The figures this line originally quoted — 33/10/2055 and 32/16/1813 — were stale when written and are stale again now; re-derived at the phase's close they are `40 commits / 11 phases / 2252 L` and `34 / 17 / 1951`. G-5 ALSO fired on a THIRD file neither this line nor CONTEXT named, `PhaseFormPanel.tsx`, whose ledger row was wrong in both directions (it claimed a phase 140 that never touched the file). All three were HONOURED — the page was extracted BEFORE the feature, the API module took a third door in a template block it already owns, and the panel took one gated line — and NO guardrail override is recorded for this phase**. **`/gsd:discuss-phase 193.1` MUST produce a refactor recommendation as its FIRST option, before the planned feature.** Both ledger cells name their seam already: the page hosts the Builder shell, the canvas mount, the publish gauntlet, the asset-descriptor resolution and the save/concurrency machinery in one component; the API module hosts definition CRUD, validate/lint, the grounding palette, the publish gauntlet, the run launcher and the template door.
   - **G-2 fires** — this adds user-visible copy to the describe door, the surface `SEED-156` says is already indistinguishable from the govern door.
@@ -365,6 +366,7 @@ because `DoorHeaderStrip.tsx` and `doorVocabulary.ts` are the files nearly every
 **Plans**: 10 plans in 7 waves — planned 2026-08-14. G-5 fired on **three** files (`WorkflowBuilderPage.tsx`, `backend/app/api/workflows.py`, and `PhaseFormPanel.tsx` — the third named only at plan time, its ledger cell wrong in both directions) and **all three were honoured, none waived**: the page's concern is EXTRACTED first (Wave 2, before the feature it makes room for — the 192.1 D-01 order), the API module gains a third door in the template block it already owns, and the name check ships as its own component behind one gated line. **No guardrail override is recorded for this phase.** ⚠ The wire (`template_placeholders`) and the bind (auto-attach on first save) sit in ONE plan and cannot merge apart: the field flips the DELIVERABLE RULE's branch, so an unbound `render_template` draft is terminal at run (`no_template_bound`) and strictly worse than the blind draft it replaces. ⚠ SC#2's real `/generate` call is a Wave-1 checkpoint, not a phase-gate afterthought.
 
 Plans:
+
 - [x] 193.1-01-PLAN.md — Wave 0 characterization baselines on the UNMOVED tree (flag ON/OFF × three `builderPhase` arms) + the `/generate` key-set pin
 - [x] 193.1-02-PLAN.md — the stateless read route (`POST /workflows/template/placeholders`), one shared name assembly, no client and no pool
 - [x] 193.1-03-PLAN.md — the grounding wire pinned mechanically: the names reach the prompt, the DELIVERABLE RULE's two branches, and `degraded` proved template-free
@@ -387,9 +389,11 @@ on its end-to-end UAT run).
 **Requirements**: none new — this phase repairs the path to `AUTH-03`, which is already satisfied.
 
 **Flags**:
+
   - ⚠ **All three items were found in ONE sitting by the operator**, on the phase's own headline
     path, immediately after `AUTH-03` was proven working. **The capability is delivered and the
     path around it is not.**
+
   - ⚠ **`BUG-260815-01` is a consequence of Phase 193.1's OWN `D-26` fix.** Once the model is told
     it must fill named template fields, it adds an `llm_human_input` step to ask the human for what
     it cannot find — and the synchronous publish gate categorically refuses that phase type.
@@ -397,15 +401,18 @@ on its end-to-end UAT run).
     the gate is deliberate and its own docblock names the deferred Phase-103 background-job publish
     as the real fix. **Do NOT fix this by removing the gate** — an unsubscribed `ask_user` can wedge
     a publish indefinitely.
+
   - ⚠ **G-2 fires on the library half, and it must not absorb the sort bug.** The operator also
     raised card density (*"a lot of information, a lot of text… maybe instead of cards a list"*).
     That is a **design question** needing `/gsd:sketch` first, and `SEED-155` binds: a sketch that
     hand-writes its own CSS is a drawing, not an acceptance bar, and one depicting a shipped
     component must RENDER it. **Sorting is a defect and ships regardless of any layout decision.**
+
   - ⚠ **G-5 will fire on `backend/app/api/workflows.py` (17 phases at 193.1's close) and probably on
     the library modules.** The recency sort touches **three** `ORDER BY name` call sites
     (`backend/app/db/workflows.py:316`, `:352`, `:553`) — change them together or the feeds
     disagree.
+
   - **G-1 does NOT fire** — this is the second `193.x`, and the rule needs ≥ 2 priors. Worth noting
     that a third would trip it.
 
@@ -459,6 +466,7 @@ FALSE — that file was not touched at all**, because D-12 makes one string feed
 refusal and the canvas warning.
 
 Plans:
+
 - [x] 193.2-01-PLAN.md — wave 1: baselines measured on the UNMOVED tree; F-2 and F-7 driven RED against real plants and restored; D-01's declined override and D-04's scope fence recorded
 - [x] 193.2-02-PLAN.md — wave 2: D-10 and D-19 confirmed at HEAD and recorded as artifacts (the gate DID fire; the publish endpoint never refused), plus the post-publish Run CTA's first automated pin ever
 - [x] 193.2-03-PLAN.md — wave 3: `db/workflows.py` published + drafts to `ORDER BY updated_at DESC`, starters stay alphabetical, the D-16 divergence written into the code at all three sites, and the 192.1 scope fence REWRITTEN in place as F-1 after being observed RED
@@ -503,18 +511,41 @@ reading** (plans 03, 06, 07, 08, 09). **A fence is only real once you have watch
 **Plans**: 13 plans in 8 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 194-01-PLAN.md — Wave 0: re-derive the four baselines + the six G-5 figures, MEASURE the duplicate-icon root cause, author the 8-row UAT scoreboard
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 194-02-PLAN.md — Migration 119 (`workflow_phases_status_check` 6 → 7) + its live-DB gate; authored, applied nowhere
 - [ ] 194-03-PLAN.md — The panel Stop mount (V-04) + the F-1 union-scoped `workflowLock.runId` fence (V-05)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 194-04-PLAN.md — The `cancelled` phase-status vocabulary widening: types, the ONE derivation, the panel word + announcer, the canvas readings (V-18/V-19 client halves)
 - [ ] 194-05-PLAN.md — The two `CLAUDE.md` hot-file ledger rows (D-02) + the correct-beside corrections + reported-bug coverage check
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 194-06-PLAN.md — The two phase-terminalize writers in `db/workflows.py` + `finish_run`'s docstring corrected beside
 - [ ] 194-07-PLAN.md — The chat banner ADVANCE (D-18, V-07, F-9) with the byte pin unmoved + `RunCard`'s D-14 decision
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 194-08-PLAN.md — Composer Stop pinned (V-06), the pre-stamp silent no-op made observable, the tray pinned (V-08)
 - [ ] 194-09-PLAN.md — Step 3b's `workflow_runs` co-write + the exported composition (V-09/10/11/12/13/17/18/19; F-2/3/4/5/6/11/12)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 194-10-PLAN.md — The engine cancel arm's in-flight phase terminalize (V-16), 096-09's gate unmoved
 - [ ] 194-11-PLAN.md — `DELETE /runs/{id}` dual-id fallback + FORWARD resolution (V-01/02/03; F-10, two plants)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 194-12-PLAN.md — SERIALIZED: operator applies migration 119, V-14/V-15 proved on the live DB, F-7/F-8 driven RED, `full-schema.sql` regenerated
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
 - [ ] 194-13-PLAN.md — SERIALIZED: the four-row data heal with a committed receipt (V-20) + every touched hot file's ledger cell re-derived
 
 #### Phase 195: Show the Deliverable

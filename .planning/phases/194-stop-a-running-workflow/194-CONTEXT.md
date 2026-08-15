@@ -85,7 +85,7 @@ criteria. See `<code_context>` § *The three gaps*.
   the file, and the named next seam — the shape the `db/workflows.py` and `publish_service.py` rows
   use. **The sentence explaining that the file was absent from the table must survive future edits.**
 
-- **D-03 — G-1 does not fire** (194 is not an `.N` insert on a hot file). **G-2 does not fire as a
+- **D-03 [informational] — G-1 does not fire** (194 is not an `.N` insert on a hot file). **G-2 does not fire as a
   blocker**: the Stop control is an affordance on shipped surfaces, not a new visual surface. ⚠ If
   planning proposes a *new* run-surface layout rather than a control inside the shipped spine, G-2
   fires and a sketch is owed first.
