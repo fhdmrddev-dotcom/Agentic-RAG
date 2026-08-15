@@ -407,6 +407,42 @@ def test_the_two_author_feeds_order_by_recency_and_starters_stay_alphabetical():
         and this deliberately does not — accepted with eyes open, on the recorded condition
         that the divergence lives in the code, which the sibling case below asserts.
 
+    ⚠ **AMENDED 2026-08-15 (code review ``WR-03``) — RECORDED BESIDE THE THREE BULLETS
+    ABOVE RATHER THAN OVER THEM, because what those bullets say was true and INCOMPLETE,
+    not wrong.** The two author feeds now read ``ORDER BY updated_at DESC, id DESC``. The
+    reason is a MEASUREMENT, not a style preference: ``updated_at`` is **not unique**, and
+    Postgres' ``now()`` is transaction-scoped, so every row touched by one migration or one
+    bulk update carries an identical timestamp. Censused against the live local DB
+    (``127.0.0.1:54322``, 225 rows) on the day this amendment was written:
+
+        published rows sharing one updated_at : 39  (2026-07-18 20:43:42.856183+00)
+                                                 2  (2026-07-30 20:16:20.222893+00)
+        draft     rows sharing one updated_at : 24  (2026-07-18 20:43:42.856183+00)
+
+    Within a tie Postgres guarantees NO order at all, so a third of the library was free to
+    reshuffle between two fetches — on a feed whose entire purpose this phase is *"find the
+    thing that just changed"*. The old ``ORDER BY name`` was total in practice (names are
+    near-unique); ``updated_at DESC`` alone is not, and the fence as first written could not
+    see the difference.
+
+    **Why ``id``:** it is the table's PRIMARY KEY (``workflow_definitions_pkey``), therefore
+    ``NOT NULL`` and unique — measured against ``pg_constraint``/``pg_attribute``, not
+    assumed — and it is ALREADY in the SELECT list of both changed feeds, so nothing widens.
+
+    **It orders WITHIN ties and nowhere else, and that is measured too.** Driving both
+    clauses over all three live predicate shapes (drafts 78 rows, owned published 28,
+    published-with-globals 91): the sequence of ``updated_at`` VALUES is identical with and
+    without the tiebreaker, the top row is unchanged, every position that moved sits inside
+    a tie group (0 outside), and two consecutive runs agree exactly. The recency behaviour
+    D-15 bought is therefore untouched — a freshly published row has a unique fresh
+    timestamp, is in no tie, and still lands first.
+
+    ⚠ **The needle below is the FULL clause, deliberately.** ``"ORDER BY updated_at DESC"``
+    is a PREFIX of ``"ORDER BY updated_at DESC, id DESC"``, so the pre-amendment needle
+    stays green against a feed with no tiebreaker at all — it could not fire on this
+    property. Asserting the whole clause is what makes the RED observable, and it was
+    observed: run against the pre-amendment source, the published and draft arms both FAIL.
+
     ⚠ The starter's ABSENCE needle is scoped to ``ORDER BY updated_at``, never to the bare
     token ``updated_at`` — that feed legitimately PROJECTS the column in its SELECT list, so
     a bare ``not in`` would be red on a correct tree. Same scoping error, different shape.
@@ -424,18 +460,24 @@ def test_the_two_author_feeds_order_by_recency_and_starters_stay_alphabetical():
         assert code, f"empty source for {name}"
         assert name in code, f"{name} is not its own source"
 
-    # POSITIVE CONTROLS — both needles really do catch the shapes they judge.
-    assert "ORDER BY updated_at DESC" in 'sql += " ORDER BY updated_at DESC"'
+    # POSITIVE CONTROLS — every needle really does catch the shape it judges.
+    assert "ORDER BY updated_at DESC, id DESC" in 'sql += " ORDER BY updated_at DESC, id DESC"'
     assert "ORDER BY name" in 'sql += " ORDER BY name"'
+    # …and the control that proves WHY the full clause is the needle: the OLD, shorter one
+    # is satisfied by a feed carrying no tiebreaker whatsoever, so it cannot see WR-03.
+    assert "ORDER BY updated_at DESC" in 'sql += " ORDER BY updated_at DESC"'
 
-    # The two feeds holding the author's OWN work: recency, and no trace of the old clause.
+    # The two feeds holding the author's OWN work: recency, made TOTAL by a unique
+    # tiebreaker (WR-03), and no trace of the old clause.
     for name, code in (("published", published), ("draft", draft)):
-        assert "ORDER BY updated_at DESC" in code, name
+        assert "ORDER BY updated_at DESC, id DESC" in code, name
         assert "ORDER BY name" not in code, name
 
-    # The curated shelf: alphabetical, and NOT re-ordered by recency (D-16).
+    # The curated shelf: alphabetical, NOT re-ordered by recency, and NOT given the
+    # tiebreaker either — D-16 leaves this feed byte-identical to what shipped.
     assert "ORDER BY name" in starter
     assert "ORDER BY updated_at" not in starter
+    assert "id DESC" not in starter
     # …but it still PROJECTS the column, which is why the needle above is scoped to the
     # clause. This assertion is what makes that scoping honest rather than convenient.
     assert "updated_at" in starter

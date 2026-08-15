@@ -365,7 +365,36 @@ async def list_published_workflows(
     # 118. The precedent is recorded twenty lines up in this same docstring — "NO
     # expression index, ZERO migration … sufficient at current scale". No file under
     # ``supabase/migrations/`` is added by this phase.
-    sql += " ORDER BY updated_at DESC"
+    #
+    # ⚠ AMENDED 2026-08-15 (code review ``WR-03``) — ``, id DESC`` IS A CORRECTNESS FIX, NOT
+    # A TIDY-UP, AND IT IS RECORDED BESIDE THE PARAGRAPHS ABOVE RATHER THAN OVER THEM.
+    # ``updated_at`` is NOT unique and Postgres' ``now()`` is TRANSACTION-scoped, so every
+    # row touched by one migration or one bulk update carries an identical timestamp.
+    # Censused against the live local DB (``127.0.0.1:54322``, 225 rows) on the day of the
+    # amendment: 39 published rows share ``2026-07-18 20:43:42.856183+00`` (and 2 more share
+    # another), 24 draft rows share the same instant. Within a tie Postgres guarantees NO
+    # order, so a THIRD of the library was free to reshuffle between two fetches — on the
+    # very feed whose purpose is "find the thing that just changed". The clause this
+    # replaced was total in practice under ``ORDER BY name`` (names are near-unique) and
+    # stopped being total the moment the sort key became a timestamp.
+    #
+    # WHY ``id``: it is this table's PRIMARY KEY (``workflow_definitions_pkey``) — therefore
+    # NOT NULL and unique, measured against ``pg_constraint``/``pg_attribute`` rather than
+    # assumed — and it is ALREADY in the SELECT list above, so the projection does not widen
+    # by one byte. No migration, no index (there is none on ``updated_at`` either, so nothing
+    # regresses), no schema change.
+    #
+    # ⚠ IT ORDERS WITHIN TIES AND NOWHERE ELSE — measured, not argued. Both clauses were
+    # driven over all three live predicate shapes (drafts 78 rows, owned published 28,
+    # published-with-globals 91): the sequence of ``updated_at`` VALUES is identical with and
+    # without the tiebreaker, the top row is unchanged, every position that moved sits inside
+    # a tie group (zero outside), and two consecutive runs agree exactly. D-15's recency is
+    # therefore untouched — a freshly published row holds a unique fresh timestamp, is in no
+    # tie, and still lands first. Pinned by
+    # ``test_the_two_author_feeds_order_by_recency_and_starters_stay_alphabetical``, whose
+    # needle is the FULL clause on purpose: ``"ORDER BY updated_at DESC"`` is a PREFIX of
+    # this one, so the shorter needle stays green against a feed with no tiebreaker at all.
+    sql += " ORDER BY updated_at DESC, id DESC"
     rows = await pool.fetch(sql, *params)
     return [dict(r) for r in rows]
 
@@ -656,10 +685,23 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # is appended after it as a static literal with no user input. No migration: there
         # is no index on ``name`` either, the table is 225 rows, and the largest feed
         # measured is 118.
+        #
+        # ⚠ AMENDED 2026-08-15 (code review ``WR-03``) — the same amendment as SITE 1, for
+        # the same measured reason, recorded BESIDE the paragraphs above rather than over
+        # them. ``updated_at`` is not unique and ``now()`` is transaction-scoped: **24 draft
+        # rows on the live local DB share one instant** (``2026-07-18 20:43:42.856183+00``),
+        # and Postgres guarantees no order inside a tie. ``id`` is the PRIMARY KEY — NOT
+        # NULL, unique, and already in the SELECT list above — so the sort becomes total
+        # with no projection change, no index and no migration. Measured over this feed's
+        # own live predicate (78 rows): the ``updated_at`` value sequence is unchanged, the
+        # top row is unchanged, every moved position is inside a tie group, and repeated
+        # runs agree. ⚠ And note again what is NOT used as the tiebreaker: ``token`` on this
+        # very row is ``updated_at`` in disguise, so it would break ties by the same field
+        # that created them — ``id`` is the only column here that is unique by construction.
         f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at "
         f"FROM workflow_definitions "
         f"WHERE status = 'draft' AND created_by = $1 "
-        f"ORDER BY updated_at DESC",
+        f"ORDER BY updated_at DESC, id DESC",
         user_id,
     )
     return [dict(r) for r in rows]
