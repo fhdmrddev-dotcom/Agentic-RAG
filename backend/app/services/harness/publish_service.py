@@ -193,9 +193,32 @@ async def publish_workflow(
     # phase (or a validator whose on_failure routes to ask_user) BLOCKS on an
     # unsubscribed ask_user prompt for which no human is watching, dead-ending the
     # publish golden run. Block such definitions PRE-RUN with a named failure (cheap —
-    # no provider call) so the golden run is never driven for them. The full
-    # background-job publish that COULD validate interactive phases is the deferred
-    # Phase-103 rework — this is the honest minimum-viable cut.
+    # no provider call) so the golden run is never driven for them. This is the honest
+    # minimum-viable cut.
+    #
+    # ⚠ SUPERSEDED — D-14 / code-review WR-05 (2026-08-15). THE SENTENCE THIS PARAGRAPH
+    # USED TO END WITH IS QUOTED HERE RATHER THAN DELETED, because a deferral that lives
+    # only in a deleted comment is exactly as invisible as one that was never written.
+    # It read, verbatim: *"The full background-job publish that COULD validate interactive
+    # phases is the deferred Phase-103 rework."* That sentence is precisely what
+    # ``SEED-164`` was planted to retire — it named work scheduled NOWHERE (zero roadmap
+    # phases, zero owning seeds, zero deferred-item entries) and attached a phase number
+    # to it, so it read like a plan for a year while Phase 103 itself had long shipped.
+    # Phase 193.2 removed it from ``_interactive_phase_failures``' docstring below and
+    # left it standing HERE, so two blocks in one file said opposite things; this is that
+    # half. ⚠ It is quoted on ONE line on purpose: split across two, as it shipped, a
+    # line-oriented ``grep`` for the phrase returned NOTHING and read as "already fixed".
+    #
+    # WHAT IS TRUE NOW, WITH THE DEFERRAL KEPT INSTEAD OF EVAPORATED. A publish that can
+    # VALIDATE an interactive phase — a durable pause with a real subscriber, or the
+    # cheaper "skip/stub the step during the golden run, keep it in the published
+    # definition for real runs" shape the operator proposed — is a named capability NEED
+    # with a durable home:
+    # ``.planning/seeds/SEED-164-a-workflow-that-legitimately-pauses-for-a-person.md``.
+    # It is a seed rather than a schedule, and nothing here promises it. Its PRIMARY
+    # re-open trigger is this gate itself: any phase that touches the publish gauntlet or
+    # ``_interactive_phase_failures`` re-opens SEED-164 by definition — that is the
+    # concrete condition which stops this deferral evaporating a second time.
     interactive_failures = _interactive_phase_failures(definition)
     if interactive_failures:
         return await _block(
