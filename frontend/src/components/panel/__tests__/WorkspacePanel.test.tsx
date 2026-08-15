@@ -69,6 +69,20 @@ const useWorkflowLockForThread = vi.fn()
 // the gate→derived render path is exercised in WorkspacePanel.derived.test.tsx
 // (which renders the REAL TodosSection — this file sentinel-mocks it).
 const useDerivedPanel = vi.fn()
+// Phase 194 Plan 03 Task 1 (RUN-01 / SC#1) — the NINTH key.
+//
+// ⚠ THIS MOCK IS AN EXPLICIT OBJECT LITERAL, NOT A PASSTHROUGH. It carried exactly
+// EIGHT keys and no `useStreamActions`, so the moment WorkspacePanel reads that hook
+// the whole file throws. The file already documents this exact failure at :97-100,
+// where Phase 100's fix was to sentinel-mock the CHILD (TemplateUpload). **194 cannot
+// do that, because the caller IS the panel** — the Stop control is mounted by
+// WorkspacePanel itself. Hence a ninth key rather than a ninth sentinel.
+//
+// `stopThread` is the ONE durable cancel path (`stopThread` → DELETE /runs/{id}).
+// It is deliberately a bare vi.fn() here: what the panel owes is the CALL and its
+// ARGUMENT, not the resolver's internals (those are StreamsProvider's own tests).
+const stopThread = vi.fn()
+const useStreamActions = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
@@ -78,6 +92,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useTasks: (...a: unknown[]) => useTasks(...a),
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useStreamActions: (...a: unknown[]) => useStreamActions(...a),
 }))
 
 // Stub the heavy timeline child (it reads the real provider hooks); the panel
@@ -152,6 +167,10 @@ function setHooks({
   useTasks.mockReturnValue({ data: tasks, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkflowLockForThread.mockReturnValue(lock)
   useDerivedPanel.mockReturnValue(derived)
+  // Phase 194 Plan 03 — reset BEFORE wiring, so a "called exactly once" assertion is
+  // a measurement of THIS test's click and never of a previous test's.
+  stopThread.mockReset()
+  useStreamActions.mockReturnValue({ stopThread })
 }
 
 function setViewport(width: number) {
@@ -709,6 +728,253 @@ describe("WorkspacePanel — the run receipt (D-188-13, the thread → run direc
     const sample = codeOf("/** PhaseCard in prose */\n// PhaseCard in a line\nconst x = 1\n")
     expect(sample).not.toMatch(/PhaseCard/)
     expect(sample).toMatch(/const x = 1/)
+  })
+})
+
+// ── Phase 194 Plan 03 Task 1 (RUN-01 / SC#1, validation row V-04) — THE PRIMARY STOP.
+//
+// WHY IT IS HERE AND NOT IN CHAT. This panel is where a user WATCHES a workflow run
+// (the Phase 094/103 decision: the panel owns the meaningful phase spine, chat carries
+// a thin run receipt). Before this plan the panel had **no Stop control of any kind** —
+// every shipped Stop keys off a streaming assistant message in the CHAT bucket, so a
+// user watching the spine had to leave the surface to stop what they were watching.
+//
+// ⚠ THE ID TYPE IS THE WHOLE POINT, AND IT IS A MEASURED LANDMINE, NOT A STYLE CHOICE.
+// `WorkflowLock.runId` carries TWO id types across its write sites: two store a
+// `workflow_runs.id`, two store a producer `runs.run_id`. Its JSDoc asserts only the
+// first. `DELETE /runs/{id}` accepts only the second, and `cancelRun` **swallows 404
+// deliberately** (`api.ts:1259-1269`). So a Stop wired to the lock SILENTLY SUCCEEDS
+// WHILE DOING NOTHING, roughly half the time — the exact dishonesty this phase exists
+// to remove. The panel therefore resolves through `stopThread(threadId)`, which finds
+// the streaming message's runId (the producer id, the correct type) itself.
+//
+// The fixture below makes that measurable rather than assertable: the lock's runId is
+// a string that is NOT the thread id, so passing the wrong one is DETECTABLE.
+describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
+  const HARNESS_LOCK = {
+    runId: "producer-run-DO-NOT-USE",
+    mode: "harness" as const,
+    capPaused: false,
+    continuesRemaining: 3,
+  }
+
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({})
+    getThreadWorkflow.mockResolvedValue({ definition_slug: null } as unknown as ThreadWorkflowState)
+    listPublishedWorkflows.mockResolvedValue([])
+  })
+
+  it("renders a run-level Stop control when a harness run holds the lock", () => {
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    // POSITIVE CONTROL for the gate: the timeline is mounted, so a later absence
+    // assertion is a measurement of the control and not of the harness gate.
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("is reachable as a labelled button that names what it stops (not a phase, THE RUN)", () => {
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    const stop = screen.getByRole("button", { name: /stop this workflow run/i })
+    expect(stop).toBe(screen.getByTestId("panel-stop-run"))
+    expect(stop).toHaveTextContent(/stop/i)
+  })
+
+  it("clicking it calls stopThread EXACTLY ONCE with the THREAD id — never the lock's run id", async () => {
+    setHooks({ lock: HARNESS_LOCK })
+    const user = userEvent.setup()
+    renderPanel({ state: "open" })
+    await user.click(screen.getByTestId("panel-stop-run"))
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith("thread-1")
+    // The three ways this goes wrong in production, each asserted rather than implied.
+    expect(stopThread).not.toHaveBeenCalledWith(HARNESS_LOCK.runId)
+    expect(stopThread).not.toHaveBeenCalledWith(undefined)
+    expect(stopThread).not.toHaveBeenCalledWith(null)
+  })
+
+  it("mounts for a phases-exist thread with no lock (the same gate its two siblings use)", () => {
+    setHooks({
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "running", subAgents: [], pendingAsk: null },
+      ],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+  })
+
+  it("renders NOTHING on a Deep / no-run thread — a Deep user sees no new control", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open" })
+    // POSITIVE CONTROL: no timeline either, which is what "Deep / no-run" means here.
+    expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
+    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+  })
+
+  it("renders NOTHING in the empty short-circuit (no activity at all)", () => {
+    setHooks({ todos: [], files: [], asks: [], phases: [], lock: null })
+    renderPanel({ state: "open" })
+    expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+  })
+
+  it("has no axe violations with the Stop mounted", async () => {
+    setHooks({ lock: HARNESS_LOCK })
+    const { container } = renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ── Phase 194 Plan 03 Task 2 (validation row V-05, fence F-1) — NO MOUNT RESOLVES A
+//    CANCEL THROUGH THE WORKFLOW LOCK'S ID.
+//
+// THE DEFECT THIS FENCE EXISTS FOR, stated as a measurement rather than a worry:
+//   · `WorkflowLock.runId` has FOUR write sites and carries TWO id types — two store a
+//     `workflow_runs.id` (the mount reconcile, the banner path), two store a producer
+//     `runs.run_id` (the kickoff seed, the Continue re-subscribe). Its JSDoc
+//     (`streamsStore.ts:51-59`) asserts only the first.
+//   · `DELETE /runs/{id}` accepts only the producer id.
+//   · `cancelRun` swallows 404 DELIBERATELY (`api.ts:1259-1269`).
+// Compose those and a Stop wired to the lock is a SILENT SUCCESS THAT DOES NOTHING,
+// roughly half the time — worse than a visible failure, in a phase about honesty.
+//
+// ⚠ THE SCOPE IS THE UNION OF THE MOUNT DIRECTORIES, NOT `panel/` ALONE, and that is
+// the single most important line in this fence. A fence that swept only this directory
+// would report green about a Stop that later lands in `chat/` or `workflows/` — the
+// exact failure mode of Phase 192.1, which shipped a fence that swept a RENAMED module
+// against the empty string and passed green. Each directory is globbed SEPARATELY and
+// each is proved non-empty by a NAMED file it must contain, so a wrong glob for one
+// directory cannot hide behind another directory's files.
+//
+// ⚠ THE SWEEP IS RAW, NOT COMMENT-STRIPPED. That is deliberate and it is the Phase 193
+// D-24(a) precedent: a docblock QUOTING a forbidden call is caught too. It is only
+// affordable because the union today contains ZERO occurrences of `cancelRun` in any
+// form — measured, not assumed, and asserted below. Anyone who needs to DISCUSS the
+// forbidden call in a union docblock writes it without its parenthesis.
+//
+// The carve-out is PROVED rather than assumed: `MessageItem.tsx` legitimately reads
+// `workflowLock.runId` and hands it to `continueRun`, which is correct because
+// `/continue` is the one route with the dual-id fallback. A fence that forbade the
+// identifier outright would red on shipped, correct code and would be rewritten to
+// uselessness on its first run.
+// ⚠ The options object MUST be an inline literal at each call — Vite's glob transform
+// is STATIC and rejects a shared `const` with "Expected the second argument to be an
+// object literal, but got Identifier". The repetition below is required, not sloppy.
+const PANEL_GLOB = import.meta.glob<string>("../**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+const CHAT_GLOB = import.meta.glob<string>("../../chat/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+const WORKFLOWS_GLOB = import.meta.glob<string>("../../workflows/**/*.{ts,tsx}", {
+  eager: true,
+  query: "?raw",
+  import: "default",
+})
+
+/** Production source only — a fence that swept its own test files would red on itself. */
+function productionOnly(mod: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(mod).filter(
+      ([p]) => !p.includes("__tests__") && !/\.test\.tsx?$/.test(p),
+    ),
+  )
+}
+
+const PANEL_SRC = productionOnly(PANEL_GLOB)
+const CHAT_SRC = productionOnly(CHAT_GLOB)
+const WORKFLOWS_SRC = productionOnly(WORKFLOWS_GLOB)
+const UNION_SRC = { ...PANEL_SRC, ...CHAT_SRC, ...WORKFLOWS_SRC }
+
+/** Every spelling of "the workflow lock's run id" that a naive wiring would reach for. */
+const LOCK_RUN_ID = /(?:workflowLock|lock)\s*\??\.\s*runId/
+/** The DESTRUCTIVE calls. `continueRun` is deliberately absent — see the carve-out above. */
+const CANCEL_CALL = /\b(?:cancelRun|stopThread|stopStream)\s*\(/
+
+describe("F-1 / V-05 — no Stop mount resolves a cancel through the workflow lock's id", () => {
+  // ── The empty-sweep guard, MECHANISED rather than promised (the 192.1 lesson). An
+  //    absence assertion over zero files is vacuously true, so the sweep must first
+  //    prove it can SEE the files it claims to protect — by NAME, not by count alone.
+  it("sweeps a non-empty set of production files in EACH mount directory", () => {
+    expect(Object.keys(PANEL_SRC).length).toBeGreaterThan(0)
+    expect(Object.keys(CHAT_SRC).length).toBeGreaterThan(0)
+    expect(Object.keys(WORKFLOWS_SRC).length).toBeGreaterThan(0)
+    // A count can be non-zero and still miss the file that matters. Name one per
+    // directory — each is a real, currently-shipped module.
+    const named = (src: Record<string, string>, file: string) =>
+      Object.keys(src).some((p) => p.endsWith(file))
+    expect(named(PANEL_SRC, "/WorkspacePanel.tsx")).toBe(true)
+    expect(named(CHAT_SRC, "/MessageItem.tsx")).toBe(true)
+    expect(named(CHAT_SRC, "/ActiveRunsTray.tsx")).toBe(true)
+    expect(named(WORKFLOWS_SRC, "/WorkflowCanvas.tsx")).toBe(true)
+    // And the sweep must carry real CONTENT, not empty strings — the precise shape of
+    // the 192.1 failure, where a renamed module was swept against "" and passed green.
+    for (const [path, src] of Object.entries(UNION_SRC)) {
+      expect(src.length, `${path} swept as an empty string`).toBeGreaterThan(0)
+    }
+  })
+
+  it("(a) no module in the union calls cancelRun — every Stop routes through the ONE resolver", () => {
+    const offenders = Object.entries(UNION_SRC)
+      .filter(([, src]) => /\bcancelRun\s*\(/.test(src))
+      .map(([p]) => p)
+    expect(
+      offenders,
+      "cancelRun has exactly TWO production call sites, both inside StreamsProvider " +
+        "(stopStream and stopThread). A third one in a mount directory is a second " +
+        "cancel path, and it is the path that takes the WRONG id.",
+    ).toEqual([])
+  })
+
+  it("(b) no module in the union hands the lock's runId to a cancel call", () => {
+    const offenders: string[] = []
+    for (const [path, src] of Object.entries(UNION_SRC)) {
+      src.split("\n").forEach((line, i) => {
+        if (CANCEL_CALL.test(line) && LOCK_RUN_ID.test(line)) {
+          offenders.push(`${path}:${i + 1}  ${line.trim()}`)
+        }
+      })
+    }
+    expect(
+      offenders,
+      "A cancel keyed on the lock's runId 404s roughly half the time and cancelRun " +
+        "swallows 404 — so it reports success and stops nothing.",
+    ).toEqual([])
+  })
+
+  it("PERMITS the one legitimate shipped read — continueRun(workflowLock.runId)", () => {
+    const messageItem = Object.entries(UNION_SRC).find(([p]) =>
+      p.endsWith("/MessageItem.tsx"),
+    )
+    expect(messageItem, "MessageItem.tsx is not in the sweep").toBeDefined()
+    const src = messageItem![1]
+    // The carve-out is a MEASUREMENT: the shipped line exists, it names the lock's id,
+    // and the fence above is green with it in the tree. `/continue` is the one route
+    // with the dual-id fallback, which is why this read is correct and a cancel is not.
+    expect(src).toMatch(/continueRun\(workflowLock\.runId\)/)
+    expect(CANCEL_CALL.test("const res = await continueRun(workflowLock.runId)")).toBe(false)
+  })
+
+  it("the fence's own needles are live — each matches a planted string and not the tree", () => {
+    // Positive controls for the two regexes, so a typo that made either unmatchable
+    // could never read as "the tree is clean". Both spellings of the optional chain.
+    expect(LOCK_RUN_ID.test("cancelRun(workflowLock.runId)")).toBe(true)
+    expect(LOCK_RUN_ID.test("cancelRun(workflowLock?.runId)")).toBe(true)
+    expect(LOCK_RUN_ID.test("cancelRun(lock.runId)")).toBe(true)
+    expect(CANCEL_CALL.test("void cancelRun(x)")).toBe(true)
+    expect(CANCEL_CALL.test("void streamActions.stopThread(threadId)")).toBe(true)
+    expect(CANCEL_CALL.test("void streamActions.stopStream()")).toBe(true)
+    // …and the needles do NOT match the innocent neighbours they sit beside.
+    expect(LOCK_RUN_ID.test("msg.runId")).toBe(false)
+    expect(CANCEL_CALL.test("await continueRun(workflowLock.runId)")).toBe(false)
   })
 })
 
