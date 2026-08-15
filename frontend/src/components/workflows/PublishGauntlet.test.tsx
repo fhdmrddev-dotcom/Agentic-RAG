@@ -46,6 +46,9 @@ import userEvent from "@testing-library/user-event"
 import publishServiceSource from "../../../../backend/app/services/harness/publish_service.py?raw"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import publishGauntletSource from "./PublishGauntlet?raw"
+// 193.2-06 (F-5, the client half): the SECOND consumer of the server's one message —
+// `blockedReason` is composed here and handed to the component verbatim.
+import builderPageSource from "@/pages/WorkflowBuilderPage?raw"
 import { PublishGauntlet } from "./PublishGauntlet"
 import type { PublishOutcome } from "@/lib/api"
 import { publishWorkflow } from "@/lib/api"
@@ -976,5 +979,89 @@ describe("PublishGauntlet 186-16 — a gauntlet cannot START while a reason stan
     expect(btn).toBeEnabled()
     expect(screen.queryByTestId("publish-inner-blocked-reason")).not.toBeInTheDocument()
     expect(screen.getByTestId("publish-trigger")).toBeEnabled()
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// PHASE 193.2-06 (F-5, the CLIENT half / D-12) — THE REFUSAL HAS EXACTLY ONE HOME
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// D-12: ONE message string feeds BOTH surfaces — the publish refusal AND `/validate` →
+// `blockedReason` → the greyed Publish control. The SERVER owns that sentence; the client
+// renders `verdict.message` VERBATIM and constructs no interactive-refusal sentence of its
+// own. The backend half (the two callers emit the same bytes) is owned by
+// `backend/tests/unit/test_publish_service.py`; this is the half that proves no SECOND copy
+// lives on the client.
+//
+// ⚠ THIS FENCE DELIBERATELY DOES NOT HAND-TYPE THE SERVER'S SENTENCE. Spelling the server's
+// copy here would ITSELF be a second home, and it would go stale silently at the next
+// reword — exactly the failure `WorkflowBuilderPage.header.test.tsx:126-130` records for the
+// governed door strings. So the assertion is STRUCTURAL: the client may not name the engine
+// identifiers the refusal is about, and the rendered node's value must come from a variable.
+describe("PublishGauntlet 193.2-06 — the interactive refusal has exactly one home (F-5)", () => {
+  // The 187-24 trap: a module that DOCUMENTS why a token is absent reds a raw grep for it.
+  // Both modules below carry prose about the publish refusal, so every fence here reads
+  // NON-COMMENT CODE. (Recorded resolution — `rowIdentity.test.ts:89-98` lists the prior
+  // instances; `libraryFilter.test.ts` scopes its own fence the same way.)
+  const strip = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+  const gauntletCode = strip(publishGauntletSource)
+  const builderCode = strip(builderPageSource)
+
+  it("(non-vacuity) both modules really loaded, and the stripper keeps CODE while removing PROSE", () => {
+    // Without this, every fence below could pass by stripping the whole file — or by
+    // importing an empty string, which is how a renamed module passes a sweep silently.
+    expect(publishGauntletSource.length).toBeGreaterThan(5000)
+    expect(builderPageSource.length).toBeGreaterThan(5000)
+
+    // CODE survives.
+    expect(gauntletCode).toContain('data-testid="publish-blocked-reason"')
+    expect(builderCode).toContain("blockedReason")
+
+    // PROSE is removed — a token that exists ONLY in a comment must not survive.
+    expect(publishGauntletSource).toContain("WR-10")
+    expect(gauntletCode).not.toContain("WR-10")
+  })
+
+  it("neither client module names an engine identifier the refusal is about", () => {
+    // `llm_human_input` / `ask_user` are the two tokens the pre-193.2 message leaked at a
+    // person who chose neither (BUG-260815-01). The client has no business composing a
+    // sentence about them: it renders whatever the server said.
+    for (const [name, code] of [
+      ["PublishGauntlet.tsx", gauntletCode],
+      ["WorkflowBuilderPage.tsx", builderCode],
+    ] as const) {
+      for (const token of ["llm_human_input", "ask_user"]) {
+        expect(code, `${name} names ${token} in non-comment code — that is a second home for
+the refusal's vocabulary, and D-12 gives the server the only one`).not.toContain(token)
+      }
+    }
+  })
+
+  it("the blocked-reason node renders a VARIABLE, never a literal sentence", () => {
+    // The span whose value is the server's message. If a future edit swaps `{blockedReason}`
+    // for a hard-coded string, the client has silently become the author of the copy.
+    const span = gauntletCode.match(
+      /data-testid="publish-blocked-reason"[\s\S]{0,400}?<\/span>/,
+    )?.[0]
+    expect(span, "the publish-blocked-reason span is no longer findable in code").toBeTruthy()
+    expect(span).toContain("{blockedReason}")
+    // No quoted prose inside the node's children — the only strings the span may carry are
+    // its own attributes, which sit before the `>` that opens the children.
+    const children = span!.slice(span!.indexOf(">") + 1)
+    expect(children).not.toMatch(/["'][A-Za-z][^"']{15,}["']/)
+  })
+
+  it("(inline plant) the needle this fence applies really does catch a client-side copy", () => {
+    // A permanent positive control: without it, the three assertions above could be passing
+    // because they inspect nothing. This is the literal shape the RED drive planted.
+    const planted = `
+      const reason = "interactive phases (llm_human_input / ask_user dispositions) cannot be validated"
+    `
+    expect(strip(planted)).toContain("llm_human_input")
+    expect(strip(planted)).toContain("ask_user")
+    // …and the stripper does NOT rescue a comment-shaped plant into invisibility by accident:
+    // a plant inside a comment is correctly ignored, which is the whole point of stripping.
+    expect(strip("// llm_human_input in a comment")).not.toContain("llm_human_input")
   })
 })
