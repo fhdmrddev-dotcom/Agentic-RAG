@@ -35,6 +35,8 @@ recorder, ``finish_run`` / ``cancel_active_phases`` are patched at ``app.db.work
 in-file ``_RecordingSupabase``. That is what keeps this suite parallel-safe under
 CLAUDE.md's rule 4.
 """
+import pathlib
+import re
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -458,4 +460,217 @@ async def test_internals_zombie_heal_workflow_cowrite_preserves_the_shipped_arms
     assert "update" in sb.op_names("threads"), (
         "the shipped standalone anchor clear must still fire — it is the "
         "belt-and-braces arm for the wf_id-is-None case and the Deep path's no-op"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 Plan 09 — the PHASE-HONESTY fences (V-18 / V-19, F-5 / F-6)
+# ══════════════════════════════════════════════════════════════════════════════
+
+_REPO = pathlib.Path(__file__).resolve().parents[2]
+_DB_WORKFLOWS_SRC = _REPO / "backend/app/db/workflows.py"
+_MIG_119 = _REPO / "supabase/migrations/119_workflow_phases_cancelled.sql"
+_MIG_115 = _REPO / "supabase/migrations/115_workflow_phases_recorded_not_sent.sql"
+
+_SET_STATUS = re.compile(r"UPDATE\s+workflow_phases\s+SET\s+status='([a-z_]+)'")
+_WHERE_STATUS_EQ = re.compile(r"AND\s+status\s*=\s*'([a-z_]+)'")
+_WHERE_STATUS_IN = re.compile(r"AND\s+status\s+IN\s*\(([^)]*)\)")
+_WHERE_RUN_KEYED = re.compile(r"WHERE\s+workflow_run_id\s*=\s*\$1")
+_LITERAL = re.compile(r"'([a-z_]+)'::text")
+
+
+def _constraint_literals(path):
+    """Every ``'x'::text`` literal BELOW ``BEGIN;`` in a migration.
+
+    ⚠ Scoped below ``BEGIN;`` ON PURPOSE: these migrations' headers quote the literals
+    in prose (119's header names all six shipped values and the new one), so a
+    whole-file scan would read the DOCUMENTATION as the constraint.
+    """
+    sql = path.read_text(encoding="utf-8")
+    body = sql.split("BEGIN;", 1)[1]
+    return set(_LITERAL.findall(body))
+
+
+class _PhaseTablePool:
+    """An asyncpg-pool double that INTERPRETS the phase UPDATE against seeded rows.
+
+    Not a call recorder — a tiny evaluator. It parses the SET value and the WHERE
+    predicate out of the SQL the writer composes and applies them to an in-memory
+    ``workflow_phases``. That is what lets V-18 be asserted BEHAVIOURALLY ("a run whose
+    phases are [completed, active, pending] produces a write matching only the active
+    row") rather than only as a string shape.
+
+    ⚠ IT UNDERSTANDS BOTH ``status = 'x'`` AND ``status IN (…)``, deliberately: F-5's
+    plant widens the predicate to ``IN ('active','completed')``, and an evaluator that
+    could not parse the planted form would leave the behavioural clause unable to fire
+    — a fence that reds only on the string shape while the behaviour clause sits inert.
+
+    ⚠ SEEDS NOTHING IN ANY DATABASE. Rows live in a list on this object.
+    """
+
+    def __init__(self, rows):
+        self.rows = [dict(r) for r in rows]
+        self.executed: list[tuple] = []
+
+    async def execute(self, sql, *args):
+        self.executed.append((sql, args))
+        set_m = _SET_STATUS.search(sql)
+        if not set_m:
+            return None  # not a phase write (e.g. the workflow_runs status UPDATE)
+        new_status = set_m.group(1)
+        run_id = args[0] if args else None
+
+        def matches(row):
+            if _WHERE_RUN_KEYED.search(sql) and str(row["workflow_run_id"]) != str(run_id):
+                return False
+            eq = _WHERE_STATUS_EQ.search(sql)
+            if eq:
+                return row["status"] == eq.group(1)
+            in_ = _WHERE_STATUS_IN.search(sql)
+            if in_:
+                return row["status"] in {
+                    v.strip().strip("'") for v in in_.group(1).split(",")
+                }
+            return True  # NO status predicate at all — a bulk terminalize
+
+        for row in self.rows:
+            if matches(row):
+                row["status"] = new_status
+        return None
+
+    def acquire(self):  # pragma: no cover - finish_run's transaction path
+        raise AssertionError(
+            "these fences drive cancel_active_phases only; finish_run is patched out"
+        )
+
+    def phase_statuses(self):
+        return [r["status"] for r in self.rows]
+
+
+async def _drive_real_phase_terminalize(monkeypatch, rows, wf_id):
+    """Drive the zombie arm with the REAL ``cancel_active_phases`` against ``rows``.
+
+    Only ``finish_run`` is patched out (its transaction path needs a connection double
+    this evaluator deliberately does not provide) — the phase writer under test runs for
+    real, composing its own SQL.
+    """
+    from app.api.threads import RUN_TASKS
+
+    rid = uuid4()
+    RUN_TASKS.pop(rid, None)
+    pool = _PhaseTablePool(rows)
+    monkeypatch.setattr("app.dependencies._pg_pool", pool)
+    monkeypatch.setattr("app.services.run_lifecycle.finalize_run_terminal", AsyncMock())
+    monkeypatch.setattr("app.db.workflows.finish_run", AsyncMock())
+
+    out = await _cancel_run_internals(
+        run_id=rid,
+        status="streaming",
+        thread_id=str(uuid4()),
+        redis=_FakeRedis(exists=0),
+        supabase=_RecordingSupabase(anchor=wf_id),
+    )
+    return out, pool
+
+
+async def test_a_cancel_leaves_completed_and_every_other_terminal_phase_untouched(
+    monkeypatch,
+):
+    """V-18 / F-5 — the cancel path's phase write reaches ONLY ``active`` rows.
+
+    A stopped run KEEPS its completed phases: their outputs are already durable, and
+    D-07 / D-13 forbid a bulk rewrite outright. ``failed``, ``skipped`` and
+    ``recorded_not_sent`` rows are equally out of reach — this migration ADMITS a
+    literal, it does not authorise a backfill.
+
+    ⚠ TWO CLAUSES, ASSERTED SEPARATELY: the composed SQL's predicate is
+    ``AND status = 'active'`` (the string shape), AND a seeded table of
+    [completed, active, pending, failed, skipped, recorded_not_sent] comes back with
+    exactly ONE row moved (the behaviour). The ``AND status = 'active'`` clause is THE
+    MECHANISM, not a convention — it is the only thing standing between this writer and
+    a bulk terminalize.
+    """
+    wf_id = str(uuid4())
+    rows = [
+        {"id": uuid4(), "workflow_run_id": wf_id, "status": s}
+        for s in ("completed", "active", "pending", "failed", "skipped", "recorded_not_sent")
+    ]
+    _out, pool = await _drive_real_phase_terminalize(monkeypatch, rows, wf_id)
+
+    phase_writes = [(s, a) for s, a in pool.executed if _SET_STATUS.search(s)]
+    assert len(phase_writes) == 1, (
+        f"expected exactly ONE workflow_phases write on the cancel path; got "
+        f"{len(phase_writes)}"
+    )
+    sql = phase_writes[0][0]
+    eq = _WHERE_STATUS_EQ.search(sql)
+    assert eq and eq.group(1) == "active", (
+        "the phase terminalize must restrict to status = 'active'; predicate was "
+        f"{sql!r}"
+    )
+
+    assert pool.phase_statuses() == [
+        "completed",
+        "cancelled",
+        "pending",
+        "failed",
+        "skipped",
+        "recorded_not_sent",
+    ], (
+        "a stop must move ONLY the interrupted (active) row; observed "
+        f"{pool.phase_statuses()}"
+    )
+
+
+async def test_no_cancel_path_writes_the_failed_or_skipped_vocabulary(monkeypatch):
+    """V-19 / F-6 — the cancel path's composed status VALUE is the mig-119 slug.
+
+    ⚠ THE HONESTY ARGUMENT, CARRIED BY THE FENCE ITSELF SO IT IS NOT ONLY IN CONTEXT:
+    the phase did NOT fail — nothing went wrong, the step was interrupted. It was NOT
+    skipped — it was never routed around; it started, it did work, and a person ended
+    the run underneath it. Reusing either word was OFFERED AND REJECTED (D-04), in a
+    phase whose entire requirement is honesty about what a stopped run did and did not
+    do. Writing ``failed`` on a phase that did not fail is precisely the dishonesty this
+    phase exists to remove.
+
+    ⚠ SCOPED OVER THE COMPOSED SQL VALUE, NEVER THE MODULE SOURCE — the 193.2 F-3
+    lesson, and here it is not hypothetical: ``db/workflows.py``'s docblocks
+    LEGITIMATELY name ``failed`` and ``skipped`` (three of the five shipped writers live
+    there and D-04's rejection is recorded there in prose), so a raw source sweep would
+    red on the documentation of the very rule it is defending. The scoping is CHECKED
+    rather than assumed below: the module source is asserted to still contain both
+    words while the composed value contains neither. If that first assertion ever fails,
+    this fence has stopped being a scope proof and is merely passing.
+
+    ⚠ THE EXPECTED SLUG IS DERIVED FROM BOTH MIGRATIONS BY GREP, NEVER RE-TYPED —
+    migration 119's constraint literals minus migration 115's — so a misspelling on
+    either side is a failure rather than a matching pair of typos.
+    """
+    wf_id = str(uuid4())
+    rows = [{"id": uuid4(), "workflow_run_id": wf_id, "status": "active"}]
+    _out, pool = await _drive_real_phase_terminalize(monkeypatch, rows, wf_id)
+
+    phase_writes = [s for s, _ in pool.executed if _SET_STATUS.search(s)]
+    assert len(phase_writes) == 1
+    written = _SET_STATUS.search(phase_writes[0]).group(1)
+
+    assert written not in ("failed", "skipped"), (
+        f"the cancel path composed status={written!r} — D-04 rejected BOTH by name"
+    )
+
+    new_literals = _constraint_literals(_MIG_119) - _constraint_literals(_MIG_115)
+    assert new_literals == {"cancelled"}, (
+        "migration 119 must add exactly ONE literal over migration 115's six; derived "
+        f"{sorted(new_literals)}"
+    )
+    assert written == new_literals.pop(), (
+        "the written slug must be byte-identical to migration 119's new literal"
+    )
+
+    # ── the scope proof, checked rather than assumed ──
+    module_src = _DB_WORKFLOWS_SRC.read_text(encoding="utf-8")
+    assert "failed" in module_src and "skipped" in module_src, (
+        "db/workflows.py no longer names 'failed'/'skipped' anywhere — this fence's "
+        "value-scoping is no longer demonstrating anything and must be re-examined, "
+        "not trusted"
     )
