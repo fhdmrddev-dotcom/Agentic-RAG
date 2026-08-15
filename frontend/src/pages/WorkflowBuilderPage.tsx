@@ -383,6 +383,51 @@ export const UNBOUND_KB_INVITATION = "No knowledge base · searches everything"
 export const REQUIREMENT_INVITATION = "What must this workflow deliver? · required to publish"
 
 /**
+ * Phase 193.2-09 (D-06, `SEED-163`) — the VISIBLE half of the requirement's provenance.
+ *
+ * WHY A MARK AT ALL, AND WHY THIS IS NOT DECORATION. `193.2-05` made the generator PROPOSE
+ * a `business_requirement` and `193.2-07` made that proposal DURABLE
+ * (`WorkflowDefinition.business_requirement_seeded_by_ai`, stamped server-side after
+ * validation and never read off the emitted payload). Between those two and this one the
+ * field arrives pre-filled with nothing anywhere saying the AI wrote it — a decision the
+ * author is never shown, which is `SEED-163`'s own root failure repeated in miniature. D-06
+ * rejects that silent pre-fill explicitly, and rejects the other direction too (an empty
+ * field with a click-to-accept proposal is still one extra act before publish, which is the
+ * friction `SEED-163` exists to remove).
+ *
+ * IT IS ALSO WHAT MAKES D-09 HONEST. The publish gate is unchanged: stage 1's
+ * `business_requirement_missing` (`backend/app/services/harness/grounding.py`) only checks
+ * the field is non-empty, so an AI-seeded value passes it untouched. That is ACCEPTED —
+ * because the author can SEE the value is the AI's and overrule it, and pressing Publish is
+ * the consent (T-193.2-03). Without this mark, D-09 would be a silent weakening of the
+ * judge's own `answers_business_requirement` criterion rather than a stated trade.
+ *
+ * THE REGISTER: what is true, plainly (D-13). Not an endorsement — it does not say the
+ * proposal is good — and not a warning: the ordinary case is that the proposal is right and
+ * the author ships it. It reads *the AI proposed this; it is yours to change*, and the
+ * second clause is a fact about behaviour that ships in this same plan (the store clears the
+ * flag on any edit), never a promise about future work. **No `planned` / `coming` / `soon` /
+ * `deferred` / `future release`** — D-14, whose whole reason for existing is that `SEED-164`
+ * came from a docblock calling shipped work "deferred" and leaving it reading as a plan for
+ * a year.
+ *
+ * NO GLYPH, DELIBERATELY, AND THE RULE IS THE PROJECT'S OWN. The icon convention's §4 states
+ * it for the shipped `waitsForYou` badge: *the WORD carries the meaning; tone is decoration*,
+ * and an emoji there spends visual budget the design withholds. Two further reasons make it
+ * binding here rather than a preference: `✦` — the one glyph a sketch has ever proposed for
+ * "AI-drafted" — is REFUSED, because it is the shipped Working badge and sits on the verdict
+ * mark's coordinates on a canvas-adjacent surface; and inventing a NEW canvas mark when the
+ * vocabulary has none is the exact drift §4's "what to avoid" list names. The affordance's
+ * own `✎` already leads the row and is not repeated.
+ */
+export const REQUIREMENT_AI_MARK_LABEL = "AI-proposed"
+
+/** The fuller sentence, carried as `title` — the shipped idiom on this header, where
+ *  `net-new-flag` and `judge-locked` both explain themselves the same way. */
+export const REQUIREMENT_AI_MARK_EXPLANATION =
+  "The generator proposed this line when this workflow was created. Edit it and this mark clears."
+
+/**
  * What the picker calls a binding it cannot NAME — a folder that is not in the author's
  * own list, because it was deleted or because the draft was forked from a workflow that
  * bound someone else's.
@@ -2038,6 +2083,39 @@ export function WorkflowBuilderPage({
    * `✦`, which is the shipped Working badge and which the icon convention refuses for
    * canvas-adjacent surfaces because it sits on the verdict mark's coordinates.
    */
+  /**
+   * Phase 193.2-09 (D-06) — is the requirement on screen an AI PROPOSAL?
+   *
+   * READ OFF THE DEFINITION, with NO page-level `useState` mirror, for the same reason the
+   * input's own value is (see its comment below): in the drafted view the definition is the
+   * single source of truth and a second copy is drift. `meta` carries an index signature, so
+   * the flag needs no widening of `BuilderDefinition` and gets none — the `=== true` is the
+   * narrowing, and it is strict on purpose: an `unknown` off a JSONB row must not be truthy-
+   * tested into a provenance claim.
+   *
+   * IT NEVER TRUSTS A MODEL-SUPPLIED VALUE, and that is a property of where the bit comes
+   * from rather than of this line. `193.2-07` stamps the flag SERVER-SIDE after validation
+   * and ignores whatever the emission claimed — in BOTH directions, each pinned and each
+   * driven RED. That matters more than it reads: `WF_SCHEMA` is
+   * `WorkflowDefinition.model_json_schema()`, so the emit tool now ADVERTISES this field to
+   * the model, making laundering reachable rather than hypothetical. Nothing on the client
+   * may add a second opinion about provenance.
+   *
+   * THE NON-EMPTY CLAUSE IS D-08's FALLBACK, NOT A VALIDATION RULE. A mark on a value that
+   * does not exist would make the demote rule read a lie — the same sentence the server's
+   * stamp obeys, inherited verbatim from D-187-03's precedent. There is deliberately NO
+   * `.trim()`: trimming here would be a second copy of the server's emptiness predicate
+   * (`grounding.py` is literally `not (definition.business_requirement or "").strip()`),
+   * which D-182-06 forbids and which `setBusinessRequirement`'s own docblock forbids by
+   * name. The whitespace-with-flag state that `!== ""` therefore admits is UNREACHABLE from
+   * both ends: the server never stamps a value that trims empty, and editing a seeded value
+   * down to whitespace clears the flag in the same `set()` that writes it.
+   */
+  const requirementIsAiProposed =
+    meta.business_requirement_seeded_by_ai === true &&
+    typeof meta.business_requirement === "string" &&
+    meta.business_requirement !== ""
+
   const requirementAffordance = canvasEnabled ? (
     <span
       data-testid="builder-business-requirement"
@@ -2076,6 +2154,24 @@ export function WorkflowBuilderPage({
         onBlur={onFieldCommit}
         className="min-w-0 w-[240px] truncate bg-transparent text-[11px] text-muted-foreground placeholder:text-muted-foreground/70 focus:outline-none focus:ring-1 focus:ring-primary"
       />
+      {/* D-06's visible half — ONE gated sibling INSIDE this affordance, never a new node in
+          `identityGroup` and never a second ternary. That placement is not tidiness: band 3
+          of `FLAG_OFF_HEADER_MARKUP` is the `<header>` hosting `identityGroup`, a literal
+          that stood unedited for NINE phases before Phase 193 re-captured it twice (words,
+          then structure) and whose own note says the phase expects NO third. Living inside
+          the same `canvasEnabled ? (…) : null` as the affordance means the flag-off header
+          cannot see this node at all, so band 3 is unmovable BY CONSTRUCTION rather than by
+          care — and the flag-off case next door in `canvas.test.tsx` is what proves it.
+          No colour, no accent and no glyph: the word carries it (see the constant's block). */}
+      {requirementIsAiProposed && (
+        <span
+          data-testid="business-requirement-ai-mark"
+          title={REQUIREMENT_AI_MARK_EXPLANATION}
+          className="shrink-0 rounded border border-border px-1 py-px font-mono text-[9px] font-medium text-muted-foreground"
+        >
+          {REQUIREMENT_AI_MARK_LABEL}
+        </span>
+      )}
     </span>
   ) : null
 
