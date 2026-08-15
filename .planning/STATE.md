@@ -5,7 +5,7 @@ milestone_name: "Workflow Product Completion"
 status: in-progress
 last_updated: 2026-08-15T15:00:00.000Z
 last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "2026-08-15 — **Phase 193.2 EXECUTED — 10 of 10 plans, every gate green at HEAD, and DELIBERATELY NOT MARKED COMPLETE.** ⏸ **ALL FIVE UAT ROWS ARE OWED (`193.2-UAT.md` U1-U5) and NO success criterion is ticked that a person has driven.** NEXT = drive **U1**, the single operator end-to-end run of the 193.1 UAT kit (`C:\\Users\\fhdmr\\Desktop\\uat-193.1-qbr\\`, scoring rule 8+ planted facts) — it is the only row exercising all three fixes together and the only one that can see an `AUTH-03` regression. Gates re-run at HEAD by `193.2-10` against `193.2-BASELINE.md`: backend `tests/unit` **62 failed / 2154 passed** (failures IDENTICAL to baseline — the SEED-056 rot set; passes grew from 2092) · six backend workflow suites **110 / 0** (was 81) · five frontend workflow suites **359 / 0** (was 337) · count gate **`count gate OK` · total 3918 · failed 0 · pinned 3868 · 75/75** (was 3892) · `tsc -p tsconfig.app.json` **33, unmoved across all ten plans**. **NO NEW FAILURE.** ⚠ **NO GUARDRAIL OVERRIDE FOR PHASE 193.2 — offered and declined for the THIRD consecutive phase (193, 193.1, 193.2); that absence is a measurement.** G-5 fired on SEVEN files, all honoured by construction. ⚠ **FIVE `CLAUDE.md` ledger rows were owed, not the three D-03 planned** — `db/workflows.py` **31/17/1405** (the SECOND-HOTTEST BACKEND FILE IN THE TREE, absent from the table for seventeen phases), `publish_service.py` **17/7/1158**, `workflow_authoring.py` **11/6/540**, `models/harness.py` **17/16/611**, and `builderStore.ts` **11/5/837**, which appeared in NO prior artifact of this phase at all. ⚠ **THE MEASURED RESULT, and the D-08 rule binds every word of it: `business_requirement` 5/5 on all four arms (pre-fix 0/N); `llm_human_input` 0/5 on all four (pre-fix 2/2 with a template); the SC#4 `render_template` control 5/5 LIKE-FOR-LIKE and it DID NOT FALL; `external_action` displacement 0/5. A MEASURED REDUCTION, NEVER AN ABSENCE — the publish gate STAYS.** ⚠ **D-10's escape hatch is recorded NOT TRIGGERED: neither candidate fact was false — BOTH are true. The false premise was the unstated third one, that a 400 was ever received.** Prior: **Phase 193.2 PLANNED (`2ddac519`) — 10 plans in 6 waves; plan-checker VERIFICATION PASSED first iteration, zero blockers. NEXT = /gsd:execute-phase 193.2.** Research REFUTED D-10 premise before any code: harness_audit measured 1 publish_attempted / 1 publish_succeeded / 0 publish_blocked, so the publish endpoint never refused anything and the refusal came from an already-greyed control — rewriting the string IS the fix, Wave 1 is confirm-and-record. A shipped green fence (test_no_feed_orders_by_updated_at) FORBIDS D-15/D-16 and is rewritten in place, never deleted, driven RED against the pre-change source. FOUR ledger rows owed not three — a seventh hot file, backend/app/models/harness.py (16/15/578), was absent from the table. BUG-260815-02 arithmetic was over the wrong feed: rendered 17 of 109 (scope=mine), landing at 4 of 109 after the sort, not 1. The post-publish Run CTA has had ZERO automated coverage since it shipped. NO guardrail override recorded — third consecutive phase to decline one. Prior: CONTEXT GATHERED (`4d1d9374`). 26 decisions locked in `193.2-CONTEXT.md`. ⚠ Two scouting findings reshaped the phase and both are recorded as DELIVERABLES rather than assumptions: (1) `/validate` ALREADY mints an `interactive_phase` verdict, it is registered route-assigned + incomplete, it ALREADY greys the Publish control with the server message verbatim, and there is a PINNED test — so the operator could not have clicked Publish and got a 400, and Wave 1 must establish which of those two facts is false on the live path (D-10); (2) the post-publish Run CTA ALREADY names the workflow and offers Run (`WorkflowsPage.tsx:897-908`), so 'the product never told me the name' is at least partly already closed and the operator was still lost (D-19). ⚠ **G-5 fires on SIX files and THREE are ABSENT from the `CLAUDE.md` hot-file ledger** — `db/workflows.py` **30 commits / 16 phases**, `publish_service.py` 16/6, `workflow_authoring.py` 9/5 — the same invisibility failure `WorkflowsPage.tsx` had for 10 phases. Honoured by construction; writing the three missing ledger rows is a phase deliverable (D-01/D-03). ⚠ **A G-5 override was OFFERED AND DECLINED for the THIRD consecutive phase, so this file records NO guardrail override for 193.2 — that absence is a measurement.** ⚠ `WorkflowsPage.tsx`'s ledger cell measured STALE for the 4th time (`33/12/1160` → **34/12/1176**). Prior: **Phase 193.1 ✅ CLOSED, AUTH-03 satisfied on a real end-to-end run.** 193.2 bundles three items the operator hit in ONE sitting on 193.1s own headline path: SEED-163 (the AI leaves business_requirement blank), BUG-260815-01 (BLOCKING — the draft grows an llm_human_input step the publish gate refuses; caused by 193.1s OWN D-26 fix, measured 2 for 2), BUG-260815-02 (BLOCKING — a just-published workflow is unfindable; ORDER BY name at three call sites, no recency anywhere, position 129 of 146). ⚠ **I routed all three to 197 and the operator OVERRULED it; the original reasoning is left visible rather than overwritten.** They are one phase because they share one root: authoring makes decisions the author is never shown and does not know what publish requires. ⚠ G-2 fires on the library half and must NOT absorb the sort bug. ⚠ G-1 does not fire but a THIRD 193.x would trip it. Also filed and routed to 194: BUG-260815-03 (run history unreachable from canvas) and BUG-260815-04 (chat stuck on Starting workflow — the string is DELIBERATE and pinned, do not reword). ⚠ Phase 193 still owes U1/U2; 193.1 closed with U2/U3/U4 owed by decision."
+stopped_at: "2026-08-15 — **Phase 193.2 ✅ CLOSED — 10 of 10 plans, all four success criteria DRIVEN by the operator, and `AUTH-03` SATISFIED END TO END for the first time.** The evidence is the row no test could stand in for (`193.2-UAT.md` U1): run **`b021c7b0` COMPLETED**, definition `93a86e21` / slug `northwind-qbr-fa65a43c`, all five phases, **zero gate failures** — `/Northwind-QBR-Template.docx` at **39,698 B** against a 37,424 B template, **10 of 10 fields filled** each with a real `source_doc`, **0** residual `{{ }}`, **0** literal `None`, **branding verified against an operator screenshot** (navy band, Georgia title, amber account-health block, teal headings 1-6, grey summary panel, navy footer rule), and **all eight planted facts grounded** (68% utilisation · 412 of 605 seats · INC-4471 · a 6h12m outage on 12 Aug · £284,000 ARR · term to 31 Jan 2027 · Freight Analytics ~£62,000 · AMBER). **A template attached AT AUTHORING TIME and a real run that FILLS THAT SAME TEMPLATE — both halves observed in one sitting**, which is exactly what 193.1 declined to tick on unit evidence alone. ⚠ **The 193.1 ATTRIBUTION REGRESSION DID NOT RECUR — Marcus Feld is named TWICE in the rendered document**, a second data point in the right direction, so the *'a second sighting earns a seed'* trigger is NOT fired and no seed is owed. **M1 the requirement arrived pre-filled, durable and NOT an echo of describe** (so 193.2-07's anti-echo predicate EARNED the mark rather than defaulting to it), `business_requirement_seeded_by_ai: true`. **M2 published with the canvas UNTOUCHED.** **M3 found without searching at rendered position 4 of 112 — the predicted index `starters.length` held EXACTLY — and the post-publish Run CTA appeared and NAMED the workflow**; recency is proved against a near-identical OLDER row (the new QBR at 14:17 above the old Q3 at 02:07), not by alphabetical luck. ⏸ **CLOSED WITH TWO UAT ROWS NOT DRIVEN, BY DECISION: U5** (the composer Harness picker — the one user-visible consequence of the sort that lands OUTSIDE the library, and nobody has looked at it; thirty seconds) **and U2** (the rendered interactive refusal — ⚠ **it could NOT be driven: no interactive step ever appeared, so the surface never rendered, and *the defect not occurring* is NOT the same as *its message reading well*. The rewritten two-arm copy has still never been read by a person**). ⚠ **ONE HONESTY CAVEAT ON M1: the operator confirmed *'I think all pass'* broadly and did NOT specifically confirm the VISIBLE mark — the DURABLE half is measured, the VISIBLE half rests on a general confirmation, and it is NOT recorded as a specifically-observed mark.** ⚠ **THREE PUBLISH ATTEMPTS WERE BLOCKED FIRST AND NONE WAS A PRODUCT DEFECT ON THE PUBLISH PATH**: the OpenAI credit balance was **exhausted** (`429 insufficient_quota`, confirmed by a live `embeddings.create`), and since every document is embedded with `text-embedding-3-small` **every search must embed its query** — retrieval returned 0 sources, `citations_required` failed 3× per run, and publish **correctly refused**. All three rows read `blocked_stage: structural_gate` (14:02:21 / 14:07:42 / 14:10:29), read through the **C-7 accessor** `metadata #>> '{}'`. Ruled out by measurement: 5 docs / 18 chunks / 0 null embeddings / matching `org_id`. **Four bugs and three seeds were filed from that session** — `BUG-260815-05` (blocking: a provider outage is reported as *'nothing was retrieved (0 sources)'*), `BUG-260815-06` (major: the structural-gate refusal names a stage, not a cause — ⚠ **the same failure class this phase fixed for the interactive gate, surviving on the gate next door**), `BUG-260815-07` (major, **NOT reproducible**, stays open; two runs stuck `active` since 2026-08-01 and 2026-06-14 are a permanent delete blocker), `BUG-260815-08` (minor, Workflows header — **G-2 fires, sketch it with `SEED-155`'s card density**), **`SEED-159` — trigger FIRED and its PREDICTION WAS WRONG** (not a silent blank but a verbose internal disclaimer, *'Not explicitly stated in the KB.'*, rendered in the front-page header of a document footed *'Commercial in confidence'* — the model behaved correctly and the real defect is that **a deliverable has no register distinct from an internal answer**), `SEED-165` (52 out-of-gate backend failures, triaged 34 stale / 18 undiagnosed), `SEED-166` (settings/operator/admin IA). **Code review: 0 Critical / 0 Warning / 5 Info**, all six Warnings fixed post-review. **G-7 CLEAR** — 10 plans, 0 gap-closure rounds. Gates at close: count gate **`OK` · 3918 · failed 0 · 75/75** · backend workflow suites **210 / 0** · full `tests/unit` **62 failed / 2221 passed** (the 62 is the baseline rot set) · `tsc -p tsconfig.app.json` **33**, unmoved all phase. NEXT = drive **U5** when someone next opens the composer, then `/gsd:discuss-phase 194`. *(Superseded, kept for the record: this entry previously read 'EXECUTED … ALL FIVE UAT ROWS ARE OWED … NEXT = drive U1'. U1 was driven hours later.)* Gates re-run at HEAD by `193.2-10` against `193.2-BASELINE.md`: backend `tests/unit` **62 failed / 2154 passed** (failures IDENTICAL to baseline — the SEED-056 rot set; passes grew from 2092) · six backend workflow suites **110 / 0** (was 81) · five frontend workflow suites **359 / 0** (was 337) · count gate **`count gate OK` · total 3918 · failed 0 · pinned 3868 · 75/75** (was 3892) · `tsc -p tsconfig.app.json` **33, unmoved across all ten plans**. **NO NEW FAILURE.** ⚠ **NO GUARDRAIL OVERRIDE FOR PHASE 193.2 — offered and declined for the THIRD consecutive phase (193, 193.1, 193.2); that absence is a measurement.** G-5 fired on SEVEN files, all honoured by construction. ⚠ **FIVE `CLAUDE.md` ledger rows were owed, not the three D-03 planned** — `db/workflows.py` **31/17/1405** (the SECOND-HOTTEST BACKEND FILE IN THE TREE, absent from the table for seventeen phases), `publish_service.py` **17/7/1158**, `workflow_authoring.py` **11/6/540**, `models/harness.py` **17/16/611**, and `builderStore.ts` **11/5/837**, which appeared in NO prior artifact of this phase at all. ⚠ **THE MEASURED RESULT, and the D-08 rule binds every word of it: `business_requirement` 5/5 on all four arms (pre-fix 0/N); `llm_human_input` 0/5 on all four (pre-fix 2/2 with a template); the SC#4 `render_template` control 5/5 LIKE-FOR-LIKE and it DID NOT FALL; `external_action` displacement 0/5. A MEASURED REDUCTION, NEVER AN ABSENCE — the publish gate STAYS.** ⚠ **D-10's escape hatch is recorded NOT TRIGGERED: neither candidate fact was false — BOTH are true. The false premise was the unstated third one, that a 400 was ever received.** Prior: **Phase 193.2 PLANNED (`2ddac519`) — 10 plans in 6 waves; plan-checker VERIFICATION PASSED first iteration, zero blockers. NEXT = /gsd:execute-phase 193.2.** Research REFUTED D-10 premise before any code: harness_audit measured 1 publish_attempted / 1 publish_succeeded / 0 publish_blocked, so the publish endpoint never refused anything and the refusal came from an already-greyed control — rewriting the string IS the fix, Wave 1 is confirm-and-record. A shipped green fence (test_no_feed_orders_by_updated_at) FORBIDS D-15/D-16 and is rewritten in place, never deleted, driven RED against the pre-change source. FOUR ledger rows owed not three — a seventh hot file, backend/app/models/harness.py (16/15/578), was absent from the table. BUG-260815-02 arithmetic was over the wrong feed: rendered 17 of 109 (scope=mine), landing at 4 of 109 after the sort, not 1. The post-publish Run CTA has had ZERO automated coverage since it shipped. NO guardrail override recorded — third consecutive phase to decline one. Prior: CONTEXT GATHERED (`4d1d9374`). 26 decisions locked in `193.2-CONTEXT.md`. ⚠ Two scouting findings reshaped the phase and both are recorded as DELIVERABLES rather than assumptions: (1) `/validate` ALREADY mints an `interactive_phase` verdict, it is registered route-assigned + incomplete, it ALREADY greys the Publish control with the server message verbatim, and there is a PINNED test — so the operator could not have clicked Publish and got a 400, and Wave 1 must establish which of those two facts is false on the live path (D-10); (2) the post-publish Run CTA ALREADY names the workflow and offers Run (`WorkflowsPage.tsx:897-908`), so 'the product never told me the name' is at least partly already closed and the operator was still lost (D-19). ⚠ **G-5 fires on SIX files and THREE are ABSENT from the `CLAUDE.md` hot-file ledger** — `db/workflows.py` **30 commits / 16 phases**, `publish_service.py` 16/6, `workflow_authoring.py` 9/5 — the same invisibility failure `WorkflowsPage.tsx` had for 10 phases. Honoured by construction; writing the three missing ledger rows is a phase deliverable (D-01/D-03). ⚠ **A G-5 override was OFFERED AND DECLINED for the THIRD consecutive phase, so this file records NO guardrail override for 193.2 — that absence is a measurement.** ⚠ `WorkflowsPage.tsx`'s ledger cell measured STALE for the 4th time (`33/12/1160` → **34/12/1176**). Prior: **Phase 193.1 ✅ CLOSED, AUTH-03 satisfied on a real end-to-end run.** 193.2 bundles three items the operator hit in ONE sitting on 193.1s own headline path: SEED-163 (the AI leaves business_requirement blank), BUG-260815-01 (BLOCKING — the draft grows an llm_human_input step the publish gate refuses; caused by 193.1s OWN D-26 fix, measured 2 for 2), BUG-260815-02 (BLOCKING — a just-published workflow is unfindable; ORDER BY name at three call sites, no recency anywhere, position 129 of 146). ⚠ **I routed all three to 197 and the operator OVERRULED it; the original reasoning is left visible rather than overwritten.** They are one phase because they share one root: authoring makes decisions the author is never shown and does not know what publish requires. ⚠ G-2 fires on the library half and must NOT absorb the sort bug. ⚠ G-1 does not fire but a THIRD 193.x would trip it. Also filed and routed to 194: BUG-260815-03 (run history unreachable from canvas) and BUG-260815-04 (chat stuck on Starting workflow — the string is DELIBERATE and pinned, do not reword). ⚠ Phase 193 still owes U1/U2; 193.1 closed with U2/U3/U4 owed by decision."
 resume_file: .planning/phases/193.2-from-authored-to-runnable/193.2-UAT.md
 ---
 
@@ -42,21 +42,137 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ⚠ **One quality observation, seeded nowhere yet by decision:** the model grounded Marcus Feld's quote and **stripped his name** — content kept, attribution lost. Fine internally; a downgrade for a client-facing document. Hold until it recurs.
 
-**NEXT = drive UAT row `U1`** (`193.2-UAT.md`) — the single operator end-to-end run. **Nothing else is
-owed by the code.** *(Superseded: this line previously read "NEXT = `/gsd:execute-phase 193.2`". The
-phase executed on 2026-08-15; the planning record immediately below is left standing rather than
-overwritten.)*
+**NEXT = drive UAT row `U5`** (the composer's Harness picker — thirty seconds, the one consequence of
+the sort nobody has looked at), then **`/gsd:discuss-phase 194`**. *(Superseded twice, both kept: this
+line read "NEXT = `/gsd:execute-phase 193.2`" before execution, then "NEXT = drive U1" before the
+operator drove it.)*
 
 ---
 
-### Phase 193.2 — EXECUTED 2026-08-15 · 10 of 10 plans · ⏸ NOT COMPLETE, five UAT rows OWED
+### Phase 193.2 — ✅ CLOSED 2026-08-15 · 10 of 10 plans · all four SCs DRIVEN · `AUTH-03` SATISFIED
 
-**⚠ THE PHASE IS DELIBERATELY NOT MARKED COMPLETE, and no ROADMAP success criterion is ticked that a
-person has driven.** All five UAT rows in `193.2-UAT.md` are **OWED**, structurally rather than by
-oversight: every one needs a browser and a running backend on the operator's machine, and scoring
-them from an agent that has read the source would be the check-that-cannot-fail that file exists to
-prevent. **0 driven · 0 pass · 0 fail · 5 owed.** ⚠ **Closing with owed rows is a legitimate DECISION
-and it is stated as one, never as a claim that everything ran.** **U1 is the row to run first.**
+**⚠ `AUTH-03` IS SATISFIED END TO END, AND UAT ROW U1 IS THE ONLY REASON IT MAY BE SAID.** A template
+attached **at authoring time**, and a real run that **fills that same template** — both halves
+observed in one sitting on run **`b021c7b0`**. 193.1 built the capability and **deliberately declined
+to tick it on unit evidence alone**; this is the evidence it was waiting for.
+
+| Moment | Verdict | The measurement |
+|---|---|---|
+| **M1** requirement pre-filled + marked | ✅ **PASS** ⚠ *with one caveat* | Durable, **NOT an echo of describe** — so `193.2-07`'s anti-echo predicate **EARNED** the mark rather than defaulting to it. `business_requirement_seeded_by_ai: true`; `assets[]` carries the bound template (193.1's auto-bind works) |
+| **M2** publishes without a canvas edit | ✅ **PASS** | Canvas untouched. ⚠ after three blocked attempts, **all environmental** |
+| **M3** findable without searching | ✅ **PASS** | **Rendered position 4 of 112** (3 starters + 29 published + 80 drafts) — **the predicted index `starters.length` held EXACTLY**. The post-publish **Run CTA appeared and NAMED the workflow** |
+| **M4** the run fills the template | ✅ **PASS** | `/Northwind-QBR-Template.docx` **39,698 B** vs a 37,424 B template; **10 of 10 fields** each with a real `source_doc`; **0** residual `{{ }}`; **0** literal `None`; **branding verified against an operator SCREENSHOT**, not merely the field map |
+| **M5** planted facts | ✅ **PASS — all eight** | 68% utilisation · 412/605 seats · INC-4471 · 6h12m outage 12 Aug · £284,000 ARR · term to 31 Jan 2027 · Freight Analytics ~£62,000 · AMBER |
+| **M6** composer picker | ⏸ **NOT DRIVEN** | optional row; recorded as not driven, **never as a pass** |
+
+⚠ **The recency claim is proved against a near-identical OLDER row rather than by alphabetical luck:**
+the new QBR (14:17) sorts **above** the old Q3 one (02:07). Without that pairing a pass at position 4
+would have been ambiguous.
+
+⚠ **THE 193.1 ATTRIBUTION REGRESSION DID NOT RECUR — Marcus Feld is named TWICE in the rendered
+document.** 193.1 observed the model grounding his quote and **stripping his name**, and held it
+*"until it recurs"*. **This is a second data point in the right direction, so the deferral's own
+trigger (*"a second sighting earns a seed"*) is NOT fired and no seed is owed.**
+
+#### ⏸ CLOSED WITH TWO ROWS NOT DRIVEN — a DECISION, never a claim that everything ran
+
+- **U5 / M6 — the composer's Harness workflow picker.** Simply not opened. **It is the ONE
+  user-visible consequence of `193.2-03` that lands outside the library** (the same feed also drives
+  `WorkspacePanel`'s run-soul and `threads.py`'s kickoff), and **nobody has looked at it.** Thirty
+  seconds. **Run it first.**
+- **U2 — the rendered interactive refusal. ⚠ IT COULD NOT BE DRIVEN.** The surface only renders when
+  an interactive step exists, and **none did** — the run's five phases contain no `llm_human_input`,
+  consistent with the measured 0/20. **The defect not occurring is NOT the same as its message
+  reading well**, and it is deliberately not recorded as a pass. ⇒ **the rewritten two-arm refusal
+  copy has still never been read by a person on a real screen.** Re-open: the next time an
+  interactive step appears on a real draft.
+
+⚠ **ONE HONESTY CAVEAT ON M1, recorded rather than rounded up:** the operator confirmed *"I think all
+pass"* **broadly** and did **not** specifically confirm the **VISIBLE** mark. **The DURABLE half is
+measured; the VISIBLE half rests on a general confirmation** — and `193.2-09` had already flagged
+that its mark shipped with **no browser UAT**. *A general "all pass" is weak positive evidence and is
+not a driven row.* Carried as a residual in `SEED-163`.
+
+#### ⚠ Three publish attempts were blocked first, and NONE was a product defect on the publish path
+
+The **OpenAI credit balance was exhausted** (`429 insufficient_quota` / `credit_balance_exhausted`,
+confirmed by a live `embeddings.create`). Every document is embedded with `text-embedding-3-small`,
+so **every search must embed its query**; with no credits retrieval returned **0 sources**,
+`citations_required` failed **3× per run**, the golden run failed and publish **correctly refused**.
+**The gauntlet behaved exactly as designed.** Ruled out *by measurement*: 5 docs / 18 chunks / **0
+null embeddings** / matching `org_id` / a definition byte-comparable to one that had worked hours
+earlier. ⚠ Attempt 2 additionally bound the **wrong KB folder** — incidental; it would have failed
+anyway.
+
+**Re-measured in `harness_audit` afterwards:** `publish_blocked` **3 today** (14:02:21 / 14:07:42 /
+14:10:29, **`blocked_stage: structural_gate` on all three**), `publish_attempted` **5**,
+`publish_succeeded` **2**, all-time `publish_blocked` **35** (was 32). ⚠ **These are the first
+`publish_blocked` rows since 2026-08-07 and they CONFIRM rather than contradict `193.2-02`'s D-10
+finding** — that finding was that the *original* refusal wrote **no** such row and therefore came from
+the greyed control; these came from a **different gate**, reached only by getting **past** the
+interactive question entirely. ⚠ **The stage is only readable through the C-7 accessor
+`metadata #>> '{}'`** — `->>'blocked_stage'` returns NULL on every row of that column by definition.
+
+#### Filed from the same session — four bugs and three seeds, referenced not re-derived
+
+| Id | Sev | What |
+|---|---|---|
+| `BUG-260815-05` | **blocking** | a provider outage is reported as *"nothing was retrieved (0 sources)"* |
+| `BUG-260815-06` | major | the structural-gate refusal **names a stage, not a cause**. ⚠ **The same failure class 193.2 fixed for the interactive gate, surviving on the gate next door** — one refusal was rewritten and its neighbour still names machinery |
+| `BUG-260815-07` | major | a delete failed once, **NOT reproducible**, stays open. Adjacent finding that IS reproducible: **two runs stuck `active` since 2026-08-01 and 2026-06-14 are a permanent delete blocker** |
+| `BUG-260815-08` | minor | Workflows header — uncoloured Build button, wrapping project dropdown, a search field that does not read as one. **G-2 FIRES; sketch it together with `SEED-155`'s card density** |
+| **`SEED-159`** | — | ⚠ **TRIGGER FIRED on the first customer-facing deliverable, AND ITS PREDICTION WAS WRONG.** Not a silent blank but a **verbose internal disclaimer** (*"Not explicitly stated in the KB."*) rendered in the **front-page header** of a document footed *"Commercial in confidence"*. **The model's behaviour was correct**; the defect is that **a deliverable has no register distinct from an internal answer** |
+| `SEED-165` | — | 52 out-of-gate backend test failures, triaged **34 stale / 18 undiagnosed** |
+| `SEED-166` | — | settings / operator / admin information architecture |
+
+#### Gates at close, after the code-review fix pass
+
+| Gate | At close | Note |
+|---|---|---|
+| count gate (`GSD_VITEST_MAX_WORKERS=2`) | **`OK` · 3918 · failed 0 · 75/75** | |
+| backend workflow suites | **210 / 0** | |
+| full `backend/tests/unit` | **62 failed / 2221 passed** | the 62 is the recorded baseline rot set — **failures unmoved, passes grown** |
+| `tsc -p tsconfig.app.json` | **33** | unmoved across the whole phase |
+| **Code review** | **0 Critical / 0 Warning / 5 Info** | all six Warnings fixed post-review (`e09e3a13`, `82d622ad`, `c4fe1066`, `accf9539`, `ab7e8ca2`, `3265dc80`) + two out-of-gate test repairs (`f6e853f8`, `138568dd`) |
+| **G-7** | **CLEAR** | 10 plans, **0 gap-closure rounds** |
+
+#### ⚠ Three ledger rows went stale ON THE DAY THEY WERE WRITTEN — corrected beside, in `CLAUDE.md`
+
+The close-out plan measured at its own HEAD; the review's WR-fix commits then landed on three of the
+five files **the same afternoon**. **This is the sharpest instance yet of the self-staling that table
+documents about itself** — *"the next commit" can be hours away.*
+
+| File | written at close-out | **re-derived after the fix pass** |
+|---|---|---|
+| `backend/app/db/workflows.py` | 31 / 17 / 1405 | **32 / 17 / 1447** |
+| `backend/app/services/harness/publish_service.py` | 17 / 7 / 1158 | **19 / 7 / 1243** |
+| `backend/app/services/workflow_authoring.py` | 11 / 6 / 540 | **12 / 6 / 572** |
+
+The other six rows are unmoved (`models/harness.py` 17/16/611 · `builderStore.ts` 11/5/837 ·
+`WorkflowsPage.tsx` 34/12/1176 · `WorkflowBuilderPage.tsx` 41/12/2348 · `api/workflows.py`
+34/17/1951 · `WorkflowCard.tsx` 8/3/818).
+
+#### ⚠ ONE DEFERRAL THIS PHASE RECORDED AS OWED WAS DISCHARGED BY THE REVIEW — and it taught the lesson twice
+
+**`publish_service.py`'s *"the deferred Phase-103 rework"* prose is GONE (WR-05, `ab7e8ca2`) — and it
+was retired the right way: the sentence is QUOTED VERBATIM AS SUPERSEDED rather than deleted**,
+because *a deferral that lives only in a deleted comment is exactly as invisible as one that was
+never written*. The capability it named is routed to `SEED-164`.
+
+⚠ **And the fix recorded a SECOND instance of this phase's own "a copy a machine cannot find is not a
+copy" lesson:** as shipped, that sentence was **split across two lines**, so a line-oriented `grep`
+for the phrase **returned NOTHING and read as "already fixed"**. It is now quoted **on one line on
+purpose.** (The first instance was `193.2-08`, whose verbatim rule was written WRAPPED and failed its
+own literal `grep -q`.) **Two independent occurrences in one phase — treat a multi-line quote of a
+governed string as unfindable by default.**
+
+#### What is STILL owed after the close
+
+**U5** (thirty seconds, run it first) · **U2** (unschedulable — waits on an interactive step
+appearing) · the **VISIBLE half of M1** · the eight other deferrals listed below, each with its
+trigger. **`DEF-193.2-03-01`'s three stale citations and the `libraryFilter.test.ts` pin at 48 vs 60
+are unchanged.** ⚠ **The refusal-length residual (196 chars worst case) is now MORE owed, not less** —
+U2 never rendered, so nobody has read it.
 
 **Gates re-run at HEAD by `193.2-10`, each beside its `193.2-BASELINE.md` value:**
 
@@ -194,7 +310,7 @@ table.
 | **D-25 — a workflow that DELIBERATELY pauses for a person and can still be published** | **`SEED-164`** | ⚠ **193.2 SUPPRESSED the unwanted step; it did NOT deliver this, and nothing shipped may imply otherwise.** A user asking for genuine human-in-the-loop raises it from seed to requirement. The expensive part is the durable pause on REAL runs, not publish (`LlmHumanInputPhaseConfig` has **no artifact field** and a **1800 s hard cap**) |
 | **D-18 — a user-facing recency ⇄ A–Z sort control** | the deferred **library layout sketch** | that sketch, **or** a second report of wanting alphabetical back. Building it now is building it twice |
 | **Card density / list-vs-card layout** | `/gsd:sketch` — **G-2 FIRES**, `SEED-155` binds | run `/gsd:sketch` on the library list before any layout plan. ⚠ **Sorting shipped regardless and must not be absorbed into this** |
-| **`publish_service.py:196-197` still says *"the deferred Phase-103 rework"*** | `/gsd:fast` (G-3: 1 file, 1 line) | ⚠ **It is literally the evaporated-deferral problem `SEED-164` exists to correct**, surviving in a comment. `193.2-06` honoured an explicit UNCHANGED constraint on `:190-208` over the docstring rule, and flagged rather than hid it. Trigger: the next plan touching that file, or a `/gsd:fast` pass |
+| ~~`publish_service.py:196-197` still says *"the deferred Phase-103 rework"*~~ **✅ DISCHARGED by code-review WR-05 (`ab7e8ca2`) hours after this row was written** | — | ⚠ **Kept rather than deleted, because the row is now evidence rather than debt.** It was the evaporated-deferral problem `SEED-164` exists to correct, surviving in a comment; `193.2-06` had honoured an explicit UNCHANGED constraint on `:190-208` over the docstring rule and **flagged rather than hid it**, which is the only reason the review found it. **The fix retired it the right way — the sentence is QUOTED VERBATIM AS SUPERSEDED, not deleted**, and the capability is routed to `SEED-164`. ⚠ **It also proved the "a copy a machine cannot find is not a copy" lesson a second time:** the sentence had shipped **split across two lines**, so a line-oriented `grep` returned NOTHING and read as *"already fixed"* |
 | **The count-gate pin for `libraryFilter.test.ts` sits at 48 against an actual of 60** | a later phase | The gate's contract is *no per-file DECREASE* and the pinned TOTAL did not move, so nothing is broken. Raise it **from the gate's own printed column across two agreeing runs**, never from a summary |
 | **Refusal-message length grew to 196 chars worst case** (vs a 105/99 baseline; ~150 realistic, 135/143 degraded) | UAT / a copy pass | The stated cost of carrying a step label and an action. Trigger: an operator reading the refusal and finding it long, at U1 moment 2 |
 | **Attribution between the suppression clause and the shortened bullet** | not scheduled | ⚠ **UNRESOLVED and UNDRIVEN — the phase claims a COMBINED effect and attributes nothing.** The third arm needs a temporary edit to production source and 20 more paid calls to answer a question no success criterion asks. Trigger: a regression in figure 2 that needs blame assigned |

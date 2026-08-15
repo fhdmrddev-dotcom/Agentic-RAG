@@ -3,9 +3,11 @@
 **Planted:** 2026-08-15, by the operator during Phase 193.1 end-to-end UAT
 **Surface:** Agentic-RAG — workflow authoring (describe door) → publish gauntlet
 **Status:** folded → **Phase 193.2 From Authored to Runnable** (context gathered 2026-08-15, `4d1d9374`;
-**EXECUTED 2026-08-15 — see the dated close-out block at the foot of this file. NOT flipped to
-`closed`: the fix is prompt-level and non-deterministic, so the claim is a MEASURED REDUCTION, never
-an absence, and UAT row U1 is OWED.**)
+**EXECUTED and DRIVEN 2026-08-15 — see the two dated blocks at the foot of this file.
+DELIVERED ON A REAL RUN (UAT `193.2-UAT.md` U1 moment 1, PASS), with ONE SLIVER OWED: the
+requirement's DURABLE half is measured, and the VISIBLE mark rests on a general confirmation rather
+than a specific observation. Not flipped to a bare `closed` for that reason, and because the claim is
+a MEASURED REDUCTION and never an absence.**)
 
 **Re-open trigger:** the requirement arrives blank on a real describe→generate cycle again (the fix is
 a frequency, not a guarantee — measured 20/20, and 21 would not make it one); **or** the AI-proposal
@@ -181,3 +183,51 @@ appeared, **the pattern is the phase, not the field.** There are now three:
 **197 / AUTH-02 inherits this as a MEASURED pattern rather than re-deriving it** — the same habit the
 hot-file ledger keeps, and the answer to the standing lesson that a deferral living in one phase's
 context file is exactly as invisible as a hot file missing from that table.
+
+---
+
+## ✅ DRIVEN 2026-08-15 — the seed's ask is delivered on a real run, and ONE sliver is owed
+
+**`193.2-UAT.md` U1 moment 1 — PASS.** Definition `93a86e21` (slug `northwind-qbr-fa65a43c`), the
+same sitting that produced run **`b021c7b0`**. The field the operator previously had to type by hand
+arrived written:
+
+> *"Produce a quarterly business review document for a named customer and quarter, filling the QBR
+> template from knowledge-base evidence on usage, support, meetings"*
+
+| Property | Observed |
+|---|---|
+| Populated before the operator typed anything | ✅ — **the whole of this seed's ask** |
+| **An echo of the describe text?** | ❌ **NO** |
+| `business_requirement_seeded_by_ai` | **`true`** |
+| `assets[]` carries the bound template | ✅ (193.1's auto-bind, unaffected) |
+| `name_seeded_by_ai` on the phase | `true` |
+
+⚠ **THE ANTI-ECHO PREDICATE EARNED THE MARK RATHER THAN DEFAULTING TO IT, and that is the finding
+worth keeping.** `193.2-07` refuses provenance for a normalised byte-copy of the describe text
+(D-07), and it was driven RED against four plants — but a predicate that never sees a near-copy in
+the wild has only ever been exercised against synthetic ones. Here the model produced a genuinely
+**durable** requirement (*"for a named customer and quarter"*, not *"for Northwind, Q3"*), the
+predicate said so, and **the mark means what it claims on this row.**
+
+⚠ **THE SLIVER, RECORDED RATHER THAN ROUNDED UP.** The operator confirmed *"I think all pass"*
+broadly and **did not specifically confirm the VISIBLE mark on screen.** So:
+
+- **the DURABLE half is MEASURED** (the value, its shape, and the stamp, all read off the definition);
+- **the VISIBLE half rests on a general confirmation**, and `193.2-09`'s own summary had already
+  flagged that its mark shipped with **no browser UAT** — the contrast of `text-[9px]` against Deep
+  Midnight, and whether *"AI-proposed"* reads right beside a real sentence, are operator judgements
+  **nobody has made**.
+
+**It is therefore not recorded as a specifically-observed mark.** *A general "all pass" is weak
+positive evidence and is not a driven row* — the same discipline 193.1 applied when the operator
+spent real time on a screen and nothing jumped out, and it declined to record that as a pass.
+
+**Re-open trigger for the sliver:** the next time anyone opens the Builder on an AI-authored draft,
+look at the requirement row and say whether the mark is visible and legible. Thirty seconds.
+
+⚠ **AND THE STANDING CAVEAT SURVIVES THE PASS, because this run is an example of it:** the mark means
+**"a model wrote this"**, never **"this is durable"**. This requirement *was* durable — but
+`193.2-FREQUENCY.md` §6(c) measured `gpt-5.5` naming one-run parameters in **5 of 5** QBR
+requirements, all 20 of which were still correctly stamped. **One durable example does not make the
+mark a durability signal**, and no copy anywhere may imply that it is.

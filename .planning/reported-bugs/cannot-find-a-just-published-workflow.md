@@ -4,12 +4,12 @@ title: A just-published workflow is unfindable — the AI names it, the library 
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: blocking
-status: folded
+status: closed
 affected_areas: [workflow/library, workflow/authoring, backend/workflows]
 folded_into: "193.2"
-verified_closed_by: null
+verified_closed_by: "193.2 — UAT rows U1 moment 3 and U4 (`193.2-UAT.md`), driven by the operator 2026-08-15: the just-published workflow was found WITHOUT searching and WITHOUT knowing its name, at rendered position 4 of 112 (3 starters + 29 published + 80 drafts), first among the operator's own work — the measured prediction of index `starters.length` held exactly. The post-publish Run CTA also appeared and NAMED the workflow. ⚠ Recency is proved against a near-identical OLDER row rather than by alphabetical luck: the new QBR (14:17) sorts above the old Q3 one (02:07). ⚠ THE PASS IS THE OPERATOR'S JUDGEMENT, NOT A MEASUREMENT — this file predicted 4 and refused to call it findable; had they said 4 was too far down, the sort would have been no less correct and the row would have failed."
 related_seeds: [SEED-155]
-re_open_trigger: "STAYS OPEN as `folded` at Phase 193.2's close. The ORDERING half is closed and proved server-side (`list_published_workflows` + `list_draft_workflows` now `ORDER BY updated_at DESC`; starters stay alphabetical by D-16), and the client merge arithmetic is pinned. What is NOT closed is the FINDABILITY JUDGEMENT: this report's own arithmetic was over the wrong feed (the page passes `?scope=mine`, so the true figures are 17 of 109 -> 4 of 109, not 129 of 146), and POSITION 4 IS NOT POSITION 1 — no `ORDER BY` change can make it 1, because `mergeLibrary` concatenates starters first. Whether 4 satisfies `findable` is a product judgement carried to UAT row U4 (`193.2-UAT.md`, OQ-5), which is OWED at close. Flip to `closed` only when U4 records the operator finding the workflow without searching. RE-OPEN if: the operator cannot find a just-published workflow again; or the post-publish Run CTA fails to appear (U3 / OQ-2); or the recency ordering degrades the composer's Harness picker, `WorkspacePanel`'s run-soul or `threads.py`'s kickoff, all three of which share this feed (U5 / OQ-6). A user-facing recency-vs-A-to-Z SORT CONTROL was deliberately NOT built (D-18) and is deferred to the library layout sketch, where G-2 fires and SEED-155 binds."
+re_open_trigger: "CLOSED 2026-08-15 on a driven run. BOTH halves are now evidenced: the ORDERING half server-side (`list_published_workflows` + `list_draft_workflows` now `ORDER BY updated_at DESC`; starters stay alphabetical by D-16; the client merge arithmetic pinned), and the FINDABILITY JUDGEMENT by the operator at UAT row U4 — found without searching at rendered position 4 of 112. ⚠ Note this report's own arithmetic was over the wrong feed: the page passes `?scope=mine`, so the true figures are 17 of 109 -> 4 of 109, not 129 of 146. POSITION 4 IS NOT POSITION 1 and no `ORDER BY` change can make it 1, because `mergeLibrary` concatenates starters first; 4 was judged findable, not measured to be. RE-OPEN if: (a) the operator cannot find a just-published workflow again; (b) the post-publish Run CTA fails to appear (it DID appear and named the workflow, U3 — but its LATENCY was never timestamped, so a late-appearing CTA is unguarded); (c) the recency ordering reads badly in the composer's Harness picker, `WorkspacePanel`'s run-soul or `threads.py`'s kickoff — all three share this feed and ⚠ UAT row U5 was NOT DRIVEN, so that consequence remains UNOBSERVED by anyone; (d) the curated starters shelf grows enough that index `starters.length` stops being near the top. A user-facing recency-vs-A-to-Z SORT CONTROL was deliberately NOT built (D-18), as was any navigate-to-row hand-off (D-19); both remain deferred to the library layout sketch, where G-2 fires and SEED-155 binds — now joined there by BUG-260815-08."
 reproduces_on:
   branch: develop
   commit: 1dc4d509
@@ -109,7 +109,17 @@ removes the blockers from in front of it, so 197 can be about depth rather than 
 
 ---
 
-## ⚠ STATUS AT PHASE 193.2's CLOSE (2026-08-15) — `folded`, NOT `closed`, and the split is the point
+## ⚠ SUPERSEDED THE SAME DAY — kept verbatim, not deleted
+
+> **The section below was written BEFORE the operator drove the D-21 run, and it says this report
+> stays `folded` because the findability JUDGEMENT was still owed. Hours later U4 was driven and the
+> judgement was made — it is now `closed`, see the CLOSED section at the foot of this file.** It is
+> preserved rather than overwritten because its split (*the ordering half is proved; the judgement is
+> not*) is the honest description of what the code could and could not establish, and because **the
+> prediction it records — position 4 — is only interesting if the reader can still see that it was a
+> prediction.**
+
+## ⚠ STATUS AT PHASE 193.2's CLOSE-OUT PLAN (2026-08-15, pre-UAT) — `folded`, NOT `closed`, and the split is the point
 
 **The ordering half is CLOSED and proved. The findability judgement is OWED.** Those are two
 different claims and neither may be quoted as the other.
@@ -186,3 +196,36 @@ may be read as having answered it.** It is UAT row **U4** (OQ-5), owed.
 - **Any client-side sort.** D-17's fence now sweeps `libraryFilter.ts` **and** `WorkflowsPage.tsx` —
   which had **no sort coverage of any kind anywhere in the repository** before this phase — and both
   arms were driven RED against real plants in production source, separately.
+
+---
+
+## ✅ CLOSED 2026-08-15 — driven, with the prediction held and the judgement made by the operator
+
+**`193.2-UAT.md` U1 moment 3 + U4.** The just-published workflow was found **without searching and
+without knowing its name**, at **rendered position 4 of 112** (3 starters + 29 published + 80
+drafts), **first among the operator's own work**. **The measured prediction — index
+`starters.length`, i.e. 4 — held exactly.** The post-publish **Run CTA appeared and named the
+workflow**, which closes the *"the product never told me the name"* half on this path.
+
+⚠ **The recency claim is proved against a near-identical OLDER row rather than by alphabetical
+luck:** the new QBR (**14:17**) sorts **above** the old Q3 one (**02:07**). Two rows whose names
+would sort adjacently, ordered correctly by time. Without that pairing the observation would have
+been ambiguous.
+
+⚠ **THE PASS IS THE OPERATOR'S JUDGEMENT, NOT A MEASUREMENT, AND THAT SURVIVES THE RESULT.**
+`193.2-UAT.md` predicted position 4 and **refused to call it findable**. Had the operator said 4 was
+still too far down, the sort would have been no less correct and the row would have **failed** —
+which is exactly why it was asked rather than asserted. **Position 4 is not position 1, and no
+`ORDER BY` change can make it 1**; `mergeLibrary` concatenates starters first, and the alternative
+was measured to invert the dedupe precedence.
+
+⚠ **One consequence of this fix remains UNOBSERVED.** `list_published_workflows` also feeds the
+**composer's Harness picker**, **`WorkspacePanel`'s run-soul** and **`threads.py`'s kickoff** — all
+three moved from alphabetical to recency. UAT row **U5 was NOT DRIVEN**, so **the one user-visible
+consequence outside the library has not been looked at by anyone.** That is a named residual, not a
+silent one, and it is the first thing to check if the ordering ever reads oddly elsewhere.
+
+**Deliberately not built, and still not built:** a user-facing recency ⇄ A–Z **sort control** (D-18)
+and any **navigate-to-row** hand-off (D-19). Both remain routed to the deferred library layout
+sketch, where **G-2 fires** and `SEED-155` binds — now joined there by **`BUG-260815-08`** (Workflows
+header polish), filed during this same UAT session.

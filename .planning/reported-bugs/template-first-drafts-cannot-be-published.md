@@ -4,12 +4,12 @@ title: A template-first draft grows an llm_human_input phase and therefore canno
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: blocking
-status: folded
+status: closed
 affected_areas: [workflow/authoring, workflow/publish, backend/harness]
 folded_into: "193.2"
-verified_closed_by: null
+verified_closed_by: "193.2 — UAT row U1 moment 2 (`193.2-UAT.md`), driven by the operator 2026-08-15: the template-first draft PUBLISHED with the canvas untouched, on definition 93a86e21 / slug northwind-qbr-fa65a43c, run b021c7b0 COMPLETED across all five phases with zero gate failures and no llm_human_input step among them. ⚠ CLOSED ON THE BUG AS REPORTED — the operator no longer has to delete a step to publish — NOT on a claim of absence: the fix is prompt-level and non-deterministic, measured 0/20, and THE PUBLISH GATE STAYS. Three earlier publish attempts that day were blocked (all `blocked_stage: structural_gate`, 14:02/14:07/14:10) by an EXHAUSTED OpenAI credit balance starving retrieval, not by this defect and not by any product defect on the publish path — the gauntlet behaved exactly as designed."
 related_seeds: [SEED-157, SEED-163, SEED-164]
-re_open_trigger: "STAYS OPEN as `folded` at Phase 193.2's close, deliberately. The fix is PROMPT-LEVEL and therefore NON-DETERMINISTIC (D-08): measured `llm_human_input` 0/20 across 20 real paid generations on two providers, against a pre-fix 2/2-with-a-template and 4/6 overall (`193.2-FREQUENCY.md` §3). THE CLAIM IS A MEASURED REDUCTION, NEVER AN ABSENCE — one more generation can still produce an interactive step, which is exactly why the publish gate stays. This report may flip to `closed` ONLY when UAT row U1 moment 2 (`193.2-UAT.md`) records a real operator-driven publish that succeeded WITHOUT a canvas edit; U1 is OWED at close. RE-OPEN if: the operator meets an interactive step on a template-first draft again; or a refusal appears that names `llm_human_input` / `ask_user` / a slug / a step number instead of the step's visible canvas label; or the publish gate is widened to refuse `external_action` (forbidden by a shipped fence — CONFLICT-1 Option B, REJECTED)."
+re_open_trigger: "CLOSED 2026-08-15 on a driven run, and these are the conditions that RE-OPEN it. ⚠ THE CLOSURE RESTS ON A FREQUENCY, SO IT IS FALSIFIABLE BY A SINGLE SIGHTING — the fix is prompt-level and therefore NON-DETERMINISTIC (D-08): measured `llm_human_input` 0/20 across 20 real paid generations on two providers, against a pre-fix 2/2-with-a-template and 4/6 overall (`193.2-FREQUENCY.md` §3). A MEASURED REDUCTION, NEVER AN ABSENCE, which is exactly why the publish gate stays. RE-OPEN if: (a) the operator meets an interactive step on a template-first draft again — one sighting is enough and it does not need to be reproducible; (b) a refusal appears naming `llm_human_input` / `ask_user` / a slug / a step number instead of the step's visible canvas label; (c) the publish gate is widened to refuse `external_action`, which a shipped fence forbids (CONFLICT-1 Option B, REJECTED). ⚠ ALSO NOT COVERED BY THIS CLOSURE: the rewritten two-arm refusal copy has still never been read by a person — UAT row U2 was NOT DRIVEN and could not be, because the surface only renders when an interactive step exists and none did. A defect not occurring is not the same as its error message reading well."
 reproduces_on:
   branch: develop
   commit: bab09f41
@@ -159,7 +159,15 @@ what makes the operator's golden-run-skip proposal the right first thing to eval
 
 ---
 
-## ⚠ STATUS AT PHASE 193.2's CLOSE (2026-08-15) — `folded`, NOT `closed`, and the reason is a measurement
+## ⚠ SUPERSEDED THE SAME DAY — kept verbatim, not deleted
+
+> **The section below was written BEFORE the operator drove the D-21 run, and it says this report
+> stays `folded`. Hours later U1 was driven and it is now `closed` — see the CLOSED section at the
+> foot of this file.** It is preserved rather than overwritten because *the reason it said `folded`
+> is still the correct reason*, and the closure rests on exactly the frequency it describes. Nothing
+> in it is retracted; only its status line is out of date.
+
+## ⚠ STATUS AT PHASE 193.2's CLOSE-OUT PLAN (2026-08-15, pre-UAT) — `folded`, NOT `closed`, and the reason is a measurement
 
 **What 193.2 shipped against this report, in two halves that must not be quoted as one.**
 
@@ -216,3 +224,47 @@ and unchanged in severity; only its location moved — it is on the canvas, not 
 **deliberately** pauses for a person still cannot be published. **193.2 SUPPRESSES the unwanted step;
 it does not deliver that capability** — that is `SEED-164`, and nothing shipped here may imply
 otherwise.
+
+---
+
+## ✅ CLOSED 2026-08-15 — verified on a real operator-driven run, and the closure names exactly what it covers
+
+**`193.2-UAT.md` U1 moment 2.** Definition `93a86e21` (slug `northwind-qbr-fa65a43c`), run
+**`b021c7b0` COMPLETED** across all five phases — `gather-usage` → `gather-support` →
+`gather-commercial` → `synthesize` → `emit-qbr` — **zero gate failures, and not one
+`llm_human_input` among them.** **The draft published with the canvas untouched.** That is the bug as
+reported, and it is closed.
+
+⚠ **WHAT THE CLOSURE DOES *NOT* CLAIM.** The fix is **prompt-level and non-deterministic**: measured
+**0/20** across 20 real paid generations on two providers, against a pre-fix **2/2 with a template**.
+**A reduction, never an absence.** One more generation can still compose an interactive step, and
+when it does the fallback is today's exact behaviour. **The publish gate stays**, and nothing
+downstream may be relaxed on the strength of this closure. The `re_open_trigger` above is falsifiable
+by a **single** sighting, which is the honest shape for a closure resting on a frequency.
+
+⚠ **The rewritten refusal copy is still UNREAD BY A PERSON.** UAT row **U2 was NOT DRIVEN and could
+not have been** — the surface only renders when an interactive step exists, and none did. Its two
+arms are pinned by unit cases and were driven RED against five real plants; that is all the evidence
+there is. **A defect not occurring is not the same as its error message reading well.**
+
+⚠ **The three blocked attempts that day were NOT this defect and NOT a product defect on the publish
+path**, and the distinction was established by measurement rather than assumed: the **OpenAI credit
+balance was exhausted** (`429 insufficient_quota` / `credit_balance_exhausted`, confirmed by a live
+`embeddings.create`). Every document is embedded with `text-embedding-3-small`, so every search must
+embed its query; with no credits retrieval returned **0 sources**, `citations_required` failed 3× per
+run, the golden run failed and publish **correctly refused**. Ruled out by measurement: 5 docs / 18
+chunks / **0 null embeddings** / matching `org_id` / a definition byte-comparable to one that had
+worked hours earlier. All three rows read `blocked_stage: structural_gate` (14:02:21, 14:07:42,
+14:10:29) — read through the **C-7 accessor** `metadata #>> '{}'`, since `->>'blocked_stage'` returns
+NULL on every row of that column by definition.
+
+⚠ **Two findings were filed from those refusals and neither is closed by this report:**
+**`BUG-260815-05`** (blocking) — *a provider outage is reported as "nothing was retrieved (0
+sources)"*; and **`BUG-260815-06`** (major) — *the structural-gate refusal names a stage, not a
+cause*. **The second is the same failure class this report is about, surviving on the gate next
+door:** 193.2 rewrote one refusal's words and the neighbouring one still names machinery instead of
+telling a person what happened.
+
+**Still true and not delivered here:** a workflow that **deliberately** pauses for a person still
+cannot be published. **193.2 SUPPRESSED the unwanted step; it did not deliver that capability** —
+that is `SEED-164`, and this closure does not touch it.
