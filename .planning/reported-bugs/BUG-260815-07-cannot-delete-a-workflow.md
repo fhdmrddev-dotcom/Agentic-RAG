@@ -37,6 +37,41 @@ Measured against the live local DB, 2026-08-15:
 request appears not to have reached the audit write at the end of the cascade — consistent with a
 failure *before* step 4, or with the request never reaching the endpoint at all.
 
+## ⚠ NOT REPRODUCIBLE — and that makes it worse, not better (2026-08-15, same session)
+
+The operator retried shortly afterwards: **deleting a published workflow AND deleting a draft both
+succeeded.** Their words: *"I don't know what happened at that time."*
+
+**This report stays `open` and stays `major`.** An intermittent delete failure is harder to trust
+than a consistent one — "it works now" is how this gets closed and then bites during a demo. What
+changed between the failing and succeeding attempts is not known.
+
+**Timing, for whoever picks this up:** the failure happened while authoring, roughly `14:01`–`14:13`
+— the same window in which three golden runs failed because the OpenAI balance was exhausted
+(`BUG-260815-05`), and in which the operator added credits. **Delete does not call OpenAI**, so a
+direct link is unlikely; but a backend restart around the credit top-up would explain a transient
+failure on any request, and is the cheapest hypothesis to hold.
+
+## ⚠ ADJACENT FINDING — two runs stuck `active` for weeks (this one IS reproducible)
+
+Measured across the whole local DB:
+
+| run id | status | created |
+|---|---|---|
+| `4b0feda7-c524-4a18-8ea0-4c6fc9705868` | `active` | **2026-08-01** |
+| `fde3bbe3-02c2-4664-902f-921411bb1fe7` | `active` | **2026-06-14** |
+
+No worker will ever finish these. **They are a genuine, permanent delete blocker for their own
+workflows**, because `delete_workflow_cascade` cancels every in-flight run for the slug *before* the
+DB delete (D-LOCK-05) — a run that cannot be cancelled cleanly stalls the cascade. They are also
+presumably rendering as live runs on any surface that reads run status.
+
+⚠ **This is NOT the operator's failure** — their drafts from the `14:01`–`14:13` window are all
+`failed`, not stuck. It is a separate defect found while investigating, and it is the one with a
+reproducible cause. **Whoever fixes deletion should handle "cancel a run that no worker owns"
+explicitly**, and the Control Room's active-runs-with-Kill surface (Phase 146-148) is where an
+operator should be able to clear them.
+
 ## What is still needed
 
 **The exact error text, and which workflow.** Then the next check is whether the failure is:
