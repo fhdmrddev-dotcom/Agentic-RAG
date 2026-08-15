@@ -77,6 +77,10 @@ const PAINTABLE_TABLE: Record<CanvasReading, true> = {
   "waiting-for-you": true,
   "recorded-not-sent": true,
   unknown: true,
+  // 194-04 (RUN-01 / D-04): the forcing fired a SECOND time, identically. `"cancelled"` was
+  // added to `CanvasReading` and this table stopped typechecking until this row landed —
+  // one of ELEVEN TS2741s the widening armed, all recorded in `194-04-SUMMARY.md`.
+  cancelled: true,
 }
 const PAINTABLE = new Set<string>(Object.keys(PAINTABLE_TABLE))
 
@@ -99,6 +103,8 @@ const ALL_PHASE_STATUSES: Record<Phase["status"], true> = {
   skipped: true,
   "recorded-not-sent": true,
   unknown: true,
+  // 194-04 (RUN-01 / D-04) — the ninth member, forced here by the compiler.
+  cancelled: true,
 }
 const PHASE_STATUSES = Object.keys(ALL_PHASE_STATUSES) as Phase["status"][]
 
@@ -113,6 +119,9 @@ const EXPECTED_READING: Record<Phase["status"], CanvasReading> = {
   // 189-08 (D-07): its own reading, spelled identically to its status. NOT `done`.
   "recorded-not-sent": "recorded-not-sent",
   unknown: "unknown",
+  // 194-04 (D-04 / D-13): its own reading, spelled identically to its status. NOT `failed`,
+  // NOT `skipped` and NOT `unknown` — the three collapses the phase exists to refuse.
+  cancelled: "cancelled",
 }
 
 /**
@@ -132,6 +141,13 @@ const DB_TABLE = [
   ["failed", "failed", "failed"],
   ["skipped", "skipped", "skipped"],
   ["recorded_not_sent", "recorded-not-sent", "recorded-not-sent"],
+  // The SEVENTH row arrived with migration 119 (194-04). ⚠ Its three columns are spelled
+  // IDENTICALLY, and that is a coincidence of this one word rather than a relaxation of
+  // D-17: `cancelled` needs no case change and no kebab hyphen, exactly as `failed` and
+  // `skipped` have always coincided. The rule that the slug, the client member and the
+  // rendered sentence are three different things still holds — the panel's word and the
+  // canvas's sentence are neither of the three strings on this line.
+  ["cancelled", "cancelled", "cancelled"],
 ] as const satisfies ReadonlyArray<readonly [string, Phase["status"], CanvasReading]>
 
 // Unmapped inputs, ASSEMBLED so this file's source carries no bare status literal a
@@ -269,6 +285,86 @@ describe("the sixth DB slug — its OWN status, neither success nor unreadable",
   })
 })
 
+// ── 1c. THE SEVENTH SLUG (Phase 194 Plan 04 — RUN-01 / D-04 / D-07 / D-13 / D-17) ──
+//
+// ⚠ THE BASELINE THIS BLOCK SUPERSEDES, MEASURED BEFORE IT WAS WRITTEN, and it is the whole
+// reason this plan exists. At the phase's base commit the migration-119 slug missed
+// `phaseStatusFromDb`'s own-property guard, resolved to `unknown`, fell through
+// `canvasReading`'s `default:` to `unknown`, and rendered as the panel's honest **"Unknown"**
+// on the run spine — fail-CLOSED and therefore not a lie, but not D-13's "the interrupted
+// phase reads stopped, not failed" either. The observation was DRIVEN, not reasoned: a
+// temporary probe asserting `phaseStatusFromDb("cancelled") === "unknown"` PASSED against
+// the unwidened tree, and the run is recorded in `194-04-SUMMARY.md`.
+//
+// ⚠ AND THE GAP WAS NOT IN THE PHASE'S RESEARCH. Both `194-RESEARCH.md` and `194-PATTERNS.md`
+// mapped the stopped-state vocabulary to `RunCard.statusGlyph`/`statusWord` — the RUN-level
+// chat receipt — and neither names `Phase["status"]` at all. The panel spine's status
+// vocabulary is a SECOND, independent closed union, and it was found by reading the union
+// rather than by reading the research. Recorded here so the next widening starts from the
+// list rather than from the map.
+//
+// All three NEGATIVES are asserted explicitly. Asserting only the positive would still pass
+// if the value were ALSO aliased to one of them somewhere — which is exactly this phase's
+// stated failure mode: a step that was interrupted reading as one that failed.
+
+describe("the seventh DB slug — its OWN status, neither failure nor unreadable", () => {
+  it("resolves to its own client member, and explicitly NOT to failed, skipped or unknown", () => {
+    expect(phaseStatusFromDb("cancelled")).toBe("cancelled")
+    expect(
+      phaseStatusFromDb("cancelled"),
+      "a step a person interrupted must never read as one that went wrong",
+    ).not.toBe("failed")
+    expect(
+      phaseStatusFromDb("cancelled"),
+      "the step DID run — it was never routed around",
+    ).not.toBe("skipped")
+    expect(
+      phaseStatusFromDb("cancelled"),
+      "the slug is now RECOGNISED — leaving it on the unknown floor is the D-13 gap this plan closes",
+    ).not.toBe("unknown")
+    expect(phaseStatusFromDb("cancelled"), "nothing finished").not.toBe("done")
+  })
+
+  it("keeps the unknown FLOOR intact, and the own-property guard with it", () => {
+    // The half of the widening a "the map is now complete" reading is likeliest to delete.
+    expect(phaseStatusFromDb("a_status_nobody_ships")).toBe("unknown")
+    expect(phaseStatusFromDb("a_status_nobody_ships")).not.toBe("cancelled")
+    // THE GUARD, PINNED BESIDE THE GROWTH rather than trusted from the block above: an
+    // INHERITED prototype name is still not a status, and specifically not the new one.
+    expect(phaseStatusFromDb(PROTOTYPE_KEY)).toBe("unknown")
+    expect(phaseStatusFromDb(PROTOTYPE_KEY)).not.toBe("cancelled")
+    expect(typeof phaseStatusFromDb(PROTOTYPE_KEY)).toBe("string")
+    // POSITIVE CONTROL — the inherited member really is reachable by index on a plain
+    // object literal, so the refusal above is a measurement.
+    expect((DB_PHASE_STATUS as Record<string, unknown>)[PROTOTYPE_KEY]).toBeDefined()
+  })
+
+  it("paints its OWN reading through an EXPLICIT arm, never through the default:", () => {
+    expect(canvasReading(mkPhase({ status: "cancelled" }))).toBe("cancelled")
+    // The arm is explicit, and this is how that is measured WITHOUT reading the source: an
+    // unrecognised status still falls to `unknown`, so if the new status were reaching the
+    // same `default:` the two calls would agree. They must not.
+    const viaDefault = canvasReading(
+      mkPhase({ status: "a_status_nobody_ships" as unknown as Phase["status"] }),
+    )
+    expect(viaDefault).toBe("unknown")
+    expect(canvasReading(mkPhase({ status: "cancelled" }))).not.toBe(viaDefault)
+    expect(canvasReading(mkPhase({ status: "cancelled" }))).not.toBe("failed")
+    expect(canvasReading(mkPhase({ status: "cancelled" }))).not.toBe("skipped")
+  })
+
+  it("leaves the arm ORDER untouched — a pending ask still outranks it, absence is still known", () => {
+    // The two precedence rules that sit ABOVE the switch, re-pinned beside the growth. A
+    // step blocked on the user is blocked on the user whatever its row says — including
+    // this row — and a node with no run row at all is still a KNOWN not-started state.
+    expect(
+      canvasReading(mkPhase({ status: "cancelled", pendingAsk: "Which supplier?" })),
+    ).toBe("waiting-for-you")
+    expect(canvasReading(undefined)).toBe("not-started")
+    expect(canvasReading(undefined)).not.toBe("cancelled")
+  })
+})
+
 // ── 2. THE Req-4 SUBSET PROPERTY (D-188-03) ─────────────────────────────────────
 
 describe("canvasReading — the canvas can only paint what a reconcile can restore", () => {
@@ -281,7 +377,8 @@ describe("canvasReading — the canvas can only paint what a reconcile can resto
     ])
     // 6 → 7 at 189-08: the sixth CHECK literal maps to a sixth distinct client status,
     // plus the honest fallback. Derived from the shipped map, so it moves with it.
-    expect(RECONCILABLE.size).toBe(7)
+    // 7 → 8 at 194-04: migration 119's seventh CHECK literal, same argument.
+    expect(RECONCILABLE.size).toBe(8)
     for (const status of RECONCILABLE) {
       expect(PAINTABLE.has(canvasReading(mkPhase({ status })))).toBe(true)
     }
@@ -292,7 +389,7 @@ describe("canvasReading — the canvas can only paint what a reconcile can resto
     // POSITIVE CONTROL — the membership check does find a reading that IS in the set,
     // so the absence above is a measurement and not a broken assertion.
     expect([...PAINTABLE]).toContain("running")
-    expect(PAINTABLE.size).toBe(8) // 7 → 8 at 189-08 (D-07)
+    expect(PAINTABLE.size).toBe(9) // 7 → 8 at 189-08 (D-07); 8 → 9 at 194-04 (D-04)
   })
 
   it("makes retrying INDISTINGUISHABLE from running by construction (D-188-03)", () => {
@@ -382,17 +479,19 @@ describe("parity — two vocabularies, ONE derivation", () => {
     })
   }
 
-  it("keeps the panel's union and the canvas's readings the same SIZE, eight each", () => {
+  it("keeps the panel's union and the canvas's readings the same SIZE, nine each", () => {
     // Not the same VALUES — that is the point of D-188-02. The panel says one thing
     // about a step the engine has not unlocked and the canvas says another; both are
     // functions of one derivation. Equal cardinality is the shape of that mapping.
     // 7 → 8 at 189-08: BOTH unions grew by exactly one, together, which is what keeps
     // the mapping a mapping rather than letting the canvas quietly lose a state.
-    expect(PHASE_STATUSES).toHaveLength(8)
-    expect(PAINTABLE.size).toBe(8)
+    // 8 → 9 at 194-04: the same, a second time. This case is the one that catches a
+    // widening that stops halfway — a `Phase["status"]` member with no reading to paint.
+    expect(PHASE_STATUSES).toHaveLength(9)
+    expect(PAINTABLE.size).toBe(9)
     // …and the mapping is NOT the identity: two statuses collapse into one reading,
     // so one reading has no status of its own.
-    expect(new Set(Object.values(EXPECTED_READING)).size).toBe(7)
+    expect(new Set(Object.values(EXPECTED_READING)).size).toBe(8)
   })
 
   it("exposes exactly the workflow_phases_status_check keys, no more", () => {
