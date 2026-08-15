@@ -191,6 +191,9 @@ const ALL_READINGS_TABLE: Record<CanvasReading, true> = {
   // widened `CanvasReading` and this table stopped typechecking, which is how the eighth
   // reading reached every loop below without a list being updated by hand.
   "recorded-not-sent": true,
+  // 194-04 (RUN-01 / D-04). The same mechanism, a second time and identically — this table
+  // was one of ELEVEN TS2741s the widening armed.
+  cancelled: true,
 }
 const ALL_READINGS = Object.keys(ALL_READINGS_TABLE) as CanvasReading[]
 
@@ -2013,6 +2016,14 @@ describe("188-06 — one ring SHAPE per reading (the greyscale acceptance clause
     // below is therefore UNMOVED at 5 while the reading set grew to 8, and that unmoved
     // number IS the evidence: the shape channel carries the eighth reading alone.
     expect(arcStroke("recorded-not-sent")).toBe(arcStroke("skipped"))
+    // 194-04: and the STOPPED reading joins the same muted token, which is the assertion
+    // that 194 SPENT NO NEW COLOUR EITHER. Every other token would have made a false claim —
+    // success would say the step finished, destructive would say something went wrong when a
+    // person simply ended the run, warning would demand an action nobody owes. So the count
+    // below is UNMOVED AT 5 for a SECOND consecutive widening while the reading set grew to
+    // 9, and that twice-unmoved number IS the evidence: the shape channel carries both new
+    // readings alone.
+    expect(arcStroke("cancelled")).toBe(arcStroke("skipped"))
     expect(new Set(strokes).size).toBe(5)
     expect(strokes).toHaveLength(ALL_READINGS.length - 1) // every reading but `not-started`
   })
@@ -2034,10 +2045,15 @@ describe("188-06 — one ring SHAPE per reading (the greyscale acceptance clause
     // and a reading added without moving it reads as a regression rather than as growth;
     // derived, the guard is inherited by the ninth reading for free. (It is 8 as this line
     // is written — D-16's `recorded-not-sent` word joined the seven.)
+    //
+    // ⚠ 194-04 — AND THE DERIVED FORM PAID OFF EXACTLY AS PREDICTED. The pairwise-distinct
+    // property above inherited the NINTH word for free: not one character of that assertion
+    // moved when `cancelled` was added. Only the inventory count on the line below had to,
+    // which is the difference between a guard and a tally.
     expect(new Set(Object.values(RUN_READING_WORD)).size).toBe(
       Object.keys(RUN_READING_WORD).length,
     )
-    expect(Object.keys(RUN_READING_WORD).length).toBe(8)
+    expect(Object.keys(RUN_READING_WORD).length).toBe(9)
   })
 })
 
@@ -3480,6 +3496,103 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeLinecap: "round",
       strokeDasharray: "32.044 21.363 32.044 21.363 32.044 21.363 32.044 21.363",
       strokeDashoffset: "16.022",
+    },
+    {
+      key: "canvas-node-run-line",
+      class: "mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90",
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-summarize",
+      class: "relative",
+      style: "width: 260px; min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "probe-icon",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+  ],
+  // ── 194-04 (RUN-01 / D-04 / D-13) — THE NINTH READING'S CAPTURE ────────────────────
+  //
+  // ⚠ THE CAPTURE RULE ABOVE APPLIED IN FULL, AND THIS IS A **NEW** CAPTURE RATHER THAN A
+  // RE-CAPTURE. Not one existing key was re-read, re-run or re-written — `git diff` on this
+  // literal is a pure addition, which is what keeps the eight 188.2-03 baselines exactly as
+  // load-bearing as they were. Every value below was READ OUT of the rendered DOM by running
+  // `cardShapeOf({ status: "cancelled" })` and substituting what it printed; not one number
+  // was typed from the source, computed by hand or reasoned about; and the capture was
+  // OBSERVED TWICE, the two dumps compared and found md5-identical
+  // (`d235a365378bc540b2a6ab88c5e94f64`) BEFORE either was written here.
+  //
+  // ⚠ AND A DIFF AGAINST THIS ARRAY IS A BEHAVIOUR CHANGE, NOT A TEST TO UPDATE — the same
+  // standing rule the eight rows above carry.
+  //
+  // The arc row is the whole point of the entry: `106.814 106.814` is the ring cut exactly in
+  // half, at an offset of `53.407`, on the muted stroke. It is the only capture in this matrix
+  // whose two dash numbers are equal.
+  cancelled: [
+    {
+      key: "(card-div — the 137-B card, no data-testid)",
+      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
+      style: "min-height: 120px;",
+      ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring",
+      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-node-ring-arc",
+      class: null,
+      style: null,
+      ariaHidden: null,
+      ariaLabel: null,
+      r: "34",
+      stroke: "hsl(var(--muted-foreground))",
+      strokeWidth: "3.5",
+      strokeLinecap: "round",
+      strokeDasharray: "106.814 106.814",
+      strokeDashoffset: "53.407",
     },
     {
       key: "canvas-node-run-line",

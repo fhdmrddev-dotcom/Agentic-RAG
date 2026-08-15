@@ -548,3 +548,162 @@ describe("panel/PhaseTimeline WR-05 — the doing-now line speaks the panel's wo
     expect(text).not.toContain("native code")
   })
 })
+
+// ── 194-04 · RUN-01 / D-04 / D-13 — the panel's own word for the STOPPED step ───────
+//
+// D-13 requires the interrupted phase to read STOPPED — not failed, and not "Unknown".
+// This is the DEVELOPER PANEL's surface, and it speaks the panel's own harness word
+// (`Stopped`), not the canvas's business sentence — two vocabularies, one derivation,
+// `lib/phaseState.ts`'s shipped rule.
+//
+// ⚠ EXACT-MATCH ASSERTIONS THROUGHOUT, deliberately, for the same reason 189-08 gave one
+// block up: the canvas's sentence for this state SHARES ITS FIRST WORD with the panel's,
+// so a `toContain("Stopped")` here would pass across both surfaces and prove nothing about
+// either. Non-collision is asserted as string INEQUALITY against every word the panel ships.
+
+describe("panel/PhaseCard 194-04 — the stopped terminal has its OWN word and mark", () => {
+  it("renders the declared row: the ■ mark and the exact text `Stopped`", () => {
+    const { container } = render(
+      <PhaseCard phase={basePhase({ status: "cancelled" })} position={0} />,
+    )
+    const [glyph, text] = statusAtomOf(container)
+    expect(text).toBe("Stopped")
+    expect(glyph).toBe("■")
+    // POSITIVE CONTROL for the reader itself — a shipped row is read the same way, so the
+    // two assertions above are measuring the atom and not an empty selector.
+    const done = render(<PhaseCard phase={basePhase({ status: "done" })} position={0} />)
+    expect(statusAtomOf(done.container)).toStrictEqual(["✓", "Complete"])
+  })
+
+  it("collides with NO shipped panel word — the four D-04 refusals, asserted exactly", () => {
+    const { container } = render(
+      <PhaseCard phase={basePhase({ status: "cancelled" })} position={0} />,
+    )
+    const [glyph, text] = statusAtomOf(container)
+    for (const word of SHIPPED_PANEL_WORDS) {
+      expect(text, `the stopped word must not be ${word}`).not.toBe(word)
+    }
+    // …and specifically not the four D-04 names. Each is a distinct FALSE claim about this
+    // step: that it finished, that something went wrong, that it never ran, that we cannot
+    // tell. The last is the one that actually shipped before this plan.
+    expect(text).not.toBe("Complete")
+    expect(text).not.toBe("Failed")
+    expect(text).not.toBe("Skipped")
+    expect(text).not.toBe("Unknown")
+    // …nor 189's terminal, which is a different state with a different cause entirely.
+    expect(text).not.toBe("Not sent")
+    // The MARK is distinct from every shipped panel glyph too — a shared mark would
+    // re-collide what the words separate. Asserted over the whole atom set, not a list.
+    const shippedGlyphs = (
+      ["pending", "running", "done", "failed", "retrying", "skipped", "recorded-not-sent", "unknown"] as const
+    ).map((status) => {
+      const r = render(<PhaseCard phase={basePhase({ status })} position={0} />)
+      const g = statusAtomOf(r.container)[0]
+      r.unmount()
+      return g
+    })
+    // Compared against the mark this row ACTUALLY RENDERED, never a literal re-typed here —
+    // a re-typed one would test that the author can copy a character, not that the table's
+    // ninth mark is unclaimed.
+    expect(shippedGlyphs).not.toContain(glyph)
+    expect(glyph).toBe("■")
+    // NON-VACUITY: the sweep really did read eight marks, not eight empty strings.
+    expect(new Set(shippedGlyphs).size).toBe(8)
+    // POSITIVE CONTROL — the comparison really can find equality, so the inequalities
+    // above are measurements.
+    const doneCard = render(<PhaseCard phase={basePhase({ status: "done" })} position={0} />)
+    expect(SHIPPED_PANEL_WORDS).toContain(statusAtomOf(doneCard.container)[1])
+  })
+
+  it("keeps the fail-closed floor: an INHERITED key still reads Unknown, not Stopped", () => {
+    // The growth must not have widened what the WR-04 own-property guard lets through.
+    // `STATUS_META` gained a key; the fallback is still the declared `unknown` row — never
+    // the new one, and never a claim of success.
+    const proto = render(
+      <PhaseCard
+        phase={basePhase({ status: "constructor" as unknown as Phase["status"] })}
+        position={0}
+      />,
+    )
+    const [protoGlyph, protoText] = statusAtomOf(proto.container)
+    expect(protoText).toBe("Unknown")
+    expect(protoText).not.toBe("Stopped")
+    expect(protoGlyph).not.toBe("■")
+  })
+
+  it("a COMPLETED sibling in the same render still reads Complete (V-18, vocabulary layer)", () => {
+    // D-07 / D-13: a stopped run KEEPS its completed phases. This is that rule at the
+    // vocabulary layer — the two rows are read out of ONE render, so a change that
+    // repainted finished steps could not hide behind two separate mounts.
+    const done = render(<PhaseCard phase={basePhase({ status: "done" })} position={0} />)
+    const stopped = render(<PhaseCard phase={basePhase({ status: "cancelled" })} position={0} />)
+    expect(statusAtomOf(done.container)).toStrictEqual(["✓", "Complete"])
+    expect(statusAtomOf(stopped.container)).toStrictEqual(["■", "Stopped"])
+  })
+})
+
+/**
+ * THE ANNOUNCER — the consumer `tsc` CANNOT find, hunted from a written list of consumers
+ * rather than from a compiler run, exactly as 189's arm was. `milestoneFor` is a switch with
+ * a fall-through arm, so the widened `Phase["status"]` produced NO typecheck error there and
+ * a screen-reader user would simply have been told nothing when the step reached its
+ * terminal. The plan is that written list; this block is its proof.
+ *
+ * ⚠ THE GAP WAS DRIVEN RED BEFORE THE ARM WAS WRITTEN. Against the un-armed switch this
+ * first case failed with `expected '' to be 'Phase 2 of 2, notify, stopped'` — the empty
+ * string, i.e. the silence the docblock predicts. Recorded in `194-04-SUMMARY.md`.
+ *
+ * Driven through the REAL `PhaseTimeline` over the REAL store rather than by calling the
+ * private switch: the announcer only writes on a transition EDGE for the ACTIVE phase, so a
+ * unit call would have proved the sentence exists without proving it is ever spoken.
+ */
+describe("panel/PhaseTimeline 194-04 — the announcer states the stopped terminal", () => {
+  it("announces `stopped` for the new terminal, and never `complete` or `failed`", async () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done", subAgents: [], pendingAsk: null },
+      { slug: "notify", phaseIndex: 1, phaseType: "llm_emit", status: "cancelled", subAgents: [], pendingAsk: null },
+    ])
+    render(<PhaseTimeline threadId={THREAD} />)
+
+    const announcer = await screen.findByRole("status")
+    expect(announcer.textContent).toBe("Phase 2 of 2, notify, stopped")
+    // It must be SPOKEN — the empty string is what the un-armed switch returned, and it is
+    // the failure this case was watched to produce.
+    expect(announcer.textContent).not.toBe("")
+    expect(announcer.textContent).not.toContain("complete")
+    expect(announcer.textContent).not.toContain("failed")
+    // …and it ends in the PANEL's own words, never in the internal member spelling.
+    expect(announcer.textContent).not.toContain("cancelled")
+  })
+
+  it("POSITIVE CONTROL — the same seam announces `complete` for a done terminal", async () => {
+    // Without this, the case above is consistent with an announcer that says whatever the
+    // last arm returns. The two sentences must differ, in the same shipped pattern.
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done", subAgents: [], pendingAsk: null },
+      { slug: "notify", phaseIndex: 1, phaseType: "llm_emit", status: "done", subAgents: [], pendingAsk: null },
+    ])
+    render(<PhaseTimeline threadId={THREAD} />)
+
+    const announcer = await screen.findByRole("status")
+    expect(announcer.textContent).toBe("Phase 2 of 2, notify, complete")
+  })
+
+  it("the doing-now line reads `notify — Stopped`, never the internal member", () => {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+      { slug: "draft", phaseIndex: 0, phaseType: "llm_single", status: "done", subAgents: [], pendingAsk: null },
+      { slug: "notify", phaseIndex: 1, phaseType: "llm_emit", status: "cancelled", subAgents: [], pendingAsk: null },
+    ])
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    const text = container.textContent ?? ""
+    expect(text).toContain("notify — Stopped")
+    // WR-05's rule, inherited: the internal member must not reach user-visible copy. Here
+    // the member and the DB slug happen to be spelled the same, so this one assertion
+    // covers both — which is a property of the word, not a relaxation of D-17.
+    expect(text).not.toContain("— cancelled")
+  })
+})

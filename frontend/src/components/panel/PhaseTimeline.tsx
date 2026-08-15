@@ -88,6 +88,19 @@ function milestoneFor(phase: Phase | undefined, total: number): string {
     // nothing as finished is the same fail-open one language layer up.
     case "recorded-not-sent":
       return `${ordinal}, ${phase.slug}, not sent`
+    // Phase 194 Plan 04 (RUN-01 / D-04 / D-13) — the stopped step's terminal, in the shipped
+    // pattern: ordinal, slug, then the state. It ends in the panel's own harness words and
+    // must not be spoken as `complete` or as `failed`; announcing an interrupted step as
+    // finished, or as broken, is the same fail-open one language layer up.
+    //
+    // ⚠ THIS IS THE ARM THE COMPILER COULD NOT ASK FOR. The widening armed ELEVEN TS2741s
+    // and NOT ONE of them was here, because of the fall-through arm below — so this arm came
+    // off the plan's written list of consumers, exactly as 189's did. It was DRIVEN RED
+    // first: with the arm absent, the announcer returned the EMPTY STRING and the case
+    // reported `expected '' to be 'Phase 2 of 2, notify, stopped'`. A screen-reader user was
+    // being told a step had reached a terminal by hearing nothing at all.
+    case "cancelled":
+      return `${ordinal}, ${phase.slug}, stopped`
     default:
       return ""
   }
