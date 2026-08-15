@@ -624,6 +624,49 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         },
 
         /**
+         * ── Phase 193.2-09 (D-06) — THE MARK DEMOTES ON EDIT, IN THIS SAME `set()` ───────
+         *
+         * `193.2-07` added `business_requirement_seeded_by_ai`, stamped server-side when the
+         * generator PROPOSES the requirement, and `193.2-09` renders it as a visible mark on
+         * the Builder header. The moment the author types, the value is no longer purely the
+         * AI's — so the flag is cleared HERE, in the SAME `set()` that writes the text. Not a
+         * second write, and not something the render decides.
+         *
+         * THE SHIPPED RULE THIS MIRRORS. `definitionOps.ts`'s `patchPhaseConfig` clears BOTH
+         * `name` and `name_seeded_by_ai` together, because *"clearing only the name would
+         * leave a provenance marker describing a name that no longer exists"*. Same sentence,
+         * other direction: writing only the text would leave a marker describing text nobody
+         * proposed. Value and marker travel together, or one of them lies.
+         *
+         * ⚠ CLEARED ON **ANY** EDIT — NO CLIENT-SIDE "IS THIS STILL THE AI's SENTENCE?".
+         * Comparing the new text against the seeded value, diffing it, or debouncing the
+         * decision would be exactly the second copy of a server predicate the paragraph below
+         * forbids by name (D-182-06) — and a worse one than a trim would be, because the
+         * server holds no such predicate at all to be a copy OF. Provenance is decided in ONE
+         * place (`workflow_authoring.py`, after validation, ignoring the emitted payload in
+         * both directions); this action only ever RETIRES it.
+         *
+         * WHY `false` RATHER THAN `delete`, and the two are NOT interchangeable here.
+         * `patchPhaseConfig` deletes because `name` / `name_seeded_by_ai` are OPTIONAL keys
+         * where absence is the only honest spelling of "no name", and an explicit `undefined`
+         * would serialize into a backend union with `extra="forbid"`. This field differs in
+         * the one way that matters: `WorkflowDefinition` DECLARES it, `bool = False`, with no
+         * `| None` (`backend/app/models/harness.py`). So `false` is a declared, valid value
+         * that `extra="forbid"` accepts and that means exactly what an absent key would mean
+         * — there is no round-trip identity to protect. What `false` buys is EVIDENCE: the
+         * demote is then directly observable in the PATCH body, whereas an absent key is
+         * indistinguishable from a store that never wrote the field at all. `undefined` is
+         * refused outright — that is the trap `definitionOps` avoided by deleting.
+         *
+         * WHITESPACE STILL GOES THROUGH, and the honest consequence is stated rather than
+         * smoothed: editing a seeded value down to `"   "` clears the flag AND leaves a
+         * whitespace value. Correct on both halves — the server's stamp would refuse to mark
+         * such a value either (`193.2-07`'s empty rule), and the shipped
+         * `REQUIREMENT_INVITATION` placeholder does not show for a whitespace value. That is
+         * today's behaviour and this plan does not change it.
+         *
+         * ── everything below is the quick-260809-klo docblock, unedited ──────────────────
+         *
          * Quick 260809-klo (BUG-260809-02) — write the workflow's one-line business
          * requirement. A WORKFLOW-LEVEL definition edit, and the store half of the one
          * hole that made a canvas-authored workflow UNPUBLISHABLE: the field is declared
@@ -668,7 +711,16 @@ export function createBuilderStore(initial: BuilderDefinition | null): BuilderSt
         setBusinessRequirement: (text) => {
           const s = get()
           if (s.builderPhase !== "drafted") return
-          set({ meta: { ...s.meta, business_requirement: text }, dirty: true })
+          set({
+            meta: {
+              ...s.meta,
+              business_requirement: text,
+              // ONE `set()`: the text and its provenance move together, so no ordering
+              // between two writes can exist for a later reader to get wrong.
+              business_requirement_seeded_by_ai: false,
+            },
+            dirty: true,
+          })
         },
 
         /**
