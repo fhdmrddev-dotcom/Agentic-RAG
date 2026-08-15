@@ -126,6 +126,15 @@ import { WorkflowBuilderPage, type BuilderDefinition } from "./WorkflowBuilderPa
 // draft's sentence, IMPORTED rather than re-typed, so the precedence row below compares
 // character-identity against the page's own constant instead of a second copy of it.
 import { EMPTY_DRAFT_INVITATION, SAVING_PUBLISH_WAIT } from "./WorkflowBuilderPage"
+// Phase 193.2-09 (D-06), on their own line so this file's diff stays additive: the
+// AI-proposal mark's two strings and the shipped empty-state invitation, IMPORTED rather
+// than re-typed, so the cases below compare character-identity against the page's own
+// constants instead of a second copy of the copy.
+import {
+  REQUIREMENT_AI_MARK_EXPLANATION,
+  REQUIREMENT_AI_MARK_LABEL,
+  REQUIREMENT_INVITATION,
+} from "./WorkflowBuilderPage"
 import { EffectiveFeaturesProvider } from "@/providers/EffectiveFeaturesProvider"
 import type { EffectiveFeatures } from "@/lib/api"
 import { researchSummarize } from "@/components/workflows/__fixtures__/canvasFixtures"
@@ -3316,5 +3325,192 @@ describe("WorkflowBuilderPage — the business requirement reaches the PATCH bod
     await waitFor(() => expect(mockValidate.mock.calls.length).toBeGreaterThanOrEqual(1), {
       timeout: 5000,
     })
+  })
+
+  // ── Phase 193.2-09 (D-06 / SEED-163) — the AI-PROPOSAL MARK ──────────────────────
+  //
+  // APPENDED to this describe, and the placement is a CORRECTION that is stated rather
+  // than made quietly. `193.2-RESEARCH.md`'s Wave-0 gap list and `193.2-VALIDATION.md`'s
+  // SC#1 row BOTH route these cases to `WorkflowBuilderPage.header.test.tsx`. That is
+  // wrong. Measured — `grep -rn "business-requirement" frontend/src --include=*.test.tsx`
+  // returns 8 hits, all in THIS file, zero in `header.test.tsx` — every shipped
+  // requirement-affordance case and both of its mount helpers live here. `header.test.tsx`'s
+  // relevance is the OPPOSITE one: it owns `FLAG_OFF_HEADER_MARKUP`, the nine-phase-old byte
+  // pin the mark must NOT move, and it gets no edit at all in this plan. Routing new cases
+  // there would have created a second home for a fixture that already exists.
+  //
+  // WHAT THE MARK IS FOR, so a later reader does not mistake it for decoration. `193.2-05`
+  // made the generator PROPOSE a `business_requirement`; `193.2-07` made that proposal
+  // durable as `business_requirement_seeded_by_ai`, stamped SERVER-SIDE after validation and
+  // ignoring whatever the emission claimed in both directions. Between them the field
+  // arrives pre-filled with nothing saying the AI wrote it — a decision the author is never
+  // shown, which is SEED-163's own root failure in miniature. And it is what makes D-09
+  // honest: the publish gate is unchanged, so an AI-seeded value passes stage 1 untouched —
+  // accepted BECAUSE the author can see the value is the AI's and overrule it.
+  //
+  // ⚠ NOTHING HERE CLAIMS THE MARK IS EVER ALWAYS PRESENT (D-08). Whether a real model emits
+  // a requirement at all is non-deterministic; the permitted claim is a measured reduction in
+  // frequency and it belongs to plan `193.2-08`, not to any assertion in this file.
+
+  /** A definition as it comes back from a row the generator seeded: a real requirement
+   *  AND the server-stamped provenance flag. */
+  function seededRequirement(text = "Produce a client-ready vendor risk brief from our own records."): BuilderDefinition {
+    return {
+      ...withoutRequirement(),
+      business_requirement: text,
+      // Undeclared on `BuilderDefinition` — it rides the index signature, which is exactly
+      // the pass-through this block drives rather than assumes.
+      business_requirement_seeded_by_ai: true,
+    }
+  }
+
+  it("SEEDED — the mark renders, with the page's own label and its fuller sentence", async () => {
+    renderRequirement(FLAG_ON, seededRequirement())
+
+    const mark = await screen.findByTestId("business-requirement-ai-mark")
+    // Compared against the EXPORTED constants, never a re-typed string: two copies of one
+    // sentence drift, and then the assertion is about the test's memory of the copy.
+    expect(mark.textContent).toBe(REQUIREMENT_AI_MARK_LABEL)
+    expect(mark.getAttribute("title")).toBe(REQUIREMENT_AI_MARK_EXPLANATION)
+    // It is a SIBLING INSIDE the affordance, never a new node in `identityGroup`. Asserted
+    // by containment rather than by class name: the placement is what keeps the mark out of
+    // the flag-off `<header>` and therefore out of `FLAG_OFF_HEADER_MARKUP` band 3.
+    expect(screen.getByTestId("builder-business-requirement")).toContainElement(mark)
+  })
+
+  it("HAND-TYPED — no mark, WITH its positive control in the same test", async () => {
+    // The negative WITH its control, in one `it()`, copying the `:3287-3300` shape exactly:
+    // a `queryByTestId(...) === null` assertion alone passes just as happily against a mark
+    // that was never built. The two renders differ in ONE key.
+    renderRequirement(FLAG_ON, {
+      ...withoutRequirement(),
+      business_requirement: "Produce a client-ready vendor risk brief from our own records.",
+    })
+    await screen.findByTestId("business-requirement-input")
+    expect(screen.queryByTestId("business-requirement-ai-mark")).toBeNull()
+
+    cleanup()
+
+    renderRequirement(FLAG_ON, seededRequirement())
+    expect(await screen.findByTestId("business-requirement-ai-mark")).toBeInTheDocument()
+  })
+
+  it("EMPTY — no mark, and the shipped invitation still shows (D-08's fallback)", async () => {
+    // D-08: when the model emits nothing the surface is today's exact behaviour — a blank
+    // field showing `REQUIREMENT_INVITATION`, no mark, and NO new string. A mark on a value
+    // that does not exist would make the demote rule read a lie, which is the same sentence
+    // the server's stamp obeys.
+    renderRequirement(FLAG_ON, { ...withoutRequirement(), business_requirement_seeded_by_ai: true })
+
+    const input = (await screen.findByTestId("business-requirement-input")) as HTMLInputElement
+    expect(input.value).toBe("")
+    // Read off the export, never re-typed — the placeholder is the page's constant.
+    expect(input.placeholder).toBe(REQUIREMENT_INVITATION)
+    expect(screen.queryByTestId("business-requirement-ai-mark")).toBeNull()
+
+    cleanup()
+
+    // POSITIVE CONTROL — the same flag with a real value DOES produce the mark, so the
+    // absence above is about the empty value and not about the mark being unbuildable.
+    renderRequirement(FLAG_ON, seededRequirement())
+    expect(await screen.findByTestId("business-requirement-ai-mark")).toBeInTheDocument()
+  })
+
+  it("FLAG OFF — the affordance AND the mark are absent, so band 3 cannot move", async () => {
+    // THE CASE THAT PROTECTS THE NINE-PHASE-OLD BYTE PIN. The mark lives inside the same
+    // `canvasEnabled ? (…) : null` as the affordance, so with the flag off the flag-off
+    // `<header>` — which is `FLAG_OFF_HEADER_MARKUP` band 3 — cannot see it at all. If this
+    // reds, the mark is mounted outside the gate: fix the PLACEMENT, never re-capture the
+    // literal next door.
+    renderRequirement(FLAG_OFF, seededRequirement())
+    await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
+    expect(screen.queryByTestId("builder-business-requirement")).toBeNull()
+    expect(screen.queryByTestId("business-requirement-ai-mark")).toBeNull()
+
+    cleanup()
+
+    // The positive control, same definition, one flag flipped.
+    renderRequirement(FLAG_ON, seededRequirement())
+    expect(await screen.findByTestId("business-requirement-ai-mark")).toBeInTheDocument()
+  })
+
+  it("DEMOTE ON EDIT — proved on the PATCH BODY, with the DOM only as a weaker second check", async () => {
+    // ASSERTED ON THE RECORDED CALL ARGUMENT, never on a DOM value — the rule this describe
+    // records at `:3214-3228`, and this is exactly the case it was written for. A controlled
+    // input echoing its own prop, and a mark that merely stopped rendering, would BOTH pass a
+    // DOM read while the persisted row kept claiming the sentence was the AI's forever.
+    renderRequirement(FLAG_ON, seededRequirement())
+    // Non-vacuity: the mark is really there before the keystroke, so its later absence is a
+    // demotion rather than a mark that never rendered.
+    expect(await screen.findByTestId("business-requirement-ai-mark")).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId("business-requirement-input"), {
+      target: { value: "Produce a client-ready vendor risk brief for any named account." },
+    })
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    const [, sent] = mockUpdate.mock.calls[0] as [string, BuilderDefinition, unknown]
+    expect(sent.business_requirement).toBe(
+      "Produce a client-ready vendor risk brief for any named account.",
+    )
+    // `false`, and PRESENT — not merely absent. The store writes the demotion explicitly
+    // rather than `delete`-ing the key precisely so this is observable: an absent key is
+    // indistinguishable from a store that never wrote the field at all.
+    expect("business_requirement_seeded_by_ai" in sent).toBe(true)
+    expect(sent.business_requirement_seeded_by_ai).toBe(false)
+    // The endpoint takes a COMPLETE WorkflowDefinition, so a demote that truncated the
+    // phases would trade this mark for a worse bug.
+    expect(sent.phases).toHaveLength(definition.phases.length)
+
+    // The second, weaker check.
+    expect(screen.queryByTestId("business-requirement-ai-mark")).toBeNull()
+  })
+
+  it("THE RELOAD ROUND TRIP — a persisted flag renders the mark, which page state could not do", async () => {
+    // THE CASE THAT JUSTIFIES THE MODEL FIELD IN `193.2-07`. Page state alone would fail
+    // this: the Builder is mounted fresh from a stored payload here, exactly as re-opening a
+    // draft does, with no generate call in the session and nothing in memory to remember
+    // that the requirement was proposed rather than typed. Only a field ON THE DEFINITION —
+    // `WorkflowDefinition.business_requirement_seeded_by_ai`, which `extra="forbid"` makes
+    // impossible to fake from page state — survives that gap. `setDrafted`'s
+    // `{ phases, ...meta }` destructure is the seam it arrives through.
+    renderRequirement(FLAG_ON, seededRequirement("Deliver a board-ready risk memo for any account."))
+
+    const input = (await screen.findByTestId("business-requirement-input")) as HTMLInputElement
+    expect(input.value).toBe("Deliver a board-ready risk memo for any account.")
+    expect(await screen.findByTestId("business-requirement-ai-mark")).toBeInTheDocument()
+  })
+
+  it("THE WIRE ROUND TRIP — a persisted flag rides back OUT untouched by an unrelated edit", async () => {
+    // ⚠ DRIVEN HERE RATHER THAN INHERITED. `193.2-07` checked this leg by READING —
+    // `BuilderDefinition` ends in `[k: string]: unknown` and `DefinitionMeta` is a
+    // key-remapped mapped type that preserves the index signature, so an undeclared key
+    // should pass through `meta` and back out on PATCH — and its summary says in writing that
+    // plan 09 should DRIVE it instead. A read is not a test: if either type ever narrows, the
+    // flag would vanish on the very next autosave and the mark would disappear from a row
+    // nobody edited, silently.
+    //
+    // The edit is the KB binding, NOT the requirement: any edit to the requirement demotes
+    // the flag by design, so it could never show a TRUE value surviving the trip.
+    renderRequirement(FLAG_ON, {
+      ...seededRequirement(),
+      project_folder_id: "folder-outside-my-list",
+    })
+
+    fireEvent.change(await screen.findByTestId("project-folder-picker"), {
+      target: { value: "" },
+    })
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalledTimes(1), { timeout: 5000 })
+
+    const [, sent] = mockUpdate.mock.calls[0] as [string, BuilderDefinition, unknown]
+    // The unrelated edit landed…
+    expect(sent.project_folder_id).toBeNull()
+    // …and the provenance the SERVER stamped came back out still true.
+    expect(sent.business_requirement_seeded_by_ai).toBe(true)
+    expect(sent.business_requirement).toBe(
+      "Produce a client-ready vendor risk brief from our own records.",
+    )
+    // And it is still on screen — the write did not quietly demote what it did not touch.
+    expect(screen.getByTestId("business-requirement-ai-mark")).toBeInTheDocument()
   })
 })
