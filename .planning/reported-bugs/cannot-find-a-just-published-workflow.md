@@ -9,7 +9,7 @@ affected_areas: [workflow/library, workflow/authoring, backend/workflows]
 folded_into: "193.2"
 verified_closed_by: null
 related_seeds: [SEED-155]
-re_open_trigger: null
+re_open_trigger: "STAYS OPEN as `folded` at Phase 193.2's close. The ORDERING half is closed and proved server-side (`list_published_workflows` + `list_draft_workflows` now `ORDER BY updated_at DESC`; starters stay alphabetical by D-16), and the client merge arithmetic is pinned. What is NOT closed is the FINDABILITY JUDGEMENT: this report's own arithmetic was over the wrong feed (the page passes `?scope=mine`, so the true figures are 17 of 109 -> 4 of 109, not 129 of 146), and POSITION 4 IS NOT POSITION 1 — no `ORDER BY` change can make it 1, because `mergeLibrary` concatenates starters first. Whether 4 satisfies `findable` is a product judgement carried to UAT row U4 (`193.2-UAT.md`, OQ-5), which is OWED at close. Flip to `closed` only when U4 records the operator finding the workflow without searching. RE-OPEN if: the operator cannot find a just-published workflow again; or the post-publish Run CTA fails to appear (U3 / OQ-2); or the recency ordering degrades the composer's Harness picker, `WorkspacePanel`'s run-soul or `threads.py`'s kickoff, all three of which share this feed (U5 / OQ-6). A user-facing recency-vs-A-to-Z SORT CONTROL was deliberately NOT built (D-18) and is deferred to the library layout sketch, where G-2 fires and SEED-155 binds."
 reproduces_on:
   branch: develop
   commit: 1dc4d509
@@ -106,3 +106,83 @@ publish gate requires.**
 ⚠ **Sequencing note for whoever plans it:** 197 / AUTH-02 (*deepen the fast door*) remains the
 right home for the BIGGER authoring redesign. Moving these three out does not empty 197 — it
 removes the blockers from in front of it, so 197 can be about depth rather than repair.
+
+---
+
+## ⚠ STATUS AT PHASE 193.2's CLOSE (2026-08-15) — `folded`, NOT `closed`, and the split is the point
+
+**The ordering half is CLOSED and proved. The findability judgement is OWED.** Those are two
+different claims and neither may be quoted as the other.
+
+### (a) What shipped — the server `ORDER BY` (`193.2-03`)
+
+`list_published_workflows` and `list_draft_workflows` — **the two feeds holding the author's own
+work** — now `ORDER BY updated_at DESC`. `list_starter_workflows` **deliberately does not** (D-16):
+starters are a curated catalogue the author did not write, and *"most recently updated starter"* is
+meaningless to someone browsing.
+
+⚠ **This report warned "change them together or the feeds disagree", and the phase deliberately did
+not.** The divergence is accepted with eyes open **on condition that it is recorded in the code and
+in the `CLAUDE.md` ledger row** rather than left to look like an inconsistency — and it is, at all
+three feed sites and in the new `db/workflows.py` ledger row.
+
+**Measured facts worth not re-deriving:**
+
+- On the published feed, `ORDER BY updated_at DESC` **IS** `ORDER BY publish-time DESC`: the publish
+  flip is an `UPDATE`, `workflow_definitions_set_updated_at` is an unconditional `BEFORE UPDATE`
+  trigger, and `workflow_definitions_block_published` then freezes the row. `created_at DESC` was
+  rejected because the card's *"changed 2 minutes ago"* reads `updated_at`, and the list and the card
+  would then disagree by construction.
+- **No migration, with the reason rather than the assurance:** there was no index on `name` either,
+  so the shipped sort was already unindexed; 225 rows, largest feed 118; `supabase/migrations/`
+  reads 112 before and after.
+- **The complete non-comment diff is TWO LINES.** Zero `WHERE` clauses, zero `params` appends, zero
+  `$N` bindings, zero projections moved — which is also the security argument, because on a
+  service-role pool that bypasses RLS the `WHERE` clause *is* the access boundary.
+- ⚠ **The shared-consumer consequence:** with `owned_only=False`, `list_published_workflows` also
+  feeds the **composer's Harness picker**, **`WorkspacePanel`'s run-soul** and **`threads.py`'s
+  kickoff**. **All three moved from alphabetical to recency.** Measured: nothing asserts alphabetical
+  for any of them — but *"nothing asserts it"* and *"it reads well"* are different claims. That is
+  UAT row **U5**.
+- A shipped green fence (192.1's `test_no_feed_orders_by_updated_at`) **forbade this change** and was
+  **rewritten in place, never deleted**, with 192.1's reasoning kept verbatim under a `SUPERSEDED`
+  marker, driven RED clause-by-clause against the pre-change source. ⚠ One third of the replacement
+  fence would have been **inert**: a bare `D-16` needle was already satisfied on the drafts feed by a
+  Phase 192.1 docblock where `D-16` names an entirely different decision. Caught by measuring, not by
+  reading, and paired with a `BUG-260815-02` clause that fired RED on all three feeds.
+
+### (b) ⚠ THIS REPORT'S OWN ARITHMETIC WAS OVER THE WRONG FEED — corrected beside, not over
+
+The report says *"Quarterly Business Review… landed at position 129 of 146"*, derived from a
+`row_number() over (order by name)` across the **whole** `workflow_definitions` table. **The page
+passes `?scope=mine`.** The true rendered figures are:
+
+| | Before | After |
+|---|---|---|
+| Rendered position of the just-published row | **17 of 109** | **4 of 109** |
+
+**Position 4 is not position 1, and no `ORDER BY` change can make it 1.** `mergeLibrary` concatenates
+**starters ++ published ++ drafts** client-side, so the newest published row lands at index
+`starters.length` — pinned as an **expression**, never a literal, because a literal rots the moment
+the curated shelf grows by one. The alternative (re-ordering the merge loops) would put it at index 0
+and a **real plant proved it also inverts the dedupe precedence**, so a row the caller owns would
+read as a shared starter. That cost is now a measurement rather than a caution.
+
+⚠ **Whether position 4 satisfies "findable" is a product judgement, and nothing in this repository
+may be read as having answered it.** It is UAT row **U4** (OQ-5), owed.
+
+### (c) What was deliberately NOT built
+
+- **A user-facing recency ⇄ A–Z sort control** (D-18) — the library surface is where **G-2 fires** and
+  where card-density / list-view is already routed to `/gsd:sketch`, bound by `SEED-155`. Building a
+  control the pending sketch may relocate is building it twice. **The default change is a defect fix
+  and shipped regardless of any layout decision**, which is what this report asked for.
+- **A navigate-to-row hand-off** (D-19). The post-publish Run CTA already names the workflow and
+  offers Run; `193.2-02` ruled *it fires; SC#3 is met by the sort plus one pin; no second hand-off is
+  built* — a second one would be a genuine second concern on a file carrying an inherited G-5
+  obligation. ⚠ **That CTA had ZERO automated coverage from the day it shipped until this phase**
+  (`run-cta` in its suite: 0 → 13 occurrences), and WR-04 had already fixed one silent drop on it
+  that no test would have caught. Its latency on a real network is UAT row **U3**.
+- **Any client-side sort.** D-17's fence now sweeps `libraryFilter.ts` **and** `WorkflowsPage.tsx` —
+  which had **no sort coverage of any kind anywhere in the repository** before this phase — and both
+  arms were driven RED against real plants in production source, separately.

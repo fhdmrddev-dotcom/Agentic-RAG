@@ -9,7 +9,7 @@ affected_areas: [workflow/authoring, workflow/publish, backend/harness]
 folded_into: "193.2"
 verified_closed_by: null
 related_seeds: [SEED-157, SEED-163, SEED-164]
-re_open_trigger: null
+re_open_trigger: "STAYS OPEN as `folded` at Phase 193.2's close, deliberately. The fix is PROMPT-LEVEL and therefore NON-DETERMINISTIC (D-08): measured `llm_human_input` 0/20 across 20 real paid generations on two providers, against a pre-fix 2/2-with-a-template and 4/6 overall (`193.2-FREQUENCY.md` §3). THE CLAIM IS A MEASURED REDUCTION, NEVER AN ABSENCE — one more generation can still produce an interactive step, which is exactly why the publish gate stays. This report may flip to `closed` ONLY when UAT row U1 moment 2 (`193.2-UAT.md`) records a real operator-driven publish that succeeded WITHOUT a canvas edit; U1 is OWED at close. RE-OPEN if: the operator meets an interactive step on a template-first draft again; or a refusal appears that names `llm_human_input` / `ask_user` / a slug / a step number instead of the step's visible canvas label; or the publish gate is widened to refuse `external_action` (forbidden by a shipped fence — CONFLICT-1 Option B, REJECTED)."
 reproduces_on:
   branch: develop
   commit: bab09f41
@@ -156,3 +156,63 @@ Phase 103 shipped long ago.
 
 **The expensive part is therefore the durable pause on REAL runs, not publish** — which is exactly
 what makes the operator's golden-run-skip proposal the right first thing to evaluate.
+
+---
+
+## ⚠ STATUS AT PHASE 193.2's CLOSE (2026-08-15) — `folded`, NOT `closed`, and the reason is a measurement
+
+**What 193.2 shipped against this report, in two halves that must not be quoted as one.**
+
+**(a) The frequency half — `193.2-05`.** `AUTHORING_SYSTEM_PROMPT`'s DELIVERABLE RULE gained ONE
+clause stating the consequence (*"publishing VALIDATES a workflow by running it, and a run waiting on
+a person cannot finish"*) and offering the alternative (*"have the step gather it with the tools it is
+given, and have the deliverable say plainly that it could not be found. Never invent it."*), and the
+`llm_human_input` bullet was cut **121 → 74** characters. ⚠ **What made that bullet a nudge was its
+TAIL, not only its length** — it ended *"— use for any 'confirm before finalizing' step"*, an active
+invitation to the one phase type the publish gate categorically refuses.
+
+**MEASURED (`193.2-FREQUENCY.md`, 20 real paid generations, 2 providers × 2 arms, 0 failed calls):**
+
+| Figure | Post-fix | Pre-fix baseline |
+|---|---|---|
+| `llm_human_input` present | **0/20** | **2/2** with a template · **4/6** overall |
+| `ask_user` validator present | **0/20** | not measured pre-fix |
+| `external_action` (displacement watch) | **0/20** | not measured pre-fix |
+| `render_template` (**SC#4 control — did NOT fall**) | **5/5 per arm**, like-for-like | 193.1's **3/3** |
+
+> ⚠ **THE CLAIM IS A REDUCTION, NEVER AN ABSENCE.** `0/20` is a frequency over a sample, not a
+> guarantee. **The publish gate STAYS, and nothing downstream may be relaxed on the strength of these
+> numbers.** The counters were **planted before their zeroes were published** — a zero from a blind
+> counter and a zero the model earned are indistinguishable in an artifact — and the positive control
+> ships permanently in the harness.
+
+⚠ **Attribution between the clause and the shortened bullet is UNRESOLVED and UNDRIVEN.** Two edits
+landed in one string literal; a single measurement cannot say which moved the number, or whether both
+did. The third arm that would have attributed it was **not driven**, and the phase claims a
+**combined effect and attributes nothing** (`193.2-FREQUENCY.md` §4).
+
+**(b) The words half — `193.2-06`.** The refusal was rewritten in **two arms that share no complete
+sentence and cannot be collapsed** — arm 1 about the STEP (*remove it*), arm 2 about a step's FAILURE
+ROUTE (*change it*) — each naming the offending step **by the plain-language label a non-coder reads
+on the canvas**. `llm_human_input` and `ask_user` no longer reach user copy. An empty label degrades
+to a **name-free TRUE sentence, never a bare slug**; the model-authored label is whitespace-collapsed
+and clamped at 72 chars before it enters copy, an aria label and a persisted audit row. The messages
+are **longer than the 105-char baseline** — 135/143 degraded, ~150 realistic, **196 worst case** — and
+that is the stated cost of carrying a label and an action. ⚠ **D-12 holds: ONE string feeds BOTH the
+publish refusal and `/validate` → `blockedReason` → the greyed canvas control.**
+
+**⚠ THE MOST IMPORTANT CORRECTION TO THIS REPORT, and it is stated rather than smoothed.** This
+report describes a **400 from the publish endpoint**. `193.2-02` measured the audit ledger at HEAD:
+on 2026-08-15 there were **0 `publish_blocked` rows**, exactly **1 `publish_attempted`** and **1
+`publish_succeeded`** 7.57 ms apart, and the newest `publish_blocked` anywhere is **2026-08-07**.
+**The publish endpoint never refused anything.** Both facts CONTEXT put on trial (that `/validate`
+mints the verdict; that the verdict greys the control and renders the server message verbatim) are
+**TRUE**. The false premise was the unstated third one — *that a 400 was received at all*. The
+refusal the operator met came from `blockedReason` beside an **already-greyed control**. ⇒ D-10's
+escape hatch is recorded **NOT TRIGGERED**, and rewriting the string IS the fix. **The defect is real
+and unchanged in severity; only its location moved — it is on the canvas, not behind a publish click.**
+
+**What is still true after 193.2, and must not be misread as fixed:** a workflow that
+**deliberately** pauses for a person still cannot be published. **193.2 SUPPRESSES the unwanted step;
+it does not deliver that capability** — that is `SEED-164`, and nothing shipped here may imply
+otherwise.

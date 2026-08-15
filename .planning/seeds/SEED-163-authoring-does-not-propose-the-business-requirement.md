@@ -2,7 +2,18 @@
 
 **Planted:** 2026-08-15, by the operator during Phase 193.1 end-to-end UAT
 **Surface:** Agentic-RAG — workflow authoring (describe door) → publish gauntlet
-**Status:** folded → **Phase 193.2 From Authored to Runnable** (context gathered 2026-08-15, `4d1d9374`)
+**Status:** folded → **Phase 193.2 From Authored to Runnable** (context gathered 2026-08-15, `4d1d9374`;
+**EXECUTED 2026-08-15 — see the dated close-out block at the foot of this file. NOT flipped to
+`closed`: the fix is prompt-level and non-deterministic, so the claim is a MEASURED REDUCTION, never
+an absence, and UAT row U1 is OWED.**)
+
+**Re-open trigger:** the requirement arrives blank on a real describe→generate cycle again (the fix is
+a frequency, not a guarantee — measured 20/20, and 21 would not make it one); **or** the AI-proposal
+mark is read as a claim that the requirement is *durable* rather than that *a model wrote it* (it
+cannot see durability — measured, `gpt-5.5` named one-run parameters in 5 of 5 requirements and all
+20 were still correctly stamped); **or** a third instance of the D-22 pattern appears beyond the three
+already recorded, in which case **the pattern is the phase, not the field** — that inheritance is
+carried forward to **197 / AUTH-02**.
 
 ⚠ **Folded, with two of this seed's own rules carried through verbatim into `193.2-CONTEXT.md`
 rather than paraphrased:** the field arrives **pre-filled and visibly marked as an AI proposal**
@@ -107,3 +118,66 @@ publish gate requires.**
 ⚠ **Sequencing note for whoever plans it:** 197 / AUTH-02 (*deepen the fast door*) remains the
 right home for the BIGGER authoring redesign. Moving these three out does not empty 197 — it
 removes the blockers from in front of it, so 197 can be about depth rather than repair.
+
+---
+
+## ⚠ CLOSE-OUT AT PHASE 193.2 (2026-08-15) — what shipped, and what it does and does not claim
+
+**Status stays `folded`, not `closed`, and the reason is a measurement rather than caution.**
+
+### What shipped
+
+| Half | Where | What |
+|---|---|---|
+| **The ask** | `AUTHORING_SYSTEM_PROMPT` (`193.2-05`) | `business_requirement` joined the **existing** sentence that already sets `slug`, `version`, `name` and `status` — *"ONE line saying what this workflow must deliver on ANY run, phrased so it stays true for the next run and the one after, NOT a restatement of the particular request described below."* **`grep -c business_requirement` over the authoring module returned `0` before this — the whole of this seed in one number — and returns `5` after.** No schema work was needed: `WF_SCHEMA` is `WorkflowDefinition.model_json_schema()` and the field was already advertised |
+| **The durable provenance** | `WorkflowDefinition.business_requirement_seeded_by_ai` (`193.2-07`) | An additive-optional `bool = False` on a JSONB column — **zero migration** (112 files before and after), `extra="forbid"` **proved not relaxed**, no validator and no computed field (a derivation would be baked into the JSONB and a stale row could lie about itself) |
+| **The stamp** | `workflow_authoring.py` (`193.2-07`) | Server-side, after validation, on the single success path, a **sibling** `model_copy` beside the shipped 187 `name_seeded_by_ai` one so both stay independently attributable. It **refuses an empty value** (this seed's own carried rule: *provenance for a value that does not exist would make the demote-on-edit rule read a lie*) **and refuses a normalised copy of `describe`** (D-07), and it **ignores the model's own provenance claim in both directions** |
+| **The visible mark** | `WorkflowBuilderPage.tsx` + `builderStore.ts` (`193.2-09`) | One gated sibling **inside** the shipped requirement affordance: the label **`AI-proposed`**, explained by its `title`. **No glyph — the word carries it** (`icon-convention.md` §4; `✦` refused). The flag is cleared on **ANY** edit, in the **same `set()`** that writes the text, with **no client-side "is this still the AI's sentence?" comparison** |
+
+**D-09 honoured: the publish gate is NOT changed.** Stage 1's `business_requirement_missing` only
+checks non-emptiness, so an AI-seeded value passes it untouched — **accepted**, because the author
+still presses Publish, which this seed names as the human checkpoint, and D-06's visible mark is what
+makes that an honest trade rather than a silent weakening.
+
+### What it claims — and the sentence that binds it
+
+**Measured over 20 real paid generations (`193.2-FREQUENCY.md`): `business_requirement` non-empty
+20/20, stamped `seeded_by_ai` 20/20, against a pre-fix baseline of 0/N.**
+
+> *"The claim is a reduction, not an absence — the publish gate stays because a prompt cannot guarantee absence."*
+
+**D-08's fallback is today's EXACT behaviour:** when the model emits nothing, the field is blank and
+the shipped `REQUIREMENT_INVITATION` shows. No second derive call, no schema-required field, no new
+string, and **no server-side substitute text** — a blank that lies is not an improvement.
+
+### ⚠ The finding this seed should carry forward: the mark cannot see durability
+
+D-07 asks for the **durable** requirement. Measured on the `kit10` arm: **anthropic named a one-run
+parameter in 0 of 5** requirements; **openai in 5 of 5** (*"…for customer Northwind Logistics covering
+Q3 2026…"* — one run's parameters baked into the workflow's definition of done, precisely what D-07
+asks against). **All 20 were still stamped `seeded_by_ai: True`, and that is CORRECT rather than a
+bug** — the stamp's question is *"is this a normalised copy of the describe text?"*, and `193.2-07`
+explicitly rejected a fuzzy similarity metric because a threshold would refuse provenance for
+requirements that are genuinely durable but share vocabulary with the describe box, which is the
+ordinary case.
+
+⇒ **The AI-proposal mark means "a model wrote this". It NEVER means "this is durable."** No copy
+anywhere may imply the latter, and an author reviewing an openai-authored requirement has something
+real to edit.
+
+### ⚠ The D-22 three-instance pattern, recorded for 197 rather than left to be re-derived
+
+This seed predicted that if a third *"the authoring path did not supply something it already had"*
+appeared, **the pattern is the phase, not the field.** There are now three:
+
+1. **`SEED-157`** — `/generate` accepted `template_placeholders` for five phases and the frontend
+   never sent it.
+2. **`SEED-163`** (this seed) — the emit tool **advertised** `business_requirement` and the prompt
+   never asked for it.
+3. **The AI-chosen `name`** the author never gets to set — deferred as **D-24** to **197 / AUTH-02**,
+   with `ForkNameDialog.tsx` (192.1) named as the asset when it is taken up. Re-open trigger: 197, or
+   a report of a wrong AI-chosen name reaching a client.
+
+**197 / AUTH-02 inherits this as a MEASURED pattern rather than re-deriving it** — the same habit the
+hot-file ledger keeps, and the answer to the standing lesson that a deferral living in one phase's
+context file is exactly as invisible as a hot file missing from that table.
