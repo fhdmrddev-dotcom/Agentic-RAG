@@ -130,6 +130,20 @@ def test_both_writers_are_locatable_and_each_carries_exactly_one_update():
     verbatim: an empty-sweep control left clauses GREEN with a third of the union
     invisible, and **absence assertions cannot detect their own blindness**. So the
     matched COUNT is asserted here, in its own case, before anything else runs.
+
+    ⚠ CORRECTED (Phase 194 Plan 06, on measurement). The paragraph above is kept
+    verbatim because it is the reason this case was written, but it OVERSTATES what
+    this case defends, and crediting a fence with a rule it cannot see is the exact
+    193.1 defect. A real harness plant — ``_TARGETS`` misspelled to
+    ``cancel_active_phasez`` — was driven, and the sweeps did NOT go silently green:
+    **five cases went RED (this one plus all four ``_TARGETS``-scoped sweeps) and nine
+    passed**, because ``_one_sql`` / ``_function_nodes()[name]`` raise ``KeyError`` on a
+    lookup miss rather than iterating an empty set. So the sweeps here fail LOUDLY on
+    their own blindness, and this case is a cheap DEFENCE-IN-DEPTH plus a readable
+    statement of the file's scope — **not** the thing standing between this suite and a
+    vacuous pass. Two cases here are deliberately outside ``_TARGETS`` and would survive
+    such a typo: ``test_the_run_keyed_predicate_lives_on_one_source_line`` (raw text)
+    and the two migration-vocabulary cases (raw regex over both files).
     """
     nodes = _function_nodes()
     assert sorted(nodes) == sorted(_TARGETS), (
