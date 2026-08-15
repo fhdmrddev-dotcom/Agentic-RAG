@@ -57,6 +57,7 @@ function-locally. `settings` is passed as a PARAMETER — no global is monkeypat
 from __future__ import annotations
 
 import copy
+import json
 import re
 from types import SimpleNamespace
 
@@ -657,3 +658,370 @@ async def test_an_emit_that_omits_the_field_still_succeeds_unchanged(monkeypatch
     assert result["definition"]["business_requirement"] is None
     # No new failure mode, no new key, no lie — the payload is the shipped shape.
     assert "error" not in result
+
+
+# ══ F-6 — the server-side PROVENANCE STAMP (plan 193.2-07) ═══════════════════════════════
+#
+# The stamp's rules are the shipped `name_seeded_by_ai` rules (`workflow_authoring.py`,
+# the sibling block directly above the new one), plus ONE widening that is D-07 made
+# mechanical. Every case below is modelled line for line on the shipped analog pair,
+# `test_187_authoring_step_names.py:241-292`.
+#
+# ⚠ NOTHING HERE IS A FREQUENCY CLAIM. Each case STUBS what the model emitted and asserts
+# what the SERVER does with it. Whether a real model fills the field at all is measured
+# k/N by plan 193.2-08 — see this module's D-08 header, which binds this section too.
+
+# The describe text every `_generate()` below sends unless a case overrides it. Named once
+# so the D-07 copy cases can be written against the SAME string the service receives — a
+# hand-retyped copy in each case would be free to drift from the one actually passed.
+DESCRIBE_TEXT = "Write a renewal brief every quarter."
+
+# The shipped CLIENT placeholder (`frontend/src/pages/WorkflowBuilderPage.tsx:383`). It is
+# named here ONLY so the D-08 case can assert the server never writes it into a definition.
+# It is a placeholder attribute on an input, not a value — see that case's docstring.
+REQUIREMENT_INVITATION = "What must this workflow deliver? · required to publish"
+
+
+# The "the model emitted no such key at all" sentinel. A genuinely different input from
+# `None` and from `""`, and the analog draws the same three-way distinction
+# (`_partially_named_definition_dict`: named / blank / absent).
+_ABSENT = object()
+
+
+def _definition_dict_with_requirement(requirement) -> dict:
+    """`_named_definition_dict()` plus a `business_requirement`.
+
+    Passing the sentinel `_ABSENT` leaves the key OFF entirely, which is a genuinely
+    different input from `None` and from `""`: it is what a model that ignored the
+    instruction emits, and the analog's `_partially_named_definition_dict` makes the same
+    three-way distinction (named / blank / absent) for the same reason.
+    """
+    d = _named_definition_dict()
+    if requirement is not _ABSENT:
+        d["business_requirement"] = requirement
+    return d
+
+
+def _expected_stamp(requirement, describe: str) -> bool:
+    """THE RULE, restated as a property, computed from the inputs.
+
+    This is the closing-assertion device the analog uses
+    (`test_187_authoring_step_names.py:269-271`): after the enumerated cases assert
+    specific values, the rule is restated over the whole definition so a branch the
+    enumeration missed still fails. Kept deliberately independent of the service's own
+    expression — it is written from the RULE ("non-empty, and not a normalised copy of
+    the describe text"), so a service-side rewrite that changes behaviour cannot be
+    mirrored into this helper by accident.
+    """
+    if requirement is _ABSENT or not requirement or not requirement.strip():
+        return False
+
+    def norm(s: str) -> str:
+        return " ".join(s.split()).casefold()
+
+    return norm(requirement) != norm(describe)
+
+
+async def _generate_emitting(monkeypatch, definition_dict: dict, **overrides):
+    """Drive ONE generation whose single emit is `definition_dict`, and return the result."""
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+    _patch_user_settings(monkeypatch)
+    _patch_emit(monkeypatch, [{"emitted": _wd(definition_dict), "failure": None}])
+    kwargs = {"describe": DESCRIBE_TEXT}
+    kwargs.update(overrides)
+    return await _generate(**kwargs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("requirement", "expected"),
+    [
+        pytest.param(
+            "Produce a client-ready renewal brief for a named account from our own records.",
+            True,
+            id="a-real-durable-requirement-is-stamped",
+        ),
+        pytest.param("", False, id="empty-string-is-never-stamped"),
+        pytest.param("   ", False, id="whitespace-only-is-never-stamped"),
+        pytest.param("\n\t  \n", False, id="whitespace-of-other-kinds-is-never-stamped"),
+        pytest.param(_ABSENT, False, id="an-absent-key-is-never-stamped"),
+    ],
+)
+async def test_the_requirement_stamp_is_never_true_for_an_empty_value(
+    monkeypatch, requirement, expected
+):
+    """**F-6** — the stamp records provenance for a value that EXISTS, and never otherwise.
+
+    The rule is inherited verbatim from the shipped `name_seeded_by_ai` stamp and its
+    reason is quoted in the service beside it: *provenance for a value that does not exist
+    would make the demote-on-edit rule read a lie.* A model that ignores the instruction,
+    or emits whitespace, has not seeded anything, and the server must not claim it did.
+
+    ⚠ This asserts what the SERVER does with a given emission. It says nothing about how
+    often any model emits one — D-08, see this module's header.
+    """
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(requirement)
+    )
+
+    assert result["ok"] is True
+    wd = _wd(result["definition"])
+    assert wd.business_requirement_seeded_by_ai is expected
+
+    # The rule restated as the property it is, computed from the input rather than
+    # enumerated — the analog's closing device.
+    assert wd.business_requirement_seeded_by_ai is _expected_stamp(
+        requirement, DESCRIBE_TEXT
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_stamp_is_the_rule_as_a_property_across_every_shape_at_once(monkeypatch):
+    """The property restatement, swept over EVERY input shape in one case.
+
+    The parametrized case above proves each shape individually; this one asserts the
+    single rule holds across all of them together, so a stamp that happened to be right
+    for five inputs by five different accidents still fails here. It is the shape of
+    `test_187_authoring_step_names.py:269-271`, adapted from a per-phase list to a
+    definition-level field by sweeping generations instead of phases.
+    """
+    shapes = [
+        "Produce a client-ready renewal brief for a named account from our own records.",
+        "",
+        "   ",
+        _ABSENT,
+        DESCRIBE_TEXT,  # the D-07 copy — refused for a DIFFERENT reason, same rule
+        f"  {DESCRIBE_TEXT.upper()}  ",  # the normalised copy
+    ]
+
+    observed: list[bool] = []
+    for shape in shapes:
+        result = await _generate_emitting(
+            monkeypatch, _definition_dict_with_requirement(shape)
+        )
+        observed.append(_wd(result["definition"]).business_requirement_seeded_by_ai)
+
+    assert observed == [_expected_stamp(s, DESCRIBE_TEXT) for s in shapes]
+    # Non-vacuity: the sweep must contain BOTH verdicts, or it would pass over a stamp
+    # that is unconditionally one value.
+    assert True in observed and False in observed
+
+
+@pytest.mark.asyncio
+async def test_the_stamp_ignores_a_provenance_claim_of_FALSE_in_the_emitted_payload(
+    monkeypatch,
+):
+    """T-193.2-03b, the adversarial half — direction one.
+
+    `WF_SCHEMA` is `WorkflowDefinition.model_json_schema()`, so adding the field to the
+    model means the emit tool now ADVERTISES this flag to the model. A model that emits
+    `business_requirement_seeded_by_ai: false` alongside text it just wrote does NOT get
+    to launder that text into looking hand-typed. The server stamps after validation,
+    unconditionally, from the VALUE — never from the claim.
+
+    This is the exact shape of `test_187_authoring_step_names.py:275-292`.
+    """
+    d = _definition_dict_with_requirement(
+        "Produce a client-ready renewal brief for a named account from our own records."
+    )
+    d["business_requirement_seeded_by_ai"] = False  # the model's (ignored) claim
+
+    result = await _generate_emitting(monkeypatch, d)
+
+    assert _wd(result["definition"]).business_requirement_seeded_by_ai is True
+
+
+@pytest.mark.asyncio
+async def test_the_stamp_ignores_a_provenance_claim_of_TRUE_on_an_empty_value(monkeypatch):
+    """T-193.2-03b, the adversarial half — direction two, and the analog does NOT have it.
+
+    The mirror matters as much as the first direction: a model claiming `true` beside an
+    EMPTY requirement would manufacture a mark for a value that does not exist, which is
+    precisely the lie F-6 exists to prevent — arriving by a different door. A stamp that
+    merely *overrode* a `false` claim would pass the case above and fail here.
+    """
+    d = _definition_dict_with_requirement("   ")
+    d["business_requirement_seeded_by_ai"] = True  # the model's (ignored) claim
+
+    result = await _generate_emitting(monkeypatch, d)
+
+    assert _wd(result["definition"]).business_requirement_seeded_by_ai is False
+
+
+# ── D-07 made mechanical: an echo of the describe text earns no mark ─────────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_byte_identical_copy_of_the_describe_text_is_refused_the_mark(monkeypatch):
+    """**D-07** — a requirement that is the describe text back again is not a durable
+    requirement, and is refused provenance.
+
+    `SEED-163` is explicit: `describe` is ONE RUN's task instruction; the requirement is
+    what the workflow must deliver on ANY run. This is also the mechanical part of
+    **T-193.2-03**'s mitigation — after this phase a model authors the criterion a model
+    later grades against (`JUDGE_RUBRIC_CORE` → `answers_business_requirement`), and
+    echoing the instruction back is the cheapest way to produce a criterion the judge
+    cannot fail.
+
+    ⚠ The refusal is of the MARK, not of the value. The text is still emitted, still
+    editable, and still passes publish stage 1 — D-09 does not change the gate.
+    """
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(DESCRIBE_TEXT)
+    )
+
+    wd = _wd(result["definition"])
+    assert wd.business_requirement_seeded_by_ai is False
+    # The VALUE survives untouched — nothing is deleted, blanked or rewritten.
+    assert wd.business_requirement == DESCRIBE_TEXT
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "variant",
+    [
+        pytest.param(f"   {DESCRIBE_TEXT}   ", id="leading-and-trailing-whitespace"),
+        pytest.param(DESCRIBE_TEXT.upper(), id="upper-cased"),
+        pytest.param(DESCRIBE_TEXT.lower(), id="lower-cased"),
+        pytest.param(
+            DESCRIBE_TEXT.replace(" ", "   "), id="internal-whitespace-runs-widened"
+        ),
+        pytest.param(
+            f"\n  {DESCRIBE_TEXT.swapcase()}\t", id="mixed-whitespace-and-case"
+        ),
+    ],
+)
+async def test_a_copy_differing_only_by_whitespace_or_case_is_still_refused(
+    monkeypatch, variant
+):
+    """D-07 — the refusal survives the cheapest evasions.
+
+    A comparison on the raw strings would be defeated by a trailing newline. The service
+    normalises both sides (strip + whitespace collapse + casefold) before comparing.
+
+    ⚠ Normalisation is where a control like this rots into a similarity metric. It must
+    not: the next case proves a genuinely different requirement built on the SAME describe
+    text still earns the mark, so the refusal cannot pass for the wrong reason.
+    """
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(variant)
+    )
+
+    assert _wd(result["definition"]).business_requirement_seeded_by_ai is False
+
+
+@pytest.mark.asyncio
+async def test_a_genuinely_durable_requirement_on_the_same_describe_still_earns_the_mark(
+    monkeypatch,
+):
+    """THE CONTROL for the two cases above — without it, they could both pass because the
+    stamp is simply never true.
+
+    Same `describe`, a requirement that is a real durable statement rather than an echo.
+    It shares vocabulary with the describe text on purpose ("renewal brief"), because that
+    is the ORDINARY case and a refusal that fired on shared vocabulary would deny the mark
+    to almost every honest requirement — the failure mode the service's own comment warns
+    the normalisation must never grow into.
+    """
+    durable = (
+        "Produce a client-ready renewal brief for a named account, sourced only from our "
+        "own records."
+    )
+    assert durable != DESCRIBE_TEXT
+    assert "renewal brief" in durable and "renewal brief" in DESCRIBE_TEXT
+
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(durable)
+    )
+
+    assert _wd(result["definition"]).business_requirement_seeded_by_ai is True
+
+
+# ── D-08, restated where it binds: the fallback writes NOTHING server-side ───────────────
+
+
+@pytest.mark.asyncio
+async def test_the_fallback_writes_no_substitute_string_server_side(monkeypatch):
+    """**D-08** — when the emit carries no requirement, the field stays absent and the
+    flag is False. The server writes NO substitute text.
+
+    The shipped `REQUIREMENT_INVITATION` is a CLIENT `placeholder` attribute on an input
+    (`frontend/src/pages/WorkflowBuilderPage.tsx:383`) — a prompt the author sees in an
+    empty box, never a value. A second copy of it written into the definition here would
+    be a stored string that reads as an answer, and every downstream reader (publish stage
+    1's non-emptiness predicate; the judge's rubric) would treat it as one. That is the
+    `SEED-159` failure — a blank that lies is not an improvement on a missing answer.
+
+    ⚠ READ THIS BEFORE ADDING A SIBLING CASE. This asserts the FALLBACK is intact. It is
+    NOT the inverse of an "always populated" claim, and no such claim may be added to this
+    file — see the module header. The frequency is 193.2-08's k/N measurement.
+    """
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(_ABSENT)
+    )
+
+    assert result["ok"] is True
+    definition = result["definition"]
+    assert definition["business_requirement"] is None
+    assert definition["business_requirement_seeded_by_ai"] is False
+    # No new failure mode, and no substitute string ANYWHERE in the emitted definition.
+    assert "error" not in result
+    assert REQUIREMENT_INVITATION not in json.dumps(definition)
+
+
+@pytest.mark.asyncio
+async def test_the_stamp_lands_before_the_slug_mint_and_survives_the_json_dump(monkeypatch):
+    """The stamp is on the SINGLE success path and reaches the returned payload.
+
+    Two properties in one case, because they are the same claim from either end:
+
+      * the slug was minted (the returned slug carries the uniquifying suffix), which is
+        the step the stamp must land BEFORE — so a stamp accidentally placed after the
+        `return` or on a discarded copy fails here;
+      * `model_dump(mode="json")` carries the flag, so what the Builder receives (and
+        PATCHes back) is the marked definition rather than a server-only fact.
+
+    ⚠ It also pins the ZERO-MIGRATION property from the other side: the flag travels in
+    the JSONB payload, which is why no file under `supabase/migrations/` was added.
+    """
+    d = _definition_dict_with_requirement(
+        "Produce a client-ready renewal brief for a named account from our own records."
+    )
+    result = await _generate_emitting(monkeypatch, d)
+
+    definition = result["definition"]
+    assert definition["business_requirement_seeded_by_ai"] is True
+    assert definition["slug"] != d["slug"]
+    assert definition["slug"].startswith(f"{d['slug']}-")
+
+
+@pytest.mark.asyncio
+async def test_a_retry_emit_is_stamped_identically_to_a_first_emit(monkeypatch):
+    """The stamp sits on the SINGLE success path, so attempt 2 is stamped like attempt 1.
+
+    The shipped `name_seeded_by_ai` stamp states this rule in its own comment and the new
+    stamp inherits it. It is asserted rather than trusted because the retry path is a
+    separate `_shot()` call whose result flows into the SAME `wd`, and a stamp written
+    inside the first branch would be invisible to a reader and silently absent here.
+    """
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+    _patch_user_settings(monkeypatch)
+
+    d = _definition_dict_with_requirement(
+        "Produce a client-ready renewal brief for a named account from our own records."
+    )
+    calls = _patch_emit(
+        monkeypatch,
+        [
+            {"emitted": None, "failure": "validation_failed"},  # attempt 1 fails
+            {"emitted": _wd(d), "failure": None},  # attempt 2 validates
+        ],
+    )
+
+    result = await _generate(describe=DESCRIBE_TEXT)
+
+    assert len(calls) == 2  # the shipped budget: 1 then 2, never 3
+    assert result["ok"] is True
+    assert _wd(result["definition"]).business_requirement_seeded_by_ai is True

@@ -537,6 +537,39 @@ class WorkflowDefinition(_StrictBase):
     # the publish ENDPOINT (Plan 05), NOT this schema, enforces "required at publish".
     business_requirement: str | None = None
 
+    # ── 193.2 (AUTH-03 / D-06, `SEED-163`) — PROVENANCE for the field directly above.
+    #
+    # Additive-optional, ZERO-MIGRATION: the column is JSONB, so old rows
+    # `model_validate()` to the `False` default. **No file under `supabase/migrations/`
+    # is added by this phase — there is no migration, and none is needed.**
+    #
+    # LOAD-BEARING, and this is the whole reason the field exists rather than a
+    # page-state derivation. `_StrictBase` sets `ConfigDict(extra="forbid")`
+    # (`:38-41`), so an UNDECLARED key 422s the Builder's autosave PATCH — the mark
+    # would be destroyed on the first save and could never survive a reload. D-06
+    # asks for a DURABLE mark ("reuse the shipped provenance pattern, do not invent
+    # one"), and a durable mark has to be a declared field. This does NOT relax
+    # extra="forbid": every OTHER unknown key still raises ValidationError.
+    #
+    # The pattern reused is `PhaseSpec.name_seeded_by_ai` (`:435`) — same spelling
+    # (`bool = False`, never `bool | None`; D-185-08's rule that absence has ONE
+    # spelling, so "absent" and "hand-typed" stay indistinguishable by design).
+    #
+    # ⚠ THE ONE RULE A READER COULD OTHERWISE GET WRONG: this marker is STAMPED
+    # SERVER-SIDE AFTER validation and is NEVER read off the emitted payload, so a
+    # model cannot claim its own text was hand-typed. That rule (and its D-07
+    # widening — a value that is a normalised byte-identical copy of the describe
+    # text is refused) lives in
+    # `app.services.workflow_authoring.generate_workflow_definition`, beside the
+    # `name_seeded_by_ai` stamp it sits with. It is pointed at from here so the two
+    # halves are findable from either end.
+    #
+    # NO validator, NO computed field, NO derivation here — the save path persists
+    # `model_dump(mode="json")`, so a derivation living in this model would be BAKED
+    # into the JSONB and a stale row could then lie about itself (the `:424-434`
+    # docblock records this trap by name).
+    business_requirement_seeded_by_ai: bool = False   # D-06 — the NL generator wrote the requirement, not a human
+
     # ── 143 WF-01 — Starters-shelf curation marker (D-143-2). Additive-optional,
     # zero-migration: old JSONB rows model_validate() to None (mirrors the 098 lock
     # above). Load-bearing (Shared Pattern 1): a seeded starter carries
