@@ -132,20 +132,27 @@ removes the blockers from in front of it, so 197 can be about depth rather than 
 
 ---
 
-## ⚠ 193.2 SUPPRESSES THIS; IT DOES NOT DELIVER THE CAPABILITY — see SEED-164
+## ⚠ 193.2 SUPPRESSES THIS; IT DOES NOT DELIVER THE CAPABILITY — see `SEED-164`
 
-Recorded 2026-08-15 so the distinction survives. Phase 193.2 fixes this bug by teaching the
-authoring model **not to emit** an interactive step it was never asked for, and by making the
-refusal actionable. **After 193.2 a workflow that DELIBERATELY pauses for a person still cannot be
+Recorded 2026-08-15 so the distinction survives. **Phase 193.2 fixes this bug by teaching the
+authoring model NOT to emit an interactive step it was never asked for**, and by making the refusal
+actionable. **After 193.2, a workflow that DELIBERATELY pauses for a person still cannot be
 published.**
 
-That capability is now owned by ****, planted at the operator instruction after they
-challenged the claim that it was "planned to be fixed in the future". ⚠ **It was not planned** —
-the only thing describing it was a docblock referring to itself, and  states outright
-that it *"is not scheduled in this milestone at all"*.
+That capability is now owned by **`SEED-164`**, planted at the operator's direction after they
+challenged the claim that it was *"planned to be fixed in the future"*. ⚠ **It was not planned** —
+the only thing describing it was a docblock referring to itself as *"the DEFERRED Phase-103
+rework"*, and `SEED-137` states outright that it *"is not scheduled in this milestone at all"*.
+Phase 103 shipped long ago.
 
-⚠ **Measured while planting it, and it reframes the problem:**  carries
-only  +  +  (**default 300 s, hard cap 1800 s**). So there is **no
-artifact field** — a long-report review is structurally not this phase type — and **the run dies
-within 30 minutes**, which makes the realistic *"drafted Friday, answered Monday"* case impossible
-today. **The expensive part is the durable pause on REAL runs, not publish.**
+⚠ **Measured while planting it, and it reframes the problem.** `LlmHumanInputPhaseConfig`
+(`backend/app/models/harness.py:128-135`) carries only `prompt` + `options` + `timeout_seconds`
+(**default 300 s, hard cap 1800 s**). So:
+
+- **There is no artifact field** — a long-report review is structurally not this phase type; it is
+  Phase 185's document-as-surface shape.
+- **The run dies within 30 minutes**, which makes the realistic *"drafted Friday, answered Monday"*
+  case impossible today.
+
+**The expensive part is therefore the durable pause on REAL runs, not publish** — which is exactly
+what makes the operator's golden-run-skip proposal the right first thing to evaluate.
