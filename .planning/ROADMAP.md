@@ -500,7 +500,22 @@ reading** (plans 03, 06, 07, 08, 09). **A fence is only real once you have watch
   2. The stopped run reports `cancelled` honestly — not failed, not silently complete.
   3. Stopping is safe mid-phase: no partial write is presented as finished.
 
-**Plans**: TBD — `/gsd:plan-phase 194`
+**Plans**: 13 plans in 8 waves
+
+Plans:
+- [ ] 194-01-PLAN.md — Wave 0: re-derive the four baselines + the six G-5 figures, MEASURE the duplicate-icon root cause, author the 8-row UAT scoreboard
+- [ ] 194-02-PLAN.md — Migration 119 (`workflow_phases_status_check` 6 → 7) + its live-DB gate; authored, applied nowhere
+- [ ] 194-03-PLAN.md — The panel Stop mount (V-04) + the F-1 union-scoped `workflowLock.runId` fence (V-05)
+- [ ] 194-04-PLAN.md — The `cancelled` phase-status vocabulary widening: types, the ONE derivation, the panel word + announcer, the canvas readings (V-18/V-19 client halves)
+- [ ] 194-05-PLAN.md — The two `CLAUDE.md` hot-file ledger rows (D-02) + the correct-beside corrections + reported-bug coverage check
+- [ ] 194-06-PLAN.md — The two phase-terminalize writers in `db/workflows.py` + `finish_run`'s docstring corrected beside
+- [ ] 194-07-PLAN.md — The chat banner ADVANCE (D-18, V-07, F-9) with the byte pin unmoved + `RunCard`'s D-14 decision
+- [ ] 194-08-PLAN.md — Composer Stop pinned (V-06), the pre-stamp silent no-op made observable, the tray pinned (V-08)
+- [ ] 194-09-PLAN.md — Step 3b's `workflow_runs` co-write + the exported composition (V-09/10/11/12/13/17/18/19; F-2/3/4/5/6/11/12)
+- [ ] 194-10-PLAN.md — The engine cancel arm's in-flight phase terminalize (V-16), 096-09's gate unmoved
+- [ ] 194-11-PLAN.md — `DELETE /runs/{id}` dual-id fallback + FORWARD resolution (V-01/02/03; F-10, two plants)
+- [ ] 194-12-PLAN.md — SERIALIZED: operator applies migration 119, V-14/V-15 proved on the live DB, F-7/F-8 driven RED, `full-schema.sql` regenerated
+- [ ] 194-13-PLAN.md — SERIALIZED: the four-row data heal with a committed receipt (V-20) + every touched hot file's ledger cell re-derived
 
 #### Phase 195: Show the Deliverable
 
