@@ -8,7 +8,7 @@ status: open
 affected_areas: [workflow/authoring, workflow/publish, backend/harness]
 folded_into: null
 verified_closed_by: null
-related_seeds: [SEED-157, SEED-163]
+related_seeds: [SEED-157, SEED-163, SEED-164]
 re_open_trigger: null
 reproduces_on:
   branch: develop
@@ -129,3 +129,23 @@ publish gate requires.**
 ⚠ **Sequencing note for whoever plans it:** 197 / AUTH-02 (*deepen the fast door*) remains the
 right home for the BIGGER authoring redesign. Moving these three out does not empty 197 — it
 removes the blockers from in front of it, so 197 can be about depth rather than repair.
+
+---
+
+## ⚠ 193.2 SUPPRESSES THIS; IT DOES NOT DELIVER THE CAPABILITY — see SEED-164
+
+Recorded 2026-08-15 so the distinction survives. Phase 193.2 fixes this bug by teaching the
+authoring model **not to emit** an interactive step it was never asked for, and by making the
+refusal actionable. **After 193.2 a workflow that DELIBERATELY pauses for a person still cannot be
+published.**
+
+That capability is now owned by ****, planted at the operator instruction after they
+challenged the claim that it was "planned to be fixed in the future". ⚠ **It was not planned** —
+the only thing describing it was a docblock referring to itself, and  states outright
+that it *"is not scheduled in this milestone at all"*.
+
+⚠ **Measured while planting it, and it reframes the problem:**  carries
+only  +  +  (**default 300 s, hard cap 1800 s**). So there is **no
+artifact field** — a long-report review is structurally not this phase type — and **the run dies
+within 30 minutes**, which makes the realistic *"drafted Friday, answered Monday"* case impossible
+today. **The expensive part is the durable pause on REAL runs, not publish.**
