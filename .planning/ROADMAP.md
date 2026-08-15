@@ -416,7 +416,19 @@ on its end-to-end UAT run).
   3. **A just-published workflow is findable without knowing its name** — the author is taken to it, or it is at the top of the list, or both (`BUG-260815-02`).
   4. Nothing here regresses `AUTH-03`: the template-first run still fills the bound template end-to-end, provable by re-running the Phase 193.1 UAT kit (`C:\Users\fhdmr\Desktop\uat-193.1-qbr\`, scoring rule: 8+ planted facts).
 
-**Plans**: TBD — `/gsd:discuss-phase 193.2` first.
+**Plans**: 10 plans in 6 waves — planned 2026-08-15.
+
+Plans:
+- [ ] 193.2-01-PLAN.md — wave 1: baselines measured on the UNMOVED tree; F-2 and F-7 driven RED against real plants and restored; D-01's declined override and D-04's scope fence recorded
+- [ ] 193.2-02-PLAN.md — wave 2: D-10 and D-19 confirmed at HEAD and recorded as artifacts (the gate DID fire; the publish endpoint never refused), plus the post-publish Run CTA's first automated pin ever
+- [ ] 193.2-03-PLAN.md — wave 3: `db/workflows.py` published + drafts to `ORDER BY updated_at DESC`, starters stay alphabetical, the D-16 divergence written into the code at all three sites, and the 192.1 scope fence REWRITTEN in place as F-1 after being observed RED
+- [ ] 193.2-04-PLAN.md — wave 3: the rendered-position arithmetic for SC#3 (newest published lands at index `starters.length` — position 4, not 1, and the residual is stated), and F-7 extended to `libraryFilter.ts` + `WorkflowsPage.tsx`
+- [ ] 193.2-05-PLAN.md — wave 3: the DELIVERABLE RULE learns what publish refuses, the 121-char `llm_human_input` nudge is shortened, the prompt asks for the DURABLE requirement, and F-8 makes the bullet-length rule mechanical for the first time
+- [ ] 193.2-06-PLAN.md — wave 3: the publish refusal rewritten in two arms that share no sentence, naming the step by its visible label with an honest empty-name degradation and a clamped label; F-3, F-4 and F-5 driven RED
+- [ ] 193.2-07-PLAN.md — wave 4: the additive-optional provenance field on `WorkflowDefinition` (zero migration) and the server-side stamp that refuses empty and refuses a copy of `describe`; F-6 with its adversarial half
+- [ ] 193.2-08-PLAN.md — wave 5 ⏸ checkpoint: the k/N frequency harness (2 driven rows, 6 recorded N/A) and the measured scoreboard stating the reduction-not-absence rule verbatim. SERIAL — real paid calls
+- [ ] 193.2-09-PLAN.md — wave 5: the visible AI-proposal mark inside the existing affordance under the same `canvasEnabled` gate, demoting on any edit — with `FLAG_OFF_HEADER_MARKUP` byte-unmoved
+- [ ] 193.2-10-PLAN.md — wave 6 ⏸ close-out: FOUR hot-file ledger rows (three files G-5 could never see), the stale cells corrected beside, STATE/ROADMAP/bug frontmatter, every gate re-run at HEAD, and D-21's single operator-driven end-to-end run
 
 #### Phase 194: Stop a Running Workflow
 
