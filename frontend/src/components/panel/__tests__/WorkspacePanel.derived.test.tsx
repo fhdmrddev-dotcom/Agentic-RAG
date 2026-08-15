@@ -39,6 +39,13 @@ const useWorkflowLockForThread = vi.fn()
 // intercepted (the existing WorkspacePanel.test.tsx mocks TodosSection itself, so
 // it never needed this entry).
 const useDerivedPanel = vi.fn()
+// Phase 194 Plan 03 Task 1 (RUN-01 / SC#1) — the NINTH key, owed here for the SAME
+// structural reason as in WorkspacePanel.test.tsx: this mock is an explicit object
+// literal, and this file renders the REAL WorkspacePanel, which now reads
+// useStreamActions to mount its run-level Stop. A missing key throws the whole file.
+// The stub is inert on purpose — the Stop's behaviour is measured next door (V-04);
+// what this file measures is the derived-panel gate, which the Stop must not disturb.
+const useStreamActions = vi.fn(() => ({ stopThread: vi.fn() }))
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
@@ -48,6 +55,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useTasks: (...a: unknown[]) => useTasks(...a),
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useStreamActions: (...a: unknown[]) => useStreamActions(...a),
 }))
 
 // Mock the heavy NON-todos children to thin sentinels exactly as

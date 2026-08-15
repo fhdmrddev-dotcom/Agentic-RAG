@@ -69,6 +69,20 @@ const useWorkflowLockForThread = vi.fn()
 // the gate→derived render path is exercised in WorkspacePanel.derived.test.tsx
 // (which renders the REAL TodosSection — this file sentinel-mocks it).
 const useDerivedPanel = vi.fn()
+// Phase 194 Plan 03 Task 1 (RUN-01 / SC#1) — the NINTH key.
+//
+// ⚠ THIS MOCK IS AN EXPLICIT OBJECT LITERAL, NOT A PASSTHROUGH. It carried exactly
+// EIGHT keys and no `useStreamActions`, so the moment WorkspacePanel reads that hook
+// the whole file throws. The file already documents this exact failure at :97-100,
+// where Phase 100's fix was to sentinel-mock the CHILD (TemplateUpload). **194 cannot
+// do that, because the caller IS the panel** — the Stop control is mounted by
+// WorkspacePanel itself. Hence a ninth key rather than a ninth sentinel.
+//
+// `stopThread` is the ONE durable cancel path (`stopThread` → DELETE /runs/{id}).
+// It is deliberately a bare vi.fn() here: what the panel owes is the CALL and its
+// ARGUMENT, not the resolver's internals (those are StreamsProvider's own tests).
+const stopThread = vi.fn()
+const useStreamActions = vi.fn()
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
@@ -78,6 +92,7 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useTasks: (...a: unknown[]) => useTasks(...a),
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
+  useStreamActions: (...a: unknown[]) => useStreamActions(...a),
 }))
 
 // Stub the heavy timeline child (it reads the real provider hooks); the panel
@@ -152,6 +167,10 @@ function setHooks({
   useTasks.mockReturnValue({ data: tasks, isLoading: false, error: null, reconcile: vi.fn() })
   useWorkflowLockForThread.mockReturnValue(lock)
   useDerivedPanel.mockReturnValue(derived)
+  // Phase 194 Plan 03 — reset BEFORE wiring, so a "called exactly once" assertion is
+  // a measurement of THIS test's click and never of a previous test's.
+  stopThread.mockReset()
+  useStreamActions.mockReturnValue({ stopThread })
 }
 
 function setViewport(width: number) {
@@ -709,6 +728,104 @@ describe("WorkspacePanel — the run receipt (D-188-13, the thread → run direc
     const sample = codeOf("/** PhaseCard in prose */\n// PhaseCard in a line\nconst x = 1\n")
     expect(sample).not.toMatch(/PhaseCard/)
     expect(sample).toMatch(/const x = 1/)
+  })
+})
+
+// ── Phase 194 Plan 03 Task 1 (RUN-01 / SC#1, validation row V-04) — THE PRIMARY STOP.
+//
+// WHY IT IS HERE AND NOT IN CHAT. This panel is where a user WATCHES a workflow run
+// (the Phase 094/103 decision: the panel owns the meaningful phase spine, chat carries
+// a thin run receipt). Before this plan the panel had **no Stop control of any kind** —
+// every shipped Stop keys off a streaming assistant message in the CHAT bucket, so a
+// user watching the spine had to leave the surface to stop what they were watching.
+//
+// ⚠ THE ID TYPE IS THE WHOLE POINT, AND IT IS A MEASURED LANDMINE, NOT A STYLE CHOICE.
+// `WorkflowLock.runId` carries TWO id types across its write sites: two store a
+// `workflow_runs.id`, two store a producer `runs.run_id`. Its JSDoc asserts only the
+// first. `DELETE /runs/{id}` accepts only the second, and `cancelRun` **swallows 404
+// deliberately** (`api.ts:1259-1269`). So a Stop wired to the lock SILENTLY SUCCEEDS
+// WHILE DOING NOTHING, roughly half the time — the exact dishonesty this phase exists
+// to remove. The panel therefore resolves through `stopThread(threadId)`, which finds
+// the streaming message's runId (the producer id, the correct type) itself.
+//
+// The fixture below makes that measurable rather than assertable: the lock's runId is
+// a string that is NOT the thread id, so passing the wrong one is DETECTABLE.
+describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
+  const HARNESS_LOCK = {
+    runId: "producer-run-DO-NOT-USE",
+    mode: "harness" as const,
+    capPaused: false,
+    continuesRemaining: 3,
+  }
+
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({})
+    getThreadWorkflow.mockResolvedValue({ definition_slug: null } as unknown as ThreadWorkflowState)
+    listPublishedWorkflows.mockResolvedValue([])
+  })
+
+  it("renders a run-level Stop control when a harness run holds the lock", () => {
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    // POSITIVE CONTROL for the gate: the timeline is mounted, so a later absence
+    // assertion is a measurement of the control and not of the harness gate.
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  it("is reachable as a labelled button that names what it stops (not a phase, THE RUN)", () => {
+    setHooks({ lock: HARNESS_LOCK })
+    renderPanel({ state: "open" })
+    const stop = screen.getByRole("button", { name: /stop this workflow run/i })
+    expect(stop).toBe(screen.getByTestId("panel-stop-run"))
+    expect(stop).toHaveTextContent(/stop/i)
+  })
+
+  it("clicking it calls stopThread EXACTLY ONCE with the THREAD id — never the lock's run id", async () => {
+    setHooks({ lock: HARNESS_LOCK })
+    const user = userEvent.setup()
+    renderPanel({ state: "open" })
+    await user.click(screen.getByTestId("panel-stop-run"))
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith("thread-1")
+    // The three ways this goes wrong in production, each asserted rather than implied.
+    expect(stopThread).not.toHaveBeenCalledWith(HARNESS_LOCK.runId)
+    expect(stopThread).not.toHaveBeenCalledWith(undefined)
+    expect(stopThread).not.toHaveBeenCalledWith(null)
+  })
+
+  it("mounts for a phases-exist thread with no lock (the same gate its two siblings use)", () => {
+    setHooks({
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "running", subAgents: [], pendingAsk: null },
+      ],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+  })
+
+  it("renders NOTHING on a Deep / no-run thread — a Deep user sees no new control", () => {
+    setHooks({ todos: mockTodos, phases: [], lock: null })
+    renderPanel({ state: "open" })
+    // POSITIVE CONTROL: no timeline either, which is what "Deep / no-run" means here.
+    expect(screen.queryByTestId("phase-timeline")).not.toBeInTheDocument()
+    expect(screen.getByTestId("todos-section")).toBeInTheDocument()
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+  })
+
+  it("renders NOTHING in the empty short-circuit (no activity at all)", () => {
+    setHooks({ todos: [], files: [], asks: [], phases: [], lock: null })
+    renderPanel({ state: "open" })
+    expect(screen.getByText(/No workspace activity yet/i)).toBeInTheDocument()
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+  })
+
+  it("has no axe violations with the Stop mounted", async () => {
+    setHooks({ lock: HARNESS_LOCK })
+    const { container } = renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    expect(await axe(container)).toHaveNoViolations()
   })
 })
 
