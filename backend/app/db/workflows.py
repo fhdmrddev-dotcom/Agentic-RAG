@@ -1290,6 +1290,106 @@ async def record_phase_not_sent(pool: asyncpg.Pool, phase_id: UUID, output: dict
     )
 
 
+async def cancel_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
+    """Flip the interrupted phase to ``cancelled`` — the ENGINE arm (194 / RUN-01, D-04).
+
+    WHAT THIS STATUS MEANS. The phase that was RUNNING when the user stopped the run.
+    It did NOT ``fail`` — nothing went wrong, the step was interrupted. It was NOT
+    ``skipped`` — it was never routed around; it started, it did work, and a person
+    ended the run underneath it. It is plainly not ``completed`` (it produced no phase
+    output), not ``pending`` (it had already started), and not ``recorded_not_sent``
+    (189's governed-external-action outcome, which has nothing to do with a stop).
+    None of the six shipped statuses is true of that outcome.
+
+    ⚠ REUSING ``failed`` OR ``skipped`` WAS OFFERED AND REJECTED (D-04). Phase 194's
+    entire requirement is honesty about what a stopped run did and did not do; writing
+    ``failed`` on a phase that did not fail, or ``skipped`` on a phase that ran, is
+    precisely the dishonesty the phase exists to remove.
+
+    ⚠ THE COLUMN STORES THE SLUG (D-17). ``cancelled`` is the literal in
+    ``workflow_phases_status_check`` (migration 119). The sentence a person reads —
+    "Run cancelled — no deliverable produced" — is RENDERED by the client's vocabulary
+    layer from this slug and appears in no query and no constraint.
+
+    ⚠ COMPLETED PHASES ARE UNTOUCHED (D-07 / D-13, inherited verbatim). Their outputs
+    are already durable and ``finish_run`` does not touch them. This writer moves ONE
+    row, named by its id — the phase the caller already knows was interrupted. It is
+    not a bulk terminalize and must never become one.
+
+    ⚠ WHERE THIS IS CALLED FROM, AND WHY THERE ARE TWO. This is the ENGINE arm's
+    writer. The engine's cancel/escape path holds ``phase_id`` in the same loop
+    iteration, so it is the only home that knows WHICH phase the user interrupted
+    without a query — and the only home that can distinguish "the phase the user
+    interrupted" from "some phase row that happens to be ``active``". The engineless
+    zombie / no-producer arm has no engine, no loop and no ``phase_id`` at all; it uses
+    the RUN-KEYED sibling ``cancel_active_phases`` below. Collapsing the two would cost
+    the engine arm its certainty or leave the zombie arm with nothing to call.
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE (T-194-06-03). The workflow cluster reads
+    through a service-role pool that BYPASSES RLS, so a WHERE clause is the access
+    boundary — but this writer takes no user-supplied filter, only a key. Ownership is
+    enforced by the CALLER (the owner-scoped, anchor-confirmed cancel route), the same
+    division ``_cancel_run_internals`` already keeps (T-147-06).
+    PHASE-KEYED write → ``WHERE id=$1``.
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now() WHERE id = $1",
+        phase_id,
+    )
+
+
+async def cancel_active_phases(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
+    """Flip a run's in-flight phase row(s) to ``cancelled`` — the ENGINELESS arm (194 / RUN-01).
+
+    WHAT THIS STATUS MEANS. Identical to ``cancel_phase`` above and stated once there:
+    the phase that was RUNNING when the user stopped the run — not failed, not skipped,
+    interrupted. ⚠ Reusing ``failed`` or ``skipped`` was OFFERED AND REJECTED (D-04).
+
+    ⚠ THE COLUMN STORES THE SLUG (D-17). ``cancelled`` is the literal in
+    ``workflow_phases_status_check`` (migration 119). The sentence a person reads —
+    "Run cancelled — no deliverable produced" — is RENDERED by the client's vocabulary
+    layer from this slug and appears in no query and no constraint.
+
+    ⚠ COMPLETED PHASES ARE UNTOUCHED (D-07 / D-13, inherited verbatim), AND THE
+    ``AND status = 'active'`` CLAUSE IS THE MECHANISM — not a convention, not belt-and-
+    braces. It is the only thing standing between this writer and a bulk terminalize of
+    every phase on the run. Widening it to a set — or dropping it — would rewrite
+    ``completed`` rows whose outputs are already durable, which D-07 forbids outright;
+    ``failed``, ``skipped`` and ``recorded_not_sent`` rows are equally out of its reach
+    and must stay so.
+
+    ⚠ RUN-KEYED write → ``WHERE workflow_run_id=$1``. The column is
+    ``workflow_run_id``. ``workflow_phases`` has NO plain ``run_id`` column and naming
+    one raises Postgres 42703 — the trap ``get_active_phase`` records above, whose
+    predicate this applies as a WRITE.
+
+    ⚠ A SET-PREDICATE, DELIBERATELY — never a read-then-update-by-id. Exactly one
+    ``active`` row per run is TYPICAL, NOT GUARANTEED (measured: 3 runs have exactly 1
+    each, 0 runs have more; ``get_active_phase`` itself hedges with ``ORDER BY
+    phase_index LIMIT 1``). One predicate UPDATE is correct for 0, 1 or N matching
+    rows, raises on none of the three, and needs no prior read.
+
+    ⚠ WHERE THIS IS CALLED FROM, AND WHY THERE ARE TWO. This is the zombie /
+    no-producer arm's writer — the path with no engine, no loop and no ``phase_id``,
+    where the row must be FOUND rather than named. The engine arm uses the PHASE-KEYED
+    ``cancel_phase`` above, which is the only home that can distinguish "the phase the
+    user interrupted" from "some phase row that happens to be ``active``".
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE (T-194-06-03). The workflow cluster reads
+    through a service-role pool that BYPASSES RLS, so a WHERE clause is the access
+    boundary — but this writer takes no user-supplied filter, only a key. Ownership is
+    enforced by the CALLER (the owner-scoped, anchor-confirmed cancel route), the same
+    division ``_cancel_run_internals`` already keeps (T-147-06).
+
+    ⚠ The predicate below is written on ONE source line ON PURPOSE (193.2-08: a rule
+    written WRAPPED failed its own literal ``grep -q`` and read as "already fixed").
+    """
+    await pool.execute(
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now() WHERE workflow_run_id = $1 AND status = 'active'",
+        workflow_run_id,
+    )
+
+
 # ── workflow_runs writes (keyed by the runs table's own id) ──────────────────
 async def advance_current_phase(
     pool: asyncpg.Pool, run_id: UUID, next_phase_id: UUID | None
@@ -1306,7 +1406,42 @@ async def advance_current_phase(
 
 
 async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
-    """Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2).
+    """Terminal run status write (``completed`` / ``failed`` / ``cancelled``) + lock-clear (SC#2).
+
+    ⚠ CORRECTED (Phase 194). This docstring's first line previously read, verbatim:
+    "Terminal run status write (``completed`` / ``failed``) + lock-clear (SC#2)." — and
+    it is quoted here rather than deleted, because it was NARROWER THAN THE FUNCTION and
+    a reader who trusted it drew exactly the wrong conclusion. It never restricted
+    ``status``; it merely failed to mention the third value two shipped callers have been
+    passing for a year:
+      * ``backend/app/services/run_producer.py:262`` — the F2 harness-failure terminalize
+        has passed ``"cancelled"`` since the v2.8 cancel-honesty fix, whenever the
+        producer's ``terminal_status`` is ``cancelled`` (a user Stop).
+      * ``backend/app/api/workflows.py:1518`` — ``delete_workflow_cascade`` passes
+        ``"cancelled"`` for every in-flight run it tears down.
+    And the schema has admitted it from the beginning: ``workflow_runs_status_check`` was
+    created with ``cancelled`` in ``supabase/migrations/057_workflow_runs.sql:19`` and
+    re-asserted in ``063_dual_mode_continue.sql:55-57`` when ``cap_paused`` was added.
+    ⇒ THE CORRECTED CONTRACT: a terminal ``workflow_runs`` status write for ``completed``,
+    ``failed`` OR ``cancelled``, plus the thread anchor clear, in ONE transaction,
+    idempotent on a re-run. Phase 194 adds new callers on the cancel path and the old
+    first line would have read as a refusal to serve them.
+
+    ⚠ THE CROSS-WORKER INTERLEAVE — NAMED HERE RATHER THAN GUARDED, because a caller is
+    who needs to know. A Stop landing on worker A (``_cancel_run_internals`` Step 3b →
+    ``finish_run``) while worker B's producer is mid-F2 can interleave two
+    ``UPDATE workflow_runs SET status = $2 WHERE id = $1`` writes against the same row.
+    That is safe today for one reason only, and the reason is worth stating precisely:
+    the interleave is BENIGN BY VALUE-IDENTITY, NOT BY EXCLUSION — both writes carry the SAME VALUE, row-level locking serialises them, and the anchor clear is idempotent (it finds 0 rows on the second pass).
+    THE ONE THING A CALLER MUST NEVER DO IS MAKE THE TWO WRITES DISAGREE — e.g. one passing 'failed' while the other passes 'cancelled'. That prohibition IS the whole guard.
+    Nothing here serialises the two workers, and adding a lock would be the wrong fix: the
+    value-identity property is cheaper and it is what the shipped paths already satisfy.
+
+    ⚠ THIS FUNCTION WRITES NO ``workflow_phases`` ROW, AND MUST NOT LEARN TO. It is
+    called on the ``completed`` path (``harness_engine.py``'s success arm) and by the
+    delete cascade; a phase write here would change behaviour on paths Phase 194 must not
+    touch. The cancel path's phase terminalize lives in ``cancel_phase`` /
+    ``cancel_active_phases`` above, called from the two cancel sites (194 / D-07).
 
     workflow_runs table, keyed by its own ``id``. Mirror ``_shielded_finalize``:
     this durable UPDATE happens BEFORE the terminal SSE sentinel.
