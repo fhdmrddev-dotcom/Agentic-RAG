@@ -5,7 +5,7 @@ milestone_name: "Workflow Product Completion"
 status: in-progress
 last_updated: 2026-08-14T21:00:00.000Z
 last_activity: "2026-08-10 — **v3.7 Workflow Product Completion OPENED** (Phases 192-198, 13 requirements; 191 reserved). Prior: 2026-08-09 — **v3.6 Visual / No-Code Workflow Studio CLOSED and TAGGED.** 13 phases (CORE 181-189 + STRETCH 190 + inserts 184.1/188.1/188.2), 151 plans, 1,064 commits over 18 days, migrations 114-118. Closed on a FRESH audit re-run at HEAD `bdd3e54b` (`41ae2618`) after the on-disk one was found to predate Phases 189 and 190 entirely. **CORE closed 19/21 satisfied with ZERO unsatisfied — every CORE requirement wired in shipped source, confirmed file:line.** The one unsatisfied requirement is STRETCH **CONN-02**: only 1 of 3 connectors is drivable from a workflow, and Slack works by coincidence. STRETCH 191 deferred, never built."
-stopped_at: "2026-08-15 — **Phase 193.1 Template-First Authoring ✅ CLOSED. `AUTH-03` SATISFIED on a real end-to-end run** (`193.1-UAT.md` § U5: run `d8331add`, all 10 template fields rendered, branding intact, 11 of 13 planted facts, zero unrendered placeholders). 11 plans / 7 waves — **`193.1-11` was authored MID-PHASE** after `193.1-04` measured the phase's central assumption FALSE (`template_placeholders` alone does not flip the DELIVERABLE RULE branch; the model must also be told a template was PROVIDED). Gates: tsc **33** unmoved, count gate **3892 / failed 0 / 75 pinned**, backend **62 (SEED-056 rot) / 2092**, G-7 clear, **NO guardrail override** (G-5 fired on THREE files, all honoured). ⛔ **Closed with U2/U3/U4 OWED by decision.** ⚠ **Two publish blockers found on the headline path and NOT fixed here — `SEED-163` and `BUG-260815-01` (BLOCKING), the latter caused by this phase's own D-26 fix — both routed to 197 / AUTH-02 under one root: authoring does not know what publish requires.** ⚠ **Phase 193 still owes its own U1/U2.** NEXT = `/gsd:discuss-phase 194`."
+stopped_at: "2026-08-15 — **Phase 193.1 ✅ CLOSED, AUTH-03 satisfied on a real end-to-end run. Phase 193.2 From Authored to Runnable INSERTED — NEXT = /gsd:discuss-phase 193.2.** 193.2 bundles three items the operator hit in ONE sitting on 193.1s own headline path: SEED-163 (the AI leaves business_requirement blank), BUG-260815-01 (BLOCKING — the draft grows an llm_human_input step the publish gate refuses; caused by 193.1s OWN D-26 fix, measured 2 for 2), BUG-260815-02 (BLOCKING — a just-published workflow is unfindable; ORDER BY name at three call sites, no recency anywhere, position 129 of 146). ⚠ **I routed all three to 197 and the operator OVERRULED it; the original reasoning is left visible rather than overwritten.** They are one phase because they share one root: authoring makes decisions the author is never shown and does not know what publish requires. ⚠ G-2 fires on the library half and must NOT absorb the sort bug. ⚠ G-1 does not fire but a THIRD 193.x would trip it. Also filed and routed to 194: BUG-260815-03 (run history unreachable from canvas) and BUG-260815-04 (chat stuck on Starting workflow — the string is DELIBERATE and pinned, do not reword). ⚠ Phase 193 still owes U1/U2; 193.1 closed with U2/U3/U4 owed by decision."
 resume_file: .planning/ROADMAP.md
 ---
 
@@ -42,7 +42,53 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ⚠ **One quality observation, seeded nowhere yet by decision:** the model grounded Marcus Feld's quote and **stripped his name** — content kept, attribution lost. Fine internally; a downgrade for a client-facing document. Hold until it recurs.
 
-**NEXT = `/gsd:discuss-phase 194`** (RUN-01), or drive U2/U3/U4 first if the owed rows should be cleared before moving on. ⚠ **Phase 193 STILL owes its own U1/U2 — nothing here discharges them.**
+**NEXT = `/gsd:discuss-phase 193.2`.**
+
+### Phase 193.2 — INSERTED 2026-08-15, on an operator instruction that overruled my routing
+
+**From Authored to Runnable** — everything between *"the AI wrote my workflow"* and *"I can run
+it and find it again"*. Three items, **all found by the operator in ONE sitting**, on Phase
+193.1's own headline path, immediately after `AUTH-03` was proven working:
+
+| Item | What happens today |
+|---|---|
+| `SEED-163` | The AI writes five phases from the describe text, then leaves `business_requirement` blank — the author restates the same intent by hand before publish is possible |
+| **`BUG-260815-01`** (blocking) | The draft grows an `llm_human_input` step that the synchronous publish gate categorically refuses; the operator deleted it on the canvas to proceed |
+| **`BUG-260815-02`** (blocking) | A just-published workflow is unfindable — the AI names it, the library sorts `ORDER BY name` at three call sites with **no recency ordering anywhere**, and *"Quarterly Business Review…"* landed at **position 129 of 146** |
+
+⚠ **I ROUTED ALL THREE TO 197 AND THE OPERATOR OVERRULED IT — the original reasoning is left
+visible in each artifact rather than overwritten.** It optimised for tidiness of scope (197 is
+the phase already scoped to authoring) and not for whether the product could be used. Hitting
+two publish walls in one sitting is what settled it.
+
+**They are ONE phase and not three fixes because they share ONE root: the authoring path makes
+decisions the author is never shown, and does not know what the publish gate requires.**
+
+⚠ **`BUG-260815-01` is a consequence of Phase 193.1's OWN `D-26` fix** — measured 2 for 2
+whenever a template step appears. **Neither side is wrong in isolation**; the gate is deliberate
+and its docblock names the deferred Phase-103 background-job publish as the real fix. **Do NOT
+fix it by removing the gate.** The generalisable lesson, worth carrying past this phase: *a
+change to what a model EMITS can push its output across a gate nobody thought to re-check.*
+
+⚠ **G-2 fires on the library half and MUST NOT absorb the sort bug.** The operator also raised
+card density and floated a list view — that is a **design question** needing `/gsd:sketch`
+first, bound by `SEED-155`. **Sorting is a defect and ships regardless of any layout decision.**
+⚠ **G-1 does not fire** (second `193.x`; the rule needs ≥ 2 priors) — **a third would trip it.**
+
+### Two further findings from the same session — routed to 194 / RUN-01, NOT to 193.2
+
+- **`BUG-260815-03`** (major) — a run's history is reachable from chat but **not from the
+  canvas** after reopening the thread. Not root-caused; the investigation is *named* rather than
+  guessed (`workflow_runs` is keyed by `definition_id` as well as `thread_id`, so the data
+  likely already exists).
+- **`BUG-260815-04`** (major) — while a workflow runs, chat keeps a **duplicate assistant icon**
+  and stays on **"Starting workflow…"** for the entire run. ⚠ **That string is DELIBERATE and
+  pinned byte-exact** (`toolMeta.ts:92`, D-14) — so this must **not** be fixed by rewording. The
+  defect is that the surface never leaves its pre-tools state while `workflow_phases` rows are
+  being written throughout. Check the existing `toolcallpanel-dedup` report before opening a
+  fresh investigation into the duplicate icon.
+
+**Both are run-surface truthfulness, not authoring** — deliberately kept out of 193.2.
 
 **NEXT = drive UAT rows U2, U3 and U4** (`193.1-UAT.md`), with a person who has not read the source. Nothing else is owed by the code.
 

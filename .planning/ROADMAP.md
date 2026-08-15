@@ -55,6 +55,7 @@ is the incumbent any proposal must beat.
 - [x] **Phase 192.1: Workflow Identity** ✓ **CLOSED 2026-08-13** — 8 plans / 7 waves, LIB-05 satisfied. ⚠ **This entry was ABSENT from this checklist entirely until the close, exactly as Phase 188.2 was at the v3.6 close** — the list ran 192 → 193 while an eight-plan phase executed between them. A phase missing from its own checklist is invisible to every audit that reads the checklist, which is the `WorkflowsPage.tsx`/G-5 lesson one layer up. **G-4 UAT DRIVEN, not owed: 9 of 9 rows** (`192.1-UAT.md`), **7 pass · 2 fail**, every row carrying a recorded `result:` and **none locating its target by id** (D-27 — the rule Phase 192's own re-drive broke). **U1 — SC#1, the row 192 failed — PASSED**, driven by the operator by reading the screen. **U4 passed AND CHANGED THE PRODUCT** (`1 of 43` read as an index → `43 share this name`, fixed same-day under G-3, `773e6365`). **U7 FAILED on salience → fixed same-day** (`5646d043`, one `className`). **U6 passes on BEHAVIOUR with its disclosure half recorded NOT VERIFIED** — carried, not rounded up. **U8 FAILED and STAYS FAILED**: the operator put sketch 163 beside the live library and the card *"does not read the same"*. ⚠ **Three of U8's four complaints are OLDER CODE** — the 2-bare-line cards + purpose hero are **Phase 124** (`PhaseSpine.tsx:50`, `c5a6c610`, 2026-06-27, seven weeks before the sketch was drawn); the toolbar is **Phase 192** (`2dd9b748`). 192.1's own half is the counter's lost chip treatment, **accepted as a recorded deviation and routed to `SEED-155`** — not restyled, because U4 had already widened the string from `1 of 2` to `43 share this name` (~3× the pill's drawn width), and because fixing one badge leaves the gap the operator actually reacted to untouched. Root cause is **structural sketch→build drift**: the sketch hand-drew an atom the card *cannot* render, since the card consumes `WorkflowSoul scale="card"` UNCHANGED by explicit decision. **SECURED — `threats_open: 0`** (`192.1-SECURITY.md`): 29 entries / 8 plans, verify-mitigations mode, 4 accepted risks logged; it found **three durability holes where the property held but nothing defended it**, and **E-1 + E-2 were closed under G-3** (`15472e7c`) — T-192.1-16's register claimed a grep-assertion that did not exist, and the subtree guard proved only 3 of 12 modules loaded. **E-3 open by decision**, trigger named. **G-5 HONOURED IN THE ORDER D-01 REQUIRES** — the fork extraction shipped in Wave 3, *before* the feature it made room for. ⚠ **NO `192.1-VERIFICATION.md` EXISTS** — stated rather than implied; the evidence base for this close is the 9 driven UAT rows + SECURITY.md + the gates (tsc 33 unmoved · count gate 118/118 on the subtree fences · `failed 0`), not a goal-backward verifier report
 - [ ] **Phase 193: Authoring Doors + Template Placement** — the two doors are tellable apart before choosing; template supply has a findable home (AUTH-01, AUTH-03)
 - [x] **Phase 193.1: Template-First Authoring** — the AI drafts knowing what the template asks for (AUTH-03, the re-opened half). ⚠ **INSERTED 2026-08-14.** `REQUIREMENTS.md` records AUTH-03 as **"ANSWERED WRONGLY, not delivered — RE-OPENED, needs a new phase"**: 193 shipped the *draft-then-attach* half (and quick task `260814-q5r` added the placeholder read on top of it), but a user who describes a workflow still gets a draft built **blind to the template it will have to fill** (`SEED-157`). Measured: `POST /workflows/generate` has accepted `template_placeholders` since **Phase 103** and the frontend has **never sent it** (`WorkflowBuilderPage.tsx:1267` sends `{describe, project_folder_id?}` only); its sibling `template_asset_id` is typed `UUID` while asset ids are Storage **paths**, a measured 422. Same shape as 192 → 192.1: the parent phase shipped, a real gap was found in lived experience, and the gap gets its own phase rather than a closure round (G-7) ✅ **CLOSED 2026-08-15 — AUTH-03 SATISFIED on a real run** (`193.1-UAT.md` § U5: run `d8331add`, all 10 template fields rendered, branding intact, 11 of 13 planted facts). 11 plans / 7 waves; **plan `193.1-11` was authored MID-PHASE** after `193.1-04` measured the phase's central assumption false. Gates at close: `tsc` **33** unmoved, count gate **3892 / failed 0 / 75 pinned**, backend **62 (SEED-056 rot) / 2092**, G-7 clear, **no guardrail override** (G-5 fired on THREE files, all honoured). ⛔ **CLOSED WITH THREE UAT ROWS OWED BY DECISION, not by oversight — U2, U3, U4** (screen-judgement rows: control confusability, the disabled-CTA explanation, the describe-column fold). ⚠ **Two publish blockers found on the phase's own headline path and NOT fixed here** — `SEED-163` and `BUG-260815-01` (blocking), both routed to 197 / AUTH-02; the second is a consequence of this phase's own D-26 fix.
+- [ ] **Phase 193.2: From Authored to Runnable** — everything between *"the AI wrote my workflow"* and *"I can run it and find it again"* (SEED-163, BUG-260815-01, BUG-260815-02). ⚠ **INSERTED 2026-08-15 on an explicit operator instruction that overruled the original routing.** All three were first routed to 197 / AUTH-02 because that is the phase already scoped to authoring; the operator hit **two publish walls in a single sitting** on Phase 193.1's own headline path and ruled them blocking. **The original reasoning is left visible in each artifact rather than overwritten** — it optimised for tidiness of scope, not for whether the product could be used. **The three share ONE root, which is why they are one phase and not three fixes: the authoring path makes decisions the author is never shown, and does not know what the publish gate requires.**
 - [ ] **Phase 194: Stop a Running Workflow** — a run can be stopped mid-execution and reports `cancelled` honestly (RUN-01)
 - [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
 - [ ] **Phase 196: Registry-Backed Model Picker (canvas)** — a step's model comes from the live registry, never typed (AUTH-04)
@@ -375,6 +376,47 @@ Plans:
 - [x] 193.1-09-PLAN.md — the three-bucket name check (re-sourced buckets, degenerate-first copy), its own component, one gated line
 - [x] 193.1-11-PLAN.md — ⚠ **AUTHORED MID-PHASE, not at plan time.** `193.1-04` measured the phase's central assumption FALSE: `template_placeholders` alone did NOT flip the DELIVERABLE RULE's branch (0 `render_template` on 3 of 3 real calls). The grounding hedged rather than asserting a template was **provided**. This plan splits the section into two assertive arms — re-measured **3/3, key coverage 3-4/8 → 8/8, control unchanged at 0** (D-26)
 - [x] 193.1-10-PLAN.md — ⏸ close-out: three corrected hot-file ledger rows, the four UAT rows driven, every gate re-run at HEAD
+
+#### Phase 193.2: From Authored to Runnable
+
+**Goal**: A person who describes a workflow can publish it and find it again, without being asked
+for something they already said or blocked by a step they did not choose.
+
+**Depends on**: Phase 193.1 (template-first authoring ships; all three findings below were observed
+on its end-to-end UAT run).
+**Requirements**: none new — this phase repairs the path to `AUTH-03`, which is already satisfied.
+
+**Flags**:
+  - ⚠ **All three items were found in ONE sitting by the operator**, on the phase's own headline
+    path, immediately after `AUTH-03` was proven working. **The capability is delivered and the
+    path around it is not.**
+  - ⚠ **`BUG-260815-01` is a consequence of Phase 193.1's OWN `D-26` fix.** Once the model is told
+    it must fill named template fields, it adds an `llm_human_input` step to ask the human for what
+    it cannot find — and the synchronous publish gate categorically refuses that phase type.
+    Measured **2 for 2** whenever a template step appears. **Neither side is wrong in isolation**:
+    the gate is deliberate and its own docblock names the deferred Phase-103 background-job publish
+    as the real fix. **Do NOT fix this by removing the gate** — an unsubscribed `ask_user` can wedge
+    a publish indefinitely.
+  - ⚠ **G-2 fires on the library half, and it must not absorb the sort bug.** The operator also
+    raised card density (*"a lot of information, a lot of text… maybe instead of cards a list"*).
+    That is a **design question** needing `/gsd:sketch` first, and `SEED-155` binds: a sketch that
+    hand-writes its own CSS is a drawing, not an acceptance bar, and one depicting a shipped
+    component must RENDER it. **Sorting is a defect and ships regardless of any layout decision.**
+  - ⚠ **G-5 will fire on `backend/app/api/workflows.py` (17 phases at 193.1's close) and probably on
+    the library modules.** The recency sort touches **three** `ORDER BY name` call sites
+    (`backend/app/db/workflows.py:316`, `:352`, `:553`) — change them together or the feeds
+    disagree.
+  - **G-1 does NOT fire** — this is the second `193.x`, and the rule needs ≥ 2 priors. Worth noting
+    that a third would trip it.
+
+**Success Criteria** (what must be TRUE):
+
+  1. A person who describes a workflow is **not asked to restate the same intent** before publishing — the business requirement arrives proposed and editable, never blank and never silently derived (`SEED-163`).
+  2. A draft produced by the template-first path **publishes without hand-editing the canvas**; if a step genuinely cannot be validated, the refusal **names that step by its visible label and offers an action**, rather than naming internal phase-type identifiers (`BUG-260815-01`).
+  3. **A just-published workflow is findable without knowing its name** — the author is taken to it, or it is at the top of the list, or both (`BUG-260815-02`).
+  4. Nothing here regresses `AUTH-03`: the template-first run still fills the bound template end-to-end, provable by re-running the Phase 193.1 UAT kit (`C:\Users\fhdmr\Desktop\uat-193.1-qbr\`, scoring rule: 8+ planted facts).
+
+**Plans**: TBD — `/gsd:discuss-phase 193.2` first.
 
 #### Phase 194: Stop a Running Workflow
 
