@@ -388,6 +388,10 @@ const ALL_READINGS: Record<CanvasReading, true> = {
   "waiting-for-you": true,
   unknown: true,
   "recorded-not-sent": true,
+  // 194-04 (RUN-01 / D-04). The mechanism fired again: 194-04 widened `CanvasReading` and
+  // this table became one of ELEVEN TS2741s the widening armed, which is how the ninth
+  // reading reached every loop below without a list being updated by hand.
+  cancelled: true,
 }
 const READINGS = Object.keys(ALL_READINGS) as CanvasReading[]
 
@@ -434,7 +438,18 @@ const DB_ONLY_STATUSES = [
  *  fenced out of the adapter (which names no reading in code at all) but CANNOT be
  *  fenced out of the vocabulary module, because there they ARE the reading — see the
  *  measured note on the `runVocabulary` block below. */
-const SHARED_SPELLINGS = [["fai", "led"].join(""), ["skip", "ped"].join("")] as const
+/** ⚠ 194-04 adds a THIRD. Migration 119's `cancelled` slug is spelled identically to the
+ *  ninth `CanvasReading` member — for THIS word only, because it needs no case change and no
+ *  kebab hyphen, exactly as the two below have always coincided. It joins this list rather
+ *  than `DB_ONLY_STATUSES` for the same reason they did, and the consequence is what makes it
+ *  worth adding: it is now swept out of the ADAPTER's code and, more importantly, out of the
+ *  rendered card FACE at every reading — so the canvas's business sentence for a stopped step
+ *  can never quietly become the database's word for it. */
+const SHARED_SPELLINGS = [
+  ["fai", "led"].join(""),
+  ["skip", "ped"].join(""),
+  ["cance", "lled"].join(""),
+] as const
 
 const STEP_ORDINAL_FIELD = ["phase", "_index"].join("")
 const STEP_ORDINAL_CAMEL = ["phase", "Index"].join("")

@@ -382,7 +382,11 @@ describe("runVocabulary 189-10 — the eighth ring is the ONLY one drawn in FOUR
       }),
     )
     expect(new Set(signatures).size).toBe(ALL_READINGS.length)
-    expect(ALL_READINGS.length).toBe(8)
+    // 8 → 9 at 194-04. ⚠ THE EXACT COUNT IS KEPT DELIBERATELY, where the sibling case in
+    // `PhaseNodeCard.test.tsx` chose a FLOOR: this one is the table's own inventory, and a
+    // row silently vanishing from `RUN_READING_WORD` (which is where `ALL_READINGS` is
+    // derived) is exactly the regression an inequality would wave through.
+    expect(ALL_READINGS.length).toBe(9)
   })
 })
 
@@ -416,5 +420,151 @@ describe("runVocabulary 189-10 — WR-04: the lookups stay own-guarded as the ta
     // as a deliberate not-send, which would be a claim about a step nobody made.
     expect(runReadingWord("constructor" as CanvasReading)).not.toBe(D16_WORD)
     expect(runReadingWord("constructor" as CanvasReading)).not.toBe(RUN_READING_WORD.done)
+  })
+})
+
+// ═══ 194-04 · THE NINTH READING, AND THE TWO NO-COLLAPSE FENCES ═════════════════════
+//
+// ⚠ EVERY ASSERTION BELOW IS SCOPED OVER COMPOSED **VALUES**, NEVER OVER MODULE SOURCE, and
+// that is a measured constraint rather than a stylistic one. `runVocabulary.ts`'s docblocks
+// legitimately NAME `failed` and `skipped` (they are readings, and the file explains why the
+// stopped reading is neither), so a raw source sweep would red on the prose documenting the
+// very rule it is checking. That is Phase 193.2's F-3 lesson, applied here before it bit.
+
+/** The stopped reading, named ONCE so no assertion below re-spells it. */
+const STOPPED: CanvasReading = "cancelled"
+
+/** D-04's locked canvas wording, spelled literally and exactly once in this repository's
+ *  tests — which is what makes the first assertion a FALSIFICATION of the table rather than
+ *  a copy of it, the same rule `D16_WORD` above follows. */
+const STOPPED_WORD = "Stopped by you"
+
+/** The PANEL's word for the same state. Written here, in the CANVAS suite, for one reason:
+ *  D-188-02 requires the two vocabularies to be DIFFERENT, and an inequality needs both
+ *  sides. It is asserted against, never imported and never rendered by this module. */
+const PANEL_WORD_FOR_THE_SAME_STATE = "Stopped"
+
+describe("runVocabulary 194-04 — the ninth word", () => {
+  it("is byte-exactly the locked wording, and reachable through the TOTAL accessor", () => {
+    expect(RUN_READING_WORD[STOPPED]).toBe(STOPPED_WORD)
+    expect(runReadingWord(STOPPED)).toBe(STOPPED_WORD)
+  })
+
+  it("is NOT the panel's word — two vocabularies, one derivation (D-188-02)", () => {
+    // ⚠ Req 8's acceptance is a grep proving zero local RE-DERIVATIONS. It is emphatically
+    // NOT that the two views print identical strings — the panel speaks harness words and
+    // the canvas speaks business ones. This inequality is that rule, made mechanical.
+    expect(RUN_READING_WORD[STOPPED]).not.toBe(PANEL_WORD_FOR_THE_SAME_STATE)
+    // …and the difference is more than casing or whitespace, which a bare `!==` would let
+    // through if someone later "unified" them with a trim.
+    expect(RUN_READING_WORD[STOPPED].toLowerCase().trim()).not.toBe(
+      PANEL_WORD_FOR_THE_SAME_STATE.toLowerCase().trim(),
+    )
+    // POSITIVE CONTROL — the comparison really can find equality, so the two above are
+    // measurements and not a comparator that always disagrees.
+    expect(RUN_READING_WORD[STOPPED]).toBe(STOPPED_WORD)
+  })
+
+  it("carries a CLAUSE, and the clause says the step did not finish", () => {
+    const clause = runReadingClause(STOPPED)
+    expect(clause).not.toBeNull()
+    expect(runReadingLabel(STOPPED)).toBe(`${STOPPED_WORD} ${clause}`)
+    // POSITIVE CONTROL — a reading WITHOUT a clause really does render the word alone, so
+    // the composition above is a measurement rather than an accessor ignoring its argument.
+    expect(runReadingLabel("done")).toBe(RUN_READING_WORD.done)
+  })
+
+  it("⚠ CLAIMS NOTHING WAS DISCARDED — D-13's red line, over the composed LABEL", () => {
+    // The validated sketch words the run band "… · partial work discarded". D-13 forbids
+    // exactly that: a stopped run KEEPS its completed phases and their outputs are durable.
+    // Asserted over the whole rendered sentence, lower-cased, so a capitalised or
+    // mid-sentence variant cannot slip past.
+    const label = runReadingLabel(STOPPED).toLowerCase()
+    for (const forbidden of ["discard", "thrown away", "throw away", "lost", "deleted", "wiped"]) {
+      expect(label, `the stopped sentence must not claim work was ${forbidden}`).not.toContain(
+        forbidden,
+      )
+    }
+    // NON-VACUITY: the needle set really can match a sentence, so six absences are six
+    // measurements rather than a loop over an empty comparison.
+    expect("partial work discarded").toContain("discard")
+    // …and the sentence is not empty, which is the other way this fence could go vacuous.
+    expect(label.length).toBeGreaterThan(20)
+  })
+})
+
+describe("runVocabulary 194-04 — V-19: no cancel path enters the failed or skipped vocabulary", () => {
+  it("the WORD is neither failure's nor bypass's, exactly", () => {
+    expect(RUN_READING_WORD[STOPPED]).not.toBe(RUN_READING_WORD.failed)
+    expect(RUN_READING_WORD[STOPPED]).not.toBe(RUN_READING_WORD.skipped)
+    // …nor a claim of success, nor the honest-ignorance word. Four refusals, four distinct
+    // false claims about this step.
+    expect(RUN_READING_WORD[STOPPED]).not.toBe(RUN_READING_WORD.done)
+    expect(RUN_READING_WORD[STOPPED]).not.toBe(RUN_READING_WORD.unknown)
+  })
+
+  it("the whole composed SENTENCE is neither, at every failure flavour", () => {
+    // `failed`'s sentence is a function of `emitFailure`, so a single compare against one
+    // of its three flavours would leave the other two undefended — the 193.2 "two arms, one
+    // assertion" lesson. Swept over the closed set instead.
+    const stopped = runReadingLabel(STOPPED)
+    for (const f of [
+      null,
+      "model_failed_to_emit",
+      "citation_gate_rejected",
+      "render_failed",
+      "integrity_failed",
+      "no_template_bound",
+    ] as const) {
+      expect(stopped, `collapsed into the failed sentence at ${f}`).not.toBe(
+        runReadingLabel("failed", f),
+      )
+    }
+    expect(stopped).not.toBe(runReadingLabel("skipped"))
+    // NON-VACUITY: the sweep really produced distinct failure sentences to compare against,
+    // rather than six copies of one string that happened to differ from ours.
+    expect(
+      new Set(
+        (["model_failed_to_emit", "citation_gate_rejected", "render_failed"] as const).map((f) =>
+          runReadingLabel("failed", f),
+        ),
+      ).size,
+    ).toBeGreaterThan(1)
+  })
+
+  it("the RING is neither — shape is the channel that survives colour being switched off", () => {
+    const stopped = ringDash(ringSpecFor(STOPPED), CIRCUMFERENCE)
+    expect(stopped).not.toEqual(ringDash(ringSpecFor("failed"), CIRCUMFERENCE))
+    expect(stopped).not.toEqual(ringDash(ringSpecFor("skipped"), CIRCUMFERENCE))
+    // …and specifically not the closed circle, which is the single worst confusion here.
+    expect(stopped).not.toEqual(ringDash(ringSpecFor("done"), CIRCUMFERENCE))
+    expect(stopped!.dasharray).not.toBeNull()
+  })
+
+  it("its assertable UNIQUE property: the only ring whose dash equals its gap", () => {
+    // Derived from the table, never from the two numbers. Every other fraction row names a
+    // dash and a gap that differ; the two `length` rows carry no fractions at all.
+    const halved = ALL_READINGS.filter((reading) => {
+      const spec = RING_GEOMETRY[reading]
+      return spec.kind === "fraction" && spec.arc.dash === spec.arc.gap
+    })
+    expect(halved).toEqual([STOPPED])
+    // …and it does not spin: the run is over for this phase, and a moving terminal would
+    // claim work still in flight.
+    const spec = RING_GEOMETRY[STOPPED]
+    expect(spec.kind).toBe("fraction")
+    if (spec.kind !== "fraction") throw new Error("unreachable — pinned above")
+    expect(spec.spinning).toBe(false)
+  })
+
+  it("claims NO card border — the sixth deliberate absence, pinned not merely commented", () => {
+    // `RUN_READING_BORDER` is a `Partial<>`, so this absence is invisible to the compiler and
+    // would otherwise be indistinguishable from an oversight.
+    expect(Object.prototype.hasOwnProperty.call(RUN_READING_BORDER, STOPPED)).toBe(false)
+    // Only the three LOUD readings claim the border, and that set is asserted WHOLE — so a
+    // later phase quietly adding a fourth claimant goes red here.
+    expect(Object.keys(RUN_READING_BORDER).sort()).toEqual(
+      ["failed", "running", "waiting-for-you"].sort(),
+    )
   })
 })

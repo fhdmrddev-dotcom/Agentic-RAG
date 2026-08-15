@@ -605,3 +605,45 @@ describe("phaseState — source fence: one import, one declaration each, zero vo
     expect(phaseStateSource).toContain(RUNS_CHECK)
   })
 })
+
+// ── 194-04 · V-18 — A STOP DOES NOT REPAINT THE STEPS THAT ALREADY FINISHED ─────────
+//
+// D-07 / D-13's rule, at the derivation layer where every surface reads it: a stopped run
+// KEEPS its completed phases. Their outputs are durable and migration 119 "ADMITS a literal
+// — it does not authorise a bulk rewrite". The failure this fences is not hypothetical: the
+// tempting one-line implementation of "the run is over" is to resolve everything terminal to
+// one reading, and that would silently promote the interrupted step to `done` as well.
+
+describe("194-04 V-18 — a stopped run keeps its completed phases", () => {
+  /** The shape a real stopped run has: something finished, one step was interrupted, the
+   *  rest never started. Built through the SHIPPED derivation, never hand-mapped. */
+  const RUN = [
+    mkPhase({ slug: "gather", phaseIndex: 0, status: "done" }),
+    mkPhase({ slug: "draft", phaseIndex: 1, status: "cancelled" }),
+    mkPhase({ slug: "deliver", phaseIndex: 2, status: "pending" }),
+  ]
+
+  it("reads [done, cancelled, not-started] — the first stays COMPLETE, the second is NOT done", () => {
+    expect(RUN.map(canvasReading)).toEqual(["done", "cancelled", "not-started"])
+    // Stated again as two separate claims, because the array compare above would also be
+    // satisfied by a derivation that had collapsed BOTH into one value in some other run.
+    expect(canvasReading(RUN[0]), "a stop must not repaint a finished step").toBe("done")
+    expect(canvasReading(RUN[1]), "the interrupted step must not read as finished").not.toBe(
+      "done",
+    )
+    // …and the two are DISTINGUISHABLE, which is the property a person actually needs: one
+    // step produced its output and the other did not, and the canvas must not say they are
+    // the same thing.
+    expect(canvasReading(RUN[0])).not.toBe(canvasReading(RUN[1]))
+    // NON-VACUITY: the compare really can find equality, so the inequality is a measurement.
+    expect(canvasReading(RUN[0])).toBe(canvasReading(mkPhase({ status: "done" })))
+  })
+
+  it("the un-started tail is still NOT-STARTED — a stop does not terminalize the future", () => {
+    // The other half nobody would notice breaking: steps the harness never reached are not
+    // cancelled, not failed and not unknown. They simply never began.
+    expect(canvasReading(RUN[2])).toBe("not-started")
+    expect(canvasReading(RUN[2])).not.toBe("cancelled")
+    expect(canvasReading(RUN[2])).not.toBe("unknown")
+  })
+})
