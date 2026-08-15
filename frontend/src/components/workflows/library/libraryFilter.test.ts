@@ -19,6 +19,7 @@ import { describe, it, expect } from "vitest"
 import libraryFilterSource from "./libraryFilter?raw"
 import type { PublishedWorkflow, WorkflowDraftRow } from "@/lib/api"
 import type { ChipId } from "./libraryRow"
+import type { LibrarySelection } from "./libraryFilter"
 import {
   CHIP_PREDICATES,
   UNBOUND,
@@ -482,5 +483,233 @@ describe("D-16 — fromDraft reads updated_at and never the opaque token", () =>
     expect(assignments).toHaveLength(1)
     expect(assignments[0]).toContain("token")
     expect(assignments[0]).not.toContain("row.updated_at")
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 193.2 / SC#3 — WHERE A FRESHLY-PUBLISHED ROW ACTUALLY LANDS
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// Plan `193.2-03` changed the SERVER: `list_published_workflows` and `list_draft_workflows`
+// now `ORDER BY updated_at DESC`, while the curated starters shelf deliberately stays
+// `ORDER BY name` (D-16). ⚠ **THAT IS NOT THE SAME CLAIM AS "the newest row appears at the
+// top of the library."** The rendered order is decided AFTER the wire, by two pure
+// functions in this module, and it is:
+//
+//     [all starters] ++ [all published] ++ [all drafts]
+//
+// because `mergeLibrary` inserts into a `Map` in that order (`libraryFilter.ts:145-147`) and
+// `[...byId.values()]` returns insertion order, and because `filterLibrary` is a
+// `rows.filter(...)` that preserves order and adds no sort of its own. So a recency-first
+// published feed lands its newest row at index `starters.length` — NOT at index 0.
+//
+// ⚠ THE MEASURED RESIDUAL, STATED RATHER THAN SMOOTHED. Against the live operator data
+// (`193.2-RESEARCH.md` §R2): 3 curated starters + 28 published (the page passes `?scope=mine`)
+// + 78 drafts = 109 rendered rows. The newest published row rendered at **17 of 109** before
+// the server change and renders at **4 of 109** after it. **Position 4 is not position 1, and
+// no SQL change can make it 1** — the starters block is concatenated CLIENT-side, ahead of
+// everything, by this module.
+//
+// ⚠ AND THE ARITHMETIC IN `BUG-260815-02` WAS OVER THE WRONG FEED. The report's "129 of 146"
+// was a `row_number() over (order by name)` across the WHOLE `workflow_definitions` table;
+// the page requests `?scope=mine`, so the true before-figure is 17 of 109. Both are recorded,
+// neither over the other.
+//
+// The three honest readings `193.2-RESEARCH.md` §R2 offers, and which one this phase took:
+//   1. ACCEPT position 4 and say so — no code, no client sort, D-17's fence stays green.
+//      **This is the reading taken.**
+//   2. Re-order `mergeLibrary`'s three loops to `published, drafts, starters`. Not a sort, but
+//      it inverts the dedupe precedence the `libraryFilter.ts:143-144` comment records ("the
+//      later write wins: a row the caller owns should read as theirs rather than as a shared
+//      starter"), so it needs its own decision. **Not recommended, and not taken here.**
+//   3. Lean on the post-publish Run CTA alone. **Weakest** (§R3).
+//
+// ⚠ WHETHER POSITION 4 SATISFIES "findable" IS AN OPERATOR JUDGEMENT, NOT A MEASUREMENT.
+// It is `OQ-5`, and it goes in front of the operator at the D-21 UAT run. Nothing in this
+// file may be read as that verdict; what is pinned below is the arithmetic only.
+//
+// D-17 / D-18: no client sort is added anywhere, and NO sort control is built. A recency ⇄ A–Z
+// toggle belongs to the deferred library sketch (G-2 fires there, `SEED-155` binds); building
+// it now would be building it twice. Nothing here touches `LibraryToolbar`.
+
+/** A published/starter feed row carrying a wire `updated_at`, for the ordering fixtures. */
+const sc3Published = (id: string, name: string, updatedAt: string): PublishedWorkflow => ({
+  id,
+  slug: id,
+  name,
+  definition: chatOnlyDef(`What ${name} is for.`, null, 1),
+  is_mine: true,
+  is_system_global: false,
+  updated_at: updatedAt,
+})
+
+const sc3Draft = (id: string, name: string, updatedAt: string): WorkflowDraftRow => ({
+  id,
+  slug: id,
+  version: 1,
+  name,
+  definition: chatOnlyDef(`What ${name} is for.`, null, 1),
+  token: `${updatedAt}-token`,
+  updated_at: updatedAt,
+})
+
+/**
+ * The curated shelf, in the order `list_starter_workflows` still returns it — `ORDER BY name`
+ * (D-16, deliberately NOT changed by `193.2-03`).
+ */
+const SC3_STARTERS: readonly PublishedWorkflow[] = [
+  sc3Published("id-s1", "Clause extractor", "2026-01-04T00:00:00.000000+00:00"),
+  sc3Published("id-s2", "Meeting minutes", "2026-01-05T00:00:00.000000+00:00"),
+  sc3Published("id-s3", "Report builder", "2026-01-06T00:00:00.000000+00:00"),
+]
+
+/**
+ * The author's own published feed, in the order `list_published_workflows` returns it AFTER
+ * `193.2-03` — `ORDER BY updated_at DESC`. This fixture simulates the WIRE; it reaches no
+ * database, and it deliberately does not re-derive the ordering client-side.
+ *
+ * ⚠ THE NEWEST ROW IS NAMED SO THAT IT SORTS **LAST** ALPHABETICALLY (`Z…` against `A…`,
+ * `B…`, `M…`). That is what makes the index assertion below able to tell a recency-first
+ * feed from the alphabetical one that shipped before — an assertion that passes under both
+ * orderings would be inert, which is the class of defect `193.2-03` found a third of its own
+ * fence suffering from.
+ */
+const SC3_PUBLISHED: readonly PublishedWorkflow[] = [
+  sc3Published("id-p1", "Zebra quarterly board recap", "2026-08-15T02:07:02.343741+00:00"),
+  sc3Published("id-p2", "Missing-clause sweep", "2026-08-14T11:20:00.000000+00:00"),
+  sc3Published("id-p3", "Beta supplier ledger", "2026-08-02T09:00:00.000000+00:00"),
+  sc3Published("id-p4", "Annual audit pack", "2026-07-01T08:00:00.000000+00:00"),
+]
+
+/**
+ * The drafts feed, also `updated_at DESC` after `193.2-03`. ⚠ `id-d1` is deliberately the
+ * GLOBALLY newest row in the whole fixture — newer than the newest published row — because
+ * the rendered order is BLOCK-WISE, not globally recency-sorted, and a fixture where the
+ * blocks happen to agree with a global sort could not tell the two apart.
+ */
+const SC3_DRAFTS: readonly WorkflowDraftRow[] = [
+  sc3Draft("id-d1", "Sign-off tracker", "2026-08-15T09:00:00.000000+00:00"),
+  sc3Draft("id-d2", "Renewal checker", "2026-08-13T09:00:00.000000+00:00"),
+  sc3Draft("id-d3", "Handover pack", "2026-08-09T09:00:00.000000+00:00"),
+]
+
+/** The newest published row — the one a person just published and then goes looking for. */
+const SC3_NEWEST_PUBLISHED = SC3_PUBLISHED[0]
+
+/**
+ * The page's defaults, verbatim: blank query (`WorkflowsPage.tsx:251`), no chips (`:252`),
+ * All projects (`:249`). No chip has to be clicked for the published block to be on screen.
+ */
+const SC3_DEFAULTS: LibrarySelection = { query: "", chips: [], projectId: null }
+
+const sc3Merged = () => mergeLibrary(SC3_PUBLISHED, SC3_STARTERS, SC3_DRAFTS)
+
+describe("193.2 / SC#3 — where a freshly-published row actually lands", () => {
+  it("the merge is `starters ++ published ++ drafts`, and it adds no order of its own", () => {
+    const ids = idsOf(sc3Merged())
+
+    expect(ids).toEqual([
+      ...SC3_STARTERS.map((r) => r.id),
+      ...SC3_PUBLISHED.map((r) => r.id),
+      ...SC3_DRAFTS.map((r) => r.id),
+    ])
+
+    // …and each block's INTERNAL order is the order that block arrived in, unmodified — the
+    // server's `ORDER BY` survives the merge rather than being re-decided here (D-17).
+    expect(ids.slice(0, SC3_STARTERS.length)).toEqual(SC3_STARTERS.map((r) => r.id))
+    expect(ids.slice(SC3_STARTERS.length, SC3_STARTERS.length + SC3_PUBLISHED.length)).toEqual(
+      SC3_PUBLISHED.map((r) => r.id),
+    )
+    expect(ids.slice(SC3_STARTERS.length + SC3_PUBLISHED.length)).toEqual(
+      SC3_DRAFTS.map((r) => r.id),
+    )
+  })
+
+  it("a recency-first published feed lands its newest row at index `starters.length`", () => {
+    // The premise, asserted rather than assumed: the newest published row sorts LAST by name,
+    // so this index would be a DIFFERENT row under the alphabetical ordering that shipped
+    // before `193.2-03`. Without this, the assertion below could not distinguish the change
+    // from its absence.
+    const byName = [...SC3_PUBLISHED].sort((a, b) => a.name.localeCompare(b.name))
+    expect(byName[byName.length - 1].id).toBe(SC3_NEWEST_PUBLISHED.id)
+    expect(byName[0].id).not.toBe(SC3_NEWEST_PUBLISHED.id)
+
+    const rows = sc3Merged()
+
+    // ⚠ THE INDEX IS THE EXPRESSION `SC3_STARTERS.length`, NEVER A HARD-CODED 3. A literal
+    // rots the moment the curated shelf grows by one — which is exactly how
+    // `GSD_VITEST_MAX_WORKERS=4` rotted: a constant that was correct when written and became
+    // wrong when the thing it was a function of changed.
+    expect(rows[SC3_STARTERS.length].id).toBe(SC3_NEWEST_PUBLISHED.id)
+    expect(rows[SC3_STARTERS.length].provenance).toBe("published")
+  })
+
+  it("`filterLibrary` under the page's defaults preserves that index — the RENDERED claim", () => {
+    // This is the case that makes the claim about the list a person SEES rather than about
+    // the merge in isolation: `visibleRows` (`WorkflowsPage.tsx:458-461`) is what
+    // `visibleRows.map(...)` renders into ONE FLAT LIST (`:1045-1055`), with no shelf and no
+    // section header between the blocks.
+    const rows = sc3Merged()
+    const visible = filterLibrary(rows, SC3_DEFAULTS)
+
+    // Order-identical on the mapped ids, not merely equal in length — a length check would
+    // pass under any permutation, which is the whole property under test.
+    expect(idsOf(visible)).toEqual(idsOf(rows))
+    expect(visible[SC3_STARTERS.length].id).toBe(SC3_NEWEST_PUBLISHED.id)
+
+    // …and non-vacuously: every fixture row survives the defaults, so the index above is an
+    // index into the whole library rather than into a filtered remnant.
+    expect(visible).toHaveLength(
+      SC3_STARTERS.length + SC3_PUBLISHED.length + SC3_DRAFTS.length,
+    )
+  })
+
+  it("THE RESIDUAL — the newest published row is NOT at index 0 while there are starters", () => {
+    // ⚠ STATED, NOT SMOOTHED. SC#3 asks for a just-published workflow to be findable "without
+    // knowing its name — it is near the top of the list, or both". Measured against the live
+    // operator data, the after-state is **rendered position 4 of 109**, not 1.
+    //
+    // THE REASON is client-side concatenation, not the SQL: `mergeLibrary` writes the three
+    // starters into the `Map` first (`libraryFilter.ts:145`), so the published block can never
+    // begin before index `starters.length` however the server orders it. No `ORDER BY` change
+    // can move this.
+    //
+    // THE OPTION NOT TAKEN: re-ordering the three loops to `published, drafts, starters` WOULD
+    // put the newest row at index 0. It is `193.2-RESEARCH.md` §R2 reading 2 and it is NOT
+    // recommended — it silently inverts the dedupe precedence recorded at
+    // `libraryFilter.ts:143-144` ("the later write wins"), so any future feed collision would
+    // resolve the other way round. That is a decision of its own, not a side effect of a
+    // findability fix. Reading 1 (accept position 4, and say so here) is the one taken.
+    //
+    // ⚠ WHETHER POSITION 4 IS GOOD ENOUGH IS `OQ-5` — a product judgement carried into the
+    // D-21 UAT run for the operator to make. This case pins the arithmetic; it does not, and
+    // may not, be read as a verdict that the row is "findable".
+    const rows = sc3Merged()
+
+    expect(SC3_STARTERS.length).toBeGreaterThan(0) // the premise the residual depends on
+    expect(rows[0].provenance).toBe("starter")
+    expect(rows[0].id).not.toBe(SC3_NEWEST_PUBLISHED.id)
+    expect(idsOf(rows).indexOf(SC3_NEWEST_PUBLISHED.id)).toBe(SC3_STARTERS.length)
+    expect(idsOf(rows).indexOf(SC3_NEWEST_PUBLISHED.id)).not.toBe(0)
+
+    // The counterfactual, so the residual reads as a consequence rather than as a mood: with
+    // an EMPTY starters shelf the very same feeds put the newest published row at index 0.
+    const noShelf = mergeLibrary(SC3_PUBLISHED, [], SC3_DRAFTS)
+    expect(noShelf[0].id).toBe(SC3_NEWEST_PUBLISHED.id)
+  })
+
+  it("the rendered order is BLOCK-WISE, never globally recency-sorted", () => {
+    // A second measured residual, recorded because it is the one a reader is most likely to
+    // assume away: `id-d1` is the newest row in the entire fixture, and it still renders in
+    // the drafts block, behind every published row. "Order by recency" is true of each FEED,
+    // and false of the LIST.
+    const newestOfAll = [...SC3_STARTERS, ...SC3_PUBLISHED, ...SC3_DRAFTS].reduce((a, b) =>
+      (a.updated_at ?? "") > (b.updated_at ?? "") ? a : b,
+    )
+    expect(newestOfAll.id).toBe("id-d1") // the premise, asserted
+
+    const ids = idsOf(sc3Merged())
+    expect(ids.indexOf("id-d1")).toBeGreaterThan(ids.indexOf(SC3_NEWEST_PUBLISHED.id))
+    expect(ids.indexOf("id-d1")).toBe(SC3_STARTERS.length + SC3_PUBLISHED.length)
   })
 })
