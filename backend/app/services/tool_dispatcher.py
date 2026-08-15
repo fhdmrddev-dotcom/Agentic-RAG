@@ -685,12 +685,49 @@ async def _handle_attach_skill_file(args: dict, ctx: ToolContext) -> ToolResult:
 
 async def _handle_search_documents(args: dict, ctx: ToolContext) -> ToolResult:
     metadata_filter = args.get("metadata_filter") or None
-    results, avg_sim = await search_documents(
-        args["query"], ctx.current_user["id"], ctx.supabase,
-        metadata_filter=metadata_filter,
-        user_settings=ctx.user_settings,
-        folder_ids=ctx.folder_subtree_ids,
-    )
+    try:
+        results, avg_sim = await search_documents(
+            args["query"], ctx.current_user["id"], ctx.supabase,
+            metadata_filter=metadata_filter,
+            user_settings=ctx.user_settings,
+            folder_ids=ctx.folder_subtree_ids,
+        )
+    except Exception as exc:  # noqa: BLE001 — honest tool-result error, never raise into the loop
+        # BUG-260815-05 — A SEARCH THAT COULD NOT RUN MUST NOT READ AS A SEARCH THAT
+        # FOUND NOTHING. Measured 2026-08-15: the OpenAI balance hit zero, every
+        # `search_documents` raised `RateLimitError insufficient_quota` from the QUERY
+        # embedding (`retrieval_service._vector_search:73` -> `openai_service.embed_texts`),
+        # and the operator was told, three golden runs in a row and by the only surface
+        # they had, *"citations_required: nothing was retrieved (0 sources) — this step
+        # reads your documents and must show where its answer came from"*. That sentence
+        # sent them to re-check their documents, their folder and their prompt, all of
+        # which were correct: 5 docs, 18 chunks, 0 null embeddings, matching org_id.
+        #
+        # ⚠ EVERY document in this product is embedded with an OpenAI model, so EVERY
+        # search must embed its query at retrieval time. Embedding is the one path with
+        # no provider fallback (chat routes across seven providers; embedding does not).
+        # A zero balance therefore silently zeroes retrieval for the WHOLE knowledge
+        # base — the blast radius is not one workflow.
+        #
+        # ⚠ THIS IS THE `resolve_template_placeholders` SHAPE (Phase 193.1, D-26), NOT a
+        # new invention: *could not read* and *nothing to read* must never share a
+        # message. The value here is the honest third state.
+        #
+        # ⚠ The exception is CONVERTED, never re-raised. `agent_loop`'s generic
+        # `except Exception -> "Tool error: ..."` (`agent_loop.py:2598`) already caught
+        # it, but that string is addressed to the MODEL; it is not a retrieval verdict
+        # and it does not reach the phase record the author reads. Returning an explicit
+        # unavailable result puts the reason where a person will meet it.
+        logger.error("search_documents failed for run %s: %s", getattr(ctx, "run_id", None), exc)
+        return ToolResult(result=json.dumps({
+            "error": "retrieval_unavailable",
+            "detail": (
+                f"The document search could not run — the search provider returned: {exc}. "
+                "This is NOT a result of zero matches: your documents were never queried. "
+                "Say plainly that document search is unavailable; do not state or imply "
+                "that the knowledge base contains no relevant information."
+            ),
+        }))
     # Phase 098 GOV-01 (SC#3 ⊆ assert + SC#4 clip + observable) — the loud runtime
     # backstop. The RPC p_folder_ids filter is the PRIMARY enforcement; this post-query
     # clip is the in-app guard for bugs / future tool paths (D-05/D-06). Gated on

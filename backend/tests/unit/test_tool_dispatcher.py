@@ -688,3 +688,76 @@ async def test_declared_install_pip_timeout_surfaces_honest_reason(monkeypatch):
 
     assert "aborted" in stderr.lower()
     assert "limit" in stderr.lower()
+
+
+# ---------------------------------------------------------------------------
+# BUG-260815-05 — a search that COULD NOT RUN must not read as one that found nothing
+# ---------------------------------------------------------------------------
+# ⚠ WHY THIS EXISTS, measured rather than imagined (2026-08-15, Phase 193.2 UAT).
+# The OpenAI balance hit zero. Every document in this product is embedded with an
+# OpenAI model, so every search must embed its QUERY at retrieval time
+# (`retrieval_service._vector_search:73` -> `openai_service.embed_texts`). With no
+# credits that call raised `RateLimitError insufficient_quota`, and the only sentence
+# the operator ever saw was the citations gate's
+#   "citations_required: nothing was retrieved (0 sources) — this step reads your
+#    documents and must show where its answer came from"
+# which is FALSE and actively misdirecting: it sent them to re-check their documents,
+# their folder selection and their prompt, all of which were correct (5 docs, 18
+# chunks, 0 null embeddings, matching org_id). Three golden runs failed this way.
+#
+# The gate CANNOT be where this is fixed — it reads only the phase output and has no
+# way to know why `citations` is empty. The knowledge lives at the tool boundary, so
+# the honest third state belongs here. Same shape as `resolve_template_placeholders`
+# (Phase 193.1 / D-26): *could not read* and *nothing to read* never share a message.
+#
+# ⚠ THIS TEST WAS DRIVEN RED against the pre-fix handler (which let the exception
+# propagate, so the call raised instead of returning) before being trusted.
+
+def _fake_ctx():
+    ctx = ToolContext.__new__(ToolContext)
+    ctx.current_user = {"id": "u1"}
+    ctx.supabase = object()
+    ctx.user_settings = None
+    ctx.folder_subtree_ids = None
+    ctx.run_id = "r1"
+    return ctx
+
+
+def test_search_documents_provider_failure_is_not_reported_as_zero_results(monkeypatch):
+    """A provider outage returns an explicit `retrieval_unavailable`, never an empty hit list."""
+    import json as _json
+    import app.services.tool_dispatcher as td
+
+    async def _boom(*_a, **_k):
+        raise RuntimeError("Error code: 429 - insufficient_quota: You have no credits remaining.")
+
+    monkeypatch.setattr(td, "search_documents", _boom)
+    out = asyncio.run(td._handle_search_documents({"query": "Northwind usage"}, _fake_ctx()))
+
+    assert isinstance(out, ToolResult)
+    body = _json.loads(out.result)
+    assert body["error"] == "retrieval_unavailable"
+
+    # The provider's own reason must survive to the surface a person reads.
+    assert "429" in body["detail"] and "insufficient_quota" in body["detail"]
+
+    # ⚠ THE LOAD-BEARING HALF: the result must not be mistakable for an empty search.
+    # `no relevant documents` is the exact string the SUCCESS path emits on 0 hits
+    # (`tool_dispatcher._handle_search_documents`), and the two must never collide.
+    assert "no relevant documents" not in out.result.lower()
+    assert out.citations == [] and out.source_refs == []
+
+
+def test_search_documents_provider_failure_does_not_raise_into_the_agent_loop(monkeypatch):
+    """The exception is CONVERTED, not propagated — `agent_loop`'s generic handler would
+    otherwise turn it into a model-facing "Tool error: ..." string that never reaches the
+    phase record the author reads."""
+    import app.services.tool_dispatcher as td
+
+    async def _boom(*_a, **_k):
+        raise ValueError("provider down")
+
+    monkeypatch.setattr(td, "search_documents", _boom)
+    # Must NOT raise.
+    out = asyncio.run(td._handle_search_documents({"query": "q"}, _fake_ctx()))
+    assert "retrieval_unavailable" in out.result
