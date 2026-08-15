@@ -453,6 +453,91 @@ async def test_interactive_phase_blocks_publish_before_golden_run(kind):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["llm_human_input", "ask_user_validator"])
+async def test_the_interactive_block_writes_a_publish_blocked_receipt(kind):
+    """G-1 (``/gsd:validate-phase 193.2``) — the stage-2.5 block DOES leave a receipt.
+
+    ⚠ THIS SETTLES A CONTRADICTION, and both sides are recorded rather than one quietly
+    corrected. ``193.2-UAT.md`` row **U2** stated the expectation verbatim as *"**no**
+    ``publish_blocked`` row is written"*, while ``_block``'s own docstring says it writes
+    one and stage 2.5 (``publish_service.py:223``) returns ``await _block(...)``. **U2 was
+    never driven** — no interactive step ever appeared across the 20 measured generations
+    (``193.2-FREQUENCY.md`` figure 2, 0/20), so the surface never rendered and no manual
+    observation settled it either. The property therefore had verification of NEITHER kind
+    while the row above it read as covered.
+
+    **Measured, and this test is what makes it re-derivable:** a publish POST that reaches
+    stage 2.5 writes a ``publish_blocked`` receipt at ``blocked_stage="interactive_phase"``.
+    U2's sentence is true ONLY of the path where the client greys ``publish-trigger`` off
+    ``/validate``'s ``blockedReason`` and the POST is never sent — a DIFFERENT path, on a
+    different tier. The two were conflated; they are separated here.
+
+    The sibling case above already patches ``write_audit`` and asserts nothing on it, which
+    is exactly how a receipt can go unobserved while looking watched.
+    """
+    row = _interactive_definition_row(kind=kind)
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()) as audit,
+        patch.object(publish_service, "_drive_golden_run", AsyncMock()),
+        patch("app.db.workflows.publish_definition", AsyncMock()),
+    ):
+        result = await _call()
+
+    assert result["blocked_stage"] == "interactive_phase"  # non-vacuity: we hit stage 2.5
+
+    # THE RECEIPT — asserted on the call the sibling case leaves unexamined.
+    blocked = [c for c in audit.await_args_list if c.kwargs.get("event_type") == "publish_blocked"]
+    assert len(blocked) == 1, (
+        f"expected exactly one publish_blocked receipt, got {len(blocked)}: "
+        f"{[c.kwargs.get('event_type') for c in audit.await_args_list]}"
+    )
+
+    metadata = blocked[0].kwargs["metadata"]
+    assert metadata["blocked_stage"] == "interactive_phase"
+    assert metadata["definition_id"] == str(_DEF_ID)  # attributable with a NULL run_id
+    assert metadata["golden_run_id"] is None  # blocked PRE-RUN, so there is no run to name
+    assert metadata["named_failures"], "the receipt carries the named phase + message"
+
+    # The receipt is written against a NULL run_id — the stage-0/1/2 shape `_block`
+    # documents (``harness_audit.run_id`` is nullable; Phase 107 receipt VIEW).
+    assert blocked[0].args[1] is None
+
+
+@pytest.mark.asyncio
+async def test_a_clean_definition_writes_no_interactive_publish_blocked_receipt():
+    """G-1's positive control — the receipt above is EARNED, not an artifact of the mock.
+
+    Without it, a ``write_audit`` mock that recorded a ``publish_blocked`` call on every
+    publish would satisfy the case above and nobody would know. A definition with no
+    interactive phase must produce NO ``interactive_phase`` receipt.
+    """
+    row = _definition_row(business_requirement="Deliver a cited answer.")
+    golden_run_id = uuid4()
+    good_verdict = {"overall_passed": True, "overall_score": 90, "summary": "good", "criteria": []}
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=row)),
+        patch("app.db.workflows.write_audit", AsyncMock()) as audit,
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
+        patch.object(
+            publish_service, "_drive_golden_run",
+            AsyncMock(return_value=(golden_run_id, {"text": "a grounded answer [doc1]"}, "completed")),
+        ),
+        patch.object(publish_service, "_judge_golden_output", AsyncMock(return_value=good_verdict)),
+        patch("app.db.workflows.publish_definition", AsyncMock(return_value=2)),
+    ):
+        result = await _call()
+
+    assert result["published"] is True  # non-vacuity: this definition really did publish
+    interactive = [
+        c for c in audit.await_args_list
+        if c.kwargs.get("event_type") == "publish_blocked"
+        and c.kwargs.get("metadata", {}).get("blocked_stage") == "interactive_phase"
+    ]
+    assert interactive == []
+
+
+@pytest.mark.asyncio
 async def test_non_interactive_definition_proceeds_past_interactive_check():
     """WR-04 control: a non-interactive definition is NOT blocked at the interactive
     stage — it proceeds to the golden run (the check is a targeted guard, not a wall)."""
