@@ -499,6 +499,92 @@ def _structural_failures(final_output) -> list:
     return []
 
 
+#: T-193.2-01 — the ceiling on a model- or author-authored ``PhaseSpec.name`` before it is
+#: embedded in the refusal below. ``name`` is an UNBOUNDED ``str | None``
+#: (``models/harness.py:364``) and the value it carries now reaches THREE surfaces: a
+#: ``text-[12px] leading-snug`` span in a ``shrink-0`` header slot
+#: (``PublishGauntlet.tsx:932-939``), an ``aria-describedby`` label, and — via ``_block`` —
+#: the PERSISTED ``harness_audit.metadata.named_failures`` payload. Unclamped, a 10 KB step
+#: name becomes a 10 KB refusal in a one-line slot AND a 10 KB audit row.
+#:
+#: 72 is chosen rather than magic: it keeps a LABELLED message (see the measured lengths on
+#: the literals below) in the same order of magnitude as the two shipped siblings this copy
+#: sits beside — the pre-193.2 interactive message at 105 characters and
+#: ``BUSINESS_REQUIREMENT_MISSING_MESSAGE`` at 99 — instead of an order above them.
+#:
+#: ⚠ XSS IS NOT THE THREAT AND THIS IS NOT AN ESCAPE FUNCTION. The message reaches React as
+#: a TEXT CHILD and there is no ``dangerouslySetInnerHTML`` anywhere on this path. Do NOT
+#: "harden" this into HTML-escaping: it would mangle ordinary copy (an apostrophe or an
+#: ampersand in a step name) to defend against something the renderer already prevents.
+#: What IS defended here is LENGTH and ONE-LINE SHAPE.
+_LABEL_MAX_CHARS = 72
+
+#: The four refusal literals (D-12/D-13). ⚠ ARM 1 AND ARM 2 SHARE NO SENTENCE, and that is a
+#: correctness property rather than style — they describe DIFFERENT things, and 193.1's D-26
+#: defect in ``grounding.py`` was precisely ONE string serving both meanings. Arm 1 is about
+#: the STEP (remove it); arm 2 is about a step's FAILURE ROUTE (change it). A later
+#: "simplification" that collapses them back onto one literal is a regression and is pinned
+#: by a test driven RED against exactly that plant.
+#:
+#: ⚠ NO INTERNAL IDENTIFIER AND NO SLUG APPEARS IN ANY BRANCH. The pre-193.2 message read
+#: *"interactive phases (llm_human_input / ask_user dispositions) cannot be validated in a
+#: synchronous publish"* — two engine identifiers aimed at a person who chose neither and can
+#: see neither word anywhere on the canvas. That is ``BUG-260815-01``, and it is the same
+#: failure class as ``BUG-260809-02`` (whose message named an internal snake_case field).
+#:
+#: ⚠ NOTHING UNSCHEDULED IS PROMISED (D-14). No "planned", "coming", "soon", "deferred" or
+#: "future release" — the capability a workflow that legitimately pauses for a person would
+#: need is ``SEED-164``, which is a seed and not a schedule.
+_INTERACTIVE_STEP_NAMED = (
+    'Publishing runs this workflow from start to finish, and the step "{label}" stops to '
+    "wait for a person. Remove that step to publish."
+)
+_INTERACTIVE_STEP_UNNAMED = (
+    "Publishing runs this workflow from start to finish, and one step stops to wait for a "
+    "person. Remove that step on the canvas to publish."
+)
+_INTERACTIVE_FALLBACK_NAMED = (
+    'Publishing cannot pause for anyone, and "{label}" asks a person whenever its check '
+    "fails. Change that check's fallback to publish."
+)
+_INTERACTIVE_FALLBACK_UNNAMED = (
+    "Publishing cannot pause for anyone, and one step asks a person whenever its check "
+    "fails. Change that check's fallback on the canvas to publish."
+)
+
+
+def _clean_label(raw) -> str | None:
+    """The single-line, length-bounded form of a phase ``name`` — or ``None`` (D-13).
+
+    ``None`` is the signal for the caller's DEGRADED, name-free literal, and it is returned
+    for a missing name, a non-string, and a name that trims empty.
+
+    ⚠ THE DEGRADATION IS NEVER THE SLUG and NEVER A STEP NUMBER. The slug reintroduces the
+    exact defect this rewrite exists to fix; and ``PhaseNodeCard`` puts no ``phase_index`` on
+    the node face, so *"Step 3"* would name something the author cannot read on the canvas.
+
+    ⚠ ``nodeTitle()``'s name → config-derived → type-sentence ladder
+    (``phaseVocabulary.ts:231-240``) is DELIBERATELY NOT PORTED HERE. That ladder is computed
+    AT RENDER and never stored (``models/harness.py:420-435``), and a second implementation of
+    a derivation is forbidden by name in this repo. The server degrades to a true, name-free
+    sentence instead of guessing at a title the client owns.
+    """
+    if not isinstance(raw, str):
+        return None
+    # Collapse EVERY whitespace run and control character to a single space. A newline in a
+    # model-authored name breaks the one-line shape on BOTH surfaces this string feeds.
+    scrubbed = "".join(
+        " " if (ch.isspace() or ord(ch) < 32 or ord(ch) == 127) else ch for ch in raw
+    )
+    collapsed = " ".join(scrubbed.split())
+    if not collapsed:
+        return None
+    if len(collapsed) > _LABEL_MAX_CHARS:
+        # One-character ellipsis, so the clamped label is EXACTLY _LABEL_MAX_CHARS.
+        return collapsed[: _LABEL_MAX_CHARS - 1].rstrip() + "…"
+    return collapsed
+
+
 def _interactive_phase_failures(definition) -> list:
     """Named failures for any INTERACTIVE phase blocking the synchronous publish (WR-04).
 
@@ -513,19 +599,41 @@ def _interactive_phase_failures(definition) -> list:
     is a PRE-RUN lint-class check (no provider call) — it short-circuits BEFORE any
     golden run so an unsubscribed ``ask_user`` prompt can never wedge the publish.
 
-    The full background-job publish that COULD validate interactive phases (a human
-    subscriber, a durable resume) is the DEFERRED Phase-103 rework — out of scope here.
+    ⚠ ``phase`` CARRIES THE SLUG AND THAT IS DELIBERATE — it is machine-readable metadata for
+    the caller (``/validate`` keys a canvas finding off it), NOT copy. ``message`` is the copy,
+    and no branch of it interpolates the slug.
+
+    ⚠ THIS GATE IS NOT EXHAUSTIVE OVER "STEPS THAT ASK A PERSON", AND THE COPY ABOVE IS
+    WORDED SO IT NEVER IMPLIES OTHERWISE. It matches exactly the two shapes named above. An
+    ``external_action`` phase also involves a human approval in a LIVE run and is NOT refused
+    here — deliberately: ``test_the_armed_checkpoint_is_not_a_validator`` pins that emptiness
+    as a FENCE, because naming armed phases here is CONFLICT-1 Option B, which makes an
+    ``external_action`` workflow unpublishable and contradicts D-06 outright (REJECTED at
+    D-19). It does not need refusing either: on a golden run the armed checkpoint is
+    AUTO-CONTINUED (``harness_engine.py:837``) and the send is skipped while the record is
+    kept (``phase_types.py`` GATE 1 / D-16), so it cannot wedge a publish the way an
+    unsubscribed ``ask_user`` can. Widening this gate is a scope decision, never a drive-by.
+
+    THE GATE ITSELF IS DELIBERATE AND STAYS. An unsubscribed ``ask_user`` prompt has no human
+    watching it during a publish and would burn ``harness_publish_max_seconds`` waiting for
+    someone nobody asked. A workflow that legitimately pauses for a person — published, and
+    skipped or stubbed during the validation run — is a real and named capability need
+    (``SEED-164``), and it is a seed rather than a schedule: nothing here promises it.
     """
     failures: list = []
     for phase in getattr(definition, "phases", []) or []:
         slug = getattr(phase, "slug", None)
         config = getattr(phase, "config", None)
+        label = _clean_label(getattr(phase, "name", None))
         if getattr(config, "phase_type", None) == "llm_human_input":
             failures.append(
                 {
                     "phase": slug,
-                    "message": "interactive phases (llm_human_input / ask_user "
-                    "dispositions) cannot be validated in a synchronous publish",
+                    "message": (
+                        _INTERACTIVE_STEP_NAMED.format(label=label)
+                        if label
+                        else _INTERACTIVE_STEP_UNNAMED
+                    ),
                 }
             )
             continue  # one finding per phase is enough
@@ -534,8 +642,11 @@ def _interactive_phase_failures(definition) -> list:
                 failures.append(
                     {
                         "phase": slug,
-                        "message": "interactive phases (llm_human_input / ask_user "
-                        "dispositions) cannot be validated in a synchronous publish",
+                        "message": (
+                            _INTERACTIVE_FALLBACK_NAMED.format(label=label)
+                            if label
+                            else _INTERACTIVE_FALLBACK_UNNAMED
+                        ),
                     }
                 )
                 break  # one finding per phase is enough
