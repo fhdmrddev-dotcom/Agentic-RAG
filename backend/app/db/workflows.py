@@ -313,7 +313,59 @@ async def list_published_workflows(
     if project_folder_id is not None:
         params.append(str(project_folder_id))  # definition->>'key' returns TEXT → bind str
         sql += f" AND definition->>'project_folder_id' = ${len(params)}"
-    sql += " ORDER BY name"
+    # ── SITE 1 of 3 — Phase 193.2 (BUG-260815-02, D-15 / D-16): RECENCY, not alphabet ──
+    #
+    # ⚠ THE DIVERGENCE BELOW IS A DECISION, NOT AN INCONSISTENCY, AND THIS IS WHERE IT IS
+    # RECORDED SO A LATER READER FINDS THE REASONING RATHER THAN A PUZZLE. This feed and
+    # ``list_draft_workflows`` — the two that hold the author's OWN work — order by
+    # ``updated_at DESC``. ``list_starter_workflows`` — the curated catalogue the author
+    # did NOT write — deliberately KEEPS ``ORDER BY name``, because "the most recently
+    # updated starter" is meaningless to someone browsing a shelf of examples.
+    # ``BUG-260815-02`` explicitly warns *"change them together or the feeds disagree"* and
+    # this decision (D-16) deliberately does NOT — accepted with eyes open, on the recorded
+    # condition that the divergence lives in the code. Do not "tidy" it back to uniformity:
+    # that restores the blocking defect. Pinned by
+    # ``test_the_d16_divergence_is_recorded_at_all_three_sites``.
+    #
+    # THE DEFECT (``BUG-260815-02``, severity `blocking`): a just-published workflow was
+    # UNFINDABLE. The AI names the workflow, so the author does not know the name they are
+    # looking for, and all three feeds sorted alphabetically — nothing anywhere surfaced the
+    # thing that had just changed.
+    #
+    # WHY ``updated_at`` AND NOT ``created_at`` (D-15): the column is already on the wire
+    # and already consumed by ``relativeChanged``'s nine bands
+    # (``library/libraryFilter.ts:86`` and `:112`), so the card's "changed <rel>" text and
+    # the list order read the SAME column and agree BY CONSTRUCTION rather than by
+    # discipline. And on THIS feed the two candidates coincide exactly: the publish flip is
+    # an ``UPDATE`` and ``workflow_definitions_set_updated_at`` is an unconditional
+    # ``BEFORE UPDATE … FOR EACH ROW`` trigger, after which
+    # ``workflow_definitions_block_published`` freezes the row — so here
+    # ``ORDER BY updated_at DESC`` IS ``ORDER BY publish-time DESC``, and D-15's rejection
+    # of ``created_at DESC`` costs nothing at all.
+    #
+    # WHAT IS PRESERVED — and on this pool that is the whole safety argument: NOT ONE BYTE
+    # of the two ``WHERE`` branches, the ``params`` list or the ``$N`` binding above is
+    # touched. This pool bypasses RLS, so the predicate IS the access boundary; the
+    # ``ORDER BY`` is appended AFTER the predicate and AFTER the ``$N`` project filter, so
+    # it cannot widen visibility. Both clauses are static literals — no user input reaches
+    # the sort. Pinned by the three ``*_predicate*_byte_identical_to_what_shipped`` cases.
+    #
+    # ⚠ SHARED-CONSUMER CONSEQUENCE, STATED HERE RATHER THAN DISCOVERED LATER — and it is
+    # unique to THIS site. With the DEFAULT ``owned_only=False`` this feed is not just the
+    # Workflows-page Published shelf: it also serves the **composer's Harness workflow
+    # picker**, **``WorkspacePanel``'s run-soul** and **``threads.py``'s kickoff** (`:97`
+    # imports it). All three therefore move from alphabetical to recency. That is
+    # defensible — recency is arguably better in a picker too — but it is a user-visible
+    # change OUTSIDE the library. MEASURED at the time of the change: no test and no
+    # frontend module asserts alphabetical order for any of those three surfaces.
+    #
+    # NO MIGRATION, and the evidence rather than the assurance: there is no index on
+    # ``name`` either, so the shipped sort was ALREADY unindexed and the plan shape is
+    # unchanged. ``workflow_definitions`` is 225 rows; the largest single feed measured is
+    # 118. The precedent is recorded twenty lines up in this same docstring — "NO
+    # expression index, ZERO migration … sufficient at current scale". No file under
+    # ``supabase/migrations/`` is added by this phase.
+    sql += " ORDER BY updated_at DESC"
     rows = await pool.fetch(sql, *params)
     return [dict(r) for r in rows]
 
@@ -345,6 +397,29 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     # below are byte-identical to what shipped. Note this feed serves the SAME
     # ``PublishedWorkflow`` model as ``/published`` (RESEARCH C-6: one model, two feeds),
     # so both SELECT lists must carry the column or one shelf renders no "changed" segment.
+    #
+    # ── SITE 2 of 3 — Phase 193.2 (BUG-260815-02, D-16): THIS ONE STAYS ALPHABETICAL ──
+    #
+    # ⚠ THE ``ORDER BY name`` BELOW IS DELIBERATE AND IS THE ONLY ONE LEFT IN THIS MODULE.
+    # Its two siblings — ``list_published_workflows`` and ``list_draft_workflows`` — moved to
+    # ``ORDER BY updated_at DESC`` in Phase 193.2 to fix ``BUG-260815-02`` (severity
+    # `blocking`: a just-published workflow was unfindable, because the AI names it and every
+    # feed sorted by that name). **This feed did not move, and that asymmetry is the decision
+    # rather than an oversight.** These rows are the CURATED starters — a fixed catalogue the
+    # author did not write and does not edit — so "the most recently updated starter" carries
+    # no information for someone browsing examples, while a stable alphabet does. Recency
+    # answers "what did I just do?"; nobody asks that of a shelf they did not touch.
+    #
+    # ``BUG-260815-02`` warns *"change them together or the feeds disagree"* and D-16
+    # deliberately does NOT — accepted with eyes open, on the recorded condition that the
+    # divergence lives in the code, which is what this comment is. **Do not "fix" the
+    # inconsistency by making this feed match its siblings**: uniformity here buys nothing and
+    # a later reader who quietly restores it is the failure mode
+    # ``test_the_d16_divergence_is_recorded_at_all_three_sites`` exists to catch.
+    #
+    # NOTHING ELSE MOVES: the three-clause ``WHERE`` and the whole projection are still
+    # byte-identical to what shipped (this pool bypasses RLS, so that predicate is the access
+    # boundary), and no migration is added — there is no index on ``name`` and never was.
     rows = await pool.fetch(
         "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
         "WHERE status = 'published' AND is_system_global = true "
@@ -547,10 +622,44 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # save then refuses as stale — probed against the live database 2026-08-01. Two
         # columns off one source field is the correct shape: one the server compares
         # byte-for-byte, one the client may format.
+        #
+        # ── SITE 3 of 3 — Phase 193.2 (BUG-260815-02, D-15 / D-16): RECENCY ────────────
+        #
+        # ⚠ TWO DIFFERENT DECISIONS SHARE THE ID ``D-16`` ON THIS ONE FUNCTION, AND THE
+        # AMBIGUITY IS NAMED HERE RATHER THAN LEFT FOR A READER TO TRIP OVER. Twelve lines
+        # up, "⚠ D-16 IS A FENCE, NOT ADVICE" is **Phase 192.1's** D-16 — *the opaque token
+        # is not the timestamp*. The ``D-16`` in this block is **Phase 193.2's** — *the two
+        # author feeds order by recency and the starters shelf does not*. Both bind; they
+        # are unrelated. ``BUG-260815-02`` is the token that disambiguates them, which is
+        # why ``test_the_d16_divergence_is_recorded_at_all_three_sites`` asserts it: a bare
+        # ``D-16`` needle was MEASURED to pass on this function against the PRE-change
+        # source, satisfied entirely by 192.1's comment about something else.
+        #
+        # THE CHANGE: ``ORDER BY name`` → ``ORDER BY updated_at DESC``. This feed and
+        # ``list_published_workflows`` hold the author's OWN work, so the row that just
+        # changed belongs at the top; ``list_starter_workflows`` keeps the alphabet (D-16).
+        # ``BUG-260815-02`` (severity `blocking`) is a just-published workflow being
+        # unfindable — the AI names it, so the author cannot search for a name they never
+        # chose.
+        #
+        # WHY THIS COLUMN (D-15): ``updated_at`` is already on the wire and already drives
+        # ``relativeChanged``'s nine bands (``library/libraryFilter.ts:86``, `:112`), so the
+        # card's "changed <rel>" text and the row order read the same column and agree by
+        # construction. ⚠ And note what is NOT used: the ``token`` alias on this very row is
+        # ``updated_at`` in disguise, and sorting by it would be a string sort over a
+        # ``to_char`` render — the sort reads the real ``timestamptz`` column, which is the
+        # same two-columns-off-one-field rule 192.1's D-16 states directly above.
+        #
+        # WHAT IS PRESERVED: the ``WHERE status = 'draft' AND created_by = $1`` owner scope
+        # and the ``CONCURRENCY_TOKEN_SQL`` projection are byte-identical to what shipped —
+        # the service role bypasses RLS, so that predicate is the boundary, and the sort key
+        # is appended after it as a static literal with no user input. No migration: there
+        # is no index on ``name`` either, the table is 225 rows, and the largest feed
+        # measured is 118.
         f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at "
         f"FROM workflow_definitions "
         f"WHERE status = 'draft' AND created_by = $1 "
-        f"ORDER BY name",
+        f"ORDER BY updated_at DESC",
         user_id,
     )
     return [dict(r) for r in rows]
