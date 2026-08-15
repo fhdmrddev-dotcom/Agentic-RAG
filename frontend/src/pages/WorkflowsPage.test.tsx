@@ -1886,6 +1886,216 @@ describe("WorkflowsPage — D-18: the two delete grades are DIFFERENT, and prova
   })
 })
 
+/**
+ * ── 193.2-02 (D-19) — THE POST-PUBLISH RUN CTA, ITS FIRST AUTOMATED COVERAGE ─────────────
+ *
+ * ⚠ BEFORE THIS BLOCK, THIS SURFACE HAD **ZERO** TESTS. Measured at HEAD `fa83585e`, not
+ * assumed: `grep -rn "run-cta\|runCta\|Ready to run it" frontend/src --include=*.test.tsx`
+ * returned NO MATCHES, and `grep -c "run-cta"` on this very file returned **0**. WR-04 had
+ * already fixed one way the banner silently dropped (a hardcoded `"workflow"` slug literal
+ * that found nothing in `published`) and **no test would have caught the next one.**
+ *
+ * The surface — `WorkflowsPage.tsx:721-729`, `:861-863`, `:897-917`:
+ *
+ *   onGauntletPublished → setPageView("library") · setRunCta({slug, version})
+ *                       · refetchPublished() · refetchDrafts()
+ *   runCtaRow = rows.find(r => r.slug === runCta.slug && r.provenance !== "draft")
+ *   {runCtaWf && <div data-testid="run-cta">Published <b>{name}</b> v{version}. Ready to run it.</div>}
+ *
+ * ⚠ THE RACE IS THE WHOLE POINT AND IT IS WHY THIS IS HELD-PROMISE SHAPED. On the first
+ * render after publish, `published` still holds the PRE-publish list and the row is still in
+ * `drafts` — excluded by `provenance !== "draft"` — so `runCtaRow` is `undefined` and the
+ * banner does not render. It appears only when `refetchPublished()` lands. `runCta` is NOT
+ * cleared by the refetch (only by the ▶ Run now button), so the banner is DELAYED, NOT LOST.
+ * A test that mounts the page with the row already published proves none of that.
+ *
+ * ⚠ NO `findBy` ON AN ABSENT NODE (T-4) — the file-level rule this block obeys literally.
+ * `asyncUtilTimeout` is 15 s here, longer than vitest's 5 s per-test budget, so a
+ * `findByTestId("run-cta")` on the IN-FLIGHT state would blow the TEST timeout and yield a RED
+ * indistinguishable from a real failure. Every ABSENCE assertion below therefore waits on a
+ * node that IS present on its own path first (the library toolbar, which `onGauntletPublished`
+ * returns to), then queries `run-cta` SYNCHRONOUSLY.
+ *
+ * ⚠ THIS BLOCK ADDS COVERAGE, NOT BEHAVIOUR. `WorkflowsPage.tsx` is byte-unchanged by the plan
+ * that wrote this. D-19 resolves as *"it fires; SC#3 is met by the sort plus one pin"* and
+ * NO navigate-to-row / scroll-to-row / highlight behaviour is built: the page carries an
+ * inherited G-5 obligation (re-derived at HEAD: 34 commits / 12 phases / 1176 lines) and
+ * CONTEXT names a second hand-off surface a genuine SECOND concern. The ruling and its
+ * evidence live in `193.2-D10-D19-CONFIRMATION.md` §4.
+ */
+describe("193.2 / D-19 — the post-publish Run CTA, its first automated coverage", () => {
+  /**
+   * The version the gauntlet's verdict carries, in ONE place. The banner renders
+   * `v{runCta.version}` from the value `onPublished(result.verdict.version ?? 0)` hands up, so
+   * the assertion reads this constant rather than a re-typed "v2" — a hardcoded literal cannot
+   * notice the version being dropped on the way through.
+   */
+  const PUBLISHED_VERSION = 2
+
+  /**
+   * The published row the refetch is going to deliver. Its slug MATCHES `draftRow`'s
+   * (`contract-clause`) because that is the draft this block publishes — and its `name`
+   * deliberately differs from nothing else on screen, so `toContain(name)` cannot pass off
+   * another card's text.
+   *
+   * ⚠ Note what it is NOT: it is absent from the mount-time published feed
+   * (`strictPublished` / `loosePublished`) and from the starters feed (`starterRow`). If the
+   * slug were already published at mount, `runCtaRow` would resolve on the very first render
+   * and the race this block exists to observe would not happen.
+   */
+  const publishedContractClause = {
+    id: "pub-cc",
+    slug: "contract-clause",
+    name: "Contract clause review",
+    definition: {
+      slug: "contract-clause",
+      version: PUBLISHED_VERSION,
+      project_folder_id: null,
+      phases: [{ slug: "draft", phase_index: 0, config: { phase_type: "llm_agent" } }],
+    },
+  }
+
+  /**
+   * Drive a real gauntlet PASS from the hosted Builder, on the draft the file already seeds.
+   *
+   * Open (never Tweak) is used deliberately: `onOpenDraft` is edit-in-place, so it reaches the
+   * Builder with a non-null `draftId` — which is what `renderPublish` gates the gauntlet on —
+   * WITHOUT calling `createWorkflowDraft` and without the 192.1-07 fork-name dialog standing
+   * between the click and the publish.
+   */
+  async function publishTheOpenDraft() {
+    const draftCard = await screen.findByTestId("draft-card")
+    fireEvent.click(within(draftCard).getByTestId("draft-open"))
+
+    const trigger = await screen.findByTestId("publish-trigger")
+    // The trigger is greyed while a save is in flight (`SAVING_PUBLISH_WAIT`). Waiting on the
+    // ENABLED state rather than on mere presence keeps a transient block from reading as a
+    // publish that silently did not happen.
+    await waitFor(() => expect(trigger).not.toBeDisabled())
+    fireEvent.click(trigger)
+
+    // `canPublish` requires a non-empty golden_input, so the gauntlet cannot run without it.
+    const golden = await screen.findByLabelText(/golden_input/i)
+    fireEvent.change(golden, { target: { value: "a representative kickoff prompt" } })
+    fireEvent.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+
+    // The publish call is what `onPublished` — and therefore `onGauntletPublished` — hangs off.
+    await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))
+    // We are back on the library, which is the node every absence assertion below waits on.
+    return screen.findByTestId("library-toolbar")
+  }
+
+  /** A gauntlet verdict that PASSES. `published === true` is the ONLY thing that fires the CTA. */
+  function seedPassingPublish() {
+    mockPublish.mockResolvedValue({
+      kind: "verdict",
+      verdict: { published: true, version: PUBLISHED_VERSION },
+    })
+  }
+
+  it("the CTA is ABSENT until the published refetch lands, then appears NAMING the workflow", async () => {
+    seedPassingPublish()
+    let release: (rows: unknown[]) => void = () => {}
+    const held = new Promise<unknown[]>((r) => (release = r))
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockResolvedValueOnce([strictPublished, loosePublished]) // the mount fetch
+      .mockReturnValueOnce(held) // the POST-PUBLISH refetch — held open
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("library-toolbar")
+    await publishTheOpenDraft()
+
+    // ── IN FLIGHT ─────────────────────────────────────────────────────────────────────
+    // T-4: the toolbar is awaited by `publishTheOpenDraft`; `run-cta` is queried SYNCHRONOUSLY.
+    expect(screen.queryByTestId("run-cta")).toBeNull()
+
+    // ── SETTLED ───────────────────────────────────────────────────────────────────────
+    // The safe direction — the node is expected PRESENT, so `findBy` is correct here.
+    release([strictPublished, loosePublished, publishedContractClause])
+    const banner = await screen.findByTestId("run-cta")
+
+    // It NAMES the workflow, and both halves are read off the fixture rather than re-typed.
+    expect(banner.textContent).toContain(publishedContractClause.name)
+    expect(banner.textContent).toContain(`v${PUBLISHED_VERSION}`)
+    // …and it offers the run. (Clicking it would `setRunCta(null)` — the self-dismissal R3
+    // measured — which is why this asserts the control exists rather than pressing it.)
+    expect(within(banner).getByRole("button", { name: /run now/i })).toBeInTheDocument()
+  })
+
+  it("POSITIVE CONTROL — a published list WITHOUT the slug keeps it absent; one WITH it makes it appear", async () => {
+    // ⚠ THIS IS THE FOUR-PART TEMPLATE'S PART 2, AND IT IS WHY THE CASE ABOVE MEANS ANYTHING.
+    // An absence assertion whose corpus can never contain the thing is the commonest way a
+    // fence stops seeing (`rowIdentity.test.ts:167-179`). Here the SAME drive, the SAME
+    // selector and the SAME settled state produce absence and presence purely from what the
+    // refetch delivers — so `queryByTestId("run-cta") === null` above is a measurement, not a
+    // property of the harness.
+    seedPassingPublish()
+    let release: (rows: unknown[]) => void = () => {}
+    const held = new Promise<unknown[]>((r) => (release = r))
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockResolvedValueOnce([strictPublished, loosePublished]) // the mount fetch
+      .mockReturnValueOnce(held) // the post-publish refetch — held
+      .mockResolvedValue([strictPublished, loosePublished, publishedContractClause]) // every later call
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("library-toolbar")
+    await publishTheOpenDraft()
+
+    // SETTLED, but the slug is NOT in the answer — the banner stays away. The list has
+    // genuinely narrowed to the released rows, which is how we know the release landed and
+    // this is not merely the in-flight state again.
+    release([strictPublished, loosePublished])
+    await waitFor(() => expect(screen.getAllByTestId("published-card")).toHaveLength(2))
+    expect(screen.queryByTestId("run-cta")).toBeNull()
+
+    // Now a refetch that DOES carry it — the project re-query is the shipped seam that fires
+    // one. `runCta` survives a refetch by design (only ▶ Run now clears it), so the banner
+    // appears now on the strength of the row alone.
+    selectProject("folder-aaa")
+    const banner = await screen.findByTestId("run-cta")
+    expect(banner.textContent).toContain(publishedContractClause.name)
+  })
+
+  it("the DRAFT EXCLUSION holds — a row with the SAME slug on the drafts feed does not raise it", async () => {
+    // ⚠ THE WR-04 CLASS OF SILENT DROP, AND THE HALF THAT HAS NEVER BEEN COVERED. `draftRow`
+    // IS `contract-clause` and it is on screen throughout, so `rows` contains a row whose slug
+    // matches `runCta.slug` for the entire in-flight window. The banner still must not render,
+    // because a CTA offering to Run a draft offers something the product refuses by design —
+    // and because a Tweak fork carries the SAME slug as the published row it forked, so a slug
+    // match alone can land on a draft (`WorkflowsPage.tsx:858-860`).
+    seedPassingPublish()
+    let release: (rows: unknown[]) => void = () => {}
+    const held = new Promise<unknown[]>((r) => (release = r))
+    mockListPublished.mockReset()
+    mockListPublished
+      .mockResolvedValueOnce([strictPublished, loosePublished])
+      .mockReturnValueOnce(held)
+    // The drafts feed keeps carrying `contract-clause` across the post-publish refetch.
+    mockListDrafts.mockResolvedValue([draftRow])
+
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("library-toolbar")
+    await publishTheOpenDraft()
+
+    // NON-VACUITY: the matching-slug DRAFT is genuinely present in `rows`. Without this, the
+    // absence below would be satisfied by a list that simply has no such row at all.
+    const draftCard = await screen.findByTestId("draft-card")
+    expect(draftCard.textContent).toContain(draftRow.name)
+    expect(draftRow.slug).toBe(publishedContractClause.slug)
+    // …and the banner is still absent, with the slug matching on a draft-provenance row.
+    expect(screen.queryByTestId("run-cta")).toBeNull()
+
+    // The published row is what raises it — same slug, different provenance.
+    release([strictPublished, loosePublished, publishedContractClause])
+    const banner = await screen.findByTestId("run-cta")
+    expect(banner.textContent).toContain(publishedContractClause.name)
+    // The draft never left; the banner is reading the published row, not the draft.
+    expect(screen.getByTestId("draft-card")).toBeInTheDocument()
+  })
+})
+
 describe("WorkflowsPage — back-nav refreshes the library lists", () => {
   it("the ← Workflows back button refetches drafts + published", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
