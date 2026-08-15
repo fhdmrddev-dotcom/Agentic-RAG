@@ -767,31 +767,124 @@ def test_t193201_a_newline_bearing_name_yields_a_single_line_message(kind):
     )
 
 
+async def _validate_via_the_real_route(definition, monkeypatch):
+    """Drive ``POST /workflows/validate``'s OWN handler and return its ``ValidateResponse``.
+
+    The handler is called DIRECTLY — the posture three shipped suites already use
+    (``test_182_validate.py:117-126``, ``test_182_grounding_degradation.py:244``,
+    ``test_182_publish_grounding_stage.py:374``) — rather than through TestClient, so no
+    live DB, no auth round-trip and no event loop of our own.
+
+    ``assemble_grounding_bundle`` is swapped for a clean empty bundle, following
+    ``test_182_validate.py``'s ``_patch_bundle``. That is deliberate rather than incidental:
+    left unpatched, ``supabase=object()`` makes the grounding read raise, the route's
+    documented ``except Exception`` catches it and appends a ``grounding_unavailable``
+    verdict — so the handler would run its DEGRADED path, and a fence should measure the
+    path users actually get. The fixtures below bind no folder, name no tool and reference
+    no skill, so with the bundle stubbed the grounding step is a genuine no-op and the only
+    thing left to observe is step (4)'s projection.
+    """
+    from app.api import workflows as wf
+    from app.services.harness import grounding as g
+
+    async def _fake_assemble(**_kwargs):
+        return g.GroundingBundle(
+            tools=[], tool_names=set(), folders=[], skills=[], skill_ids=set(), placeholders=[]
+        )
+
+    monkeypatch.setattr(g, "assemble_grounding_bundle", _fake_assemble)
+
+    return await wf.validate_workflow(
+        body=definition,
+        current_user={"id": "00000000-0000-0000-0000-000000000001"},
+        supabase=object(),
+    )
+
+
 @pytest.mark.parametrize("kind", _BOTH_KINDS)
 @pytest.mark.parametrize("name", ["Approve the quarterly draft", None], ids=["named", "degraded"])
-def test_f5_validate_and_the_publish_refusal_emit_the_same_bytes(kind, name):
+async def test_f5_validate_and_the_publish_refusal_emit_the_same_bytes(kind, name, monkeypatch):
     """F-5 (D-12), the publish half — ONE message string feeds BOTH surfaces.
 
-    Computed rather than hard-coded: a hard-coded expectation would pass while the two
-    callers drifted apart, which is the whole property under test. The other half — that an
-    ``interactive_phase`` verdict actually REACHES ``blockedReason`` — is owned by
-    ``tests/unit/test_187_route_assigned_reach.py``, per that file's two-halves header.
+    ⚠ **REWRITTEN 2026-08-15 (code review ``WR-01``). WHAT THIS CASE ASSERTED UNTIL THEN IS
+    RECORDED HERE VERBATIM RATHER THAN DELETED, because a fence whose history is erased
+    cannot be audited — and because the shape it had is the single most valuable thing about
+    it: it is what a tautology looks like when it is wearing a correct docstring.** In full:
+
+        publish_failures = publish_service._interactive_phase_failures(definition)
+        validate_findings = [
+            {"code": "interactive_phase", "phase": f.get("phase"), "message": f.get("message")}
+            for f in publish_service._interactive_phase_failures(definition)   # ← same call
+        ]
+        assert [f["message"] for f in publish_failures] == [
+            f["message"] for f in validate_findings
+        ]
+
+    …under the claim *"Computed rather than hard-coded: a hard-coded expectation would pass
+    while the two callers drifted apart, which is the whole property under test."* The claim
+    was right about the danger and the code did not implement it. ``_interactive_phase_failures``
+    is a pure function of ``definition``, so **both sides of that comparison were the same
+    call and the assertion was ``x == x``.** It could not go red for any edit to any file.
+    Worse, it **never imported ``app.api.workflows`` at all** — it hand-copied the route's
+    projection into the test, so the one artefact under test was a replica of the thing that
+    could drift. D-12's server-side property had ZERO coverage while reading ✅.
+
+    **What it asserts NOW:** the REAL ``/validate`` handler is executed, and the ``message``
+    on every ``interactive_phase`` verdict it returns is compared against what the PUBLISH
+    path composes. Two different call paths, one expected value. An edit to the route's
+    step-(4) projection — clamping the message for the canvas, prefixing a code, mapping it
+    through a lookup table, swapping the composer — now fails here, which is the whole point:
+    the client renders ``verdict.message`` verbatim, so a drift is directly user-visible.
+
+    ⚠ **DRIVEN RED, not reasoned about.** Planting ``f.get("message")[:20]`` in the route's
+    step-(4) projection (``app/api/workflows.py``) fails all four parametrized shapes; the
+    plant was then reverted to an EMPTY ``git diff --numstat`` and all four went green. The
+    pre-rewrite version of this case stayed GREEN under that same plant — measured, which is
+    how a fence is shown to see something rather than assumed to.
+
+    ⚠ **The ``phase`` key is asserted too, and separately from the message.** It carries the
+    SLUG as machine-readable metadata (the canvas keys nodes off it) while only ``message``
+    is copy — ``test_f3_no_internal_identifier_and_no_slug_reaches_the_copy`` depends on that
+    split, so a route that leaked the slug into the message and dropped it from ``phase``
+    must not read as a pass here.
+
+    The other half of F-5 — that an ``interactive_phase`` verdict actually reaches
+    ``blockedReason`` on the client — is owned by ``PublishGauntlet.test.tsx``'s ``?raw``
+    one-home fence (``193.2-06`` task 3), NOT by ``test_187_route_assigned_reach.py``, which
+    ``193.2-VALIDATION.md`` credited in error and which received zero changes this phase.
     """
+    from app.api import workflows as wf
+
     definition = _interactive_definition(kind=kind, name=name)
 
     # The way the PUBLISH path calls it (publish_service.py stage 2.5).
     publish_failures = publish_service._interactive_phase_failures(definition)
-    # The way ``/validate`` calls it (workflows.py:894-902) — same helper, same object, then
-    # projected into a finding with a `code`. The MESSAGE must survive that projection.
-    validate_findings = [
-        {"code": "interactive_phase", "phase": f.get("phase"), "message": f.get("message")}
-        for f in publish_service._interactive_phase_failures(definition)
-    ]
 
-    assert publish_failures and validate_findings
+    # The way ``/validate`` calls it — through the ROUTE, not through a copy of the route.
+    response = await _validate_via_the_real_route(definition, monkeypatch)
+    validate_verdicts = [v for v in response.verdicts if v.code == "interactive_phase"]
+
+    # NON-VACUITY, on BOTH sides. An equality between two empty lists is the commonest way a
+    # fence like this stops seeing — and it is exactly what a route that dropped step (4)
+    # entirely would produce.
+    assert publish_failures, f"{kind}/{name!r}: the publish path composed no refusal"
+    assert validate_verdicts, (
+        f"{kind}/{name!r}: /validate emitted no interactive_phase verdict — the route no "
+        f"longer runs the WR-04 check, so the equality below would prove nothing"
+    )
+    assert len(publish_failures) == len(validate_verdicts), (
+        f"{kind}/{name!r}: the two surfaces disagree on HOW MANY steps are at fault"
+    )
+
+    # PROOF THAT THE ROUTE WAS REALLY EXECUTED — not a helper that happens to share a name.
+    assert wf.validate_workflow.__module__ == "app.api.workflows"
+
     assert [f["message"] for f in publish_failures] == [
-        f["message"] for f in validate_findings
-    ], "the publish refusal and the /validate finding no longer carry the same bytes"
+        v.message for v in validate_verdicts
+    ], "the publish refusal and the /validate verdict no longer carry the same bytes"
+
+    # The slug stays METADATA on both surfaces (see the docstring's `phase` note).
+    assert [f["phase"] for f in publish_failures] == [v.phase for v in validate_verdicts]
 
 
 # ══════════════════════════════════════════════════════════════════════════════════════
