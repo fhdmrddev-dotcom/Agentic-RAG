@@ -17,6 +17,7 @@
  */
 import { describe, it, expect } from "vitest"
 import libraryFilterSource from "./libraryFilter?raw"
+import workflowsPageSource from "@/pages/WorkflowsPage?raw"
 import type { PublishedWorkflow, WorkflowDraftRow } from "@/lib/api"
 import type { ChipId } from "./libraryRow"
 import type { LibrarySelection } from "./libraryFilter"
@@ -711,5 +712,145 @@ describe("193.2 / SC#3 — where a freshly-published row actually lands", () => 
     const ids = idsOf(sc3Merged())
     expect(ids.indexOf("id-d1")).toBeGreaterThan(ids.indexOf(SC3_NEWEST_PUBLISHED.id))
     expect(ids.indexOf("id-d1")).toBe(SC3_STARTERS.length + SC3_PUBLISHED.length)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// F-7 EXTENDED — D-17: SERVER `ORDER BY` IS THE SOLE ORDERING AUTHORITY
+// ═══════════════════════════════════════════════════════════════════════════════════════
+//
+// The shipped F-7 fence (`rowIdentity.test.ts:167-179`, T-7 / P-4) is scoped to
+// `rowIdentity.ts`'s OWN source, so **nothing today would catch a client sort introduced in
+// `libraryFilter.ts` or `WorkflowsPage.tsx`** — which are precisely the two modules that hold
+// the merged list and could most plausibly grow one. `193.2-03` moved two feeds to
+// `ORDER BY updated_at DESC` on the server; that change is only sufficient while no client
+// re-orders the result. This block extends the fence to those two modules.
+//
+// It reproduces ALL FOUR parts of the canonical `rowIdentity.test.ts` template — three is not
+// enough, and each part answers a different way a fence goes blind:
+//   1. SCOPE       — comments stripped first, so a docblock DESCRIBING a forbidden shape does
+//                    not red a clean tree (the 187-24 trap; `libraryFilter.test.ts:461-468`
+//                    and `rowIdentity.test.ts:89-99` both already scope themselves this way).
+//   2. NON-VACUITY — the stripper is proved to keep the CODE and drop the PROSE, and the
+//                    swept corpus is stated explicitly rather than assumed non-empty.
+//   3. ABSENCE     — the actual rule.
+//   4. INLINE PLANT— a literal forbidden string asserted to MATCH the needle, kept permanently
+//                    in the file rather than performed once and described in a summary.
+//
+// ⚠ AND PARTS 1-4 ARE STILL NOT SUFFICIENT ON THEIR OWN. An inline needle-match proves the
+// REGEX sees the shape; only a REAL plant in production source proves the FENCE is pointed at
+// the right file. Both arms were driven RED against real plants — one in `libraryFilter.ts`
+// and one in `WorkflowsPage.tsx`, separately — and restored; the observations are recorded in
+// `193.2-04-SUMMARY.md`. Phase 193.1 found FOUR fences that could not fire and every one was
+// caught by planting, none by reading.
+//
+// ⚠ THE SHIPPED `rowIdentity.test.ts:167` FENCE IS NOT EDITED, WEAKENED OR DUPLICATED. It
+// stays green and unchanged; this block adds coverage beside it, over different modules.
+
+/**
+ * Block comments first, then whole-line `//` comments — the same two-step
+ * `rowIdentity.test.ts:99` uses. JSX comment bodies (a block comment wrapped in braces) are
+ * removed by the first replacement, which is what takes `WorkflowsPage.tsx`'s prose out of
+ * scope: `ONE FLAT LIST (D-02)` at `WorkflowsPage.tsx:1045` is one of those.
+ */
+const stripComments = (source: string): string =>
+  source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+
+const libraryFilterCode = stripComments(libraryFilterSource)
+const workflowsPageCode = stripComments(workflowsPageSource)
+
+/**
+ * The forbidden shapes: a re-order of the MERGED ROW LIST under any of the five names the two
+ * modules actually use for it. Deliberately NOT a bare `.sort(` — a sort that names a narrow
+ * thing it sorts (a slug's version numbers, a row's candidate axes) is legal and is what
+ * `rowIdentity.ts` does twice.
+ */
+const FORBIDDEN_ROW_SORT =
+  /\brows\.sort\(|\bvisibleRows\.sort\(|\bmerged\.sort\(|\bfamily\.sort\(|\blist\.sort\(/
+
+const SWEPT = [
+  ["libraryFilter.ts", libraryFilterCode],
+  ["WorkflowsPage.tsx", workflowsPageCode],
+] as const
+
+describe("F-7 extended — no client sort on the merged list (D-17)", () => {
+  it("is really the two files under test (non-vacuity)", () => {
+    expect(libraryFilterSource.length).toBeGreaterThan(2000)
+    expect(workflowsPageSource.length).toBeGreaterThan(20000)
+    expect(libraryFilterSource).toContain("export function mergeLibrary")
+    expect(workflowsPageSource).toContain("export function WorkflowsPage")
+  })
+
+  it("the comment stripper leaves the CODE and removes the PROSE (non-vacuity)", () => {
+    // Without this pair, every fence below could pass by stripping the whole file — the
+    // failure mode a fence cannot report about itself.
+    expect(libraryFilterCode).toContain("export function mergeLibrary")
+    expect(libraryFilterCode).toContain("export function filterLibrary")
+    expect(workflowsPageCode).toContain("export function WorkflowsPage")
+
+    // …and the prose really is gone. `D-16` is a decision id that appears ONLY inside comments
+    // in BOTH modules (measured), so it is the one token that proves the strip on each.
+    expect(libraryFilterSource).toContain("D-16")
+    expect(libraryFilterCode).not.toContain("D-16")
+    expect(workflowsPageSource).toContain("D-16")
+    expect(workflowsPageCode).not.toContain("D-16")
+    expect(workflowsPageSource).toContain("ONE FLAT LIST")
+    expect(workflowsPageCode).not.toContain("ONE FLAT LIST")
+  })
+
+  it("SCOPE — the stripped page still contains the merged-list region the fence exists to watch", () => {
+    // A stripper that survived its own non-vacuity guard could still have eaten the ~600 lines
+    // where a sort would actually be written. These three anchors ARE that region: the merge,
+    // the narrow, and the render.
+    expect(workflowsPageCode).toContain("mergeLibrary(published, starters, drafts)")
+    expect(workflowsPageCode).toContain("filterLibrary(rows, { query, chips: activeChips")
+    expect(workflowsPageCode).toContain("visibleRows.map(")
+  })
+
+  it("NON-VACUITY — the swept corpus is EMPTY today: neither module contains any `.sort(` at all", () => {
+    // ⚠ STATED RATHER THAN GLOSSED. `rowIdentity.test.ts:173` can assert
+    // `sorts.length > 0` because that module really does sort two narrow things. These two
+    // modules sort NOTHING, so the equivalent guard here is the opposite assertion: the
+    // corpus is empty, deliberately, and the absence fence below therefore sweeps zero lines
+    // TODAY. That is a true statement about a clean tree, not a fence passing by accident —
+    // and the real-plant RED runs recorded in `193.2-04-SUMMARY.md` are what prove the fence
+    // starts seeing lines the moment one is written.
+    for (const [name, code] of SWEPT) {
+      const sorts = code.split("\n").filter((line) => line.includes(".sort("))
+      expect(sorts, name).toHaveLength(0)
+    }
+  })
+
+  it("INLINE PLANT — the needle really catches the shapes it forbids", () => {
+    // Kept permanently in the file, exactly as `rowIdentity.test.ts:169-172` keeps its own.
+    expect("const shown = rows.sort((a, b) => a.name.localeCompare(b.name))").toMatch(
+      FORBIDDEN_ROW_SORT,
+    )
+    expect("  const ordered = visibleRows.sort(byUpdatedAtDesc)").toMatch(FORBIDDEN_ROW_SORT)
+    expect("  return merged.sort((a, b) => b.updatedAt - a.updatedAt)").toMatch(FORBIDDEN_ROW_SORT)
+
+    // …and the legal shapes are NOT caught, or the absence assertion would be unsatisfiable
+    // the day either module legitimately sorts something narrow of its own.
+    expect("versions.sort((a, b) => a - b)").not.toMatch(FORBIDDEN_ROW_SORT)
+    expect("candidates.sort(byRank)").not.toMatch(FORBIDDEN_ROW_SORT)
+  })
+
+  it("ABSENCE — no line in either stripped source re-orders the merged row list", () => {
+    for (const [name, code] of SWEPT) {
+      for (const line of code.split("\n")) {
+        expect(line, `${name}: ${line.trim()}`).not.toMatch(FORBIDDEN_ROW_SORT)
+      }
+    }
+  })
+
+  it("D-18 — and no sort CONTROL is wired from either module either", () => {
+    // The deferred library sketch owns any recency ⇄ A–Z toggle (G-2 fires there, `SEED-155`
+    // binds). Building it now would be building it twice, so the absence is pinned rather
+    // than left to good intentions.
+    for (const [name, code] of SWEPT) {
+      expect(code, name).not.toMatch(/\bsortOrder\b|\bsortBy\b|\bsetSortOrder\b|\borderBy\b/)
+    }
+    // POSITIVE CONTROL — the needle catches the state hook such a control would need.
+    expect("const [sortOrder, setSortOrder] = useState('recent')").toMatch(/\bsortOrder\b/)
   })
 })
