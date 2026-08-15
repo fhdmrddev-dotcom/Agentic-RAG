@@ -55,6 +55,7 @@ metadata. The governance trail is honest about whether a real run was created.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -553,6 +554,54 @@ _INTERACTIVE_FALLBACK_UNNAMED = (
 )
 
 
+#: The Unicode GENERAL CATEGORIES ``_clean_label`` collapses to a space, stated as a CLASS
+#: rather than as a list of codepoints — which is the whole correction made here.
+#:
+#: ⚠ CORRECTED ON MEASUREMENT, 2026-08-15 (code review ``WR-02``), AND THE PREVIOUS RULE IS
+#: RECORDED BESIDE IT RATHER THAN ERASED. As first shipped the scrub was
+#: ``ch.isspace() or ord(ch) < 32 or ord(ch) == 127`` — i.e. exactly category ``Cc`` plus
+#: whitespace. Driven against the shipped function over a 31-codepoint table
+#: (``test_publish_service.py::_HOSTILE_CODEPOINTS``), **22 survived it and every single
+#: survivor was category ``Cf``**: ``U+00AD`` (soft hyphen), ``U+200B`` (zero-width space),
+#: ``U+200E``/``U+200F`` (the directional marks), ``U+202A``–``U+202E`` (the bidi embeddings
+#: and the RIGHT-TO-LEFT OVERRIDE), ``U+2066``–``U+2069`` (the directional isolates),
+#: ``U+2060`` (word joiner), ``U+FEFF`` (BOM/ZWNBSP) and the rest.
+#:
+#: ⚠ FIXING THIS BY NAMING THE FOUR CODEPOINTS A REVIEWER HAPPENED TO TRY WOULD REPRODUCE THE
+#: EXACT BLINDNESS BEING FIXED. The rule is the category, and the test that guards it asserts
+#: an INDEPENDENT literal table of hostile codepoints rather than re-deriving this predicate.
+#:
+#: WHAT IS EXCLUDED, AND WHY — audit this list rather than re-deriving it:
+#:   ``Cc``  control            — the original rule; a newline or a ``\\x07`` breaks the
+#:                                one-line shape this function exists to guarantee.
+#:   ``Cf``  format             — THE CLASS THAT WAS MISSING. Zero-width and bidi-control
+#:                                characters are INVISIBLE in the refusal yet change what the
+#:                                operator reads: ``U+202E`` reverses the *displayed* order of
+#:                                everything after it, including the actionable clause, and
+#:                                ``U+200B`` makes an operator ``grep`` disagree with the
+#:                                screen. Display spoofing and hidden content — NOT injection
+#:                                (see the ``_LABEL_MAX_CHARS`` note above: React renders this
+#:                                as a text child and there is no ``dangerouslySetInnerHTML``
+#:                                on the path).
+#:   ``Cs``  surrogate          — never a legible character on its own.
+#:   ``Co``  private use        — renders as whatever a font decides; carries no shared meaning.
+#:   ``Zl``/``Zp`` line + paragraph separators — ``U+2028``/``U+2029`` are line breaks that
+#:                                ``isspace()`` already catches; named so the one-line
+#:                                guarantee does not silently depend on that coincidence.
+#:
+#: WHAT IS DELIBERATELY **NOT** EXCLUDED, and why — both are named so the omissions read as
+#: decisions rather than oversights:
+#:   ``Cn``  unassigned         — Python's ``unicodedata`` is pinned to the Unicode version its
+#:                                build ships. A character assigned in a LATER Unicode version
+#:                                reads as ``Cn`` here, so excluding it would mangle a
+#:                                legitimate label written in a newer script. Unassigned
+#:                                codepoints render as tofu; they do not spoof.
+#:   ``Mn``  non-spacing marks  — excluding them would destroy ordinary Arabic, Hindi, Hebrew
+#:                                and Vietnamese step names. Stacked-diacritic ("Zalgo") noise
+#:                                is bounded by ``_LABEL_MAX_CHARS`` instead.
+_NON_PRINTING_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Co", "Zl", "Zp"})
+
+
 def _clean_label(raw) -> str | None:
     """The single-line, length-bounded form of a phase ``name`` — or ``None`` (D-13).
 
@@ -568,13 +617,26 @@ def _clean_label(raw) -> str | None:
     AT RENDER and never stored (``models/harness.py:420-435``), and a second implementation of
     a derivation is forbidden by name in this repo. The server degrades to a true, name-free
     sentence instead of guessing at a title the client owns.
+
+    ⚠ THE SCRUB IS BY UNICODE GENERAL CATEGORY, NOT BY CODEPOINT RANGE (``WR-02``, 2026-08-15).
+    Every character in ``_NON_PRINTING_CATEGORIES`` — ``Cc`` control, ``Cf`` **format**, ``Cs``
+    surrogate, ``Co`` private-use, ``Zl``/``Zp`` line + paragraph separator — plus anything
+    ``str.isspace()`` accepts, becomes a single space, and runs are then collapsed. The
+    constant's own comment records which classes are excluded, which two (``Cn``, ``Mn``) are
+    deliberately NOT, and the 22-of-31 measurement that forced the change. **The invariant this
+    function now delivers is: no non-printing character survives into copy** — the previous
+    docstring's *"single-line"* claim was true only of ``Cc``.
     """
     if not isinstance(raw, str):
         return None
-    # Collapse EVERY whitespace run and control character to a single space. A newline in a
-    # model-authored name breaks the one-line shape on BOTH surfaces this string feeds.
+    # Collapse EVERY whitespace run and non-printing character to a single space. A newline in
+    # a model-authored name breaks the one-line shape on BOTH surfaces this string feeds; a
+    # format character (``Cf``) breaks something worse — it is invisible while changing what
+    # the operator reads. ``Cc`` here is exactly the retired ``ord(ch) < 32 or ord(ch) == 127``
+    # test, so nothing the old rule caught is let through.
     scrubbed = "".join(
-        " " if (ch.isspace() or ord(ch) < 32 or ord(ch) == 127) else ch for ch in raw
+        " " if (ch.isspace() or unicodedata.category(ch) in _NON_PRINTING_CATEGORIES) else ch
+        for ch in raw
     )
     collapsed = " ".join(scrubbed.split())
     if not collapsed:

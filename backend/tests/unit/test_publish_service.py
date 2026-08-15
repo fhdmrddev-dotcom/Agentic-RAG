@@ -745,10 +745,198 @@ def test_t193201_a_huge_name_yields_a_bounded_message(kind):
     assert publish_service._LABEL_MAX_CHARS >= 60
 
 
+#: ⚠ THE HOSTILE TABLE IS A FIXED LITERAL LIST AND IT IS **NOT** DERIVED FROM THE
+#: IMPLEMENTATION'S PREDICATE — that independence is the entire point of it (code review
+#: ``WR-02``, 2026-08-15).
+#:
+#: WHAT THIS REPLACES, RECORDED RATHER THAN ERASED. Until this date the single-line case below
+#: asserted ``not any(ord(ch) < 32 or ord(ch) == 127 for ch in message)`` — the **identical
+#: predicate** to the code under test (``publish_service.py``'s pre-``WR-02``
+#: ``ch.isspace() or ord(ch) < 32 or ord(ch) == 127``). A test that restates the
+#: implementation's own condition can never discover a class that condition misses, and this
+#: one did not: driven against the pre-``WR-02`` scrubber, **22 of the 31 codepoints below
+#: survived it, and every single survivor was Unicode category ``Cf``** (the table's other
+#: nine are 7 × ``Cc`` + ``Zl`` + ``Zp``, which the old rule did catch) — while the case sat
+#: green the whole time. The fix widened the guard to
+#: general categories; re-deriving the *test* from those categories would rebuild the same
+#: circularity one level up. So the codepoints are spelled out here, individually, and a
+#: future NARROWING of the guard reds one named row rather than nothing.
+#:
+#: ⚠ WRITTEN AS ``\\uXXXX`` ESCAPES, NEVER AS RAW CHARACTERS, AND THAT IS A HARD RULE.
+#: ``U+202E`` and its neighbours reverse the DISPLAYED order of a source file for any human or
+#: agent reading it; a raw bidi override committed into a repository that becomes model context
+#: is the very hazard this table exists to fence. The names are carried beside each codepoint
+#: so a failure is legible without a Unicode chart.
+_HOSTILE_CODEPOINTS = (
+    ("\u0000", "NULL"),
+    ("\u0009", "CHARACTER TABULATION"),
+    ("\u000a", "LINE FEED"),
+    ("\u000d", "CARRIAGE RETURN"),
+    ("\u001b", "ESCAPE"),
+    ("\u007f", "DELETE"),
+    ("\u0085", "NEXT LINE"),
+    ("\u00ad", "SOFT HYPHEN"),
+    ("\u061c", "ARABIC LETTER MARK"),
+    ("\u180e", "MONGOLIAN VOWEL SEPARATOR"),
+    ("\u200b", "ZERO WIDTH SPACE"),
+    ("\u200c", "ZERO WIDTH NON-JOINER"),
+    ("\u200d", "ZERO WIDTH JOINER"),
+    ("\u200e", "LEFT-TO-RIGHT MARK"),
+    ("\u200f", "RIGHT-TO-LEFT MARK"),
+    ("\u2028", "LINE SEPARATOR"),
+    ("\u2029", "PARAGRAPH SEPARATOR"),
+    ("\u202a", "LEFT-TO-RIGHT EMBEDDING"),
+    ("\u202b", "RIGHT-TO-LEFT EMBEDDING"),
+    ("\u202c", "POP DIRECTIONAL FORMATTING"),
+    ("\u202d", "LEFT-TO-RIGHT OVERRIDE"),
+    ("\u202e", "RIGHT-TO-LEFT OVERRIDE"),
+    ("\u2060", "WORD JOINER"),
+    ("\u2066", "LEFT-TO-RIGHT ISOLATE"),
+    ("\u2067", "RIGHT-TO-LEFT ISOLATE"),
+    ("\u2068", "FIRST STRONG ISOLATE"),
+    ("\u2069", "POP DIRECTIONAL ISOLATE"),
+    ("\ufeff", "ZERO WIDTH NO-BREAK SPACE (BOM)"),
+    ("\ufff9", "INTERLINEAR ANNOTATION ANCHOR"),
+    ("\ufffa", "INTERLINEAR ANNOTATION SEPARATOR"),
+    ("\ufffb", "INTERLINEAR ANNOTATION TERMINATOR"),
+)
+
+#: The four the code reviewer drove against the shipped function by hand. Asserted to be a
+#: SUBSET of the table above, so nobody can "fix" this finding down to the four examples that
+#: happened to be tried — which is the blindness, not the bug.
+_WR02_REVIEWER_CODEPOINTS = ("\u200b", "\u202e", "\u2066", "\u00ad")
+
+
+def test_wr02_the_hostile_table_is_well_formed_and_covers_the_reported_four():
+    """NON-VACUITY + SCOPE for the table above — a fence's own inputs must be checked.
+
+    Three ways this table could quietly stop meaning anything, each pinned:
+      1. it shrinks to the four codepoints a reviewer named (the blindness being fixed);
+      2. a duplicate row makes the parametrized case count lie about its coverage;
+      3. a row is written as a RAW character, defeating the escape rule in the docblock.
+    """
+    chars = [ch for ch, _ in _HOSTILE_CODEPOINTS]
+    assert len(chars) >= 30, "the hostile table shrank"
+    assert len(set(chars)) == len(chars), "the hostile table has a duplicate row"
+    assert all(len(ch) == 1 for ch in chars), "a row is not a single codepoint"
+    for ch in _WR02_REVIEWER_CODEPOINTS:
+        assert ch in chars, f"U+{ord(ch):04X} — the review's own repro case is not in the table"
+    # The table is NOT allowed to be re-derived from the implementation's category set, but it
+    # SHOULD be a subset of what that set covers; a row outside it would be a silent xfail.
+    import unicodedata
+
+    for ch, name in _HOSTILE_CODEPOINTS:
+        assert (
+            unicodedata.category(ch) in publish_service._NON_PRINTING_CATEGORIES
+            or ch.isspace()
+        ), f"{name} (U+{ord(ch):04X}) is in the table but outside the guard's stated classes"
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+@pytest.mark.parametrize(
+    "hostile,name",
+    _HOSTILE_CODEPOINTS,
+    ids=[f"U+{ord(ch):04X}" for ch, _ in _HOSTILE_CODEPOINTS],
+)
+def test_wr02_no_non_printing_codepoint_survives_into_the_refusal(hostile, name, kind):
+    """``WR-02`` — each hostile codepoint asserted INDIVIDUALLY against the composed refusal.
+
+    Individually, not as a set comprehension: a future narrowing of the guard must red a row
+    that NAMES the codepoint it stopped catching. The concrete harm being fenced is display
+    spoofing and hidden content — ``U+202E`` reverses the displayed order of everything after
+    it, including *"Remove that step to publish."*, so a crafted step label can make a refusal
+    read as something other than what it says; ``U+200B`` hides content inside a label the
+    operator is being asked to act on, and makes an operator ``grep`` disagree with the screen.
+    **It is NOT an XSS or injection surface** — the message reaches React as a text child and
+    there is no ``dangerouslySetInnerHTML`` on the path (verified in the ``193.2`` review).
+    """
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=f"Approve{hostile}the draft")
+    )
+    assert findings
+    message = findings[0]["message"]
+
+    assert hostile not in message, (
+        f"{kind}: {name} (U+{ord(hostile):04X}) survived into copy. The scrub is not covering "
+        f"its Unicode class. Message was: {message!r}"
+    )
+    # …and the READABLE label still lands: scrubbing may not degrade the step name into
+    # something the operator cannot match against the canvas (the D-13 constraint).
+    assert "Approve" in message and "the draft" in message, (
+        f"{kind}: scrubbing {name} destroyed the readable label: {message!r}"
+    )
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_wr02_a_name_made_only_of_invisibles_degrades_rather_than_quoting_nothing(kind):
+    """``WR-02`` boundary — a label that scrubs to NOTHING must take the name-free arm.
+
+    The failure this forbids is a refusal reading ``the step "" stops to wait for a person``:
+    an empty quoted label is worse than the honest degraded sentence, because it looks like a
+    step whose name the author simply cannot see.
+    """
+    invisible = "".join(ch for ch, _ in _HOSTILE_CODEPOINTS if not ch.isspace())
+    findings = publish_service._interactive_phase_failures(
+        _interactive_definition(kind=kind, name=invisible, slug="zz-plant-slug")
+    )
+    assert findings
+    message = findings[0]["message"]
+
+    expected = (
+        publish_service._INTERACTIVE_STEP_UNNAMED
+        if kind == "llm_human_input"
+        else publish_service._INTERACTIVE_FALLBACK_UNNAMED
+    )
+    assert message == expected, f"{kind}: an all-invisible name did not degrade: {message!r}"
+    assert '""' not in message, "an empty quoted label reached copy"
+    assert "zz-plant-slug" not in message, "the degradation fell back to the slug"
+
+
+@pytest.mark.parametrize("kind", _BOTH_KINDS)
+def test_wr02_scrubbing_keeps_the_refusal_inside_its_measured_length_ceiling(kind):
+    """``WR-02`` re-measurement — the clamp interacts with the scrub, so both are re-driven.
+
+    ⚠ RE-MEASURED 2026-08-15 AFTER THE CATEGORY WIDENING, because the two are coupled: every
+    scrubbed character becomes a space and runs are then collapsed, so a hostile-stuffed name
+    SHORTENS rather than lengthens. Driven over the degraded arm, a realistic 27-character
+    label, a 10,000-``A`` name, a 200-character wide-glyph name and a 10,000-character name
+    stuffed with ``U+202E``/``U+200B``: the worst case is **196** characters on arm 1 and
+    **195** on arm 2 — IDENTICAL to the pre-fix figures recorded in ``193.2-06-SUMMARY.md``,
+    against the 250 ceiling that summary set. Nothing grew.
+    """
+    stuffed = ("A\u202e\u200b" * 4_000)[:10_000]
+    for name in (None, "Approve the quarterly draft", "A" * 10_000, "—" * 200, stuffed):
+        findings = publish_service._interactive_phase_failures(
+            _interactive_definition(kind=kind, name=name)
+        )
+        assert findings
+        message = findings[0]["message"]
+        assert len(message) <= 250, (
+            f"{kind}: a {len(message)}-character refusal breached the 250 ceiling "
+            f"({'degraded' if name is None else repr(name[:20]) + '…'})"
+        )
+        assert len(message) <= 196, (
+            f"{kind}: the refusal grew past the measured 196-character worst case to "
+            f"{len(message)} — the clamp and the scrub have drifted apart"
+        )
+
+
 @pytest.mark.parametrize("kind", _BOTH_KINDS)
 def test_t193201_a_newline_bearing_name_yields_a_single_line_message(kind):
     """T-193.2-01 — a newline in a model-authored name breaks the one-line shape on BOTH
-    surfaces this one string feeds, so whitespace and control characters are collapsed."""
+    surfaces this one string feeds, so whitespace and non-printing characters are collapsed.
+
+    ⚠ AMENDED 2026-08-15 (code review ``WR-02``). WHAT THIS CASE ASSERTED UNTIL THEN IS
+    RECORDED HERE VERBATIM RATHER THAN DELETED, because the shape it had is the finding:
+
+        assert not any(ord(ch) < 32 or ord(ch) == 127 for ch in message)
+
+    That is the **identical predicate** to the code it was testing, so it could only ever
+    confirm the implementation agreed with itself. The class-wide guarantee now lives in
+    ``test_wr02_no_non_printing_codepoint_survives_into_the_refusal``, asserted against the
+    INDEPENDENT ``_HOSTILE_CODEPOINTS`` table above; what stays here is the concrete
+    one-line/one-space shape a newline-bearing name must produce.
+    """
     findings = publish_service._interactive_phase_failures(
         _interactive_definition(kind=kind, name="Approve\nthe\r\nquarterly\tdraft\x07")
     )
@@ -758,7 +946,7 @@ def test_t193201_a_newline_bearing_name_yields_a_single_line_message(kind):
     assert "\n" not in message and "\r" not in message and "\t" not in message, (
         f"{kind}: the refusal is not a single line: {message!r}"
     )
-    assert not any(ord(ch) < 32 or ord(ch) == 127 for ch in message), (
+    assert "\x07" not in message, (
         f"{kind}: a control character survived into copy: {message!r}"
     )
     # The SANITISED label lands, not the raw one.
