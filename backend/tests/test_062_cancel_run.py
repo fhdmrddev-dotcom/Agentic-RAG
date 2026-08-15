@@ -19,6 +19,21 @@ is supabase (``aexec`` builder) — driven via a ``get_supabase`` override; the 
 finalize is the asyncpg pool + ``run_lifecycle.finalize_run_terminal`` — patched directly;
 Redis best-effort ops use a tiny in-file async fake. We do NOT assert against the stale
 supabase ``runs.update`` layer the 145-03 co-write refactor retired.
+
+⚠ EXTENDED BY PHASE 194 PLAN 09 (RUN-01 / SC#2) — the WORKFLOW half of the zombie heal.
+Everything above shipped in Phase 147 and is untouched. The cases appended at the bottom
+of this file cover the co-write Step 3b gained in 194-09: with ``WORKER_COUNT=2`` and a
+PER-PROCESS ``RUN_TASKS`` dict, a Stop landing on the wrong worker takes the zombie arm —
+roughly HALF of all missed Stops, not an edge case — and before 194-09 that arm healed only
+the ``runs`` row, leaving ``workflow_runs.status='active'`` forever with no anchor pointing
+at it (invisible to ``find_resumable_runs``, which requires ``t.active_workflow_run_id =
+wr.id``). An orphaned lie, not a lock.
+
+⚠ THESE CASES SEED NOTHING IN ANY DATABASE. The asyncpg pool is the ``mock_asyncpg_pool``
+recorder, ``finish_run`` / ``cancel_active_phases`` are patched at ``app.db.workflows``
+(the module the helper late-imports from, so the patch lands), and supabase is the
+in-file ``_RecordingSupabase``. That is what keeps this suite parallel-safe under
+CLAUDE.md's rule 4.
 """
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -172,3 +187,275 @@ async def test_internals_zombie_heal_routes_finalize_run_terminal(mock_asyncpg_p
     # best-effort SETNX cancel-lock + EXPIRE still fire on the zombie path
     assert any(c[0] == "set" for c in fr.calls), "zombie heal must SETNX the cancel-lock"
     assert any(c[0] == "expire" for c in fr.calls), "zombie heal must EXPIRE the stream buffer"
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 Plan 09 (RUN-01 / SC#2) — the WORKFLOW half of the zombie heal
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Everything above this banner shipped in Phase 147 and is byte-untouched.
+
+
+class _RecordingBuilder:
+    """A supabase query builder that RECORDS which op it is, on the owning double.
+
+    Only ``select`` and ``update`` are recorded — those are the two the ordering
+    proof (V-10) needs. Every other builder method is a fluent no-op, matching the
+    shipped ``_chainable`` above.
+    """
+
+    def __init__(self, sb, table):
+        self._sb = sb
+        self._table = table
+        self._op = None
+
+    def select(self, *a, **k):
+        self._op = "select"
+        self._sb.ops.append(("select", self._table, a))
+        return self
+
+    def update(self, payload=None, *a, **k):
+        self._op = "update"
+        self._sb.ops.append(("update", self._table, payload))
+        return self
+
+    def eq(self, *a, **k):
+        return self
+
+    def maybe_single(self, *a, **k):
+        return self
+
+    def single(self, *a, **k):
+        return self
+
+    def limit(self, *a, **k):
+        return self
+
+    def execute(self):
+        res = MagicMock()
+        if self._op == "select":
+            res.data = (
+                {"active_workflow_run_id": self._sb.anchor}
+                if self._sb.anchor is not None
+                else None
+            )
+        else:
+            res.data = None
+        res.count = None
+        return res
+
+
+class _RecordingSupabase:
+    """A supabase double that records the ORDER of ``threads`` builder ops.
+
+    ⚠ V-10 IS ASSERTED BY CALL ORDER, NEVER BY A SOURCE GREP. The anchor
+    ``.select("active_workflow_run_id")`` MUST be recorded BEFORE the shipped
+    092-03 ``.update({"active_workflow_run_id": None})`` clear, because
+    ``finish_run`` keys its own anchor clear on ``active_workflow_run_id = $1``:
+    if the standalone clear ran first, the id is gone and the ``workflow_runs``
+    row is unreachable forever.
+
+    ⚠ AND THE REASON THE ASSERTION IS ON THE ORDER RATHER THAN ON ``wf_id``:
+    against a REAL database, moving the read below the clear makes ``wf_id`` come
+    back ``None``. Against a MOCK it does not — a double keeps returning whatever
+    it was seeded with, so a "wf_id is not None" assertion would stay GREEN under
+    exactly the defect it is meant to catch. The recorded order is the only thing
+    that moves here, which is why it is what is asserted.
+    """
+
+    def __init__(self, anchor=None):
+        self.anchor = anchor
+        self.ops: list = []
+
+    def table(self, name):
+        return _RecordingBuilder(self, name)
+
+    def op_names(self, table="threads"):
+        return [o[0] for o in self.ops if o[1] == table]
+
+
+def _patch_workflow_writers(monkeypatch):
+    """Patch the two db writers AT ``app.db.workflows`` — the module the helper
+    late-imports from, so a late ``from app.db.workflows import ...`` picks the
+    patched objects up at call time. Returns ``(finish_run, cancel_active_phases)``.
+    """
+    fake_finish = AsyncMock()
+    fake_cancel_phases = AsyncMock()
+    monkeypatch.setattr("app.db.workflows.finish_run", fake_finish)
+    monkeypatch.setattr("app.db.workflows.cancel_active_phases", fake_cancel_phases)
+    return fake_finish, fake_cancel_phases
+
+
+async def _drive_zombie_heal(monkeypatch, mock_asyncpg_pool, *, anchor, redis=None):
+    """Drive Step 3b's zombie arm with a thread whose anchor is ``anchor``.
+
+    Seeds NOTHING: the pool is the recorder fixture, ``finalize_run_terminal`` is
+    patched out (its own behaviour is covered by the shipped case above), and the
+    two workflow writers are patched at their module.
+    """
+    from app.api.threads import RUN_TASKS
+
+    rid = uuid4()
+    RUN_TASKS.pop(rid, None)  # ensure the happy path can't fire
+
+    monkeypatch.setattr("app.dependencies._pg_pool", mock_asyncpg_pool)
+    monkeypatch.setattr(
+        "app.services.run_lifecycle.finalize_run_terminal", AsyncMock()
+    )
+    fake_finish, fake_cancel_phases = _patch_workflow_writers(monkeypatch)
+
+    sb = _RecordingSupabase(anchor=anchor)
+    fr = redis if redis is not None else _FakeRedis(exists=0)
+    out = await _cancel_run_internals(
+        run_id=rid,
+        status="streaming",
+        thread_id=str(uuid4()),
+        redis=fr,
+        supabase=sb,
+    )
+    return out, sb, fr, fake_finish, fake_cancel_phases
+
+
+async def test_internals_zombie_heal_finishes_the_workflow_run(
+    mock_asyncpg_pool, monkeypatch
+):
+    """V-09 — the zombie arm terminalizes ``workflow_runs``, not only ``runs``.
+
+    A Stop that lands on a worker where the producer task is dead now marks the
+    workflow run ``cancelled`` too, so "stop at ANY point" is TRUE rather than
+    qualified. ``finish_run`` is awaited exactly ONCE, with the id read off the
+    thread anchor and the status ``'cancelled'``.
+
+    ⚠ THE STATUS VALUE IS LOAD-BEARING, not incidental: a cross-worker interleave
+    with worker B's F2 terminalize is benign ONLY BY VALUE-IDENTITY (both writes
+    carry the same value, row-level locking serialises them, the anchor clear is
+    idempotent). The one thing a caller must never do is make the two writes
+    DISAGREE — e.g. this one passing 'failed' while F2 passes 'cancelled'.
+    """
+    wf_id = str(uuid4())
+    out, _sb, _fr, fake_finish, _ = await _drive_zombie_heal(
+        monkeypatch, mock_asyncpg_pool, anchor=wf_id
+    )
+
+    assert out == "zombie_healed"
+    assert fake_finish.await_count == 1, (
+        "the zombie arm must terminalize workflow_runs exactly once "
+        f"(awaited {fake_finish.await_count}×)"
+    )
+    args = fake_finish.await_args.args
+    assert str(args[1]) == wf_id, "finish_run must be keyed on the anchored workflow_runs.id"
+    assert args[2] == "cancelled"
+
+
+async def test_internals_zombie_heal_terminalizes_the_interrupted_phase(
+    mock_asyncpg_pool, monkeypatch
+):
+    """V-17 — the interrupted ``workflow_phases`` row is terminalized too.
+
+    A run whose status says ``cancelled`` while its phase row still says ``active``
+    is the same class of lie this plan removes one level up. ``cancel_active_phases``
+    is awaited exactly once, keyed on the SAME ``workflow_runs.id`` as ``finish_run``.
+
+    This is a SEPARATE case from V-09 on purpose: they are two clauses of the
+    co-write, and a plant that breaks one must not be able to hide behind the other
+    (194-03 shipped four REQUIRED plants that all red on the same clause, which
+    would have left a second clause inert and indistinguishable from live).
+    """
+    wf_id = str(uuid4())
+    _out, _sb, _fr, fake_finish, fake_cancel_phases = await _drive_zombie_heal(
+        monkeypatch, mock_asyncpg_pool, anchor=wf_id
+    )
+
+    assert fake_cancel_phases.await_count == 1, (
+        "the zombie arm must terminalize the interrupted phase exactly once "
+        f"(awaited {fake_cancel_phases.await_count}×)"
+    )
+    assert str(fake_cancel_phases.await_args.args[1]) == wf_id
+    # Same id on both halves of the composition — one run, one phase set.
+    assert str(fake_cancel_phases.await_args.args[1]) == str(
+        fake_finish.await_args.args[1]
+    )
+
+
+async def test_internals_zombie_heal_reads_the_anchor_before_the_shipped_clear(
+    mock_asyncpg_pool, monkeypatch
+):
+    """V-10 / F-2 — the anchor READ precedes the shipped 092-03 anchor CLEAR.
+
+    Asserted by CALL ORDER on the supabase double, never by reading the source.
+    ``finish_run`` keys its own anchor clear on ``WHERE active_workflow_run_id = $1``;
+    if the standalone 092-03 clear ran first the id is already NULL, the read comes
+    back empty and the ``workflow_runs`` row becomes permanently unreachable — the
+    exact orphaned-lie state this plan exists to remove.
+    """
+    wf_id = str(uuid4())
+    _out, sb, _fr, _fin, _ph = await _drive_zombie_heal(
+        monkeypatch, mock_asyncpg_pool, anchor=wf_id
+    )
+
+    ops = sb.op_names("threads")
+    assert "select" in ops, "Step 3b must READ the thread anchor"
+    assert "update" in ops, "the shipped 092-03 standalone anchor clear must survive"
+    assert ops.index("select") < ops.index("update"), (
+        f"the anchor read must precede the shipped clear; recorded order was {ops}"
+    )
+
+
+async def test_internals_zombie_heal_is_idempotent_on_a_second_call(
+    mock_asyncpg_pool, monkeypatch
+):
+    """V-13 — a second ``_cancel_run_internals`` for the same run changes nothing.
+
+    ``finish_run`` may legitimately be awaited again (its UPDATE writes the same
+    value and its anchor clear finds 0 rows), so idempotence here means the WRITE
+    and the DISCRIMINATOR are unchanged — not that the call is skipped. That
+    distinction matters: the delete cascade has called both for the same run since
+    Phase 152 without incident, which is the shipped evidence the double call is
+    benign.
+    """
+    wf_id = str(uuid4())
+    out1, _sb1, _fr1, fin1, ph1 = await _drive_zombie_heal(
+        monkeypatch, mock_asyncpg_pool, anchor=wf_id
+    )
+    out2, _sb2, _fr2, fin2, ph2 = await _drive_zombie_heal(
+        monkeypatch, mock_asyncpg_pool, anchor=wf_id
+    )
+
+    assert out1 == out2 == "zombie_healed", "the discriminator must not change"
+    assert fin1.await_args.args[1:] == fin2.await_args.args[1:], (
+        "the second call must write the SAME value — a divergent status is the one "
+        "thing the cross-worker interleave is not safe against"
+    )
+    assert ph1.await_args.args[1:] == ph2.await_args.args[1:]
+
+
+async def test_internals_zombie_heal_workflow_cowrite_preserves_the_shipped_arms(
+    mock_asyncpg_pool, monkeypatch
+):
+    """The four shipped Step-3b arms still fire, unchanged, alongside the co-write.
+
+    D-11 — the outcome discriminator's honesty rule is INHERITED, not re-decided:
+    the returned value stays ``"zombie_healed"`` byte-for-byte, so the shipped 064-B
+    rendering ("recovered a stuck run", NEVER "killed") is preserved BY CONSTRUCTION.
+    The workflow half of the heal introduces no new discriminator and no new
+    user-facing verb.
+
+    ⚠ THIS CASE IS A REGRESSION PIN, NOT A FENCE ON NEW BEHAVIOUR, AND IT IS SAID
+    HERE SO NOBODY LATER MISREADS IT. It asserts only things that were ALREADY TRUE
+    before 194-09, so it PASSED on this plan's RED run (4 failed / 5 passed — the 5th
+    was this) while its four siblings failed. That is correct and expected: its job is
+    to red if the co-write ever DAMAGES a shipped arm, not to prove the co-write
+    exists. Reading a RED run case-by-case rather than by its count is what makes that
+    distinction visible (194-06 caught a genuinely vacuous fence exactly this way).
+    """
+    out, sb, fr, _fin, _ph = await _drive_zombie_heal(
+        monkeypatch, mock_asyncpg_pool, anchor=str(uuid4())
+    )
+
+    assert out == "zombie_healed"
+    assert any(c[0] == "set" for c in fr.calls), "SETNX cancel-lock must still fire"
+    assert any(c[0] == "expire" for c in fr.calls), "EXPIRE must still fire"
+    assert "update" in sb.op_names("threads"), (
+        "the shipped standalone anchor clear must still fire — it is the "
+        "belt-and-braces arm for the wf_id-is-None case and the Deep path's no-op"
+    )
