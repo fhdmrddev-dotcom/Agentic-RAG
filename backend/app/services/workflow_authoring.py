@@ -508,6 +508,38 @@ async def generate_workflow_definition(
     # run's task instruction, and echoing the instruction back is the cheapest way to
     # produce a criterion the judge cannot fail.
     #
+    # ⚠ MEASURED AFTER THE PARAGRAPH ABOVE WAS WRITTEN, AND CORRECTED HERE BESIDE IT
+    # RATHER THAN OVER IT (code-review WR-06, 2026-08-15). THE LAST SENTENCE ABOVE
+    # CREDITS THIS CONTROL WITH A MITIGATION IT DOES NOT DELIVER, and the number is in
+    # `.planning/phases/193.2-from-authored-to-runnable/193.2-FREQUENCY.md` §(c) — 20 real
+    # generations — so the next reader can check it instead of trusting this prose. On the
+    # `kit10` arm **openai named a one-run parameter in 5 of 5 requirements** —
+    # representative: *"Produce a quarterly business review for customer Northwind
+    # Logistics covering Q3 2026 …"* — and **all 5 were stamped `seeded_by_ai: True`. The
+    # copy check fired on 0 of those 5.** (anthropic was 0 of 5 on the same arm: it wrote
+    # durable requirements, so there was nothing there for a control to catch.) A reader
+    # who trusted the paragraph above would conclude the weakened-judge residual is
+    # mechanically mitigated and would not build the real mitigation.
+    #
+    # ⚠ THE CHECK IS NOT BROKEN AND MUST NOT BE "FIXED" HERE. Its question is *"is this
+    # value a normalised copy of the `describe` text?"* and it answers that correctly —
+    # all 20 stamps in that run were correct, including those five, because a requirement
+    # naming one run's parameters IS still genuinely a model's proposal. A fuzzy
+    # similarity threshold was considered and DELIBERATELY REJECTED; the reason is in
+    # `_normalised_for_copy_check`'s own docstring (it would refuse provenance to
+    # requirements that are durable but merely share vocabulary with the describe box,
+    # which is the ordinary case). What was wrong was the CLAIM, not the predicate.
+    #
+    # ⇒ WHAT THIS CONTROL ACTUALLY DOES: it is an ANTI-ECHO guard. It refuses the mark to
+    # the cheapest possible non-requirement — the describe text handed straight back — and
+    # to nothing weaker. **It is not a durability control.** The phrase this phase settled
+    # on, and the one that should be read off the mark anywhere it appears: **the
+    # AI-proposal mark means "a model wrote this", NEVER "this is durable."** The
+    # durability instruction lives in the prompt (D-07, `AUTHORING_SYSTEM_PROMPT`), it is
+    # obeyed only in part, and the real backstop is D-06's visible mark under the author's
+    # eye before they press Publish — which is exactly why D-09's acceptance rests on that
+    # mark rather than on this predicate.
+    #
     # The predicate is ONE expression: the shipped `bool(x and x.strip())` rule, WIDENED.
     # It is a widening of "empty was not seeded", not a second concern.
     #
