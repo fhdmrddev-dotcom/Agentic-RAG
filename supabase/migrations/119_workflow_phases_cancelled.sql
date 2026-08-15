@@ -1,0 +1,131 @@
+-- 119_workflow_phases_cancelled.sql
+-- Phase 194 (RUN-01 / D-04 / D-05 / D-07) — extend the workflow_phases status CHECK with the
+-- ONE stopped-run outcome literal: 'cancelled'.
+--
+-- WHAT THE STATUS MEANS. `cancelled` is the phase that was RUNNING when the user stopped the
+-- run. It did NOT fail — nothing went wrong, the step was interrupted. It was NOT skipped —
+-- it was never routed around; it started, it did work, and a person ended the run underneath
+-- it. And it is plainly not `completed` (it produced no phase output) nor `pending` (it had
+-- already started) nor `recorded_not_sent` (that is 189's governed-external-action outcome and
+-- has nothing to do with a stop). **None of the six shipped statuses is true of that outcome.**
+--
+-- ⚠ REUSING `failed` OR `skipped` WAS OFFERED AND REJECTED (D-04), and the rejection is
+-- recorded HERE rather than only in CONTEXT.md, because the schema is where the next person
+-- reading the constraint will ask the question. Phase 194's entire requirement is honesty
+-- about what a stopped run did and did not do; writing `failed` on a phase that did not fail,
+-- or `skipped` on a phase that ran, is precisely the dishonesty the phase exists to remove.
+--
+-- WHY A MIGRATION IS OWED AT ALL. Measured at HEAD: `finish_run` writes the workflow_runs row
+-- plus the thread anchor and NOTHING ELSE, so the in-flight `workflow_phases` row on a
+-- cancelled run stays `active` FOREVER. `workflow_phases_status_check` (migration 115,
+-- :113-119) admits exactly six values — `pending, active, completed, failed, skipped,
+-- recorded_not_sent` — and there is NO `cancelled`. Without this literal, the cancel path's
+-- phase-terminalize write would die with a Postgres 23514 mid-cancel and the row would be
+-- stranded `active` under a run marked `cancelled`: SC#3's failure mode, in the schema itself.
+--
+-- ⚠ D-17 (INHERITED FROM MIGRATION 115) — THE STORED VALUE AND THE RENDERED WORD ARE
+-- DIFFERENT THINGS, AND THIS CONSTRAINT STORES THE SLUG. It gains `cancelled`: lowercase, in
+-- the shape of the six literals that already exist. The sentence a person actually reads —
+-- "Run cancelled — no deliverable produced" — is RENDERED by the CLIENT's vocabulary layer
+-- for that slug. It lives one language away, appears in no query and in no constraint. Putting
+-- display prose inside a database constraint would make the wording un-editable without a
+-- second migration, would put an em-dash in a CHECK, and would break the shape of the column.
+-- backend/tests/test_migration_119.py's NEGATIVE control asserts that sentence is REJECTED
+-- here with SQLSTATE 23514 naming workflow_phases_status_check — i.e. D-17 is expressed as an
+-- executable test, not as this comment.
+--
+-- ⚠ COMPLETED PHASES ARE UNTOUCHED (D-07 / D-13). A stopped run KEEPS its completed phases:
+-- their outputs are already durable and the engine's existing rule ("finish_run does NOT touch
+-- them") is preserved verbatim, not re-litigated. Only the single `active` row moves to
+-- `cancelled`. **This migration ADMITS a literal — it does not authorise a bulk rewrite**, and
+-- it contains no UPDATE, no backfill and no data statement of any kind.
+--
+-- ALTER (NOT CREATE — workflow_phases and its status CHECK both already exist). Adds exactly
+-- ONE literal (6 → 7) and changes nothing else: no table, no column, no index, no grant. Does
+-- NOT touch RLS on workflow_phases — no policy is created, dropped or altered, so the existing
+-- org/membership access rules are untouched.
+--
+-- ⚠ NO MIGRATION IS OWED ON THE `workflow_runs` SIDE. Verified at HEAD:
+-- `workflow_runs_status_check` ALREADY admits `cancelled` — 057_workflow_runs.sql:19 created it
+-- with `('active','paused','completed','failed','cancelled')` and
+-- 063_dual_mode_continue.sql:55-57 re-asserted it while adding `cap_paused`. This file touches
+-- only the PHASE-level constraint.
+--
+-- ── THE FOUR RULES COPIED FROM MIGRATION 115, EACH WITH ITS STATED REASON ────────────────
+--
+--   1. BEGIN / COMMIT (mig 115's review finding WR-01, 2026-08-07). Without it, the two ALTERs
+--      each run in their OWN implicit transaction when pasted into the Supabase SQL editor, so
+--      a dropped session / editor timeout / any interruption BETWEEN them leaves the table with
+--      NO workflow_phases_status_check AT ALL — "the closed vocabulary this whole migration
+--      exists to PRESERVE, gone, fail-open, and SILENTLY" (nothing reads pg_constraint at
+--      boot). DDL is transactional in Postgres, so BEGIN/COMMIT genuinely rolls back: the
+--      constraint is either the OLD six-literal one or the NEW seven-literal one, never absent.
+--   2. DROP CONSTRAINT **IF EXISTS** — "makes a re-paste safe". House style: migrations 048 and
+--      063 are the shipped CHECK-widening precedents and both use it. Without IF EXISTS, a
+--      re-paste after a partial apply errors on the bare DROP.
+--   3. `= ANY (ARRAY[…])` with ::text casts, **NOT `IN (…)`** — this is the form pg_dump
+--      regenerates, and it is the shape the SHIPPED constraint already has. Matching the live
+--      shape keeps the regenerated full-schema.sql diff to roughly ONE line instead of a
+--      whole-constraint reformat.
+--   4. **Re-add every shipped literal VERBATIM.** "A re-typed ARRAY[…] is precisely where a
+--      shipped literal gets silently dropped, which would orphan every existing row using it."
+--      All six are re-added below and backend/tests/test_migration_119.py re-asserts all SEVEN
+--      one literal per loop iteration — a collapsed `assert all(...)` short-circuits and would
+--      prove only the first.
+--
+-- ── THE CODE COUNTERPART POINTER — RE-DERIVED AT THIS COMMIT, AND MIGRATION 115'S IS STALE ──
+--
+-- ⚠ Migration 115's header (:56-59) says the phase-status literals live in "the four UPDATEs in
+-- backend/app/db/workflows.py (lines 965, 979, 1001, 1013)". **Measured at this commit that
+-- pointer is WRONG IN BOTH DIRECTIONS, and the correction is recorded BESIDE it rather than
+-- silently:**
+--   * The LINES are stale by ~240. At HEAD, :965 and :979 sit inside
+--     `count_foreign_runs_on_global` (defined :960) and :1001 / :1013 inside `load_run_phases`
+--     (defined :998) — neither of which writes a phase status at all.
+--   * The COUNT is wrong: there are **FIVE** phase-status writers, not four. 115's own new
+--     `record_phase_not_sent` was the fifth and its header was written before it landed.
+-- Re-derived at this commit with
+-- `grep -n "UPDATE workflow_phases SET status" backend/app/db/workflows.py`:
+--   * `mark_phase_active`      (def :1202) → UPDATE at :1208  — 'active'
+--   * `complete_phase`         (def :1213) → UPDATE at :1222  — 'completed'
+--   * `fail_phase`             (def :1228) → UPDATE at :1244  — 'failed'
+--   * `skip_phase`             (def :1250) → UPDATE at :1256  — 'skipped'
+--   * `record_phase_not_sent`  (def :1261) → UPDATE at :1287  — 'recorded_not_sent'
+--   ('pending' is the column DEFAULT set at INSERT, not written by any of them.)
+-- Phase 194 adds the SIXTH writer — the cancel path's phase-terminalize write — in a later
+-- plan of this phase. There is still NO Python enum and NO allow-list mirroring these literals,
+-- so there is nothing to widen in lockstep; the constraint and these bare string literals are
+-- the whole vocabulary. **These line numbers WILL go stale the same way 115's did — re-derive
+-- them with the grep above rather than trusting this block.**
+--
+-- ── HOW THIS IS APPLIED (D-06) ──────────────────────────────────────────────────────────────
+--
+-- Apply by pasting into the Supabase SQL editor — NEVER `supabase db push` / `supabase db
+-- reset` (both wipe local dev data; CLAUDE.md forbids them outright); then
+-- `bash scripts/regenerate-full-schema.sh` (NO --reset), and commit the regenerated artifact.
+-- Never hand-edit supabase/full-schema.sql.
+-- **This plan (194-02) ONLY AUTHORS the file — it is NOT applied here.** The apply is plan
+-- 194-12, deliberately serialized into its own wave.
+--
+-- NOTE (T-194-02-02): DROP+ADD CONSTRAINT takes a brief ACCESS EXCLUSIVE lock on
+-- workflow_phases. Immaterial on local dev; on cloud this belongs in the standing
+-- migration-parity window (migs 099 onward land together, in order), not mid-traffic.
+-- Do NOT apply this to the cloud database during Phase 194.
+
+BEGIN;
+
+ALTER TABLE public.workflow_phases DROP CONSTRAINT IF EXISTS workflow_phases_status_check;
+ALTER TABLE public.workflow_phases ADD CONSTRAINT workflow_phases_status_check CHECK (
+    status = ANY (ARRAY[
+        'pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text,
+        -- 189 (CONN-01 / D-08, D-17) — the governed external action that was recorded
+        -- rather than transmitted. THE SLUG, never the rendered sentence:
+        'recorded_not_sent'::text,
+        -- 194 (RUN-01 / D-04, D-07, D-17) — the phase that was RUNNING when the user stopped
+        -- the run: not failed, not skipped, interrupted. THE SLUG, never the rendered
+        -- sentence "Run cancelled — no deliverable produced":
+        'cancelled'::text
+    ])
+);
+
+COMMIT;
