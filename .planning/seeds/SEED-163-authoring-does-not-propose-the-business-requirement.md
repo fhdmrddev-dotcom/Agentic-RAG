@@ -2,7 +2,17 @@
 
 **Planted:** 2026-08-15, by the operator during Phase 193.1 end-to-end UAT
 **Surface:** Agentic-RAG — workflow authoring (describe door) → publish gauntlet
-**Status:** open
+**Status:** folded → **Phase 193.2 From Authored to Runnable** (context gathered 2026-08-15, `4d1d9374`)
+
+⚠ **Folded, with two of this seed's own rules carried through verbatim into `193.2-CONTEXT.md`
+rather than paraphrased:** the field arrives **pre-filled and visibly marked as an AI proposal**
+(D-06, reusing 187's `name_seeded_by_ai` provenance shape), and the proposal must be the **durable**
+requirement, never a copy of the describe text (D-07). ⚠ **The publish gate is NOT changed** — an
+AI-seeded value passes stage 1 untouched, and pressing Publish is the consent (D-09). ⚠ Measured
+while scoping: `WF_SCHEMA` is `WorkflowDefinition.model_json_schema()`, so **the emit tool already
+advertises this field** — no schema work; the prompt is the entire gap. The **three-instance
+pattern** this seed predicted is now recorded for 197 (D-22): `SEED-157`, this seed, and the
+AI-chosen workflow **name** (deferred to 197 as D-24).
 
 ---
 

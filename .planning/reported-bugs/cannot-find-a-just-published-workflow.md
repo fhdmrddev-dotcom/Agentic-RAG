@@ -4,9 +4,9 @@ title: A just-published workflow is unfindable — the AI names it, the library 
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: folded
 affected_areas: [workflow/library, workflow/authoring, backend/workflows]
-folded_into: null
+folded_into: "193.2"
 verified_closed_by: null
 related_seeds: [SEED-155]
 re_open_trigger: null

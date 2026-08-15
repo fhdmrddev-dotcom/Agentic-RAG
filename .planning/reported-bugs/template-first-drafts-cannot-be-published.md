@@ -4,9 +4,9 @@ title: A template-first draft grows an llm_human_input phase and therefore canno
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: blocking
-status: open
+status: folded
 affected_areas: [workflow/authoring, workflow/publish, backend/harness]
-folded_into: null
+folded_into: "193.2"
 verified_closed_by: null
 related_seeds: [SEED-157, SEED-163, SEED-164]
 re_open_trigger: null
