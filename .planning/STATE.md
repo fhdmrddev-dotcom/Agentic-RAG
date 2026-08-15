@@ -32,7 +32,9 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
-**Phase:** **193.1 Template-First Authoring — ✅ CLOSED 2026-08-15. `AUTH-03` SATISFIED on a real end-to-end run.**
+**Phase:** **193.2 From Authored to Runnable — ✅ CLOSED. Validated + `U5` driven 2026-08-16; only UAT row `U2` remains owed (unschedulable).** *(This line read "193.1 Template-First Authoring" until 2026-08-16 — stale by one phase; the 193.1 detail below is kept.)*
+
+**Prior:** **193.1 Template-First Authoring — ✅ CLOSED 2026-08-15. `AUTH-03` SATISFIED on a real end-to-end run.**
 
 **The evidence, and it is the row no test could stand in for** (`193.1-UAT.md` § U5): a purpose-built 10-field `.docx` attached at authoring time, a five-document knowledge base, and run `d8331add` completed producing `/Northwind-QBR-Template.docx` — **38,763 B against a 37,424 B template, all ten fields rendered, zero unrendered `{{ }}`, zero literal `None`**, branding intact (navy ×11, amber, teal ×7, Georgia, 4 shading elements), and **11 of 13 planted facts** grounded including `INC-4471`, 412/605 seats, £284,000 and AMBER. **Both halves of the rewritten requirement are observed: attached WHEN AUTHORING, and the run FILLS THAT SAME TEMPLATE.**
 
@@ -42,10 +44,92 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ⚠ **One quality observation, seeded nowhere yet by decision:** the model grounded Marcus Feld's quote and **stripped his name** — content kept, attribution lost. Fine internally; a downgrade for a client-facing document. Hold until it recurs.
 
-**NEXT = drive UAT row `U5`** (the composer's Harness picker — thirty seconds, the one consequence of
-the sort nobody has looked at), then **`/gsd:discuss-phase 194`**. *(Superseded twice, both kept: this
-line read "NEXT = `/gsd:execute-phase 193.2`" before execution, then "NEXT = drive U1" before the
-operator drove it.)*
+~~**NEXT = drive UAT row `U5`** (the composer's Harness picker — thirty seconds, the one consequence of
+the sort nobody has looked at), then **`/gsd:discuss-phase 194`**.~~ *(Superseded three times, all
+kept: this line read "NEXT = `/gsd:execute-phase 193.2`" before execution, then "NEXT = drive U1",
+then "NEXT = drive U5".)*
+
+**NEXT = `/gsd:discuss-phase 194`.**
+
+### 2026-08-16 — `/gsd:validate-phase 193.2` + UAT row `U5` DRIVEN. Phase 193.2 is fully closed bar `U2`.
+
+**`/gsd:validate-phase 193.2`** (`fc5e8d50`, `54639093`): VALIDATION.md was `status: draft` /
+`nyquist_compliant: false` with every row `⬜ pending` — ten plans and a code-review pass after the
+fact. Now scored on RUNS: **17 of 17 automated rows COVERED and green** · backend workflow suites
+**213 / 0** · count gate **total 3918 · failed 1**. ⚠ **That one gate failure is NOT this phase's** —
+`WorkflowsPage … a PENDING project re-query never zeroes a count` fails with `STACK_TRACE_ERROR`
+(the oversubscription signature); `git log -S` attributes it to **`bf7f986f` (192-11)** and the file
+passes **55/55 alone**. Name captured from the gate's JSON report BEFORE any re-run.
+
+**ONE GAP FOUND AND FILLED — `G-1`, a property with verification of NEITHER kind.** Nothing covered
+whether the stage-2.5 interactive block writes a `publish_blocked` receipt, and the two sources
+DISAGREED: `193.2-UAT.md` U2 said *"no `publish_blocked` row is written"*; `_block`'s docstring says
+it writes one. U2 was never driven (0/20), so nothing settled it. **Measured: a POST reaching stage
+2.5 DOES write the receipt.** U2's sentence is true only of the client-greys-the-button path — two
+tiers conflated. 3 cases added, **both plants observed RED**, **zero implementation files modified**.
+
+**UAT row `U5` DRIVEN (`d1e50f98`) — PASS by measurement, and the row's own premise was FALSE.** It
+asked whether the composer's Harness workflow picker reads sensibly under recency ordering. **THE
+PICKER DOES NOT EXIST.** `list_published_workflows` has **exactly ONE backend call site**
+(`api/workflows.py:339`); of the row's four named consumers, **`WorkspacePanel` is order-insensitive**
+(`.find(w => w.slug === slug)`), **`threads.py:97` is a DEAD IMPORT** (imported, never called — the
+wording *"`:97` imports it"* was literally true and read as *"consumes it"*), and a fourth it never
+named (`ConnectionsTab:841`) aggregates into counts. **So the reorder is user-visible in exactly ONE
+surface — the library — already driven by U4.** Live feed at `127.0.0.1:54322`: **156 published rows**,
+recency correct, U1's QBR at index 0; the observed identical-timestamp PAIRS make the review's
+**WR-03** `, id DESC` tiebreaker load-bearing rather than defensive.
+
+⚠ **The false claim had THREE homes** — `CLAUDE.md`'s `db/workflows.py` ledger row, `193.2-UAT.md`
+§U5 and `193.2-VALIDATION.md`, the latter two inherited verbatim from the first. *A sentence repeated
+across three artifacts is not three pieces of evidence.* All three corrected BESIDE their originals.
+
+**UAT tally: 3 driven → 4 driven · 3 PASS + 1 PARTIAL · 0 FAIL · 1 NOT DRIVEN.** Only **U2** remains
+owed and **it still cannot be scheduled** — it waits on an interactive step appearing, which is
+exactly what this phase reduced to 0/20. Its receipt half is now automated by G-1; only the *rendered*
+observation is outstanding.
+
+---
+
+### ⚠ PHASE 194 — TWO FINDINGS MEASURED 2026-08-16, BEFORE DISCUSS-PHASE OPENS
+
+**1. THE ROADMAP'S SCOPE FLAG FOR 194 IS MEASURABLY WRONG, AND IT IS THE ONE THAT SIZES THE PHASE.**
+`ROADMAP.md:491-503` says *"**Depends on**: Nothing structural — mostly UI over an endpoint that
+already exists"* and *"Reuses the owned cancel endpoint + `run_lifecycle` internals — **this is not a
+new runtime path**"*. Measured at HEAD:
+
+| Claim | Measured |
+|---|---|
+| a workflow-run cancel endpoint exists | ⛔ **NO.** `backend/app/api/workflow_runs.py` has **exactly ONE route, a `GET`** (`:164`) |
+| `db/workflows.py` can cancel a run | ⛔ **NO** cancel function, no `cancelled` write |
+| *"the owned cancel endpoint"* | ✅ exists — but it is `DELETE /runs/{run_id}` (`api/runs.py:1155`) over the **`runs`** table, i.e. **deep-agent** runs |
+| workflow runs live in `runs` | ⛔ **NO** — `create_workflow_run` writes `INSERT INTO workflow_runs` (`db/workflows.py:175-203`), a **separate table** |
+
+⇒ **194 is a NEW runtime path on the workflow side**: an endpoint, a DB writer, and harness-engine
+cooperation so a run can be interrupted mid-phase. SC#3 (*"safe mid-phase: no partial write is
+presented as finished"*) is **structural, not UI**. ⚠ **This is the same failure class U5 just
+exposed** — an unmeasured premise in a planning artifact, scheduled as a small job. Re-scope at
+discuss time; do not plan against the flag as written.
+
+**2. G-5 FIRES ON TWO LIKELY-194 FILES AND BOTH ARE ABSENT FROM THE `CLAUDE.md` HOT-FILE LEDGER** —
+the invisibility failure that hid `WorkflowsPage.tsx` for ten phases, `WorkflowDoorSwitch.tsx` for six
+and `WorkflowBuilderPage.tsx` for ten. Neither appears as a ledger ROW (both names occur only inside
+other rows' prose, the same trap the `WorkflowCard.tsx` row documents about itself):
+
+| File | Measured | Ledger |
+|---|---|---|
+| `frontend/src/components/chat/RunCard.tsx` | **20 commits / ~9 buckets** | ⛔ absent — **G-5 fires** |
+| `frontend/src/components/panel/WorkspacePanel.tsx` | **13 commits / ~8 buckets** | ⛔ absent — **G-5 fires** |
+
+Re-derive with `git log --oneline -- <file> | wc -l` and the standard `sed` bucket recipe (⚠ that
+recipe counts quick-task buckets as phases — subtract them). **Per G-5, if 194's `files_modified`
+names either, discuss-phase owes a refactor recommendation as its FIRST option**, and the ledger rows
+should be written in that phase.
+
+**3. Two bugs were routed to 194 but their frontmatter never recorded it** — `folded_into` is `null`
+on both `workflow-run-history-not-reachable-from-canvas.md` (BUG-260815-03) and
+`chat-stuck-on-starting-workflow-with-duplicate-icon.md` (BUG-260815-04), though STATE records the
+routing decision. ⚠ The second carries a standing warning: *the "Starting workflow" string is
+DELIBERATE and pinned — do not reword it.*
 
 ---
 
