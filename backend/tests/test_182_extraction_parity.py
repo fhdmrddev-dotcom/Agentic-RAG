@@ -88,7 +88,22 @@ _GOLDEN_PROMPT = (
     "### Skill registry (enabled; owner + global) — ids eligible for `skill_ref`\n"
     "- Legal Review (id=s1)\n"
     "\n"
-    "### Template placeholder fields (if the workflow must fill a template)\n"
+    # ⚠ SUPERSEDED 2026-08-15. This line read, from Phase 182 until Phase 193.1:
+    #     "### Template placeholder fields (if the workflow must fill a template)\n"
+    # Phase 193.1's D-26 replaced that ONE hedged heading with TWO ASSERTIVE ARMS
+    # (`grounding.py:618-632`), because the hedge was measured to SUPPRESS the branch it
+    # was meant to license: three `POST /workflows/generate` calls out of three emitted
+    # 0 `render_template` phases while the names were reaching the prompt intact. The old
+    # wording is kept here rather than overwritten so a later reader can see WHAT changed
+    # and why this pin moved — the string below is not a reword, it is a different claim.
+    #
+    # `_fake_bundle()` sets `placeholders=["client_name"]`, so this pins the PRESENT arm.
+    # ⚠ The ABSENT arm has no byte pin in this file; D-26's "the two arms share no
+    # sentence" property is guarded in Phase 193.1's own suite, not here.
+    "### Template placeholder fields — the user HAS attached a template document "
+    "to this workflow; the final deliverable MUST therefore be an `llm_emit` phase "
+    "with `emitter: 'render_template'` that fills EXACTLY the fields named on the "
+    "next line\n"
     "client_name\n"
 )
 
