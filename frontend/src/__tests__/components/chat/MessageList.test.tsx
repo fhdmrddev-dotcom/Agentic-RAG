@@ -494,6 +494,99 @@ describe("194.1-06 — the LIVE state (R5), present from the synchronous kickoff
   })
 })
 
+describe("194.1-06 — R4 THROUGH THE LIST, with the streaming store structurally empty", () => {
+  /**
+   * ⚠ THIS IS R4's CENTRAL ACCEPTANCE AND THE HARNESS IS THE EVIDENCE. Everything
+   * here goes through `MessageList` — the real mount, the real prop — inside a bare
+   * `TooltipProvider` with **NO `StreamsProvider` anywhere in the tree**. So the
+   * claim *"it renders with the live streaming store empty"* is STRUCTURAL rather
+   * than arranged: there is no provider to arrange.
+   *
+   * That is 174 D1 made mechanical (*derived from persisted state, never from live
+   * streaming state*), and it is the property whose absence kept `BUG-260610-01`
+   * open for two months.
+   */
+  beforeEach(() => {
+    resetRunLineStore()
+    mockGetThreadWorkflow.mockReset()
+    mockGetThreadWorkflow.mockResolvedValue(frame())
+  })
+  afterEach(() => {
+    cleanup()
+    resetRunLineStore()
+  })
+
+  function stoppedThread(): Message {
+    return {
+      id: "msg-user-1",
+      thread_id: "thread-1",
+      user_id: "user-1",
+      role: "user",
+      content: "Run the quarterly close workflow",
+      created_at: RUN_NOW,
+      updated_at: RUN_NOW,
+    }
+  }
+
+  it("a returning transcript carries the stopped receipt, with both figures as VALUES", async () => {
+    const { container } = renderML(
+      <MessageList messages={[stoppedThread()]} isStreaming={false} threadId="thread-1" />,
+    )
+    await screen.findByTestId("thread-run-line")
+
+    // The prompt is rendered too, so this is a reading INSIDE a transcript rather
+    // than a component floating on its own.
+    expect(container.textContent ?? "").toContain("Run the quarterly close workflow")
+
+    expect(screen.getByTestId("thread-run-line-word")).toHaveTextContent("Stopped by you")
+    expect(screen.getByTestId("thread-run-line-steps")).toHaveTextContent("2 of 3 steps")
+    expect(screen.getByTestId("thread-run-line-elapsed")).toHaveTextContent("2m 18s")
+  })
+
+  it("the line sits AFTER the last message and BEFORE the scroll anchor (list level, D-15)", async () => {
+    const { container } = renderML(
+      <MessageList messages={[stoppedThread()]} isStreaming={false} threadId="thread-1" />,
+    )
+    const line = await screen.findByTestId("thread-run-line")
+    const prompt = screen.getByTestId("user-message")
+
+    // ⚠ ORDER asserted by DOM position, never by class name or by markup shape.
+    // `Node.DOCUMENT_POSITION_FOLLOWING` is 4.
+    expect(prompt.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // …and it is a SIBLING of the transcript rather than a child of any message:
+    // no `MessageItem` subtree contains it.
+    expect(prompt.contains(line)).toBe(false)
+    // The scroll anchor is still the LAST child of the message column, so the
+    // auto-follow effect keeps landing at the true bottom.
+    const column = container.querySelector(".relative.space-y-1") as HTMLElement
+    expect(column).not.toBeNull()
+    expect(column.contains(line)).toBe(true)
+  })
+
+  it("absent through the list on `completed`, and absent on `failed` (D-16, two cases)", async () => {
+    mockGetThreadWorkflow.mockResolvedValue(frame({ last_run_status: "completed" }))
+    renderML(<MessageList messages={[stoppedThread()]} isStreaming={false} threadId="thread-1" />)
+    await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalled())
+    expect(screen.queryByTestId("thread-run-line")).toBeNull()
+    cleanup()
+
+    mockGetThreadWorkflow.mockClear()
+    mockGetThreadWorkflow.mockResolvedValue(frame({ last_run_status: "failed" }))
+    renderML(<MessageList messages={[stoppedThread()]} isStreaming={false} threadId="thread-1" />)
+    await waitFor(() => expect(mockGetThreadWorkflow).toHaveBeenCalled())
+    expect(screen.queryByTestId("thread-run-line")).toBeNull()
+  })
+
+  it("every shipped call site without the prop is unaffected — no line, no round trip", () => {
+    // `MessageList`'s new prop is optional, and the four Phase-068.5 / 095 describes
+    // above call it without one. This states that as a property rather than leaving
+    // it to be inferred from those suites still being green.
+    renderML(<MessageList messages={[stoppedThread()]} isStreaming={false} />)
+    expect(screen.queryByTestId("thread-run-line")).toBeNull()
+    expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
+  })
+})
+
 describe("194.1-06 — the source fences on ThreadRunLine", () => {
   /** ⚠ RAW, NOT COMMENT-STRIPPED, for the two forbidden identifiers — the Phase
    *  193 D-24(a) precedent: a docblock QUOTING one would be caught too. That is
