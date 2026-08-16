@@ -270,13 +270,32 @@ describe("194.1-01 case 2 — the silent no-op is REAL (the defect R6 repairs)",
     expect(mockCancelRun).not.toHaveBeenCalled()
     expect(consoleWarnSpy).toHaveBeenCalled()
     const warned = consoleWarnSpy.mock.calls.flat().join(" ")
-    expect(warned).toContain("Stop did nothing: no run id yet for thread")
-    // ⚠ The FALSE-CAUSE half of that string, pinned at its live site. This is
-    // one of the exactly TWO occurrences in `frontend/src`
-    // (`StreamsProvider.tsx:2394` and `:2457` — `194.1-BASELINE.md` §5), and
-    // R6's `== 0` acceptance retires BOTH. Pinning it on the emitted VALUE
-    // rather than on source is what makes this a behavioural before.
-    expect(warned).toContain("press Stop again in a moment")
+    // ═════════════════════════════════════════════════════════════════════════
+    // ⚠ SUPERSEDED BY PLAN 03 (R6) — 2026-08-16. The two original assertions are
+    // quoted VERBATIM below rather than deleted, with their original comment, so
+    // the BEFORE this file exists to record is still legible:
+    //
+    //     expect(warned).toContain("Stop did nothing: no run id yet for thread")
+    //     // ⚠ The FALSE-CAUSE half of that string, pinned at its live site. This is
+    //     // one of the exactly TWO occurrences in `frontend/src`
+    //     // (`StreamsProvider.tsx:2394` and `:2457` — `194.1-BASELINE.md` §5), and
+    //     // R6's `== 0` acceptance retires BOTH. Pinning it on the emitted VALUE
+    //     // rather than on source is what makes this a behavioural before.
+    //     expect(warned).toContain("press Stop again in a moment")
+    //
+    // THE PIN DID ITS JOB AND IS BEING HONOURED, NOT DISCARDED. It said R6's
+    // acceptance retires both occurrences; plan 03 retired both, and the sweep in
+    // `StreamsProvider.stopping.test.ts` now asserts ZERO across all of
+    // `frontend/src`. The inversion below is what that retirement LOOKS like from
+    // this file, and the assertion is flipped to `not` rather than removed — an
+    // absent assertion could not tell a retirement from an oversight.
+    //
+    // The two properties this case actually pinned are UNWEAKENED and are
+    // re-asserted above: the guard holds (zero cancels) and the no-op is VISIBLE.
+    // ═════════════════════════════════════════════════════════════════════════
+    expect(warned).toContain("Stop resolved no run id for thread")
+    expect(warned).not.toContain("press Stop again in a moment")
+    expect(warned).not.toMatch(/pre-stamp/i)
   })
 })
 
@@ -333,14 +352,53 @@ describe("194.1-01 case 3 — `stopStream` is the BYTE-MIRROR (CONTEXT D-22)", (
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("194.1-01 case 4 — the HARNESS kickoff inserts an assistant placeholder today", () => {
+describe("194.1-01 case 4 — the HARNESS kickoff placeholder [SUPERSEDED by plan 03 / R5]", () => {
   /**
-   * The node R5 deletes (`StreamsProvider.tsx:1925-1941`). Captured in its
-   * PRE-STAMP shape via a never-resolving `postMessage`: once the POST resolves,
-   * `:2031` stamps `runId` onto this very node, and a resolving mock would
-   * measure the post-stamp row while calling it the insert.
+   * ⚠ THE TITLE SAID "inserts an assistant placeholder today" AND THAT WAS TRUE
+   * ON 2026-08-16 WHEN PLAN 01 WROTE IT. Plan 03 made it false, and the title is
+   * amended rather than left to mislead — a describe block asserting a
+   * present-tense fact goes stale exactly as a ledger row does.
+   *
+   * The original body, its reasoning and its `1` are quoted verbatim on the case
+   * below. What the case measured is unchanged and still valuable: the node R5
+   * deletes (`StreamsProvider.tsx:1925-1941`), captured in its PRE-STAMP shape via
+   * a never-resolving `postMessage` — once the POST resolves, `:2031` stamps
+   * `runId` onto that very node, and a resolving mock would have measured the
+   * post-stamp row while calling it the insert.
    */
-  it("exactly ONE assistant row, runStatus streaming, runId undefined", async () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ⚠ SUPERSEDED BY PLAN 03 (R5) — 2026-08-16. THE WHOLE BODY IS INVERTED, and
+   * the original is quoted VERBATIM here rather than deleted, because this case's
+   * ONLY job was to be the BEFORE and a deleted before is not a before:
+   *
+   *     it("exactly ONE assistant row, runStatus streaming, runId undefined", async () => {
+   *       postMessageHangs()
+   *       const { result } = renderActions()
+   *       act(() => {
+   *         void result.current.sendMessage(THREAD, "run the quarterly close", {
+   *           workflowDefinitionId: "wf-def-1",
+   *         })
+   *       })
+   *       await waitFor(() => {
+   *         expect(readBucket(THREAD).filter((m) => m.role === "assistant")).toHaveLength(1)
+   *       })
+   *       const assistants = readBucket(THREAD).filter((m) => m.role === "assistant")
+   *       expect(assistants).toHaveLength(1)
+   *       expect(assistants[0].runStatus).toBe("streaming")
+   *       expect(assistants[0].runId).toBeUndefined()
+   *       expect(assistants[0].content).toBe("")
+   *       // The user bubble is a SEPARATE node and is NOT what R5 removes.
+   *       expect(readBucket(THREAD).filter((m) => m.role === "user")).toHaveLength(1)
+   *     })
+   *
+   * R5 deletes exactly that node, so `1` becomes `0`. The case's OTHER half —
+   * "the user bubble is a SEPARATE node and is NOT what R5 removes" — was a
+   * prediction, and it is kept as a live assertion below because it is now a
+   * RESULT: the user bubble is still there, alone.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it("ZERO assistant rows — the node is gone; the user bubble is NOT", async () => {
     postMessageHangs()
     const { result } = renderActions()
 
@@ -351,15 +409,11 @@ describe("194.1-01 case 4 — the HARNESS kickoff inserts an assistant placehold
     })
 
     await waitFor(() => {
-      expect(readBucket(THREAD).filter((m) => m.role === "assistant")).toHaveLength(1)
+      expect(readBucket(THREAD).filter((m) => m.role === "user")).toHaveLength(1)
     })
 
-    const assistants = readBucket(THREAD).filter((m) => m.role === "assistant")
-    expect(assistants).toHaveLength(1)
-    expect(assistants[0].runStatus).toBe("streaming")
-    expect(assistants[0].runId).toBeUndefined()
-    expect(assistants[0].content).toBe("")
-    // The user bubble is a SEPARATE node and is NOT what R5 removes.
+    expect(readBucket(THREAD).filter((m) => m.role === "assistant")).toHaveLength(0)
+    // The prediction this case made about the user bubble, now a measurement.
     expect(readBucket(THREAD).filter((m) => m.role === "user")).toHaveLength(1)
   })
 })

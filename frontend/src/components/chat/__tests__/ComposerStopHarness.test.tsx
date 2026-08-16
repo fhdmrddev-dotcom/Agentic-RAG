@@ -83,6 +83,7 @@ const {
   mockGetActiveRuns,
   mockGetSnapshot,
   mockCancelRun,
+  mockGetThreadWorkflow,
 } = vi.hoisted(() => ({
   mockPostMessage: vi.fn(),
   mockSubscribeToRun: vi.fn(),
@@ -90,6 +91,14 @@ const {
   mockGetActiveRuns: vi.fn(),
   mockGetSnapshot: vi.fn(),
   mockCancelRun: vi.fn(),
+  // ⚠ ADDED BY PHASE 194.1 PLAN 03 (R6) AND IT IS LOAD-BEARING, NOT COSMETIC.
+  // `stopThread`/`stopStream` now fall back to `GET /threads/{id}/workflow` when
+  // the bucket has no streaming row — which, after R5, is the NORMAL state during
+  // a harness run. Left unmocked, the real implementation runs `fetch` in jsdom,
+  // the resolver's own try/catch swallows the failure, and every harness Stop
+  // case here reports "cancelRun called 0 times" for a reason that has nothing to
+  // do with what it is testing. Measured: that is exactly what happened.
+  mockGetThreadWorkflow: vi.fn(),
 }))
 
 // ⚠ `getSnapshot` is load-bearing and is NOT in the ported five: since Phase 075
@@ -108,6 +117,7 @@ vi.mock("@/lib/api", async (importActual) => {
     getActiveRuns: mockGetActiveRuns,
     getSnapshot: mockGetSnapshot,
     cancelRun: mockCancelRun,
+    getThreadWorkflow: mockGetThreadWorkflow,
   }
 })
 
@@ -235,6 +245,13 @@ beforeEach(() => {
   mockGetActiveRuns.mockResolvedValue([])
   mockGetSnapshot.mockResolvedValue({ messages: [], active_runs: [], since_cursors: {} })
   mockCancelRun.mockResolvedValue(undefined)
+  // The DEFAULT frame names NO run, so a case that relies on the R6 fallback must
+  // say so explicitly. A default that quietly supplied an id would let a case
+  // pass while proving nothing about which source answered.
+  mockGetThreadWorkflow.mockResolvedValue({
+    active_workflow_run_id: null,
+    last_workflow_run_id: null,
+  })
 })
 
 afterEach(() => {
@@ -284,19 +301,66 @@ describe("V-06 — composer Stop during a harness run resolves the producer runs
     })
     await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
 
-    // Hop 2 landed: the placeholder carries the PRODUCER id.
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R5 + R6) — 2026-08-16. The original
+    // assertions are quoted VERBATIM rather than deleted:
+    //
+    //     // Hop 2 landed: the placeholder carries the PRODUCER id.
+    //     const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-H") ?? []
+    //     const streaming = [...bucket].reverse().find((m) => m.role === "assistant" && m.runStatus === "streaming")
+    //     expect(streaming?.runId).toBe(PRODUCER_RUN_ID)
+    //     …
+    //     expect(mockCancelRun).toHaveBeenCalledWith(PRODUCER_RUN_ID)
+    //
+    // ⚠ THE CHANGE IS REAL AND SIGNIFICANT AND IS STATED PLAINLY RATHER THAN
+    // SMOOTHED: **on a HARNESS run the composer Stop no longer resolves the
+    // producer `runs.run_id` at all.** R5 removes the optimistic placeholder that
+    // carried it, so there is no bucket row to scan, and R6's fallback resolves
+    // the thread's workflow frame instead — a `workflow_runs.id`.
+    //
+    // That is SAFE, and the reason is a shipped mechanism rather than an opinion:
+    // `194-11` gave `DELETE /runs/{id}` a Step-1b dual-id fallback that accepts a
+    // `workflow_runs.id`, whose clause (c) requires the thread anchor to still
+    // point at the run — true for exactly the LIVE runs this case drives. ⚠ This
+    // file's own header says `DELETE /runs/{id}` "accepts the PRODUCER
+    // `runs.run_id` and nothing else"; **that sentence was made FALSE by 194-11 in
+    // the same phase that wrote it**, and it is left standing above with this
+    // correction beside it rather than edited away.
+    //
+    // ⚠ DEEP IS UNAFFECTED. R5's gate is keyed on `workflowDefinitionId`, which a
+    // Deep send never sets, so a Deep composer Stop still scans the bucket and
+    // still hands `cancelRun` the producer id. Only the harness surface moves.
+    //
+    // THE LANDMINE THIS CASE EXISTS TO GUARD IS STILL GUARDED, and the fixture is
+    // built so it can still fire: `WorkflowLock.runId` is seeded here with the
+    // PRODUCER id (write site #3 in its own JSDoc table — the kickoff seed) while
+    // the frame returns the workflow-run anchor, so the two sources hold
+    // DIFFERENT values, exactly as they do in production. If the resolver ever
+    // read `workflowLockByThread` instead of the frame, the value assertion below
+    // would red.
+    // ═══════════════════════════════════════════════════════════════════════
+    mockGetThreadWorkflow.mockResolvedValue({
+      active_workflow_run_id: WORKFLOW_RUN_ANCHOR,
+      last_workflow_run_id: WORKFLOW_RUN_ANCHOR,
+    })
+
+    // R5: the harness kickoff inserted NO assistant node, so the scan has nothing.
     const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-H") ?? []
-    const streaming = [...bucket].reverse().find((m) => m.role === "assistant" && m.runStatus === "streaming")
-    expect(streaming?.runId).toBe(PRODUCER_RUN_ID)
+    expect(bucket.filter((m) => m.role === "assistant")).toHaveLength(0)
 
     await act(async () => {
       await result.current.stopThread("thread-H")
     })
 
     expect(mockCancelRun).toHaveBeenCalledTimes(1)
-    // THE ASSERTION THAT MATTERS: the VALUE, not the call.
-    expect(mockCancelRun).toHaveBeenCalledWith(PRODUCER_RUN_ID)
-    expect(mockCancelRun).not.toHaveBeenCalledWith(WORKFLOW_RUN_ANCHOR)
+    // THE ASSERTION THAT MATTERS IS STILL THE VALUE, NOT THE CALL — only the
+    // source of the value moved.
+    expect(mockCancelRun).toHaveBeenCalledWith(WORKFLOW_RUN_ANCHOR)
+    // …and it came from the OWNER-SCOPED frame read, never from the lock record.
+    expect(mockGetThreadWorkflow).toHaveBeenCalledWith("thread-H")
+    expect(useStreamsStore.getState().workflowLockByThread.get("thread-H")?.runId).toBe(
+      PRODUCER_RUN_ID,
+    )
     void sendPromise
   })
 
@@ -320,22 +384,54 @@ describe("V-06 — composer Stop during a harness run resolves the producer runs
     })
     await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
 
-    // Assert we are genuinely IN the stuck-banner shape before claiming the
-    // scan survives it — otherwise this case proves nothing about the bug.
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R5) — 2026-08-16, and this one is
+    // worth reading rather than skimming, because R5 does not merely change the
+    // assertions: **IT REMOVES THE BUG THIS CASE WAS ABOUT.** The originals:
+    //
+    //     const last = bucket[bucket.length - 1]
+    //     expect(last.role).toBe("assistant")      // MessageList's isLastAssistant
+    //     expect(last.tool_calls ?? []).toHaveLength(0)  // MessageItem's !hasAnyTools
+    //     expect(last.runStatus).toBe("streaming") // what the scan keys on
+    //     …
+    //     expect(mockCancelRun).toHaveBeenCalledWith(PRODUCER_RUN_ID)
+    //
+    // `BUG-260815-04` is the chat surface stuck on the pre-tools banner during a
+    // harness run. That banner is `MessageItem.tsx:635`'s
+    // `isStreaming && !hasAnyTools` arm, rendered on the LAST ASSISTANT ROW —
+    // and after R5 a harness kickoff HAS no assistant row. The shape this case
+    // drove is therefore unreachable on the harness path, which is the surface
+    // removal `194.1-CONTEXT.md` D-21 claims for `BUG-260610-01`'s duplicate
+    // avatar arriving in the same change.
+    //
+    // ⚠ THE CASE IS KEPT, NOT DELETED, AND ITS SUBJECT IS INVERTED: it now pins
+    // the ABSENCE of the shape rather than survival OF it. A deleted case could
+    // not tell a future reader that the state is gone by construction — it would
+    // look like coverage nobody bothered to write. The Stop assertion stays,
+    // because "the Stop still works in the stuck-banner scenario" is still the
+    // question; only its answer's mechanism moved to R6's frame read.
+    // ═══════════════════════════════════════════════════════════════════════
     const st = useStreamsStore.getState()
     expect(st.workflowLockByThread.has("thread-H")).toBe(true) // harness-locked
     expect(st.streamingThreads.has("thread-H")).toBe(true) // thread-level isStreaming
     const bucket = st.bucketsBySurface.get("chat")?.get("thread-H") ?? []
-    const last = bucket[bucket.length - 1]
-    expect(last.role).toBe("assistant") // MessageList's isLastAssistant
-    expect(last.tool_calls ?? []).toHaveLength(0) // MessageItem's !hasAnyTools
-    expect(last.runStatus).toBe("streaming") // what the scan keys on
+    // The banner needs a LAST ASSISTANT row. There is none — so the banner has
+    // no row to be stuck on.
+    expect(bucket.filter((m) => m.role === "assistant")).toHaveLength(0)
+    expect(bucket[bucket.length - 1]?.role).toBe("user")
 
+    mockGetThreadWorkflow.mockResolvedValue({
+      active_workflow_run_id: "wfrun-stuck-banner",
+      last_workflow_run_id: null,
+    })
     await act(async () => {
       await result.current.stopThread("thread-H")
     })
     expect(mockCancelRun).toHaveBeenCalledTimes(1)
-    expect(mockCancelRun).toHaveBeenCalledWith(PRODUCER_RUN_ID)
+    expect(mockCancelRun).toHaveBeenCalledWith("wfrun-stuck-banner")
+    // The producer id is still the one the LOCK holds, and it is still not what
+    // reached `cancelRun` — the landmine guard survives the inversion.
+    expect(mockCancelRun).not.toHaveBeenCalledWith(PRODUCER_RUN_ID)
     void sendPromise
   })
 
@@ -561,13 +657,29 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
       })
     })
 
-    // We are genuinely in the window: streaming placeholder, no runId yet.
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R5) — 2026-08-16. The originals:
+    //
+    //     // We are genuinely in the window: streaming placeholder, no runId yet.
+    //     const inWindow = (…bucket…).filter((m) => m.role === "assistant" && m.runStatus === "streaming")
+    //     expect(inWindow).toHaveLength(1)
+    //     expect(inWindow[0].runId).toBeUndefined()
+    //
+    // R5 removes the placeholder on a harness kickoff, so "a streaming row with
+    // no runId" is no longer the shape of this window — the shape is now "no
+    // assistant row at all". The PROPERTY this case defends is UNCHANGED and is
+    // the whole reason it survives the inversion: a Stop that cancelled NOTHING
+    // must not leave the surface claiming the user stopped the run.
+    //
+    // The default frame mock names no run (see `beforeEach`), so this really is
+    // the no-id arm on BOTH sources rather than a bucket miss papered over by a
+    // frame hit — which is a stronger precondition than the original had.
+    // ═══════════════════════════════════════════════════════════════════════
     const inWindow =
       (useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []).filter(
-        (m) => m.role === "assistant" && m.runStatus === "streaming",
+        (m) => m.role === "assistant",
       )
-    expect(inWindow).toHaveLength(1)
-    expect(inWindow[0].runId).toBeUndefined()
+    expect(inWindow).toHaveLength(0)
 
     await act(async () => {
       await result.current.stopThread("thread-W")
@@ -589,18 +701,66 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
 
     // The run ended on its own. A Stop that cancelled NOTHING must not have
     // marked it stopped-by-user.
+    //
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R5) — the ORIGINAL observable, quoted:
+    //
+    //     const asst = bucket.find((m) => m.role === "assistant")
+    //     expect(asst?.runStatus).toBe("completed") // the finally really ran
+    //     expect(asst?.stopped).not.toBe(true)
+    //
+    // With no placeholder on the harness path, `sendMessage`'s terminal write is
+    // guarded by `if (!prev.some((m) => m.id === assistantId)) return prev` and is
+    // a NO-OP — so there is no node to read `runStatus` off, and "the finally
+    // really ran" needs a different witness. `streamingThreads` is that witness:
+    // the finally's `streamingThreads.delete` is described in the provider as
+    // "the AUTHORITATIVE streaming-end write", and it runs unconditionally.
     const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get("thread-W") ?? []
-    const asst = bucket.find((m) => m.role === "assistant")
-    expect(asst?.runStatus).toBe("completed") // the finally really ran
-    expect(asst?.stopped).not.toBe(true)
+    expect(useStreamsStore.getState().streamingThreads.has("thread-W")).toBe(false)
+    // THE PROPERTY IS UNWEAKENED, and is now asserted over the WHOLE bucket
+    // rather than over one node — a stronger form, because it also catches a
+    // future node that a later change might mint on this path.
+    expect(bucket.filter((m) => m.stopped === true)).toHaveLength(0)
   })
 
-  it("POSITIVE CONTROL: a Stop AFTER the stamp DOES mark the same message stopped, on the same 'done' terminal", async () => {
+  it("POSITIVE CONTROL: a Stop that DID cancel marks the message stopped, on the same 'done' terminal", async () => {
     // Without this the case above proves nothing. It must exercise the SAME
     // mechanism: kind "done", so `stopped` can only come from
     // `wasStoppedByUser`. (An earlier draft of this control used kind
     // "cancelled" and was VACUOUS — `:2138` stamps `stopped: true` off the kind
     // alone, with no reference to the ref.)
+    //
+    // ═══════════════════════════════════════════════════════════════════════
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R5) — 2026-08-16, AND THE CONTROL
+    // MOVED FROM THE HARNESS PATH TO THE DEEP PATH. The original opened with:
+    //
+    //     mockPostMessage.mockResolvedValueOnce({ run_id: "producer-run-marked", … })
+    //     sendPromise = result.current.sendMessage("thread-W", "go", {
+    //       workflowDefinitionId: "wf-def-1",
+    //     })
+    //     …
+    //     expect(mockCancelRun).toHaveBeenCalledWith("producer-run-marked")
+    //     …
+    //     expect(asst?.stopped).toBe(true)
+    //
+    // WHY IT HAD TO MOVE, stated rather than smoothed: `stoppedByUserRef`'s only
+    // OBSERVABLE EFFECT is `sendMessage`'s finally stamping `stopped: true` onto
+    // `m.id === assistantId`. After R5 the harness path mints no such node, so on
+    // that path the effect is not observable AT ALL — a control asserting it there
+    // would be asserting `undefined === undefined` and would be exactly the
+    // vacuous control the comment above warns about.
+    //
+    // ⚠ MOVING IT IS SOUND BECAUSE THE REF IS SHARED CODE, NOT PER-PATH CODE:
+    // `stopThread` sets it below one resolution used by both paths, and the
+    // finally that reads it is one block. Deep is simply the path on which the
+    // effect still has somewhere to land — R5's gate keys on
+    // `workflowDefinitionId`, which a Deep send never sets.
+    //
+    // ⚠ AND IT IS WORTH KNOWING WHAT THIS MEANS FOR THE PRODUCT rather than only
+    // for the test: on a harness run there is no chat assistant bubble left for
+    // "Response stopped" to render on. That is R5's intent — the harness run's
+    // receipt is the RunCard and the panel, not a chat bubble — and it is why
+    // this phase's stopping READING lives in the store rather than on a message.
+    // ═══════════════════════════════════════════════════════════════════════
     const run = makeControllableRun()
     mockPostMessage.mockResolvedValueOnce({
       run_id: "producer-run-marked",
@@ -613,16 +773,26 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
     })
     let sendPromise!: Promise<void>
     await act(async () => {
-      sendPromise = result.current.sendMessage("thread-W", "go", {
-        workflowDefinitionId: "wf-def-1",
-      })
+      // DEEP: no `workflowDefinitionId`, so the placeholder is inserted exactly as
+      // it always was (174 D-14 byte-identity) and carries the producer id.
+      sendPromise = result.current.sendMessage("thread-W", "go")
     })
     await waitFor(() => expect(mockSubscribeToRun).toHaveBeenCalled())
 
     await act(async () => {
       await result.current.stopThread("thread-W")
     })
+    // Deep still resolves from the BUCKET, so the producer id is still the value
+    // — the original assertion, unchanged, on the path that still holds it.
     expect(mockCancelRun).toHaveBeenCalledWith("producer-run-marked")
+    // ⚠ NO `expect(mockGetThreadWorkflow).not.toHaveBeenCalled()` HERE, and the
+    // reason is a measurement rather than an omission: the provider's MOUNT
+    // RECONCILE calls `getThreadWorkflow` on its own (`StreamsProvider.tsx`,
+    // inside the reconcile action), so that assertion fails for a caller this
+    // case is not about. The property is asserted the honest way instead — the
+    // default frame mock (see `beforeEach`) names NO run, so a resolver that had
+    // consulted the frame first would have resolved `undefined` and cancelled
+    // NOTHING. The producer id above could only have come from the bucket.
 
     await act(async () => {
       await run.finishNormally()

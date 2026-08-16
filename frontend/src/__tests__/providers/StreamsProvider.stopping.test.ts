@@ -614,6 +614,12 @@ describe("194.1-03 R6 — the frame read is a FALLBACK, on both resolvers", () =
       last_workflow_run_id: "wfr-also-not",
     })
 
+    // ⚠ CLEARED IMMEDIATELY BEFORE THE CALL, and it is load-bearing rather than
+    // tidy: the provider's MOUNT RECONCILE calls `getThreadWorkflow` on its own,
+    // so a bare `not.toHaveBeenCalled()` would be measuring a caller this case is
+    // not about. Clearing here scopes the assertion to the RESOLVER exactly.
+    mockGetThreadWorkflow.mockClear()
+
     await act(async () => {
       await result.current.stopThread(THREAD)
     })
