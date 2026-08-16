@@ -153,3 +153,79 @@ unchanged tree).
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## Accepted scoped limitations — recorded at phase close (2026-08-16)
+
+⚠ **Both entries below are ACCEPTED LIMITATIONS, not passing rows.** They are written here, in
+`STATE.md` and on the RUN-01 row so that none of them lives only in a transcript — this project's
+standing lesson is that *a measurement that lives in one place is invisible to the next phase*
+(`WorkspacePanel.tsx:161-165` recorded the two-id finding in Phase 188 and Phase 194 had to
+re-derive it from scratch).
+
+### L-01 — CR-04: with `WORKER_COUNT=2`, a Stop can be overwritten by the still-running producer
+
+**Status: OPEN. Routed to a dedicated phase. NOT closed by Phase 194 and not claimed to be.**
+
+`RUN_TASKS` is **per-process** and `WORKER_COUNT=2` is the default. When the producer task lives
+on the *other* worker, `DELETE /runs/{id}` takes the no-producer arm and writes `cancelled`
+correctly — but **no cross-worker cancel signal exists and the engine has no in-loop status
+poll**, so the still-running producer continues, calls `mark_phase_active`, and then
+`finish_run(run_id, "completed")` (`harness_engine.py:1579`, `:1981`), **overwriting the
+`cancelled` the Stop just wrote.**
+
+⚠ **This is roughly HALF of all Stops at the default worker count, not an edge case** — the same
+arithmetic CONTEXT used to justify the zombie arm in the first place. ⚠ **The limitation is
+INHERITED, not introduced by Phase 194; what Phase 194 added is the CLAIM to have closed it.**
+That distinction is the reason this entry exists.
+
+**Why it is a PHASE and not a `/gsd:fast` or a bare seed** (the fixer's assessment, adopted):
+both candidate repairs are NEW MECHANISMS. The cheaper one — re-read `workflow_runs.status`
+before `mark_phase_active` and raise `CancelledError` when terminal — lands in the hottest engine
+loop in the tree, interacts with the boot resume sweep AND with the CR-02 arm changed in this
+phase's fix pass, and needs its own RED-driven fences. The fallback is a Redis cancel channel.
+**A seed alone would let *"a Stop that half the time does not stop"* read as a footnote.**
+
+Neither CR-01 nor CR-02's fix touches this or changes its shape.
+
+**Re-open trigger:** immediate — the next workflow phase scheduled after 194. Status-poll option
+first, Redis-channel option as fallback.
+
+### L-02 — the CR-01 defect has a TWIN in `api/workflows.py`, unfixed
+
+**Status: OPEN. Pre-existing; NOT introduced by Phase 194** — `git diff 743965a1..HEAD` on that
+file is **EMPTY** for the whole phase.
+
+`delete_workflow_cascade` (`backend/app/api/workflows.py:1483-1490`) carries the **identical
+unnarrowed join** that CR-01 fixed in `api/runs.py`:
+
+```sql
+LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming'
+```
+
+— no `parent_run_id IS NULL`, no `ORDER BY`, no `LIMIT` — and hands `r["producer_id"]` straight to
+`_cancel_run_internals`. **It can therefore cancel a SUB-AGENT while deleting a workflow**, for
+exactly CR-01's reason: sub-agent runs are inserted on the same `thread_id` with
+`status='streaming'` (`task_service.py`), and harness phases are built to spawn them
+(`harness/phase_types.py` — `parent_run_id=None`, `spawn` passed through).
+
+⚠ **Severity is lower than CR-01 and the reason is measured, not assumed:** this query is
+owner-scoped (`wd.created_by = $2`), so there is **no cross-tenant exposure** — the confusion is
+producer-vs-sub-agent within one owner's own thread.
+
+**Deliberately not fixed in the review pass:** different file, outside the named fix scope, and
+`backend/app/api/workflows.py` is a **G-5-firing hot file (17 phases)** whose next editor owes a
+refactor recommendation FIRST. It is the natural companion to WR-01's owed re-pointing of that
+same block, and to L-01's phase.
+
+**Re-open trigger:** the next phase whose `files_modified` names `backend/app/api/workflows.py`
+— it fixes this join in the same commit, or states why not.
+
+### Owed UAT — driven at verification, not in any plan
+
+`194-UAT.md`'s rows are **UNDRIVEN**: the 8-row cross-provider scoreboard, the multi-tool /
+parallel-thread / long-message axes, and the four G-4 lived-experience rows. ⚠ **The sharpest is
+the negative row — reload the page mid-run, THEN press Stop** — which is the row that would have
+caught the two-id landmine. They need Chrome MCP; `list_connected_browsers` returned `[]` for the
+whole of this phase, so none could be driven.
