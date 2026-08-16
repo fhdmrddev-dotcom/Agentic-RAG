@@ -1478,3 +1478,73 @@ def test_cr01_the_forward_resolution_sql_excludes_sub_agents_and_is_deterministi
         "the resolution must return at most one candidate — the route acts on a single "
         f"row and must not silently discard the rest. SQL={sql!r}"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 code review — CR-03: the no-producer arm may not report a write it
+# cannot know happened
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ THE DEFECT THESE CASES EXIST FOR. That arm performs exactly ONE durable action —
+# ``cancel_workflow_run_internals`` — and then answered 204 with the comment "this arm
+# has just written it". The composition wraps BOTH its writes in one
+# ``except Exception: logger.exception(…)`` and returned ``None`` on every path, so the
+# claim was one the code could not make: a pool exhaustion or a transient Postgres error
+# left ``workflow_runs`` ``active`` forever while ``cancelRun`` reported success. That is
+# the same silent-success class this route's own header comment condemns twice —
+# reintroduced by the arm the phase added, and it is the arm that runs on exactly the
+# stuck data the phase exists for.
+
+
+def test_cr03_the_no_producer_arm_refuses_to_report_success_when_its_only_write_failed(
+    client, auth_headers, monkeypatch
+):
+    """CR-03 (a) — a failed composition must NOT answer 204.
+
+    204 on this route means "the run is stopped, durably". With no producer to cancel
+    and the workflow-side write gone, nothing at all has happened — reporting success is
+    the dishonesty, not the 500.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    pool = _JoinInterpretingPool(wf_id=wf_id, thread_id=thread_id, runs=[])
+    _producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    workflow_spy.return_value = False
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert workflow_spy.await_count == 1, (
+        "the arm never attempted the write — the case would be vacuous"
+    )
+    assert res.status_code != 204, (
+        "the route reported the run stopped while its ONLY durable write had failed. "
+        "workflow_runs stays `active` forever and the client shows success"
+    )
+    assert res.status_code == 500, (
+        f"expected a 500 on a failed durable write; got {res.status_code} {res.text}"
+    )
+
+
+def test_cr03_the_no_producer_arm_still_204s_when_the_write_landed(
+    client, auth_headers, monkeypatch
+):
+    """CR-03 (b) — and the happy path is unchanged: one write, 204.
+
+    ⚠ THE ANTI-OVER-CORRECTION CONTROL. Case (a) alone is satisfied by an arm that
+    500s unconditionally, which would break every honest Stop of a producerless run —
+    the exact rows this phase healed. Both directions are driven.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    pool = _JoinInterpretingPool(wf_id=wf_id, thread_id=thread_id, runs=[])
+    _producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    workflow_spy.return_value = True
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204, f"expected 204; got {res.status_code} {res.text}"
+    assert workflow_spy.await_count == 1

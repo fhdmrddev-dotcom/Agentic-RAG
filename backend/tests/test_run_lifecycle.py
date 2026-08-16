@@ -298,8 +298,13 @@ class _AnchorSupabase:
             return res
 
 
-async def _drive_step_3b(monkeypatch, *, anchor, redis=None):
-    """Drive ``_cancel_run_internals``'s zombie arm. Patches every writer; seeds nothing."""
+async def _drive_step_3b(monkeypatch, *, anchor, redis=None, finish=None):
+    """Drive ``_cancel_run_internals``'s zombie arm. Patches every writer; seeds nothing.
+
+    ``finish`` is ADDITIVE (194 CR-03): every shipped caller omits it and gets the
+    same plain ``AsyncMock`` it always did, so their behaviour is byte-identical. It
+    exists so one case can drive a FAILING run-status write through the composition.
+    """
     from app.api.threads import RUN_TASKS
     from app.services.run_lifecycle import _cancel_run_internals
 
@@ -308,7 +313,7 @@ async def _drive_step_3b(monkeypatch, *, anchor, redis=None):
 
     monkeypatch.setattr("app.dependencies._pg_pool", _FakePool())
     fake_finalize = AsyncMock()
-    fake_finish = AsyncMock()
+    fake_finish = finish if finish is not None else AsyncMock()
     fake_cancel_phases = AsyncMock()
     monkeypatch.setattr(
         "app.services.run_lifecycle.finalize_run_terminal", fake_finalize
@@ -564,4 +569,125 @@ async def test_the_cancel_sentinel_is_published_before_task_cancel(monkeypatch):
     assert out == "task_cancelled"
     assert order == ["publish_cancel_sentinel", "task.cancel"], (
         f"D-085-04 ordering broken; recorded sequence was {order}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 code review CR-03 — the composition must report whether it wrote
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ THE DEFECT THESE CASES EXIST FOR. ``cancel_workflow_run_internals`` wraps BOTH
+# writes in one ``try: … except Exception: logger.exception(…)`` and returned ``None``
+# on every path — success and total failure were INDISTINGUISHABLE to a caller. Its own
+# docstring justifies that with "the chat-side cancel has already landed by the time
+# this runs", which is TRUE of the Step-3b zombie caller and FALSE of the ``DELETE
+# /runs/{id}`` no-producer arm, where this composition performs the ONLY durable write
+# in the whole request. That arm then answered 204 — "stopped" — over a write that may
+# never have happened, and its comment claimed "this arm has just written it": a claim
+# the code could not make. A guard that only passes by making a comment lie is a broken
+# guard.
+#
+# ⚠ THE BEST-EFFORT CONTRACT IS **NOT** REPEALED. The composition still never raises;
+# it now REPORTS. Step 3b keeps ignoring the return — its best-effort framing is still
+# correct there, because ``runs.status`` has already been written by then — and the
+# case below pins that, so "returns False" can never start failing a zombie heal.
+
+
+async def _drive_the_workflow_composition(monkeypatch, *, finish=None, phases=None):
+    """Call ``cancel_workflow_run_internals`` with both writers patched at their module.
+
+    The helper late-imports from ``app.db.workflows``, so that is where the patch must
+    land (the shipped ``_patch_workflow_writers`` discipline). Seeds nothing anywhere.
+    """
+    from app.services.run_lifecycle import cancel_workflow_run_internals
+
+    monkeypatch.setattr(
+        "app.db.workflows.finish_run", finish if finish is not None else AsyncMock()
+    )
+    monkeypatch.setattr(
+        "app.db.workflows.cancel_active_phases",
+        phases if phases is not None else AsyncMock(),
+    )
+    return await cancel_workflow_run_internals(pool=_FakePool(), workflow_run_id=uuid4())
+
+
+@pytest.mark.asyncio
+async def test_the_workflow_cancel_composition_reports_that_both_writes_landed():
+    """CR-03 (a) — the happy path reports success, so a caller can act on it."""
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        out = await _drive_the_workflow_composition(monkeypatch)
+    finally:
+        monkeypatch.undo()
+
+    assert out is True, (
+        "the composition must report whether it wrote; a caller whose ONLY durable "
+        f"action this is cannot otherwise tell success from silence. It returned {out!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_workflow_cancel_composition_reports_a_failed_run_status_write():
+    """CR-03 (b) — the run-status write failing is reported, and still never raises.
+
+    A SEPARATE case from (c) on purpose: ``assert`` short-circuits, and one ``except``
+    covering two writes can be repaired for one of them alone.
+    """
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        out = await _drive_the_workflow_composition(
+            monkeypatch, finish=AsyncMock(side_effect=RuntimeError("pool exhausted"))
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert out is False, (
+        f"finish_run raised and the composition still reported {out!r} — the DELETE "
+        "no-producer arm would answer 204 over a run that stays `active` forever"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_workflow_cancel_composition_reports_a_failed_phase_write():
+    """CR-03 (c) — the phase write failing is reported too, and still never raises."""
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        out = await _drive_the_workflow_composition(
+            monkeypatch, phases=AsyncMock(side_effect=RuntimeError("transient error"))
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert out is False, (
+        f"cancel_active_phases raised and the composition reported {out!r} — the run "
+        "would read `cancelled` with its interrupted step still rendering as running"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_reported_failure_still_cannot_fail_the_zombie_heal():
+    """CR-03 (d) — Step 3b keeps IGNORING the report, deliberately.
+
+    ⚠ THE SCOPE FENCE FOR THIS FIX. Step 3b's best-effort framing is correct there and
+    is not being repealed: ``runs.status`` — the durable cancel record — has already
+    been written by ``finalize_run_terminal`` above it, so a workflow-side failure must
+    still not turn a successful Stop into an error. Only the arm with NO other write
+    (the DELETE no-producer arm) acts on the report.
+    """
+    monkeypatch = pytest.MonkeyPatch()
+    try:
+        r = await _drive_step_3b(monkeypatch, anchor=str(uuid4()))
+        # re-drive with the run-status write raising, everything else identical
+        broken = await _drive_step_3b(
+            monkeypatch,
+            anchor=str(uuid4()),
+            finish=AsyncMock(side_effect=RuntimeError("pool exhausted")),
+        )
+    finally:
+        monkeypatch.undo()
+
+    assert r["out"] == "zombie_healed"
+    assert broken["out"] == "zombie_healed", (
+        "a workflow-side write failure must not change the zombie arm's outcome — the "
+        f"chat-side cancel already landed. It reported {broken['out']!r}"
     )

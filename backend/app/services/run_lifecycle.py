@@ -155,7 +155,7 @@ async def finalize_run_terminal(
     await redis.zrem(f"runs_by_thread:{thread_id}", str(run_id))
 
 
-async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> None:
+async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> bool:
     """The ONE workflow-side cancel composition — status + the interrupted phase (194).
 
     ``db.workflows.finish_run`` with the status ``'cancelled'`` (the
@@ -178,12 +178,22 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> None:
     this since Phase 152, in the wrong file — 194 MOVES that composition here rather
     than copying it.
 
-    ⚠ BEST-EFFORT BY CONTRACT — IT NEVER RAISES (D-062-13, T-062-03). "Postgres
-    ``runs.status`` is the durable cancel record": the chat-side cancel has already
-    landed by the time this runs, and a workflow-side failure must never turn a
-    successful Stop into an error. The caller's outcome discriminator is returned
-    regardless. This is why the try/except lives HERE and not at each call site — a
-    second caller inherits the discipline instead of having to remember it.
+    ⚠ BEST-EFFORT BY CONTRACT — IT NEVER RAISES (D-062-13, T-062-03) — BUT IT REPORTS.
+    Returns ``True`` iff BOTH writes landed, ``False`` if either raised. This is the
+    whole of the 194 CR-03 fix and the reason it is a return value rather than an
+    exception: the try/except must stay HERE (a second caller inherits the discipline
+    instead of having to remember it), yet a caller must still be able to tell success
+    from silence.
+    ⚠ THE JUSTIFICATION THIS DOCSTRING USED TO GIVE IS QUOTED RATHER THAN DELETED,
+    BECAUSE IT IS TRUE OF ONE CALLER AND FALSE OF THE OTHER: "the chat-side cancel has
+    already landed by the time this runs, and a workflow-side failure must never turn a
+    successful Stop into an error." That holds for Step 3b below — ``runs.status`` is
+    already written there, so it IGNORES this return by design, and a fence pins that.
+    It does NOT hold for the ``DELETE /runs/{id}`` no-producer arm, where this
+    composition is the ONLY durable write in the entire request; that arm answered 204
+    over a write that may never have happened.
+    ⇒ THE RULE FOR A THIRD CALLER: a caller with NO other durable write MUST NOT report
+    success on ``False``.
 
     ⚠ THE APP-SHUTDOWN GATE IS ABSENT FROM THIS MODULE ON PURPOSE, AND ITS ABSENCE IS
     A MEASURED DECISION RATHER THAN AN OVERSIGHT. 194-CONTEXT warns that "any new
@@ -222,10 +232,12 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> None:
         _wf = UUID(workflow_run_id) if isinstance(workflow_run_id, str) else workflow_run_id
         await finish_run(pool, _wf, "cancelled")
         await cancel_active_phases(pool, _wf)
+        return True
     except Exception:
         logger.exception(
             "Workflow cancel co-write failed for workflow run %s", workflow_run_id
         )
+        return False
 
 
 async def _cancel_run_internals(

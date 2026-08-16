@@ -1370,11 +1370,32 @@ async def cancel_run(
                             "workflow run %s",
                             run_id,
                         )
-                    await cancel_workflow_run_internals(
+                    _wrote = await cancel_workflow_run_internals(
                         pool=pool, workflow_run_id=run_id
                     )
+                    # ⚠ CR-03 (194 code review) — THIS ARM MAY NOT REPORT A WRITE IT
+                    # CANNOT KNOW HAPPENED. The comment here used to read "Postgres is
+                    # the durable cancel record (D-062-13), and this arm has just
+                    # written it", and that second clause was a claim the code could not
+                    # make: the composition swallows every exception by contract and
+                    # returned nothing, so a pool exhaustion or a transient Postgres
+                    # error left ``workflow_runs`` ``active`` FOREVER while this route
+                    # answered 204 and ``cancelRun`` reported success. The shipped
+                    # justification for that swallow — "the chat-side cancel has already
+                    # landed" — is true of the Step-3b caller and FALSE HERE, where this
+                    # is the ONLY durable write in the whole request. So the composition
+                    # now REPORTS (it still never raises), and this arm acts on it.
+                    # 204 on this route means "stopped, durably"; with no producer to
+                    # cancel and the write gone, NOTHING has happened, and the honest
+                    # answer is a failure the client can see. Step 3b keeps ignoring the
+                    # report — its best-effort framing is still correct there.
+                    if not _wrote:
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Could not stop the run",
+                        )
                     # Same 204 as every other arm — Postgres is the durable cancel
-                    # record (D-062-13), and this arm has just written it.
+                    # record (D-062-13), and this arm has now confirmed it wrote.
                     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     if not row:
