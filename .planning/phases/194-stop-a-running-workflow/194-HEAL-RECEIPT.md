@@ -231,6 +231,373 @@ the route's own predicates.**
 
 ---
 
+## Method — per group, with the reason, because THE METHOD IS PART OF THE DELIVERABLE
+
+### ⚠ READ THIS FIRST: which instrument healed Group A, stated per row rather than left inferable
+
+**The two run rows were healed by calling the exported composition
+`backend/app/services/run_lifecycle.py::cancel_workflow_run_internals(*, pool, workflow_run_id)`
+directly — NOT by driving `DELETE /runs/{workflow_run_id}` over HTTP.** That is stated plainly and
+per row, because *a receipt that implies the route ran when the function was called directly is the
+same class of false claim D-12 exists to prevent.*
+
+| row | instrument | evidence |
+|---|---|---|
+| A1 `fde3bbe3` | `await cancel_workflow_run_internals(pool=pool, workflow_run_id='fde3bbe3-…')` | § *Group A — the drive*, below |
+| A2 `4b0feda7` | `await cancel_workflow_run_internals(pool=pool, workflow_run_id='4b0feda7-…')` | § *Group A — the drive*, below |
+| B1 `961c290d` | one id-scoped `UPDATE`, `rowcount = 1` | § *Group B — the drive*, below |
+| B2 `9e6acf54` | one id-scoped `UPDATE`, `rowcount = 1` | § *Group B — the drive*, below |
+| C1 `0e0cf57c` | **no instrument of its own** — written by `cancel_active_phases` inside A2's composition | § *Group A — the drive*, below |
+
+**Why the HTTP route was not driven, measured rather than asserted.** The backend was up and the
+route's authentication guard was verified LIVE and left intact:
+
+```
+GET  /health                                   -> 200
+DELETE /runs/fde3bbe3-…  (no Authorization)    -> 403  {"detail":"Not authenticated"}
+```
+
+The route requires a Supabase user JWT for the owning user `d8a54002-6a29-4b88-b918-cff2aa4a06d5`,
+and no legitimate token for that user was obtainable in this session. ⛔ **No authentication was
+forged, minted, impersonated or bypassed; no dependency was overridden; no guard was weakened,
+relaxed or deleted to make a call succeed.** That was an explicit constraint and it is recorded as
+honoured rather than assumed. The 403 above is the guard doing its job, and it wrote nothing — the
+request never reached Step 1's ownership `SELECT`.
+
+**What is therefore evidenced, and what is NOT.** `cancel_workflow_run_internals` *is* the shared
+writer this phase built (plan `194-09`), and it is *exactly* what the route's no-live-producer arm
+calls — one composition, two callers (D-08/D-10). So this heal evidences **the composition**, and
+with it SC#2's server-side half and SC#3's phase terminalize, on real data. It does **not**
+evidence the HTTP layer above it: the dual-id fallback's three authorization clauses, the forward
+resolution, `publish_cancel_sentinel`, and the `204` were **not exercised here**. Their RED-driven
+evidence is plan `194-11`'s six production-source plants, and this receipt does not stand in for
+them. ⚠ **The `204` responses the plan's acceptance criteria ask for DO NOT EXIST and are not
+claimed.**
+
+⚠ **The one thing measured about the route rather than assumed:** its forward-resolution SQL was
+executed verbatim, read-only, against both ids and returned `producer_id IS NULL` for both (§ *Which
+arm the route would take*). So the arm that would have run **is** the arm whose writer was called —
+the instrument differs from the route, the write does not.
+
+⚠ **One arm of the route was deliberately not replicated:** `publish_cancel_sentinel(redis, run_id)`.
+It wakes a paused harness `ask_user` prompt subscribed on the workflow-run channel. Not replicating
+it is a decision with a measured basis, not an omission: zero `runs` rows are `streaming` (Q4), both
+runs have been abandoned since 2026-06-14 and 2026-08-01, and there is no subscriber to wake. The
+route treats it as best-effort by contract anyway.
+
+### Group A — the drive
+
+Both rows were healed **one at a time, by id**, each with its own before/after re-read.
+⚠ **`cancel_workflow_run_internals` NEVER RAISES** (best-effort by contract, D-062-13) — so a clean
+return proves nothing at all, and **every write below is verified by RE-READING the row**, never by
+the absence of an exception. A `WARNING`/`ERROR` log handler was attached for the whole drive to
+catch anything the composition swallowed: **0 records captured.**
+
+```
+==============================================================================
+A1  fde3bbe3-02c2-4664-902f-921411bb1fe7
+------------------------------------------------------------------------------
+  BEFORE run   : {'id': UUID('fde3bbe3-02c2-4664-902f-921411bb1fe7'), 'status': 'active', 'updated_at': datetime.datetime(2026, 7, 18, 20, 43, 42, 887245, tzinfo=datetime.timezone.utc), 'is_golden_run': False}
+  BEFORE phase : {'id': UUID('5dc9355f-28b8-4a4a-aaa7-23bd85cda345'), 'slug': 'retrieve', 'phase_index': 0, 'status': 'pending'}
+  BEFORE phase : {'id': UUID('02d8e0a8-2650-4128-a145-76a6a96f69b4'), 'slug': 'emit', 'phase_index': 1, 'status': 'pending'}
+  BEFORE anchors: [{'id': UUID('4bf89cbc-5630-4fb3-982e-5fd179450003'), 'active_workflow_run_id': UUID('fde3bbe3-02c2-4664-902f-921411bb1fe7')}]
+  >>> await cancel_workflow_run_internals(pool=pool, workflow_run_id='fde3bbe3-02c2-4664-902f-921411bb1fe7')
+  AFTER  run   : {'id': UUID('fde3bbe3-02c2-4664-902f-921411bb1fe7'), 'status': 'cancelled', 'updated_at': datetime.datetime(2026, 8, 16, 5, 59, 33, 756251, tzinfo=datetime.timezone.utc), 'is_golden_run': False}
+  AFTER  phase : {'id': UUID('5dc9355f-28b8-4a4a-aaa7-23bd85cda345'), 'slug': 'retrieve', 'phase_index': 0, 'status': 'pending'}
+  AFTER  phase : {'id': UUID('02d8e0a8-2650-4128-a145-76a6a96f69b4'), 'slug': 'emit', 'phase_index': 1, 'status': 'pending'}
+  AFTER  anchors: []
+  VERIFIED by re-read: run=cancelled, anchors_remaining=0
+==============================================================================
+A2  4b0feda7-c524-4a18-8ea0-4c6fc9705868
+------------------------------------------------------------------------------
+  BEFORE run   : {'id': UUID('4b0feda7-c524-4a18-8ea0-4c6fc9705868'), 'status': 'active', 'updated_at': datetime.datetime(2026, 8, 9, 6, 12, 35, 972373, tzinfo=datetime.timezone.utc), 'is_golden_run': True}
+  BEFORE phase : {'id': UUID('d751095b-36c9-4832-b583-85f406a0d347'), 'slug': 'research', 'phase_index': 0, 'status': 'completed'}
+  BEFORE phase : {'id': UUID('0e0cf57c-b2ba-4b49-8b05-1448a2531aad'), 'slug': 'summarize', 'phase_index': 1, 'status': 'active'}
+  BEFORE anchors: [{'id': UUID('e52a19f7-52cc-45ba-bedf-03247a8c4133'), 'active_workflow_run_id': UUID('4b0feda7-c524-4a18-8ea0-4c6fc9705868')}]
+  >>> await cancel_workflow_run_internals(pool=pool, workflow_run_id='4b0feda7-c524-4a18-8ea0-4c6fc9705868')
+  AFTER  run   : {'id': UUID('4b0feda7-c524-4a18-8ea0-4c6fc9705868'), 'status': 'cancelled', 'updated_at': datetime.datetime(2026, 8, 16, 5, 59, 33, 777865, tzinfo=datetime.timezone.utc), 'is_golden_run': True}
+  AFTER  phase : {'id': UUID('d751095b-36c9-4832-b583-85f406a0d347'), 'slug': 'research', 'phase_index': 0, 'status': 'completed'}
+  AFTER  phase : {'id': UUID('0e0cf57c-b2ba-4b49-8b05-1448a2531aad'), 'slug': 'summarize', 'phase_index': 1, 'status': 'cancelled'}
+  AFTER  anchors: []
+  VERIFIED by re-read: run=cancelled, anchors_remaining=0
+==============================================================================
+WARNING/ERROR log records captured during the heal: 0
+```
+
+**Three properties fell out of this that are worth more than the heal itself, because they are the
+phase's own invariants observed on REAL data for the first time rather than against a mock:**
+
+1. ⚠ **`AND status = 'active'` held, in both directions, on rows nobody constructed.** A2's
+   `research` phase was **`completed` and stayed `completed`**; A1's two phases were **`pending` and
+   stayed `pending`**. That clause is the only thing standing between `cancel_active_phases` and a
+   bulk terminalize (D-07), and `194-09`'s F-5 drove it RED against a widened-predicate plant — here
+   it is watched holding against live rows whose outputs are already durable.
+2. ⚠ **`finish_run`'s status write and its anchor clear landed in ONE transaction, and the receipt
+   proves it rather than quoting the docstring:** the thread row's `updated_at` is **byte-identical**
+   to its run row's — `4bf89cbc` and `fde3bbe3` both `05:59:33.756251+00`; `e52a19f7` and `4b0feda7`
+   both `05:59:33.777865+00`. Two separate transactions could not produce identical microseconds.
+3. ⚠ **C1 was written as a CONSEQUENCE, with no instrument of its own** — `0e0cf57c` moved inside
+   A2's composition, `05:59:33.782910+00`, five microseconds after A2's run write. **That is SC#3
+   working on live data, and it is the fifth row the plan's four-row criterion did not anticipate.**
+
+### Group B — the drive, and ⚠ THE PLAN'S STATED REASON FOR IT IS CORRECTED BY MEASUREMENT
+
+**The instrument:** two `UPDATE` statements, two ids, each asserted to report `rowcount = 1` inside
+a single transaction that would have **rolled back** on any other count. ⛔ **No
+`WHERE status='active'` sweep** — a predicate write could catch a genuinely live phase, and there is
+no reason to take that risk for two known rows (`T-194-13-01`).
+
+```
+==============================================================================
+B1  961c290d-8ec7-46c2-b6d9-58923f8612cc
+------------------------------------------------------------------------------
+  BEFORE: ('961c290d-…', '5aa42b6b-…', 'confirm', 1, 'active', 2026-07-18 20:43:42.944508+00:00)
+  >>> UPDATE workflow_phases SET status='cancelled', updated_at=now() WHERE id = '961c290d-8ec7-46c2-b6d9-58923f8612cc'
+  rowcount = 1
+  AFTER : ('961c290d-…', '5aa42b6b-…', 'confirm', 1, 'cancelled', 2026-08-16 06:00:19.130432+00:00)
+==============================================================================
+B2  9e6acf54-8c10-46d8-8351-5d31dc3946af
+------------------------------------------------------------------------------
+  BEFORE: ('9e6acf54-…', 'e0d1f740-…', 'confirm', 1, 'active', 2026-07-18 20:43:42.944508+00:00)
+  >>> UPDATE workflow_phases SET status='cancelled', updated_at=now() WHERE id = '9e6acf54-8c10-46d8-8351-5d31dc3946af'
+  rowcount = 1
+  AFTER : ('9e6acf54-…', 'e0d1f740-…', 'confirm', 1, 'cancelled', 2026-08-16 06:00:19.130432+00:00)
+==============================================================================
+COMMITTED — 2 statements, 2 ids, rowcount 1 each.
+```
+
+**⚠ THE REASON THE PATH CANNOT REACH THESE TWO ROWS IS NOT THE ONE THE PLAN GIVES, AND BOTH ARE
+RECORDED — THE LOSER BESIDE THE WINNER.** `194-13-PLAN.md` states, twice and in its acceptance
+criteria, that *"their parent runs are already terminally `failed`, so `DELETE /runs/{id}` takes
+**Step 2 `terminal_noop`** — no writes at all"*. Driven read-only against both parent-run ids, that
+mechanism **is not what stops the request**:
+
+```
+Step 1  SELECT run_id, status FROM runs WHERE run_id IN (5aa42b6b-…, e0d1f740-…)  ->  []
+        (no producer row at either id, so Step 1 misses and the 194-11 fallback engages)
+(a)     workflow_runs: 5aa42b6b-… owner d8a54002-… status failed   -> clause (a) PASSES
+        workflow_runs: e0d1f740-… owner d8a54002-… status failed   -> clause (a) PASSES
+(b)     threads b3f8fda5-… owner d8a54002-…                        -> clause (b) PASSES
+        threads cef20cdf-… owner d8a54002-…                        -> clause (b) PASSES
+(c)     b3f8fda5-….active_workflow_run_id IS NULL                  -> clause (c) FAILS
+        cef20cdf-….active_workflow_run_id IS NULL                  -> clause (c) FAILS
+```
+
+⇒ **The request falls out of the fallback and returns `404`. It never reaches Step 2, so it never
+reaches `terminal_noop`.** The plan's conclusion — *a one-off write is the only instrument* — is
+**correct**; its stated mechanism is not, and correcting it matters because the next reader would
+otherwise look for a `terminal_noop` that never executes.
+
+**And there is a THIRD reason, stronger than either, which the plan does not name: the path MUST
+NOT be used here even if it could reach them.** `cancel_workflow_run_internals` calls
+`finish_run(pool, wf_id, "cancelled")` **unconditionally on the run row**. Driven against
+`5aa42b6b` or `e0d1f740` it would overwrite a **truthful `failed`** with `cancelled` — destroying
+two accurate terminal records to repair two phase rows. *The run rows are not lying; only their
+phase rows are.* A phase-scoped write is the only instrument that repairs the lie without
+manufacturing a new one.
+
+⚠ **Both parent threads hold NO anchor** (Q3 lists only the two Group-A threads), so **no anchor was
+cleared by Group B and none needed to be.** Neither parent run is `is_golden_run`.
+
+---
+
 ## AFTER
 
-_(Recorded in the second half of this receipt — see § AFTER, below.)_
+Re-run at **2026-08-16**, same DSN, same read-only session shape, **all five queries**, verbatim:
+
+### Q1 — `workflow_runs` WHERE status IN ('active','paused','cap_paused')
+
+```
+id | thread_id | status | created_at | updated_at | is_golden_run
+(0 rows)
+```
+
+### Q2 — `workflow_phases` status='active', joined to their run
+
+```
+id | workflow_run_id | slug | phase_index | status | updated_at | run_status
+(0 rows)
+```
+
+### Q3 — threads holding an anchor
+
+```
+id | active_workflow_run_id
+(0 rows)
+```
+
+### Q4 — `runs` histogram
+
+```
+status | count
+cancelled | 29
+completed | 1002
+failed | 136
+timed_out | 1
+(4 rows)
+```
+
+⚠ **BYTE-IDENTICAL to BEFORE, and that is a POSITIVE result rather than a null one.** The
+no-live-producer arm deliberately does **not** call `finalize_run_terminal`, so no `runs` row should
+have moved — and none did. `streaming` is still absent from the histogram entirely. Had a `runs`
+count changed, it would have meant the shared `_cancel_run_internals` writer ran, which on these
+rows would have been the wrong arm.
+
+### Q5a — `workflow_runs` histogram
+
+```
+status | count
+cancelled | 2
+completed | 179
+failed | 31
+(3 rows)
+```
+
+### Q5b — `workflow_phases` histogram
+
+```
+status | count
+cancelled | 3
+completed | 423
+failed | 41
+pending | 23
+recorded_not_sent | 5
+skipped | 1
+(6 rows)
+total: 496
+```
+
+---
+
+## Per-row BEFORE → AFTER
+
+| # | table | id | BEFORE | AFTER | instrument |
+|---|---|---|---|---|---|
+| A1 | `workflow_runs` | `fde3bbe3-02c2-4664-902f-921411bb1fe7` | `active` | **`cancelled`** | `cancel_workflow_run_internals` (the exported composition — NOT the HTTP route) |
+| A2 | `workflow_runs` | `4b0feda7-c524-4a18-8ea0-4c6fc9705868` ⚠ `is_golden_run = True` | `active` | **`cancelled`** | `cancel_workflow_run_internals` (the exported composition — NOT the HTTP route) |
+| C1 | `workflow_phases` | `0e0cf57c-b2ba-4b49-8b05-1448a2531aad` | `active` | **`cancelled`** | **no instrument of its own** — `cancel_active_phases`, inside A2's composition (SC#3) |
+| B1 | `workflow_phases` | `961c290d-8ec7-46c2-b6d9-58923f8612cc` | `active` | **`cancelled`** | one id-scoped `UPDATE`, `rowcount = 1` |
+| B2 | `workflow_phases` | `9e6acf54-8c10-46d8-8351-5d31dc3946af` | `active` | **`cancelled`** | one id-scoped `UPDATE`, `rowcount = 1` |
+| — | `threads` | `4bf89cbc-5630-4fb3-982e-5fd179450003` | anchor → `fde3bbe3-…` | **`NULL`** | `finish_run`'s own transaction, inside A1's composition |
+| — | `threads` | `e52a19f7-52cc-45ba-bedf-03247a8c4133` | anchor → `4b0feda7-…` | **`NULL`** | `finish_run`'s own transaction, inside A2's composition |
+
+**Untouched, and named so their survival is a measurement rather than an assumption:**
+`5dc9355f` (`retrieve`, `pending`) · `02d8e0a8` (`emit`, `pending`) · `d751095b` (`research`,
+**`completed`**).
+
+---
+
+## No row outside the five moved — PROVED BY ENUMERATION, not by arithmetic
+
+The plan asks the histograms to prove it. Histograms can only prove a **net**, so the rows
+themselves were enumerated by `updated_at`, which catches a row that moved **without** changing
+status:
+
+```
+--- every workflow_runs row touched in the last 30 min ---
+  fde3bbe3-02c2-4664-902f-921411bb1fe7 | cancelled | 2026-08-16 05:59:33.756251+00:00
+  4b0feda7-c524-4a18-8ea0-4c6fc9705868 | cancelled | 2026-08-16 05:59:33.777865+00:00
+  count = 2
+--- every workflow_phases row touched in the last 30 min ---
+  0e0cf57c-b2ba-4b49-8b05-1448a2531aad | 4b0feda7-… | summarize | cancelled | 2026-08-16 05:59:33.782910+00:00
+  9e6acf54-8c10-46d8-8351-5d31dc3946af | e0d1f740-… | confirm   | cancelled | 2026-08-16 06:00:19.130432+00:00
+  961c290d-8ec7-46c2-b6d9-58923f8612cc | 5aa42b6b-… | confirm   | cancelled | 2026-08-16 06:00:19.130432+00:00
+  count = 3
+--- every threads row touched in the last 30 min ---
+  4bf89cbc-5630-4fb3-982e-5fd179450003 | None | 2026-08-16 05:59:33.756251+00:00
+  e52a19f7-52cc-45ba-bedf-03247a8c4133 | None | 2026-08-16 05:59:33.777865+00:00
+  count = 2
+--- runs rows touched ---
+  runs completed_at in window = 0
+```
+
+**Every id in that enumeration is one of the seven in the table above, and there are no others.**
+
+### Prediction vs. outcome — compared, not fitted
+
+| quantity | predicted BEFORE the write | measured AFTER | verdict |
+|---|---|---|---|
+| `workflow_runs` `active` | 0 | **0** | ✅ |
+| `workflow_runs` `cancelled` | 2 | **2** | ✅ |
+| `workflow_phases` `active` | 0 | **0** | ✅ |
+| `workflow_phases` `cancelled` | 3 | **3** | ✅ |
+| `workflow_phases` total | 496 | **496** | ✅ no row created or destroyed |
+| threads holding an anchor | 0 | **0** | ✅ |
+| rows moved | **5** (not the plan's 4) | **5** | ✅ the corrected figure held |
+| `runs` histogram | unmoved | **unmoved** | ✅ |
+
+**Zero divergence.** Had there been any, it would be recorded here rather than the data being made
+to match — that instruction was explicit and there was, in the event, nothing to invoke it for.
+
+---
+
+## Caveats
+
+### ⚠ A2 is a GOLDEN RUN, and this receipt is the only thing that distinguishes it as HEALED
+
+`4b0feda7` carries `is_golden_run = True` — a publish-validation artifact, not a user run. Its
+thread is *"[validation] publish golden run — Project Meridian Risk Summary (GOOD)"*. Since Phase
+190's A4 gate, `find_resumable_runs` excludes `is_golden_run = true` outright, so **nothing will ever
+pick it up again**; cancelling it is honest rather than merely convenient.
+
+**⛔ NO DISTINGUISHING MARKER WAS WRITTEN, AND THE REASON IS MEASURED, NOT PREFERRED.** The plan
+allows an `error`/audit note and forbids a new status literal. Measured at this commit,
+**`workflow_runs` HAS NO `error` COLUMN** — its columns are `id, thread_id, definition_id, status,
+current_phase_id, org_id, created_at, updated_at, claimed_at, inputs, model, continues_used,
+user_id, is_golden_run`. So the note the plan contemplates has nowhere to live without a schema
+change, and a second migration for a one-off is exactly what D-17 forbids. ⛔ **No new status
+literal was invented; the row reads the shipped `cancelled`, the same value A1 reads.**
+
+⇒ **A future reader distinguishes this row by `is_golden_run = True` plus THIS COMMITTED RECEIPT.**
+That is the whole reason the receipt is committed rather than pasted into a session. Stated on one
+line so it survives a `grep`: **workflow run 4b0feda7-c524-4a18-8ea0-4c6fc9705868 was healed by Phase 194 plan 13, not stopped by a user.**
+
+⚠ **It was CANCELLED, never RE-ANCHORED** (`T-194-13-02`, an explicit non-goal). Its thread's
+`active_workflow_run_id` is now `NULL` and nothing here writes it back. No arm of this heal can
+return the row to a resumable state, and Phase 190's A4 gate would exclude it even if one did.
+
+### ⚠ `BUG-260815-07`'s delete-blocker justification was MEASURED FALSE and is NOT why this shipped
+
+The bug report's stated justification — that these rows are a **permanent delete blocker** — is
+false, and it is named here so nobody re-quotes it. `delete_workflow_cascade` already cancel-firsts
+**and** calls `finish_run(wf_id, "cancelled")` unconditionally for every in-flight row, and both
+definitions are `is_system_global = False` (measured above: `pm-weekly-status-report` and
+`meridian-risk-summary-good-07aedc33`), so the 409 guard could not fire either.
+
+**The honest reasons this heal shipped, which are the ones to record:**
+
+1. **Two rows lied about being live.** `fde3bbe3` read `active` for **63 days**; `4b0feda7` for
+   **15**. Anything reading run status without joining the anchor rendered them as running.
+2. **Two threads still held anchors** to those lies, keeping the composer harness-locked against
+   runs that could never finish.
+3. **Two phase rows presented partial writes as still running** — `961c290d` and `9e6acf54`, both
+   `confirm`, both `active` under runs that had already `failed`. That is **SC#3's exact failure
+   mode sitting in the live data** while this phase shipped the fix that prevents new ones.
+4. **One of them is an abandoned golden run that nothing will ever pick up**, re-driven 77 times
+   (see the correction below) and then permanently excluded by Phase 190's A4 gate.
+
+⛔ **`BUG-260815-07`'s non-reproducible delete-failure half is NOT closed by this receipt** and no
+claim is made about it.
+
+### ⚠ A RESEARCH figure corrected on measurement, recorded beside rather than over it
+
+`194-RESEARCH.md` § *The two stuck rows* states that A2's thread *"carries **five** `runs` rows, all
+`failed` with `error='resume re-drive failed'`"*. Measured at this commit, thread `e52a19f7` carries
+**79** `runs` rows — **77 `failed` and 2 `completed`** — and the failure text comes in **two**
+distinct spellings, not one: `resume re-drive failed` and
+`failed: orphaned — stream stale, reconciled by staleness sweep`. RESEARCH's narrative (the boot
+sweep re-drove it and failed, repeatedly, until A4 landed) is **correct and is in fact understated by
+more than an order of magnitude**. Re-derive with:
+`SELECT thread_id, status, count(*) FROM runs WHERE thread_id = 'e52a19f7-52cc-45ba-bedf-03247a8c4133' GROUP BY 1,2;`
+
+### Scope
+
+⛔ Local dev only. ⛔ No cloud write. ⛔ No migration applied, authored or edited; `ls
+supabase/migrations/*.sql | wc -l` is unchanged at **113**. ⛔ `supabase/full-schema.sql` untouched.
+⛔ No schema change of any kind — every write in this receipt is a row `UPDATE` inside the
+seven-literal vocabulary migration 119 already applied (`194-MIGRATION-RECEIPT.md`). ⛔ No
+`.planning/STATE.md`, `ROADMAP.md` or `REQUIREMENTS.md` edit.
+
+**Information disclosure (`T-194-13-05`):** this receipt carries row ids, thread ids, a user id,
+statuses, timestamps, workflow slugs/names and phase slugs. **No prompt, no phase `output`, no
+provider payload, no auth header and no token appears anywhere in it.**
