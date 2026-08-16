@@ -139,9 +139,31 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
     expect(typeof src).toBe("string")
     expect(src.length).toBeGreaterThan(10000)
     expect(src).toContain("export function PendingAskCard")
-    // `wc -l` → 486; segments → 487 (trailing newline). Both true, different
-    // questions; §3 of the baseline record publishes the `wc -l` figure.
-    expect(src.split("\n").length).toBe(487)
+    /**
+     * ⚠ SUPERSEDED IN PLACE BY 194.1-05 TASK 3 — `487` → `630`. The original is
+     * quoted rather than overwritten (193.2 WR-05).
+     *
+     * SUPERSEDED (194.1-01):
+     *   // `wc -l` → 486; segments → 487 (trailing newline). Both true, different
+     *   // questions; §3 of the baseline record publishes the `wc -l` figure.
+     *   expect(src.split("\n").length).toBe(487)
+     *
+     * `486 → 629` (`wc -l`), i.e. `487 → 630` segments. Task 3 added the fourth
+     * retirement sentence's constant, the `runIsOver` prop, the derived `retired`
+     * arm and its render, plus the `PendingAskStack` derivation — and the growth is
+     * dominated by recorded reasoning rather than by logic, which is this project's
+     * fifth consecutive measurement of that pattern.
+     *
+     * ⚠ THE PIN IS KEPT EXACT RATHER THAN RELAXED TO A RANGE, and that is
+     * deliberate: this clause's only job is to prove the `?raw` sweep is reading
+     * the file it thinks it is. An exact figure that must be re-derived on every
+     * edit is a weaker fence than the ones around it, but it is the one that would
+     * catch a `?raw` import silently resolving to the wrong module — and it goes
+     * stale loudly, in the same commit as the change, which is the behaviour asked
+     * for. Re-derive with `wc -l frontend/src/components/panel/PendingAskCard.tsx`
+     * and add one.
+     */
+    expect(src.split("\n").length).toBe(630)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */

@@ -910,7 +910,37 @@ const BASELINE = {
   // (observed RED first), the other that the LIVE anchor still wins while a run is under
   // way — the guard against the fix drifting into "always the latest row". Both numbers
   // read from this script's own `actual` column.
-  "WorkspacePanel.test.tsx": 41,
+  //
+  // 194.1-05 (R7(a) / R1 / D-06): 41 → 58. An EXTENSION, not a lowering — nothing was
+  // deleted, so no deletion rides along (`:24-45`: that requirement is on LOWERINGS only).
+  // Read from THIS SCRIPT'S OWN `actual` column on two agreeing runs, never hand-counted.
+  //
+  // ⚠ THE `41` WAS STALE BY TWELVE BEFORE THIS PLAN ADDED A SINGLE CASE, AND THAT IS
+  // RECORDED RATHER THAN QUIETLY ABSORBED INTO THE NEW NUMBER. `194.1-BASELINE.md` §11
+  // measured the file's `actual` at **53** against a pin of **41** at Wave 1 — the gate was
+  // satisfied the whole time, because its contract is *no per-file DECREASE* and not
+  // equality, so twelve cases had accumulated behind a pin nobody re-derived. So the +17 is
+  // **12 inherited + 5 mine**, and a reader who takes `58 − 41 = 17` as this plan's case
+  // count would be wrong by more than double. *A pin is a floor, never a census.*
+  //
+  // The FIVE that are actually this plan's:
+  //   · +1  a LIVE run with phases already recorded still renders the Stop — the pair that
+  //         makes D-25's two booleans measurable (the lock, not the phase count, is the
+  //         signal). Two other cases were REWRITTEN IN PLACE rather than added: the Phase
+  //         194 case that pinned the DEFECT (a phases-exist thread with no lock rendering
+  //         `panel-stop-run`) is now its own inverse, with the original quoted verbatim.
+  //   · +4  the REAL cross-mount block — composer + panel, ONE thread. D-06's only proof,
+  //         and a case a single-mount test structurally cannot see: both mounts render;
+  //         pressing the panel retires the composer's control too; the symmetric direction;
+  //         and the scope clause proving the slice is keyed BY THREAD, not global.
+  //
+  // ⚠ IT IS THIS FILE AND NOT A FOURTH NEW ONE FOR A GATE REASON, exactly like the
+  // `WorkflowRunPage.test.tsx` note above. `src/components/panel/__tests__/` is reached by
+  // THREE NAMED FILES and has no directory entry, and `src/components/chat` has no entry at
+  // all (`194.1-BASELINE.md` §2) — so a new suite would land UNGATED and the phase's single
+  // most important case would be the one nothing runs in CI. *A falsification that does not
+  // run has falsified nothing.*
+  "WorkspacePanel.test.tsx": 58,
   // 189-08 (CONN-01 / D-07 / D-17): 34 → 40. An EXTENSION, not a lowering — nothing was
   // deleted or renamed. The +6 are the sixth `workflow_phases_status_check` slug arriving
   // in the ONE derivation: +2 from the shipped `DB_TABLE` gaining a row (it drives both the

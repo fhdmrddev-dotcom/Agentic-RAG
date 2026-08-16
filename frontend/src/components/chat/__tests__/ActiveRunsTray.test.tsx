@@ -304,7 +304,29 @@ describe("V-08 — a harness thread is LISTED by the tray and stoppable from out
     // and still contains the thing it is supposed to contain.
     expect(stripped.length).toBeGreaterThan(500)
     expect(stripped).toContain("streamActions.stopThread(")
-    expect(stripped.match(/streamActions\.stopThread\(/g) ?? []).toHaveLength(2)
+    /**
+     * ⚠ SUPERSEDED IN PLACE BY 194.1-05 TASK 2 — `toHaveLength(2)` → `(1)`. The
+     * original figure is quoted here rather than overwritten (193.2 WR-05).
+     *
+     * SUPERSEDED (Phase 194):
+     *   expect(stripped.match(/streamActions\.stopThread\(/g) ?? []).toHaveLength(2)
+     *
+     * The TWO were the per-row Stop and `Stop all`. The per-row Stop is now the
+     * shared `<StopControl>`, which owns the dispatch, so this module's own call
+     * count fell to ONE — `Stop all`, which is byte-untouched by decision (a bulk
+     * control over N threads is not a per-thread mount; see the file's docblock).
+     *
+     * ⚠ THE COUNT IS KEPT EXACT RATHER THAN RELAXED TO `toBeGreaterThan(0)`, and
+     * that is the whole value of this clause: an exact count is what would catch a
+     * SECOND cancel path being added back to this file, which is the failure the
+     * fence exists for. A loosened count would report green about exactly that.
+     */
+    expect(stripped.match(/streamActions\.stopThread\(/g) ?? []).toHaveLength(1)
+    // …and the per-row Stop is genuinely still there, reached through the shared
+    // component. Without this clause the lowered count above is equally consistent
+    // with the per-row Stop having simply been DELETED.
+    expect(stripped).toContain("<StopControl")
+    expect(stripped.match(/<StopControl/g) ?? []).toHaveLength(1)
 
     // The absence clauses.
     expect(stripped).not.toContain("cancelRun")

@@ -422,12 +422,42 @@ describe("194.1-01 — mount 2: the panel Stop (WorkspacePanel)", () => {
     expect(icon!.getAttribute("aria-hidden")).toBe("true")
   })
 
-  /** The lead word sits in its own node beside the control — recorded because
-   *  D-08's successor reading occupies the slot the CONTROL leaves, not this. */
-  it("the lead sits in a sibling node, not inside the button", () => {
+  /**
+   * ⚠ SUPERSEDED IN PLACE BY 194.1-05 TASK 2. The original is quoted verbatim
+   * rather than deleted (193.2 WR-05), and this supersede was PREDICTED BY NAME
+   * in `194.1-04-SUMMARY.md` § *Known Stubs* before the code that caused it
+   * existed: *"mounting the panel variant will wrap `panel-stop-run` in a slot
+   * `<div>`, so this case — which reads `btn.parentElement` — will need
+   * superseding in place."*
+   *
+   * SUPERSEDED (194.1-01):
+   *   const row = btn.parentElement!
+   *   expect(row.textContent).toContain("This run")
+   *   expect(btn.textContent).not.toContain("This run")
+   *
+   * ⚠ WHAT CHANGED IS THE TREE DEPTH, NOT THE PROPERTY. `<StopControl>` renders
+   * its control inside a slot `<div>` — the RESERVATION that the stopping reading
+   * later occupies — so `btn.parentElement` is now that slot rather than the row.
+   * Measured: it read `' Stop'` and the assertion failed on `toContain("This
+   * run")`. The property the case was written to defend is unchanged and is
+   * re-asserted below against the ROW, located by its own testid-free identity
+   * (the slot's parent), so the case survives a further nesting change rather
+   * than pinning today's exact depth a second time.
+   *
+   * ⚠ The second clause is the one that actually matters and it is UNWEAKENED:
+   * the lead must never be inside the button, because D-08's successor reading
+   * occupies the slot the CONTROL leaves — a lead swallowed by the button would
+   * vanish with it.
+   */
+  it("the lead sits in a sibling node of the SLOT, not inside the button", () => {
     renderPanel()
     const btn = screen.getByTestId(SHIPPED.panel.testid)
-    const row = btn.parentElement!
+    const slot = btn.parentElement!
+    const row = slot.parentElement!
+    // The slot is a real reservation node, not the row itself.
+    expect(slot).not.toBe(row)
+    expect(slot.textContent).not.toContain("This run")
+    // The lead lives on the row, beside the slot — so it outlives the control.
     expect(row.textContent).toContain("This run")
     expect(btn.textContent).not.toContain("This run")
   })

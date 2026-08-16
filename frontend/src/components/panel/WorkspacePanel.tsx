@@ -29,7 +29,7 @@
  * respects prefers-reduced-motion (the grid transition lives on ChatLayout).
  */
 import { useEffect, useMemo, useState } from "react"
-import { PanelRightClose, Square, X } from "lucide-react"
+import { PanelRightClose, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   useTodos,
@@ -40,10 +40,24 @@ import {
   useTasks,
   useWorkflowLockForThread,
   useDerivedPanel,
-  // Phase 194 Plan 03 (RUN-01 / SC#1) — the NINTH import from a module this file
-  // already imports eight from. It buys the panel's run-level Stop and nothing else:
-  // no new fetch, no new prop, no new store slice, no new state. See the mount below.
-  useStreamActions,
+  // ⚠ Phase 194.1 Plan 05 Task 2 RETIRED THE NINTH IMPORT. Phase 194 Plan 03 read
+  // the store's action surface here to dispatch the panel's Stop; the dispatch now
+  // lives inside the shared `StopControl` component, so this file imports EIGHT names again
+  // — the same eight it imported before the Stop existed.
+  //
+  // ⚠ THE RETIRED IMPORT'S NAME AND THE RESOLVER'S NAME ARE SPELLED NOWHERE IN THIS
+  // FILE, INCLUDING IN THIS SENTENCE EXPLAINING THEIR ABSENCE. That is deliberate
+  // and it is load-bearing twice over: (1) a raw grep for the resolver over this
+  // file must stay DISCRIMINATING, so any occurrence at all means a second cancel
+  // path came back; and (2) `WorkspacePanel.test.tsx`'s own F-1 / V-05 fence sweeps
+  // the RAW source of every production module under `panel/`, `chat/` and
+  // `workflows/` UN-STRIPPED on purpose, and its header states the remedy verbatim:
+  // *"Anyone who needs to DISCUSS the forbidden call in a docblock writes it
+  // without its parenthesis."* Plan 04 tripped that fence and fixed the PROSE
+  // rather than weakening the sweep; the same discipline applies here, and it is
+  // the one `backend/app/services/run_lifecycle.py` keeps about its app-shutdown
+  // gate. A later editor who "tidies" this comment by naming either symbol breaks
+  // a real needle silently.
 } from "@/providers/StreamsProvider"
 import type { Thread, WorkspaceFile } from "@/types"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -65,6 +79,12 @@ import { BatchResultList } from "./BatchResultList"
 // published definition ADDITIVELY by id (A2) — getThreadWorkflow gives the run
 // frame's definition_slug, listPublishedWorkflows gives the SAME owner-scoped
 // WorkflowDefinitionJSON the library card already reads (PublishedWorkflow.definition).
+// Phase 194.1 Plan 05 Task 2 (R1 / D-06) — the ONE shared Stop control. Importing
+// ACROSS the panel/chat boundary is deliberate: the alternative is four mounts that
+// acknowledge a press four different ways, which satisfies D-08's runtime rule and
+// leaves the user exactly as confused. It lives under `chat/` because that is where
+// plan 04 built it beside the composer mount; nothing about it is chat-specific.
+import { StopControl } from "@/components/chat/StopControl"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import type { DefShape } from "@/components/workflows/soulData"
 import { getThreadWorkflow, listPublishedWorkflows } from "@/lib/api"
@@ -296,6 +316,12 @@ function RunSeam({
  * absent from `icon-convention.md` §4's table, owes a flagged proposal) and `■` is
  * refused too — that is RunCard's cancelled-STATE glyph, a state and not a control.
  *
+ * ⚠ 194.1-05 UPDATE — the sentence above is still the governing decision and is kept
+ * verbatim, but the icon is no longer DRAWN in this file. `StopControl` renders it,
+ * so `Square` is no longer imported here; this block remains the ONE production home
+ * of the refusal argument (`StopControl.tsx`'s docblock points AT it rather than
+ * restating it — one home per concern), which is why it survives the import's removal.
+ *
  * ⚠ The visible words are written ONCE, in the two constants below, and no comment
  * here spells them — a comment that did would turn a measurement of the rendered
  * control into a measurement of the prose (the 187-24 lesson, kept by RunSeam above).
@@ -346,13 +372,39 @@ export function WorkspacePanel({
   // chat re-render — PANEL-06 preserved). `derived.length > 0` is the correct
   // "earns a derived panel" signal; do NOT re-derive the gate here.
   const derived = useDerivedPanel(threadId)
-  // Phase 194 Plan 03 (RUN-01 / SC#1): the one durable cancel path. Read here, beside
-  // the other hook calls, and consumed by exactly one control — see PANEL_STOP_LABEL.
-  const streamActions = useStreamActions()
+  // ⚠ Phase 194.1 Plan 05 Task 2: the action-surface read that Phase 194 Plan 03
+  // placed here is GONE. The panel now dispatches nothing itself — see the import
+  // block for why neither symbol is spelled anywhere in this file.
   const workflowLock = useWorkflowLockForThread(threadId)
   const isHarness = workflowLock != null
   const showTimeline = isHarness || phases.length > 0
   const showBatchResults = showTimeline && tasks.length > 0
+  // Phase 194.1 Plan 05 (R7(a) / BUG-260816-01 / D-25) — THE SECOND BOOLEAN.
+  //
+  // ⚠ TWO BOOLEANS, NOT ONE — narrowing `showTimeline` would regress Phase 098 UAT run-honesty fix B (its `|| phases.length > 0` disjunct is what keeps a FINISHED run's timeline visible).
+  //
+  // The line above is deliberately written UNWRAPPED, on ONE line, so a
+  // line-oriented `grep` for the rule finds it. A rule written wrapped fails its
+  // own literal grep and reads as "already fixed" (193.2-08, re-proved by WR-05).
+  //
+  // WHAT WENT WRONG WITH ONE BOOLEAN, measured rather than reasoned about: 194
+  // UAT-03 pressed this row on a COMPLETED run and got no network request and a
+  // byte-identical `document.body.innerText` (`diffLen: 0`). Phase rows OUTLIVE
+  // the run (`threads.py:1176-1186`), so `phases.length > 0` stayed true forever
+  // and the Stop outlived the thing it could stop.
+  //
+  // WHY `isHarness` IS THE HONEST "still going" SIGNAL: the lock invariant —
+  // "a thread holds a lock IFF a NON-TERMINAL Harness workflow run owns its
+  // `active_workflow_run_id` anchor" (`streamsStore.ts`) — and it is cleared on
+  // EVERY terminal route (StreamsProvider's send-path onTerminal, its sibling,
+  // and the reconcile's "Stale / terminal / Deep → unlock").
+  //
+  // ⚠ `showTimeline` and `showBatchResults` are BYTE-UNCHANGED above, and that is
+  // the point of adding a boolean rather than editing one: `showTimeline` has
+  // three consumers (the run soul, the run receipt, the timeline section) plus
+  // `showBatchResults`, and every one of them is CORRECT to survive a terminal.
+  // Only the CONTROL is not.
+  const showStopRow = isHarness && threadId != null
 
   const isMobile = useIsMobile()
 
@@ -449,22 +501,36 @@ export function WorkspacePanel({
               phase row, so it can never be misread as skipping a step. See the block
               above the constants for why the argument is the THREAD id and never the
               lock's run id. The `threadId &&` clause is a type narrowing, not a second
-              gate — showTimeline is already unreachable without a viewed thread. */}
-          {showTimeline && threadId && (
+              gate — showStopRow already carries `threadId != null` as a conjunct.
+
+              ⚠ Phase 194.1 Plan 05 (R7(a) / D-25): the gate is `showStopRow`, NOT
+              `showTimeline`. Its two siblings above deliberately keep `showTimeline`
+              — a finished run KEEPS its soul, its receipt and its timeline, and only
+              loses the control. See the comment beside the boolean's definition. */}
+          {showStopRow && (
             <div className="flex items-center gap-2 border-b border-border/40 px-3 py-2">
               <span className="text-[10px] uppercase tracking-wider text-panel-muted-foreground">
                 {PANEL_STOP_LEAD}
               </span>
-              <button
-                type="button"
-                data-testid="panel-stop-run"
-                onClick={() => void streamActions.stopThread(threadId)}
-                aria-label={PANEL_STOP_ARIA}
-                className="ml-auto flex shrink-0 items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-destructive transition-colors hover:bg-destructive/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" />{" "}
-                {PANEL_STOP_LABEL}
-              </button>
+              {/* Phase 194.1 Plan 05 Task 2 (R1) — the SHARED control, mounted.
+                  The inline `<button>` that stood here is gone; its chrome is
+                  reproduced byte-for-byte by `StopControl`'s `panel` variant, and
+                  the dispatch moved INTO the shared component. That is why this
+                  file no longer names the resolver at all: "four mounts, ONE
+                  mechanism" (Phase 194 D-08) is now held by CONSTRUCTION rather
+                  than by four call sites agreeing with each other.
+
+                  ⚠ The three constants are still declared in THIS file and passed
+                  down, rather than moved into the shared component's table. They
+                  are already extracted, and relocating them would be a second
+                  change dressed as tidying — the panel keeps its own words. */}
+              <StopControl
+                threadId={threadId}
+                variant="panel"
+                label={PANEL_STOP_LABEL}
+                ariaLabel={PANEL_STOP_ARIA}
+                testId="panel-stop-run"
+              />
             </div>
           )}
 

@@ -35,7 +35,15 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
-import { useAskUserPrompt, useViewingThread } from "@/providers/StreamsProvider"
+import {
+  useAskUserPrompt,
+  useViewingThread,
+  // Phase 194.1 Plan 05 (R7(b)): the two READS that derive "this run is over".
+  // Both are already consumed by WorkspacePanel for its timeline gate, so this
+  // adds no fetch and no new source of truth — only a second reader.
+  useWorkflowLockForThread,
+  usePhases,
+} from "@/providers/StreamsProvider"
 import { answerAskUser, ApiError } from "@/lib/api"
 import type { PendingAsk } from "@/types"
 import {
@@ -158,6 +166,32 @@ function DraftBlock({ draft }: { draft: string }) {
 export const NO_DEADLINE_WAITING_LINE =
   "No deadline — the run is waiting for your answer and will not continue on its own"
 
+/**
+ * Phase 194.1 Plan 05 Task 3 (R7(b)) — THE FOURTH RETIREMENT SENTENCE, and the
+ * only one raised by a STOP rather than by a clock or a server.
+ *
+ * Exported so the mount, the fence and this file read ONE string rather than
+ * three transcriptions of it.
+ *
+ * ⚠ FOUR RETIREMENTS WEARING ONE COAT WOULD BE FOUR LIES, so this sentence is
+ * PAIRWISE-DISTINCT from the three shipped ones and shares no complete sentence
+ * with any of them (`PendingAskCard.test.tsx` asserts all SIX pairs, reading the
+ * shipped three out of this file's own source rather than re-typing them). The
+ * three it must differ from say, in order: the run is no longer active (a 404 on
+ * submit); no response arrived within the deadline (a clock); and the prompt is no
+ * longer active (no deadline at all). NONE of them says a PERSON stopped the run,
+ * which is the one fact this arm exists to report.
+ *
+ * ⚠ IT NAMES THE ACT, NOT A CAUSE IT CANNOT KNOW. The client learns the run ended
+ * by watching the workflow lock clear; that clears on EVERY terminal route. This
+ * arm is only reached when the surface already shows a stop, so "stopped" is
+ * honest — but it claims nothing about who stopped it, or why, or what survived.
+ * The step count belongs on the stopped receipt (plan 07's run line), which is the
+ * reading D-13 is actually about.
+ */
+export const RUN_STOPPED_RETIREMENT_LINE =
+  "The run was stopped, so this question no longer needs an answer"
+
 /** mm:ss from a non-negative seconds count. */
 function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.floor(totalSeconds))
@@ -170,11 +204,21 @@ interface PendingAskCardProps {
   ask: PendingAsk
   /** Re-fetch the GET-reconciled prompt (carries run_id) — A2 / Pitfall 1. */
   reconcile: () => Promise<void>
+  /**
+   * Phase 194.1 Plan 05 (R7(b)) — true once the run this prompt belongs to is
+   * over. DERIVED by `PendingAskStack` from two hooks the panel already calls; it
+   * is never fetched, never stored and never written by this card.
+   *
+   * ⚠ OPTIONAL, defaulting to `false` — so every existing caller renders exactly
+   * the card it rendered before this prop existed. `PendingAskStack` is the only
+   * production caller and it always passes it.
+   */
+  runIsOver?: boolean
 }
 
 type CardState = "pending" | "answered" | "expired"
 
-export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
+export function PendingAskCard({ ask, reconcile, runIsOver = false }: PendingAskCardProps) {
   const { tool_call_id, prompt, timeout_seconds, run_id, draft } = ask
   // ask_user with no choices → backend stores options=null (free-text path).
   // Normalize to [] so the `.length`/index reads below never throw (a null here
@@ -288,6 +332,83 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
   }
 
   const labelId = `ask-${tool_call_id}-prompt`
+
+  // ── Retired by a stopped run (194.1-05 / R7(b)) — DERIVED, never stored. ──
+  //
+  // ⚠ THIS IS A DERIVATION AND NOT A TENTH `useState`, and the distinction is the
+  // D-03 stop condition rather than a style preference. This card already carries
+  // NINE pieces of state; a tenth holding a fact that is a pure function of a prop
+  // and existing state would be new state ownership on a file this plan is only
+  // supposed to give a RENDER arm.
+  //
+  // ⚠ IT SHORT-CIRCUITS **ABOVE** THE `expired` ARM, WHICH IS WHY `canSubmit` IS
+  // BYTE-UNTOUCHED. `canSubmit`'s `state === "pending"` conjunct is never re-read
+  // once this branch is taken, so the retirement needs no clause there and cannot
+  // perturb the 404 path, the countdown path or the "Preparing…" gate.
+  //
+  // ⚠ ONLY `pending` IS RETIRED. A card that already reached `answered` records
+  // something the user really did and must keep saying so; one that already
+  // reached `expired` has its own honest sentence. Overwriting either with a
+  // fourth would be replacing a true statement with a different true statement,
+  // for no reader's benefit.
+  const arm: CardState | "retired" = runIsOver && state === "pending" ? "retired" : state
+
+  if (arm === "retired") {
+    return (
+      <div
+        className="flex flex-col gap-2 rounded-md border border-[hsl(var(--muted-foreground-dim))] bg-muted/80 p-3 opacity-90"
+        role="status"
+      >
+        {/* The SHAPE is adopted from the shipped `expired` arm below — calm grey,
+            a `role="status"` root, a label, the question, a message slot. That is
+            reuse of a settled design, not a new one. Only the WORD and the
+            SENTENCE are new, because this is a different event. */}
+        <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wider text-[hsl(var(--muted-foreground-dim))]">
+          <span
+            className="h-[7px] w-[7px] flex-none rounded-full bg-[hsl(var(--muted-foreground-dim))]"
+            aria-hidden="true"
+          />
+          Retired
+        </div>
+        {/* ⚠ THE QUESTION STAYS. "Retired with a sentence, never removed" is a rule
+            across every sketch-170 variant: a card that vanishes mid-read leaves
+            the user unable to tell "the run stopped" from "the app lost my
+            question". */}
+        <p className="text-sm leading-relaxed text-foreground" id={labelId}>
+          {prompt}
+        </p>
+        {/* IN-05: the root is already `role="status"`, so this inner line must NOT
+            carry aria-live — a nested polite region can double-announce. */}
+        <p className="text-[13px] text-[hsl(var(--muted-foreground-dim))]">
+          {RUN_STOPPED_RETIREMENT_LINE}
+        </p>
+        {/* ⚠ THE SUBMIT CONTROL IS RENDERED, VISIBLY DEAD, RATHER THAN DELETED —
+            and that is the same argument as keeping the card. A user who had
+            already chosen an answer and reached for Send needs to see that the
+            thing they were about to press is no longer available; a control that
+            silently disappears from under a moving cursor is the small dishonesty
+            this phase exists to remove, in miniature.
+
+            BOTH axes are hard-`true` here, never one: `disabled` is what the
+            BROWSER honours and `aria-disabled` is what a SCREEN READER announces,
+            and a retirement that set only one would make the two audiences
+            disagree. There is deliberately NO `onClick` — the attribute is not the
+            only thing standing between this button and a dispatch. */}
+        <button
+          type="button"
+          aria-disabled={true}
+          disabled
+          className={cn(
+            "self-end rounded-md px-3.5 py-2 text-[13px] font-semibold",
+            "min-h-[44px] bg-muted text-[hsl(var(--muted-foreground-dim))]",
+            "cursor-not-allowed opacity-40",
+          )}
+        >
+          Send Answer
+        </button>
+      </div>
+    )
+  }
 
   // ── Expired (D5) — calm grey, never a crash. ──
   if (state === "expired") {
@@ -459,6 +580,28 @@ export function PendingAskCard({ ask, reconcile }: PendingAskCardProps) {
 export function PendingAskStack() {
   const threadId = useViewingThread()
   const { data: asks, reconcile } = useAskUserPrompt(threadId)
+  // Phase 194.1 Plan 05 (R7(b)) — the run-is-over signal, DERIVED from two hooks
+  // the panel already calls for its timeline. No new fetch, no new endpoint, no
+  // new store slice, and nothing written anywhere.
+  //
+  //   lock == null            the anchor is released. The lock invariant is
+  //                           "a thread holds a lock IFF a NON-TERMINAL Harness
+  //                           run owns its `active_workflow_run_id`", and it is
+  //                           cleared on every terminal route.
+  //   phases.length > 0       a harness run EXISTED. Durable phase rows outlive a
+  //                           terminal (`threads.py:1176-1186`), so this is what
+  //                           separates "the run ended" from "there was never one".
+  //
+  // ⚠ BOTH CONJUNCTS ARE LOAD-BEARING AND EACH ONE ALONE IS WRONG IN A DIFFERENT
+  // DIRECTION. `lock == null` alone is TRUE on a Deep thread, which has no run to
+  // stop and whose `ask_user` prompts must stay answerable — that would retire
+  // every Deep approval the instant it appeared. `phases.length > 0` alone is TRUE
+  // mid-run, which would retire a LIVE prompt the moment its first phase landed —
+  // the exact failure mode of the shipped Stop row this plan's Task 1 fixed, in a
+  // new place.
+  const workflowLock = useWorkflowLockForThread(threadId)
+  const { data: phases } = usePhases(threadId)
+  const runIsOver = workflowLock == null && phases.length > 0
 
   if (asks.length === 0) return null
 
@@ -476,7 +619,7 @@ export function PendingAskStack() {
           key={ask.tool_call_id}
           className="sticky top-0 z-[4]"
         >
-          <PendingAskCard ask={ask} reconcile={reconcile} />
+          <PendingAskCard ask={ask} reconcile={reconcile} runIsOver={runIsOver} />
         </div>
       ))}
     </div>

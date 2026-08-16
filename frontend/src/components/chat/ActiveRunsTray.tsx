@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Thread } from "@/types"
 import {
@@ -7,6 +6,9 @@ import {
   useStreamActions,
   getActiveRunStartMs,
 } from "@/providers/StreamsProvider"
+// Phase 194.1 Plan 05 Task 2 (R1 / D-06) — the ONE shared Stop control, which is
+// also why `Square` is no longer imported here: the shared component draws it.
+import { StopControl } from "./StopControl"
 
 /**
  * SEED-064 — cross-thread active-runs tray (the "Both, layered" winner, sketch 017).
@@ -24,6 +26,22 @@ import {
  *    (only while the popover is open) so per-token bucket mutations cost nothing.
  *  - Every Stop routes through the one durable cancel path (`stopThread` →
  *    DELETE /runs/{id}); nothing here invents new backend behavior.
+ *
+ * ⚠ PHASE 194.1 PLAN 05 — `Stop all` IS BYTE-UNTOUCHED, AND THAT IS A DECISION
+ * RATHER THAN AN OMISSION, recorded here so the next reader finds a decision.
+ *
+ * The PER-ROW Stop became the shared `StopControl` component (one component, one pressed
+ * state, one resolver). `Stop all` did not, because it is a BULK control over N
+ * threads and not a per-thread mount: it has no single thread whose stopping state
+ * it could show, so a shared per-thread component is the wrong shape for it. The
+ * acknowledgement a user needs is nevertheless delivered — pressing `Stop all`
+ * dispatches the same resolver once per listed thread, which puts EVERY row into
+ * its own stopping reading through the shared store. The bulk button is answered by
+ * the rows it acts on, which is more informative than a state on the button itself.
+ *
+ * ⚠ Consequence, stated rather than left to be discovered: this file now contains
+ * exactly ONE `streamActions.stopThread` call, not two. `ActiveRunsTray.test.tsx`'s
+ * source fence pins that count and was superseded in place when it changed.
  */
 function formatElapsed(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000))
@@ -124,13 +142,18 @@ export function ActiveRunsTray({ threads }: { threads: Thread[] }) {
                     <div className="font-mono text-[10px] text-muted-foreground">⏱ {elapsed} · running</div>
                   )}
                 </div>
-                <button
-                  onClick={() => void streamActions.stopThread(id)}
-                  className="flex shrink-0 items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-destructive hover:bg-destructive/20 transition-colors"
-                  aria-label={`Stop run on ${titleFor(id)}`}
-                >
-                  <Square className="h-2.5 w-2.5 fill-current" aria-hidden="true" /> Stop
-                </button>
+                {/* Phase 194.1 Plan 05 Task 2 (R1) — the SHARED control. The inline
+                    `<button>` that stood here is gone; `StopControl`'s `tray` variant
+                    reproduces its chrome byte-for-byte (it differs from the panel's by
+                    exactly two things and the two strings are deliberately NOT
+                    unified — see the variant table), and the dispatch moved into the
+                    shared component. The aria label stays per-ROW because it names the
+                    thread, which is the one thing a shared default cannot know. */}
+                <StopControl
+                  threadId={id}
+                  variant="tray"
+                  ariaLabel={`Stop run on ${titleFor(id)}`}
+                />
               </div>
             )
           })}
