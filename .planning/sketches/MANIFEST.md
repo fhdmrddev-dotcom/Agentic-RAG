@@ -1828,3 +1828,114 @@ recognise the evidence when they see it:
 `SEED-158` (authoring placeholders into a plain template) and `SEED-159` (a null field
 rendering as a blank cell that lies) are **untouched and remain open** — both were named on
 the sketch pages precisely so nobody solves them inside this phase by accident.
+
+---
+
+## Session: Phase 194.1 — Make the Stop Visible (2026-08-16)
+
+G-2 sketch, BEFORE spec/discuss. **RUN-01's re-opened, user-facing half.** Phase 194 landed the
+durable half and **verified it on seven live runs** (`workflow_runs` + the interrupted
+`workflow_phases` row + the thread anchor + the producer `runs` row). Its own UAT then found
+that **a person cannot perceive any of it**. Same shape as 192 → 192.1 and 193 → 193.1: the
+parent shipped, a real gap was found in lived experience, and the gap gets its own phase rather
+than a third gap-closure round (**G-7**).
+
+**Measured before drawing anything**, at `045a83dc`:
+
+- `grep -c "stopThread\|cancelRun\|Stop" frontend/src/pages/WorkflowRunPage.tsx` → **0**. The
+  surface **▶ Run workflow** sends you to cannot stop the run it is displaying.
+- `grep -ri "stopping" frontend/src` → **0** in production source. A pending-state vocabulary
+  does not exist and is net-new copy, not a re-use.
+- The panel Stop's gate is `showTimeline = isHarness || phases.length > 0` — **phase rows
+  outlive the run**, so a finished run renders a live-looking Stop that produces no request,
+  no screen change (`diffLen: 0`) and one console line whose stated cause is **false**.
+- `runs.message_id` is **NULL on 587 of 607** rows whose thread owns a `workflow_run`
+  (**96.7 %**, all 25 most recent) — so the chat surface has no run key for a harness run.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 168 | the-press-that-says-it-heard-you | What does Stop look like between the press and the run actually ending — and what stands where it stood once there is nothing left to stop? | **B — the control yields** (2026-08-16, operator). Chosen because `⊘` is already shipped tier-1 vocabulary (174 D1/D2) so no net-new glyph is introduced, and a double-press becomes impossible **by construction**. A and C stay as evidence. | phase-194.1, run-01, stop, pressed-state, bug-260816-01, bug-260709-01 |
+| 169 | a-stop-on-the-runs-own-surface | Where does Stop live on a surface that says `👁 View only` — and does pressing it need a guard? | **A — in the title row** (2026-08-16, operator), over the sketch's own lean toward B. Guard: **direct flip**. C rejected on canvas-vocabulary grounds. All variants stay as evidence. | phase-194.1, run-01, stop, workflow-run-page, canvas, action-guards, bug-260816-01 |
+| 170 | the-thread-that-remembers-the-stop | What does a stopped workflow thread show on return — and what happens to the approval card that was on screen when you stopped? | TBD | phase-194.1, run-01, run-honesty, zombie-approval, bug-260816-02, bug-260710-01 |
+| 171 | one-run-one-slot | What does the kickoff moment render, such that two assistant nodes cannot be drawn — **without** first knowing which of the three candidate mechanisms is live? | TBD | phase-194.1, bug-260610-01, duplicate-avatar, kickoff, unmeasured-mechanism |
+
+### ⚠ The 168-B × 169-A collision, and its resolution
+
+**Recorded here because it is a consequence of the two picks that neither sketch asked about.**
+168-B replaces the control with a *reading*. 169-A puts the control in the *title row*. Combined,
+B-on-terminal wants to render a terminal reading one line above the state row that already **is**
+the terminal reading.
+
+That is precisely the defect the operator reported on **2026-08-06** — `✓ Complete · Ran for
+2m 18s` rendered directly beneath `✓ Complete   Ran for 2m 18s — from when it was queued to its
+last update` — and the fix for it (making `run-band` `sr-only`) is still commented in
+`WorkflowRunPage.tsx`.
+
+> **Resolution: in the title-row mount, B yields to NOTHING.** The slot empties. The state row
+> below *is* the terminal reading and it already ships (`⊘ Cancelled` + `Ran for …`). B's
+> "the slot holds a reading" rule applies in the panel and the tray, where no such row exists.
+
+### Three decisions taken at pick time (2026-08-16), to carry into `194.1-CONTEXT.md`
+
+1. **The sketch's own "B's gate comes free" argument for 169 is CORRECTED, not defended.**
+   `isTerminal` is a component-level const already in scope for **both** rows, so A's liveness
+   gate is one clause reading the same variable — not a new derivation. What genuinely favours A
+   is that the state row is `flex-wrap` and grows a long `claimed_at … → created_at … →
+   updated_at …` string under the ⌥ reveal, so a control there wraps exactly when the row is most
+   crowded. *Measured beside it:* `WorkflowRunPage.test.tsx:676` ships a fence asserting the band
+   *"states the fact and offers NO control"* — ⚠ scoped to the **`sr-only`** `run-band` node, so B
+   would **not** have failed it, but the recorded intent leans A's way.
+2. **Two things now ride on 168-B and are correctness requirements, not polish.** (a) The
+   composer's slot width — a 32 px icon button and a text line differ, and forking B to icon-only
+   there **kills 168's whole premise** of one vocabulary across four mounts. (b) B's losing arm is
+   **load-bearing**: B *removes* the control while stopping, so the timeout is the only route back
+   to a pressable Stop. In A the control merely disables.
+3. **Geometry, not a guard, answers the new misclick risk 169-A creates.** Stop now sits beside
+   *Open the chat thread*, a routinely-clicked link. Recommendation: **Stop at the extreme right,
+   the seam link inboard, with real separation** — a guard would tax the one thing this phase buys
+   (speed of stopping). *Measured, so the move is unblocked:* the seam link is asserted **by text**
+   (`getByText("Open the chat thread")`, two call sites) with **no order, position or byte pin** on
+   that header.
+
+### ⚠ Sketch 171 asks a DIFFERENT question than it appears to, on purpose
+
+`194-MEASUREMENTS.md` opens *"VERDICT: ⏸ NOT MEASURED — DEFERRED with a trigger"* and states
+*"The word 'probably' appears nowhere in this file, and neither does a verdict."* Three
+mechanisms remain consistent with the evidence and are separated **only** by a live store dump
+taken while a harness run streams — which does not exist.
+
+So 171 does **not** ask *"how do we dedupe?"* (unanswerable today, and Phase 174 D6 already
+decided the *outcome*). It asks **"is there one owned slot per run at all?"** — because **B and C
+make the mechanism moot while A requires knowing it.** That asymmetry is available now.
+
+⚠ **B implies persisting `message_id` for harness runs — a backend change**, in a phase whose
+ROADMAP entry says it *"adds no new runtime path."* Most correct, most likely out of scope. That
+is worth knowing **before** planning.
+
+### Method note — these four are HAND-COMPOSED, not generated
+
+Sketches 165–167 used the generated-DOM mechanism (render the real component, splice one block)
+because of `SEED-155`. **These four are hand-composed against class strings and copy constants
+read verbatim from source**, and every page carries a **PROVENANCE** table naming which regions
+are shipped-verbatim and which are proposals. The reason is stated rather than assumed: most of
+what is drawn here **does not exist yet** — there is no stopping state, no canvas Stop, no
+durable stopped mark — so there is no component to render for the new parts.
+
+⚠ **Two limits a build must honour rather than trust this page for:** 169's canvas nodes are a
+**stand-in**, not `PhaseNodeCard` (which has a two-badge ceiling enforced by an
+`@ts-expect-error` control and forbids focusable children — so **this page cannot prove variant
+C's mount fits**); and 170's approval-card wording is **observed from the Phase 194 UAT report,
+not read from source** — a build must read the real `PendingAskCard`.
+
+### Reported bugs these four claim — all still `status: open` by design
+
+`BUG-260816-01` · `BUG-260816-02` · `BUG-260709-01` (re-opened on its own trigger) ·
+`BUG-260610-01` (frontmatter corrected 2026-08-16 — it read `folded` for two months while its own
+body said the avatar half *"Stays OPEN"*). **The fold happens at `/gsd:discuss-phase`**, because
+`status:` **is** the index a routing scan reads, and prose claiming a fold the frontmatter does
+not record is worse than no claim at all.
+
+⚠ **`BUG-260710-01` is the Deep-chat sibling of `BUG-260816-02` and must be looked at in the same
+breath.** Different renderer, different source of truth (`runs` vs `workflow_runs` +
+`workflow_phases`) — a fix to one does **not** automatically fix the other. If 194.1 closes only
+the workflow half, the other's frontmatter must say so.

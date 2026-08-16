@@ -1,0 +1,464 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sketch 171 — One run, one slot (Phase 194.1)</title>
+<link rel="stylesheet" href="../themes/default.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding-top: 52px; background: var(--color-bg); color: var(--color-text);
+         font-family: var(--font-sans); font-size: var(--text-base); -webkit-font-smoothing: antialiased; }
+  h1,h2,h3,h4 { font-family: var(--font-headline); margin: 0; }
+
+  #variant-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 9998;
+    background: var(--color-bg-elev1); border-bottom: 1px solid var(--color-border);
+    padding: 8px 16px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  #variant-nav .brand { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-dim); margin-right: 10px; }
+  .variant-tab { background: transparent; border: 1px solid var(--color-border); color: var(--color-text-muted);
+    font-size: var(--text-xs); padding: 5px 11px; border-radius: var(--radius-full); cursor: pointer;
+    transition: all .15s ease; font-family: var(--font-sans); }
+  .variant-tab:hover { border-color: var(--color-primary-glow); color: var(--color-text); }
+  .variant-tab.active { background: var(--color-primary-dim); border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .variant-tab.broken.active { background: var(--color-danger-dim); border-color: hsl(0 72% 51% / .5); color: hsl(0 80% 78%); }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 26px 24px 90px; }
+  .lede { color: var(--color-text-muted); font-size: var(--text-sm); line-height: 1.65; max-width: 82ch; }
+  .lede strong { color: var(--color-text); font-weight: 600; }
+  .kicker { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-text-dim); margin-bottom: 7px; }
+
+  .driver { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-end;
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg); padding: 14px 16px; margin: 20px 0 26px; }
+  .driver .grp { display: flex; flex-direction: column; gap: 6px; }
+  .driver label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-dim); }
+  .seg { display: flex; border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button { background: transparent; border: 0; border-right: 1px solid var(--color-border);
+    color: var(--color-text-muted); font-size: var(--text-xs); padding: 6px 11px; cursor: pointer;
+    transition: all .15s ease; font-family: var(--font-sans); }
+  .seg button:last-child { border-right: 0; }
+  .seg button:hover { background: var(--color-muted); color: var(--color-text); }
+  .seg button.on { background: var(--color-primary-dim); color: var(--color-primary); }
+  .driver .spacer { flex: 1; }
+  .play { background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow);
+    color: var(--color-primary); font-size: var(--text-xs); padding: 7px 15px;
+    border-radius: var(--radius-sm); cursor: pointer; }
+  .play:hover { background: hsl(239 100% 82% / .22); }
+
+  /* stage */
+  .thread { border: 1px solid var(--color-border); border-radius: var(--radius-lg);
+    padding: 18px 20px; background: var(--color-bg); min-height: 190px;
+    display: flex; flex-direction: column; gap: 14px; }
+  .msg { display: flex; gap: 11px; align-items: flex-start; }
+  .msg.user { justify-content: flex-end; }
+  .bubble-user { background: var(--color-primary-dim); border: 1px solid var(--color-primary-glow);
+    border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg); padding: 9px 13px;
+    font-size: var(--text-sm); max-width: 72%; }
+  .avatar { width: 27px; height: 27px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+    background: var(--color-primary-dim); color: var(--color-primary); border: 1px solid var(--color-primary-glow); }
+  .avatar.ghost { background: transparent; border-style: dashed; border-color: hsl(0 72% 51% / .55); color: hsl(0 72% 51% / .65); }
+  .body-col { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 7px; }
+  .placeholder { font-size: var(--text-sm); color: var(--color-text-dim); font-style: italic; }
+  .assistant-text { font-size: var(--text-sm); line-height: 1.62; }
+
+  /* the never-vanishes run strip (sketch 015) */
+  .status-strip { display: flex; align-items: center; gap: 9px; padding: 8px 12px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    background: var(--color-surface); font-size: var(--text-xs); color: var(--color-text-muted); }
+  .status-strip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-primary);
+    animation: pulse 1.6s ease-in-out infinite; flex-shrink: 0; }
+  @keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: .3 } }
+  .status-strip .clk { margin-left: auto; font-family: var(--font-mono); color: var(--color-text-dim); }
+
+  /* the owned slot (variant B) */
+  .slot { border: 1px dashed var(--color-primary-glow); border-radius: var(--radius-md);
+    padding: 3px; position: relative; }
+  .slot::before { content: attr(data-key); position: absolute; top: -8px; left: 10px;
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: .05em; color: var(--color-primary);
+    background: var(--color-bg); padding: 0 5px; }
+  .slot .inner { padding: 8px 10px; display: flex; gap: 11px; align-items: flex-start; }
+
+  .marker { display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono);
+    font-size: var(--text-xs); }
+  .marker.bad { color: hsl(0 80% 76%); }
+  .marker.ok { color: hsl(142 60% 66%); }
+  .marker.warn { color: hsl(38 92% 74%); }
+
+  /* callouts */
+  .note { border: 1px solid var(--color-border); border-left: 3px solid var(--color-warning);
+    background: var(--color-warning-dim); border-radius: var(--radius-sm); padding: 12px 15px;
+    margin: 20px 0; font-size: var(--text-sm); color: var(--color-text-muted); line-height: 1.65; }
+  .note.bad { border-left-color: var(--color-danger); background: var(--color-danger-dim); }
+  .note.good { border-left-color: var(--color-success); background: var(--color-success-dim); }
+  .note strong { color: var(--color-text); }
+  .note code, .lede code, td code { font-family: var(--font-mono); font-size: .92em;
+    background: hsl(220 30% 11% / .8); padding: 1px 5px; border-radius: 3px; color: var(--color-text-muted); }
+
+  table.cost { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: var(--text-sm); }
+  table.cost th, table.cost td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-border-soft); vertical-align: top; line-height: 1.6; }
+  table.cost th { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-dim); font-weight: 400; }
+  table.cost td { color: var(--color-text-muted); }
+  table.cost td strong { color: var(--color-text); }
+  table.cost code { white-space: nowrap; }
+
+  .variant { display: none; } .variant.active { display: block; }
+  .vh { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .vh h2 { font-size: var(--text-xl); }
+  .tag { font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: var(--radius-full); border: 1px solid var(--color-border); color: var(--color-text-dim); }
+  .tag.new { border-color: var(--color-primary-glow); color: var(--color-primary); }
+  .tag.ship { border-color: hsl(142 71% 45% / .4); color: hsl(142 60% 62%); }
+  .tag.risk { border-color: hsl(0 72% 51% / .45); color: hsl(0 78% 74%); }
+  .stagelabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--color-text-dim); margin: 20px 0 8px; }
+  hr.sep { border: 0; border-top: 1px solid var(--color-border-soft); margin: 30px 0; }
+
+  #sketch-tools { position: fixed; bottom: 12px; right: 12px; z-index: 9999; font-family: system-ui;
+    font-size: 12px; background: rgba(0,0,0,.78); color: #fff; padding: 8px 12px; border-radius: 8px;
+    opacity: .35; transition: opacity .2s; display: flex; gap: 8px; align-items: center; }
+  #sketch-tools select, #sketch-tools button { background: #1a1a1a; color: #fff; border: 1px solid #444;
+    border-radius: 4px; font-size: 11px; padding: 3px 7px; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="variant-nav">
+  <span class="brand">SKETCH 171 · phase 194.1 · BUG-260610-01</span>
+  <button class="variant-tab broken active" data-v="today" onclick="showVariant('today')">Today (the artefact)</button>
+  <button class="variant-tab" data-v="a" onclick="showVariant('a')">A: Dedupe harder</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: One owned slot</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: No placeholder at all</button>
+  <button class="variant-tab" data-v="measure" onclick="showVariant('measure')">Why nobody knows the cause</button>
+</div>
+
+<div class="wrap">
+
+  <div class="kicker">Drive it — press Play and watch the kickoff moment</div>
+  <div class="driver">
+    <div class="grp">
+      <label>Provider first-token latency</label>
+      <div class="seg" id="seg-speed">
+        <button class="on" data-p="fast">Fast (gpt-5.4-mini)</button>
+        <button data-p="slow">Slow (kimi-k2.6)</button>
+      </div>
+    </div>
+    <div class="grp">
+      <label>Surface</label>
+      <div class="seg" id="seg-surface">
+        <button class="on" data-s="harness">Workflow run</button>
+        <button data-s="deep">Plain chat</button>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="play" onclick="playAll()">▶ Play the kickoff</button>
+  </div>
+
+  <!-- ═════════ TODAY ═════════ -->
+  <div class="variant active" id="variant-today">
+    <div class="vh"><h2>Today — the artefact</h2><span class="tag ship">045a83dc</span></div>
+    <p class="lede">
+      The operator, 2026-08-16, watching runs during Phase 194 UAT:
+      <em>“if you notice the duplicated avatar — which is the case not only [in] the workflow, it is in
+      the chat area I think. And it is a documented bug.”</em> They are right that it is documented:
+      <code>BUG-260610-01</code>, first reported <strong>2026-06-10</strong>, reproduced on Google,
+      OpenRouter, Moonshot, DeepSeek and OpenAI — <strong>provider-agnostic</strong>.
+    </p>
+    <p class="lede" style="margin-top:10px">
+      Press <strong>Play</strong>. A bare avatar mounts, then a second one arrives with the placeholder,
+      and on a fast provider they reconcile in a second or two — which is why point-in-time screenshots
+      kept catching only one of them.
+    </p>
+    <div id="stage-today"></div>
+    <div class="note bad">
+      ⚠ <strong>This report spent two months invisible to the routing scan.</strong> Its frontmatter
+      read <code>status: folded</code> while its own <code>re_open_trigger</code> ended
+      <em>“The duplicate-avatar symptom … is <strong>NOT folded</strong> … Stays OPEN.”</em>
+      The scan reads the frontmatter, not the prose. Corrected to <code>status: open</code> on
+      2026-08-16 — the same class of failure as a hot file missing from the G-5 ledger:
+      <strong>a guardrail cannot see what is absent from its list.</strong>
+    </div>
+  </div>
+
+  <!-- ═════════ A ═════════ -->
+  <div class="variant" id="variant-a">
+    <div class="vh"><h2>A — Dedupe harder</h2><span class="tag ship">what ships today</span></div>
+    <p class="lede">
+      Keep both renderers and make the collapse smarter. This is not a proposal so much as
+      <strong>the status quo, drawn honestly</strong> — <code>dedupMessages.ts</code> already carries a
+      runId-dedup exemption for harness rows (<code>:20-26</code>) and a narrow 174-04 collapse
+      (<code>:31-45</code>).
+    </p>
+    <div id="stage-a"></div>
+    <div class="note bad">
+      <strong>Why A cannot be made reliable, measured rather than argued.</strong> The natural dedup key
+      is the run id — and on a harness run the chat surface <strong>does not have one</strong>.
+      <code>runs.message_id</code> is <code>NULL</code> on <strong>587 of 607</strong> rows whose thread
+      owns a <code>workflow_run</code> (<strong>96.7 %</strong>, and all 25 most recent), so
+      <code>dbRunIds</code> cannot hold it. An ordinary Deep run sets <code>message_id</code> and it
+      points exactly at the row that rendered. <strong>A is asking a key that does not exist to do the
+      work.</strong>
+    </div>
+  </div>
+
+  <!-- ═════════ B ═════════ -->
+  <div class="variant" id="variant-b">
+    <div class="vh"><h2>B — One owned slot per run</h2><span class="tag new">proposal</span>
+      <span class="tag risk">needs a backend half</span></div>
+    <p class="lede">
+      The thread renders <strong>exactly one assistant node for the active run</strong>, keyed on the
+      run. Whatever arrives — the optimistic <code>temp-</code> row, the first SSE event, the persisted
+      row on reconcile — <em>fills that slot</em> rather than mounting beside it. Two mounts collapse
+      <strong>structurally</strong>, so it does not matter which of the three candidate mechanisms is
+      live.
+    </p>
+    <div id="stage-b"></div>
+    <div class="note bad">
+      <strong>The constructibility cost, stated up front.</strong> A run-keyed slot needs a run key, and
+      that is the 96.7 % NULL above. <strong>B implies persisting <code>message_id</code> for harness
+      runs</strong> — a backend change with its own migration question, in a phase whose ROADMAP entry
+      says it <em>“adds no new runtime path.”</em> B is the most correct answer and the one most likely
+      to be out of scope. That is worth knowing <em>before</em> planning, not during.
+    </div>
+  </div>
+
+  <!-- ═════════ C ═════════ -->
+  <div class="variant" id="variant-c">
+    <div class="vh"><h2>C — No placeholder at all until there is something to say</h2>
+      <span class="tag new">proposal</span><span class="tag ship">zero backend</span></div>
+    <p class="lede">
+      No avatar, no bubble, no <em>“Starting workflow…”</em> shell. The run's presence is carried
+      entirely by the <strong>status strip that never vanishes</strong> (sketch 015), which is anchored
+      to the run rather than to a message. The assistant node appears when it has content.
+      <strong>Two of nothing is nothing</strong> — the artefact stops being drawable without anyone
+      needing to know which mechanism causes it.
+    </p>
+    <div id="stage-c"></div>
+    <div class="note">
+      <strong>Drive the “Slow (kimi-k2.6)” setting before judging C.</strong> That is where C is tested:
+      several seconds where the transcript shows the prompt and no reply. The claim is that the strip
+      covers it — <em>the run is visibly running, it just has not spoken.</em> If that gap feels dead
+      rather than calm, C is wrong and the phase needs B.
+    </div>
+    <div class="note good">
+      <strong>C does not contradict Phase 174 D4 — it relocates it.</strong> D4 replaced the dead
+      <em>“Setting up agent…”</em> with an honest live sub-state naming what the model is doing
+      (<code>toolMeta.ts:182</code> already picks <em>“Starting workflow…”</em> for a harness thread).
+      C keeps that sentence and moves it into the strip, where it belongs to the run. D5 already put the
+      activity pill, the anchored timer and the single avatar in the run-card <strong>header</strong> —
+      C is that decision followed to its conclusion.
+    </div>
+  </div>
+
+  <!-- ═════════ MEASUREMENT ═════════ -->
+  <div class="variant" id="variant-measure">
+    <div class="vh"><h2>Why nobody knows the cause — and why this sketch does not guess</h2></div>
+    <p class="lede">
+      Phase 194 plan <code>194-01</code> Task 2 existed to measure this and
+      <strong>recorded that it did not</strong>. <code>194-MEASUREMENTS.md</code> opens
+      <em>“VERDICT: ⏸ NOT MEASURED — DEFERRED with a trigger”</em> and states outright:
+      <em>“The word ‘probably’ appears nowhere in this file, and neither does a verdict.”</em>
+    </p>
+    <table class="cost">
+      <tr><th>Candidate mechanism</th><th>What the store would show</th><th>Fix</th></tr>
+      <tr><td><strong>174-04 mount / first-SSE race</strong></td><td>two <code>temp-</code> rows</td>
+        <td>an ordering fix in the render path</td></tr>
+      <tr><td><strong>BUG-260609-03 class</strong></td><td>one <code>temp-</code> + one persisted</td>
+        <td>persist <code>message_id</code> for harness runs — <em>backend</em></td></tr>
+      <tr><td><strong>Does not reproduce</strong></td><td>exactly one row</td><td>nothing</td></tr>
+    </table>
+    <p class="lede">
+      <strong>All three are consistent with the evidence in hand</strong>, because the evidence is a
+      database observation and the difference lives in the client store. Two operator samples were both
+      disqualified — one was not a workflow run at all (no <code>workflow_runs</code> row), and one was
+      already <code>completed</code>, and the symptom is a <strong>streaming-time</strong> condition, so
+      a post-completion snapshot <em>structurally cannot</em> observe it.
+    </p>
+    <div class="note good">
+      <strong>This is why the sketch asks the question it asks.</strong> “How do we dedupe?” cannot be
+      answered without the measurement. <strong>“Is there one owned slot at all?”</strong> can — and
+      both B and C make the mechanism <em>moot</em>, while A requires knowing it. That asymmetry is the
+      finding, and it is available now rather than after the next live repro.
+    </div>
+    <div class="note">
+      <strong>The trigger is still open and still cheap to satisfy.</strong> A qualifying sample needs
+      a thread with a <code>workflow_runs</code> row and at least one assistant row reading
+      <code>runStatus: "streaming"</code>. ⚠ The plan's own console snippet <strong>does not work as
+      written</strong> — <code>useStreamsStore.getState()</code> is not on <code>window</code>. The
+      dev-server form is
+      <code>const { useStreamsStore } = await import('/src/stores/streamsStore.ts');</code>.
+    </div>
+
+    <h3 style="margin-top:28px;font-size:var(--text-lg)">PROVENANCE</h3>
+    <table class="cost">
+      <tr><th>Region</th><th>Status</th></tr>
+      <tr><td><em>“Starting workflow…”</em> / <em>“Setting up agent…”</em></td>
+        <td><span class="tag ship">shipped verbatim</span> — <code>toolMeta.ts:182</code>, chosen by
+          <code>isHarness</code></td></tr>
+      <tr><td>The never-vanishes run status strip</td>
+        <td><span class="tag ship">shipped design</span> — sketch 015 / Phase 174 D5</td></tr>
+      <tr><td>The 96.7 % <code>message_id</code> NULL figure and the three candidate mechanisms</td>
+        <td><span class="tag ship">measured</span> — <code>194-MEASUREMENTS.md</code>, live DB
+          2026-08-16</td></tr>
+      <tr><td><strong>The owned slot (B) and the empty kickoff (C)</strong></td>
+        <td><span class="tag new">PROPOSAL</span></td></tr>
+      <tr><td>The duplicate artefact as drawn here</td>
+        <td><span class="tag risk">RECONSTRUCTED</span> — from the reports and screenshots, <strong>not
+          from a DOM capture</strong>. <code>BUG-260610-01</code>'s own 2026-08-16 update says the
+          sighting is <em>“an operator observation, not a measurement”</em> and <em>“needs a DOM-level
+          repro before anyone claims a cause.”</em> This page does not claim one.</td></tr>
+    </table>
+  </div>
+
+</div>
+
+<div id="sketch-tools" onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='.35'">
+  <select onchange="document.querySelector('link[href*=themes]').href='../themes/'+this.value+'.css'">
+    <option value="default">Deep Midnight</option>
+  </select>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='420px'">375</button>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='800px'">768</button>
+  <button onclick="document.querySelector('.wrap').style.maxWidth='1120px'">full</button>
+</div>
+
+<script>
+var VS = ['today', 'a', 'b', 'c'];
+var d = { speed: 'fast', surface: 'harness' };
+/* phase: 0 = before, 1 = optimistic mount, 2 = first SSE, 3 = content */
+var phase = 0;
+var timers = [];
+
+function placeholderText() {
+  return d.surface === 'harness' ? 'Starting workflow…' : 'Setting up agent…';
+}
+function contentText() {
+  return d.surface === 'harness'
+    ? 'Collected 14 updates across 4 workstreams. Drafting the summary section…'
+    : 'Here is the comparison you asked for, across the three vendors…';
+}
+function gapMs() { return d.speed === 'slow' ? 2600 : 900; }
+
+function playAll() {
+  timers.forEach(clearTimeout); timers = [];
+  phase = 0; render();
+  timers.push(setTimeout(function () { phase = 1; render(); }, 260));
+  timers.push(setTimeout(function () { phase = 2; render(); }, 260 + 420));
+  timers.push(setTimeout(function () { phase = 3; render(); }, 260 + 420 + gapMs()));
+}
+
+function userMsg() {
+  return '<div class="msg user"><div class="bubble-user">'
+    + (d.surface === 'harness'
+        ? 'Run the weekly status report for the Northwind account.'
+        : 'Compare the three vendor proposals and tell me which is cheapest over 3 years.')
+    + '</div></div>';
+}
+
+function strip(live) {
+  return '<div class="status-strip"><span class="dot"></span>'
+    + '<span>' + (live ? placeholderText() : 'Working — 2 of 3 steps') + '</span>'
+    + '<span class="clk">' + (phase >= 3 ? '4s' : (phase === 2 ? '1s' : '0s')) + '</span></div>';
+}
+
+function assistant(av, inner, ghost) {
+  return '<div class="msg"><div class="avatar' + (ghost ? ' ghost' : '') + '">' + av + '</div>'
+    + '<div class="body-col">' + inner + '</div></div>';
+}
+
+function stageFor(v) {
+  var out = userMsg();
+
+  if (v === 'today') {
+    if (phase >= 1) out += assistant('◆', '<div class="marker bad">bare avatar — no body</div>', true);
+    if (phase === 2) out += assistant('◆', '<div class="placeholder">' + placeholderText() + '</div>');
+    if (phase >= 3) out += assistant('◆', '<div class="assistant-text">' + contentText() + '</div>');
+    if (phase === 2) {
+      out += '<div class="marker bad">⚠ two assistant nodes on screen — the artefact</div>';
+    }
+    if (phase >= 3 && d.speed === 'fast') {
+      out += '<div class="marker warn">on a fast provider it reconciled in ~1 s — which is why single '
+           + 'screenshots kept catching only one</div>';
+    }
+  }
+
+  if (v === 'a') {
+    if (phase >= 1) out += assistant('◆', '<div class="placeholder">' + placeholderText() + '</div>');
+    if (phase >= 3) {
+      out = userMsg() + assistant('◆', '<div class="assistant-text">' + contentText() + '</div>');
+    }
+    if (phase === 2) {
+      out += '<div class="marker warn">the collapse held here — on this run. '
+           + 'dedupMessages has no run key to hold it with</div>';
+    }
+  }
+
+  if (v === 'b') {
+    if (phase >= 1) {
+      var inner = phase >= 3
+        ? '<div class="assistant-text">' + contentText() + '</div>'
+        : '<div class="placeholder">' + placeholderText() + '</div>';
+      out += '<div class="slot" data-key="run 9f69ddf1 · one node, whatever arrives">'
+           + '<div class="inner"><div class="avatar">◆</div>'
+           + '<div class="body-col">' + inner + '</div></div></div>';
+    }
+    if (phase === 2) {
+      out += '<div class="marker ok">the first SSE event filled the slot — it did not mount beside it</div>';
+    }
+  }
+
+  if (v === 'c') {
+    if (phase >= 1 && phase < 3) out += strip(true);
+    if (phase >= 3) out += assistant('◆', '<div class="assistant-text">' + contentText() + '</div>') + strip(false);
+    if (phase >= 1 && phase < 3) {
+      out += '<div class="marker ' + (d.speed === 'slow' ? 'warn' : 'ok') + '">'
+           + (d.speed === 'slow'
+              ? 'the honest gap — ' + (gapMs() / 1000).toFixed(1) + 's of transcript with no reply in it'
+              : 'no assistant node exists yet, so there cannot be two of them')
+           + '</div>';
+    }
+  }
+
+  var label = phase === 0 ? 'before the kickoff'
+            : phase === 1 ? 'the optimistic mount'
+            : phase === 2 ? 'the first SSE event arrives'
+            : 'first content';
+
+  return '<div class="stagelabel">' + label + '</div><div class="thread">' + out + '</div>';
+}
+
+function render() {
+  VS.forEach(function (v) {
+    var host = document.getElementById('stage-' + v);
+    if (host) host.innerHTML = stageFor(v);
+  });
+}
+
+function showVariant(id) {
+  var tabs = document.querySelectorAll('.variant-tab');
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  var t = document.querySelector('.variant-tab[data-v="' + id + '"]');
+  if (t) t.classList.add('active');
+  var vs = document.querySelectorAll('.variant');
+  for (var j = 0; j < vs.length; j++) vs[j].classList.remove('active');
+  document.getElementById('variant-' + id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+document.getElementById('seg-speed').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  d.speed = b.dataset.p;
+  var sib = this.querySelectorAll('button');
+  for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+  b.classList.add('on'); playAll();
+});
+document.getElementById('seg-surface').addEventListener('click', function (e) {
+  var b = e.target.closest('button'); if (!b) return;
+  d.surface = b.dataset.s;
+  var sib = this.querySelectorAll('button');
+  for (var i = 0; i < sib.length; i++) sib[i].classList.remove('on');
+  b.classList.add('on'); playAll();
+});
+
+playAll();
+</script>
+</body>
+</html>
