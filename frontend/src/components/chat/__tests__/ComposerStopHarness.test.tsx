@@ -448,9 +448,30 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
     expect(mockCancelRun).toHaveBeenCalledTimes(0)
     expect(warn).toHaveBeenCalled()
     const said = warn.mock.calls.map((c) => c.map(String).join(" ")).join("\n")
-    expect(said).toMatch(/Stop did nothing/i)
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R6). The original three assertions are
+    // quoted VERBATIM rather than deleted, because a pin that vanishes is
+    // indistinguishable from a pin that never existed:
+    //
+    //     expect(said).toMatch(/Stop did nothing/i)
+    //     expect(said).toContain("thread-P")
+    //     expect(said).toMatch(/pre-stamp/i)
+    //
+    // WHAT CHANGED AND WHY THE INVERSION IS THE POINT. 194-08 could only report
+    // "no run id YET" and name the pre-stamp window as the CAUSE, because the
+    // bucket scan was the only source of an id. 194.1 R6 adds a fallback read of
+    // the thread's workflow frame (`GET /threads/{id}/workflow`), so by the time
+    // this arm is reached BOTH sources have been consulted — and the pre-stamp
+    // window is no longer even the likeliest explanation. A line asserting a cause
+    // the code has not established is exactly the class of defect this phase
+    // exists to remove, so `/pre-stamp/i` is now asserted ABSENT.
+    //
+    // The two properties 194-08 actually cared about are UNWEAKENED: the guard
+    // still holds (zero cancels above) and the no-op is still VISIBLE.
+    expect(said).toMatch(/resolved no run id/i)
     expect(said).toContain("thread-P")
-    expect(said).toMatch(/pre-stamp/i)
+    expect(said).toMatch(/nothing was cancelled/i)
+    expect(said).not.toMatch(/pre-stamp/i)
+    expect(said).not.toContain("press Stop again in a moment")
   })
 
   it("stopStream in the same condition behaves identically", async () => {
@@ -470,8 +491,21 @@ describe("T-194-08-01 — a Stop in the pre-stamp window is OBSERVABLE, not a si
     expect(mockCancelRun).toHaveBeenCalledTimes(0)
     expect(warn).toHaveBeenCalled()
     const said = warn.mock.calls.map((c) => c.map(String).join(" ")).join("\n")
-    expect(said).toMatch(/Stop did nothing/i)
+    // ⚠ SUPERSEDED BY PHASE 194.1 PLAN 03 (R6) — see the case above for the full
+    // reasoning. The original assertions were, verbatim:
+    //
+    //     expect(said).toMatch(/Stop did nothing/i)
+    //     expect(said).toContain("thread-P")
+    //
+    // ⚠ AND THIS CASE'S OWN SUBJECT — "behaves identically" — IS NOW STRONGER
+    // THAN IT WAS. 194-08 achieved the mirroring by DUPLICATING the guard and its
+    // message in both resolvers, which is what let the retired string exist TWICE
+    // (`:2394` and `:2457` — CONTEXT D-22). 194.1 makes both resolvers call ONE
+    // shared `resolveStopRunId` and ONE shared no-id arm, so identical behaviour
+    // is now structural rather than a duplicated literal that could drift.
+    expect(said).toMatch(/resolved no run id/i)
     expect(said).toContain("thread-P")
+    expect(said).not.toMatch(/pre-stamp/i)
   })
 
   it("the HAPPY paths stay silent — otherwise the signal cannot tell silence from noise", async () => {

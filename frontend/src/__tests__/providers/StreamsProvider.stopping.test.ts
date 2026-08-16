@@ -802,6 +802,13 @@ describe("194.1-03 R6 — the false-cause string is gone from BOTH resolvers", (
    * asserted zero. That is the 192.1 lesson: a sweep over an empty list reports
    * "0 occurrences" and passes green while defending nothing.
    */
+  /**
+   * ⚠ THE EXPLICIT 30s BUDGET IS NOT DECORATION. This case reads several hundred
+   * modules through Vite's `?raw` transform; it was measured at **5007 ms** on one
+   * run — i.e. it FAILED ON THE DEFAULT 5s TIMEOUT and PASSED on the next run of
+   * the identical tree. A fence that reds on wall-clock rather than on the
+   * property it defends teaches the next reader to ignore it.
+   */
   it("zero occurrences across every .ts/.tsx under frontend/src", async () => {
     const NEEDLE = "press Stop again in a moment"
     const files = import.meta.glob("/src/**/*.{ts,tsx}", { query: "?raw", import: "default" })
@@ -811,18 +818,26 @@ describe("194.1-03 R6 — the false-cause string is gone from BOTH resolvers", (
     expect(paths.length).toBeGreaterThan(100)
     expect(paths.some((p) => p.includes("providers/StreamsProvider"))).toBe(true)
 
+    // ⚠ THE ONE-LINE EXCLUSION, stated rather than implied: TEST FILES ARE
+    // EXCLUDED, because three of them legitimately QUOTE the retired sentence in
+    // order to assert its ABSENCE — this suite, plan 01's baseline (whose pin is
+    // superseded in place), and `ComposerStopHarness.test.tsx`. Excluding them by
+    // individual name rotted within one commit: adding
+    // `expect(said).not.toContain(NEEDLE)` to a third file reddened this fence
+    // for asserting exactly the property it defends.
+    const isTest = (p: string) => p.includes("__tests__") || /\.test\.tsx?$/.test(p)
+    const production = paths.filter((p) => !isTest(p))
+    // …and the exclusion must not have eaten the surface under test.
+    expect(production.length).toBeGreaterThan(100)
+    expect(production.some((p) => p.includes("providers/StreamsProvider"))).toBe(true)
+
     const hits: string[] = []
-    for (const p of paths) {
+    for (const p of production) {
       const src = (await files[p]()) as string
-      // THIS suite is the one legitimate place the needle may appear (it is the
-      // literal under test), so it is excluded BY NAME and the exclusion is
-      // stated rather than implied.
-      if (p.includes("StreamsProvider.stopping.test")) continue
-      if (p.includes("StreamsProvider.stopping.baseline.test")) continue
       if (src.includes(NEEDLE)) hits.push(p)
     }
     expect(hits).toEqual([])
-  })
+  }, 30_000)
 })
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1261,8 +1261,14 @@ export function StreamsProvider({ children }: PropsWithChildren) {
    *  ("no disabled button, because no button") is load-bearing, not a nicety: with
    *  the control REMOVED while stopping, a stop that never resolves would strand
    *  the user with no control at all if this did not fire. */
-  const stopWindowExpired = (threadId: string) => {
+  const disarmStopTimer = (threadId: string) => {
+    const handle = stopTimersRef.current.get(threadId)
+    if (handle !== undefined) window.clearTimeout(handle)
     stopTimersRef.current.delete(threadId)
+  }
+
+  const stopWindowExpired = (threadId: string) => {
+    disarmStopTimer(threadId)
     useStreamsStore.setState((s) => {
       const stopping = new Set(s.stoppingThreads)
       stopping.delete(threadId)
@@ -1305,11 +1311,7 @@ export function StreamsProvider({ children }: PropsWithChildren) {
    *  is an honest Stop, and it is fenced by the t+2000 case in
    *  `StreamsProvider.stopping.test.ts`. */
   const clearStopStateForThread = (threadId: string) => {
-    const handle = stopTimersRef.current.get(threadId)
-    if (handle !== undefined) {
-      window.clearTimeout(handle)
-      stopTimersRef.current.delete(threadId)
-    }
+    disarmStopTimer(threadId)
     useStreamsStore.setState((s) => {
       if (
         !s.stoppingThreads.has(threadId) &&
@@ -1330,6 +1332,78 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         harnessKickoffThreads: kickoff,
       }
     })
+  }
+
+  // ── Phase 194.1 Plan 03 (R6 — CONTEXT D-09b / D-12 / D-14) — ONE run-id resolver ──
+  //
+  // The live message bucket FIRST, the thread's workflow frame as a FALLBACK ONLY.
+  //
+  // ⚠ DO NOT REVERSE THE ORDER. The bucket path yields the PRODUCER `runs.run_id`;
+  // the frame path yields a `workflow_runs.id`, which `DELETE /runs/{id}` accepts
+  // only via `194-11`'s slower Step-1b dual-id fallback. Reversing them would
+  // change the id type on EVERY Deep stop — a needless behaviour change on a
+  // surface this phase has no business on. Both are bare uuids, so a swap
+  // typechecks and then resolves nothing, and `api.ts::cancelRun` deliberately
+  // SWALLOWS 404: the failure would be a silent success.
+  //
+  // ⚠ D-12 — REJECTED ALTERNATIVE, recorded here so it is not re-proposed as a
+  // "cheaper" fix: a store field stamped at kickoff to serve R6. It is a LIVE-ONLY
+  // reading of a DURABLE fact, and a live-only reading is precisely why
+  // `BUG-260610-01` is two months old (174 D1). Two sources of truth for one fact
+  // is the defect, not the fix. `GET /threads/{id}/workflow` is the durable one:
+  // owner-scoped (ownership-gated 404), ungated (`threads.py:1036` — NOT on the
+  // canvas-gated `workflow_runs` router), and it already resolves anchor-then-latest
+  // via `last_workflow_run_id`, which SURVIVES the anchor NULL that `finish_run`
+  // writes in the same transaction as the terminal status.
+  //
+  // ⚠ D-14 is satisfied BY CONSTRUCTION rather than by sequencing luck: this
+  // fallback and R5's kickoff gate land in the SAME plan, so `stopThread` never
+  // spends a moment with no run-id source at all.
+  const resolveStopRunId = async (threadId: string): Promise<string | undefined> => {
+    const bucket = useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
+    const streamingMsg = [...bucket]
+      .reverse()
+      .find((m) => m.role === "assistant" && m.runStatus === "streaming")
+    if (streamingMsg?.runId) return streamingMsg.runId
+    try {
+      const frame = await getThreadWorkflow(threadId)
+      return frame.active_workflow_run_id ?? frame.last_workflow_run_id ?? undefined
+    } catch (err) {
+      // A failed frame read falls THROUGH to the no-id arm; it must never throw
+      // out of a click handler. Only the error's CLASS is logged — never its
+      // message, which could carry a URL or a server body (T-194.1-03-01).
+      console.warn(
+        "Stop: the thread's workflow frame could not be read for thread",
+        threadId,
+        "— error class:",
+        err instanceof Error ? err.name : "unknown",
+      )
+      return undefined
+    }
+  }
+
+  /** The honest no-id arm, shared by both resolvers.
+   *
+   *  ⚠ IT CLAIMS ONLY WHAT HAS BEEN ESTABLISHED. The retired wording asserted a
+   *  CAUSE — *"the run had not finished registering (the pre-stamp window)"* — that
+   *  the code had not checked and, with the frame read in place, is usually FALSE.
+   *  What is established is exactly two things: no run id could be resolved from
+   *  either the live message bucket or the thread's workflow frame, and nothing was
+   *  cancelled. It names the thread id and the condition and NOTHING ELSE
+   *  (T-194.1-03-01, inherited verbatim from T-194-08-04: no message content, no
+   *  auth header, no run output), and it is worded distinctly from the
+   *  `"Stop failed:"` catch so the two conditions stay separable in a log.
+   *
+   *  It also CLIMBS DOWN AT ONCE. A press that provably cancelled nothing must not
+   *  sit showing `⊘ Stopping this run…` for eight seconds — the whole subject of
+   *  this phase is that the surface says only true things about a Stop. */
+  const stopResolvedNoRunId = (threadId: string) => {
+    console.warn(
+      "Stop resolved no run id for thread",
+      threadId,
+      "— no streaming run id in the live message bucket and none on the thread's workflow frame. Nothing was cancelled.",
+    )
+    stopWindowExpired(threadId)
   }
 
   // Phase 068.5 D-068.5-03: throttled localStorage writer; hoisted into a ref
@@ -2489,22 +2563,15 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // Phase 194.1 Plan 03 (R1): the press, recorded synchronously and BEFORE
           // any network work. Byte-mirrored in `stopThread` below.
           recordStopPress(stid)
-          const bucket =
-            useStreamsStore.getState().bucketsBySurface.get("chat")?.get(stid) ?? []
-          const streamingMsg = [...bucket]
-            .reverse()
-            .find((m) => m.role === "assistant" && m.runStatus === "streaming")
-          const runId = streamingMsg?.runId
-          // ── Phase 194-08 (T-194-08-01): the PRE-STAMP WINDOW ──────────────
-          // Was a bare `if (!runId) return`. See stopThread below for the full
-          // reasoning, the rejected alternative and its re-open trigger; this
-          // arm is its exact mirror so the two resolvers cannot drift.
+          // ── Phase 194.1 Plan 03 (R6) ──────────────────────────────────────
+          // Bucket FIRST, thread workflow frame as the fallback. See
+          // `resolveStopRunId` for the ordering argument, D-12's rejected
+          // alternative and D-14. This arm is `stopThread`'s exact mirror — the
+          // two resolvers share the resolver AND the no-id arm, so they cannot
+          // drift, which is the whole reason CONTEXT D-22 exists.
+          const runId = await resolveStopRunId(stid)
           if (!runId) {
-            console.warn(
-              "Stop did nothing: no run id yet for thread",
-              stid,
-              "— the run had not finished registering (the pre-stamp window). Nothing was cancelled; press Stop again in a moment.",
-            )
+            stopResolvedNoRunId(stid)
             return
           }
           stoppedByUserRef.current = true
@@ -2525,17 +2592,17 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // Phase 194.1 Plan 03 (R1): the press, recorded synchronously and BEFORE
           // any network work. Byte-mirrored in `stopStream` above.
           recordStopPress(threadId)
-          const bucket =
-            useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
-          const streamingMsg = [...bucket]
-            .reverse()
-            .find((m) => m.role === "assistant" && m.runStatus === "streaming")
-          const runId = streamingMsg?.runId
+          // ── Phase 194.1 Plan 03 (R6) ──────────────────────────────────────
+          // Bucket FIRST, thread workflow frame as the fallback. See
+          // `resolveStopRunId` for the ordering argument, D-12's rejected
+          // alternative and D-14. `stopStream` above calls the SAME resolver and
+          // the SAME no-id arm, so the two byte-mirror resolvers cannot drift.
+          const runId = await resolveStopRunId(threadId)
           // ── Phase 194-08 (T-194-08-01): the PRE-STAMP WINDOW ──────────────
           // Was a bare `if (!runId) return`, and that return was a SILENT
-          // no-op. `sendMessage` inserts the optimistic assistant placeholder
-          // with `runStatus: "streaming"` and NO `runId` (:1926-1936), and only
-          // stamps `runId: run_id` once the kickoff POST resolves (:2031).
+          // no-op. `sendMessage` inserted the optimistic assistant placeholder
+          // with `runStatus: "streaming"` and NO `runId`, and only stamped
+          // `runId: run_id` once the kickoff POST resolved.
           // A Stop pressed between those two points matched the scan, read an
           // undefined id, and returned having done nothing — with no evidence
           // in the console, in a log capture, or on the surface.
@@ -2548,29 +2615,40 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // than a visible failure.
           //
           // The GUARD IS UNCHANGED — `cancelRun` is still never called with a
-          // falsy id. Only the silence is removed. The wording is deliberately
-          // distinct from the "Stop failed:" catch below so the two conditions
-          // are separable in a log; it names the thread id and the condition
-          // and NOTHING ELSE (T-194-08-04: no message content, no auth header,
-          // no run output).
+          // falsy id. Only the silence is removed.
           //
-          // ⚠ REJECTED ALTERNATIVE, recorded so a future reader finds a
-          // decision rather than an omission. 194-RESEARCH § B offered a second
-          // option: DISABLE the Stop control until the id lands. It was
-          // rejected as out of proportion — it reaches into the composer's
-          // shipped `disabled` logic and changes a control's behaviour during a
-          // one-RTT window on EVERY run, Deep included, to close a gap measured
-          // in one round trip. RE-OPEN TRIGGER: a second sighting of a Stop
-          // lost in the pre-stamp window (a UAT row, a bug report, or this warn
-          // appearing in a real log capture). At that point disabling the
-          // control — or queueing the intent until the stamp lands — becomes
-          // the proportionate fix and this comment is its starting point.
+          // ── ⚠ THE 194-08 RE-OPEN TRIGGER IS **DISCHARGED** BY 194.1 R1 + R6 ──
+          //
+          // ⚠ SUPERSEDED — the original text is quoted VERBATIM below rather than
+          // deleted, because a deferral that lives only in a deleted comment is
+          // exactly as invisible as one that was never written (193.2 WR-05):
+          //
+          //   "⚠ REJECTED ALTERNATIVE, recorded so a future reader finds a
+          //    decision rather than an omission. 194-RESEARCH § B offered a second
+          //    option: DISABLE the Stop control until the id lands. It was
+          //    rejected as out of proportion — it reaches into the composer's
+          //    shipped `disabled` logic and changes a control's behaviour during a
+          //    one-RTT window on EVERY run, Deep included, to close a gap measured
+          //    in one round trip. RE-OPEN TRIGGER: a second sighting of a Stop
+          //    lost in the pre-stamp window (a UAT row, a bug report, or this warn
+          //    appearing in a real log capture). At that point disabling the
+          //    control — or queueing the intent until the stamp lands — becomes
+          //    the proportionate fix and this comment is its starting point."
+          //
+          // The trigger fired (`BUG-260816-01`) and BOTH halves are now answered,
+          // and by something better than the option 194-08 had on the table:
+          //   - R1: the control is **REMOVED** while stopping, not disabled — so a
+          //     second press is impossible BY CONSTRUCTION rather than discouraged,
+          //     and nothing reaches into the composer's shipped `disabled` logic.
+          //     Sketch 168-B: no disabled button, because no button.
+          //   - R6: the id no longer depends on the stamp at all. The frame read
+          //     resolves a run the bucket has never seen, so the pre-stamp WINDOW
+          //     is no longer a window in which the id is unavailable.
+          // What remains owed is NOT this: it is L-01 (a producer on the other
+          // worker writing `completed` over the cancel — `db/workflows.py:1458-1463`),
+          // which is a SERVER-side terminal-guard problem and has its own phase.
           if (!runId) {
-            console.warn(
-              "Stop did nothing: no run id yet for thread",
-              threadId,
-              "— the run had not finished registering (the pre-stamp window). Nothing was cancelled; press Stop again in a moment.",
-            )
+            stopResolvedNoRunId(threadId)
             return
           }
           // ⚠ `stoppedByUserRef` is set only BELOW the guard, and that ordering
@@ -2580,6 +2658,11 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // the same lie one layer up — the surface would claim the user
           // stopped a run that ran to completion. Verified at HEAD: the shipped
           // order was already correct, so this is a pin, not a fix.
+          //
+          // ⚠ 194.1 R6 makes this ordering MORE load-bearing, not less: the
+          // resolution above is now TWO sources (bucket, then frame), so there are
+          // two ways to arrive here with nothing to cancel. The ref stays BELOW
+          // both of them, and the no-id arm returns without ever touching it.
           stoppedByUserRef.current = true
           try {
             await cancelRun(runId)
