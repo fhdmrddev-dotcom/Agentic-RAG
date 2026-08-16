@@ -86,10 +86,17 @@ class WorkflowRunPhaseRead(BaseModel):
     phase_index: int
     status: str = Field(
         description=(
-            "pending | active | completed | failed | skipped | recorded_not_sent "
+            "pending | active | completed | failed | skipped | recorded_not_sent | cancelled "
             "(the DB-native vocabulary). ``recorded_not_sent`` is migration 115's sixth "
             "literal (189 / D-05): an approved governed external action that RECORDED "
-            "what it would have done and sent nothing. The wire carries the SLUG (D-17) "
+            "what it would have done and sent nothing. ``cancelled`` is migration 119's "
+            "SEVENTH literal (194 / D-04): the phase that was RUNNING when the user stopped "
+            "the run — it did not FAIL and was not SKIPPED, it ran and was interrupted. "
+            "⚠ THE AUTHORITY IS ``supabase/migrations/119_workflow_phases_cancelled.sql``'s "
+            "``ADD CONSTRAINT workflow_phases_status_check`` ARRAY, NEVER this prose — this "
+            "description listed only six literals from Phase 194 until 194.1 corrected it, so "
+            "derive the set from the constraint rather than trusting the sentence. "
+            "The wire carries the SLUG (D-17) "
             "— the sentence a person reads is rendered by the client's vocabulary layer."
         )
     )
