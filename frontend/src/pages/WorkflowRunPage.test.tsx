@@ -1787,3 +1787,230 @@ describe("api.getWorkflowRun 188.1-04 — WR-07: the run-id path segment is enco
     }
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 194.1 Plan 07 (RUN-01 / R3 / D-19) — THE STOP ON THE RUN'S OWN SURFACE
+// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * `▶ Run workflow` lands the user HERE, and until this plan
+ * `grep -c "onStop|stopThread|cancelRun|Stop" WorkflowRunPage.tsx` returned **0** —
+ * the natural launch path had no working Stop at all. That is half of
+ * `BUG-260816-01`, and it is what these cases exist to keep closed.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠ FIVE STATUS CASES, NOT TWO, AND THE REASON IS A PLANT RATHER THAN A HABIT
+ * ─────────────────────────────────────────────────────────────────────────────
+ * A `completed`-only pair of cases passes a gate written `runStatus !== "completed"`
+ * — the exact plant P1 was driven against — because `cancelled` and `failed` are
+ * also terminal and that gate lets both through. `cancelled` matters most of all:
+ * it is the state the user lands on IMMEDIATELY AFTER pressing this very control,
+ * so a live-looking Stop there would be the same defect this plan exists to remove,
+ * one screen later.
+ *
+ * Each case is named for the shipped BAND SENTENCE it drives (`WorkflowRunPage.tsx`
+ * `:288-308`), not for the raw status literal, so a reading and its control are
+ * asserted against the same fact the user sees.
+ */
+describe("194.1-07 R3 — the Stop renders on the two live states and on none of the three terminal ones", () => {
+  /** The shared component's `page` variant testids (`StopControl.tsx:231-242`). */
+  const STOP_TESTID = "run-page-stop"
+  const SLOT_TESTID = "run-page-stop-slot"
+  const STOPPING_TESTID = "page-stopping"
+  const STOPPING_READING = "⊘ Stopping this run…"
+
+  async function openWithStatus(status: string, overrides: Partial<RunLike> = {}) {
+    getWorkflowRun.mockResolvedValue(mkRun({ status, ...overrides }))
+    const utils = renderPage()
+    await screen.findByTestId("canvas-stub")
+    return utils
+  }
+
+  /**
+   * ⚠ `getAllByText`, NOT `getByText`, and the reason is a property of the surface
+   * rather than a workaround: this page renders `band.sentence` TWICE on purpose —
+   * once in the header for sighted users and once in the visually-hidden
+   * `data-testid="run-band"`, which is the ANNOUNCEMENT channel for assistive tech.
+   * A `getByText` here reds with *"found multiple elements"* — measured, not
+   * predicted.
+   *
+   * ⚠ AND ON `failed` IT IS THREE, NOT TWO — which this helper was written assuming
+   * and was WRONG about. Measured: `expected [ … ] to have a length of 2 but got 3`.
+   * The third home is `data-testid="run-alert"`, the `role="alert"` region gated on
+   * `ALERTING_STATUSES = new Set(["failed", "cap_paused"])` — the two run-level
+   * states that earn an ASSERTIVE announcement. So the count is a parameter and its
+   * value is the fact being asserted, rather than a constant that happened to hold
+   * for four of the five states.
+   *
+   * ⚠ AND IT WAITS RATHER THAN SAMPLES, WHICH IS NOT DEFENSIVENESS — IT IS A
+   * MEASURED FIX FOR A FENCE THAT WAS ALREADY LYING TO ME. The third home is
+   * `useState` written from a `useEffect` (`:824-832`), so it lands a tick AFTER
+   * `findByTestId("canvas-stub")` resolves. With a plain `getAllByText` the failed
+   * case read **3** on the whole-file run and **2** under plant P1 — a plant that
+   * changed only an unrelated ternary. The plant perturbed render timing, so the
+   * case red on the WRONG clause, and P1 would have been credited with catching an
+   * announcement race instead of a gate. *A fence that reds for a reason other than
+   * its subject is not evidence for its subject.* `waitFor` makes the count the
+   * assertion again, and P1 was re-driven afterwards to get honest evidence.
+   */
+  async function expectBandSentence(sentence: string, homes = 2) {
+    await waitFor(() => expect(screen.getAllByText(sentence)).toHaveLength(homes))
+  }
+
+  it("`● Running` — the control is offered", async () => {
+    await openWithStatus("active")
+    await expectBandSentence("● Running")
+    expect(screen.getByTestId(STOP_TESTID)).toBeTruthy()
+  })
+
+  it("`Paused for your answer` — the control is offered", async () => {
+    await openWithStatus("paused")
+    await expectBandSentence("Paused for your answer")
+    expect(screen.getByTestId(STOP_TESTID)).toBeTruthy()
+  })
+
+  it("`✓ Complete` — the control is absent", async () => {
+    await openWithStatus("completed")
+    await expectBandSentence("✓ Complete")
+    expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
+    // The whole SLOT is gone, not merely the button inside it — an empty reservation
+    // on a finished run would still be spending header space on a dead affordance.
+    expect(screen.queryByTestId(SLOT_TESTID)).toBeNull()
+  })
+
+  it("`⊘ Cancelled` — the control is absent (the state this control itself produces)", async () => {
+    await openWithStatus("cancelled")
+    await expectBandSentence("⊘ Cancelled")
+    expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
+    expect(screen.queryByTestId(SLOT_TESTID)).toBeNull()
+  })
+
+  it('`✕ Failed at "…"` — the control is absent', async () => {
+    await openWithStatus("failed", {
+      phases: [
+        { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+        { slug: "draft-letter", phase_index: 1, status: "failed", phase_type: "llm_agent" },
+        { slug: "final-check", phase_index: 2, status: "pending", phase_type: "llm_human_input" },
+      ],
+    })
+    // THREE homes: the header, the polite band, and the assertive `run-alert`.
+    await expectBandSentence('✕ Failed at "Draft the renewal letter"', 3)
+    expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
+    expect(screen.queryByTestId(SLOT_TESTID)).toBeNull()
+  })
+
+  /**
+   * DOM CONTAINMENT, never a line number. The acceptance is *"the mount sits inside
+   * the same flex container as `COPY_OPEN_THREAD`"*, and a source-line assertion
+   * would rot on the next edit to this file while a containment assertion cannot.
+   */
+  it("the control and the seam link share one container, and the seam link is LAST in it", async () => {
+    await openWithStatus("active")
+    const slot = screen.getByTestId(SLOT_TESTID)
+    const seam = screen.getByText("Open the chat thread")
+    const group = slot.parentElement
+    expect(group).not.toBeNull()
+    expect(group!.contains(seam)).toBe(true)
+    // ⚠ ORDER, asserted by CHILD POSITION rather than by class name (the 192.1 /
+    // 193 precedent). The seam link is the LAST child of the right-aligned group,
+    // which is what pins its right edge — if a later edit appends the Stop after
+    // it, the seam link moves every time the run goes terminal and G-4 row 2's
+    // "the row twitches" failure is back.
+    expect(group!.lastElementChild).toBe(seam)
+    expect(group!.firstElementChild).toBe(slot)
+  })
+
+  /**
+   * ⚠ THE PRESS ASSERTS THE VALUE, NEVER MERELY THE CALL.
+   *
+   * `expect(fn).toHaveBeenCalled()` alone passes under the two-id landmine
+   * (`ComposerStopHarness.test.tsx:16-19`): `WorkflowLock.runId` carries two id
+   * types while its JSDoc asserts one, and `api.ts::cancelRun` swallows 404, so a
+   * wrong-id stop is indistinguishable from a successful one.
+   *
+   * At THIS seam the value is the THREAD id — the page hands `stopThread` a thread
+   * and never resolves a run id itself, which is D-08's *four mounts, ONE mechanism*
+   * expressed as a call signature. The fixture uses `RUN_THREAD_ID` against the
+   * suite's shipped `VIEWED_THREAD_ID` DECOY precisely so a press that reached for
+   * the globally-viewed thread instead resolves to a DIFFERENT, visibly wrong value
+   * rather than to a coincidence.
+   */
+  it("one press issues exactly ONE stop, keyed on the RUN's thread and not the viewed one", async () => {
+    await openWithStatus("active", { thread_id: RUN_THREAD_ID })
+    fireEvent.click(screen.getByTestId(STOP_TESTID))
+
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(RUN_THREAD_ID)
+    expect(stopThread).not.toHaveBeenCalledWith(VIEWED_THREAD_ID)
+  })
+
+  /**
+   * THE DIRECT-FLIP GUARD, TESTED RATHER THAN ASSUMED. Sketch 169 offered three
+   * guards (direct flip / arm-to-confirm / naming sheet) and settled on the first;
+   * an unenforced settlement is a hope. If a later plan slips a confirmation in,
+   * `toHaveBeenCalledTimes(1)` after ONE click reds here first.
+   */
+  it("there is NO confirmation step — one press, no dialog, no second control", async () => {
+    await openWithStatus("active", { thread_id: RUN_THREAD_ID })
+    fireEvent.click(screen.getByTestId(STOP_TESTID))
+
+    // The cancel is already away after the FIRST press.
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    // No sheet, no armed state, no "are you sure".
+    expect(screen.queryByRole("alertdialog")).toBeNull()
+    expect(screen.queryByRole("dialog")).toBeNull()
+    const body = document.body.textContent ?? ""
+    expect(body).not.toMatch(/are you sure/i)
+    expect(body).not.toMatch(/confirm/i)
+  })
+
+  /**
+   * THE SLOT SWAP, at THIS mount.
+   *
+   * ⚠ WHAT THIS CASE PROVES AND WHAT IT DOES NOT, stated rather than implied. The
+   * production flip is store-driven: `stopThread` sets the thread's `stopping` flag
+   * and every subscriber re-renders. This suite mocks the provider module away, so
+   * the flag is flipped from inside the `stopThread` spy and a re-render is forced.
+   * That makes this case's subject *"the page renders the shared slot's stopping arm
+   * in its title row"* — NOT *"pressing flips the store"*, which is plan 03's
+   * property (`StreamsProvider.stopping.test.ts`), and NOT *"stopping removes the
+   * control"*, which is plan 04's (`StopControl.test.tsx`). Three arms, each pinned
+   * where it lives; none of them is faked here to stand in for another.
+   */
+  it("with the store reporting stopping, the reading takes the slot and the control is GONE", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
+    stopThread.mockImplementation((_t: string) => {
+      stoppingNow = true
+      return Promise.resolve()
+    })
+    const onBack = vi.fn()
+    const onOpenThread = vi.fn()
+    // ⚠ A FRESH ELEMENT OBJECT EACH TIME, and this is load-bearing rather than
+    // style: React bails out of a re-render when handed the REFERENTIALLY IDENTICAL
+    // element, so `rerender(el)` with one hoisted `el` renders nothing and this case
+    // reported the control still present while the flag was already `true` —
+    // measured, not predicted. A test that cannot re-render cannot observe a swap.
+    const el = () => (
+      <TechnicalNamesProvider>
+        <WorkflowRunPage runId="run-1" onBack={onBack} onOpenThread={onOpenThread} />
+      </TechnicalNamesProvider>
+    )
+    const { rerender } = render(el())
+    await screen.findByTestId("canvas-stub")
+
+    fireEvent.click(screen.getByTestId(STOP_TESTID))
+    await act(async () => {
+      rerender(el())
+    })
+
+    expect(screen.queryByTestId(STOP_TESTID)).toBeNull()
+    const reading = screen.getByTestId(STOPPING_TESTID)
+    expect(reading.textContent).toBe(STOPPING_READING)
+    // It is in the TITLE ROW, beside the seam link — not somewhere else on the page.
+    expect(reading.closest(`[data-testid="${SLOT_TESTID}"]`)).not.toBeNull()
+    expect(
+      screen
+        .getByTestId(SLOT_TESTID)
+        .parentElement!.contains(screen.getByText("Open the chat thread")),
+    ).toBe(true)
+  })
+})
