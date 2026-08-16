@@ -6,7 +6,7 @@
  * the GET-reconciled prompt (run_id present) and the pure-SSE prompt (run_id
  * ABSENT — A2 / Pitfall 1: submit must be gated + reconcile triggered).
  */
-import { describe, it, expect, vi, afterEach } from "vitest"
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest"
 import { act, render, screen, waitFor, cleanup, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
@@ -45,6 +45,28 @@ const hookState: { asks: PendingAsk[]; reconcile: ReturnType<typeof vi.fn> } = {
   asks: [],
   reconcile: vi.fn().mockResolvedValue(undefined),
 }
+/**
+ * Phase 194.1 Plan 05 Task 3 — the THIRD and FOURTH keys, and needing them is the
+ * measurement rather than plumbing.
+ *
+ * `PendingAskStack` now DERIVES `runIsOver` from the workflow lock and the phase
+ * list — two hooks `WorkspacePanel` already calls for its timeline gate. Left out
+ * of this explicit object literal they resolve to `undefined` and every case that
+ * renders the STACK throws; the cases that render a bare `PendingAskCard` are
+ * unaffected, which is itself the proof that the derivation lives in the stack and
+ * not in the card.
+ *
+ * They default to the LIVE-RUN arm (`lock` present, `phases` empty) so every
+ * pre-existing case still measures exactly what it measured before this prop
+ * existed. `stackState` lets a case move them.
+ */
+const stackState: {
+  lock: { runId: string; mode: "harness"; capPaused: boolean; continuesRemaining: number } | null
+  phases: unknown[]
+} = {
+  lock: { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 },
+  phases: [],
+}
 vi.mock("@/providers/StreamsProvider", () => ({
   useViewingThread: () => "thread-1",
   useAskUserPrompt: () => ({
@@ -52,6 +74,13 @@ vi.mock("@/providers/StreamsProvider", () => ({
     isLoading: false,
     error: null,
     reconcile: hookState.reconcile,
+  }),
+  useWorkflowLockForThread: () => stackState.lock,
+  usePhases: () => ({
+    data: stackState.phases,
+    isLoading: false,
+    error: null,
+    reconcile: vi.fn(),
   }),
 }))
 
@@ -70,6 +99,11 @@ afterEach(() => {
   vi.clearAllMocks()
   hookState.asks = []
   hookState.reconcile = vi.fn().mockResolvedValue(undefined)
+  // Phase 194.1 Plan 05 — back to the LIVE-RUN arm, for the same reason the two
+  // lines above exist: state a previous case left behind is indistinguishable from
+  // state this case caused.
+  stackState.lock = { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 }
+  stackState.phases = []
 })
 
 const noopReconcile = () => Promise.resolve()
@@ -562,6 +596,48 @@ describe("PendingAskCard (194.1-05 / R7(b)) — retired by a stopped run, never 
   it("has no axe violations in the retired arm", async () => {
     const { container } = renderRetired()
     expect(await axe(container)).toHaveNoViolations()
+  })
+
+  /**
+   * ⚠ THE DERIVATION'S TWO CONJUNCTS, EACH SHOWN TO MATTER SEPARATELY. This is the
+   * lesson `api/runs.py`'s ledger row states in the backend and it applies here
+   * unchanged: *a clause whose only test is a world where a sibling clause also
+   * holds has never actually been tested.* `runIsOver = lock == null && phases > 0`
+   * has exactly two ways to be wrong, and they point in OPPOSITE directions, so a
+   * single "retired when the run is over" case cannot see either.
+   */
+  describe("the runIsOver derivation, driven through PendingAskStack", () => {
+    beforeEach(() => {
+      hookState.asks = [ASK]
+    })
+
+    it("retires when the lock is cleared AND phases exist (the run ended)", () => {
+      stackState.lock = null
+      stackState.phases = [{ slug: "p0" }]
+      render(<PendingAskStack />)
+      expect(screen.getByText(RUN_STOPPED_RETIREMENT_LINE)).toBeInTheDocument()
+    })
+
+    it("does NOT retire on a DEEP thread — no lock, but no phases either", () => {
+      // ⚠ `lock == null` ALONE is true here. Retiring on it would kill every Deep
+      // `ask_user` prompt the instant it appeared — a thread with no run to stop
+      // must keep its approvals answerable.
+      stackState.lock = null
+      stackState.phases = []
+      render(<PendingAskStack />)
+      expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+      expect(screen.getByText(ASK.prompt)).toBeInTheDocument()
+    })
+
+    it("does NOT retire MID-RUN — phases exist, but the lock is still held", () => {
+      // ⚠ `phases.length > 0` ALONE is true here. Retiring on it would kill a LIVE
+      // prompt the moment its first phase row landed — the same defect Task 1 just
+      // removed from the panel's Stop row, in a new place.
+      stackState.lock = { runId: "wr-1", mode: "harness", capPaused: false, continuesRemaining: 3 }
+      stackState.phases = [{ slug: "p0" }]
+      render(<PendingAskStack />)
+      expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+    })
   })
 })
 
