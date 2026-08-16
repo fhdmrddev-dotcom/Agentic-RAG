@@ -1943,6 +1943,131 @@ async def test_a_failing_phase_terminalize_never_swallows_the_cancellation(
     )
 
 
+# ── Phase 194 code review CR-02 — a CRASH is not a STOP ──────────────────────
+#
+# ⚠ THE DEFECT THESE CASES EXIST FOR. The terminalize was placed inside the
+# pre-existing ``except BaseException:`` arm and the exception was never captured or
+# inspected — while that arm's OWN shipped comment says "a crash escapes the same way",
+# and it is right: any non-``TimeoutError`` exception out of ``_execute_phase``
+# propagates through ``_run_phase_with_gates`` (which catches only
+# ``asyncio.TimeoutError``, at :907) and lands here. So a phase that FAILED FOR A REAL
+# REASON was persisted as ``cancelled``, rendered "Stopped by you" on the canvas and
+# "Stopped" on the panel spine — under a ``workflow_runs`` row the producer's terminal
+# classifier writes as ``failed``. A persisted, user-visible false statement, in the
+# phase whose entire requirement is honesty about what a stopped run did.
+#
+# ⚠ AND WHAT THE CRASH ARM MUST **NOT** DO INSTEAD, RECORDED HERE BECAUSE IT WAS
+# OFFERED AND REJECTED: it must not write ``failed`` either. This module's own header
+# states the shipped contract verbatim — "A phase whose execution raises mid-work is
+# left ``active`` (never ``completed``) so a later sweep re-runs it — the
+# crash-leaves-active resume contract" (``harness_engine.py:15-16``). Writing a terminal
+# status on a crash would repeal that contract from inside a cancel fix. So the honest
+# literal for a crash is the one the module already defines: NO terminal write at all,
+# which is exactly the behaviour that shipped for a year before 194. The ``cancelled``
+# write is scoped to a real cancellation and nothing else.
+#
+# ⚠ NO EXISTING CASE DRIVES A NON-``CancelledError`` THROUGH THIS ARM — the drive helper
+# defaults ``exc`` to ``asyncio.CancelledError()``, so the arm's inability to tell a
+# crash from a Stop was unobservable by the suite.
+
+
+@pytest.mark.asyncio
+async def test_a_crashed_phase_is_never_persisted_as_stopped_by_the_user(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """CR-02 (a) — a real crash writes NO ``cancelled`` status, and still propagates.
+
+    ``cancelled`` is rendered to a person as "Stopped by you" / "you ended the run while
+    this step was still working". Nobody ended this run: the step blew up.
+    """
+    raised, _expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+        exc=RuntimeError("a provider blew up mid-phase"),
+    )
+
+    assert _cancel_writes(mock_asyncpg_pool) == [], (
+        "a phase that CRASHED was persisted as `cancelled` — the canvas then says "
+        "'Stopped by you' about a failure nobody asked for, under a workflow_runs row "
+        "that reads `failed`"
+    )
+    assert isinstance(raised, RuntimeError), (
+        f"the crash must still propagate unchanged out of the arm; got {raised!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_crashed_phase_keeps_the_crash_leaves_active_resume_contract(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """CR-02 (b) — and it writes no OTHER terminal status either.
+
+    A SEPARATE case from (a) on purpose: ``assert`` short-circuits, and "not cancelled"
+    and "not terminal at all" are two different properties. Repairing (a) by writing
+    ``failed`` instead would leave (a) green and red here — which is the whole point,
+    because this module's header defines the crash contract as leaving the row
+    ``active`` for the resume sweep (``harness_engine.py:15-16``).
+    """
+    _raised, _expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+        exc=RuntimeError("a provider blew up mid-phase"),
+    )
+
+    phase_writes = [
+        sql for sql, _args in mock_asyncpg_pool.calls if "UPDATE workflow_phases" in sql
+    ]
+    assert phase_writes, (
+        "the drive composed NO workflow_phases write at all — not even the shipped "
+        "mark-active. The case would be vacuous (the 194-03 empty-sweep lesson)"
+    )
+    for sql in phase_writes:
+        assert "SET status='active'" in sql, (
+            "a crashed phase must be left `active` for the resume sweep — this module's "
+            f"documented crash-leaves-active contract. It wrote: {sql!r}"
+        )
+
+
+@pytest.mark.asyncio
+async def test_the_arm_tells_a_stop_from_a_crash_by_the_ESCAPE_not_by_a_flag(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """CR-02 (c) — THE DISCRIMINATOR, driven in one case so it cannot be half-satisfied.
+
+    ⚠ THIS IS THE ANTI-OVER-CORRECTION CONTROL AND THE REASON IT IS A THIRD CASE.
+    Cases (a) and (b) are both satisfied by an arm that writes NOTHING EVER — i.e. by
+    deleting the 194 feature outright. This one fails in BOTH directions: it drives the
+    same helper twice, on the same shape of run, changing ONLY the escape, and asserts
+    the two disagree — one ``cancelled`` write for the Stop, zero for the crash.
+    """
+    stop_pool = mock_asyncpg_pool
+    _r1, _e1, stop_ids, _rid1 = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, stop_pool, statuses=("active",),
+        exc=asyncio.CancelledError(),
+    )
+    # ⚠ A SECOND, GENUINELY INDEPENDENT RECORDER — not a proxy over the first. A proxy
+    # that delegated ``execute`` would have written the crash drive's calls into the
+    # Stop drive's log too: the first draft of this case did exactly that and red with
+    # TWO cancelled writes, which is a test bug, not evidence (the 194-11 lesson).
+    crash_pool = type(stop_pool)()
+    _r2, _e2, _crash_ids, _rid2 = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, crash_pool, statuses=("active",),
+        exc=RuntimeError("boom"),
+    )
+
+    stop_writes = _cancel_writes(stop_pool)
+    crash_writes = _cancel_writes(crash_pool)
+    assert len(stop_writes) == 1 and stop_writes[0][1] == (stop_ids[0],), (
+        "a real Stop must still terminalize the interrupted phase — deleting the write "
+        f"is not a fix for CR-02. recorded={stop_writes!r}"
+    )
+    assert crash_writes == [], (
+        f"the same arm wrote `cancelled` for a crash. recorded={crash_writes!r}"
+    )
+
+
 def test_the_cancel_arm_is_the_harness_engines_alone_and_deep_never_enters_it():
     """Deep runs are unaffected: ``cancel_phase`` is CALLED in exactly one module.
 

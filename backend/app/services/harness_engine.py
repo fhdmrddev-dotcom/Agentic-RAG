@@ -1611,7 +1611,7 @@ async def run_workflow(
                 # ``len(definition.phases)`` ``effective_phase`` already receives above.
                 total_phases=_total,
             )
-        except BaseException:
+        except BaseException as _escape:
             # ── cancel/escape path (D-06 / BUG-260605-01) ─────────────────────
             # A user Stop cancels the producer task while the phase await blocks
             # (a paused ask_user lives exactly here); a crash escapes the same
@@ -1674,15 +1674,46 @@ async def run_workflow(
                 # above is: cancellation is already in flight, an unshielded
                 # await would be cancelled before it wrote, and a cleanup failure
                 # must never mask the escape. The ``raise`` stays LAST.
-                try:
-                    await asyncio.shield(cancel_phase(pool, phase_id))
-                except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
-                    logger.exception(
-                        "interrupted-phase terminalize failed on cancel/escape "
-                        "for run %s phase %s",
-                        run_id,
-                        phase_id,
-                    )
+                #
+                # ⚠ CR-02 (194 code review) — ONLY A CANCELLATION MAY BE WRITTEN
+                # AS ONE, AND THE ESCAPE IS THE ONLY THING THAT KNOWS. ⚠ The
+                # paragraph above says the interrupted phase "did not `fail`
+                # (nothing went wrong) and was not `skipped` (it ran)" — that is
+                # TRUE OF A USER STOP AND FALSE OF A CRASH, and this handler
+                # catches both (its own comment three screens up says so: "a
+                # crash escapes the same way"). As first shipped the write was
+                # UNCONDITIONAL, so a phase that failed for a real reason was
+                # persisted as `cancelled` and rendered "Stopped by you" on the
+                # canvas — under a `workflow_runs` row the producer's terminal
+                # classifier writes as `failed`. A persisted, user-visible false
+                # statement, produced by the fix for user-visible false
+                # statements. So the escape is CAPTURED and inspected.
+                #
+                # ⚠ AND THE CRASH ARM DELIBERATELY WRITES NOTHING — writing
+                # `failed` here was OFFERED AND REJECTED. This module's header
+                # states the shipped contract verbatim: "A phase whose execution
+                # raises mid-work is left ``active`` (never ``completed``) so a
+                # later sweep re-runs it — the crash-leaves-active resume
+                # contract" (:15-16). A terminal write on the crash path would
+                # repeal that contract from inside a cancel fix. Leaving the row
+                # `active` is not an omission, it is that contract's own answer,
+                # and it is exactly what shipped for a year before 194.
+                # ⚠ The residual it leaves is named rather than hidden: an
+                # `active` phase row under a run that ends `failed`. That is
+                # PRE-EXISTING and inherited, not introduced here; closing it
+                # means giving the crash path its own honest status, which is a
+                # vocabulary decision (a seventh literal / a migration), not a
+                # line of this arm.
+                if isinstance(_escape, asyncio.CancelledError):
+                    try:
+                        await asyncio.shield(cancel_phase(pool, phase_id))
+                    except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
+                        logger.exception(
+                            "interrupted-phase terminalize failed on cancel/escape "
+                            "for run %s phase %s",
+                            run_id,
+                            phase_id,
+                        )
             raise
 
         # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─
