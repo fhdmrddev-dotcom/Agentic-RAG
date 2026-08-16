@@ -1321,6 +1321,22 @@ export interface ThreadWorkflowState {
    *  `latest_producer_run_id` directly above, which is the OTHER table. Both are bare uuids,
    *  so a swap typechecks and then resolves nothing. */
   last_workflow_run_id?: string | null
+  /** Phase 194.1 (D-09 AMENDED) — the LAST run's status and its two timestamps, keyed to the
+   *  same anchor-then-latest run as `last_workflow_run_id` directly above. The server reads
+   *  them off SELECTs it already issued: no new route, no extra round trip.
+   *
+   *  ⚠ `last_run_status` is the LAST run's status. It is NOT `run_status` above, which is the
+   *  LIVE anchor's and is `null` after a stop — that gap is why these exist. Both are
+   *  `string | null` and a swap TYPECHECKS, exactly like the two id types warned about above.
+   *
+   *  ⚠ ELAPSED IS `last_run_created_at` -> `last_run_updated_at`, i.e. from QUEUED to LAST
+   *  UPDATE — NOT a wall-clock run duration, because queue time is inside it. `claimed_at` is
+   *  deliberately not offered (0 of 149 completed rows carry it — the in-process producer
+   *  never takes `claim_run`'s CAS lease). Any surface printing the interval owes that
+   *  disclosure. Timestamps are ISO strings on the wire. */
+  last_run_status?: string | null
+  last_run_created_at?: string | null
+  last_run_updated_at?: string | null
   /** Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
    *  (ordered by phase_index) from workflow_phases, so the reconcile floor can
    *  rebuild an HONEST timeline for a TERMINAL run instead of returning [] (which
