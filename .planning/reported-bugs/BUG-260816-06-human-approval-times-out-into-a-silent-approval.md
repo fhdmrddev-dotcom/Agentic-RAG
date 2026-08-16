@@ -1,5 +1,5 @@
 ---
-id: BUG-260816-03
+id: BUG-260816-06
 title: An unanswered `llm_human_input` step times out into a SILENT APPROVAL — the phase records `completed` with `answer: ""` and the run proceeds as if the human confirmed
 reported: 2026-08-16
 surface: Agentic-RAG
@@ -16,7 +16,7 @@ reproduces_on:
   date: 2026-08-16
 ---
 
-# BUG-260816-03: A human approval that nobody answers becomes an approval
+# BUG-260816-06: A human approval that nobody answers becomes an approval
 
 ## What we observed
 

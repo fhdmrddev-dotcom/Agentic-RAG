@@ -1,5 +1,5 @@
 ---
-id: BUG-260816-02
+id: BUG-260816-05
 title: The canvas run surface PAINTS a waiting human step but hosts no way to answer it — the responder is mounted only in WorkspacePanel
 reported: 2026-08-16
 surface: Agentic-RAG
@@ -16,7 +16,7 @@ reproduces_on:
   date: 2026-08-16
 ---
 
-# BUG-260816-02: The canvas run surface cannot answer a human-in-the-loop step
+# BUG-260816-05: The canvas run surface cannot answer a human-in-the-loop step
 
 ## What we observed
 

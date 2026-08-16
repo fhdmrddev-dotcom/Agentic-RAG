@@ -1,5 +1,5 @@
 ---
-id: BUG-260816-01
+id: BUG-260816-04
 title: A published workflow cannot be opened or inspected — `▶ Run` is the only way to learn what it does
 reported: 2026-08-16
 surface: Agentic-RAG
@@ -16,7 +16,7 @@ reproduces_on:
   date: 2026-08-16
 ---
 
-# BUG-260816-01: A published workflow cannot be opened or inspected
+# BUG-260816-04: A published workflow cannot be opened or inspected
 
 ## What we observed
 

@@ -16,7 +16,7 @@ relates_to:
   - SEED-148 → RUN-02/RUN-03 (phase 195) — the "show me what it produced" axis.
   - SEED-141 → NODE-01 (phase 198) — the deterministic-step axis (axis C/B).
   - NODE-02 (phase 198) — the human-role axis, and **the one thing v3.7 can still cheaply get right**.
-  - BUG-260816-03 — an unanswered human step becomes an approval. Axis D is broken today, not just thin.
+  - BUG-260816-06 — an unanswered human step becomes an approval. Axis D is broken today, not just thin.
 trigger_when:
   - Scoping ANY phase that touches phase types, the authoring vocabulary, or the human-in-the-loop step
   - "/gsd:discuss-phase 198" — NODE-01 and NODE-02 both live here; read the axes table first
@@ -112,7 +112,7 @@ The engine ships **seven phase types**: `llm_agent`, `llm_single`, `llm_batch_ag
 | **A** | `A1` | `A2` no scheduler (Phase 105, deferred). `A3` **ingestion is manual upload only** (CLAUDE.md rule; SEED-142). `A4` **nothing can express a date-condition trigger at all** |
 | **B** | `B1` | `B2`/`B3`/`B4` — ⚠ **no run-to-run state exists.** `grep -rn "previous_run\|prior_run\|last_run_output\|incremental\|since_last"` over `services/harness/` + `models/harness.py` → **ZERO hits** (SEED-167) |
 | **C** | `C1`, partial `C3` | ⚠ **`C2` is not a first-class shape.** `llm_batch_agents` fans out over **sub-QUESTIONS** produced by an upstream `programmatic` `split_topic` — not over a document set. "One row per contract" has no primitive. `C4` absence-detection is the weakest thing retrieval does, and nothing compensates |
-| **D** | `D1`, weak `D2` | ⚠ **`llm_human_input` is ONE prompt with free text or a flat choice list.** `D3` item-level adjudication has no shape at all. `D5` attribution exists only for the armed checkpoint. ⚠ **And `D1` is currently BROKEN — `BUG-260816-03`: an unanswered step times out into a silent approval** |
+| **D** | `D1`, weak `D2` | ⚠ **`llm_human_input` is ONE prompt with free text or a flat choice list.** `D3` item-level adjudication has no shape at all. `D5` attribution exists only for the armed checkpoint. ⚠ **And `D1` is currently BROKEN — `BUG-260816-06`: an unanswered step times out into a silent approval** |
 | **E** | `E1`, `E2` | `E3` needs stable row identity (SEED-167 open Q2). `E4` untested. `E5` — connectors are **send-only and only 1 of 3 is drivable from a workflow** (CONN-02, unsatisfied). ⚠ Even `E2`'s output **cannot be seen from the run surface** (RUN-02, phase 195) |
 | **F** | `F1`, `F2`, partial `F3` | `F3` is thin outside the armed path. `F4` golden runs exist |
 
