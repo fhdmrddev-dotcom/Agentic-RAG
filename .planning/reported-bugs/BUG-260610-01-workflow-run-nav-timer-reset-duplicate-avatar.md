@@ -4,7 +4,12 @@ title: Navigating away/back during a streaming workflow run resets the run timer
 reported: 2026-06-10
 surface: Agentic-RAG
 severity: minor
-status: folded
+status: open   # ⚠ CORRECTED 2026-08-16 — was `folded` / folded_into 174, but this report's OWN
+               # re_open_trigger says the DUPLICATE-AVATAR half was "NOT folded … Stays OPEN".
+               # The frontmatter and the body disagreed for two months and the frontmatter is what
+               # the routing scan reads. Re-observed live 2026-08-16 (Phase 194 UAT) — see the
+               # 2026-08-16 update at the foot of this file. The TIMER half may well be closed by
+               # 174/128; nobody has verified it (verified_closed_by is still null).
 affected_areas: [frontend/streaming, frontend/run-honesty, harness/workflow-ui]
 folded_into: "174"
 verified_closed_by: null
@@ -80,3 +85,57 @@ Stay on the running thread for an accurate timer; the glitch is display-only —
 - `screenshots/Screenshot 2026-06-10 122245.png` / `122304.png` (run completed correctly despite the glitch)
 - Phase 099 UAT session: `.planning/phases/099-workflow-skill-composition/099-UAT.md` Test 3
 - Prior family: 095 reload-timer (fixed 095.1 for Deep), 098 open run-honesty trio (BUG-260609-02 / BUG-260609-04 / 1-2s empty-bubble)
+
+---
+
+## Update — RE-OBSERVED 2026-08-16 (Phase 194 UAT), and the frontmatter was corrected
+
+Operator report while watching live workflow runs being stopped during Phase 194 UAT, verbatim:
+
+> *"if you notice the duplicated avatar — which is the case not only [in] the workflow, it is in the
+> chat area I think. And it is a documented bug."*
+
+The operator is right that it is documented: **this report.** Two things follow.
+
+### 1. ⚠ The frontmatter said `folded` while this report's own body said the avatar half stays OPEN
+
+`status: folded` / `folded_into: "174"` has been the machine-readable state since Phase 174, while
+the `re_open_trigger` on the same record ends:
+
+> *"The duplicate-avatar symptom (StreamsProvider/MessageList double-mount race) is **NOT folded** —
+> deferred to the run-honesty cluster slot. **Stays OPEN**."*
+
+**The routing scan reads the frontmatter, not the prose.** `CLAUDE.md`'s reported-bugs touchpoints
+filter on `status: open`, so for two months this bug was invisible to every `/gsd:discuss-phase`
+sweep **despite its own text saying it was open** — the same class of failure as a hot file being
+absent from the G-5 ledger: *a guardrail cannot see what is absent from its list.* Corrected to
+`status: open` 2026-08-16; the original values are recorded in the inline comment rather than
+overwritten silently.
+
+`verified_closed_by` is still `null`, so nothing has ever confirmed the timer half either.
+
+### 2. It reproduces on a surface this report had not yet named
+
+Prior confirmations: Google, OpenRouter, Moonshot, DeepSeek — all *workflow* runs plus a Deep-mode
+sibling. The 2026-08-16 sighting adds the operator's own observation that it is **"not only [in] the
+workflow, it is in the chat area"** — i.e. the plain chat surface, at `045a83dc`, ten weeks and
+several run-honesty phases (128, 174) after the last recorded sighting.
+
+⚠ **Not independently measured in this session.** The Phase 194 UAT was driven against the database
+and the wire, and a duplicated avatar is a pure render artifact that neither instrument can see —
+which is exactly why the operator's eye caught something seven driven rows did not. Recorded as an
+operator observation, not as a measurement, and it needs a DOM-level repro before anyone claims a
+cause.
+
+### Routing
+
+- Still `Agentic-RAG`; still the run-honesty cluster.
+- Now a natural companion to `BUG-260816-01` and `BUG-260816-02` (the Stop-feedback and
+  stopped-thread-honesty reports from the same session) — all three are *"what the message list
+  renders during and after an interrupted run"*.
+- ⚠ **G-2 fires** — avatar/placeholder render is visual; `/gsd:sketch` before spec/discuss if it is
+  fixed alongside the other two.
+- Phase 194 recorded an adjacent, deliberately-unresolved measurement of its own: see
+  `194-MEASUREMENTS.md` (plan `194-01` Task 2, the duplicate-icon sample), which **disqualified its
+  own sample on two measured grounds** and recorded what was and was not established rather than
+  drawing a verdict. Start there — it is the most recent honest attempt to pin this.
