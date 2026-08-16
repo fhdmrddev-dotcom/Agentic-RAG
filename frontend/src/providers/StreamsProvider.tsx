@@ -3258,8 +3258,20 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // `✓ Complete`. **THAT IS CORRECT AND MUST NOT BE SPECIAL-CASED.** Nothing in
   // this file may suppress, delay or rewrite the terminal reading because a thread
   // had been stopping; a dedicated fence in `StreamsProvider.stopping.test.ts`
-  // reds against exactly that change. RUN-01 stays UNTICKED until the separate
-  // L-01 phase ships — the lie is a BOUNDARY to state, never a defect to hide.
+  // reds against exactly that change. The lie is a BOUNDARY to state, never a
+  // defect to hide.
+  //
+  // ⚠ CORRECTED 2026-08-16, and the superseded sentence is kept rather than
+  // deleted: this comment read "RUN-01 stays UNTICKED until the separate L-01
+  // phase ships". **RUN-01 IS NOW TICKED**, on a change that landed after this
+  // was written — the `finish_run` terminal guard (`9dbd57f5`), which refuses to
+  // let a far-worker producer write `completed` over a user's `cancelled`. So the
+  // ✓ Complete reading described above is now RARE rather than routine.
+  // ⚠ WHAT HAS NOT CHANGED, and is why this whole block stays: **the producer
+  // still keeps running.** The guard fixed the REPORT, not the work. This file
+  // must still never suppress a terminal reading, and the fence still reds
+  // against it. The remaining L-01 work is routed to the automations milestone
+  // with THE FIRST SCHEDULED RUN as its trigger.
   useEffect(() => {
     const unsubscribe = useStreamsStore.subscribe(
       (s) => s.streamingThreads,
