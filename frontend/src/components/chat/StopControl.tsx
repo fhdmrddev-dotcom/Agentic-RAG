@@ -4,12 +4,22 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * WHY THIS COMPONENT EXISTS AT ALL
  * ─────────────────────────────────────────────────────────────────────────────
- * Phase 194 **D-08** binds the RUNTIME half of *four mounts, ONE mechanism*:
- * every Stop calls `stopThread(threadId)`, and nothing reads `workflowLock?.runId`
- * or calls `cancelRun(` directly. This file is the DISPLAY half of the same rule.
- * Four mounts that acknowledge a press four different ways satisfy D-08 and leave
- * the user exactly as confused — which is the defect `BUG-260816-01` is actually
- * about:
+ * Phase 194 **D-08** binds the RUNTIME half of *four mounts, ONE mechanism*: every
+ * Stop goes through the thread-keyed resolver, and no mount reads the workflow
+ * lock's run id or calls `cancelRun` itself. This file is the DISPLAY half of the
+ * same rule. Four mounts that acknowledge a press four different ways satisfy D-08
+ * and leave the user exactly as confused — which is the defect `BUG-260816-01` is
+ * actually about:
+ *
+ * ⚠ THE TWO FORBIDDEN TOKENS ARE DELIBERATELY NOT SPELLED IN THIS DOCBLOCK — no
+ * `cancelRun` WITH its parenthesis, and no `lock` + `.runId` on one line. That is
+ * not fastidiousness: `WorkspacePanel.test.tsx`'s **F-1 / V-05** fence sweeps the
+ * RAW source of every production module under `panel/`, `chat/` and `workflows/`,
+ * uncomment-stripped ON PURPOSE (the Phase 193 D-24(a) precedent — a docblock
+ * QUOTING a forbidden call is caught too), and its own header says: *"Anyone who
+ * needs to DISCUSS the forbidden call in a union docblock writes it without its
+ * parenthesis."* An earlier draft of this file ignored that and reddened BOTH of
+ * that fence's arms — observed, not predicted.
  *
  *   > *(a) and (b) are individually minor ergonomics; they are filed at major
  *   > because they are what makes UAT-01 INVISIBLE — a Stop that silently does
@@ -32,7 +42,14 @@
  * vocabulary) — **no net-new glyph** (D-18). The Stop CONTROL stays the lucide
  * `Square` on every variant: `■` is `RunCard`'s cancelled-STATE glyph, a state and
  * not a control (194-03 refused it for a Stop button; 194-04 drew the
- * complementary half), and `⏹` is in no table in `icon-convention.md` §4.
+ * complementary half).
+ *
+ * ⚠ The OTHER refused mark — the one the validated sketch drew, absent from
+ * `icon-convention.md` §4's table — is deliberately NOT reproduced here. Its
+ * refusal is already recorded verbatim in production source at
+ * `WorkspacePanel.tsx:293-297` (194-03's MARK block), and one home per concern
+ * beats two copies that can drift. Restating it here would also put the glyph back
+ * into `chat/` source, where this file's own suite counts it as an absence.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * ⚠ ZERO OWNED STATE, AND THAT IS D-05/D-06 MADE STRUCTURAL RATHER THAN POLITE
