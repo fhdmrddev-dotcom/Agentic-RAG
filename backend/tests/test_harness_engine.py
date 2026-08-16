@@ -1705,3 +1705,279 @@ def test_an_output_with_no_sentinel_still_routes_to_complete_phase(
         f"The shared path must be byte-identical."
     )
     assert r.visited == ["p0", "p1"]
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 194 Plan 10 (RUN-01 / SC#3 / V-16) — THE ENGINE CANCEL ARM
+#
+# When a live producer is Stopped mid-phase, ``DELETE /runs/{id}`` takes Step 3a
+# (``task.cancel()``), the producer raises ``CancelledError``, and the engine's
+# cancel/escape arm is the ONLY place in the system that knows WHICH phase the
+# user interrupted — ``phase_id`` is bound in the same ``while`` iteration,
+# before the ``try``, so it is in scope inside the ``except`` WITHOUT a query.
+#
+# The RUN-KEYED sibling (``cancel_active_phases``, plan 194-09) is the zombie
+# arm's writer: that path has no engine, no loop and no ``phase_id`` at all.
+# Collapsing the two would cost this arm its certainty (RESEARCH § G-C).
+# ═══════════════════════════════════════════════════════════════════════
+
+import asyncio  # noqa: E402
+
+_CANCELLED_SQL = "SET status='cancelled'"
+
+
+class _PoolThatFailsTheCancelWrite:
+    """Delegating pool whose ONLY difference is that the cancel write raises.
+
+    Used to prove a cleanup failure cannot swallow the cancellation. It is a
+    PROXY rather than a subclass so every other write still lands on the real
+    recorder and the case can assert the failing write was ATTEMPTED — a pool
+    that silently dropped it would make the case vacuous.
+    """
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.attempted: list[tuple] = []
+
+    async def execute(self, sql, *args):
+        if _CANCELLED_SQL in sql:
+            self.attempted.append((sql, args))
+            raise RuntimeError("simulated phase-terminalize failure")
+        return await self._inner.execute(sql, *args)
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+
+def _cancel_writes(pool):
+    """Every recorded write that composes the ``cancelled`` phase status."""
+    return [(sql, args) for sql, args in pool.calls if _CANCELLED_SQL in sql]
+
+
+async def _drive_engine_through_a_mid_phase_cancel(
+    build_workflow_definition,
+    pool,
+    *,
+    statuses=("pending",),
+    shutting_down=False,
+    exc=None,
+    ctx=None,
+):
+    """Drive ``run_workflow`` into the cancel/escape arm and report what happened.
+
+    Returns ``(raised, expiry_mock, ids, run_id)`` where ``ids`` are the durable
+    phase-row ids in ``phase_index`` order.
+
+    ⚠ THE SHUTDOWN FLAG IS SET **AND RESTORED**, INCLUDING FOR THE NON-SHUTDOWN
+    CASES, and that is load-bearing rather than tidy. ``_APP_SHUTTING_DOWN`` is a
+    process-global that LEAKS ACROSS TESTS: the shared ``client`` fixture is
+    ``with TestClient(app)``, whose teardown runs the lifespan shutdown handler and
+    leaves the flag ``True`` for the rest of the pytest process (measured in plan
+    194-09: False → False → **True** across a fixture's life). A case that merely
+    ASSUMED the flag was False would silently take the graceful-shutdown branch and
+    assert nothing. The PRIOR value is restored rather than hard-reset to ``False``
+    — a fence that repaired global state other suites run in would be changing the
+    very thing it measures.
+    """
+    from app.services import harness_engine
+
+    exc = exc if exc is not None else asyncio.CancelledError()
+    wf = build_workflow_definition(
+        [
+            {"config": {"phase_type": "llm_single", "prompt": f"p{i}"}}
+            for i in range(len(statuses))
+        ]
+    )
+    run_id = uuid.uuid4()
+    ids = [uuid.uuid4() for _ in statuses]
+    pool.set_fetch_result(
+        [
+            {
+                "id": ids[i],
+                "slug": f"p{i}",
+                "phase_index": i,
+                "status": st,
+                "output": {},
+            }
+            for i, st in enumerate(statuses)
+        ]
+    )
+
+    async def _boom(*a, **k):
+        raise exc
+
+    ctx = ctx if ctx is not None else type("C", (), {})()
+    prior_flag = harness_engine.is_app_shutting_down()
+    harness_engine.set_app_shutting_down(shutting_down)
+    raised: BaseException | None = None
+    try:
+        with patch.object(
+            harness_engine, "_run_phase_with_gates", new=_boom
+        ), patch.object(
+            harness_engine, "_expire_pending_ask_user", new=AsyncMock()
+        ) as expiry:
+            try:
+                await harness_engine.run_workflow(
+                    run_id, wf, ctx, pool=pool, redis=_NoopRedis()
+                )
+            except BaseException as e:  # noqa: BLE001 — the arm's re-raise IS the subject
+                raised = e
+    finally:
+        harness_engine.set_app_shutting_down(prior_flag)
+    return raised, expiry, ids, run_id
+
+
+@pytest.mark.asyncio
+async def test_a_mid_phase_cancel_marks_the_phase_the_user_interrupted(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """V-16: the interrupted phase is terminalized, keyed on the loop's ``phase_id``.
+
+    The run's rows are ``[completed, active, pending]``; the engine picks up at the
+    ``active`` row. Exactly ONE ``cancelled`` write lands and it is PHASE-KEYED on
+    that row's id — identified without a query, because ``phase_id`` was already
+    bound in this loop iteration.
+    """
+    _raised, _expiry, ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+    )
+
+    writes = _cancel_writes(mock_asyncpg_pool)
+    assert len(writes) == 1, (
+        f"the cancel arm must terminalize the interrupted phase exactly ONCE; "
+        f"recorded cancelled-writes={writes!r}"
+    )
+    sql, args = writes[0]
+    assert "WHERE id = $1" in sql, (
+        f"the engine arm's write must be PHASE-KEYED — it is the only home that knows "
+        f"WHICH phase the user interrupted. SQL={sql!r}"
+    )
+    assert args == (ids[1],), (
+        f"the write must bind the phase_id bound in this loop iteration ({ids[1]}), "
+        f"not some other row. args={args!r}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_cancellation_still_propagates_after_the_phase_is_marked(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """The arm's ``raise`` stays LAST — the caller still sees the ``CancelledError``.
+
+    Cancellation is already in flight when this arm runs; a cleanup that swallowed
+    or delayed it would leave the producer task alive after a Stop.
+    """
+    raised, _expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, mock_asyncpg_pool, statuses=("active",)
+    )
+
+    assert isinstance(raised, asyncio.CancelledError), (
+        f"the cancel/escape arm must re-raise the original cancellation; got {raised!r}"
+    )
+    # ...and it did the write BEFORE re-raising — otherwise the assertion above is
+    # satisfied by an arm that does nothing at all.
+    assert len(_cancel_writes(mock_asyncpg_pool)) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_graceful_shutdown_leaves_the_prompt_and_the_phase_row_resumable(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """096-09 (UAT Test 2) — the gate's scope covers BOTH cleanups, deliberately.
+
+    On a GRACEFUL app shutdown the run stays resumable: the boot sweep re-claims it
+    and re-emits the SAME pending prompt. Expiring the prompt would break that, and
+    terminalizing the phase row would break it too — a phase left ``active`` on a run
+    the sweep will RESUME is correct, because that phase really is still pending work.
+    So the new write sits INSIDE the shipped ``if not is_app_shutting_down():`` scope.
+    Neither cleanup runs here; the cancellation still propagates.
+    """
+    raised, expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("active",),
+        shutting_down=True,
+    )
+
+    assert _cancel_writes(mock_asyncpg_pool) == [], (
+        "a graceful shutdown must leave the phase row `active` — the sweep will resume it"
+    )
+    assert expiry.await_count == 0, (
+        "096-09: the pending prompt must NOT be expired on a graceful shutdown"
+    )
+    assert isinstance(raised, asyncio.CancelledError), (
+        "the shutdown branch must still re-raise the cancellation"
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_failing_phase_terminalize_never_swallows_the_cancellation(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """A cleanup failure logs and STILL re-raises — the write is best-effort.
+
+    The pool raises on the cancel write ONLY; every other write still lands, so the
+    case can prove the write was ATTEMPTED rather than quietly skipped.
+    """
+    failing = _PoolThatFailsTheCancelWrite(mock_asyncpg_pool)
+    raised, _expiry, ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition, failing, statuses=("active",)
+    )
+
+    assert failing.attempted, (
+        "the arm never attempted the phase terminalize — the case would be vacuous"
+    )
+    assert failing.attempted[0][1] == (ids[0],)
+    assert isinstance(raised, asyncio.CancelledError), (
+        f"a cleanup failure must never mask the original cancellation; got {raised!r}"
+    )
+
+
+def test_the_cancel_arm_is_the_harness_engines_alone_and_deep_never_enters_it():
+    """Deep runs are unaffected: ``cancel_phase`` is CALLED in exactly one module.
+
+    ⚠ AST-PARSED, NEVER GREPPED. A bare ``grep`` for the identifier matches this
+    project's own docblocks — the trap that tripped 194-02 (twice), 194-03, 194-06
+    and 194-09, the last of them in production source. Only real ``Call`` nodes count.
+
+    ANTI-VACUITY: the counter is first shown to FIND a call that is known to exist
+    (``fail_phase``, three lines below the arm) and to return 0 for a name that does
+    not, so the 1/0 reading below is a measurement rather than a broken parser.
+    """
+    import ast
+    import pathlib
+
+    def _calls_named(src: str, name: str) -> int:
+        tree = ast.parse(src)
+        return sum(
+            1
+            for n in ast.walk(tree)
+            if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Name)
+            and n.func.id == name
+        )
+
+    services = pathlib.Path(__file__).resolve().parents[1] / "app" / "services"
+    engine_src = (services / "harness_engine.py").read_text(encoding="utf-8")
+    deep_src = (services / "agent_loop.py").read_text(encoding="utf-8")
+    assert len(engine_src) > 10_000 and len(deep_src) > 10_000, (
+        "the sweep read nothing — an empty-source fence passes green while seeing "
+        "nothing at all (the 194-03 empty-sweep lesson)"
+    )
+
+    # Positive controls: the counter really can see a call, and really can miss one.
+    assert _calls_named(engine_src, "fail_phase") >= 1, (
+        "the AST counter cannot see a call that is known to exist — it is broken"
+    )
+    assert _calls_named(engine_src, "no_such_writer_anywhere") == 0
+
+    assert _calls_named(engine_src, "cancel_phase") == 1, (
+        "exactly ONE cancel_phase call belongs in the engine — the interrupted-phase "
+        "terminalize on the cancel/escape arm"
+    )
+    assert _calls_named(deep_src, "cancel_phase") == 0, (
+        "the Deep agent loop must not terminalize workflow phases — it runs no workflow "
+        "and never enters the harness engine's cancel arm"
+    )
