@@ -173,10 +173,20 @@ async def cancel_workflow_run_internals(*, pool, workflow_run_id) -> bool:
     calls it, and so does the ``DELETE /runs/{id}`` no-producer arm (plan 194-10) —
     which is D-08/D-10's "one mechanism" applied to the server side. ⚠ Do NOT fork a
     second cancel writer or a second ``workflow_runs`` status writer; if a third caller
-    appears it calls THIS, it does not re-compose the two writes. The shape is not new:
-    ``delete_workflow_cascade`` (``api/workflows.py:1494-1518``) has composed exactly
-    this since Phase 152, in the wrong file — 194 MOVES that composition here rather
-    than copying it.
+    appears it calls THIS, it does not re-compose the two writes.
+    ⚠ CORRECTED BESIDE, NOT OVER (194 code review WR-01). This paragraph shipped
+    claiming, verbatim: "The shape is not new: ``delete_workflow_cascade``
+    (``api/workflows.py:1494-1518``) has composed exactly this since Phase 152, in the
+    wrong file — 194 MOVES that composition here rather than copying it." **Measured,
+    that is FALSE IN BOTH HALVES.** ``git diff`` on ``api/workflows.py`` across the whole
+    of Phase 194 is EMPTY: nothing was moved, a SECOND composition was created, and the
+    cascade still inline-composes its own run-status write at ``api/workflows.py:1518``.
+    It is wrong a second way too — the cascade has never called the phase writer (which
+    did not exist before this phase), so it never composed "exactly this" at all.
+    ⇒ The rule above still binds and is now the ONLY thing keeping the two in step:
+    re-pointing ``delete_workflow_cascade``'s steps (2)+(3) at this helper is OWED, and
+    is the trigger for the next phase that touches that route. A docstring crediting
+    itself with a de-duplication it did not perform is how the fork stays invisible.
 
     ⚠ BEST-EFFORT BY CONTRACT — IT NEVER RAISES (D-062-13, T-062-03) — BUT IT REPORTS.
     Returns ``True`` iff BOTH writes landed, ``False`` if either raised. This is the
