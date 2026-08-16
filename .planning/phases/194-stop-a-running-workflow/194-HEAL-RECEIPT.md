@@ -601,3 +601,81 @@ seven-literal vocabulary migration 119 already applied (`194-MIGRATION-RECEIPT.m
 **Information disclosure (`T-194-13-05`):** this receipt carries row ids, thread ids, a user id,
 statuses, timestamps, workflow slugs/names and phase slugs. **No prompt, no phase `output`, no
 provider payload, no auth header and no token appears anywhere in it.**
+
+---
+
+## Ledger
+
+Every hot-file triple Phase 194 owes, **re-derived at this plan's own commit** rather than inherited
+from the plan that measured it, so the phase's final figures are auditable in one place.
+
+**The two commands, run for every file** (a third, `git show <base>:<file> | wc -l`, gives the
+phase-base line count; Phase 194's base is `743965a1`):
+
+```
+git log --oneline -- <file> | wc -l
+git log --format=%s -- <file> | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' | sed -E 's/-.*//' | sort -u
+wc -l <file>
+```
+
+| File | commits | raw buckets | **phases** | non-phase buckets, NAMED | L at `743965a1` | **L now** | 194 diff | G-5 | ledger row |
+|---|---|---|---|---|---|---|---|---|---|
+| `backend/app/db/workflows.py` | 34 | 18 | **18** | none | 1447 | **1582** | +136 / −1 | **FIRES** | ✅ cell RE-DERIVED (was `32 / 17 / 1447`) |
+| `frontend/src/components/panel/WorkspacePanel.tsx` | 14 | 9 | **9** | none | 493 | **580** | +88 / −1 | **FIRES** | ✅ **ROW ADDED** |
+| `backend/app/services/run_lifecycle.py` | 4 | 3 | **3** | none | 299 | **437** | +138 / −0 | **FIRES** (at the threshold) | ✅ **ROW ADDED** |
+| `backend/app/api/runs.py` | 33 | 16 | **16** | none | 1208 | **1376** | +168 / −0 | **FIRES HARD** | ✅ **ROW ADDED** |
+| `backend/app/services/harness_engine.py` | 45 | **17** | **16** | ⚠ `quick` — from `fix(quick-260731-3y4)` | 2494 | **2536** | +42 / −0 | **FIRES HARD** | ✅ **ROW ADDED** |
+| `frontend/src/components/chat/RunCard.tsx` | 20 | **9** | **8** | ⚠ `streaming` — an untagged 075.x fix/revert pair | 550 | **550** | **none** | fires (8) | ⛔ **NO ROW — see below** |
+
+### ⚠ `RunCard.tsx` gets NO row here, and the reason is a measurement rather than an oversight
+
+`194-13-PLAN.md` Task 3(a) names it as one of *"the three ledger cells this phase touched"*.
+**Measured, Phase 194 has not touched it:** `git log --oneline 743965a1..HEAD --
+frontend/src/components/chat/RunCard.tsx` is **EMPTY**, and its line count is unmoved at 550. This
+plan's own non-goals say ⛔ *"Do not add a ledger row for a file this phase did not touch"*, so no
+row was written. **Its triple is recorded here instead of being lost: `20 commits / 8 phases /
+550 L`.**
+
+**Who owes it, named rather than left open:** plan **`194-07`** is the one whose `files_modified`
+includes `RunCard.tsx`, and plan **`194-05`** is the one whose `files_modified` includes `CLAUDE.md`
+with the explicit must-have *"RunCard.tsx and WorkspacePanel.tsx are ROWS in the CLAUDE.md hot-file
+ledger"*. **Both were still pending when this receipt was written.**
+
+### ⚠ THESE FIGURES WILL GO STALE, AND THE COMMIT THAT STALES THEM IS ALREADY KNOWN TO BE COMING
+
+Plans **`194-05`** and **`194-07`** have not run — both are blocked on an operator measurement that
+has not arrived. `194-05` touches `CLAUDE.md` and `streamsStore.ts`; `194-07` touches
+`RunCard.tsx`, `MessageItem.tsx`, `toolMeta.ts` and two test files. **When either lands, the
+`RunCard.tsx` triple above and the `WorkspacePanel.tsx` ledger row's neighbourhood both move.**
+
+This is the exact self-staling the ledger documents about itself — the `WorkflowsPage.tsx` cell has
+gone stale **four consecutive times and once within a single day**, and *a figure written at a
+plan's close goes stale on the next commit that touches any file it counted*. The difference here is
+only that the next commit is **already identified by plan number**, so it is stated rather than left
+to be discovered. ⚠ **Whoever lands `194-05` must UPDATE the `WorkspacePanel.tsx` row, never add a
+second one for the same file** — that instruction is written into the row itself, not only here.
+
+### The G-5 override — VERIFIED, not assumed
+
+`194-CONTEXT.md` **D-01** records that a G-5 override was **OFFERED AND DECLINED**, the fourth
+consecutive phase to decline one (193, 193.1, 193.2, 194) — and states that *if* `.planning/STATE.md`
+records none for Phase 194, that absence is a measurement.
+
+**It was checked before the sentence was written.** `.planning/STATE.md` carries five
+guardrail-override records; the only one under a `## Guardrail overrides` heading of its own is the
+**v3.6 close** (`:1713`, *"None recorded"*), and the three phase-level entries are `193` (`:858`),
+`193.1` (`:670`) and `193.2` (`:386`/`:519`) — **each recording NONE.** There is **no Phase-194
+override record of any kind**, and STATE.md's own Phase-194 entry says so in its own words:
+*"this file records NO guardrail override for Phase 194, and that absence is a measurement."*
+⇒ The sentence is written in all five ledger cells, and it is true.
+
+### One inherited correction, recorded beside its original
+
+`194-CONTEXT.md` **D-01** states that `RunCard.tsx` and `WorkspacePanel.tsx` *"occur only inside
+other rows' prose"*. **Measured — first by `194-01-BASELINE.md` and re-confirmed here — that is
+FALSE: `grep -o` returned 0 for BOTH before this plan ran. Neither filename appeared in `CLAUDE.md`
+at all.** *"Present but only in prose"* and *"absent entirely"* are different diagnoses with
+different fixes, and the wrong one sends the next reader looking for a mention that was never there.
+⚠ The prose-only state D-01 described **is** real for a different file, which is why the distinction
+is worth keeping: `harness_engine.py` occurs **exactly once** in `CLAUDE.md`, inside the
+`publish_service.py` row's prose — and a row-scanning audit cannot see it there either.
