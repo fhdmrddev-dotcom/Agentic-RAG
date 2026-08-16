@@ -1142,6 +1142,37 @@ async def continue_run(
 #            Redis op fails (Postgres UPDATE is the durable cancel record;
 #            Redis ops are best-effort per D-062-13).
 #
+# ── Phase 194 (194-11 / RUN-01 / SC#1) — the route accepts a SECOND id shape ──
+#
+# ⚠ THE FINDING THIS FALLBACK EXISTS FOR, WRITTEN HERE BECAUSE THIS IS WHERE THE
+# NEXT READER LOOKS. The frontend's ``WorkflowLock.runId`` CARRIES TWO ID TYPES:
+# some write sites store a ``workflow_runs.id`` (StreamsProvider seeds it from
+# ``wf.active_workflow_run_id`` on reconcile) and others store a producer
+# ``runs.run_id``. Its own JSDoc asserts only the first. Until 194-11 this route
+# accepted ONLY the second, and the client's ``cancelRun`` SWALLOWS 404 — so a Stop
+# resolved through the anchor id SILENTLY SUCCEEDED WHILE DOING NOTHING. That is
+# precisely the dishonesty RUN-01/SC#2 forbids, and a silent success is worse than a
+# visible failure in a phase about honesty.
+# ⚠ This was measured once before, in Phase 188, and recorded ONLY in a comment at
+# ``WorkspacePanel.tsx:161-165`` — so it was invisible to Phase 194 until re-derived.
+# A measurement that lives in one file's comment is invisible to the next phase.
+#
+# The repair is the shipped dual-id fallback, MIRRORED not invented: this is the
+# THIRD route on the /runs prefix to gain it, after ``continue_run`` (:722-756,
+# Facet C / 092-07) and ``submit_ask_user_response`` (:537-584, F10 / 093). The
+# three clauses are NONE OF THEM OPTIONAL and they ARE the access boundary, not a
+# convenience — see the block comment on the fallback itself.
+#
+# ⚠ BUT THIS ROUTE CANNOT STOP WHERE /continue STOPS, AND THAT IS THE HALF NEITHER
+# SHIPPED FALLBACK HAS. The shared cancel writer keys ``RUN_TASKS`` and
+# ``finalize_run_terminal`` on the PRODUCER ``runs.run_id``. Hand it a
+# ``workflow_runs.id`` and you get: RUN_TASKS miss → Step 3b → ``finalize_run_terminal``
+# updates ZERO ``runs`` rows → **the live producer task is never cancelled while this
+# route returns 204.** The same silent success, moved server-side. So the fallback
+# resolves FORWARD to the producer identity (a LEFT JOIN to the live ``runs`` row),
+# and when no producer is alive it does NOT call the shared writer at all — it calls
+# the exported workflow-side composition instead. Both forward arms return 204.
+#
 # IMPORTANT: same RedisError-shadowing rule as stream_run applies here — use
 # the top-level unqualified `RedisError` import, NOT `redis.exceptions.X`,
 # inside the route body (the `redis: aioredis.Redis = Depends(get_redis)`
@@ -1176,6 +1207,143 @@ async def cancel_run(
         .maybe_single()
     )
     row = row_resp.data if row_resp is not None else None
+
+    if not row:
+        # ── Step 1b (194-11 / RUN-01 / SC#1): the dual-id fallback ──
+        #
+        # BRANCH, NEVER REPLACE (D-08) — the rule this route inherits verbatim from
+        # the ask_user fallback's own comment at :549-552: "the Step-1 ``runs`` SELECT
+        # above stays FIRST and unchanged — Deep's runs-keyed … path is byte-identical
+        # and still returns 200; this fallback only engages AFTER that SELECT misses."
+        # A producer ``runs.run_id`` therefore never reaches a single line below.
+        #
+        # ⚠ THE THREE CLAUSES BELOW ARE THE ACCESS BOUNDARY, NOT A CONVENIENCE, AND
+        # NONE OF THEM IS OPTIONAL:
+        #   (a) ``.eq("user_id", …)`` on the ``workflow_runs`` select,
+        #   (b) ``.eq("user_id", …)`` on the ``threads`` anchor read,
+        #   (c) the anchor equality check.
+        # The workflow cluster is read further down this route through a SERVICE-ROLE
+        # pool that BYPASSES RLS, so on that side the WHERE clause is the only gate;
+        # these three keep an attacker-chosen uuid from ever reaching it. Phase 190's
+        # CR-01 was a REAL credential exposure that 19 plans of RED-first self-checking
+        # missed, and a later quick task found a missing owner-prefix clause returning
+        # another user's asset — which is why each clause has its OWN fence and its OWN
+        # plant (F-10, ``test_062_cancel_run.py``), rather than one fence for all three.
+        #
+        # 404 — NEVER 403 — on every miss: "doesn't exist" and "not yours" must be
+        # INDISTINGUISHABLE (T-062-01 / D-062-12), the same collapse both shipped
+        # fallbacks make.
+        wf_self_resp = await aexec(
+            supabase.table("workflow_runs")
+            .select("id, thread_id")
+            .eq("id", str(run_id))
+            .eq("user_id", current_user["id"])  # (a) owner-scoped — no existence leak
+            .maybe_single()
+        )
+        wf_self = wf_self_resp.data if wf_self_resp is not None else None
+        if wf_self:
+            anchor_resp = await aexec(
+                supabase.table("threads")
+                .select("active_workflow_run_id")
+                .eq("id", wf_self["thread_id"])
+                .eq("user_id", current_user["id"])  # (b) thread-anchor confirm
+                .maybe_single()
+            )
+            _anchor = (anchor_resp.data if anchor_resp is not None else None) or {}
+            if str(_anchor.get("active_workflow_run_id")) == str(run_id):  # (c)
+                # ── FORWARD RESOLUTION — the half neither shipped fallback needs ──
+                #
+                # A live kickoff-started run's producer task is registered in
+                # ``RUN_TASKS`` under the PRODUCER ``runs.run_id`` (threads.py:2011),
+                # NOT the ``workflow_runs.id``. Resolve that producer identity via a
+                # LEFT JOIN to the live ``runs`` row and cancel through IT — the same
+                # shape ``delete_workflow_cascade`` has used since Phase 152
+                # (api/workflows.py:1483-1518), narrowed here to ONE workflow run.
+                # ``$N`` binds only — no f-string ever reaches this SQL (T-152-05-05).
+                from app.dependencies import get_pg_pool  # noqa: PLC0415
+                pool = await get_pg_pool()
+                _live = await pool.fetch(
+                    "SELECT wr.id AS wf_id, wr.thread_id, "
+                    "r.run_id AS producer_id, r.status AS producer_status "
+                    "FROM workflow_runs wr "
+                    "LEFT JOIN runs r ON r.thread_id = wr.thread_id "
+                    "AND r.status = 'streaming' "
+                    "WHERE wr.id = $1",
+                    run_id,
+                )
+                _producer = next(
+                    (r for r in (_live or []) if r["producer_id"] is not None), None
+                )
+                if _producer is not None:
+                    # Synthesize Step 1's row from the PRODUCER identity, so Steps
+                    # 2/3a/3b below run UNCHANGED and actually reach the live task.
+                    #
+                    # ⚠ ``run_id`` IS DELIBERATELY REBOUND TO THE PRODUCER ID HERE, and
+                    # that is the whole point of the forward resolution rather than an
+                    # incidental tidy-up. The shared writer below is called as
+                    # ``run_id=run_id`` — byte-unchanged, which is what keeps the Deep
+                    # path identical — and it keys ``RUN_TASKS`` and
+                    # ``finalize_run_terminal`` on the PRODUCER id. Leaving the path's
+                    # ``workflow_runs.id`` bound here would miss ``RUN_TASKS``, take the
+                    # zombie arm, update ZERO ``runs`` rows and still 204. A UUID is
+                    # coerced so the registry lookup (keyed by UUID objects) cannot miss
+                    # on a string that merely prints the same.
+                    _pid = _producer["producer_id"]
+                    run_id = UUID(str(_pid)) if not isinstance(_pid, UUID) else _pid
+                    #
+                    # ⚠ THE STATUS MUST BE THE PRODUCER'S, NOT ``None``. This route
+                    # READS ``row["status"]`` as Step 2's terminal check, whereas the
+                    # ask_user fallback synthesizes ``status: None`` and never reads it
+                    # — so copying that shape here would silently reclassify every
+                    # already-terminal producer as cancellable.
+                    row = {
+                        "run_id": str(run_id),
+                        "status": _producer["producer_status"],
+                        "thread_id": (
+                            str(_producer["thread_id"])
+                            if _producer["thread_id"] is not None
+                            else None
+                        ),
+                    }
+                else:
+                    # ── No live producer: terminalize the WORKFLOW side directly ──
+                    #
+                    # Do NOT fall through to the shared cancel writer with the
+                    # ``workflow_runs.id``: it would miss ``RUN_TASKS``, take the zombie
+                    # arm, update ZERO ``runs`` rows and return 204 — a success report
+                    # over a no-op. There is no producer to cancel, so the honest act is
+                    # to write the terminal state the run will otherwise never get.
+                    #
+                    # ONE MECHANISM (D-08/D-10): call plan 194-09's EXPORTED composition
+                    # rather than re-composing ``finish_run`` + ``cancel_active_phases``
+                    # here. It coerces the id, carries its own D-062-13 best-effort
+                    # try/except and never raises. This is exactly what
+                    # ``delete_workflow_cascade`` already does, shipped since Phase 152.
+                    from app.services.ask_user_service import (  # noqa: PLC0415
+                        publish_cancel_sentinel,
+                    )
+                    from app.services.run_lifecycle import (  # noqa: PLC0415
+                        cancel_workflow_run_internals,
+                    )
+
+                    # Wake any paused harness ask_user prompt — the harness subscribes
+                    # on the WORKFLOW run id channel. Best-effort by contract; wrapped
+                    # anyway so a Redis outage can never fail a Stop (D-062-13).
+                    try:
+                        await publish_cancel_sentinel(redis, run_id)
+                    except Exception:
+                        logger.exception(
+                            "cancel_run: workflow cancel sentinel failed for "
+                            "workflow run %s",
+                            run_id,
+                        )
+                    await cancel_workflow_run_internals(
+                        pool=pool, workflow_run_id=run_id
+                    )
+                    # Same 204 as every other arm — Postgres is the durable cancel
+                    # record (D-062-13), and this arm has just written it.
+                    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
     if not row:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
