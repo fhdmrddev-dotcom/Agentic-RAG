@@ -102,3 +102,36 @@ visual pass could reasonably carry both.
 - `WorkflowCanvas.tsx` is on the hot-file ledger (13 plans / 6 phases) with G-5 recorded **satisfied**
   at 188.1. This fix adds no concern to it — it replaces a literal with a prop — so it does not
   disturb that status.
+
+
+---
+
+## 2026-08-16 — MEASURED, and the "≈3 lines, one file" estimate is WRONG
+
+Picked up in the Phase 194.1 close-out fast batch and **put back down**, because the fix is not the
+shape the estimate assumed.
+
+**What is true:** `colorMode="dark"` is a single hardcoded occurrence
+(`WorkflowCanvas.tsx:1250`), and `frontend/src/hooks/useTheme.ts` does exist. That is where the
+"one line, swap in the hook" reading came from.
+
+⚠ **What that misses: `useTheme` is a PER-CONSUMER hook, not shared state.** It holds its own
+`useState` and there is exactly **one** consumer today (`ChatLayout.tsx:111`). The repo already
+records the consequence, in `TechnicalNamesProvider.tsx:15-16`: *"This is NOT a bare per-consumer
+hook — copying `useTheme.ts` verbatim would give each consumer its OWN useState and the toggles
+would drift."*
+
+⇒ **`const { theme } = useTheme()` inside the canvas would ship a canvas that IGNORES the theme
+toggle** — it would read the right value on mount and never hear the user flip it. It would also
+make the canvas a second *writer* of the theme (the hook's effect writes localStorage and toggles
+the root class).
+
+**The honest fix is one of:**
+1. a small read-only observer of `document.documentElement`'s `dark` class (a new shared primitive
+   — correct, but a primitive, and a fast batch is the wrong place to introduce one); or
+2. lift `useTheme` into a context provider the way `TechnicalNamesProvider` already models — which
+   changes a shipped hook's shape and touches its existing consumer.
+
+**Routed to phase 196 (AUTH-04, the registry-backed model picker on the canvas)** — that phase opens
+canvas files anyway, and either option above is a considered change rather than a polish sweep.
+⚠ **Do NOT re-estimate this as a one-liner.** The one-liner is available and it is wrong.
