@@ -406,6 +406,18 @@ async def list_active_runs(
         .eq("thread_id", str(thread_id))
         .eq("user_id", current_user["id"])
         .eq("status", "streaming")
+        # ⚠ A-1 (2026-08-16) — a SUB-AGENT is never a producer. Sub-agent runs live
+        # on the SAME thread with the SAME 'streaming' status (task_service.py's
+        # insert_run writes parent_run_id=parent_ctx.run_id), so without this clause
+        # a sub-agent's run_id reaches the client: the reconcile loop stamps a
+        # runStatus:"streaming" placeholder per row returned here, and stopThread
+        # picks by bucket order — so DELETE /runs/{id} could be handed a sub-agent id
+        # through the PRIMARY path, which CR-01's narrowing (api/runs.py, the cancel
+        # FALLBACK) never touches. Ordering-dependent, which is why it was recorded
+        # as UNCERTAIN rather than reproduced.
+        # ⚠ This NARROWS what the query can reach and widens nothing. Both selects in
+        # this module carry it — they are documented as mirrors and must not drift.
+        .is_("parent_run_id", "null")
         .order("started_at", desc=True)
     )
     return runs_resp.data or []
@@ -478,6 +490,18 @@ async def get_snapshot(
         .eq("thread_id", str(thread_id))
         .eq("user_id", current_user["id"])
         .eq("status", "streaming")
+        # ⚠ A-1 (2026-08-16) — a SUB-AGENT is never a producer. Sub-agent runs live
+        # on the SAME thread with the SAME 'streaming' status (task_service.py's
+        # insert_run writes parent_run_id=parent_ctx.run_id), so without this clause
+        # a sub-agent's run_id reaches the client: the reconcile loop stamps a
+        # runStatus:"streaming" placeholder per row returned here, and stopThread
+        # picks by bucket order — so DELETE /runs/{id} could be handed a sub-agent id
+        # through the PRIMARY path, which CR-01's narrowing (api/runs.py, the cancel
+        # FALLBACK) never touches. Ordering-dependent, which is why it was recorded
+        # as UNCERTAIN rather than reproduced.
+        # ⚠ This NARROWS what the query can reach and widens nothing. Both selects in
+        # this module carry it — they are documented as mirrors and must not drift.
+        .is_("parent_run_id", "null")
         .order("started_at", desc=True)
     )
     active_runs = runs_resp.data or []

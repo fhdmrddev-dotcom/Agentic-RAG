@@ -1485,7 +1485,18 @@ async def delete_workflow_cascade(
         "r.run_id AS producer_id, r.status AS producer_status "
         "FROM workflow_runs wr "
         "JOIN workflow_definitions wd ON wd.id = wr.definition_id "
+        # ⚠ L-02 (2026-08-16) — ``r.parent_run_id IS NULL``, the IDENTICAL narrowing
+        # CR-01 shipped for this exact join in ``api/runs.py`` (its cancel fallback).
+        # Without it this LEFT JOIN can bind ``producer_id`` to a SUB-AGENT: sub-agent
+        # runs live on the SAME thread with the SAME ``'streaming'`` status
+        # (``task_service.py``'s ``insert_run`` writes ``parent_run_id=parent_ctx.run_id``),
+        # so ``delete_workflow_cascade`` could cancel a sub-agent, leave the real
+        # producer running, and report success — the same silent-success class CR-01
+        # removed one route away. Pre-existing and owner-scoped, so never a
+        # cross-tenant exposure; a correctness defect, not a security one.
+        # ⚠ This NARROWS what the join can reach and widens nothing.
         "LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming' "
+        "AND r.parent_run_id IS NULL "
         "WHERE wd.slug = $1 AND wd.created_by = $2 "
         "AND wr.status IN ('active', 'paused', 'cap_paused')",
         slug,
