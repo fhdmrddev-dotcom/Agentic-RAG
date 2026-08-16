@@ -42,7 +42,14 @@ findings:
   warning: 8
   info: 5
   total: 17
-status: issues_found
+status: partially_fixed
+fix_pass:
+  ran: 2026-08-16
+  scope: "CR-01, CR-02, CR-03 (+ WR-01 as a pure comment correction)"
+  fixed: [CR-01, CR-02, CR-03, WR-01]
+  open: [CR-04, WR-02, WR-03, WR-04, WR-05, WR-06, WR-07, WR-08, IN-01, IN-02, IN-03, IN-04, IN-05]
+  open_critical: 1
+  cr04_verdict: "a phase — no cross-worker cancel signal exists; needs a new mechanism, not a line"
 ---
 
 # Phase 194: Code Review Report
@@ -453,6 +460,198 @@ beside — not over — the receipt's figures, per the project's standing habit.
 
 ---
 
+## Fix Pass
+
+**Ran:** 2026-08-16 · main working tree, branch `develop`, base `657a134f`
+**Scope:** CR-01, CR-02, CR-03 only, plus WR-01 because it is a pure comment correction of
+the same class as CR-03. **CR-04 was deliberately NOT fixed** (see § CR-04 below).
+**Status after this pass:** `partially_fixed` — **one Critical (CR-04), seven Warnings and
+five Info remain open.**
+
+> ⚠ Every RED below is a real observation against real shipped source, read **case by
+> case and never by count**, and every fix carries at least one **production-source
+> plant** driven per clause — because `assert` short-circuits and this phase already shipped
+> fences that could not fire. Every plant was reverted in a `finally:` and the file
+> **md5-verified byte-identical** afterwards.
+
+### CR-01 — the forward resolution could cancel a SUB-AGENT · `c601aeb0`
+
+**RED, before the fix** (`pytest tests/test_062_cancel_run.py -k cr01` → **4 failed / 22
+deselected**), by case:
+
+| Case | The assertion that failed |
+|---|---|
+| `…cancels_the_producer_not_the_sub_agent` | `assert '54cd6f46…' != '54cd6f46…'` — **the Stop cancelled the sub-agent.** The defect is reachable, not theoretical. |
+| `…deterministic_not_whatever_comes_back_first` | picked the STALE producer, not the newest |
+| `…only_a_sub_agent_alive_takes_the_no_producer_arm` | `assert 1 == 0` — the shared writer was handed the sub-agent |
+| `…sql_excludes_sub_agents_and_is_deterministic` | `'parent_run_id IS NULL' not in <the composed SQL>` |
+
+**Applied:** the join gains `AND r.parent_run_id IS NULL`, an explicit
+`ORDER BY r.started_at DESC NULLS LAST, r.run_id DESC` and `LIMIT 1`, and the row is read
+by index instead of `next(...)` over an arbitrarily-ordered result. **This NARROWS what the
+query can reach and widens nothing**; the three owner/anchor clauses that are the access
+boundary on the service-role pool are byte-untouched.
+
+⚠ **The shipped suite could not observe this bug at all** — every 194-11 case seeds
+`_FetchPool` with exactly one row and the double answers regardless of the SQL. The new
+`_JoinInterpretingPool` **interprets** the join's clauses (and refuses a statement it does
+not recognise), so deleting one changes the ANSWER rather than only the SQL text.
+
+**Plants (all four in `backend/app/api/runs.py`, md5 `4858226681…` before and after each):**
+
+| Plant | Cases that RED |
+|---|---|
+| **P-a** `AND r.parent_run_id IS NULL` deleted | the sub-agent case, the no-producer-arm case, the SQL fence — **3 failed / 23 passed** |
+| **P-b** `ORDER BY …` deleted (LIMIT kept) | the determinism case + the SQL fence — **2 / 24** |
+| **P-c** `LIMIT 1` deleted (ORDER BY kept) | the SQL fence **only** — **1 / 25** |
+| **P-d** the indexed pick reverted to `next(...)` | **NONE — 26 passed** |
+
+⚠ **P-d's null result is published rather than smoothed.** With `ORDER BY` + `LIMIT 1` in
+place, `_live[0]` and `next(...)` are behaviourally identical, so **the indexed read has no
+independent RED and is not defended by any case**. It ships as an intent/readability choice;
+the determinism it expresses is defended by P-b and P-c. A later reader should not credit it
+with a guard it does not carry.
+
+### CR-02 — a CRASHED phase was persisted as `cancelled` · `2c614ebf`
+
+**RED, before the fix** (`pytest tests/test_harness_engine.py -k "crash or ESCAPE"` → **3
+failed / 58 deselected**), by case: `…never_persisted_as_stopped_by_the_user` red on a real
+`UPDATE workflow_phases SET status='cancelled'` recorded for a `RuntimeError` escape;
+`…keeps_the_crash_leaves_active_resume_contract` red on `"SET status='active'" in
+"…status='cancelled'…"`; `…tells_a_stop_from_a_crash_by_the_ESCAPE…` red on the two drives
+agreeing when they must differ.
+
+**Applied:** the escape is CAPTURED (`except BaseException as _escape:`) and the `cancelled`
+write is scoped to `isinstance(_escape, asyncio.CancelledError)`.
+
+⚠ **`fail_phase` on the crash path was OFFERED AND REJECTED, and the reason is a measured
+constraint rather than a preference.** This module's own header states the shipped contract
+verbatim — *"A phase whose execution raises mid-work is left `active` (never `completed`) so
+a later sweep re-runs it — the crash-leaves-active resume contract"* (`harness_engine.py:15-16`).
+A terminal write on the crash path would repeal that contract from inside a cancel fix. The
+crash arm therefore writes **nothing**, which is exactly what shipped for a year before 194.
+**The residual is named, not hidden:** an `active` phase row under a run that ends `failed`.
+That state is **pre-existing and inherited** — 194 did not introduce it — and closing it needs
+a vocabulary decision (a seventh literal + a migration), not a line of this arm.
+
+**Every property of the surrounding code is preserved and was re-verified:** phase-keyed on the
+loop's `phase_id`; inside the 096-09 `is_app_shutting_down()` gate (neither moved, duplicated
+nor widened — `grep -c` still **4**); `asyncio.shield`-ed with its own `try/except` +
+`logger.exception`; `raise` still LAST; completed phases untouched. **All six shipped 194-10
+fences are green, including the AST shape fence F-S** — `except BaseException as _escape:`
+leaves `handler.type` an `ast.Name` and the walk unchanged.
+
+**Plants (in `backend/app/services/harness_engine.py`, md5 `bd63f89c40…` before and after each):**
+
+| Plant | Cases that RED |
+|---|---|
+| **P-x** the guard does not discriminate (`if True:` — the shipped defect) | the three NEW cases and **no shipped case** — 3 / 58 |
+| **P-y** the write never happens (`if False:` — the over-correction) | **6 / 55**: V-16, propagation, cleanup-failure, F-5, F-6 **and** the discriminator case |
+| **P-z** the guard inverted | **8 / 53** — both directions |
+
+P-y is why the discriminator case exists: cases (a) and (b) alone are satisfied by deleting
+the 194 feature outright.
+
+### CR-03 — 204 over a write that may never have happened · `f97aa5c5`
+
+**RED, before the fix** (**4 failed / 9 passed** across the two suites):
+`…reports_that_both_writes_landed` → `assert None is True`;
+`…reports_a_failed_run_status_write` → `assert None is False`;
+`…reports_a_failed_phase_write` → `assert None is False`;
+`…refuses_to_report_success_when_its_only_write_failed` → **`assert 204 != 204`**.
+⚠ Two of the six new cases were correctly **GREEN** pre-change and that is stated rather than
+left to be mistaken for vacuity: the happy-path 204 control and the Step-3b scope pin both
+assert behaviour that must NOT move — their RED evidence is plants P-h and P-g.
+
+**Applied:** `cancel_workflow_run_internals` now returns `True` iff both writes landed
+(**it still never raises** — the D-062-13 contract is reported, not repealed), and the DELETE
+no-producer arm 500s on `False`. **Step 3b keeps ignoring the return by design** — `runs.status`
+is already written by then — and a fence pins that so "returns False" can never start failing a
+zombie heal. The retired justification is **quoted as superseded in the docstring**, not deleted.
+Both discriminating grep needles in `run_lifecycle.py` still read `is_app_shutting_down` → **0**
+and `finish_run(` → **1**.
+
+**Plants (four, across `api/runs.py` + `run_lifecycle.py`, both md5-verified):**
+P-e the route ignores the report again → the route case **only** (1 / 39) · P-f the composition
+reports nothing again → the success case **only** (1 / 39) · P-g a failure reported as success →
+the two failure cases (2 / 38) · P-h the route refuses unconditionally → the happy-path controls,
+including `test_v01b` (3 / 37).
+
+⚠ **One downstream consequence, stated rather than discovered later:** `cancelRun` now has a
+path that returns 500 where it previously always saw 204. That is the point — a visible failure
+instead of a silent success — but **WR-07 (which is still open) is about exactly this seam**, so
+the client's rendering of that 500 is untested here.
+
+### WR-01 — the docstring's false "MOVES" claim · `06f40aca`
+
+Comment-only. Re-measured before touching it: `git diff --numstat 743965a1..HEAD --
+backend/app/api/workflows.py` is **EMPTY** and `api/workflows.py:1518` still inline-composes
+its own run-status write. Both halves of the claim are false (nothing moved; and the cascade
+never called the phase writer, which did not exist before this phase). The sentence is **quoted
+as superseded beside the correction**, and the owed re-pointing is recorded with its trigger.
+
+### Gate readings after the fix pass
+
+Compared to `194-BASELINE.md`, never to RESEARCH.
+
+| Gate | Baseline | After | Verdict |
+|---|---|---|---|
+| (a) count gate | `OK` · 3918 · failed 0 · 3868 pinned · 75/75 | **`count gate OK` · total 3954 · failed 0 · pinned total 3868 · 75/75** | ✅ `failed` was **0 on the first run**, so no filename capture and no second run was owed. A growing total is the gate working. |
+| (b) `tsc -p tsconfig.app.json --noEmit` | **33** | **33** | ✅ unmoved (the `-p` is load-bearing) |
+| (c) cancel-path pytest, 7 files | **110 passed / 0 skipped** | **123 passed / 0 failed / 0 skipped** | ✅ +13 new cases, nothing lowered |
+| (d) backend unit rot, **BY NAME** | 62 failed / 2242 passed | **62 failed / 2242 passed — 0 NEW, 0 DISAPPEARED, SET-IDENTICAL** | ✅ parsed 62/62 on both sides; the comparator cuts at `" - "` and at a drive-letter pattern before matching, and refuses an empty parse |
+
+⚠ **No frontend file was touched** (`git diff --numstat` names only four `backend/` paths and
+this artifact), so (a) and (b) could not move — they were run anyway and did not.
+⚠ **No migration was applied, created or edited**, and `full-schema.sql` is untouched. No test
+in this pass seeds any table: supabase is an in-file double, both pools are doubles, Redis is a
+fake, and both cancel writers are patched at their own modules.
+
+### CR-04 — NOT fixed, and the assessment
+
+**It is a phase, not a fix**, and the recommendation is to record it as a scoped limitation
+**now** rather than at the next review.
+
+- There is **no cross-worker cancel signal anywhere in the backend** and the engine's phase
+  loop has **no in-loop status poll**. Both proposed repairs are new mechanisms: a Redis cancel
+  channel every worker's producer subscribes to (plus an ack/SETNX window before the zombie arm
+  may run), or a per-phase re-read of `workflow_runs.status` that raises `CancelledError` when
+  terminal. The second is the cheaper one and is localized to `run_workflow`'s loop — but it
+  lands in the **hottest engine loop in the tree**, it interacts with the boot resume sweep (a
+  terminal status mid-run versus a resumable one) and with this pass's CR-02 arm, and it needs
+  its own RED-driven fences. That is a phase's worth of work, not a `/gsd:fast`.
+- **It is not a defect in a line of this phase's code.** The limitation is inherited (Deep runs
+  have always had it); what 194 added is the *claim* to have closed it. So the paperwork half is
+  urgent even if the code half is scheduled: with `WORKER_COUNT=2` as the default this is
+  **roughly half of all Stops**, and RUN-01's "stop at any point, and the run reports honestly
+  that it was stopped" is materially unmet for them — the run finishes and reports `completed`,
+  overwriting the `cancelled` the Stop wrote.
+- **Neither CR-01 nor CR-02 touches it, and neither makes it better or worse.** CR-01 changes
+  *which* producer id is resolved, not whether the owning worker can be reached; on the
+  cross-worker path `RUN_TASKS` misses either way and the request takes the zombie arm. CR-02
+  only narrows what the engine writes on its own escape.
+- ⚠ **Recommended routing:** (1) record it verbatim as an accepted, scoped limitation in
+  `194-VALIDATION.md` and on the RUN-01 row — *this pass did not do that, because editing
+  `STATE.md` / `ROADMAP.md` / `REQUIREMENTS.md` is out of its scope*; (2) open a dedicated phase
+  for the cross-worker cancel signal, taking the status-poll option first and the Redis-channel
+  option as the fallback. A SEED alone is too weak here: a seed with no date lets a *"a Stop that
+  half the time does not stop"* read as a footnote, which is the failure mode this whole phase
+  exists to remove.
+
+### One adjacent finding this pass did NOT fix, reported rather than silently left
+
+⚠ **`api/workflows.py:1483-1490` (`delete_workflow_cascade`) carries the IDENTICAL unnarrowed
+join CR-01 fixes** — `LEFT JOIN runs r ON r.thread_id = wr.thread_id AND r.status = 'streaming'`
+with no `parent_run_id IS NULL` — and hands `r["producer_id"]` straight to
+`_cancel_run_internals`. It can therefore cancel a **sub-agent** while deleting a workflow, for
+exactly CR-01's reason. It was left alone on purpose: it is a different file, outside this pass's
+named scope, `git diff` on it is EMPTY for the whole of Phase 194 (WR-01's measurement), and it
+is a **G-5-firing hot file** (17 phases) whose next editor owes a refactor recommendation first.
+It is the natural companion to WR-01's owed re-pointing of that same block.
+
+---
+
 _Reviewed: 2026-08-16_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Fix pass: 2026-08-16 — Claude (gsd-code-fixer) — CR-01 `c601aeb0` · CR-02 `2c614ebf` · CR-03 `f97aa5c5` · WR-01 `06f40aca`_
