@@ -2479,10 +2479,29 @@ export function StreamsProvider({ children }: PropsWithChildren) {
               // Keyed narrowly to status===403 and placed BEFORE the generic ApiError branch
               // so the 400 disabled-skill + 409 workflow-lock rollback paths stay byte-identical
               // (D-05). No run_id / runs query — the 403 fires before any INSERT (Pitfall 5).
+              //
+              // ── Phase 194.1 Plan 03 (R5 / CONTEXT D-23) — THE HONESTY REPAIR ──
+              // R5 stops inserting the optimistic placeholder on a harness kickoff,
+              // and this arm WROTE ONTO THAT PLACEHOLDER BY ID. Left as a bare
+              // `map`, it would become a NO-OP OVER AN ABSENT NODE — and since
+              // `workflow_kickoff.py:200` is raised on the harness path and ONLY the
+              // harness path, silencing it here silences the administrator's
+              // kill-switch EVERYWHERE. So: INSERT the notice-bearing node when the
+              // placeholder was skipped, instead of mapping onto one that is not
+              // there. Same `assistantId`, so identity is unchanged downstream.
+              //
+              // ⚠ A REFUSED KICKOFF IS NOT A RUNNING KICKOFF. A node that exists
+              // ONLY to carry a refusal does not reinstate the surface the duplicate
+              // avatar was drawn on (BUG-260610-01): it carries no `runStatus:
+              // "streaming"`, no empty streaming body and no live instrument — it is
+              // a message, not a placeholder. That distinction is what keeps R5's
+              // "zero assistant nodes" acceptance true of a RUNNING kickoff.
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, blockedNotice: { message: err.message } } : m,
-                ),
+                prev.some((m) => m.id === assistantId)
+                  ? prev.map((m) =>
+                      m.id === assistantId ? { ...m, blockedNotice: { message: err.message } } : m,
+                    )
+                  : [...prev, { ...assistantMsg, runStatus: undefined, blockedNotice: { message: err.message } }],
               )
               // D-04: guarantee the composer is never left locked. The kickoff lock is only
               // seeded AFTER run_id (a 403 never gets there), so this is a defensive no-op in
@@ -2508,10 +2527,23 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             } else {
               // genuine network / non-HTTP failure — unchanged swallow-to-failed-placeholder.
               console.error("sendMessage failed:", err)
+              //
+              // ── Phase 194.1 Plan 03 (R5 / CONTEXT D-23) — THE HONESTY REPAIR ──
+              // The second of the two arms that rode on the placeholder. Without
+              // this, a harness kickoff that fails the NETWORK is COMPLETELY SILENT
+              // — no node, no notice, no console-visible surface change — because
+              // the `map` would run over an absent id. Measured RED at BASELINE §8
+              // and again in this plan's own task-4 commit, which shipped the gate
+              // without this repair on purpose.
+              //
+              // ⚠ Same rule as the 403 arm above: a FAILED kickoff is not a RUNNING
+              // kickoff. The inserted node carries `runStatus: "failed"` and never
+              // `"streaming"`, so it is a failure receipt rather than a reinstated
+              // placeholder.
               useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, runStatus: "failed" } : m,
-                ),
+                prev.some((m) => m.id === assistantId)
+                  ? prev.map((m) => (m.id === assistantId ? { ...m, runStatus: "failed" } : m))
+                  : [...prev, { ...assistantMsg, runStatus: "failed" as const }],
               )
             }
           } finally {
