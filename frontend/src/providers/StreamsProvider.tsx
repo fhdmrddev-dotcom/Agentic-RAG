@@ -168,6 +168,14 @@ const STREAM_POOL_SIZE = 3
 const WATCHDOG_TICK_MS = 5_000 // shared-interval tick cadence
 const WATCHDOG_INACTIVITY_MS = 20_000 // per-thread N: quiet-for-this-long → probe
 
+// Phase 194.1 Plan 03 (R2 / CONTEXT D-07) — the stop climb-down window. R2's
+// acceptance is three points, not one: the reading is still "stopping" at 7s, it
+// has climbed down by 8s, and it NEVER appears for a cancel that resolved at 2s.
+// A single at-8s assertion passes a 1ms timeout, which is why all three are
+// fenced. The timer is keyed BY THREAD (never by run), so a thread whose run id
+// could not be resolved still climbs down.
+const STOP_TIMEOUT_MS = 8000
+
 // WR-04 fix (260529-0sc): the persistence trigger set now includes the panel
 // todo/task Maps. This equalityFn returns true (= "no change, skip") ONLY when
 // all three watched refs are unchanged, so a reference change in bucketsBySurface
@@ -1212,6 +1220,15 @@ export function StreamsProvider({ children }: PropsWithChildren) {
   // entry reads as "immediately stale" (probe on the next tick) — safe, because
   // the probe is read-only and no-ops when the run is still streaming.
   const lastEventAtRef = useRef<Map<string, number>>(new Map())
+  // Phase 194.1 Plan 03 (R2 / D-05 / D-07): per-thread `window.setTimeout` handles
+  // for the stop climb-down. THE HANDLE LIVES HERE AND NOT IN THE STORE, per
+  // `streamsStore.ts:22-27` — a timer handle is a non-serializable handle exactly
+  // like an AbortController, and the shipped pattern is `subscriptionsRef` (:1178)
+  // ↔ `subscriptionsByThread`. The pure-data mirrors are `stoppingThreads` /
+  // `stopNotConfirmed`. Provider-scoped, so it OUTLIVES every mount: `App.tsx:253-313`
+  // wraps <StreamsProvider> above the page switch, which is D-06's argument made
+  // structural — navigating away mid-stop cannot restore a pressable Stop.
+  const stopTimersRef = useRef<Map<string, number>>(new Map())
   const abortControllerRef = useRef<AbortController | null>(null)
   const loadAbortRef = useRef<AbortController | null>(null)
   const stoppedByUserRef = useRef(false)
@@ -3658,3 +3675,49 @@ export const useFailedSendDraftForThread = (threadId: string | null): string | n
 // equality re-renders only the threads whose lock actually changed.
 export const useWorkflowLockForThread = (threadId: string | null): WorkflowLock | null =>
   useStreamsStore((s) => (threadId ? (s.workflowLockByThread.get(threadId) ?? null) : null))
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 03 (R1 / R2 / R5 — D-05 / D-06 / D-07) — the stopping readers.
+//
+// Appended BELOW the shipped selectors per the :3601-3603 convention ("additions
+// go BELOW (alphabetical) so the existing 4 stay grep-stable"), alphabetical
+// among themselves.
+//
+// ⚠ ALL THREE RETURN A PRIMITIVE, and that is a correctness property rather than
+// a taste one. Zustand's default equality is `Object.is`; a selector returning a
+// fresh object or a Set re-renders EVERY subscriber on every unrelated store
+// write (`:3293` records that churn hazard by name). A boolean re-renders only
+// the mount whose value actually flipped — which is what makes four Stop mounts
+// on one thread cheap.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** True when a harness run is LIVE for this thread — by either of the two
+ *  readings, which cover different windows and neither is sufficient alone:
+ *
+ *   - `harnessKickoffThreads` is stamped SYNCHRONOUSLY at kickoff (R5), so it
+ *     covers the round trip BEFORE the lock is seeded (`:1981`, which needs
+ *     `run_id` back from the POST).
+ *   - `workflowLockByThread` covers a run REJOINED by the mount reconcile after
+ *     navigation, where no kickoff happened in this session at all.
+ *
+ *  ⚠ Returns a BOOLEAN, never the lock object. Handing back the record would
+ *  both leak the `WorkflowLock.runId` two-id landmine (see its JSDoc in
+ *  `streamsStore.ts`) to callers that have no business resolving ids, and give
+ *  every consumer an object-identity dependency this selector does not need. */
+export const useHarnessLiveForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) =>
+    threadId
+      ? s.harnessKickoffThreads.has(threadId) || s.workflowLockByThread.has(threadId)
+      : false,
+  )
+
+/** True when this thread's stop passed the 8s window with no terminal (R2). The
+ *  Stop control is pressable again alongside this reading — the climb-down is the
+ *  ONLY route back to a pressable Stop (sketch 168-B's losing arm, load-bearing). */
+export const useStopNotConfirmedForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.stopNotConfirmed.has(threadId) : false))
+
+/** True from the synchronous instant Stop is pressed until the run reaches a
+ *  terminal by ANY route, or the 8s window expires (R1 + R2). */
+export const useStoppingForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.stoppingThreads.has(threadId) : false))

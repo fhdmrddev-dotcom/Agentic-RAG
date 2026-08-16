@@ -113,6 +113,56 @@ export interface StreamsState {
    *  `isStreaming: boolean`. `streamingThreads.size > 0` is the back-compat
    *  any-thread-streaming check. */
   streamingThreads: Set<string>
+  // ────────────────────────────────────────────────────────────────────────────
+  // Phase 194.1 Plan 03 (R1 / R2 / R5 — D-05 / D-06 / D-07) — the STOPPING slice.
+  //
+  // ⚠ D-02's whole no-second-concern argument for this file lives in this
+  // sentence and it must survive future edits: THESE THREE ARE THE SIBLING OF
+  // `streamingThreads` ABOVE, NOT ITS RIVAL. They are the same concern —
+  // per-thread run liveness — held in a second state. A thread is streaming, or
+  // it is stopping, or its stop went unconfirmed; one subject, three readings.
+  //
+  // IMMUTABLE REPLACE ONLY. Every write is `new Set(s.X).add(t)` or
+  // copy-then-`delete` — NEVER `.add`/`.delete` in place. That is not style: it
+  // is what makes `StreamsProvider.tsx:3610-3613`'s MEASURED reference-stability
+  // property ("the Set is reassigned ONLY on stream start/stop — tokens never
+  // touch it") inherited BY CONSTRUCTION rather than re-argued. These three are
+  // reassigned only on press / clear / timeout. A token never touches them.
+  //
+  // TWO SETS, NOT ONE MAP — recorded as a rejected alternative rather than
+  // omitted, because CONTEXT puts the shape in Claude's discretion (§Claude's
+  // Discretion) and this is the exercise of it. A
+  // `Map<string,"stopping"|"unconfirmed">` collapses "cleared entirely" and
+  // "unconfirmed" onto ONE key, and R2's acceptance needs those distinguishable
+  // (its third point is *never appears for a 2s cancel*, which is a statement
+  // about the unconfirmed reading being ABSENT while the stopping reading was
+  // present and then gone). Two Sets also keep both selectors
+  // PRIMITIVE-returning, which is what lets the default `Object.is` equality
+  // re-render only the mount whose boolean flipped — `:3293` records the
+  // fresh-object selector-churn hazard that a Map-returning selector reopens.
+  //
+  // ⚠ NO TIMER HANDLE MAY EVER BE PUT HERE. The rule is this module's own, at
+  // :22-27, verbatim: "AbortController must NOT live in Zustand state (not
+  // serializable, identity churn breaks selector memoization). The provider
+  // holds the actual Map<runId, AbortController> in a ref; this Set is the pure-
+  // data mirror." A `window.setTimeout` handle is exactly that kind of
+  // non-serializable handle. The shipped pattern being followed is the pair
+  // `subscriptionsRef` (StreamsProvider.tsx:1178) ↔ `subscriptionsByThread`
+  // (:136 below); the stopping analogue is `stopTimersRef` ↔ these Sets.
+  // ────────────────────────────────────────────────────────────────────────────
+  /** Threads whose Stop has been PRESSED and not yet resolved. Written
+   *  synchronously by both resolvers before any network work, so the press is
+   *  acknowledged in the same tick (R1). */
+  stoppingThreads: Set<string>
+  /** Threads whose stop passed the 8s window with no terminal (R2's climb-down).
+   *  Disjoint from `stoppingThreads` by construction — the expiry clears one and
+   *  raises the other in the same write. */
+  stopNotConfirmed: Set<string>
+  /** Threads whose HARNESS kickoff is in flight (R5's synchronous liveness
+   *  mark). Added in the same tick as the user-message insert, so a harness run's
+   *  presence is readable with ZERO round trips once the optimistic assistant
+   *  placeholder is no longer inserted. */
+  harnessKickoffThreads: Set<string>
   /** Per-thread fallback-model notice strings. Replaces the old global
    *  `fallbackNotice: string | null`. */
   fallbackNotices: Map<string, string>
@@ -343,6 +393,16 @@ export const useStreamsStore = create<StreamsState>()(subscribeWithSelector(() =
   // defaults (>= 2 hits per field).
   // Type: streamingThreads: Set<string>
   streamingThreads: new Set<string>(),
+  // Phase 194.1 Plan 03 (R1/R2/R5): the stopping slice — three fresh empty Sets,
+  // siblings of streamingThreads above (see the docblock on the interface). The
+  // `// Type: …` line on each mirrors the interface declaration verbatim, per the
+  // shipped 075.4-01 convention (>= 2 grep hits per field: interface + default).
+  // Type: stoppingThreads: Set<string>
+  stoppingThreads: new Set<string>(),
+  // Type: stopNotConfirmed: Set<string>
+  stopNotConfirmed: new Set<string>(),
+  // Type: harnessKickoffThreads: Set<string>
+  harnessKickoffThreads: new Set<string>(),
   // Type: fallbackNotices: Map<string, string>
   fallbackNotices: new Map<string, string>(),
   // Type: reconcileErrors: Map<string, Error>
