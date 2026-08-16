@@ -1972,7 +1972,7 @@ CREATE TABLE public.workflow_phases (
     org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text, 'recorded_not_sent'::text])))
+    CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text, 'recorded_not_sent'::text, 'cancelled'::text])))
 );
 
 
