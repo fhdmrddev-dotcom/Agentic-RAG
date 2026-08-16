@@ -66,6 +66,10 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+// Phase 194.1 Plan 06 — the elapsed formatter, hoisted out of this file VERBATIM so the
+// chat run line consumes the shipped one instead of becoming a fourth copy. See the
+// docblock where it used to live (search `fmtElapsed NO LONGER LIVES HERE`).
+import { fmtElapsed } from "@/lib/fmtElapsed"
 import { downloadWorkspaceFile, getWorkflowRun, type WorkflowRunRead } from "@/lib/api"
 import { ApiError } from "@/lib/api"
 import {
@@ -183,22 +187,27 @@ function iconFor(file: WorkspaceFile) {
 // ── The elapsed figure (D-188-18) ──────────────────────────────────────────────
 
 /**
- * `< 60s → 12s` · `< 60m → 4m 12s` · else `1h 06m`. A local formatter sited next to its
- * one consumer, in the house shape the panel's own file list uses for its byte figure —
- * NO date library is added for one label, and none is wanted: the three branches below
- * are the entire contract.
+ * ⚠ `fmtElapsed` NO LONGER LIVES HERE — Phase 194.1 Plan 06 HOISTED it, VERBATIM, to
+ * `@/lib/fmtElapsed` (imported at the top of this file). It is not gone and it was not
+ * rewritten: `lib/__tests__/runStepCount.test.ts` compares the moved body against a
+ * constant captured with `git show f9e55b6d…:frontend/src/pages/WorkflowRunPage.tsx`,
+ * so the move is byte-proved rather than promised.
  *
- * ⚠ The panel component is named by ROLE here, never by its identifier: this plan's
- * acceptance fence measures that this page does NOT import it, and a comment spelling
- * the name would turn that measurement into prose (the 187-24 lesson, met again).
+ * WHY IT MOVED, stated so nobody moves it back: `components/chat/ThreadRunLine.tsx`
+ * became its SECOND consumer, and this tree already carried THREE elapsed formatters
+ * (`RunCard`'s `formatElapsed`, `MessageList`'s `formatFloatingElapsed`, and this one).
+ * `194.1-RESEARCH.md`'s *Don't Hand-Roll* table names a fourth as the thing not to write.
+ *
+ * ⚠ WHAT DID **NOT** MOVE, and stays here because the thing it guards is here: this page
+ * names the panel component by ROLE, never by its identifier — an acceptance fence
+ * measures that this page does NOT import it, and a comment spelling the name would turn
+ * that measurement into prose (the 187-24 lesson, met again).
+ *
+ * ⚠ THE ANCHOR DECISION IS ALSO STILL HERE, DELIBERATELY. The formatter takes a duration
+ * in milliseconds and nothing else; `:758-791` below decides what this page's two anchors
+ * are and discloses them in words. The chat run line makes its own, different choice. A
+ * formatter that knew which would be a second home for a per-caller decision.
  */
-function fmtElapsed(ms: number): string {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  if (total < 60) return `${total}s`
-  const minutes = Math.floor(total / 60)
-  if (minutes < 60) return `${minutes}m ${String(total % 60).padStart(2, "0")}s`
-  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`
-}
 
 /** Parse a wire timestamp to epoch ms, or `null` when it is absent/unparseable. An
  *  unparseable anchor is treated exactly like a missing one — it may never become a
