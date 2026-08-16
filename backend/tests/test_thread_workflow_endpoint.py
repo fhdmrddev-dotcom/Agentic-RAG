@@ -15,8 +15,34 @@ mock_builder, mock_execute_result.
 """
 from __future__ import annotations
 
+import re
 import uuid
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, patch
+
+
+# ── Phase 194.1 (D-09 AMENDED): the pure-read fence, corrected on measurement ──
+# The three pure-read loops below asserted `"UPDATE" not in sql.upper()`. That is a
+# SUBSTRING test, and it reds on a COLUMN NAME: 194.1 widened this endpoint's ARM B
+# SELECT to read `updated_at`, whose upper-case form `UPDATED_AT` literally contains
+# `UPDATE`. The endpoint is still a pure read — SELECTing a column called
+# `updated_at` writes nothing — so the FENCE was mis-scoped, never the code.
+#
+# This is the project's recurring lesson landing in a new place: a raw sweep reds on
+# the thing it sweeps for (192-05's `title=` fence had to be AST-parsed for exactly
+# this reason; 194.1-BASELINE.md §9 Trap 2 records the same shape in PendingAskCard).
+#
+# The corrected form matches UPDATE/INSERT/DELETE as WHOLE WORDS. It is NOT weaker:
+# `\bUPDATE\b` still matches `UPDATE workflow_runs SET …` (a real write) and no longer
+# matches `UPDATED_AT` (a column), because `_` and `D` are word characters so there is
+# no boundary after `UPDATE` inside `UPDATED_AT`. Driven RED against a planted write.
+_WRITE_VERB = re.compile(r"\b(UPDATE|INSERT|DELETE)\b")
+
+
+def _assert_pure_read(sql: str) -> None:
+    """Fail iff `sql` contains a write VERB — never merely the letters of one."""
+    hit = _WRITE_VERB.search(sql.upper())
+    assert hit is None, f"GET reconcile must not write; saw {hit.group(0)!r} in: {sql}"
 
 import pytest
 
@@ -187,7 +213,7 @@ def test_lock_is_stale_when_producer_run_terminal_workflow_lagged(
     assert body["lock_is_stale"] is True
     # pure read — the heal probe must not write.
     for sql, _ in mock_asyncpg_pool.calls:
-        assert "UPDATE" not in sql.upper() and "INSERT" not in sql.upper()
+        _assert_pure_read(sql)
 
 
 def test_get_workflow_is_pure_read_never_writes(
@@ -213,10 +239,7 @@ def test_get_workflow_is_pure_read_never_writes(
     assert resp.json()["mode"] == "deep"
     # No write SQL recorded — pure read.
     for sql, _ in mock_asyncpg_pool.calls:
-        upper = sql.upper()
-        assert "UPDATE" not in upper and "INSERT" not in upper and "DELETE" not in upper, (
-            f"GET reconcile must not write; saw: {sql}"
-        )
+        _assert_pure_read(sql)
 
 
 # ── Phase 188 CR-03: the anchor that SURVIVES termination ────────────────────
@@ -250,7 +273,16 @@ def test_last_workflow_run_id_survives_the_anchor_clear(
     }
     # With no anchor the workflow_runs join and the producer probe are both skipped, so the
     # fetchrow order is: (1) the deep cap_paused probe; (2) the latest workflow_runs row.
-    mock_asyncpg_pool.set_fetchrow_results([None, {"id": last_run_id}])
+    # Phase 194.1 (D-09 AMENDED): ARM B's SELECT was widened from `id` alone to
+    # `id, status, created_at, updated_at` — same query, same round trip, three more
+    # columns. The fixture is widened to match, because a mock that returns fewer
+    # columns than the query it stands in for is stale, not a finding.
+    mock_asyncpg_pool.set_fetchrow_results([None, {
+        "id": last_run_id,
+        "status": "cancelled",
+        "created_at": datetime(2026, 8, 16, 12, 0, 0, tzinfo=timezone.utc),
+        "updated_at": datetime(2026, 8, 16, 12, 2, 18, tzinfo=timezone.utc),
+    }])
     # No durable phase rows -> the definition lookup never runs (kept out of the queue above).
     mock_asyncpg_pool.set_fetch_results([[]])
 
@@ -274,8 +306,7 @@ def test_last_workflow_run_id_survives_the_anchor_clear(
     assert body["last_workflow_run_id"] == str(last_run_id)
     # STILL a pure read (the 092 invariant this whole endpoint is held to).
     for sql, _ in mock_asyncpg_pool.calls:
-        upper = sql.upper()
-        assert "UPDATE" not in upper and "INSERT" not in upper and "DELETE" not in upper
+        _assert_pure_read(sql)
 
 
 def test_last_workflow_run_id_is_the_live_anchor_while_a_run_is_under_way(
@@ -295,6 +326,11 @@ def test_last_workflow_run_id_is_the_live_anchor_while_a_run_is_under_way(
     mock_asyncpg_pool.set_fetchrow_results([
         {
             "status": "active",
+            # Phase 194.1 (D-09 AMENDED): ARM A's SELECT already read `wr.status` and now
+            # also reads `wr.created_at` / `wr.updated_at` — a widened projection, not a
+            # new query. The fixture is widened to match.
+            "created_at": datetime(2026, 8, 16, 12, 0, 0, tzinfo=timezone.utc),
+            "updated_at": datetime(2026, 8, 16, 12, 0, 45, tzinfo=timezone.utc),
             "continues_used": 0,
             "definition_slug": "wf",
             "definition_name": "WF",

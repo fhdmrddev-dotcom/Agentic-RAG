@@ -1088,10 +1088,19 @@ async def get_thread_workflow(
     total_phases = None
     wf_continues_used = 0
     phases_list: list[WorkflowPhaseState] | None = None
+    # Phase 194.1 (D-09 AMENDED) — the LAST run's status + its two timestamps, keyed to the
+    # already-resolved `phases_source_run_id` below. Initialized beside `run_status = None`
+    # above so a pure-Deep thread (no workflow_run ever) yields three Nones, the same shape
+    # `phases_list = None` already has.
+    last_run_status = None
+    last_run_created_at = None
+    last_run_updated_at = None
     if active_workflow_run_id is not None:
         wf_row = await _rls_fetchrow(
             """
             SELECT wr.status,
+                   wr.created_at,
+                   wr.updated_at,
                    wr.continues_used,
                    wd.slug  AS definition_slug,
                    wd.name  AS definition_name,
@@ -1114,6 +1123,10 @@ async def get_thread_workflow(
             current_phase_slug = wf_row["current_phase_slug"]
             current_phase_index = wf_row["current_phase_index"]
             total_phases = wf_row["total_phases"]
+            # ARM A (live anchor). Same row, widened SELECT — no extra round trip.
+            last_run_status = wf_row["status"]
+            last_run_created_at = wf_row["created_at"]
+            last_run_updated_at = wf_row["updated_at"]
 
     # mode / locked / lock_is_stale derive from the anchor + run terminality.
     mode = "harness" if active_workflow_run_id is not None else "deep"
@@ -1187,13 +1200,18 @@ async def get_thread_workflow(
     # panel timeline; a pure-deep thread (no workflow_run ever) yields phases=None.
     phases_source_run_id = active_workflow_run_id
     if phases_source_run_id is None:
+        # D-09 (AMENDED): this widening is what makes the stopped receipt possible on an UNGATED route — the workflow_runs router that D-09 originally chose is canvas_gate'd (middleware/canvas_gate.py:85-93 + workflow_runs.py:169) and visual_workflow_canvas ships OFF (models/user_settings.py:1197-1203), so a chat receipt fed from it would be invisible at the shipped default.
         latest_wf = await _rls_fetchrow(
-            "SELECT id FROM workflow_runs WHERE thread_id = $1 "
+            "SELECT id, status, created_at, updated_at FROM workflow_runs WHERE thread_id = $1 "
             "ORDER BY created_at DESC LIMIT 1",
             UUID(thread_id) if isinstance(thread_id, str) else thread_id,
         )
         if latest_wf is not None:
             phases_source_run_id = latest_wf["id"]
+            # ARM B (latest, after the anchor is NULLed). Same row, widened SELECT.
+            last_run_status = latest_wf["status"]
+            last_run_created_at = latest_wf["created_at"]
+            last_run_updated_at = latest_wf["updated_at"]
     if phases_source_run_id is not None:
         phase_rows = await _rls_fetch(
             "SELECT slug, phase_index, status FROM workflow_phases "
@@ -1269,5 +1287,12 @@ async def get_thread_workflow(
             if isinstance(phases_source_run_id, str)
             else phases_source_run_id
         ),
+        # Phase 194.1 (D-09 AMENDED) — keyed to the SAME already-resolved id directly above,
+        # read off whichever of the two arms produced it. `run_status` above is UNCHANGED and
+        # remains the LIVE anchor's status; these three are the LAST run's and survive the
+        # anchor NULL that `finish_run` writes on every terminal run.
+        last_run_status=last_run_status,
+        last_run_created_at=last_run_created_at,
+        last_run_updated_at=last_run_updated_at,
         phases=phases_list,
     )
