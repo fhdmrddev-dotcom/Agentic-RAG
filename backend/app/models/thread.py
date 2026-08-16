@@ -113,6 +113,37 @@ class ThreadWorkflowState(BaseModel):
     # ADDITIVE and OPTIONAL — every existing consumer ignores it (the ``latest_producer_run_id``
     # precedent directly above is the same shape for the same reason).
     last_workflow_run_id: UUID | None = None
+    # Phase 194.1 (D-09 AMENDED) — the LAST run's status and its two timestamps, keyed to
+    # ``phases_source_run_id``: the SAME anchor-then-latest id that already sources ``phases``
+    # below and ``last_workflow_run_id`` directly above. Nothing new is queried — both arms of
+    # that resolution simply widen a SELECT they already issue.
+    #
+    # WHY THEY ARE NEEDED. ``run_status`` above is populated ONLY inside
+    # ``if active_workflow_run_id is not None:`` (``threads.py:1091``; the plan quoted 1092 —
+    # corrected on measurement). So after a stop, ``finish_run`` has NULLed the anchor and the
+    # frame reads ``run_status = None`` / ``mode = "deep"`` / ``locked = False`` while
+    # ``phases[]`` and ``last_workflow_run_id`` BOTH survive. That gap is these three fields:
+    # the thread knows which run it held and how far it got, but not that it was stopped,
+    # when it started, or when it last moved.
+    #
+    # ⚠ ``last_run_status`` is the ``workflow_runs.status`` of the LAST run this thread held.
+    # It is NOT ``run_status`` above, which is the LIVE anchor's status and stays anchor-based
+    # and byte-unchanged. Both are plain ``str | None`` and a swap TYPECHECKS — the same trap
+    # ``last_workflow_run_id``'s own docblock records about the two id types.
+    #
+    # ⚠ THE ELAPSED ANCHOR IS ``created_at`` -> ``updated_at``, i.e. from QUEUED to LAST UPDATE,
+    # and ``claimed_at`` is deliberately NOT offered. Measured (``WorkflowRunPage.tsx:759-768``):
+    # 5 of 181 ``workflow_runs`` carry ``claimed_at`` and 0 of 149 COMPLETED rows do —
+    # ``claim_run``'s CAS lease is the distributed-worker path and the in-process producer never
+    # takes it, so a ``claimed_at`` anchor would be absent on essentially every run. Any surface
+    # printing the interval owes that disclosure; it is not a wall-clock run duration.
+    #
+    # ADDITIVE and OPTIONAL — every existing consumer ignores all three (the
+    # ``latest_producer_run_id`` and ``last_workflow_run_id`` precedents directly above are the
+    # same shape for the same reason).
+    last_run_status: str | None = None
+    last_run_created_at: datetime | None = None
+    last_run_updated_at: datetime | None = None
     # Phase 098-UAT run-honesty fix (B) — the run's durable per-phase status array
     # (ordered by phase_index), so the frontend reconcile floor can rebuild an
     # honest timeline for a TERMINAL run (which previously returned [] / blanked).
