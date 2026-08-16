@@ -2118,10 +2118,49 @@ export function StreamsProvider({ children }: PropsWithChildren) {
             tool_calls: [],
             runStatus: "streaming",
           }
-          useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
-            ...prev,
-            assistantMsg,
-          ])
+          // ── Phase 194.1 Plan 03 (R5 — CONTEXT D-13) — THE HARNESS GATE ─────
+          //
+          // A harness kickoff inserts ZERO assistant nodes. `opts.workflowDefinitionId`
+          // is the signal `sendMessage` ALREADY receives and the one Deep never
+          // sets — the store's own JSDoc on this opt says so verbatim: "Omitted on
+          // a Deep send (byte-identical)". So Deep enters the same branch it
+          // entered before this commit, and 174 D-14's byte-identity holds BY
+          // CONSTRUCTION rather than by test.
+          //
+          // ⚠ TWO REJECTED ALTERNATIVES, recorded so they are not re-litigated:
+          //  - The RENDER-LEVEL rule ("the assistant renders only when it has
+          //    content") is closer to R5's literal wording and is REJECTED: it
+          //    changes what DEEP renders during its own first-token window, which
+          //    is out of this phase's scope entirely.
+          //  - HIDING the node with CSS is REJECTED: R5's acceptance is *zero
+          //    assistant nodes in the transcript*, and a hidden node is still in
+          //    the transcript, still in the bucket, and still the thing every
+          //    `m.id === assistantId` map writes onto. That is why the fence
+          //    COUNTS nodes rather than measuring visibility.
+          //
+          // ⚠ `assistantId` STAYS DECLARED and stays the identity every later arm
+          // keys on. The `finally` chain is a no-op over an absent id (every write
+          // there is `m.id === assistantId`) and is deliberately UNTOUCHED. The two
+          // arms that are NOT harmless over an absent id — the 403 kill-switch and
+          // the network-failure flip — are repaired in their own place below
+          // (CONTEXT D-23); this gate would ship a NEW SILENCE without them.
+          if (!opts?.workflowDefinitionId) {
+            useStreamsStore.getState().actions.setMessagesForBucket(surfaceId, threadId, (prev) => [
+              ...prev,
+              assistantMsg,
+            ])
+          } else {
+            // The run's liveness, marked SYNCHRONOUSLY — in the same tick as the
+            // user-message insert and the `streamingThreads` add below, with ZERO
+            // round trips. R5's acceptance is "no interval showing a prompt with no
+            // run instrument"; a fetch-driven liveness signal would fail it by one
+            // kickoff RTT, and the shipped lock seed cannot serve here because it
+            // needs `run_id` back from the POST. Cleared by the SAME
+            // slice-transition subscription that clears the stopping slice.
+            useStreamsStore.setState((s) => ({
+              harnessKickoffThreads: new Set(s.harnessKickoffThreads).add(threadId),
+            }))
+          }
           // Plan 075.4-01 D-075.4-A1: per-thread streamingThreads.
           useStreamsStore.setState((s) => ({
             streamingThreads: new Set(s.streamingThreads).add(threadId),
