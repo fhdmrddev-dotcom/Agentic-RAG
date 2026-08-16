@@ -7,7 +7,11 @@ import { cn } from "@/lib/utils"
 // workflow lock (carries capPaused + continuesRemaining) keyed by the OWNING
 // thread id — delivered OUT-OF-BAND (the role='system' carrier row is filtered
 // from /messages, BUG-260528-01) via the cap_paused SSE + the mount reconcile.
-import { useWorkflowLockForThread } from "@/providers/StreamsProvider"
+// Phase 194 Plan 07 (RUN-01 / BUG-260815-04 / D-18): `usePhases` is the shipped
+// selector over the harness demux's `phasesByThread` slice. It is called from
+// `HarnessOuterBanner` below — NOT from `MessageItem` itself — and the reason is
+// measured rather than stylistic; see that component's docblock.
+import { useWorkflowLockForThread, usePhases } from "@/providers/StreamsProvider"
 // Phase 092-07 (Facet C): after a Harness Continue the backend mints a FRESH
 // producer runs row + returns its id; re-subscribe its live stream (per-thread
 // keyed, additive — mirrors panelOpenSignal).
@@ -30,7 +34,7 @@ import { CitationList } from "./CitationList"
 import { SuggestionPills } from "./SuggestionPills"
 import { MessageFeedback } from "./MessageFeedback"
 import { OutputFileCard } from "./OutputFileCard"
-import { toolLabel, toolSummary, outerBannerLabel } from "@/lib/toolMeta"
+import { toolLabel, toolSummary, outerBannerLabel, harnessBannerProgress } from "@/lib/toolMeta"
 // Phase 087-05 (D-05 / chat-panel-seam.md): ADDITIVE seam renderers. Live runs
 // show quiet pointers / a paused cue; reloaded history resolves to self-contained
 // cards. These mount as NEW siblings only — they never touch RunCard /
@@ -286,6 +290,84 @@ function hasInRangeMarker(content: string, count: number): boolean {
     if (n >= 1 && n <= count) return true
   }
   return false
+}
+
+/**
+ * Phase 194 Plan 07 (RUN-01 / BUG-260815-04 / D-18) — THE ADVANCING HARNESS BANNER.
+ *
+ * ── What was broken, and it was a MECHANISM, never copy ──────────────────────
+ * `hasAnyTools` (below, `:329`) is `(message.tool_calls?.length ?? 0) > 0`, and a
+ * HARNESS run writes NO `tool_calls` — its progress lives in `workflow_phases`
+ * rows and in `phase_started` / `phase_completed` SSE. So the pre-tools branch
+ * held from kickoff to terminal and the banner was structurally incapable of
+ * advancing: one sentence for the whole run. The pinned string is not the bug and
+ * is not edited (D-13); this component is the advance.
+ *
+ * ── THE PANEL-09 CROSSING, RECORDED BESIDE ITS ORIGINAL REASONING, NOT OVER IT ─
+ *
+ * 1. PANEL-09's original reasoning, QUOTED verbatim from its source
+ *    (`StreamsProvider.tsx:971-978`), not paraphrased:
+ *
+ *      "Phase 094 Plan 02 (PANEL-08 / PANEL-09) — harness phase-lifecycle demux.
+ *       ... They write phasesByThread ONLY — never bucketsBySurface
+ *       (PANEL-09: the chat selector useThreadMessages reads bucketsBySurface
+ *       exclusively → zero chat re-renders). ..."
+ *
+ *    That was a considered performance decision and it still stands.
+ *
+ * 2. WHAT IS AND IS NOT BEING CHANGED. PANEL-09 is a rule about what the demux
+ *    WRITES. This adds a READ and changes NOT ONE LINE of the demux
+ *    (`StreamsProvider.tsx:963-1100` is untouched by this plan — `git diff
+ *    --numstat` on that file is empty). `bucketsBySurface` is untouched. This is
+ *    exactly what `useWorkflowLockForThread` has done in this same component
+ *    since Phase 092: `workflowLockByThread` is written by the SAME harness demux.
+ *    A chat component has consumed a harness-demux slice for a hundred phases.
+ *
+ * 3. THE ACCEPTED COST, WITH THE MEASURED NUMBERS (D-18 requires measurements,
+ *    not an assurance — `194-07-SUMMARY.md` § "The two measured re-render counts"
+ *    carries the raw output):
+ *      - Across a 6-token simulated stream the commit count is IDENTICAL with the
+ *        subscription live (harness) and without it (Deep): **7 and 7**. The
+ *        re-render is NOT per token.
+ *      - Across a 3-transition simulated phase sequence with the message object
+ *        held fixed: **3** commits — one per transition, which is the cost D-18
+ *        accepted. A workflow run has a handful of phases.
+ *    ⇒ the cost PANEL-09 was protecting against (token-rate re-renders) is not
+ *    the cost being incurred.
+ *
+ * ── WHY THIS IS A CHILD COMPONENT AND NOT A HOOK CALL IN `MessageItem` ────────
+ * ⚠ MEASURED, and it corrects the plan's own instruction to read `usePhases`
+ * beside the `useWorkflowLockForThread` call at `:303`. The two hooks are NOT
+ * equivalent in cost: `useWorkflowLockForThread` is a bare store selector, while
+ * `usePhases` also mounts `usePanelReconcile`, which fires a `getThreadWorkflow`
+ * FETCH per mount. `MessageList` renders one `MessageItem` per message with no
+ * virtualisation (`MessageList.tsx:175-188`), so a hook at `MessageItem`'s top
+ * level would fire ONE FETCH PER ASSISTANT ROW on every thread open — measured at
+ * 6 rows: **6 calls**, versus **1** with this component. That is T-194-07-03's
+ * denial-of-service disposition, and it is closed by construction here.
+ *
+ * Mounting is doubly narrow, and both narrowings are load-bearing:
+ *   - only inside the `isStreaming && !hasAnyTools` arm, and `MessageList.tsx:182`
+ *     passes `isStreaming={isStreaming && isLastAssistant}` ⇒ at most ONE row;
+ *   - only when `workflowLock != null` ⇒ a DEEP thread never mounts it, so the
+ *     Deep path costs zero fetches and zero subscriptions and stays byte-identical.
+ *
+ * The rendered `<span className="italic">` is the shipped one, unchanged.
+ */
+function HarnessOuterBanner({ message }: { message: Message }) {
+  const { data: phases } = usePhases(message.thread_id ?? null)
+  return (
+    <span className="italic">
+      {outerBannerLabel(
+        null,
+        false,
+        message.isPlanning ?? false,
+        true,
+        !message.content && !!message.reasoningContent,
+        harnessBannerProgress(phases),
+      )}
+    </span>
+  )
 }
 
 // Plan 075.4-04 D-075.4-SC#6 — React.memo wrap with default shallow-eq props.
@@ -641,7 +723,16 @@ export const MessageItem = memo(function MessageItem({ message, isStreaming, onS
                 of the dead "Setting up agent…". Scoped to the reasoning-before-any-
                 token window (no content yet). Anthropic/Google never emit reasoning,
                 so they keep the calm fallback (by design). No new backend state (D-08). */}
-            <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, workflowLock != null, !message.content && !!message.reasoningContent)}</span>
+            {/* Phase 194 Plan 07 (BUG-260815-04 / D-18): the harness arm reads the
+                phase slice so this sentence ADVANCES; the Deep arm is the shipped
+                call with `false` substituted for `workflowLock != null` — provably
+                the same value, since that is the only branch where the lock is null.
+                Both arms render the identical shipped <span className="italic">. */}
+            {workflowLock != null ? (
+              <HarnessOuterBanner message={message} />
+            ) : (
+              <span className="italic">{outerBannerLabel(null, false, message.isPlanning ?? false, false, !message.content && !!message.reasoningContent)}</span>
+            )}
             <span className="flex gap-1 items-center">
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "0ms" }} />
               <span className="w-1.5 h-1.5 rounded-full bg-primary animate-dotBounce" style={{ animationDelay: "160ms" }} />
