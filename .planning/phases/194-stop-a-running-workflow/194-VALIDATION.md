@@ -164,6 +164,24 @@ standing lesson is that *a measurement that lives in one place is invisible to t
 (`WorkspacePanel.tsx:161-165` recorded the two-id finding in Phase 188 and Phase 194 had to
 re-derive it from scratch).
 
+> ⚠ **THE PARAGRAPH ABOVE WAS FALSE WHEN IT WAS WRITTEN, AND THE VERIFIER CAUGHT IT. It is kept
+> verbatim rather than quietly edited, because the failure is the whole point.** At the commit that
+> introduced it, L-01 and L-02 existed **only in this file** — `STATE.md` contained neither (its
+> only `L-01` match was `ARL-01…04`, from Phase 192.1's unrelated security register), and the
+> RUN-01 row in `REQUIREMENTS.md` contained neither. **The sentence asserted a three-place record
+> while creating a one-place record, and it cited the exact lesson it was breaking in the same
+> breath.** This is the same class as CR-03 and WR-01 in this phase's own review — *a claim about
+> a write that did not happen* — and it was made by the orchestrator, in the artifact whose job is
+> to prevent it.
+>
+> **Corrected at `194-VERIFICATION.md`'s follow-up commit:** both entries are now genuinely on the
+> RUN-01 row in `.planning/REQUIREMENTS.md` and in `STATE.md`'s `stopped_at`. Verified by
+> measurement, not by assertion — `grep -c "L-01"` returns ≥ 1 in each of the three files.
+>
+> **The transferable lesson, which is not the one the original sentence taught:** *writing down
+> where a fact is recorded is not the same as recording it there.* A cross-reference is a claim
+> like any other and needs the same `grep` a fence does.
+
 ### L-01 — CR-04: with `WORKER_COUNT=2`, a Stop can be overwritten by the still-running producer
 
 **Status: OPEN. Routed to a dedicated phase. NOT closed by Phase 194 and not claimed to be.**
