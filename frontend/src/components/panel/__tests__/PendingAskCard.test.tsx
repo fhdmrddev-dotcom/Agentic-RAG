@@ -57,9 +57,13 @@ vi.mock("@/providers/StreamsProvider", () => ({
 
 import {
   NO_DEADLINE_WAITING_LINE,
+  RUN_STOPPED_RETIREMENT_LINE,
   PendingAskCard,
   PendingAskStack,
 } from "../PendingAskCard"
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import cardSource from "../PendingAskCard.tsx?raw"
 
 afterEach(() => {
   cleanup()
@@ -439,5 +443,226 @@ describe("PendingAskCard (185-05) — a null deadline is a wait, never an expiry
       <PendingAskCard ask={mockPendingAskNoDeadline()} reconcile={noopReconcile} />,
     )
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 05 Task 3 (R7(b)) — A STOPPED RUN RETIRES ITS APPROVAL WITH A
+// SENTENCE, AND NEVER BY REMOVING IT.
+//
+// THE DEFECT, stated as a measurement: after a Stop, Postgres already reads
+// `cancelled` while this card is still fully actionable — a user can pick an
+// option and press Send Answer into a run that is over. The server's 404 catches
+// it and that authority is UNCHANGED here; what this adds is the client declining
+// to OFFER the action first. Defence in depth, not a replacement.
+//
+// ⚠ RETIRED, NOT REMOVED — a rule across every sketch-170 variant, not a
+// preference. A card that vanishes mid-read is its own small dishonesty: the user
+// who was halfway through the question cannot tell "the run stopped" from "the app
+// lost my question". So the card STAYS, says why, and stops being dispatchable.
+//
+// ⚠ NO NEW `useState`. The card already carries NINE; a tenth for a fact derivable
+// from two hooks the panel already calls would be the second-concern failure D-03
+// forbids. The arm is DERIVED and short-circuits ABOVE `canSubmit`, which is why
+// `canSubmit`'s own `state === "pending"` conjunct is byte-untouched.
+describe("PendingAskCard (194.1-05 / R7(b)) — retired by a stopped run, never removed", () => {
+  const ASK = mockPendingAskWithRunId
+
+  function renderRetired() {
+    return render(<PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver />)
+  }
+
+  it("the card is STILL IN THE DOM after the run is over — it is retired, not removed", () => {
+    renderRetired()
+    // The question the user was reading is still readable. This is the assertion
+    // P3 (remove-the-card) reds against.
+    expect(screen.getByText(ASK.prompt)).toBeInTheDocument()
+  })
+
+  it("says the RUN WAS STOPPED, in the exported constant's own words", () => {
+    renderRetired()
+    expect(screen.getByText(RUN_STOPPED_RETIREMENT_LINE)).toBeInTheDocument()
+    // The sentence must actually name the event. A retirement that does not say
+    // WHY is just the calm expired state the card already had.
+    expect(RUN_STOPPED_RETIREMENT_LINE.toLowerCase()).toContain("stopped")
+  })
+
+  /**
+   * ⚠ THE NAIVE FORM OF THIS CASE PASSES VACUOUSLY, AND IT WAS CAUGHT BY RUNNING
+   * THE RED GATE RATHER THAN BY READING IT. Rendering a retired card cold and
+   * asserting `disabled === true` proves NOTHING: `canSubmit` requires
+   * `hasAnswer`, so a plain `pending` card with no option chosen is ALREADY
+   * disabled on both axes. That version of the assertion was green against a
+   * component with no retirement arm at all — it would have shipped a fence P4
+   * could not red.
+   *
+   * The honest form drives the LIVED sequence on ONE instance: the user picks an
+   * answer (proving the button is genuinely enabled first), and only THEN does the
+   * run end. The enabled→disabled transition on the same node is the measurement;
+   * either half alone is not.
+   */
+  it("a chosen answer becomes UNDISPATCHABLE when the run ends — BOTH disabled and aria-disabled", async () => {
+    const user = userEvent.setup()
+    const { rerender } = render(
+      <PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver={false} />,
+    )
+    await user.click(screen.getByText("prod_sales_2026"))
+
+    // PRECONDITION, asserted rather than assumed: it really is dispatchable now.
+    const before = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(before.disabled).toBe(false)
+    expect(before.getAttribute("aria-disabled")).toBe("false")
+
+    // …the run is stopped.
+    rerender(<PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver />)
+
+    // ⚠ BOTH axes, never one. `disabled` is what the BROWSER honours and
+    // `aria-disabled` is what a SCREEN READER announces; the shipped card drives
+    // both from one `canSubmit`, and a retirement touching only one would make the
+    // two audiences disagree. This is the assertion P4 reds against.
+    const after = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(after.disabled).toBe(true)
+    expect(after.getAttribute("aria-disabled")).toBe("true")
+
+    // …and pressing it dispatches nothing. A `disabled` attribute that some later
+    // refactor routed around would still satisfy the two clauses above.
+    await user.click(after).catch(() => {})
+    expect(vi.mocked(answerAskUser)).not.toHaveBeenCalled()
+  })
+
+  it("announces itself as a live region, like the expired arm whose shape it borrows", () => {
+    renderRetired()
+    expect(screen.getByRole("status")).toBeInTheDocument()
+  })
+
+  /**
+   * The negative half. Without it, "retired when runIsOver" is equally consistent
+   * with a card that is ALWAYS retired — and a fence that cannot tell those apart
+   * has measured nothing.
+   */
+  it("a LIVE run's card is untouched — dispatchable, and carrying none of the retirement copy", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={ASK} reconcile={noopReconcile} runIsOver={false} />)
+    await user.click(screen.getByText("prod_sales_2026"))
+    const btn = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(btn.disabled).toBe(false)
+    expect(btn.getAttribute("aria-disabled")).toBe("false")
+    expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+  })
+
+  it("the prop is OPTIONAL and defaults to live — every existing caller is unchanged", async () => {
+    const user = userEvent.setup()
+    render(<PendingAskCard ask={ASK} reconcile={noopReconcile} />)
+    await user.click(screen.getByText("prod_sales_2026"))
+    const btn = screen.getByRole("button", { name: /send answer/i }) as HTMLButtonElement
+    expect(btn.disabled).toBe(false)
+    expect(screen.queryByText(RUN_STOPPED_RETIREMENT_LINE)).toBeNull()
+  })
+
+  it("has no axe violations in the retired arm", async () => {
+    const { container } = renderRetired()
+    expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 05 Task 3 — FOUR retirements must wear FOUR coats.
+//
+// ⚠ THE THREE SHIPPED SENTENCES ARE **READ FROM SOURCE**, NEVER RE-TYPED. A fence
+// built on a re-typed literal tests the typing. The extraction recipes are the ones
+// `194.1-BASELINE.md` §9 recorded, including its two measured traps:
+//   · Trap 1 — they are NOT three parallel strings. (b) is a TEMPLATE literal and
+//     the other two are constants, so a fence that harvests double-quoted literals
+//     finds two and silently thinks it found three.
+//   · Trap 2 — a RAW sweep for (b) reds on the PROSE DOCUMENTING it: the sentence
+//     appears in double quotes inside the NaN/0 guard's comment. Comments are
+//     stripped FIRST, and the comment mention is separately asserted PRESENT so the
+//     strip can never cover for a real absence.
+// ⚠ §9's standing instruction holds: a later plan must NOT "fix" a red here by
+// deleting that comment. It documents a real guard; the FENCE would be what is
+// mis-scoped, never the documentation.
+describe("PendingAskCard (194.1-05) — the four retirement sentences are pairwise distinct", () => {
+  const src = cardSource as string
+  const codeOnly = src
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("//") && !l.trim().startsWith("*"))
+    .join("\n")
+
+  it("the swept source is real and is the right file (an absence fence cannot detect its own blindness)", () => {
+    expect(typeof src).toBe("string")
+    expect(src.length).toBeGreaterThan(10000)
+    expect(src).toContain("export function PendingAskCard")
+    expect(codeOnly.length).toBeGreaterThan(3000)
+  })
+
+  it("all four are pairwise distinct AND share no complete sentence", () => {
+    // (a) the 404-expiry constant, (b) the countdown template, (c) the no-deadline
+    // fallback — all three READ out of the module's own source.
+    const a = codeOnly.match(/setExpiredMessage\(\s*"([^"]+)"\s*\)/)![1]
+    const b = codeOnly.match(/`(No response within \$\{[^}]+\} — agent stopped)`/)![1]
+    const c = codeOnly.match(/"(This prompt is no longer active)"/)![1]
+    // (d) is THIS plan's, imported from the module rather than typed here.
+    const d = RUN_STOPPED_RETIREMENT_LINE
+
+    // Every extraction actually found something — otherwise the distinctness below
+    // is a set of comparisons over `undefined`.
+    for (const s of [a, b, c, d]) {
+      expect(typeof s).toBe("string")
+      expect(s.length).toBeGreaterThan(20)
+    }
+
+    const all = [a, b, c, d]
+    expect(new Set(all).size).toBe(4)
+
+    // ⚠ THE STRONGER CLAUSE, AND THE ONE THAT ACTUALLY FIRES. 193.2 measured a
+    // fence asserting only `a !== b` passing a real plant that swapped one arm's
+    // SECOND sentence for another arm's while leaving the strings unequal. So split
+    // on the em-dash and the sentence terminators and require NO overlap.
+    //
+    // ⚠ ALL SIX PAIRS, not three. A fence over a subset is passed by a plant that
+    // reuses the pair it does not check.
+    const sentences = (s: string) =>
+      s
+        .split(/[—.!?]/)
+        .map((x) => x.trim().toLowerCase())
+        .filter((x) => x.length > 8)
+    const parts = all.map(sentences)
+    const pairs: Array<[number, number]> = [
+      [0, 1],
+      [0, 2],
+      [0, 3],
+      [1, 2],
+      [1, 3],
+      [2, 3],
+    ]
+    expect(pairs).toHaveLength(6)
+    for (const [i, j] of pairs) {
+      expect(
+        parts[i].filter((s) => parts[j].includes(s)),
+        `sentences ${i} and ${j} share a complete sentence`,
+      ).toHaveLength(0)
+    }
+
+    // ⚠ (a) and (c) BOTH open with "This prompt" and that is NOT a violation — the
+    // clause is about complete sentences, not shared prefixes (§9 Trap 3). Asserted
+    // positively so a later plan does not "fix" a non-problem by rewording shipped
+    // copy nobody asked it to touch.
+    expect(a.startsWith("This prompt")).toBe(true)
+    expect(c.startsWith("This prompt")).toBe(true)
+  })
+
+  it("§9 Trap 2 is still real — (b) IS quoted in a comment, which is why the strip is what makes the fence honest", () => {
+    // The comment mention is asserted PRESENT so nobody later reads the strip as
+    // covering for an absence — and so nobody "fixes" a future red by deleting it.
+    expect(src).toContain('"No response within 0:00 — agent stopped"')
+    expect(codeOnly).not.toContain('"No response within')
+  })
+
+  it("the shared-complete-sentence clause DOES fire when two arms are collapsed (positive control)", () => {
+    const collapsed = ["one thing here — same tail sentence", "two things — same tail sentence"]
+    const sentences = (s: string) =>
+      s.split(/[—.!?]/).map((x) => x.trim().toLowerCase()).filter((x) => x.length > 8)
+    const [x, y] = collapsed.map(sentences)
+    expect(x.filter((s) => y.includes(s))).not.toHaveLength(0)
   })
 })
