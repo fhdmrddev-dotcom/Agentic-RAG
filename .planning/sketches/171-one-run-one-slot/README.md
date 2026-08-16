@@ -2,7 +2,7 @@
 sketch: 171
 name: one-run-one-slot
 question: "What does the kickoff moment render, such that two assistant nodes cannot be drawn — without first knowing which of the three candidate mechanisms is live?"
-winner: null
+winner: "C — AMENDED (2026-08-16). ⚠ C AS DRAWN WAS REFUTED BY MEASUREMENT AFTER THE PAGE WAS BUILT, and the refutation is recorded rather than the page quietly corrected: C claims 'the never-vanishes strip covers the gap', and there is NO such strip at kickoff. The list-level `RunStatusStrip` (`MessageList.tsx:217`) is gated on `showJumpToLive = !isPinned && isStreaming` — it appears ONLY when you have scrolled away — and the only always-present strip is INSIDE `RunCard`, i.e. inside the very assistant message C proposes not to render. C as drawn produces dead air for the whole first-token latency. THE AMENDMENT: C requires BUILDING a run-anchored line at list level — which is the SAME element 170-B needs, so the two converge into one component with a live state and a terminal state. A rejected: its dedup key does not exist for harness runs (`runs.message_id` NULL on 587/607). B rejected on SCOPE, not correctness — it implies persisting `message_id`, a backend change, in a phase whose ROADMAP entry says it adds no new runtime path; re-open B if the amended C proves insufficient."
 tags: [phase-194.1, bug-260610-01, duplicate-avatar, kickoff, run-honesty, unmeasured-mechanism, g-2]
 ---
 
@@ -78,6 +78,67 @@ it asks what shape makes the outcome structural rather than defended.
    scoping decision, not a default.
 4. **On B, watch the dashed slot outline at the first-SSE step.** The event *fills* the node
    instead of mounting beside it. That is the entire mechanism.
+
+## ⚠ C AS DRAWN WAS REFUTED — after the page was built, by measurement
+
+**Recorded here rather than quietly corrected on the page, because a sketch that silently
+repairs its own losing argument teaches nobody anything.**
+
+C's whole claim is that removing the kickoff placeholder is safe *because the never-vanishes run
+status strip carries the run's presence instead*. **There is no such strip at kickoff.** Measured
+at `045a83dc`:
+
+```
+MessageList.tsx:217   <RunStatusStrip … placement="header-bare" />
+MessageList.tsx:193   showJumpToLive = !isPinned && isStreaming      ← the gate
+```
+
+The list-level strip renders **only when you have scrolled away** — it is the `↓ Jump to live`
+chip. The only always-present `RunStatusStrip` is at `RunCard.tsx:336`, in the run-card
+**header** — i.e. **inside the very assistant message C proposes not to render.**
+
+⇒ C as drawn produces **dead air**: the prompt, then nothing, for the whole first-token latency,
+with no instrument saying a run is underway. On the *slow* setting that is several seconds. The
+page's own instruction — *"if that gap feels dead rather than calm, C is wrong"* — is answered,
+and the answer is that it would have been dead.
+
+### The amendment, and it is what makes C the pick anyway
+
+**C requires BUILDING the run-anchored line at list level** rather than assuming one. And that
+line is **the same element `170-B` independently needs** — a thread-level reading derived from
+`workflow_runs` that does not live inside a message.
+
+> **One component, two states.**
+> live: `◆ Starting workflow… · Step 2 of 3 · 2m 18s`
+> stopped: `⊘ Stopped by you · 2 of 3 steps · 2m 18s · Open the run ›`
+>
+> The assistant message then renders **only when it has content**, so at kickoff there is no
+> assistant node for a double-mount to duplicate — and on return the line is still there.
+
+That convergence is the reason C survives its own refutation: the cost it was hiding turns out to
+be a cost `170-B` was already paying.
+
+## ⚠ What this does and does NOT guarantee
+
+Asked for *"the best ones that guarantee perfect results"* — so, precisely:
+
+| | |
+|---|---|
+| **Guaranteed** | At the workflow kickoff there is **no assistant node**, so the artefact cannot be drawn twice — **regardless of which of the three candidate mechanisms is live.** That is a structural property, not a fix. |
+| **NOT guaranteed** | The double-mount **race is not repaired.** The surface it rendered on at kickoff is removed. If the same race later affects the **content-bearing** message, the artefact returns — and nothing here would have prevented it. |
+| **NOT covered** | **Plain chat.** The operator reported the duplicate *"not only [in] the workflow, it is in the chat area."* Deep also renders `Setting up agent…`, and changing it breaks the *Deep byte-identical* constraint held since Phase 174 (D-14). **This closes the workflow half only** — the Deep half is a scoping decision for `194.1-CONTEXT.md`, not something to do silently. |
+| **Still owed** | The measurement trigger in `194-MEASUREMENTS.md` is **not discharged**. A qualifying store dump would still tell us which mechanism is live — worth taking if one appears, because it is the difference between "cannot render twice here" and "cannot render twice." |
+
+## ⚠ A G-5 finding this pick surfaces
+
+`frontend/src/components/chat/MessageList.tsx` — where the run-anchored line would mount — is
+**absent from the `CLAUDE.md` hot-file ledger**. Measured: **18 commits**, at least **6 phases**
+(`063 068.5 076.1 083 092 095`, plus untagged buckets), **234 lines**. G-5's threshold is 3.
+
+That is the identical invisibility failure `WorkflowsPage.tsx` suffered for ten phases,
+`WorkflowDoorSwitch.tsx` for six and `db/workflows.py` for seventeen — *a guardrail cannot see
+what is absent from its list.* **It should be added to the ledger at discuss-phase**, and the
+phase then owes a refactor recommendation on it as a first option.
 
 ## C does not contradict Phase 174 — it relocates it
 

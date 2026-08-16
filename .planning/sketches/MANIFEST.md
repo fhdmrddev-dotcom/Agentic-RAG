@@ -1856,8 +1856,110 @@ than a third gap-closure round (**G-7**).
 |---|------|----------------|--------|------|
 | 168 | the-press-that-says-it-heard-you | What does Stop look like between the press and the run actually ending — and what stands where it stood once there is nothing left to stop? | **B — the control yields** (2026-08-16, operator). Chosen because `⊘` is already shipped tier-1 vocabulary (174 D1/D2) so no net-new glyph is introduced, and a double-press becomes impossible **by construction**. A and C stay as evidence. | phase-194.1, run-01, stop, pressed-state, bug-260816-01, bug-260709-01 |
 | 169 | a-stop-on-the-runs-own-surface | Where does Stop live on a surface that says `👁 View only` — and does pressing it need a guard? | **A — in the title row** (2026-08-16, operator), over the sketch's own lean toward B. Guard: **direct flip**. C rejected on canvas-vocabulary grounds. All variants stay as evidence. | phase-194.1, run-01, stop, workflow-run-page, canvas, action-guards, bug-260816-01 |
-| 170 | the-thread-that-remembers-the-stop | What does a stopped workflow thread show on return — and what happens to the approval card that was on screen when you stopped? | TBD | phase-194.1, run-01, run-honesty, zombie-approval, bug-260816-02, bug-260710-01 |
-| 171 | one-run-one-slot | What does the kickoff moment render, such that two assistant nodes cannot be drawn — **without** first knowing which of the three candidate mechanisms is live? | TBD | phase-194.1, bug-260610-01, duplicate-avatar, kickoff, unmeasured-mechanism |
+| 170 | the-thread-that-remembers-the-stop | What does a stopped workflow thread show on return — and what happens to the approval card that was on screen when you stopped? | **B — the durable receipt** (2026-08-16). Decided on a MEASUREMENT, not appearance: the stop clears `threads.active_workflow_run_id`, so the anchor cannot be the source and a `workflow_runs`-by-thread read is the only construction that survives. A rejected — its mark is a MESSAGE property while the thing that stopped is a RUN. C rejected against the actual complaint. A and C stay as evidence. | phase-194.1, run-01, run-honesty, zombie-approval, bug-260816-02, bug-260710-01 |
+| 171 | one-run-one-slot | What does the kickoff moment render, such that two assistant nodes cannot be drawn — **without** first knowing which of the three candidate mechanisms is live? | **C — AMENDED** (2026-08-16). ⚠ C **as drawn was REFUTED by measurement after the page was built** — there is no never-vanishes strip at kickoff. The amendment: C must BUILD the run-anchored line, which is the SAME element 170-B needs. A rejected (its dedup key does not exist for harness). B rejected on SCOPE not correctness — re-open if the amended C proves insufficient. | phase-194.1, bug-260610-01, duplicate-avatar, kickoff, unmeasured-mechanism |
+
+### ⚠ 170 × 171 CONVERGE ON ONE COMPONENT — the single most consequential outcome of this session
+
+Recorded at the top of this block because it is easy to lose inside two separate sketch READMEs,
+and *a decision that lives only inside a chosen variant is a decision nobody made.*
+
+**170-B** needs a thread-level reading derived from `workflow_runs` that survives the return.
+**171-C**, once amended, needs a run-anchored line at list level that exists before any assistant
+message does. **These are the same element in two states, not two features:**
+
+> live &nbsp;→&nbsp; `◆ Starting workflow… · Step 2 of 3 · 2m 18s`
+> stopped &nbsp;→&nbsp; `⊘ Stopped by you · 2 of 3 steps · 2m 18s · Open the run ›`
+>
+> …and the assistant message renders **only when it has content**.
+
+One component answers **SC#3** and removes the kickoff double-avatar surface, frontend-only, with
+no dependence on the unmeasured duplicate-avatar mechanism.
+
+### ⚠ 171-C AS DRAWN WAS REFUTED BY MEASUREMENT, AFTER the page was built
+
+Recorded rather than quietly repaired — a sketch that silently fixes its own losing argument
+teaches nobody anything, and this project has the standing habit of recording the loser beside
+the winner.
+
+C's claim is that removing the kickoff placeholder is safe *because the never-vanishes run status
+strip carries the run instead*. **There is no such strip at kickoff.** Measured at `045a83dc`:
+
+```
+MessageList.tsx:217   <RunStatusStrip … placement="header-bare" />
+MessageList.tsx:193   showJumpToLive = !isPinned && isStreaming        ← the gate
+```
+
+The list-level strip is the **↓ Jump to live** chip and appears **only when you have scrolled
+away**. The one always-present `RunStatusStrip` is `RunCard.tsx:336`, in the run-card header —
+**inside the very assistant message C proposes not to render.** C as drawn would produce dead air
+for the whole first-token latency. The sketch's own instruction (*"if that gap feels dead rather
+than calm, C is wrong"*) is answered, and the answer is that it would have been.
+
+**The amendment is what makes C the pick anyway:** the cost C was hiding is a cost 170-B was
+already paying.
+
+### The measurement that decided 170, and it is not a visual one
+
+Phase 194 verified on seven live runs that a stop sets **`threads.active_workflow_run_id = NULL`**
+— *the thread anchor is cleared by the very event the thread now has to remember.* `RunSoul` and
+`RunSeam` both resolve their run **from that anchor**, so neither can carry a returning reading
+either. ⇒ a mark that survives the return **must** come from a `workflow_runs`-by-thread read.
+A and C are reading from places the stop has already emptied, or that can be absent.
+
+### ⚠ Operator feedback on 170/171: "they all look similar to me" — and it is CORRECT
+
+Both sketches render three variants that differ by a short line of text. The difference between
+them is **where the reading comes from and whether it can be absent** — architecture wearing a
+sketch's clothes.
+
+**The lesson for the next G-2 call, worth more than either pick:** the guardrail fired here
+expecting screen judgement and the judgement turned out to be non-visual. When the separating
+condition is a *failure state* (here: a stopped run with no assistant content; a kickoff with no
+strip), a sketch must **lead with the failure state** rather than offer it as one setting among
+six. 168 and 169 did not have this problem — their variants differ on screen.
+
+### ⚠ A claim inside sketch 170 is CORRECTED rather than defended
+
+Variant A's note reads *"there is no assistant message to hang this on — 587 of 607 harness runs
+leave `runs.message_id` NULL."* **That is stronger than what was measured.** A NULL `message_id`
+means the run cannot be joined to a message *from the run side*; it does **not** prove no
+assistant row exists. A's real weakness stands on its own — its mark is a **message** property
+while the thing that stopped is a **run** — and the figure should not be quoted as though A
+rested on it.
+
+### ⚠ What the two picks GUARANTEE, and what they do not
+
+The picks were requested as *"the best ones that guarantee perfect results."* Precisely:
+
+| | |
+|---|---|
+| **Guaranteed** | At the workflow kickoff there is **no assistant node**, so the duplicate artefact **cannot be drawn** — regardless of which of the three candidate mechanisms is live. A structural property, not a repair. And the stopped reading **cannot be lost on return**, because it is not attached to anything the stop empties. |
+| **NOT guaranteed** | The double-mount **race is not fixed** — the surface it rendered on at kickoff is removed. If the same race later affects the **content-bearing** message, the artefact returns. |
+| **NOT covered** | **Plain chat.** The operator reported the duplicate *"not only [in] the workflow, it is in the chat area."* Deep renders `Setting up agent…` too, and changing it breaks the *Deep byte-identical* constraint held since Phase 174. **This closes the workflow half only** — the Deep half is a scoping decision for `194.1-CONTEXT.md`, not something to do silently. |
+| **Still owed** | `194-MEASUREMENTS.md`'s trigger is **not discharged**. A qualifying store dump still tells us which mechanism is live — the difference between *"cannot render twice here"* and *"cannot render twice."* |
+
+### ⚠ 170-B is a NARROW AMENDMENT to Phase 194 D-14, and must be recorded as one
+
+D-14 examined `RunCard.tsx` on 2026-08-16 and **declined** to thicken the receipt, on two grounds:
+*the panel owns the meaningful phase spine and chat carries a thin run receipt* (the 094/103
+split), and *nothing here needs a new source of truth*.
+
+B keeps the first (one line, no spine — the receipt stays thin) and **reverses the second** (it
+adds a `workflow_runs`-by-thread read). That reversal is forced by the anchor-clearing
+measurement above, and it is the decision to record — not a repudiation of D-14.
+
+### ⚠ NEW G-5 FINDING — `MessageList.tsx` is ABSENT from the hot-file ledger
+
+Where the converged run-anchored line would mount. Measured 2026-08-16: **18 commits**, at least
+**6 phases** (`063 068.5 076.1 083 092 095`, plus untagged buckets), **234 lines**. G-5's
+threshold is 3.
+
+Identical invisibility failure to `WorkflowsPage.tsx` (ten phases), `WorkflowDoorSwitch.tsx`
+(six) and `db/workflows.py` (seventeen) — *a guardrail cannot see what is absent from its list.*
+**Add it to the `CLAUDE.md` ledger at discuss-phase**, at which point the phase owes a refactor
+recommendation on it as its first option — alongside the two already owed on `WorkspacePanel.tsx`
+(`14 / 9 / 580`) and `RunCard.tsx` (`21 / 9 / 608`).
 
 ### ⚠ The 168-B × 169-A collision, and its resolution
 

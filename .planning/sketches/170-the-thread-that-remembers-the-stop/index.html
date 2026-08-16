@@ -164,7 +164,7 @@
   <span class="brand">SKETCH 170 · phase 194.1 · SC#3</span>
   <button class="variant-tab broken active" data-v="today" onclick="showVariant('today')">Today (broken)</button>
   <button class="variant-tab" data-v="a" onclick="showVariant('a')">A: The dim tier</button>
-  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: The durable receipt</button>
+  <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: The durable receipt ★ Selected</button>
   <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: Chat stays thin</button>
   <button class="variant-tab" data-v="contract" onclick="showVariant('contract')">The contract</button>
 </div>
@@ -242,7 +242,28 @@
 
   <!-- ═════════════ B ═════════════ -->
   <div class="variant" id="variant-b">
-    <div class="vh"><h2>B — A durable receipt, read from the run</h2><span class="tag new">proposal</span></div>
+    <div class="vh"><h2>B — A durable receipt, read from the run</h2><span class="tag new">proposal</span>
+      <span class="tag ship">★ SELECTED 2026-08-16</span></div>
+    <div class="note good">
+      <strong>Selected on a measurement, not on appearance — the three variants look alike and the
+      difference is not visual.</strong> Phase 194 verified on seven live runs that a stop sets
+      <code>threads.active_workflow_run_id = NULL</code>. <strong>The thread anchor is cleared by the
+      very event the thread now has to remember</strong> — and <code>RunSoul</code> and
+      <code>RunSeam</code> both resolve their run <em>from that anchor</em>, so neither can carry the
+      reading either. A mark that survives the return therefore <strong>must</strong> come from a
+      <code>workflow_runs</code>-by-thread read. There is no cheaper construction; A and C are reading
+      from places the stop has already emptied, or that can be absent.
+      <br><br>
+      ⚠ <strong>One claim on this page is corrected rather than defended:</strong> variant A's note
+      says <em>"there is no assistant message to hang this on."</em> That is stronger than what was
+      measured — a NULL <code>runs.message_id</code> means the run cannot be joined to a message
+      <em>from the run side</em>; it does not prove no assistant row exists. A's real weakness is that
+      its mark is a <strong>message</strong> property while the thing that stopped is a
+      <strong>run</strong>.
+      <br><br>
+      ⚠ <strong>Converges with sketch 171.</strong> This line and 171's run-anchored kickoff line are
+      <strong>one component in two states</strong> — see 171's README.
+    </div>
     <p class="lede">
       One line, rendered for any thread that owns a workflow run, <strong>derived from
       <code>workflow_runs</code> rather than from a message</strong>. It cannot be lost, because it is

@@ -2,7 +2,7 @@
 sketch: 170
 name: the-thread-that-remembers-the-stop
 question: "What does a stopped workflow thread show on return — and what happens to the approval card that was on screen when you stopped?"
-winner: null
+winner: "B — the durable receipt (2026-08-16). Chosen on a measurement rather than on appearance: the stop CLEARS `threads.active_workflow_run_id` (Phase 194 verified NULL on seven live runs), so the thread anchor cannot be the source of a returning reading — chat needs a `workflow_runs`-by-thread read and no cheaper option exists. A rejected because the mark it hangs on is a MESSAGE property while the thing that stopped is a RUN. C rejected against the actual complaint (the operator was looking at the thread; the panel collapses). ⚠ B is a NARROW AMENDMENT to Phase 194 D-14, not a repudiation — the receipt stays thin (one line, no spine); what changes is D-14's clause that 'nothing here needs a new source of truth'. ⚠ CONVERGES WITH 171: B's line and 171's run-anchored kickoff line are ONE component in two states. A and C stay as evidence."
 tags: [phase-194.1, run-01, run-honesty, stopped-state, zombie-approval, bug-260816-02, bug-260710-01, bug-260610-01, g-2]
 ---
 
@@ -68,6 +68,39 @@ nowhere.**
 4. **Watch the panel column on the Today tab.** The clock reads **28s** on nav-back instead of
    2m 18s — `BUG-260610-01`'s timer half, drawn beside the stop bug because the operator hit
    both in one session.
+
+## ⚠ Why the three variants LOOK alike — and where they actually differ
+
+Operator feedback at pick time (2026-08-16): *"they all look similar to me."* **That is correct
+and it is a property of this sketch, not of the eye reading it.** All three render a short line
+saying the run stopped; the pixels are nearly the same. The difference is entirely in **where
+the reading comes from and whether it can be absent** — architecture wearing a sketch's clothes.
+
+⚠ **Worth recording for the next G-2 call:** the guardrail fired here expecting screen judgement,
+and the judgement turned out to be non-visual. The one condition that separates the variants is
+the **empty case** — a stopped run with no assistant content — and a sketch that wants to make
+that visible has to lead with the empty case, not offer it as one setting among six.
+
+### The measurement that decided it, and it is not a visual one
+
+Phase 194 verified on seven live runs that a stop sets **`threads.active_workflow_run_id =
+NULL`.** The thread anchor is *cleared by the very event the thread now needs to remember*. So:
+
+- the anchor **cannot** be the source of a returning reading — it is gone by definition;
+- `RunSoul` and `RunSeam` both resolve their run *from that anchor*, so neither can carry it;
+- therefore a mark that survives the return **must** come from a `workflow_runs`-by-thread read.
+
+**That is B, and there is no cheaper construction.** A and C are not merely weaker — they are
+reading from places the stop has already emptied or that can be absent.
+
+### ⚠ One claim in this sketch is CORRECTED rather than defended
+
+The page says of variant A: *"there is no assistant message to hang this on — 587 of 607 harness
+runs leave `runs.message_id` NULL."* **That is stronger than what was measured.** A NULL
+`message_id` means the run row cannot be joined to a message *from the run side*; it does **not**
+prove that no assistant row exists. A's weakness is real — its mark is a **message** property
+while the thing that stopped is a **run** — but it does not rest on that figure, and the figure
+should not be quoted as though it did.
 
 ## ⚠ The decision this sketch cannot make alone
 

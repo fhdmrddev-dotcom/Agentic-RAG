@@ -127,7 +127,7 @@
   <button class="variant-tab broken active" data-v="today" onclick="showVariant('today')">Today (the artefact)</button>
   <button class="variant-tab" data-v="a" onclick="showVariant('a')">A: Dedupe harder</button>
   <button class="variant-tab" data-v="b" onclick="showVariant('b')">B: One owned slot</button>
-  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: No placeholder at all</button>
+  <button class="variant-tab" data-v="c" onclick="showVariant('c')">C: No placeholder at all ★ Selected (AMENDED)</button>
   <button class="variant-tab" data-v="measure" onclick="showVariant('measure')">Why nobody knows the cause</button>
 </div>
 
@@ -224,7 +224,45 @@
   <!-- ═════════ C ═════════ -->
   <div class="variant" id="variant-c">
     <div class="vh"><h2>C — No placeholder at all until there is something to say</h2>
-      <span class="tag new">proposal</span><span class="tag ship">zero backend</span></div>
+      <span class="tag new">proposal</span><span class="tag risk">★ SELECTED — AMENDED 2026-08-16</span></div>
+    <div class="note bad">
+      <strong>⚠ THIS VARIANT AS DRAWN WAS REFUTED BY MEASUREMENT AFTER THE PAGE WAS BUILT. The
+      refutation is recorded here rather than the page being quietly repaired</strong> — a sketch that
+      silently fixes its own losing argument teaches nobody anything.
+      <br><br>
+      C's whole claim is that removing the placeholder is safe <em>because the never-vanishes strip
+      carries the run instead</em>. <strong>There is no such strip at kickoff.</strong> Measured at
+      <code>045a83dc</code>: the list-level strip at <code>MessageList.tsx:217</code> is gated on
+      <code>showJumpToLive = !isPinned &amp;&amp; isStreaming</code> (<code>:193</code>) — it is the
+      <strong>↓ Jump to live</strong> chip and appears <strong>only when you have scrolled away</strong>.
+      The one always-present <code>RunStatusStrip</code> is at <code>RunCard.tsx:336</code>, in the
+      run-card header — <strong>inside the very assistant message C proposes not to render.</strong>
+      <br><br>
+      ⇒ C as drawn produces <strong>dead air</strong> for the whole first-token latency. This page's own
+      instruction — <em>"if that gap feels dead rather than calm, C is wrong"</em> — is answered, and
+      the answer is that it would have been.
+    </div>
+    <div class="note good">
+      <strong>THE AMENDMENT — and it is why C is still the pick.</strong> C must <strong>BUILD</strong>
+      the run-anchored line at list level rather than assume one. That line is <strong>the same element
+      sketch 170-B independently needs</strong> — a thread-level reading derived from
+      <code>workflow_runs</code> that does not live inside a message. <strong>One component, two
+      states:</strong>
+      <br><br>
+      live &nbsp;→&nbsp; <code>◆ Starting workflow… · Step 2 of 3 · 2m 18s</code><br>
+      stopped &nbsp;→&nbsp; <code>⊘ Stopped by you · 2 of 3 steps · 2m 18s · Open the run ›</code>
+      <br><br>
+      The assistant message then renders <strong>only when it has content</strong> — so at kickoff there
+      is no assistant node for a double-mount to duplicate, and on return the line is still there. The
+      cost C was hiding turns out to be a cost 170-B was already paying.
+      <br><br>
+      ⚠ <strong>What this guarantees and does not:</strong> it guarantees the artefact
+      <em>cannot be drawn</em> at the workflow kickoff, whichever mechanism is live — a structural
+      property, not a repair. It does <strong>not</strong> fix the race; if the same race later affects
+      the <em>content-bearing</em> message, the artefact returns. And it covers the
+      <strong>workflow half only</strong> — Deep also renders <code>Setting up agent…</code>, and
+      changing it breaks the <em>Deep byte-identical</em> constraint held since Phase 174.
+    </div>
     <p class="lede">
       No avatar, no bubble, no <em>“Starting workflow…”</em> shell. The run's presence is carried
       entirely by the <strong>status strip that never vanishes</strong> (sketch 015), which is anchored
