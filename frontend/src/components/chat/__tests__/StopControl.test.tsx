@@ -1,0 +1,560 @@
+/**
+ * Phase 194.1 Plan 04 (RUN-01 / R1 + R2) — `<StopControl>`, THE ONE SHARED
+ * PRESSED-STATE MECHANISM ALL FOUR STOP MOUNTS RENDER.
+ *
+ * The AFTER to `StopControl.baseline.test.tsx`'s BEFORE. That file was captured
+ * by plan 01 on an UNMOVED tree, named for a component that did not yet exist,
+ * and pins the chrome this one must preserve. Every inversion it owes is made
+ * IN PLACE there under a `SUPERSEDED` marker — never by deletion.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHY THE ABSENCE IS THE ASSERTION, AND A PRESENCE CHECK IS NOT ENOUGH
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Sketch 168-B's winning property is that **a double-press is impossible by
+ * construction rather than defended**: on press the control LEAVES its slot and
+ * `⊘ Stopping this run…` takes it. There is no disabled button, because there is
+ * no button.
+ *
+ * A suite asserting only *"the stopping reading is present"* passes under the
+ * "disabled button" shape — variant A, the one 168-B beat. So every stopping
+ * case below asserts the control's `data-testid` is **ABSENT FROM THE DOM**, and
+ * additionally that no `disabled` / `aria-disabled` / `hidden` control is hiding
+ * inside the slot. Plant P1 drives exactly that difference.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠ THE SLOT FENCE IS CLASS-TOKEN IDENTITY, NOT GEOMETRY — AND THAT IS AN
+ *   HONEST LIMIT, NOT A SHORTCUT
+ * ─────────────────────────────────────────────────────────────────────────────
+ * CONTEXT **D-24**: jsdom returns 0 for all layout. No test in this tree measures
+ * real geometry, and the only `getBoundingClientRect` anywhere in the test tree is
+ * a NEGATIVE source fence (`PhaseNodeCard.test.tsx:523-527`). A fence promising a
+ * "measured slot" would pass every plant.
+ *
+ * What IS asserted: the wrapper's `className` is **byte-identical** across all
+ * three arms for a given variant, and for `variant="composer"` it carries the
+ * shipped sizing tokens `h-8` / `rounded-lg` / `shrink-0`. That guards HEIGHT.
+ * **WIDTH is not guarded and cannot be here** — the resting control is a 32 px
+ * icon button and the stopping reading is a text line. Width is judged by
+ * **G-4 row 1** (*"Press — fails if the button sits inert or the row twitches"*,
+ * `194.1-VALIDATION.md`). See `StopControl.tsx`'s docblock for the named fallback.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHY THE REAL PROVIDER, AND NOT A MODULE MOCK
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `vi.mock` is FILE-GLOBAL. Task 2's three timing points and the two-instance
+ * case need the REAL store timer, so this file cannot mock
+ * `@/providers/StreamsProvider` for some cases and use the real one for others.
+ * Every case therefore mounts inside a real `<StreamsProvider>` with the
+ * `@/lib/api` bundle mocked — the shape ported from `ComposerStopHarness.test.tsx`,
+ * including the two keys that are load-bearing and look optional:
+ *
+ *   - `getSnapshot` — since Phase 075 (D-075-02) `reconcile` reads the ATOMIC
+ *     `getSnapshot`. Left unmocked the whole reconcile dies SILENTLY inside its
+ *     own `catch { console.error("reconcile failed:") }`.
+ *   - `getThreadWorkflow` — plan 03's R6 frame fallback. Left unmocked the real
+ *     implementation runs `fetch` in jsdom, the resolver's try/catch swallows it,
+ *     and a Stop case reports "cancelRun called 0 times" for a reason unrelated
+ *     to what it tests.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * GATE SCOPE — measured, not assumed
+ * ─────────────────────────────────────────────────────────────────────────────
+ * NOT executed by `scripts/vitest-count-gate.cjs`. `TARGETS` has exactly one
+ * directory entry (`src/components/workflows`) and reaches everything else by
+ * NAMED FILE; there is no `src/components/chat` entry anywhere in the array
+ * (`194.1-BASELINE.md` §2). This plan adds none — a gate-scope change is not
+ * scoped here.
+ */
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { render, screen, act, cleanup, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import { createElement, type ReactNode } from "react"
+
+// ⚠ `?raw`, NOT `node:fs`. `tsconfig.app.json` carries no node types on purpose;
+// the first draft of plan 03's suite produced SIX typecheck errors that way. This
+// is the shipped pattern (`ActiveRunsTray.test.tsx:104`,
+// `StopControl.baseline.test.tsx:149`, `WorkspacePanel.test.tsx:30`).
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import stopControlSource from "../StopControl.tsx?raw"
+
+const {
+  mockPostMessage,
+  mockSubscribeToRun,
+  mockGetMessages,
+  mockGetActiveRuns,
+  mockGetSnapshot,
+  mockCancelRun,
+  mockGetThreadWorkflow,
+} = vi.hoisted(() => ({
+  mockPostMessage: vi.fn(),
+  mockSubscribeToRun: vi.fn(),
+  mockGetMessages: vi.fn(),
+  mockGetActiveRuns: vi.fn(),
+  mockGetSnapshot: vi.fn(),
+  mockCancelRun: vi.fn(),
+  mockGetThreadWorkflow: vi.fn(),
+}))
+
+vi.mock("@/lib/api", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/api")>()
+  return {
+    ApiError: actual.ApiError,
+    postMessage: mockPostMessage,
+    subscribeToRun: mockSubscribeToRun,
+    getMessages: mockGetMessages,
+    getActiveRuns: mockGetActiveRuns,
+    getSnapshot: mockGetSnapshot,
+    cancelRun: mockCancelRun,
+    getThreadWorkflow: mockGetThreadWorkflow,
+  }
+})
+
+vi.mock("@/lib/supabase", () => ({
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { user: { id: "user-1" }, access_token: "token" } },
+      }),
+    },
+    channel: vi.fn(),
+    removeChannel: vi.fn(),
+  },
+}))
+
+import { StreamsProvider } from "@/providers/StreamsProvider"
+import { useStreamsStore } from "@/stores/streamsStore"
+import { StopControl, COPY_STOPPING, COPY_STOP_NOT_CONFIRMED } from "../StopControl"
+
+const THREAD = "thread-stop-1"
+
+/**
+ * ⚠ THE COMPOSER'S SHIPPED `className`, MEASURED OFF THE RENDERED DOM by plan 01
+ * and re-declared here rather than imported.
+ *
+ * It is NOT in `MessageInput.tsx`: the source carries only the last 8 tokens
+ * (`:417`); everything before `border bg-background` is
+ * `buttonVariants({variant:"outline", size:"icon"})` merged in by shadcn's
+ * `<Button>` through tailwind-merge. A component that "preserves the className"
+ * by copying the source line preserves 8 of 27 tokens — this literal is what says
+ * so, and it is the whole reason `<StopControl variant="composer">` must render a
+ * real `<Button variant="outline" size="icon">` rather than a styled `<button>`.
+ */
+const COMPOSER_SHIPPED_CLASSNAME =
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border bg-background hover:text-accent-foreground h-8 w-8 rounded-lg shrink-0 transition-all border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive"
+
+/** Plan 01's measured panel + tray chrome. `<StopControl>`'s per-variant defaults
+ *  must reproduce these so plans 05/06 mount without re-typing their own chrome —
+ *  and so a unification that silently changes one surface reds HERE rather than at
+ *  the mount. ⚠ The two differ by exactly two things (no `ml-auto` on the tray, and
+ *  `hover:bg-destructive/20 transition-colors` in the opposite order); they are NOT
+ *  one string today and this suite refuses to pretend otherwise. */
+const PANEL_SHIPPED_CLASSNAME =
+  "ml-auto flex shrink-0 items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-destructive transition-colors hover:bg-destructive/20 focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+const TRAY_SHIPPED_CLASSNAME =
+  "flex shrink-0 items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-destructive hover:bg-destructive/20 transition-colors"
+
+// ── Store drivers ─────────────────────────────────────────────────────────────
+// The arms are driven by writing the pure-data Sets plan 03 shipped, NOT by
+// mocking the selectors — a mocked selector proves the component reads SOMETHING,
+// never that it reads the slice the rest of the tree writes.
+function setStopping(threadId: string, on: boolean) {
+  act(() => {
+    useStreamsStore.setState((s) => {
+      const next = new Set(s.stoppingThreads)
+      if (on) next.add(threadId)
+      else next.delete(threadId)
+      return { stoppingThreads: next }
+    })
+  })
+}
+
+function setNotConfirmed(threadId: string, on: boolean) {
+  act(() => {
+    useStreamsStore.setState((s) => {
+      const next = new Set(s.stopNotConfirmed)
+      if (on) next.add(threadId)
+      else next.delete(threadId)
+      return { stopNotConfirmed: next }
+    })
+  })
+}
+
+/** Replace the store's `stopThread` action with a spy, AFTER the provider's mount
+ *  effect has installed the real bodies (otherwise the effect overwrites it). */
+function spyOnStopThread() {
+  const spy = vi.fn(async () => {})
+  act(() => {
+    useStreamsStore.setState((s) => ({ actions: { ...s.actions, stopThread: spy } }))
+  })
+  return spy
+}
+
+function renderStop(props: Parameters<typeof StopControl>[0]) {
+  return render(
+    createElement(
+      StreamsProvider,
+      null as unknown as { children: ReactNode },
+      createElement(StopControl, props),
+    ),
+  )
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  localStorage.clear()
+  useStreamsStore.setState({
+    bucketsBySurface: new Map(),
+    viewedThreadId: null,
+    streamingThreads: new Set<string>(),
+    stoppingThreads: new Set<string>(),
+    stopNotConfirmed: new Set<string>(),
+    harnessKickoffThreads: new Set<string>(),
+    fallbackNotices: new Map<string, string>(),
+    reconcileErrors: new Map<string, Error>(),
+    failedSendDrafts: new Map<string, string>(),
+    loadingThreads: new Set<string>(),
+    subscriptionsByThread: new Map<string, Set<string>>(),
+    workflowLockByThread: new Map(),
+  })
+  mockGetMessages.mockResolvedValue([])
+  mockGetActiveRuns.mockResolvedValue([])
+  mockGetSnapshot.mockResolvedValue({ messages: [], active_runs: [], since_cursors: {} })
+  mockCancelRun.mockResolvedValue(undefined)
+  mockGetThreadWorkflow.mockResolvedValue({ definition_slug: null })
+  mockSubscribeToRun.mockImplementation(async () => new Promise<void>(() => {}))
+})
+
+afterEach(() => {
+  cleanup()
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARM 1 — RESTING
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 R1 — resting: the variant's shipped Stop control, unchanged", () => {
+  it("composer: renders the shipped chrome BYTE-IDENTICALLY to plan 01's measurement", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    const btn = screen.getByTestId("composer-stop")
+
+    expect(btn.tagName).toBe("BUTTON")
+    expect(btn.getAttribute("aria-label")).toBe("Stop generation")
+    expect(btn.textContent).toBe("")
+    expect(btn.className).toBe(COMPOSER_SHIPPED_CLASSNAME)
+
+    const icon = btn.querySelector("svg")
+    expect(icon).not.toBeNull()
+    expect(icon!.getAttribute("class")).toBe("lucide lucide-square h-3.5 w-3.5 fill-current")
+  })
+
+  it("composer: the stopping reading is ABSENT while resting", () => {
+    const { container } = renderStop({ threadId: THREAD, variant: "composer" })
+    expect(container.textContent ?? "").not.toContain("Stopping this run")
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+  })
+
+  it("panel + tray defaults reproduce plan 01's measured chrome, and are NOT one string", () => {
+    renderStop({ threadId: THREAD, variant: "panel" })
+    const panelBtn = screen.getByTestId("panel-stop-run")
+    expect(panelBtn.getAttribute("type")).toBe("button")
+    expect(panelBtn.getAttribute("aria-label")).toBe("Stop this workflow run")
+    expect(panelBtn.textContent?.trim()).toBe("Stop")
+    expect(panelBtn.className).toBe(PANEL_SHIPPED_CLASSNAME)
+    expect(panelBtn.querySelector("svg")!.getAttribute("class")).toBe(
+      "lucide lucide-square h-2.5 w-2.5 fill-current",
+    )
+    cleanup()
+
+    renderStop({ threadId: THREAD, variant: "tray" })
+    const trayBtn = screen.getByTestId("tray-stop-run")
+    expect(trayBtn.textContent?.trim()).toBe("Stop")
+    expect(trayBtn.className).toBe(TRAY_SHIPPED_CLASSNAME)
+
+    // The two shipped surfaces are NOT the same string. Recorded as an assertion
+    // so a later "tidy-up" that unifies them is a deliberate, visible decision.
+    expect(PANEL_SHIPPED_CLASSNAME).not.toBe(TRAY_SHIPPED_CLASSNAME)
+  })
+
+  it("the three optionals OVERRIDE the variant defaults (the tray's per-run aria)", () => {
+    renderStop({
+      threadId: THREAD,
+      variant: "tray",
+      ariaLabel: "Stop run on Quarterly close workflow",
+      testId: "tray-stop-thread-A",
+      label: "Stop",
+    })
+    const btn = screen.getByTestId("tray-stop-thread-A")
+    expect(btn.getAttribute("aria-label")).toBe("Stop run on Quarterly close workflow")
+  })
+
+  it("threadId == null renders NOTHING at all", () => {
+    const { container } = renderStop({ threadId: null, variant: "composer" })
+    expect(container.querySelector("[data-testid='composer-stop']")).toBeNull()
+    expect(container.querySelector("[data-testid='composer-stop-slot']")).toBeNull()
+    expect((container.textContent ?? "").trim()).toBe("")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARM 2 — STOPPING: THE CONTROL IS GONE, NOT DISABLED
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 R1 — stopping: the control LEAVES the DOM (168-B, plant P1)", () => {
+  it("the reading renders and the control's testid is ABSENT — not merely disabled", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    expect(screen.getByTestId("composer-stop")).toBeTruthy()
+
+    setStopping(THREAD, true)
+
+    expect(screen.getByText(COPY_STOPPING)).toBeTruthy()
+    // ⚠ THE LOAD-BEARING ASSERTION. A presence-only check on the reading passes
+    // the "disabled button" plant (P1) — the shape 168-B beat. The ABSENCE is the
+    // requirement, because it is what makes a second press impossible.
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+  })
+
+  it("no disabled / aria-disabled / hidden control is hiding inside the slot", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    setStopping(THREAD, true)
+
+    const slot = screen.getByTestId("composer-stop-slot")
+    expect(slot.querySelectorAll("button").length).toBe(0)
+    expect(slot.querySelectorAll("[disabled]").length).toBe(0)
+    expect(slot.querySelectorAll("[aria-disabled]").length).toBe(0)
+    expect(slot.querySelectorAll("[hidden]").length).toBe(0)
+  })
+
+  it("the reading is the sketch 168-B literal, verbatim", () => {
+    expect(COPY_STOPPING).toBe("⊘ Stopping this run…")
+    renderStop({ threadId: THREAD, variant: "composer" })
+    setStopping(THREAD, true)
+    expect(screen.getByTestId("composer-stopping").textContent).toBe(COPY_STOPPING)
+  })
+
+  it("stopping on ANOTHER thread does not touch this mount", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    setStopping("some-other-thread", true)
+    expect(screen.getByTestId("composer-stop")).toBeTruthy()
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ARM 3 — NOT CONFIRMED
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 R2 — not-confirmed: a PRESSABLE control beside honest copy", () => {
+  it("the control is back AND the copy is present, in the same slot", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    setStopping(THREAD, true)
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+
+    setStopping(THREAD, false)
+    setNotConfirmed(THREAD, true)
+
+    const btn = screen.getByTestId("composer-stop")
+    expect(btn).toBeTruthy()
+    expect((btn as HTMLButtonElement).disabled).toBe(false)
+    const slot = screen.getByTestId("composer-stop-slot")
+    expect(slot.contains(btn)).toBe(true)
+    expect(slot.textContent).toContain(COPY_STOP_NOT_CONFIRMED)
+    // The stopping reading is gone — the two readings are never on together.
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+  })
+
+  it("the copy names non-confirmation, claims NO cause, and carries NO step count", () => {
+    // One sentence.
+    expect(COPY_STOP_NOT_CONFIRMED.split(".").filter((s) => s.trim().length > 0)).toHaveLength(1)
+    // Says the thing it is for.
+    expect(COPY_STOP_NOT_CONFIRMED).toContain("not confirmed")
+    // ⚠ Claims no cause it has not established — these are the retired string's
+    // words (`StreamsProvider.tsx:2394`/`:2457` before plan 03 removed them), and
+    // the reading is a TIMEOUT: it knows nothing about registration windows.
+    expect(COPY_STOP_NOT_CONFIRMED).not.toContain("in a moment")
+    expect(COPY_STOP_NOT_CONFIRMED).not.toContain("registering")
+    expect(COPY_STOP_NOT_CONFIRMED.toLowerCase()).not.toContain("pre-stamp")
+    // ⚠ NO step count. Phase 194 D-13's "every reading carries the step count in
+    // the same sentence as the word" is about the STOPPED RECEIPT — a stop that
+    // was not confirmed stopped nothing, so a count here would be a number about
+    // a thing that did not happen. (Plan 07 owns the receipt.)
+    expect(COPY_STOP_NOT_CONFIRMED).not.toMatch(/\d/)
+    expect(COPY_STOP_NOT_CONFIRMED.toLowerCase()).not.toContain("step")
+  })
+
+  it("pressing again while not-confirmed dispatches stopThread again", async () => {
+    const user = userEvent.setup()
+    renderStop({ threadId: THREAD, variant: "composer" })
+    const spy = spyOnStopThread()
+    setNotConfirmed(THREAD, true)
+
+    await user.click(screen.getByTestId("composer-stop"))
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenCalledWith(THREAD)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE ONE DURABLE CANCEL PATH
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 — the press goes to stopThread(threadId) and nowhere else", () => {
+  it("dispatches stopThread with the threadId and exactly one argument", async () => {
+    const user = userEvent.setup()
+    renderStop({ threadId: THREAD, variant: "composer" })
+    const spy = spyOnStopThread()
+
+    await user.click(screen.getByTestId("composer-stop"))
+
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy).toHaveBeenCalledWith(THREAD)
+    // ⚠ Exactly ONE argument. A handler passed straight through as
+    // `onClick={() => stopThread(threadId)}` takes one; `onClick={stopThread}`
+    // would hand React's synthetic event as a second, and the value assertion
+    // alone would not see it.
+    expect(spy.mock.calls[0]).toHaveLength(1)
+  })
+
+  it("every variant's press reaches the SAME action (D-08: four mounts, ONE mechanism)", async () => {
+    const user = userEvent.setup()
+    for (const [variant, testId] of [
+      ["composer", "composer-stop"],
+      ["panel", "panel-stop-run"],
+      ["tray", "tray-stop-run"],
+      ["page", "run-page-stop"],
+    ] as const) {
+      renderStop({ threadId: THREAD, variant })
+      const spy = spyOnStopThread()
+      await user.click(screen.getByTestId(testId))
+      expect(spy, `variant ${variant}`).toHaveBeenCalledWith(THREAD)
+      cleanup()
+    }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE SLOT RESERVATION (D-24) — CLASS-TOKEN IDENTITY, NEVER GEOMETRY
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 R1 — the slot is a RESERVATION, asserted on class tokens (D-24)", () => {
+  it("composer: the wrapper className is BYTE-IDENTICAL across all three arms", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    const resting = screen.getByTestId("composer-stop-slot").className
+
+    setStopping(THREAD, true)
+    const stopping = screen.getByTestId("composer-stop-slot").className
+
+    setStopping(THREAD, false)
+    setNotConfirmed(THREAD, true)
+    const notConfirmed = screen.getByTestId("composer-stop-slot").className
+
+    expect(stopping).toBe(resting)
+    expect(notConfirmed).toBe(resting)
+  })
+
+  it("composer: the wrapper carries the shipped sizing tokens, so the row's HEIGHT cannot move", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    const tokens = screen.getByTestId("composer-stop-slot").className.split(/\s+/)
+    expect(tokens).toContain("h-8")
+    expect(tokens).toContain("rounded-lg")
+    expect(tokens).toContain("shrink-0")
+  })
+
+  it("composer: the STOPPING child itself carries h-8 / rounded-lg / shrink-0 (plant P2)", () => {
+    renderStop({ threadId: THREAD, variant: "composer" })
+    setStopping(THREAD, true)
+    const tokens = screen.getByTestId("composer-stopping").className.split(/\s+/)
+    expect(tokens).toContain("h-8")
+    expect(tokens).toContain("rounded-lg")
+    expect(tokens).toContain("shrink-0")
+    // ⚠ The plant this fires under is `h-6 w-auto` on the stopping child — a
+    // change that looks like styling and silently makes the row twitch, which is
+    // G-4 row 1's named failure shape.
+    expect(tokens).not.toContain("h-6")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SOURCE FENCES
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 — source fences on StopControl.tsx", () => {
+  /** The 192.1 lesson: a fence swept against an empty string passes green and
+   *  proves nothing. Assert the input FIRST, in both directions. */
+  it("the swept source is non-empty and is the right file", () => {
+    const src = stopControlSource as string
+    expect(typeof src).toBe("string")
+    expect(src.length).toBeGreaterThan(2000)
+    expect(src).toContain("export function StopControl")
+    expect(src).toContain("COPY_STOPPING")
+  })
+
+  /**
+   * D-05/D-06 made STRUCTURAL. With component-local state, pressing the panel
+   * Stop would leave the composer's pressable for the same thread, and the state
+   * would die on unmount — so navigating away mid-stop would restore a pressable
+   * Stop. That is a new lie, in a phase whose subject is an honest Stop.
+   */
+  it("declares NO useState and NO useEffect — the pressed state is store-owned", () => {
+    const src = stopControlSource as string
+    expect((src.match(/useState[(<]/g) ?? []).length).toBe(0)
+    expect((src.match(/useEffect\(/g) ?? []).length).toBe(0)
+  })
+
+  /** Phase 194 D-08's "four mounts, ONE mechanism", held mechanically. */
+  it("never reads a lock's runId and never calls cancelRun directly (plant P3)", () => {
+    const src = stopControlSource as string
+    expect((src.match(/workflowLock\??\.runId|cancelRun\(/g) ?? []).length).toBe(0)
+    // The positive control: the same regex DOES match when the pattern is there.
+    expect((`${src}\n// cancelRun(`.match(/workflowLock\??\.runId|cancelRun\(/g) ?? []).length).toBe(
+      1,
+    )
+  })
+
+  /** D-18 / D-24: no net-new glyph, and no promise of geometry jsdom cannot give. */
+  it("contains no ⏹ and no getBoundingClientRect", () => {
+    const src = stopControlSource as string
+    expect((src.match(/⏹|getBoundingClientRect/g) ?? []).length).toBe(0)
+  })
+
+  /** ⚠ The prose about the width gap must SURVIVE. A later editor who deletes it
+   *  removes the only place a reader learns the fence does not cover width. */
+  it("the docblock states the width gap and names G-4 row 1 as where it is judged", () => {
+    const src = stopControlSource as string
+    expect(src).toContain("G-4 row 1")
+    expect(src.toLowerCase()).toContain("width")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE GLYPH
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 D-18 — the Stop CONTROL is the lucide Square on every arm", () => {
+  it("neither ■ nor ⏹ is rendered in any arm of any variant", async () => {
+    for (const variant of ["composer", "panel", "tray", "page"] as const) {
+      const { container } = renderStop({ threadId: THREAD, variant })
+      expect(container.textContent ?? "", `${variant} resting`).not.toContain("■")
+      expect(container.textContent ?? "", `${variant} resting`).not.toContain("⏹")
+
+      setStopping(THREAD, true)
+      await waitFor(() => expect(container.textContent ?? "").toContain("Stopping this run"))
+      expect(container.textContent ?? "", `${variant} stopping`).not.toContain("■")
+      expect(container.textContent ?? "", `${variant} stopping`).not.toContain("⏹")
+
+      setStopping(THREAD, false)
+      setNotConfirmed(THREAD, true)
+      expect(container.textContent ?? "", `${variant} not-confirmed`).not.toContain("■")
+      expect(container.textContent ?? "", `${variant} not-confirmed`).not.toContain("⏹")
+
+      setNotConfirmed(THREAD, false)
+      cleanup()
+    }
+  })
+
+  it("each resting control contains exactly one svg", () => {
+    for (const [variant, testId] of [
+      ["composer", "composer-stop"],
+      ["panel", "panel-stop-run"],
+      ["tray", "tray-stop-run"],
+      ["page", "run-page-stop"],
+    ] as const) {
+      renderStop({ threadId: THREAD, variant })
+      expect(screen.getByTestId(testId).querySelectorAll("svg").length, variant).toBe(1)
+      cleanup()
+    }
+  })
+})
