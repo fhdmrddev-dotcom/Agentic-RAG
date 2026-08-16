@@ -353,6 +353,32 @@ export function WorkspacePanel({
   const isHarness = workflowLock != null
   const showTimeline = isHarness || phases.length > 0
   const showBatchResults = showTimeline && tasks.length > 0
+  // Phase 194.1 Plan 05 (R7(a) / BUG-260816-01 / D-25) — THE SECOND BOOLEAN.
+  //
+  // ⚠ TWO BOOLEANS, NOT ONE — narrowing `showTimeline` would regress Phase 098 UAT run-honesty fix B (its `|| phases.length > 0` disjunct is what keeps a FINISHED run's timeline visible).
+  //
+  // The line above is deliberately written UNWRAPPED, on ONE line, so a
+  // line-oriented `grep` for the rule finds it. A rule written wrapped fails its
+  // own literal grep and reads as "already fixed" (193.2-08, re-proved by WR-05).
+  //
+  // WHAT WENT WRONG WITH ONE BOOLEAN, measured rather than reasoned about: 194
+  // UAT-03 pressed this row on a COMPLETED run and got no network request and a
+  // byte-identical `document.body.innerText` (`diffLen: 0`). Phase rows OUTLIVE
+  // the run (`threads.py:1176-1186`), so `phases.length > 0` stayed true forever
+  // and the Stop outlived the thing it could stop.
+  //
+  // WHY `isHarness` IS THE HONEST "still going" SIGNAL: the lock invariant —
+  // "a thread holds a lock IFF a NON-TERMINAL Harness workflow run owns its
+  // `active_workflow_run_id` anchor" (`streamsStore.ts`) — and it is cleared on
+  // EVERY terminal route (StreamsProvider's send-path onTerminal, its sibling,
+  // and the reconcile's "Stale / terminal / Deep → unlock").
+  //
+  // ⚠ `showTimeline` and `showBatchResults` are BYTE-UNCHANGED above, and that is
+  // the point of adding a boolean rather than editing one: `showTimeline` has
+  // three consumers (the run soul, the run receipt, the timeline section) plus
+  // `showBatchResults`, and every one of them is CORRECT to survive a terminal.
+  // Only the CONTROL is not.
+  const showStopRow = isHarness && threadId != null
 
   const isMobile = useIsMobile()
 
@@ -449,8 +475,13 @@ export function WorkspacePanel({
               phase row, so it can never be misread as skipping a step. See the block
               above the constants for why the argument is the THREAD id and never the
               lock's run id. The `threadId &&` clause is a type narrowing, not a second
-              gate — showTimeline is already unreachable without a viewed thread. */}
-          {showTimeline && threadId && (
+              gate — showStopRow already carries `threadId != null` as a conjunct.
+
+              ⚠ Phase 194.1 Plan 05 (R7(a) / D-25): the gate is `showStopRow`, NOT
+              `showTimeline`. Its two siblings above deliberately keep `showTimeline`
+              — a finished run KEEPS its soul, its receipt and its timeline, and only
+              loses the control. See the comment beside the boolean's definition. */}
+          {showStopRow && threadId && (
             <div className="flex items-center gap-2 border-b border-border/40 px-3 py-2">
               <span className="text-[10px] uppercase tracking-wider text-panel-muted-foreground">
                 {PANEL_STOP_LEAD}

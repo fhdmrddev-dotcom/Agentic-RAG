@@ -786,7 +786,7 @@ describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
     setHooks({
       lock: HARNESS_LOCK,
       phases: [
-        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "completed", subAgents: [], pendingAsk: null },
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "done", subAgents: [], pendingAsk: null },
       ],
     })
     renderPanel({ state: "open" })
@@ -842,11 +842,22 @@ describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
    * narrows `showTimeline` itself — which is precisely how the Phase 098 UAT
    * run-honesty regression (fix B: a finished run KEEPS its timeline) would ship
    * unnoticed. The timeline-still-renders clause is what reds against it.
+   *
+   * ⚠ THE FIXTURE'S TERMINAL STATUS IS `"done"`, NOT `"completed"`, and the
+   * distinction cost a typecheck error before it was measured. `Phase.status` is
+   * `pending | running | done | failed | cancelled | skipped | retrying |
+   * recorded-not-sent | unknown` — `"completed"` belongs to `Message.runStatus`,
+   * an entirely different union. That is the SAME class of mistake
+   * `194.1-BASELINE.md` §11 records against itself (`runStatus: "done"`, where the
+   * SSE terminal KIND was written where the persisted STATUS belonged) — two
+   * vocabularies for one moment, and the compiler is the only thing that tells
+   * them apart. ⚠ The bare `tsc --noEmit` form would NOT have caught it: it
+   * checks ZERO files in this repo. Use `-p tsconfig.app.json`.
    */
   it("a COMPLETED run (phases present, lock cleared) offers NO Stop — and its timeline STILL renders", () => {
     setHooks({
       phases: [
-        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "completed", subAgents: [], pendingAsk: null },
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "done", subAgents: [], pendingAsk: null },
       ],
       lock: null,
     })
