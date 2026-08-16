@@ -54,9 +54,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook, act, waitFor, cleanup } from "@testing-library/react"
 import { createElement, type ReactNode } from "react"
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
 import type { Message } from "@/types"
+
+// ⚠ `?raw` IMPORTS, NOT `node:fs`. The first draft of this file read both sources
+// with `readFileSync`/`resolve` and produced SIX typecheck errors under
+// `tsc -p tsconfig.app.json` (`Cannot find module 'node:fs'`, `Cannot find name
+// '__dirname'`, and implicit-any on the strip callbacks) — the app tsconfig
+// carries no node types, on purpose. `?raw` is the shipped pattern in this tree
+// (`ActiveRunsTray.test.tsx:104`, `StopControl.baseline.test.tsx:149`,
+// `WorkspacePanel.test.tsx:30`) and it is also what the count gate's own
+// `tsc` baseline was measured against.
+import providerSource from "@/providers/StreamsProvider.tsx?raw"
+import storeSource from "@/stores/streamsStore.ts?raw"
 
 const {
   mockPostMessage,
@@ -185,6 +194,29 @@ function cancelHangs() {
   mockCancelRun.mockImplementation(() => new Promise(() => {}))
 }
 
+/**
+ * ⚠ LOAD-BEARING IN EVERY FAKE-TIMER CASE, and it was found by MEASURING rather
+ * than by reading. `seedStreaming` writes `streamingThreads` DIRECTLY without
+ * stamping `lastEventAtRef`, so the thread reads as immediately inactive to the
+ * Phase 145-05 inactivity watchdog — whose shared ~5s interval then fires a
+ * read-only `getSnapshot` probe, gets the default EMPTY `active_runs`, and
+ * silently finalizes the thread at t+5000. Under fake timers that lands INSIDE
+ * R2's 8s window and clears the stopping state for a reason that has nothing to
+ * do with R2.
+ *
+ * The first draft of this suite hit exactly that: the t+7000 case read `false`.
+ * Note the t+2000 case would have passed ANYWAY under the artifact — for the
+ * wrong reason — which is the more dangerous half and the reason this helper is
+ * applied to the whole describe rather than to the cases that visibly failed.
+ */
+function snapshotStillStreaming(runId: string) {
+  mockGetSnapshot.mockResolvedValue({
+    messages: [],
+    active_runs: [{ run_id: runId, started_at: new Date().toISOString(), status: "streaming" }],
+    since_cursors: { [runId]: "0" },
+  })
+}
+
 function subscribeHangs() {
   mockSubscribeToRun.mockImplementation(
     async (_runId: string, _since: string, _cb: StreamCallbacks) => new Promise<void>(() => {}),
@@ -286,6 +318,10 @@ describe("194.1-03 R1 — the press is synchronous, before any network work", ()
 // ─────────────────────────────────────────────────────────────────────────────
 describe("194.1-03 R2 — the climb-down is exactly 8s, measured at three points", () => {
   beforeEach(() => {
+    // See `snapshotStillStreaming`'s docblock — without this the Phase 145-05
+    // watchdog finalizes the seeded thread at t+5000 and every reading below
+    // measures the watchdog instead of R2.
+    snapshotStillStreaming(PRODUCER_RUN_ID)
     vi.useFakeTimers()
   })
   afterEach(() => {
@@ -431,6 +467,7 @@ describe("194.1-03 — the clear is keyed on the SLICE TRANSITION, not on onTerm
   })
 
   it("the not-confirmed reading is ALSO cleared when the thread later leaves streaming", async () => {
+    snapshotStillStreaming(PRODUCER_RUN_ID)
     vi.useFakeTimers()
     try {
       cancelHangs()
@@ -505,18 +542,29 @@ describe("194.1-03 — the L-01 boundary: the terminal reading is NOT suppressed
    * Trap 2; the `192-05` `title=` lesson), and a strip that hid a real absence
    * would be worse than no fence at all.
    */
-  it("no line in the provider conditions a runStatus write on the stopping slice", () => {
-    const path = resolve(__dirname, "../../providers/StreamsProvider.tsx")
-    const raw = readFileSync(path, "utf8")
+  it("no runStatus write in the provider sits inside a stopping-slice condition", () => {
+    const raw = providerSource
     const lines = raw.split("\n")
     expect(lines.length).toBeGreaterThan(1000) // the sweep is over a real file
 
-    const code = lines.filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    const code = lines.filter((l: string) => !/^\s*(\/\/|\*|\/\*)/.test(l))
     expect(code.length).toBeGreaterThan(500) // …and the strip did not eat it
 
-    const offenders = code.filter(
-      (l) => /stoppingThreads|stopNotConfirmed/.test(l) && /runStatus/.test(l),
-    )
+    // ⚠ THE WINDOW IS LOAD-BEARING AND WAS FOUND BY DRIVING, NOT BY READING. The
+    // first form of this fence asked whether ONE line named both the slice and
+    // `runStatus` — and it stayed GREEN under plant P4, whose `if
+    // (stoppingThreads.has(t))` and whose `runStatus` rewrite sit five lines
+    // apart. A one-line fence cannot see the only shape this suppression would
+    // ever actually take. (The behavioural case above DID fire under P4; this
+    // arm was being credited with a reach it did not have — the 193.2 lesson.)
+    const WINDOW = 8
+    const offenders: string[] = []
+    for (let i = 0; i < code.length; i++) {
+      if (!/stoppingThreads|stopNotConfirmed/.test(code[i])) continue
+      for (let j = i + 1; j <= Math.min(i + WINDOW, code.length - 1); j++) {
+        if (/runStatus/.test(code[j])) offenders.push(`${code[i].trim()} … ${code[j].trim()}`)
+      }
+    }
     expect(offenders).toEqual([])
 
     // The strip cannot be hiding an absence: the rule IS documented in prose here.
@@ -539,14 +587,13 @@ describe("194.1-03 — no timer handle lives in the Zustand store", () => {
    * assert the prose mention is PRESENT so the strip cannot cover for an absence.
    */
   it("zero timer calls in store CODE, with the rule still stated in store PROSE", () => {
-    const path = resolve(__dirname, "../../stores/streamsStore.ts")
-    const raw = readFileSync(path, "utf8")
+    const raw = storeSource
     const lines = raw.split("\n")
     expect(lines.length).toBeGreaterThan(300)
 
-    const code = lines.filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    const code = lines.filter((l: string) => !/^\s*(\/\/|\*|\/\*)/.test(l))
     expect(code.length).toBeGreaterThan(100)
-    expect(code.filter((l) => /setTimeout|setInterval|clearTimeout/.test(l))).toEqual([])
+    expect(code.filter((l: string) => /setTimeout|setInterval|clearTimeout/.test(l))).toEqual([])
 
     expect(raw).toContain("NO TIMER HANDLE MAY EVER BE PUT HERE")
   })

@@ -1240,6 +1240,98 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     ((threadId: string, producerRunId: string) => void) | null
   >(null)
 
+  // ── Phase 194.1 Plan 03 (R1 + R2 — D-05 / D-06 / D-07) — the two stop helpers ──
+  //
+  // `stopStream` and `stopThread` are DECLARED byte-mirror resolvers (:2387-2389
+  // says so on purpose). Both call the SAME two functions below so they cannot
+  // drift — the press-record and the climb-down are one mechanism with two
+  // entrances, which is Phase 194 D-08 (*four mounts, ONE mechanism*) made
+  // structural rather than a matter of discipline.
+  //
+  // Both close over refs only, so the mount-time instance captured by useEffect #1
+  // stays correct for the provider's whole life.
+
+  /** R2's climb-down. Fires ONCE, `STOP_TIMEOUT_MS` after the FIRST press.
+   *
+   *  ⚠ D-07: keyed BY THREAD, never by run. A Stop whose run id could not be
+   *  resolved at all — the R6 no-id arm, a thread never opened this session —
+   *  must still climb down, and a run-keyed timer has nothing to key on there.
+   *
+   *  This is the ONLY route back to a pressable Stop. Sketch 168-B's losing arm
+   *  ("no disabled button, because no button") is load-bearing, not a nicety: with
+   *  the control REMOVED while stopping, a stop that never resolves would strand
+   *  the user with no control at all if this did not fire. */
+  const stopWindowExpired = (threadId: string) => {
+    stopTimersRef.current.delete(threadId)
+    useStreamsStore.setState((s) => {
+      const stopping = new Set(s.stoppingThreads)
+      stopping.delete(threadId)
+      const unconfirmed = new Set(s.stopNotConfirmed)
+      unconfirmed.add(threadId)
+      return { stoppingThreads: stopping, stopNotConfirmed: unconfirmed }
+    })
+  }
+
+  /** R1's press-record. SYNCHRONOUS and unconditional — it runs before the bucket
+   *  scan, before the frame read, before any await. A press acknowledged one
+   *  microtask later is still a press acknowledged after the user stopped looking,
+   *  and R6's frame read makes the "later" a whole round trip. That is the whole
+   *  reason R1 and R6 belong in ONE provider change.
+   *
+   *  ⚠ A SECOND PRESS DOES NOT RE-ARM. The existing handle is left alone, so the
+   *  window is measured from the FIRST press — otherwise a user who pressed twice
+   *  would wait LONGER for the truth than one who pressed once. */
+  const recordStopPress = (threadId: string) => {
+    useStreamsStore.setState((s) => {
+      const stopping = new Set(s.stoppingThreads)
+      stopping.add(threadId)
+      const unconfirmed = new Set(s.stopNotConfirmed)
+      unconfirmed.delete(threadId)
+      return { stoppingThreads: stopping, stopNotConfirmed: unconfirmed }
+    })
+    if (stopTimersRef.current.has(threadId)) return
+    stopTimersRef.current.set(
+      threadId,
+      window.setTimeout(() => stopWindowExpired(threadId), STOP_TIMEOUT_MS),
+    )
+  }
+
+  /** Clear the whole stopping slice for one thread, and DISARM its timer.
+   *
+   *  ⚠ The `clearTimeout` is the half that is easy to omit and impossible to see
+   *  omitted: without it, a run that terminated at t+2s still raises "not
+   *  confirmed" at t+8s — i.e. the surface would report an unconfirmed stop about
+   *  a stop that WAS confirmed. That is a NEW lie, in the one phase whose subject
+   *  is an honest Stop, and it is fenced by the t+2000 case in
+   *  `StreamsProvider.stopping.test.ts`. */
+  const clearStopStateForThread = (threadId: string) => {
+    const handle = stopTimersRef.current.get(threadId)
+    if (handle !== undefined) {
+      window.clearTimeout(handle)
+      stopTimersRef.current.delete(threadId)
+    }
+    useStreamsStore.setState((s) => {
+      if (
+        !s.stoppingThreads.has(threadId) &&
+        !s.stopNotConfirmed.has(threadId) &&
+        !s.harnessKickoffThreads.has(threadId)
+      ) {
+        return {}
+      }
+      const stopping = new Set(s.stoppingThreads)
+      stopping.delete(threadId)
+      const unconfirmed = new Set(s.stopNotConfirmed)
+      unconfirmed.delete(threadId)
+      const kickoff = new Set(s.harnessKickoffThreads)
+      kickoff.delete(threadId)
+      return {
+        stoppingThreads: stopping,
+        stopNotConfirmed: unconfirmed,
+        harnessKickoffThreads: kickoff,
+      }
+    })
+  }
+
   // Phase 068.5 D-068.5-03: throttled localStorage writer; hoisted into a ref
   // so the synchronous setViewingThread action body can call `.flush()` without
   // re-creating the throttle on every render. The actual writer is installed by
@@ -2394,6 +2486,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           // Was `streamingThreadIdRef.current ?? activeThreadIdRef.current`.
           const stid = activeThreadIdRef.current
           if (!stid) return
+          // Phase 194.1 Plan 03 (R1): the press, recorded synchronously and BEFORE
+          // any network work. Byte-mirrored in `stopThread` below.
+          recordStopPress(stid)
           const bucket =
             useStreamsStore.getState().bucketsBySurface.get("chat")?.get(stid) ?? []
           const streamingMsg = [...bucket]
@@ -2427,6 +2522,9 @@ export function StreamsProvider({ children }: PropsWithChildren) {
         // stopped-by-user marking so the terminal renders "Response stopped".
         stopThread: async (threadId: string) => {
           if (!threadId) return
+          // Phase 194.1 Plan 03 (R1): the press, recorded synchronously and BEFORE
+          // any network work. Byte-mirrored in `stopStream` above.
+          recordStopPress(threadId)
           const bucket =
             useStreamsStore.getState().bucketsBySurface.get("chat")?.get(threadId) ?? []
           const streamingMsg = [...bucket]
@@ -2972,6 +3070,66 @@ export function StreamsProvider({ children }: PropsWithChildren) {
     // by the actions registered above and the listeners below).
     void subscriptionsRef
     void lastSeenOffsetRef
+  }, [])
+
+  // ---- useEffect #1b (Phase 194.1 Plan 03, R1/R2/R5): the ONE stopping clear ----
+  //
+  // ⚠ KEYED ON THE `streamingThreads` SLICE TRANSITION, NOT ON `onTerminal`, AND
+  // THAT CHOICE IS THE WHOLE POINT OF THIS EFFECT.
+  //
+  // `onTerminal` is WRAPPED TWICE — once on the reconcile/re-subscribe path
+  // (:1662-1663 as measured at the plan-set SHA) and once on the send path
+  // (:2057-2058) — and even between them it covers only TWO of the FOUR routes a
+  // thread can leave `streamingThreads` by. All four, by line at that same SHA:
+  //
+  //   #1 :2304-2311  the sendMessage `finally` — "the AUTHORITATIVE streaming-end
+  //                  write" (covered by onTerminal)
+  //   #2 :1599-1602  the reconcile-DERIVE delete from snapshot.active_runs
+  //                  (NOT covered — no terminal event fires at all)
+  //   #3 :3007-3010  the inactivity watchdog's silent-finalize
+  //                  (NOT covered — D-145-04 finalizes SILENTLY, on purpose)
+  //   #4 :3222-3225  the org-switch teardown (NOT covered)
+  //
+  // #2 and #3 are EXACTLY the missed-terminal cases Phase 145 exists to close. A
+  // clear keyed on `onTerminal` would therefore leave `⊘ Stopping this run…` on
+  // screen forever on precisely the runs whose terminal went missing — the failure
+  // mode this phase is about, reintroduced one layer up. One subscription over the
+  // slice every one of the four routes writes covers all four by construction.
+  //
+  // ⚠ THE L-01 BOUNDARY, stated here and nowhere weaker. At the shipped
+  // `WORKER_COUNT=2`, on roughly half of stops a producer on the OTHER worker
+  // writes `completed` over the cancel (`backend/app/db/workflows.py:1458-1463` —
+  // `finish_run` has no terminal guard; Phase 194 SC#2, FAILED). With the clear
+  // keyed here, the surface will show `⊘ Stopping this run…` and then
+  // `✓ Complete`. **THAT IS CORRECT AND MUST NOT BE SPECIAL-CASED.** Nothing in
+  // this file may suppress, delay or rewrite the terminal reading because a thread
+  // had been stopping; a dedicated fence in `StreamsProvider.stopping.test.ts`
+  // reds against exactly that change. RUN-01 stays UNTICKED until the separate
+  // L-01 phase ships — the lie is a BOUNDARY to state, never a defect to hide.
+  useEffect(() => {
+    const unsubscribe = useStreamsStore.subscribe(
+      (s) => s.streamingThreads,
+      (next) => {
+        const { stoppingThreads, stopNotConfirmed, harnessKickoffThreads } =
+          useStreamsStore.getState()
+        // The union, because a harness kickoff that was never STOPPED still owes
+        // its liveness mark a clear when the run ends (R5).
+        for (const t of new Set([
+          ...stoppingThreads,
+          ...stopNotConfirmed,
+          ...harnessKickoffThreads,
+        ])) {
+          if (!next.has(t)) clearStopStateForThread(t)
+        }
+      },
+    )
+    return () => {
+      unsubscribe()
+      // Symmetric cleanup (Pattern S3): no timer may outlive the provider.
+      for (const handle of stopTimersRef.current.values()) window.clearTimeout(handle)
+      stopTimersRef.current.clear()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ---- useEffect #2: reconcile listeners (D-068-07 / D-068-08) ----
