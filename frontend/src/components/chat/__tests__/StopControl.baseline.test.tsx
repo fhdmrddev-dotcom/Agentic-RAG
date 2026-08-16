@@ -511,13 +511,66 @@ describe("194.1-01 — mount 3: the tray Stop (ActiveRunsTray)", () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("194.1-01 — mount 4: WorkflowRunPage has NO Stop control (the R3 absence)", () => {
+describe("194.1-07 — mount 4: WorkflowRunPage NOW HAS the Stop control (R3, the inversion)", () => {
   /**
-   * ⚠ THE LENGTH GUARD IS NOT CEREMONY. A `?raw` import that resolves to an
-   * empty string makes every `not.toContain` below pass, and the suite then
-   * reports green while measuring nothing. Phase 192.1 measured a renamed module
-   * being swept against the empty string and passing — this assertion is the
-   * only thing standing between that failure and a false PASS here.
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ⚠ SUPERSEDED IN PLACE BY PHASE 194.1 PLAN 07 — THE ORIGINAL IS QUOTED, NOT
+   *   DELETED, because a capture that is deleted the moment it inverts leaves no
+   *   record that the absence was ever real (193.2 WR-05).
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Plan 01 authored this block as an ABSENCE, with the describe title
+   * *"194.1-01 — mount 4: WorkflowRunPage has NO Stop control (the R3 absence)"*
+   * and these three cases, verbatim:
+   *
+   *     it("the swept source is non-empty and is the right file", () => {
+   *       const src = runPageSource as string
+   *       expect(typeof src).toBe("string")
+   *       expect(src.length).toBeGreaterThan(20000)
+   *       expect(src).toContain("WorkflowRunPage")
+   *       expect(src.split("\n").length).toBe(1047)
+   *       expect(src.endsWith("\n")).toBe(true)
+   *     })
+   *
+   *     it("contains zero occurrences of onStop / stopThread / cancelRun / Stop", () => {
+   *       const src = runPageSource as string
+   *       expect(src.length).toBeGreaterThan(0)
+   *       const hits = (src.match(/onStop|stopThread|cancelRun|Stop/g) ?? []).length
+   *       expect(hits).toBe(0)
+   *     })
+   *
+   *     it("the same regex DOES match when the pattern is present (positive control)", () => {
+   *       const planted = `${runPageSource as string}\n// onStop`
+   *       expect((planted.match(/onStop|stopThread|cancelRun|Stop/g) ?? []).length).toBe(1)
+   *     })
+   *
+   * Its own reasoning, kept because it still governs the replacement: *"⚠ THE
+   * LENGTH GUARD IS NOT CEREMONY. A `?raw` import that resolves to an empty
+   * string makes every `not.toContain` below pass, and the suite then reports
+   * green while measuring nothing. Phase 192.1 measured a renamed module being
+   * swept against the empty string and passing."* That guard is KEPT below — the
+   * inversion changes what is asserted, never whether the input is real.
+   *
+   * ⚠ TWO THINGS INVERTED, AND ONLY ONE OF THEM WAS THIS PLAN'S DOING. Recorded
+   * separately because they have different lessons:
+   *
+   *  (1) The `hits === 0` sweep is inverted BY DESIGN — plan 07 mounts the
+   *      control, so `Stop` now appears in that file. That is R3 shipping.
+   *
+   *  (2) ⚠ **THE LINE PIN `toBe(1047)` WAS ALREADY RED BEFORE PLAN 07 TOUCHED
+   *      ANYTHING**, and it was red on the tree plan 07 inherited: plan 06's
+   *      `fmtElapsed` hoist moved the file 1046 → 1055 `wc -l`, i.e. 1047 → 1056
+   *      segments. Measured at plan 07's base commit, this suite reported
+   *      `1 failed | 14 passed` with `expected 1056 to be 1047`.
+   *      **Nobody saw it, and the reason is structural rather than careless:**
+   *      `194.1-BASELINE.md` §2 measured that `src/components/chat` has NO
+   *      `TARGETS` entry, so this suite is UNGATED — `scripts/vitest-count-gate.cjs`
+   *      never runs it, and plan 06's four clean gate reports could not have
+   *      included it. *A pin in an ungated suite is a pin nothing checks.*
+   *      The replacement therefore does NOT re-pin a line count: a figure that
+   *      rots on every neighbouring plan, in a file no gate runs, is a tripwire
+   *      pointed at the wrong thing. The non-emptiness + identity guards stay,
+   *      because those are what the 192.1 lesson is actually about.
    */
   it("the swept source is non-empty and is the right file", () => {
     const src = runPageSource as string
@@ -525,33 +578,30 @@ describe("194.1-01 — mount 4: WorkflowRunPage has NO Stop control (the R3 abse
     expect(src.length).toBeGreaterThan(20000)
     // Identity, not just size: a non-empty sweep of the WRONG file is the same bug.
     expect(src).toContain("WorkflowRunPage")
-    // ⚠ 1047, not the 1046 `wc -l` reports, and the discrepancy is recorded
-    // rather than papered over: `wc -l` counts NEWLINE CHARACTERS while
-    // `split("\n")` counts SEGMENTS, and a file ending in a trailing newline has
-    // exactly one more segment than newline. Both numbers are right about
-    // different questions. `194.1-BASELINE.md` §3 publishes the `wc -l` figure
-    // (1046) because that is the ledger's unit; this fence publishes 1047
-    // because that is what this expression measures.
-    expect(src.split("\n").length).toBe(1047)
     expect(src.endsWith("\n")).toBe(true)
   })
 
-  it("contains zero occurrences of onStop / stopThread / cancelRun / Stop", () => {
+  /**
+   * THE INVERSION. Plan 01 asserted zero occurrences; the mount is the point of
+   * plan 07, so the same needle must now find the shared component — and it must
+   * find it EXACTLY ONCE, because "four mounts, ONE mechanism" (Phase 194 D-08)
+   * is about there being one Stop per surface as much as one dispatch path.
+   */
+  it("mounts <StopControl exactly once — the fourth and last mount", () => {
     const src = runPageSource as string
-    expect(src.length).toBeGreaterThan(0)
-
-    const hits = (src.match(/onStop|stopThread|cancelRun|Stop/g) ?? []).length
-    expect(hits).toBe(0)
+    expect(src.length).toBeGreaterThan(20000)
+    expect((src.match(/<StopControl/g) ?? []).length).toBe(1)
   })
 
   /**
-   * The positive control for the sweep above. Without it, `hits === 0` is
-   * equally consistent with a regex that cannot match anything — the same class
-   * of un-fireable fence the length guard defends against, one level up.
+   * The positive control for the sweep above, kept in the shape plan 01 gave it.
+   * Without it, a count of 1 is equally consistent with a regex that can only
+   * ever match once — the same class of un-fireable fence the length guard
+   * defends against, one level up.
    */
-  it("the same regex DOES match when the pattern is present (positive control)", () => {
-    const planted = `${runPageSource as string}\n// onStop`
-    expect((planted.match(/onStop|stopThread|cancelRun|Stop/g) ?? []).length).toBe(1)
+  it("the same regex counts a SECOND mount when one is planted (positive control)", () => {
+    const planted = `${runPageSource as string}\n// <StopControl threadId={null} variant="page" />`
+    expect((planted.match(/<StopControl/g) ?? []).length).toBe(2)
   })
 })
 

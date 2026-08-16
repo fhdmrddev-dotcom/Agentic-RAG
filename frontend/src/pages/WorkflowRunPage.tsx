@@ -81,6 +81,9 @@ import {
 import { runReadingLabel, type NodeRunState } from "@/components/workflows/runVocabulary"
 import { nodeTitle, waitsForYou, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
+// Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
+// own dispatch and its own pressed state; this page hands it a thread id and nothing else.
+import { StopControl } from "@/components/chat/StopControl"
 import {
   useAskUserPrompt,
   usePhases,
@@ -883,13 +886,56 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
             {run?.workflow_name || "Workflow"}
           </h1>
           <span className="font-mono text-xs text-muted-foreground">v{run?.workflow_version}</span>
-          <button
-            type="button"
-            onClick={() => run && onOpenThread(run.thread_id)}
-            className="ml-auto text-xs font-medium text-primary transition-opacity hover:opacity-80"
-          >
-            {COPY_OPEN_THREAD}
-          </button>
+          {/* ── THE STOP (Phase 194.1 Plan 07 / R3 / D-19) ──────────────────────────────
+                SKETCH 169-A, chosen over the sketch's OWN lean toward B, and the reason is
+                a measurement rather than taste: `isTerminal` (:604) is a component-level
+                const already in scope for BOTH this row and the state row below, so A's
+                liveness gate is ONE clause reading the same variable — not a new
+                derivation. B's headline argument, *"the gate comes free"*, overstated the
+                difference and is corrected here rather than repeated. A also dodges a real
+                hazard B carries: the state row below is `flex-wrap` and grows a long
+                `claimed_at … → created_at … → updated_at …` string under the ⌥ reveal, so a
+                control living there wraps unpredictably.
+
+                THE GUARD IS A DIRECT FLIP — no sheet, no arm-to-confirm, no second press.
+                The shipped ladder is *irreversible + names a victim → sheet; consequential
+                but reversible → arm-to-confirm; reversible with no victim → direct flip*,
+                and a Stop is your own run, which you launched and are watching (Phase 194
+                verified on seven live runs that completed phases survive and only the
+                interrupted one is marked). The asymmetry, said out loud: a Stop that is too
+                easy costs you one run; a Stop that is too hard costs you the reason the
+                control exists.
+
+                THE ACCENT COST, stated rather than left for a later reader to notice: this
+                header's own docblock (:870-871) says it is *"orientation, never a focal
+                point. The only accent it spends is the seam link."* This mount spends a
+                SECOND accent, and puts a primary-tinted link beside a destructive control.
+                That was weighed at sketch time and accepted with the placement.
+
+                C — the lane beside the running node — WAS REJECTED, on canvas-vocabulary
+                grounds, and it is recorded so it is not re-proposed: that lane already
+                spends itself on `＋ insert` and `✕ remove`, so a stop there is one glance
+                from reading as *delete this step* on a surface whose own chrome says
+                👁 View only; and Phase 188.2 pins that no focusable control may live inside
+                `PhaseNodeCard` at all.
+
+                ⚠ THE WRAPPER IS LOAD-BEARING, NOT TIDINESS. `COPY_OPEN_THREAD` carries
+                `ml-auto`, so a Stop appended AFTER it would shove the seam link left every
+                time the run went terminal — the "row twitches" failure G-4 row 2 judges.
+                Right-grouping both instead pins the seam link's RIGHT edge: the group grows
+                leftward and the link does not move. The seam button below is byte-unchanged
+                (its own `ml-auto` is inert inside a shrink-wrapped group), so no shipped
+                class string was edited to make room. ── */}
+          <div className="ml-auto flex items-center gap-3">
+            {!isTerminal ? <StopControl threadId={run?.thread_id ?? null} variant="page" /> : null}
+            <button
+              type="button"
+              onClick={() => run && onOpenThread(run.thread_id)}
+              className="ml-auto text-xs font-medium text-primary transition-opacity hover:opacity-80"
+            >
+              {COPY_OPEN_THREAD}
+            </button>
+          </div>
         </div>
         {/* The status word + the ANCHORED clock. The number is a plain child here (not a
             live region), so it re-renders once a second without ever being announced. */}

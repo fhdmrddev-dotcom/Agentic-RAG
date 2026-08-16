@@ -89,12 +89,38 @@ const useGroundingBundle = vi.fn()
 vi.mock("@/hooks/useGroundingBundle", () => ({
   useGroundingBundle: (...a: unknown[]) => useGroundingBundle(...(a as [boolean])),
 }))
+// ── Phase 194.1 Plan 07 (R3): the stopping slice. ────────────────────────────────
+//
+// ⚠ THESE THREE ADDITIONS ARE NOT OPTIONAL AND THEY ARE NOT THIS PLAN'S PREFERENCE —
+// the page now mounts `<StopControl>`, which reads `useStoppingForThread` and
+// `useStopNotConfirmedForThread` off this very module and dispatches through
+// `useStreamActions().stopThread`. A module mock that omits an export the component
+// under test imports does not fail informatively: the import resolves to `undefined`
+// and the render dies inside React, taking all 89 shipped cases with it. Measured, not
+// predicted — the mount was added before this block and the whole suite went red.
+//
+// `stopThread` is deliberately a REAL `vi.fn()` rather than a no-op arrow, because the
+// press case asserts the VALUE it received, and `expect(fn).toHaveBeenCalled()` alone
+// passes under the two-id landmine (`ComposerStopHarness.test.tsx:16-19`).
+const stopThread = vi.fn((_threadId: string): Promise<void> => Promise.resolve())
+// ⚠ MUTABLE MODULE STATE ON PURPOSE. The production flip is store-driven — plan 03's
+// `stopThread` sets the thread's `stopping` flag and every subscriber re-renders. With
+// the provider module mocked away there is no store to drive, so the press case flips
+// this flag from inside the `stopThread` spy and forces a re-render. That is a STAND-IN
+// for the store, and it is labelled as one: what it proves is that THIS PAGE renders
+// the shared slot's stopping arm in the title row. That `stopThread` really does flip
+// `stopping` is plan 03's property, pinned in `StreamsProvider.stopping.test.ts`; that
+// `stopping === true` removes the control is plan 04's, pinned in `StopControl.test.tsx`.
+let stoppingNow = false
+let notConfirmedNow = false
 vi.mock("@/providers/StreamsProvider", () => ({
   usePhases: (...a: unknown[]) => usePhases(...(a as [string | null])),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...(a as [string | null])),
   useAskUserPrompt: (...a: unknown[]) => useAskUserPrompt(...(a as [string | null])),
   useViewingThread: () => useViewingThread(),
-  useStreamActions: () => ({ reconcile: reconcileStream, setViewingThread }),
+  useStreamActions: () => ({ reconcile: reconcileStream, setViewingThread, stopThread }),
+  useStoppingForThread: (_t: string | null) => stoppingNow,
+  useStopNotConfirmedForThread: (_t: string | null) => notConfirmedNow,
 }))
 
 // ── The canvas leaf-stub: it renders what the page HANDED it and nothing else, so a
@@ -310,6 +336,10 @@ const COPY_EMPTY_TERMINAL = "This run produced no files."
 
 beforeEach(() => {
   vi.clearAllMocks()
+  // Plan 07: the stopping stand-in is module state, so `clearAllMocks` cannot reset it.
+  // Reset explicitly or one press case leaks its flipped flag into every case after it.
+  stoppingNow = false
+  notConfirmedNow = false
   window.localStorage.clear()
   setLiveSlice([])
   setFiles([])
