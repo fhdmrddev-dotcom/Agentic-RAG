@@ -4,7 +4,15 @@ title: Navigating away/back during a streaming workflow run resets the run timer
 reported: 2026-06-10
 surface: Agentic-RAG
 severity: minor
-status: folded   # ⚠ CORRECTED 2026-08-16 then FOLDED into Phase 194.1 the same day at
+status: open     # ⚠⚠ RE-OPENED 2026-08-16 (LATE THE SAME DAY) — the 194.1 fold claim below was
+                 # OBSERVED FAILING by the operator during 194.1 UAT, on the very path it claimed
+                 # to have made impossible. `status: folded` would have hidden a live defect from
+                 # the routing scan for a second time in this one report's history. The whole
+                 # `folded` reasoning is kept verbatim below rather than deleted, because a claim
+                 # that failed is evidence and deleting it destroys the trail. See the
+                 # `## 2026-08-16 (late) — THE 194.1 FOLD CLAIM DID NOT HOLD` section at the foot.
+                 # Prior value, superseded not overwritten:
+                 # folded   # ⚠ CORRECTED 2026-08-16 then FOLDED into Phase 194.1 the same day at
                  # discuss-phase. ⚠ PARTIAL FOLD — the DUPLICATE-AVATAR half only, and even that
                  # is claimed as SURFACE REMOVAL, not repair: R5 suppresses the harness kickoff
                  # assistant placeholder, so the artefact has nothing to draw on. The double-mount
@@ -17,7 +25,11 @@ status: folded   # ⚠ CORRECTED 2026-08-16 then FOLDED into Phase 194.1 the sam
                # 2026-08-16 update at the foot of this file. The TIMER half may well be closed by
                # 174/128; nobody has verified it (verified_closed_by is still null).
 affected_areas: [frontend/streaming, frontend/run-honesty, harness/workflow-ui]
-folded_into: "194.1"   # duplicate-avatar half only; was "174" — superseded, not overwritten (the 174 history is in the body)
+folded_into: null      # ⚠ CLEARED 2026-08-16 (late) — the 194.1 fold claim was observed failing.
+                       # Superseded values, kept not overwritten: "194.1" (duplicate-avatar half,
+                       # claimed at discuss-phase 194.1 and REFUTED by UAT the same day), and
+                       # before that "174". A `folded_into` naming a phase that did not close it
+                       # is worse than null: it tells every later scan the work is done.
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: "Reviewed at /gsd:discuss-phase 124 (2026-06-26) — left OPEN, NOT folded: live-run timer/reconcile mechanics, not the soul/door chrome Phase 124 re-skins. Re-check after the 124 run-header soul re-skin lands — if the soul header touches the run strip, this timer-reseed + duplicate-avatar bug may then be in-scope to fix. | Reviewed at /gsd:discuss-phase 128 (2026-06-27) — CONDITIONAL fold (CONTEXT D-04): CTC-03 makes the header RunStatusStrip the SOLE timer, so the timer-reseed fix (seed elapsed from run started_at, not mount) is folded into 128 ONLY IF the planner confirms the reseed is in that same canonical Deep RunStatusStrip (vs the 095.1-fixed Deep run-card, vs the harness/workflow strip = Phase 127's surface); else leave open. The duplicate-avatar symptom (StreamsProvider/MessageList double-mount race) is NOT folded — deferred to the run-honesty cluster slot. Stays OPEN. | Folded at /gsd:discuss-phase 194.1 (2026-08-16) — PARTIAL, DUPLICATE-AVATAR HALF ONLY, and claimed as SURFACE REMOVAL rather than repair: R5 suppresses the harness kickoff assistant placeholder (StreamsProvider.tsx:1926-1936) via a harness-scoped gate inside sendMessage, so at harness kickoff there is no assistant node for the artefact to be drawn on. THE DOUBLE-MOUNT RACE ITSELF IS NOT FIXED — 194-MEASUREMENTS.md still lists three live candidate mechanisms with no verdict. Re-open the duplicate-avatar half if the artefact is seen on a CONTENT-BEARING message, or anywhere on the Deep / plain-chat path (which 194.1 does not touch, per 174 D-14). The TIMER half is NOT claimed by 194.1 and stays unverified — verified_closed_by is still null after 174 and 128."
@@ -145,3 +157,65 @@ cause.
   `194-MEASUREMENTS.md` (plan `194-01` Task 2, the duplicate-icon sample), which **disqualified its
   own sample on two measured grounds** and recorded what was and was not established rather than
   drawing a verdict. Start there — it is the most recent honest attempt to pin this.
+
+---
+
+## 2026-08-16 (late) — THE 194.1 FOLD CLAIM DID NOT HOLD
+
+**Observed by the operator during Phase 194.1 UAT, hours after the fold was recorded, on the exact path the
+fold claimed to have made impossible.** Evidence: `screenshots/Screenshot 2026-08-16 213715.png`, a harness
+kickoff.
+
+Three stacked elements on the assistant side of the transcript:
+
+1. a **bare avatar with no content**,
+2. a **second avatar reading `Starting workflow… •••`**,
+3. the new Phase-194.1 run line `◆ Starting workflow… · Step 1 of 5 · 24s`.
+
+Items 1 and 2 are this report's originally recorded shape, verbatim: *"one bare avatar with no content directly
+above the real streaming placeholder."* ⚠ **`Starting workflow…` now renders TWICE on one kickoff** — so on
+this path Phase 194.1 added a third run indicator without removing either of the two it claimed to remove.
+
+### Why the claim failed — hypothesis, NOT finding
+
+The fold's reasoning was: *"R5 suppresses the harness kickoff assistant placeholder … so at harness kickoff
+there is no assistant node for the artefact to be drawn on."*
+
+R5's shipped gate is `if (!opts?.workflowDefinitionId)` (`StreamsProvider.tsx:2147`, Phase 194.1 plan 03). It
+suppresses the optimistic insert **only on the `sendMessage` path, and only when that call carries a workflow
+definition id.** The observed run was a **workflow-LOCKED composer kickoff** (composer placeholder read
+`Workflow running — Cancel to switch back`).
+
+**Two things must be established before any re-fold, and neither is established now:**
+1. **Does the workflow-locked composer kickoff reach `sendMessage` with `workflowDefinitionId` set at all?**
+   If it does not, R5's gate is simply never consulted on this path and the fold was scoped to a path the
+   operator does not use.
+2. **`REQUIREMENTS.md` A-1 names a SECOND placeholder source that R5 does not touch** — the reconcile loop
+   stamping a `runStatus:"streaming"` placeholder per run (`StreamsProvider.tsx:1607-1638`). If that is the
+   source of the bare avatar, R5 could never have removed it, and the two avatars have two different origins.
+
+⚠ **Do not re-fold this report on a code-reading.** It has now been folded twice (174, then 194.1) and
+survived both. The next fold must be accompanied by an operator observation of a harness kickoff with **zero**
+bare avatars, or it is a third claim of the same kind.
+
+### What this report demonstrates about the process, and why the note stays
+
+`status:` frontmatter **is** the routing index — the `/gsd:discuss-phase` scan reads it and nothing else.
+This report has now been mis-indexed twice in its life:
+
+- **2026-06 → 2026-08:** `status: folded` / `folded_into: 174` while the report's own `re_open_trigger` prose
+  said the duplicate-avatar half *"Stays OPEN"*. Frontmatter and body disagreed for **two months** and the
+  frontmatter won every scan.
+- **2026-08-16:** `status: folded` / `folded_into: 194.1` for roughly **six hours**, on a claim the operator
+  refuted the same day.
+
+Both times the failure was identical: **a claim recorded as an outcome.** The lesson is not "check more
+carefully" — it is that a fold asserting *surface removal* is a claim about rendered output and can only be
+discharged by looking at rendered output.
+
+### Status of the two halves, restated
+
+| half | status | claimed by | verified |
+|---|---|---|---|
+| duplicate empty assistant avatar | **OPEN** — re-observed 2026-08-16 | 174 (failed), 194.1 (failed) | never |
+| run timer resets on nav | **OPEN, unverified** | 128 conditionally, 174 | never — `verified_closed_by` is still null |
