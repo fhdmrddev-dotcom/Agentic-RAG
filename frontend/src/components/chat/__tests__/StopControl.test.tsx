@@ -66,7 +66,7 @@
  * scoped here.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, act, cleanup, waitFor } from "@testing-library/react"
+import { render, screen, act, cleanup, waitFor, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { createElement, type ReactNode } from "react"
 
@@ -233,6 +233,108 @@ function renderStop(props: Parameters<typeof StopControl>[0]) {
       createElement(StopControl, props),
     ),
   )
+}
+
+/**
+ * TWO `<StopControl>` instances for ONE thread, under ONE provider.
+ *
+ * ⚠ THIS IS PLAN 04's ONLY PROOF OF **D-06**, and it must not be dropped for
+ * looking artificial. The composer Stop and the panel Stop CAN be mounted for the
+ * same thread simultaneously; with component-local state, pressing one would leave
+ * the other pressable, and R1's acceptance is that a second press is impossible
+ * **by construction**. Plan 05 lands the real cross-mount case (composer + panel);
+ * this is its structural ancestor, and it fires under a plant no single-mount test
+ * can see (P5).
+ */
+function renderTwoStops(threadId: string) {
+  return render(
+    createElement(
+      StreamsProvider,
+      null as unknown as { children: ReactNode },
+      createElement(StopControl, { threadId, variant: "composer" as const, key: "a" }),
+      createElement(StopControl, { threadId, variant: "panel" as const, key: "b" }),
+    ),
+  )
+}
+
+// ── R2 fake-timer drivers ─────────────────────────────────────────────────────
+const PRODUCER_RUN_ID = "run-producer-stopcontrol"
+
+/** ⚠ Mirrors `STOP_TIMEOUT_MS` in `StreamsProvider.tsx`, DELIBERATELY re-declared
+ *  rather than imported: the constant is module-private, and R2's acceptance is
+ *  about the OBSERVED window — a test that imported the value would agree with any
+ *  value the source happened to hold, including 1 ms. Plant P4 (source set to
+ *  3000) is what proves the pair is load-bearing. */
+const STOP_WINDOW_MS = 8000
+
+function assistantRow(over: Record<string, unknown>) {
+  return {
+    id: "m-" + Math.random().toString(36).slice(2),
+    thread_id: THREAD,
+    user_id: "",
+    role: "assistant",
+    content: "",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    tool_calls: [],
+    ...over,
+  }
+}
+
+/** Seed the thread as live, with a streaming assistant row the resolver can read a
+ *  run id off — the bucket arm of plan 03's R6 bucket-then-frame resolution. */
+function seedLiveRun(threadId: string) {
+  act(() => {
+    useStreamsStore.setState((s) => {
+      const surf = new Map(s.bucketsBySurface.get("chat") ?? new Map())
+      surf.set(threadId, [assistantRow({ runStatus: "streaming", runId: PRODUCER_RUN_ID })])
+      const buckets = new Map(s.bucketsBySurface)
+      buckets.set("chat", surf)
+      return {
+        bucketsBySurface: buckets as never,
+        streamingThreads: new Set(s.streamingThreads).add(threadId),
+      }
+    })
+  })
+}
+
+/** The ONLY honest way to simulate "the run reached a terminal": drop the thread
+ *  from `streamingThreads`. All four shipped terminal routes end in exactly this
+ *  write, which is why plan 03 keys the clear on the slice transition. */
+function reachTerminal(threadId: string) {
+  act(() => {
+    useStreamsStore.setState((s) => {
+      const next = new Set(s.streamingThreads)
+      next.delete(threadId)
+      return { streamingThreads: next }
+    })
+  })
+}
+
+/** A `cancelRun` that never settles — the "never resolves" arm of sketch 168's
+ *  driver, which is the arm the sketch calls *the judgement*. */
+function cancelHangs() {
+  mockCancelRun.mockImplementation(() => new Promise(() => {}))
+}
+
+/**
+ * ⚠ LOAD-BEARING IN EVERY FAKE-TIMER CASE, inherited from plan 03 where it was
+ * found by MEASURING rather than by reading. Seeding `streamingThreads` directly
+ * never stamps `lastEventAtRef`, so the thread reads as immediately inactive to the
+ * Phase 145-05 inactivity watchdog — whose shared ~5s interval fires a read-only
+ * `getSnapshot` probe, gets the default EMPTY `active_runs`, and silently finalizes
+ * the thread **at t+5000, inside R2's 8s window**.
+ *
+ * ⚠ The t+2000 case would pass ANYWAY under that artifact, for the wrong reason.
+ * That is the more dangerous half, and it is why this is applied to the whole
+ * describe rather than only to the cases that visibly failed.
+ */
+function snapshotStillStreaming(runId: string) {
+  mockGetSnapshot.mockResolvedValue({
+    messages: [],
+    active_runs: [{ run_id: runId, started_at: new Date().toISOString(), status: "streaming" }],
+    since_cursors: { [runId]: "0" },
+  })
 }
 
 beforeEach(() => {
@@ -632,5 +734,150 @@ describe("194.1-04 D-18 — the Stop CONTROL is the lucide Square on every arm",
       expect(screen.getByTestId(testId).querySelectorAll("svg").length, variant).toBe(1)
       cleanup()
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 2 — R2's THREE TIMING POINTS, AT COMPONENT LEVEL
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Plan 03 proved these three points at PROVIDER level, on the store Sets. This
+ * block proves the same three at COMPONENT level, on what a person can actually
+ * see — pressed with a real click, read off the rendered DOM. It does not
+ * duplicate that suite; it mounts on top of it.
+ *
+ * ⚠ ALL THREE POINTS ARE REQUIRED, and the reason is mechanical rather than
+ * stylistic. A block asserting only *"the control is back at t+8000"* passes under
+ * a **1 ms** timeout — and therefore also under plant P4 (`STOP_TIMEOUT_MS` set to
+ * 3000). The t+7000 case is the one that fires under P4, and the t+2000 case is the
+ * ONLY one that proves `clearTimeout` actually runs (P6).
+ *
+ * ⚠ `advanceTimersByTimeAsync`, never the sync form: the resolvers await a bucket
+ * scan and (on the no-row arm) a frame read, so a sync advance leaves those
+ * microtasks unflushed. `WorkflowRunPage.test.tsx:1171` uses the `…Async` form for
+ * exactly that reason. Every advance is inside `act`.
+ */
+describe("194.1-04 R2 — the climb-down, measured at three points on the RENDERED control", () => {
+  beforeEach(() => {
+    // See `snapshotStillStreaming`'s docblock — without this the Phase 145-05
+    // watchdog finalizes the seeded thread at t+5000 and every reading below
+    // measures the watchdog instead of R2.
+    snapshotStillStreaming(PRODUCER_RUN_ID)
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("at t+7000 the reading is STILL shown and no control is back (plant P4)", async () => {
+    cancelHangs()
+    renderStop({ threadId: THREAD, variant: "composer" })
+    seedLiveRun(THREAD)
+
+    fireEvent.click(screen.getByTestId("composer-stop"))
+
+    // R1: the reading is on in the SAME tick, before any await yields.
+    expect(screen.getByTestId("composer-stopping").textContent).toBe(COPY_STOPPING)
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STOP_WINDOW_MS - 1000)
+    })
+
+    expect(screen.getByTestId("composer-stopping")).toBeTruthy()
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+    expect(screen.queryByText(COPY_STOP_NOT_CONFIRMED)).toBeNull()
+  })
+
+  it("at t+8000 a PRESSABLE control is back beside the not-confirmed copy", async () => {
+    cancelHangs()
+    renderStop({ threadId: THREAD, variant: "composer" })
+    seedLiveRun(THREAD)
+
+    fireEvent.click(screen.getByTestId("composer-stop"))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STOP_WINDOW_MS)
+    })
+
+    const btn = screen.getByTestId("composer-stop")
+    expect(btn).toBeTruthy()
+    expect((btn as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getByText(COPY_STOP_NOT_CONFIRMED)).toBeTruthy()
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+  })
+
+  /**
+   * ⚠ THE ONLY CASE THAT PROVES `clearTimeout` ACTUALLY RUNS (plant P6). Clearing
+   * the flag on terminal without clearing the HANDLE leaves a timer that fires at
+   * t+8000 over a thread that terminated at t+2000 — raising "not confirmed" about
+   * a stop that WAS confirmed. That is a new lie, in the one phase whose subject is
+   * an honest Stop.
+   */
+  it("a cancel that terminates at t+2000 NEVER shows the not-confirmed copy, even past t+8000", async () => {
+    cancelHangs()
+    renderStop({ threadId: THREAD, variant: "composer" })
+    seedLiveRun(THREAD)
+
+    fireEvent.click(screen.getByTestId("composer-stop"))
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    expect(screen.getByTestId("composer-stopping")).toBeTruthy()
+
+    reachTerminal(THREAD)
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+    expect(screen.queryByText(COPY_STOP_NOT_CONFIRMED)).toBeNull()
+
+    // Well past the window the ARMED timer would have fired at.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(STOP_WINDOW_MS + 2000)
+    })
+    expect(screen.queryByText(COPY_STOP_NOT_CONFIRMED)).toBeNull()
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+    expect(screen.getByTestId("composer-stop")).toBeTruthy()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TASK 2 — D-06: TWO MOUNTS, ONE STATE
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1-04 D-06 — two mounts for one thread move together (plant P5)", () => {
+  it("pressing ONE removes BOTH controls, because neither owns the state", () => {
+    cancelHangs()
+    renderTwoStops(THREAD)
+    seedLiveRun(THREAD)
+
+    // Both are present and both are real, pressable controls.
+    expect(screen.getByTestId("composer-stop")).toBeTruthy()
+    expect(screen.getByTestId("panel-stop-run")).toBeTruthy()
+
+    // Press exactly ONE of them.
+    fireEvent.click(screen.getByTestId("panel-stop-run"))
+
+    // ⚠ BOTH leave the DOM. With component-local state the composer's would still
+    // be sitting there pressable — a second press on a run already stopping, which
+    // is precisely what R1's "impossible by construction" forbids.
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+
+    // …and BOTH show the reading, from the one store slice.
+    expect(screen.getByTestId("composer-stopping").textContent).toBe(COPY_STOPPING)
+    expect(screen.getByTestId("panel-stopping").textContent).toBe(COPY_STOPPING)
+  })
+
+  it("the terminal returns BOTH controls together", () => {
+    cancelHangs()
+    renderTwoStops(THREAD)
+    seedLiveRun(THREAD)
+
+    fireEvent.click(screen.getByTestId("composer-stop"))
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+
+    reachTerminal(THREAD)
+
+    expect(screen.getByTestId("composer-stop")).toBeTruthy()
+    expect(screen.getByTestId("panel-stop-run")).toBeTruthy()
+    expect(screen.queryByTestId("composer-stopping")).toBeNull()
+    expect(screen.queryByTestId("panel-stopping")).toBeNull()
   })
 })
