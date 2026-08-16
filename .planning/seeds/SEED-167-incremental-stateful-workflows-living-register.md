@@ -28,6 +28,23 @@ trigger_when:
 
 # SEED-167: Incremental / stateful workflows — the "living risk register"
 
+> ## ⚠⚠ READ `SEED-168` FIRST — THIS SEED IS AN INSTANCE, NOT THE REQUIREMENT
+>
+> **Added 2026-08-16 (same day), on the operator's explicit correction:**
+>
+> > "This is an example. I don't want you to just take the specific thing and implement things according to
+> > the specific example. The point is that we need to automate as much as possible business cases in
+> > different domains based on the knowledge in knowledge base."
+>
+> **Anyone who plans from this file alone will build a risk-register feature, and that is the wrong outcome.**
+> The risk register is a *probe* that exposed one axis (state — a run that reads its own last output) out of
+> six. `SEED-168` derives all six from cases across PM, HR, finance, legal, education and healthcare, and
+> carries the measured coverage table.
+>
+> **What stays valid here:** everything below is accurate about the STATE axis specifically — the measurement
+> that no run-to-run state exists, the AUTH-03 comparison, the six open questions, and the fit analysis. Read
+> it as the deep-dive on axis **B**, with `SEED-168` as the map.
+
 ## The business requirement, in the operator's words
 
 > "Suppose for example I will run a workflow or author a workflow that look into my project folder for a
