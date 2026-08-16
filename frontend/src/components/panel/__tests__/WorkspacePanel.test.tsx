@@ -174,6 +174,15 @@ vi.mock("@/components/panel/PendingAskCard", () => ({
 
 // eslint-disable-next-line import/first
 import { WorkspacePanel, type PanelState } from "@/components/panel/WorkspacePanel"
+// Phase 194.1 Plan 05 Task 4 — the COMPOSER, imported here so the cross-mount case
+// can render the two Stops a user genuinely has on screen at once. `MessageInput`
+// imports nothing from `@/providers/StreamsProvider` itself; only the shared
+// `StopControl` it mounts does, so this file's module mock serves both mounts —
+// which is exactly what makes them share one source.
+// eslint-disable-next-line import/first
+import { MessageInput } from "@/components/chat/MessageInput"
+// eslint-disable-next-line import/first
+import { COPY_STOPPING } from "@/components/chat/StopControl"
 
 const thread = { id: "thread-1", title: "T" } as never
 
@@ -933,6 +942,155 @@ describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
     const { container } = renderPanel({ state: "open" })
     expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 194.1 Plan 05 Task 4 (R1 / D-06) — THE REAL CROSS-MOUNT CASE.
+//
+// ⚠ THIS IS THE ONLY PROOF OF D-06, AND IT IS A CASE A SINGLE-MOUNT TEST
+// STRUCTURALLY CANNOT SEE. Every other Stop case in this phase renders ONE mount,
+// presses it, and watches that same mount change — which is equally consistent
+// with a control that owns its own pressed state. The property D-06 actually
+// claims is that NEITHER mount owns it: the composer Stop and the panel Stop can
+// be on screen for the SAME thread at the same time, and pressing either must
+// retire BOTH, because a second press has to be impossible BY CONSTRUCTION rather
+// than merely discouraged.
+//
+// Plan 04's `StopControl.test.tsx` has the structural ancestor — two
+// `<StopControl>` instances under one provider. THIS is the real one, because it
+// uses the two mounts a user can genuinely have in front of them at once: the
+// composer at the bottom of the chat and the panel on the right.
+//
+// ⚠ IT LIVES IN THIS FILE RATHER THAN IN A FOURTH NEW ONE FOR A MEASURED REASON:
+// `WorkspacePanel.test.tsx` is one of only three named `panel/__tests__` files the
+// count gate actually executes (`194.1-BASELINE.md` §2), and this plan is already
+// bumping its pin. A fourth file would land UNGATED — `src/components/chat` has no
+// TARGETS entry at all — so the phase's single most important case would be the
+// one nothing runs in CI.
+//
+// ⚠ THE HONEST SCOPE, stated rather than overclaimed. `vi.mock` is FILE-GLOBAL, so
+// this file cannot mount the REAL `StreamsProvider` beside its mocked data hooks.
+// What is real here is the READ topology and the SHARED SOURCE: both mounts read
+// the genuine zustand store through the production selector bodies, and the press
+// writes to that same store. What is this suite's own is the WRITE. The real
+// resolver — its 8s window, its no-re-arm rule, its `clearTimeout` — is driven by
+// `StopControl.test.tsx` and `StreamsProvider.stopping.test.ts`, and this case
+// claims none of it.
+describe("194.1-05 — composer + panel, ONE thread: pressing either retires BOTH", () => {
+  const THREAD = "thread-1"
+  const HARNESS_LOCK = {
+    runId: "producer-run-DO-NOT-USE",
+    mode: "harness" as const,
+    capPaused: false,
+    continuesRemaining: 3,
+  }
+
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({ lock: HARNESS_LOCK })
+    getThreadWorkflow.mockResolvedValue({ definition_slug: null } as unknown as ThreadWorkflowState)
+    listPublishedWorkflows.mockResolvedValue([])
+    // The press writes the real store, exactly as `recordStopPress` does. This is
+    // the suite's own write — see the block above for why, and for what it does
+    // and does not claim.
+    useStreamActions.mockReturnValue({
+      stopThread: (id: string) => {
+        stopThread(id)
+        useStreamsStore.setState((s) => {
+          const stopping = new Set(s.stoppingThreads)
+          stopping.add(id)
+          return { stoppingThreads: stopping }
+        })
+      },
+    })
+  })
+
+  /** BOTH mounts, for ONE thread, in ONE tree — the composition a user really has
+   *  on screen during a workflow run. */
+  function renderBothMounts() {
+    return render(
+      <>
+        <MessageInput onSend={vi.fn()} disabled threadId={THREAD} />
+        <WorkspacePanel
+          selectedThread={thread}
+          state="open"
+          onToggle={vi.fn()}
+          onExpand={vi.fn()}
+        />
+      </>,
+    )
+  }
+
+  it("both Stops are on screen for the same thread before anything is pressed", () => {
+    renderBothMounts()
+    // The PRECONDITION, asserted rather than assumed. Without it the absence
+    // assertions below are equally consistent with neither mount ever rendering.
+    expect(screen.getByTestId("composer-stop")).toBeInTheDocument()
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+  })
+
+  it("pressing the PANEL's Stop removes the COMPOSER's control too, and both slots read stopping", async () => {
+    const user = userEvent.setup()
+    renderBothMounts()
+
+    await user.click(screen.getByTestId("panel-stop-run"))
+
+    // ⚠ THE COMPOSER'S CONTROL — a mount this press never touched. This is the
+    // assertion P6 reds against, and no single-mount case in the phase can make it.
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+    // …and the mount that WAS pressed is gone too: no disabled button, because no
+    // button (sketch 168-B). A second press is impossible by construction.
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+
+    // Both slots carry the reading, so neither surface goes silent.
+    expect(screen.getByTestId("composer-stopping")).toBeInTheDocument()
+    expect(screen.getByTestId("panel-stopping")).toBeInTheDocument()
+    expect(screen.getAllByText(COPY_STOPPING)).toHaveLength(2)
+
+    // The resolver was reached exactly once, with the THREAD id — never the lock's
+    // producer run id, which is the wrong type for a cancel.
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(THREAD)
+    expect(stopThread).not.toHaveBeenCalledWith(HARNESS_LOCK.runId)
+  })
+
+  /** The symmetric direction. Without it, "pressing the panel retires both" is
+   *  equally consistent with the composer simply never rendering a control after
+   *  any press at all. */
+  it("pressing the COMPOSER's Stop removes the PANEL's control too", async () => {
+    const user = userEvent.setup()
+    renderBothMounts()
+
+    await user.click(screen.getByTestId("composer-stop"))
+
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    expect(screen.queryByTestId("composer-stop")).toBeNull()
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(THREAD)
+  })
+
+  /** ⚠ THE SCOPE CLAUSE. A flag that retired every Stop everywhere would pass both
+   *  cases above and be a worse bug than the one they defend against. The store
+   *  slice is a Set keyed BY THREAD, and this is what says so. */
+  it("a DIFFERENT thread's Stop is untouched — the slice is keyed by thread, not global", async () => {
+    const user = userEvent.setup()
+    render(
+      <>
+        <MessageInput onSend={vi.fn()} disabled threadId={THREAD} />
+        <MessageInput onSend={vi.fn()} disabled threadId="thread-OTHER" />
+      </>,
+    )
+    const stops = screen.getAllByTestId("composer-stop")
+    expect(stops).toHaveLength(2)
+
+    await user.click(stops[0])
+
+    // One retired, one still pressable.
+    expect(screen.getAllByTestId("composer-stop")).toHaveLength(1)
+    expect(screen.getAllByTestId("composer-stopping")).toHaveLength(1)
+    expect(stopThread).toHaveBeenCalledTimes(1)
+    expect(stopThread).toHaveBeenCalledWith(THREAD)
   })
 })
 
