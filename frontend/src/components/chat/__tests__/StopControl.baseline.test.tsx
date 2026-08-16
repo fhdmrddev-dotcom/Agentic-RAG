@@ -86,6 +86,19 @@ const useStreamActions = vi.fn()
 const useStreamingThreadIds = vi.fn()
 const getActiveRunStartMs = vi.fn()
 const stopThread = vi.fn()
+/**
+ * ⚠ ADDED BY PLAN 04, AND THE ADDITION IS ITSELF A MEASUREMENT RATHER THAN
+ * PLUMBING. `MessageInput` now renders `<StopControl>`, which reads these two
+ * selectors. Left out of the mock they resolve to `undefined` and the composer
+ * throws on render — so the fact that this file needed them at all is the proof
+ * that the composer's Stop is now store-driven, which is exactly what this
+ * baseline was captured to detect.
+ *
+ * They default to `false` in `beforeEach`, i.e. the RESTING arm — so every chrome
+ * assertion below still measures the same thing it measured on the unmoved tree.
+ */
+const useStoppingForThread = vi.fn()
+const useStopNotConfirmedForThread = vi.fn()
 
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
@@ -99,6 +112,8 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useStreamActions: (...a: unknown[]) => useStreamActions(...a),
   useStreamingThreadIds: (...a: unknown[]) => useStreamingThreadIds(...a),
   getActiveRunStartMs: (...a: unknown[]) => getActiveRunStartMs(...a),
+  useStoppingForThread: (...a: unknown[]) => useStoppingForThread(...a),
+  useStopNotConfirmedForThread: (...a: unknown[]) => useStopNotConfirmedForThread(...a),
 }))
 
 // The panel's run-soul effect reads these; resolve them to an honest empty frame
@@ -252,13 +267,44 @@ function renderPanel() {
   )
 }
 
-/** The composer renders its Stop only while `disabled` — that IS the gate. */
+/**
+ * The composer renders its Stop only while `disabled` — that IS the gate.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════
+ * ⚠ SUPERSEDED BY PHASE 194.1 PLAN 04 — 2026-08-16. The originals, VERBATIM:
+ *
+ *     function renderComposerStreaming() {
+ *       return render(<MessageInput onSend={vi.fn()} onStop={vi.fn()} disabled={true} />)
+ *     }
+ *     function renderComposerIdle() {
+ *       return render(<MessageInput onSend={vi.fn()} onStop={vi.fn()} disabled={false} />)
+ *     }
+ *
+ * TWO changes, and both are consequences rather than convenience:
+ *
+ *  1. `onStop` is GONE from `MessageInput`'s `Props`. The composer carries no Stop
+ *     dispatcher any more — `<StopControl>` calls `stopThread(threadId)` off the
+ *     store (D-05). Passing it is now a TYPECHECK ERROR, which is how the removal
+ *     enumerates its own call sites instead of a default hiding them.
+ *
+ *  2. `threadId` is now REQUIRED FOR THE STOP TO RENDER AT ALL, and that is a real
+ *     behaviour change stated rather than smoothed: `<StopControl threadId={null}>`
+ *     renders nothing, because a composer with no thread has no run to stop.
+ *     ⚠ It loses NO live case, and the reason is a measurement, not a hope:
+ *     `ChatArea.tsx` passes `disabled={isStreaming}` where `isStreaming =
+ *     useStreamingForThread(thread?.id ?? null)`, which is `false` whenever there is
+ *     no thread — so `disabled === true` IMPLIES a thread exists. The original
+ *     helpers passed no `threadId` only because the shipped button did not need one.
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
+const BASELINE_THREAD = "thread-1"
+
 function renderComposerStreaming() {
-  return render(<MessageInput onSend={vi.fn()} onStop={vi.fn()} disabled={true} />)
+  return render(<MessageInput onSend={vi.fn()} disabled={true} threadId={BASELINE_THREAD} />)
 }
 
 function renderComposerIdle() {
-  return render(<MessageInput onSend={vi.fn()} onStop={vi.fn()} disabled={false} />)
+  return render(<MessageInput onSend={vi.fn()} disabled={false} threadId={BASELINE_THREAD} />)
 }
 
 beforeEach(() => {
@@ -272,6 +318,10 @@ beforeEach(() => {
   })
   setPanelHooks()
   useStreamingThreadIds.mockReturnValue(new Set<string>(["thread-A"]))
+  // Plan 04: the RESTING arm by default, so every chrome assertion in this file
+  // still measures what it measured on the unmoved tree.
+  useStoppingForThread.mockReturnValue(false)
+  useStopNotConfirmedForThread.mockReturnValue(false)
   getActiveRunStartMs.mockReturnValue(null)
   getThreadWorkflow.mockResolvedValue({ definition_slug: null })
   listPublishedWorkflows.mockResolvedValue([])
@@ -320,9 +370,37 @@ describe("194.1-01 — mount 1: the composer Stop (MessageInput)", () => {
     expect(streaming.container.textContent).not.toContain("Shift+Enter for newline")
   })
 
-  it(`does not contain "${STOPPING_READING}" anywhere — the absence plan 04 inverts`, () => {
-    const { container } = renderComposerStreaming()
-    expect(container.textContent ?? "").not.toContain(STOPPING_READING)
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ⚠ SUPERSEDED BY PHASE 194.1 PLAN 04 — 2026-08-16. **THIS IS THE INVERSION THE
+   * CASE WAS WRITTEN TO BE**, and its own title said so. The original, VERBATIM:
+   *
+   *     it(`does not contain "${STOPPING_READING}" anywhere — the absence plan 04 inverts`, () => {
+   *       const { container } = renderComposerStreaming()
+   *       expect(container.textContent ?? "").not.toContain(STOPPING_READING)
+   *     })
+   *
+   * measured on the unmoved tree, where `grep -ri "stopping" frontend/src` returned
+   * zero production hits of this reading. Plan 04 introduces it. The case is
+   * INVERTED IN PLACE rather than deleted: an absent assertion cannot tell a
+   * deliberate introduction from an oversight, and the inversion is the only
+   * available proof that the reading is NEW rather than pre-existing.
+   *
+   * ⚠ BOTH DIRECTIONS ARE ASSERTED. Presence alone would be satisfied by a reading
+   * that is ALWAYS on; the resting arm's absence is what makes it a state.
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it(`shows "${STOPPING_READING}" while stopping, and NOT while resting (inverted by plan 04)`, () => {
+    // Resting — the reading is absent, exactly as on the unmoved tree.
+    const resting = renderComposerStreaming()
+    expect(resting.container.textContent ?? "").not.toContain(STOPPING_READING)
+    cleanup()
+
+    // Stopping — the reading is present, and the CONTROL is gone (sketch 168-B).
+    useStoppingForThread.mockReturnValue(true)
+    const stopping = renderComposerStreaming()
+    expect(stopping.container.textContent ?? "").toContain(STOPPING_READING)
+    expect(screen.queryByTestId(SHIPPED.composer.testid)).toBeNull()
   })
 })
 

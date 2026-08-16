@@ -493,19 +493,75 @@ describe("V-06 — composer Stop during a harness run resolves the producer runs
     expect(mockCancelRun).not.toHaveBeenCalled()
   })
 
-  it("the composer Stop control renders (and fires) while the harness thread is streaming", async () => {
-    const onStop = vi.fn()
-    // ChatArea.tsx:361-363 wires `onStop={stopStreaming}` and
-    // `disabled={isStreaming}`; a harness thread additionally carries
-    // workflowLocked. Both flags true is the live-workflow composer.
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ⚠ SUPERSEDED BY PHASE 194.1 PLAN 04 (R1 / D-05 / D-22) — 2026-08-16. The
+   * original body, VERBATIM:
+   *
+   *     const onStop = vi.fn()
+   *     // ChatArea.tsx:361-363 wires `onStop={stopStreaming}` and
+   *     // `disabled={isStreaming}`; a harness thread additionally carries
+   *     // workflowLocked. Both flags true is the live-workflow composer.
+   *     render(
+   *       <MessageInput onSend={vi.fn()} onStop={onStop} disabled workflowLocked threadId="thread-H" />,
+   *     )
+   *     const stop = screen.getByTestId("composer-stop")
+   *     expect(stop).toBeInTheDocument()
+   *     expect(stop).toHaveAttribute("aria-label", "Stop generation")
+   *     await userEvent.click(stop)
+   *     expect(onStop).toHaveBeenCalledTimes(1)
+   *
+   * ⚠ THE SUPERSEDED ASSERTION WAS THE WEAKER ONE, AND SAYING SO IS THE POINT.
+   * `expect(onStop).toHaveBeenCalledTimes(1)` proved only that the composer invoked
+   * *whatever the page handed it* — it could not see WHERE that went. The comment
+   * above it (`onStop={stopStreaming}`) is precisely CONTEXT **D-22**'s finding:
+   * the composer reached `stopStream`, NOT `stopThread`, and this suite's own
+   * header could not tell.
+   *
+   * Plan 04 removes the prop entirely. The composer renders `<StopControl>`, which
+   * dispatches `stopThread(threadId)` off the store — so the press can now be
+   * followed all the way to `cancelRun`'s ARGUMENT, which is this file's stated
+   * assertion rule (`:16-19`: never `toHaveBeenCalled()` alone, because `cancelRun`
+   * swallows 404 and a wrong-id DELETE silently succeeds).
+   *
+   * ⚠ On this HARNESS thread the resolved id is the `workflow_runs.id` from the
+   * frame, not the producer `runs.run_id` — R5 removed the bucket row that carried
+   * the producer id. See the two SUPERSEDED blocks above for why that is safe
+   * (`194-11`'s dual-id fallback on `DELETE /runs/{id}`).
+   * ═══════════════════════════════════════════════════════════════════════════
+   */
+  it("the composer Stop control renders, and its press reaches cancelRun with the resolved id", async () => {
+    const WORKFLOW_RUN_ANCHOR = "wfrun-composer-mount"
+    mockGetThreadWorkflow.mockResolvedValue({
+      active_workflow_run_id: WORKFLOW_RUN_ANCHOR,
+      last_workflow_run_id: WORKFLOW_RUN_ANCHOR,
+    })
+
+    // The composer must sit INSIDE the provider now — its Stop reads the store
+    // slice and dispatches the store action, rather than calling a prop.
     render(
-      <MessageInput onSend={vi.fn()} onStop={onStop} disabled workflowLocked threadId="thread-H" />,
+      <StreamsProvider>
+        <MessageInput onSend={vi.fn()} disabled workflowLocked threadId="thread-H" />
+      </StreamsProvider>,
     )
+
     const stop = screen.getByTestId("composer-stop")
     expect(stop).toBeInTheDocument()
+    // The accessible name is byte-unchanged through the move to a shared component.
     expect(stop).toHaveAttribute("aria-label", "Stop generation")
-    await userEvent.click(stop)
-    expect(onStop).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      await userEvent.click(stop)
+    })
+
+    // R1: the control LEAVES the DOM in the same tick (168-B), so a second press
+    // is impossible by construction.
+    await waitFor(() => expect(screen.queryByTestId("composer-stop")).toBeNull())
+    expect(screen.getByText("⊘ Stopping this run…")).toBeInTheDocument()
+
+    // …and the VALUE reached the one durable cancel path.
+    await waitFor(() => expect(mockCancelRun).toHaveBeenCalledWith(WORKFLOW_RUN_ANCHOR))
+    expect(mockCancelRun).toHaveBeenCalledTimes(1)
   })
 })
 

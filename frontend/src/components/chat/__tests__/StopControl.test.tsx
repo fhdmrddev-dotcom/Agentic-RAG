@@ -77,6 +77,12 @@ import { createElement, type ReactNode } from "react"
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
 import stopControlSource from "../StopControl.tsx?raw"
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import messageInputSource from "../MessageInput.tsx?raw"
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
+import chatAreaSource from "./../ChatArea.tsx?raw"
 
 const {
   mockPostMessage,
@@ -687,6 +693,73 @@ describe("194.1-04 — source fences on StopControl.tsx", () => {
     expect(
       (stripComments(`${src}\nconst g = "⏹"`).match(/⏹|getBoundingClientRect/g) ?? []).length,
     ).toBe(1)
+  })
+
+  /**
+   * ⚠ THE COMPOSER MOUNT IS EXACTLY ONE, HELD MECHANICALLY RATHER THAN BY A
+   * ONE-TIME GREP — the `PhaseFormPanel.tsx` / `<TemplateNameCheck` precedent from
+   * 193.1, which this repository already trusts for the identical property.
+   *
+   * The needle is the JSX-OPEN token `<StopControl`, not the bare identifier: the
+   * import line and every prose mention in `MessageInput.tsx` carry the bare name,
+   * and three of them were REWRITTEN from the angle-bracket form after the raw grep
+   * measured **4** — the same fence-reds-on-its-own-documentation trap this suite
+   * hits twice above. Keeping the token out of prose is what keeps the needle
+   * DISCRIMINATING, and this case is where that is enforced rather than hoped.
+   */
+  it("MessageInput mounts StopControl EXACTLY once, and ChatArea mounts it not at all", () => {
+    const mi = messageInputSource as string
+    const ca = chatAreaSource as string
+
+    // Fence-can-fire, in both directions, before any count is trusted.
+    expect(mi.length).toBeGreaterThan(5000)
+    expect(mi).toContain("export function MessageInput")
+    expect(ca.length).toBeGreaterThan(5000)
+    expect(ca).toContain("export function ChatArea")
+
+    const mounts = mi.split("\n").filter((l) => l.includes("<StopControl"))
+    expect(mounts).toHaveLength(1)
+    // …and that ONE line hands it the thread and the variant, nothing else.
+    expect(mounts[0]).toContain("threadId=")
+    expect(mounts[0]).toContain('variant="composer"')
+
+    // The page mounts none — the control is the composer's, not the page's.
+    expect(ca.split("\n").filter((l) => l.includes("<StopControl"))).toHaveLength(0)
+
+    // Positive control: the needle DOES match when a second mount is present.
+    expect(
+      `${mi}\n<StopControl threadId={x} variant="composer" />`
+        .split("\n")
+        .filter((l) => l.includes("<StopControl")),
+    ).toHaveLength(2)
+  })
+
+  /**
+   * ⚠ THE STOP-DISPATCHER PROP IS GONE FROM BOTH FILES, AND THE NEEDLE IS RAW ON
+   * PURPOSE. Neither `MessageInput.tsx` nor `ChatArea.tsx` spells it anywhere —
+   * including in the docblocks explaining its removal, which say so explicitly.
+   * That is the `run_lifecycle.py` app-shutdown-gate discipline: a raw count of
+   * ZERO means the prop is absent, and any occurrence at all means it came back.
+   *
+   * ⚠ A later editor who "tidies" either docblock by naming the prop breaks this
+   * fence silently. That is why both files carry a warning saying so.
+   */
+  it("neither the composer nor the page carries a Stop-dispatcher prop any more", () => {
+    const NEEDLE = /onStop/g
+    const mi = messageInputSource as string
+    const ca = chatAreaSource as string
+
+    expect((mi.match(NEEDLE) ?? []).length).toBe(0)
+    expect((ca.match(NEEDLE) ?? []).length).toBe(0)
+    // Positive controls, one per file.
+    expect((`${mi}\nonStop`.match(NEEDLE) ?? []).length).toBe(1)
+    expect((`${ca}\nonStop`.match(NEEDLE) ?? []).length).toBe(1)
+  })
+
+  /** D-08 held mechanically on the mount too, not only inside the component. */
+  it("neither file reads a lock's runId nor calls cancelRun directly", () => {
+    expect(((messageInputSource as string).match(NEEDLE_LOCK_OR_CANCEL) ?? []).length).toBe(0)
+    expect(((chatAreaSource as string).match(NEEDLE_LOCK_OR_CANCEL) ?? []).length).toBe(0)
   })
 
   /** ⚠ The prose about the width gap must SURVIVE. A later editor who deletes it

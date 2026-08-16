@@ -37,3 +37,39 @@ phase. The reasoning above is diff-containment, not a before/after run.
 **Re-open trigger:** a phase that adds `src/__tests__` to the count gate's `TARGETS`, or any
 phase that touches the reconcile lock, the reconcile re-mint, `loadMessages`' MERGE filter or
 the `argsCodeText` reducer — at which point these become that phase's to measure properly.
+
+---
+
+## From plan `194.1-04` (2026-08-16)
+
+### A **14th** failing case, in a suite plan 03 never ran — same class, same disposition
+
+`src/__tests__/hooks/useMessages.test.ts` ·
+*"Phase 067.5 — Row 11 empty-thread-until-refresh regression › reconcile on switch-back
+surfaces the post-done state, not an empty placeholder"* — **1 failing.**
+
+Found while widening plan 04's verification beyond its own `<verify>` paths (the project rule:
+*"run what actually covers the files you touched"*, after plan 02's stated near-miss). Plan 03's
+sweep covered `src/__tests__/providers` and `src/components/chat/__tests__`; it did **not** run
+`src/__tests__/hooks`, so this case's failure is newly OBSERVED rather than newly CAUSED.
+
+**Why it is provably not plan 04's, as a measurement:**
+
+1. My whole working-tree diff is seven files — `MessageInput.tsx`, `ChatArea.tsx`,
+   `StopControl.tsx` and four test files. **`useMessages.test.ts` imports NONE of them.**
+   `grep -n "MessageInput\|ChatArea\|StopControl" src/__tests__/hooks/useMessages.test.ts`
+   returns four hits and **all four are COMMENTS** (`:466`, `:548`, `:556`, `:626`, each naming
+   `ChatArea.tsx` line numbers in prose). There is no import edge from that suite to anything
+   this plan wrote.
+2. Its subject — the reconcile placeholder re-mint on switch-back — is **the same
+   `StreamsProvider.tsx:1621-1632` re-mint** the plan-03 block above already names as a failing
+   subject outside its diff. It belongs to the same rot set, and it is recorded separately only
+   because it lives in a directory nobody had run.
+
+⚠ **What is NOT claimed:** that it passed before. It was never measured by this phase — `src/__tests__`
+has no entry in the count gate's `TARGETS` (BASELINE §2), so no baseline covers it. The reasoning is
+import-containment, not a before/after run.
+
+**Most likely home:** `SEED-056`.
+**Re-open trigger:** as above, plus — a phase that touches `useMessages`' action surface (which is
+already the recorded trigger for retiring `stopStream`, so the two are likely to arrive together).

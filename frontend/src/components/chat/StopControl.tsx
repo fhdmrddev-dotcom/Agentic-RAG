@@ -96,12 +96,19 @@ export const COPY_STOPPING = "⊘ Stopping this run…"
 /**
  * The 8s climb-down's reading (R2).
  *
- * ⚠ IT CLAIMS NO CAUSE, AND THAT IS THE WHOLE REQUIREMENT. Its predecessor —
- * *"the run had not finished registering (the pre-stamp window). Nothing was
- * cancelled; press Stop again in a moment."* — explained THREE different failures
- * with one sentence and was wrong for two of them (plan 03 retired both
- * occurrences). This reading is raised by a TIMEOUT: all it knows is that no
+ * ⚠ IT CLAIMS NO CAUSE, AND THAT IS THE WHOLE REQUIREMENT. Its predecessor was a
+ * console line that asserted a pre-stamp registration window as the cause and told
+ * the user to retry shortly; it explained THREE different failures with one
+ * sentence and was wrong for two of them, and plan 03 retired both of its
+ * occurrences. This reading is raised by a TIMEOUT: all it knows is that no
  * terminal arrived inside the window. It does not know why, and it must not guess.
+ *
+ * ⚠ THE RETIRED SENTENCE IS DELIBERATELY NOT QUOTED VERBATIM HERE, and that is a
+ * measurement rather than squeamishness: `StreamsProvider.stopping.test.ts` sweeps
+ * every production `.ts`/`.tsx` under `frontend/src` for that literal and excludes
+ * TEST files by rule. Quoting it in this docblock put the string back into
+ * production source and reddened that fence — observed, not predicted. The verbatim
+ * text lives in that suite and in `194.1-BASELINE.md` §5, where spelling it is free.
  *
  * ⚠ IT DELIBERATELY CARRIES NO STEP COUNT, and that is stated rather than left as
  * an omission. Phase 194 **D-13** — *"every reading carries the step count in the

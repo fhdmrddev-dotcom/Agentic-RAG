@@ -52,7 +52,6 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     messages,
     loadMessages,
     sendMessage,
-    stopStreaming,
     clearMessages,
     setViewingThread,
     resumeFromFailed,
@@ -358,7 +357,22 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
   const inputBar = (
     <MessageInput
       onSend={handleSend}
-      onStop={stopStreaming}
+      /* Phase 194.1 Plan 04 (RUN-01 / D-05/D-22) — THE STOP-DISPATCHER PROP IS GONE
+         from this element. The composer's Stop is `StopControl` (written WITHOUT its
+         JSX angle bracket on purpose — that token is a fence needle counting real
+         mounts, and this page must contain zero), which calls
+         `stopThread(threadId)` off the StreamsProvider store; this page no longer
+         threads a dispatcher down, and `stopStreaming` is no longer destructured
+         from `useMessages` above.
+
+         ⚠ The prop's name is spelled nowhere in this file, including in this
+         sentence explaining its absence — so a raw grep for it stays DISCRIMINATING
+         and any occurrence means it came back. Same discipline as `MessageInput`'s
+         `Props` docblock; do not "tidy" this by naming it.
+
+         ⚠ `stopStream` itself SURVIVES on `useMessages`' action surface — removing
+         it is a Deep-path change, deferred with the trigger *"a phase that touches
+         `useMessages`' action surface"*. */
       disabled={isStreaming}
       threadId={thread?.id ?? null}
       providers={providers}
