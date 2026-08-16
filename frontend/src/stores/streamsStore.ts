@@ -49,7 +49,42 @@ export type SurfaceId = string
  * getThreadWorkflow reconcile.
  */
 export interface WorkflowLock {
-  /** The workflow_runs.id (active_workflow_run_id) that owns the lock. */
+  /**
+   * The workflow_runs.id (active_workflow_run_id) that owns the lock.
+   *
+   * ⚠ CORRECTED (Phase 194, plan 194-05). The sentence above is the ORIGINAL and is kept
+   * visible rather than overwritten, because it is what a reader believed for nine phases.
+   * Measured at HEAD: **it is FALSE at two of this field's five write sites.**
+   *
+   *   | # | write site (the ASSIGNMENT line, not the call line) | value | actual id type          |
+   *   |---|-----------------------------------------------------|-------|--------------------------|
+   *   | 1 | StreamsProvider.tsx:965  — onCapPaused SSE          | info.runId                 | inherits whatever the SSE carried |
+   *   | 2 | StreamsProvider.tsx:1840 — mount reconcile          | wf.active_workflow_run_id  | workflow_runs.id  ✅ matches the doc |
+   *   | 3 | StreamsProvider.tsx:1983 — kickoff seed             | run_id from the kickoff POST body | runs.run_id (PRODUCER) ❌ |
+   *   | 4 | StreamsProvider.tsx:3034 — Continue re-subscribe    | producerRunId              | runs.run_id (PRODUCER) ❌ |
+   *   | 5 | ChatArea.tsx:176         — banner path              | state.active_workflow_run_id | workflow_runs.id ✅ |
+   *
+   * THE CONSEQUENCE, which is why this is a landmine and not a documentation nit.
+   * Both ids are bare uuids, so **a swap typechecks and then resolves nothing.**
+   * `DELETE /runs/{id}` accepts only the PRODUCER id, and `cancelRun` (lib/api.ts:1259-1269)
+   * **deliberately swallows 404**. So a Stop wired to this field would report success while
+   * cancelling nothing — silently, and roughly half the time.
+   *
+   * ⚠ THE ONE LEGITIMATE PRODUCTION READ IS NOT A COUNTEREXAMPLE. `workflowLock.runId` has
+   * exactly ONE production read in the whole frontend — MessageItem.tsx:596 / :599, feeding
+   * `continueRun`. That is correct **only because `/continue` carries a dual-id fallback**, i.e.
+   * the field works there because the SERVER tolerates both, not because the field is one type.
+   *
+   * Plan 194-03's F-1 fence now enforces this mechanically across three directories: no Stop
+   * mount may read this field or call `cancelRun(` directly — every Stop routes through
+   * `stopThread(threadId)` / `stopStream()` (D-08, "four mounts, ONE mechanism").
+   *
+   * ⚠ THE PROJECT ALREADY RECORDED THIS ONCE AND IT WAS NOT CARRIED FORWARD.
+   * WorkspacePanel.tsx:164-168 (Phase 188) states the same two-id finding, in that component's
+   * own docblock — where it then sat invisible to Phase 194 until it was re-derived from
+   * scratch. *A measurement that lives in one consumer's comment is invisible to the next
+   * phase*, which is why it is recorded HERE, at the type's own declaration, this time.
+   */
   runId: string
   mode: "harness"
   /** True when the run is cap_paused (a Continue card is pending). */
