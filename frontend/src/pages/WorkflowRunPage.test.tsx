@@ -2014,3 +2014,90 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
     ).toBe(true)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Phase 194.1 Plan 07 — F1 / F2: "FOUR MOUNTS, ONE MECHANISM", HELD MECHANICALLY
+// ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Phase 194 **D-08** binds every Stop to the thread-keyed resolver: no mount reads
+ * the workflow lock's id field, and no mount calls the cancel API itself. Three of
+ * the four mounts are already swept — `WorkspacePanel.test.tsx`'s **F-1 / V-05**
+ * fence globs `components/panel/**`, `components/chat/**` and
+ * `components/workflows/**`.
+ *
+ * ⚠ **`src/pages/**` IS IN NONE OF THOSE THREE GLOBS**, so the mount this plan adds
+ * would have been the ONE mount outside the fence that guards all the others. That
+ * is the gap these two cases close, and it is stated rather than left implicit,
+ * because "there is already a fence for this" is exactly the belief that leaves a
+ * fourth mount unguarded.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠ THE SWEPT LENGTH IS PRINTED AND ASSERTED BEFORE ANY COUNT IS TRUSTED
+ * ─────────────────────────────────────────────────────────────────────────────
+ * The 192.1 lesson, which cost that phase three fences: a sweep against the EMPTY
+ * STRING passes every `toBe(0)` and defends nothing — a renamed module was measured
+ * doing exactly that and reporting green. A `?raw` import that fails to resolve, or
+ * that resolves to the wrong file, produces a zero count for a reason that has
+ * nothing to do with the rule. So each case asserts its own input is real and says
+ * so out loud.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * ⚠ RAW, UN-STRIPPED, AND THAT IS DELIBERATE (the Phase 193 D-24(a) precedent)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * No comment stripper. A docblock QUOTING the forbidden call is caught too, because
+ * the next person to copy a line out of a comment copies it into code. **The remedy
+ * is the one `StopControl.tsx:14-22` already publishes and obeys: anyone who needs
+ * to DISCUSS the forbidden call writes it WITHOUT its parenthesis** — which is why
+ * F1's needle carries one — **and refers to the lock's id field by ROLE rather than
+ * spelling the property path**, which is what `WorkspacePanel.tsx` does in the very
+ * comment where it records the finding. Measured at this commit: this page's source
+ * contains neither form, so the fence is un-stripped AND green.
+ *
+ * The reason F2's second needle matters at all is specific and worth the line:
+ * `WorkflowLock.runId` carries **two id types** while its JSDoc asserts one, so a
+ * mount that reaches for it TYPECHECKS and then resolves nothing — and
+ * `api.ts::cancelRun` swallows 404, so the wrong-id stop is indistinguishable from
+ * a successful one. That is a silent no-op, which is the defect `BUG-260816-01` is
+ * about. It is recorded at `WorkspacePanel.tsx:161-165` and copied into
+ * `api/runs.py`'s route header; this is its third home, and the first mechanical one
+ * covering `src/pages`.
+ */
+describe("194.1-07 F1/F2 — the run page reaches the cancel through ONE mechanism", () => {
+  it("F1: the swept source is real, and it calls the cancel API ZERO times", () => {
+    const src = pageSource as string
+    // The input, asserted before the count — never after.
+    expect(typeof src).toBe("string")
+    expect(src.length).toBeGreaterThan(20000)
+    expect(src).toContain("WorkflowRunPage")
+    // Identity beyond the name: this is the file that mounts the shared control.
+    expect(src).toContain("<StopControl")
+
+    expect((src.match(/cancelRun\(/g) ?? []).length).toBe(0)
+  })
+
+  it("F1 positive control: the same needle DOES find a planted call", () => {
+    const planted = `${pageSource as string}\nvoid cancelRun(runId)\n`
+    expect((planted.match(/cancelRun\(/g) ?? []).length).toBe(1)
+  })
+
+  it("F2: neither the lock's id path nor the cancel call appears — four mounts, ONE mechanism", () => {
+    const src = pageSource as string
+    expect(src.length).toBeGreaterThan(20000)
+    expect(src).toContain("<StopControl")
+
+    const needle = /workflowLock\??\.runId|cancelRun\(/g
+    expect((src.match(needle) ?? []).length).toBe(0)
+  })
+
+  it("F2 positive control: BOTH arms of the union are individually reachable", () => {
+    const src = pageSource as string
+    const needle = () => /workflowLock\??\.runId|cancelRun\(/g
+    // ⚠ TWO plants, not one. A union needle tested with a single plant proves only
+    // that ONE of its arms can fire; the other could be a typo and the fence would
+    // still report green forever. The `?.` arm is planted separately for the same
+    // reason — optional chaining is how a real mount would most plausibly write it.
+    expect((`${src}\nconst a = workflowLock.runId\n`.match(needle()) ?? []).length).toBe(1)
+    expect((`${src}\nconst b = workflowLock?.runId\n`.match(needle()) ?? []).length).toBe(1)
+    expect((`${src}\nvoid cancelRun(x)\n`.match(needle()) ?? []).length).toBe(1)
+  })
+})
