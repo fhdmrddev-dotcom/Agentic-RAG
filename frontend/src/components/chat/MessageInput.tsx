@@ -1,7 +1,12 @@
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowUp, ChevronDown, Compass, Cpu, Layers, Square } from "lucide-react"
+import { ArrowUp, ChevronDown, Compass, Cpu, Layers } from "lucide-react"
+// Phase 194.1 Plan 04 (RUN-01 / R1) — the composer's Stop is now the ONE shared
+// `StopControl` every mount renders. The lucide `Square` moved WITH it (it is
+// still the Stop control's mark on every variant, D-18); it is dropped from this
+// import because this file no longer draws the control itself.
+import { StopControl } from "./StopControl"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +31,25 @@ interface Provider {
 
 interface Props {
   onSend: (content: string) => void
-  onStop?: () => void
+  /** ⚠ Phase 194.1 Plan 04 REMOVED THE OPTIONAL STOP-DISPATCHER PROP from this
+   *  interface (16 members → 15). The composer no longer carries its own Stop
+   *  dispatcher: `StopControl` calls `stopThread(threadId)` off the store, and
+   *  `ChatArea.tsx` correspondingly stopped passing one down.
+   *
+   *  ⚠ THE PROP'S NAME IS SPELLED NOWHERE IN THIS FILE, INCLUDING IN THIS SENTENCE
+   *  EXPLAINING ITS ABSENCE — deliberately, so that a raw grep for it stays
+   *  DISCRIMINATING and any occurrence at all means the prop came back. That is the
+   *  same discipline `backend/app/services/run_lifecycle.py` keeps about the
+   *  app-shutdown gate, and it is written down because a later editor who "tidies"
+   *  this docblock by naming the prop would break a real needle silently. The name
+   *  is recorded in `194.1-04-SUMMARY.md` and in `StopControl.baseline.test.tsx`'s
+   *  superseded block, where spelling it costs nothing.
+   *
+   *  ⚠ `stopStream` ITSELF SURVIVES and was deliberately NOT deleted — it is
+   *  exported through `useMessages`' action surface and removing it is a DEEP-path
+   *  change. RESEARCH records that as a DEFERRAL with a trigger: *"a phase that
+   *  touches `useMessages`' action surface."* A deferral that lives only in a
+   *  deleted line is exactly as invisible as one never written (193.2 WR-05). */
   disabled: boolean
   /** 099-08 follow-up (per-thread drafts): the thread this composer is serving.
    *  Switching threads saves the current text under the OUTGOING thread and
@@ -77,7 +100,6 @@ export function _resetComposerDraftsForTest() {
 
 export function MessageInput({
   onSend,
-  onStop,
   disabled,
   threadId,
   providers = [],
@@ -408,16 +430,26 @@ export function MessageInput({
                 </span>
               )}
               {disabled ? (
-                <Button
-                  onClick={onStop}
-                  size="icon"
-                  variant="outline"
-                  aria-label="Stop generation"
-                  data-testid="composer-stop"
-                  className="h-8 w-8 rounded-lg shrink-0 transition-all border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive"
-                >
-                  <Square className="h-3.5 w-3.5 fill-current" />
-                </Button>
+                /* Phase 194.1 Plan 04 (RUN-01 / R1 + R2 / D-05) — the composer owns
+                   NO Stop state and NO Stop dispatcher. `StopControl` reads the
+                   StreamsProvider stopping slice and calls `stopThread(threadId)`
+                   itself, which is Phase 194 D-08 (*four mounts, ONE mechanism*)
+                   made structural on the DISPLAY half too, not only the runtime one.
+
+                   ⚠ `threadId` is not a new prop: `Props` has declared it since
+                   099-08 (per-thread drafts). And gating the control on it loses no
+                   live case — `ChatArea.tsx` passes `disabled={isStreaming}` where
+                   `isStreaming = useStreamingForThread(thread?.id ?? null)`, which is
+                   `false` whenever there is no thread, so `disabled` true implies a
+                   thread exists.
+
+                   ⚠ D-22: this arm used to dispatch the removed prop → `stopStreaming`
+                   → `actions.stopStream`, NOT `stopThread`. Routing it at `stopThread`
+                   is behaviour-preserving — after plan 03 the two resolver bodies are
+                   mirrors and `stopStream` resolves `activeThreadIdRef.current`, which
+                   IS this composer's thread — and it retires the second resolver as a
+                   consequence rather than as extra scope. */
+                <StopControl threadId={threadId ?? null} variant="composer" />
               ) : (
                 <Button
                   onClick={handleSend}

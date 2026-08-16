@@ -57,6 +57,14 @@ function renderComposer(overrides: Record<string, unknown> = {}) {
   )
 }
 
+/**
+ * ⚠ Phase 194.1 Plan 04: the two streaming renders below dropped their `onStop`
+ * prop, which `MessageInput`'s `Props` no longer declares — the composer's Stop is
+ * the shared `<StopControl>`, which dispatches `stopThread(threadId)` off the
+ * store. The a11y ASSERTIONS are byte-unchanged and still pass, which is the
+ * property worth recording: the accessible name (`Stop generation`) and the
+ * button role survived the move to a shared component.
+ */
 describe("MessageInput a11y — WCAG 2.1 AA (structural) across honest states", () => {
   it("no aXe structural violations — the idle composer (send state)", async () => {
     const { container } = render(<MessageInput onSend={vi.fn()} disabled={false} threadId="thread-A" />)
@@ -70,7 +78,7 @@ describe("MessageInput a11y — WCAG 2.1 AA (structural) across honest states", 
 
   it("no aXe structural violations — streaming (Stop control shown)", async () => {
     const { container } = render(
-      <MessageInput onSend={vi.fn()} onStop={vi.fn()} disabled={true} threadId="thread-A" />,
+      <MessageInput onSend={vi.fn()} disabled={true} threadId="thread-A" />,
     )
     expect(await axe(container)).toHaveNoViolations()
   })
@@ -84,7 +92,7 @@ describe("MessageInput a11y — D-09 scenario-4 composer controls reachable by r
   })
 
   it("the Stop control is a named button while streaming", () => {
-    render(<MessageInput onSend={vi.fn()} onStop={vi.fn()} disabled={true} threadId="thread-A" />)
+    render(<MessageInput onSend={vi.fn()} disabled={true} threadId="thread-A" />)
     expect(screen.getByRole("button", { name: "Stop generation" })).toBeInTheDocument()
   })
 
