@@ -32,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
-**Phase:** **194.1 Make the Stop Visible — SKETCHED (168-171 baked), SPEC'd (7 requirements, ambiguity 0.14) and CONTEXT GATHERED 2026-08-16 (`bc5c73da`). NEXT = `/gsd:plan-phase 194.1`, targeted at ~7 plans.** *(This line read "INSERTED 2026-08-16, not planned yet. NEXT = `/gsd:sketch 194.1` (G-2 fires), then `/gsd:discuss-phase 194.1`" until the discuss step landed; before that "194 Stop a Running Workflow — PLANNED 2026-08-16 (`67e87b88`), 13 plans in 8 waves, plan-checker PASSED first iteration, zero blockers, NEXT = `/gsd:execute-phase 194`" before the insert; before that "194 … CONTEXT GATHERED", "193.2 From Authored to Runnable — ✅ CLOSED…" until 194 opened, and "193.1 Template-First Authoring"; all prior readings are kept.)*
+**Phase:** **194.1 Make the Stop Visible — EXECUTED 2026-08-16 (`182e5eb4`), 8 plans across 6 waves, ALL MERGED. Plan 08 is at its blocking `human-verify` checkpoint with tasks 1-4 committed and task 5 — the three G-4 lived-experience rows — OWED BY THE OPERATOR. NEXT = drive those three rows, then `/gsd:verify-work 194.1`.** ⚠ **The phase is NOT closed and RUN-01 is deliberately UNTICKED** (`REQUIREMENTS.md` byte-unchanged, verified at this commit) — plan 08 declined to tick it because the L-01 phase is not yet inserted. ⚠ **Every one of the 8 worktrees dispatched this phase arrived on the WRONG BASE — 7/7 on the executor plans plus the pattern's recurrence — each landing on `fda79214`, a master merge with NO descent from its dispatched SHA.** Every one was caught only by the explicit base assertion carried in the executor prompt, on top of Phase 192's 12/12. **The dispatch mechanism, not the executors, is where this lives.** *(This line previously read "SKETCHED (168-171 baked), SPEC'd (7 requirements, ambiguity 0.14) and CONTEXT GATHERED 2026-08-16 (`bc5c73da`). NEXT = `/gsd:plan-phase 194.1`, targeted at ~7 plans." and before that "INSERTED 2026-08-16, not planned yet. NEXT = `/gsd:sketch 194.1` (G-2 fires), then `/gsd:discuss-phase 194.1`" until the discuss step landed; before that "194 Stop a Running Workflow — PLANNED 2026-08-16 (`67e87b88`), 13 plans in 8 waves, plan-checker PASSED first iteration, zero blockers, NEXT = `/gsd:execute-phase 194`" before the insert; before that "194 … CONTEXT GATHERED", "193.2 From Authored to Runnable — ✅ CLOSED…" until 194 opened, and "193.1 Template-First Authoring"; all prior readings are kept.)*
 
 ⚠ **Phase 194 is EXECUTED and NOT CLOSED, and 194.1 does not close it.** 194's 13 plans landed and its UAT was driven 2026-08-16 — **7 rows driven (4 pass, 3 fail), 8 ⛔ blocked** — which is what produced 194.1. The stop's **durable** half is verified on live data; its **visible** half is not, and that is 194.1's scope. Two findings from that session are 194's own to settle, not 194.1's: a **second silently-complete path that is client-side** (`stopThread` resolves the run id only from the chat message bucket, so the tray lists runs it cannot stop) and the fact that **L-01 was never probed** — the backend ran under `--reload`, i.e. a single worker.
 
@@ -1740,6 +1740,20 @@ by-construction claim has a stated STOP CONDITION and it is not rhetorical** (CO
 pressed state lives in a StreamsProvider store slice, and if it ends up owned inside any mount
 component instead, that IS a second concern, this entry becomes false, and a refactor recommendation
 is owed FIRST. Ledger rows are added/corrected inside the phase (CONTEXT D-04).
+
+⚠ **CORRECTED ON MEASUREMENT AT THE PHASE'S EXECUTION CLOSE (2026-08-16, `182e5eb4`) — the "FIVE
+files" above is STALE and the measured figure is SEVEN. Recorded BESIDE the original rather than
+over it, per this project's habit, and hand-edited into STATE.md by the orchestrator because plan 08
+was instructed not to write this file.** The verdict is UNCHANGED: still NONE, still offered and
+declined, still honoured by construction, still the fifth consecutive phase. Only the count moved.
+**The two files the discuss-time audit did not see are `ChatArea.tsx` (29 phases) and
+`PendingAskCard.tsx` (5 phases) — both ABSENT from the ledger entirely, and both missing from this
+phase's OWN G-5 audit**, which is the same invisibility failure the ledger documents about
+`WorkflowsPage.tsx` (10 phases), `WorkflowDoorSwitch.tsx` (6) and `db/workflows.py` (17).
+⚠ **`StreamsProvider.tsx`'s own figures also moved between discuss and close — `77 / 33 / 3660` at
+discuss, `34 phases / 4035 L` at close — so the stalest row in the table staled again inside one
+phase.** *A guardrail cannot see what is absent from its list, and a row that is PRESENT AND WRONG is
+worse than one that is missing, because it answers the auditor `satisfied` and stops the audit.*
 
 None recorded during the v3.6 close. G-7 did not fire — no gap-closure round was opened; CONN-02
 was routed to a future milestone precisely because closing it here would have added a user-facing
