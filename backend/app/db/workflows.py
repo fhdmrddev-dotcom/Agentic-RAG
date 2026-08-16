@@ -1219,7 +1219,35 @@ async def complete_phase(pool: asyncpg.Pool, phase_id: UUID, output: dict) -> No
     PHASE-KEYED write → ``WHERE id=$1``.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now() WHERE id = $1",
+        # ── L-01 RESIDUE AT THE PHASE LEVEL (added 2026-08-16) ───────────────
+        # ⚠ THIS CLAUSE EXISTS BECAUSE THE RUN-LEVEL GUARD CREATED A CONTRADICTION
+        # IT DID NOT CLOSE. `finish_run` now refuses to overwrite a terminal
+        # `workflow_runs.status`, so a user's Stop survives. The four terminal
+        # `workflow_phases` writers had NO equivalent — measured:
+        # `git show 9dbd57f5 -- backend/app/db/workflows.py | grep -cE "^\+.*workflow_phases"`
+        # returns 0. So on the known L-01 residue (the far-worker producer keeps
+        # running after a Stop) worker B could write `completed` over worker A's
+        # `cancelled` phase, and the run would read `cancelled` while its spine
+        # showed that very step DONE — with `runStepCount.ts` counting it toward
+        # "N of M steps". Making the run row honest while leaving the phase rows
+        # unguarded is a WORSE state than leaving both dishonest, because the two
+        # surfaces then disagree.
+        #
+        # ⚠ SCOPED DELIBERATELY NARROWER THAN `finish_run`'s GUARD, and the reason
+        # is that the wider one is not provable here. `finish_run` refuses ANY
+        # terminal→different-terminal write; a phase cannot take that rule, because
+        # a retry legitimately re-runs a phase (`mark_phase_active` at
+        # `harness_engine.py:1579`) and a `failed`→`completed` transition may be
+        # correct. **`cancelled` is the one phase status nothing legitimately
+        # transitions OUT of**: its only writers are `cancel_phase` and
+        # `cancel_active_phases`, both on the Stop path, and the run itself is
+        # terminal by then. So the fence is `IS DISTINCT FROM 'cancelled'` and
+        # nothing else. A broader guard would strand retried phases — a far worse
+        # failure than the one being fixed.
+        #
+        # `IS DISTINCT FROM` rather than `<>` on purpose: `status` is NOT NULL
+        # today, and `<>` would silently stop matching if that ever changed.
+        "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
         json.dumps(output),
     )
@@ -1241,7 +1269,7 @@ async def fail_phase(
     """
     payload: dict = {**(output or {}), "_failure_reason": reason}
     await pool.execute(
-        "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
         json.dumps(payload),
     )
@@ -1253,7 +1281,7 @@ async def skip_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
     PHASE-KEYED write → ``WHERE id=$1``.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='skipped', updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='skipped', updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
     )
 
@@ -1284,7 +1312,7 @@ async def record_phase_not_sent(pool: asyncpg.Pool, phase_id: UUID, output: dict
     PHASE-KEYED write → ``WHERE id=$1``.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
         json.dumps(output),
     )
