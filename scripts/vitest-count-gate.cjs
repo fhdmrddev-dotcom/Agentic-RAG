@@ -901,7 +901,22 @@ const BASELINE = {
   //      what RUNS, `BASELINE` what is PINNED — so a suite written beside `api.ts` would
   //      never be executed by this gate. A falsification that does not run has falsified
   //      nothing (verification truth 14, round 5 of Phase 187). This file is inside both.
-  "WorkflowRunPage.test.tsx": 89,
+  // 102 = 89 + Phase 194.1 Plan 07's thirteen (2026-08-16). An EXTENSION, not a lowering —
+  //       nothing was deleted, and `git diff --diff-filter=D` on the whole plan is EMPTY, so
+  //       the `:24-45` deletion rule does not apply. The figure is the GATE's OWN `actual`
+  //       column on TWO agreeing runs (`total 3972 · failed 0 · pinned total 3885 · 75/75`,
+  //       verdict `count gate OK` both times), never a hand count.
+  //       ⚠ THE PIN IT REPLACES WAS EXACT (89 = 89 at `194.1-BASELINE.md` §11), unlike its
+  //       neighbour `WorkspacePanel.test.tsx`, whose pin was found running TWELVE cases
+  //       behind its actual. Recorded because "the pin is the case count" is true here and
+  //       was false there, twenty lines below, at the same moment.
+  //       The thirteen: NINE mount cases (R3) — five status cases, one per shipped band
+  //       sentence, plus DOM containment + child order, the press-by-VALUE, the no-guard
+  //       direct flip, and the stopping-slot swap — and FOUR fence cases (F1/F2 + one
+  //       positive control each), which exist because `WorkspacePanel.test.tsx`'s F-1/V-05
+  //       globs `components/panel|chat|workflows` and NOT `src/pages`: the fourth Stop mount
+  //       would otherwise have been the one outside the fence guarding the other three.
+  "WorkflowRunPage.test.tsx": 102,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
