@@ -154,6 +154,41 @@ const PANEL_SHIPPED_CLASSNAME =
 const TRAY_SHIPPED_CLASSNAME =
   "flex shrink-0 items-center gap-1 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-[11px] text-destructive hover:bg-destructive/20 transition-colors"
 
+/**
+ * ⚠ COMMENT-STRIPPING IS LOAD-BEARING FOR TWO OF THE SOURCE FENCES BELOW, AND THE
+ * REASON IS RECORDED HERE RATHER THAN DISCOVERED AGAIN.
+ *
+ * `StopControl.tsx`'s docblock STATES the rules it obeys, which means it legally
+ * contains the very tokens those rules forbid (`cancelRun(`, `workflowLock?.runId`,
+ * `⏹`). A raw sweep therefore reds on the DOCUMENTATION of the rule — measured at
+ * 2 and 1 hits respectively on the first run of this suite.
+ *
+ * `194.1-BASELINE.md` §9 is explicit that the remedy is NOT to delete the prose.
+ * So: strip comment lines, assert zero in CODE, and separately assert the prose is
+ * PRESENT — otherwise a strip would make a genuinely undocumented rule
+ * indistinguishable from a documented one.
+ *
+ * The stripper is line-oriented and that is honest about its limit: it drops lines
+ * whose trimmed form STARTS with a comment opener or a continuation star, so an
+ * INLINE trailing comment would survive. Every comment in `StopControl.tsx` is
+ * whole-line, and each fence that uses this asserts the stripper did not eat its
+ * own subject.
+ */
+function stripComments(src: string): string {
+  return src
+    .split("\n")
+    .filter((line) => {
+      const t = line.trim()
+      return !(t.startsWith("//") || t.startsWith("/*") || t.startsWith("*") || t.startsWith("{/*"))
+    })
+    .join("\n")
+}
+
+/** Declared ONCE so the fence and its positive control cannot drift apart by
+ *  being typed twice. ⚠ `g` flag + `.match()` is stateless; do not switch it to
+ *  `.test()`, which would carry `lastIndex` between calls. */
+const NEEDLE_LOCK_OR_CANCEL = /workflowLock\??\.runId|cancelRun\(/g
+
 // ── Store drivers ─────────────────────────────────────────────────────────────
 // The arms are driven by writing the pure-data Sets plan 03 shipped, NOT by
 // mocking the selectors — a mocked selector proves the component reads SOMETHING,
@@ -495,20 +530,61 @@ describe("194.1-04 — source fences on StopControl.tsx", () => {
     expect((src.match(/useEffect\(/g) ?? []).length).toBe(0)
   })
 
-  /** Phase 194 D-08's "four mounts, ONE mechanism", held mechanically. */
+  /**
+   * Phase 194 D-08's "four mounts, ONE mechanism", held mechanically.
+   *
+   * ⚠ THE RAW FORM OF THIS FENCE IS NOT SATISFIABLE, AND THE FENCE WAS THE THING
+   * AT FAULT — not the component. Written raw it counted **2**, and BOTH hits were
+   * `StopControl.tsx`'s own docblock stating the rule (*"nothing reads
+   * `workflowLock?.runId` or calls `cancelRun(` directly"*).
+   *
+   * This is the repository's recurring lesson landing again: `194.1-BASELINE.md`
+   * §9 Trap 2, the `192-05` `title=` fence (AST-parsed for the identical reason),
+   * and plan 03's own `setTimeout` fence. §9 is explicit that a later plan **must
+   * not** "fix" such a red by deleting the documentation.
+   *
+   * Shipped form: strip comment lines, assert **0 in CODE**, and assert the prose
+   * mention is **PRESENT** — so the strip can never cover for a real absence of
+   * the rule, which is the failure mode a bare strip would introduce.
+   */
   it("never reads a lock's runId and never calls cancelRun directly (plant P3)", () => {
     const src = stopControlSource as string
-    expect((src.match(/workflowLock\??\.runId|cancelRun\(/g) ?? []).length).toBe(0)
-    // The positive control: the same regex DOES match when the pattern is there.
-    expect((`${src}\n// cancelRun(`.match(/workflowLock\??\.runId|cancelRun\(/g) ?? []).length).toBe(
-      1,
-    )
+    const code = stripComments(src)
+
+    // The stripper must not have eaten the surface under test (in both directions).
+    expect(code).toContain("export function StopControl")
+    expect(code).toContain("actions.stopThread(threadId)")
+    expect(code).not.toContain("four mounts, ONE mechanism")
+
+    expect((code.match(NEEDLE_LOCK_OR_CANCEL) ?? []).length).toBe(0)
+    // The prose stating the rule SURVIVES — a strip that hid a genuinely missing
+    // rule would otherwise read exactly like a strip that hid its documentation.
+    expect((src.match(NEEDLE_LOCK_OR_CANCEL) ?? []).length).toBeGreaterThan(0)
+    // Positive control: the same regex DOES match a real plant in CODE.
+    expect(
+      (stripComments(`${src}\nconst x = cancelRun(1)`).match(NEEDLE_LOCK_OR_CANCEL) ?? []).length,
+    ).toBe(1)
   })
 
-  /** D-18 / D-24: no net-new glyph, and no promise of geometry jsdom cannot give. */
-  it("contains no ⏹ and no getBoundingClientRect", () => {
+  /**
+   * D-18 / D-24: no net-new glyph, and no promise of geometry jsdom cannot give.
+   *
+   * ⚠ Same trap, same remedy: raw, this counted **1**, and the hit was the
+   * docblock sentence recording that `⏹` is in no table in `icon-convention.md`
+   * §4. Deleting that sentence would remove the only place a reader learns WHY
+   * the mark is refused, which is worth more than the convenience of a raw grep.
+   */
+  it("contains no ⏹ and no getBoundingClientRect in CODE", () => {
     const src = stopControlSource as string
-    expect((src.match(/⏹|getBoundingClientRect/g) ?? []).length).toBe(0)
+    const code = stripComments(src)
+
+    expect((code.match(/⏹|getBoundingClientRect/g) ?? []).length).toBe(0)
+    // …and the refusal is still documented.
+    expect(src).toContain("⏹")
+    // Positive control in CODE.
+    expect(
+      (stripComments(`${src}\nconst g = "⏹"`).match(/⏹|getBoundingClientRect/g) ?? []).length,
+    ).toBe(1)
   })
 
   /** ⚠ The prose about the width gap must SURVIVE. A later editor who deletes it
