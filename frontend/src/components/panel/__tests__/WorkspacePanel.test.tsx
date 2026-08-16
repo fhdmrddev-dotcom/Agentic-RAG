@@ -765,13 +765,32 @@ describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
     listPublishedWorkflows.mockResolvedValue([])
   })
 
-  it("renders a run-level Stop control when a harness run holds the lock", () => {
+  /** ⚠ The LIVE half of the D-25 pair. Both nodes present here and only the
+   *  timeline present on the completed run below is what makes the two booleans
+   *  measurable: either assertion alone is satisfied by a single boolean. */
+  it("a LIVE run (lock held) renders BOTH the Stop control and the timeline", () => {
     setHooks({ lock: HARNESS_LOCK })
     renderPanel({ state: "open" })
     expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
     // POSITIVE CONTROL for the gate: the timeline is mounted, so a later absence
     // assertion is a measurement of the control and not of the harness gate.
     expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
+  })
+
+  /** The lock is the honest "the run is still going" signal, and this case says
+   *  why in a form a plant can red: phases exist here TOO, so a gate keyed on
+   *  `phases.length > 0` (the shipped bug) would render a Stop and this case
+   *  would pass — it is the COMPLETED-run case above that separates them. Kept
+   *  as a pair on purpose. */
+  it("a LIVE run with phases already recorded still renders the Stop (the lock, not the phase count, is the signal)", () => {
+    setHooks({
+      lock: HARNESS_LOCK,
+      phases: [
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "completed", subAgents: [], pendingAsk: null },
+      ],
+    })
+    renderPanel({ state: "open" })
+    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
   })
 
   it("is reachable as a labelled button that names what it stops (not a phase, THE RUN)", () => {
@@ -795,14 +814,48 @@ describe("WorkspacePanel — the panel Stop (RUN-01 / SC#1, V-04)", () => {
     expect(stopThread).not.toHaveBeenCalledWith(null)
   })
 
-  it("mounts for a phases-exist thread with no lock (the same gate its two siblings use)", () => {
+  /**
+   * ⚠ SUPERSEDED IN PLACE BY 194.1-05 TASK 1 (R7(a) / D-25). The original is
+   * quoted verbatim rather than deleted — a deleted assertion is invisible to
+   * `git log -S` and to the next reader (193.2 WR-05).
+   *
+   * SUPERSEDED (Phase 194 Plan 03):
+   *   it("mounts for a phases-exist thread with no lock (the same gate its two
+   *      siblings use)", () => {
+   *     setHooks({ phases: [ …one running phase… ] })
+   *     renderPanel({ state: "open" })
+   *     expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+   *   })
+   *
+   * ⚠ THAT ASSERTION PINNED THE DEFECT. `BUG-260816-01` / 194 UAT-03 measured the
+   * panel offering "THIS RUN — Stop" on a FINISHED run: the row's gate was
+   * `showTimeline = isHarness || phases.length > 0`, and **phase rows OUTLIVE the
+   * run** (`threads.py:1176-1186`), so the control survived every terminal.
+   * Pressing it produced NO network request and a byte-identical
+   * `document.body.innerText` (`diffLen: 0`). A control that does nothing is the
+   * exact lie this phase exists to remove — so the row now gates on a SECOND
+   * boolean (`showStopRow = isHarness && threadId != null`) and this case asserts
+   * the inverse of what it used to.
+   *
+   * ⚠ TWO ASSERTIONS, NOT ONE, AND THE SECOND IS THE LOAD-BEARING ONE. A
+   * "no Stop on a completed run" case ALONE is passed by the plant that simply
+   * narrows `showTimeline` itself — which is precisely how the Phase 098 UAT
+   * run-honesty regression (fix B: a finished run KEEPS its timeline) would ship
+   * unnoticed. The timeline-still-renders clause is what reds against it.
+   */
+  it("a COMPLETED run (phases present, lock cleared) offers NO Stop — and its timeline STILL renders", () => {
     setHooks({
       phases: [
-        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "running", subAgents: [], pendingAsk: null },
+        { slug: "p0", phaseIndex: 0, phaseType: "programmatic", status: "completed", subAgents: [], pendingAsk: null },
       ],
+      lock: null,
     })
     renderPanel({ state: "open" })
-    expect(screen.getByTestId("panel-stop-run")).toBeInTheDocument()
+    // (1) the dead control is gone…
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    // (2) …and the thing the user came to look at is still there. Narrowing
+    //     `showTimeline` would satisfy (1) and destroy (2).
+    expect(screen.getByTestId("phase-timeline")).toBeInTheDocument()
   })
 
   it("renders NOTHING on a Deep / no-run thread — a Deep user sees no new control", () => {
