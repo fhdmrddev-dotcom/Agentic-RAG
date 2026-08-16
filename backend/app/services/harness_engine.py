@@ -51,6 +51,7 @@ from app.config import settings
 from app.db.workflows import (
     advance_current_phase,
     ask_user_response_exists,
+    cancel_phase,
     claim_run,
     complete_phase,
     fail_phase,
@@ -1640,6 +1641,47 @@ async def run_workflow(
                     logger.exception(
                         "ask_user expiry cleanup failed on cancel/escape for run %s",
                         run_id,
+                    )
+                # ── 194 / RUN-01 / SC#3 (V-16) — the INTERRUPTED phase row ────
+                # THIS ARM IS THE ONLY HOME THAT KNOWS *WHICH* PHASE THE USER
+                # INTERRUPTED WITHOUT A QUERY. ``phase_id`` is bound at the top
+                # of THIS loop iteration (``phase_id = row["id"]``), so the write
+                # is PHASE-KEYED on the row that was actually running — it can
+                # distinguish "the phase the user interrupted" from "some phase
+                # row that happens to be `active`". The run-keyed sibling
+                # (``cancel_active_phases``) belongs to the engineless zombie
+                # arm, which has no loop and no phase_id at all; using it here
+                # would throw that certainty away (RESEARCH § G-C).
+                #
+                # Completed phases' outputs are ALREADY durable — this does NOT
+                # touch them (D-07 / D-13, inherited verbatim from the fail_run
+                # arm below). Only the phase that was RUNNING moves. It did not
+                # `fail` (nothing went wrong) and was not `skipped` (it ran); the
+                # `cancelled` literal is migration 119's (D-04).
+                #
+                # ⚠ WHY THIS SITS INSIDE THE 096-09 GATE — STATED, NOT INHERITED.
+                # The gate's own scope is the ask_user expiry, and this write is
+                # deliberately placed under the SAME condition rather than beside
+                # it: on a GRACEFUL app shutdown the run stays resumable and the
+                # boot sweep re-claims it, so a phase row left `active` is
+                # CORRECT — that phase really is still pending work, and
+                # terminalizing it would strand a resumable run with a dead step.
+                # A user Stop / crash / timeout (flag False) terminalizes exactly
+                # as SC#3 requires. The gate itself is neither moved, duplicated
+                # nor widened; one more statement joins its existing body.
+                #
+                # Shielded + its own try/except for the same reason the expiry
+                # above is: cancellation is already in flight, an unshielded
+                # await would be cancelled before it wrote, and a cleanup failure
+                # must never mask the escape. The ``raise`` stays LAST.
+                try:
+                    await asyncio.shield(cancel_phase(pool, phase_id))
+                except BaseException:  # noqa: BLE001 — second cancel mid-cleanup
+                    logger.exception(
+                        "interrupted-phase terminalize failed on cancel/escape "
+                        "for run %s phase %s",
+                        run_id,
+                        phase_id,
                     )
             raise
 
