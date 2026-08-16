@@ -4,9 +4,11 @@ title: A stopped workflow thread shows no trace of the stop — navigating back 
 reported: 2026-08-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded   # 2026-08-16 — folded into Phase 194.1 at discuss-phase. Claimed WHOLE by R4:
+                 # the run-anchored line derives from the new workflow_runs-by-thread read, so it
+                 # is present on FIRST PAINT after navigation, not only while streaming.
 affected_areas: [frontend/chat-display, frontend/streaming, frontend/run-honesty, harness/workflow-ui]
-folded_into: null
+folded_into: "194.1"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

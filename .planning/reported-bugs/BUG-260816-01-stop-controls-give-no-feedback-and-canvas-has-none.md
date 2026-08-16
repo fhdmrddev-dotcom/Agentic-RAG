@@ -4,9 +4,11 @@ title: The Stop controls give no feedback that a stop is happening, and the canv
 reported: 2026-08-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded   # 2026-08-16 — folded into Phase 194.1 at discuss-phase. Claimed WHOLE:
+                 # the pressed state (R1) + the 8s climb-down (R2) cover "no feedback" on all
+                 # four mounts; R3 mounts the missing Stop in WorkflowRunPage.tsx's title row.
 affected_areas: [frontend/chat-display, frontend/streaming, harness/workflow-ui, workflow/run-surface]
-folded_into: null
+folded_into: "194.1"
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: null

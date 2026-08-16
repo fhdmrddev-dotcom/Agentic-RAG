@@ -4,17 +4,23 @@ title: Navigating away/back during a streaming workflow run resets the run timer
 reported: 2026-06-10
 surface: Agentic-RAG
 severity: minor
-status: open   # ⚠ CORRECTED 2026-08-16 — was `folded` / folded_into 174, but this report's OWN
+status: folded   # ⚠ CORRECTED 2026-08-16 then FOLDED into Phase 194.1 the same day at
+                 # discuss-phase. ⚠ PARTIAL FOLD — the DUPLICATE-AVATAR half only, and even that
+                 # is claimed as SURFACE REMOVAL, not repair: R5 suppresses the harness kickoff
+                 # assistant placeholder, so the artefact has nothing to draw on. The double-mount
+                 # RACE ITSELF IS NOT FIXED and returns if it ever reaches a content-bearing
+                 # message. The TIMER half is NOT claimed (see re_open_trigger). Prior note:
+                 # was `folded` / folded_into 174, but this report's OWN
                # re_open_trigger says the DUPLICATE-AVATAR half was "NOT folded … Stays OPEN".
                # The frontmatter and the body disagreed for two months and the frontmatter is what
                # the routing scan reads. Re-observed live 2026-08-16 (Phase 194 UAT) — see the
                # 2026-08-16 update at the foot of this file. The TIMER half may well be closed by
                # 174/128; nobody has verified it (verified_closed_by is still null).
 affected_areas: [frontend/streaming, frontend/run-honesty, harness/workflow-ui]
-folded_into: "174"
+folded_into: "194.1"   # duplicate-avatar half only; was "174" — superseded, not overwritten (the 174 history is in the body)
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: "Reviewed at /gsd:discuss-phase 124 (2026-06-26) — left OPEN, NOT folded: live-run timer/reconcile mechanics, not the soul/door chrome Phase 124 re-skins. Re-check after the 124 run-header soul re-skin lands — if the soul header touches the run strip, this timer-reseed + duplicate-avatar bug may then be in-scope to fix. | Reviewed at /gsd:discuss-phase 128 (2026-06-27) — CONDITIONAL fold (CONTEXT D-04): CTC-03 makes the header RunStatusStrip the SOLE timer, so the timer-reseed fix (seed elapsed from run started_at, not mount) is folded into 128 ONLY IF the planner confirms the reseed is in that same canonical Deep RunStatusStrip (vs the 095.1-fixed Deep run-card, vs the harness/workflow strip = Phase 127's surface); else leave open. The duplicate-avatar symptom (StreamsProvider/MessageList double-mount race) is NOT folded — deferred to the run-honesty cluster slot. Stays OPEN."
+re_open_trigger: "Reviewed at /gsd:discuss-phase 124 (2026-06-26) — left OPEN, NOT folded: live-run timer/reconcile mechanics, not the soul/door chrome Phase 124 re-skins. Re-check after the 124 run-header soul re-skin lands — if the soul header touches the run strip, this timer-reseed + duplicate-avatar bug may then be in-scope to fix. | Reviewed at /gsd:discuss-phase 128 (2026-06-27) — CONDITIONAL fold (CONTEXT D-04): CTC-03 makes the header RunStatusStrip the SOLE timer, so the timer-reseed fix (seed elapsed from run started_at, not mount) is folded into 128 ONLY IF the planner confirms the reseed is in that same canonical Deep RunStatusStrip (vs the 095.1-fixed Deep run-card, vs the harness/workflow strip = Phase 127's surface); else leave open. The duplicate-avatar symptom (StreamsProvider/MessageList double-mount race) is NOT folded — deferred to the run-honesty cluster slot. Stays OPEN. | Folded at /gsd:discuss-phase 194.1 (2026-08-16) — PARTIAL, DUPLICATE-AVATAR HALF ONLY, and claimed as SURFACE REMOVAL rather than repair: R5 suppresses the harness kickoff assistant placeholder (StreamsProvider.tsx:1926-1936) via a harness-scoped gate inside sendMessage, so at harness kickoff there is no assistant node for the artefact to be drawn on. THE DOUBLE-MOUNT RACE ITSELF IS NOT FIXED — 194-MEASUREMENTS.md still lists three live candidate mechanisms with no verdict. Re-open the duplicate-avatar half if the artefact is seen on a CONTENT-BEARING message, or anywhere on the Deep / plain-chat path (which 194.1 does not touch, per 174 D-14). The TIMER half is NOT claimed by 194.1 and stays unverified — verified_closed_by is still null after 174 and 128."
 reproduces_on:
   branch: develop
   commit: 66dca2d8

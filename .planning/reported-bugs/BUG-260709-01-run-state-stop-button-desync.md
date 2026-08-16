@@ -4,16 +4,18 @@ title: Chat run-state / stop button desyncs from backend reality (both direction
 reported: 2026-07-09
 surface: Agentic-RAG
 severity: major
-status: open   # ⚠ RE-OPENED 2026-08-16 — was `folded` / folded_into 145. This report's OWN
-               # re_open_trigger reads "Re-open if either direction still reproduces after 145
-               # ships." DIRECTION A REPRODUCES, driven at 045a83dc in Phase 194 UAT (UAT-03).
-               # See the 2026-08-16 update at the foot of this file. The trigger was honoured,
-               # not overridden.
+status: folded   # ⚠ RE-OPENED 2026-08-16 (was `folded` / folded_into 145 — this report's OWN
+                 # re_open_trigger reads "Re-open if either direction still reproduces after 145
+                 # ships"; DIRECTION A REPRODUCES, driven at 045a83dc in Phase 194 UAT-03), then
+                 # FOLDED into Phase 194.1 the same day at discuss-phase.
+                 # ⚠ PARTIAL FOLD — DIRECTION A ONLY (a dead Stop offered on a finished run),
+                 # claimed by R7's WorkspacePanel.tsx:354 showTimeline gate fix. Direction B is
+                 # NOT claimed. See re_open_trigger.
 affected_areas: [frontend/streaming, backend/run-lifecycle, StreamsProvider, redis/runs-active]
-folded_into: "145"
+folded_into: "194.1"   # was "145"; superseded, not overwritten — the 145 fold is recorded in the body
 verified_closed_by: null
 related_seeds: [SEED-094]
-re_open_trigger: "Folded at /gsd:discuss-phase 145 (2026-07-09). Fix model: Postgres runs.status authoritative (D-145-01); runs:active demoted to derived mirror written atomically by the extracted owner (D-145-02); Direction A = client inactivity watchdog + silent finalize (D-145-03/04); Direction B = periodic+boot stream-age staleness sweep (D-145-06). Re-open if either direction still reproduces after 145 ships."
+re_open_trigger: "Folded at /gsd:discuss-phase 145 (2026-07-09). Fix model: Postgres runs.status authoritative (D-145-01); runs:active demoted to derived mirror written atomically by the extracted owner (D-145-02); Direction A = client inactivity watchdog + silent finalize (D-145-03/04); Direction B = periodic+boot stream-age staleness sweep (D-145-06). Re-open if either direction still reproduces after 145 ships. | Folded at /gsd:discuss-phase 194.1 (2026-08-16) — PARTIAL, DIRECTION A ONLY: R7 makes the WorkspacePanel Stop render only while the run is non-terminal (the gate is defined at WorkspacePanel.tsx:354, NOT at :453 where the row renders). DIRECTION B (a live run the client believes is finished) is NOT claimed by 194.1 and this record does not assert it is fixed. Re-open the WHOLE report if Direction A reproduces after 194.1 ships; carry Direction B forward if it is still observed once 194.1 has landed."
 reproduces_on:
   branch: develop
   commit: 6ce1be0a
