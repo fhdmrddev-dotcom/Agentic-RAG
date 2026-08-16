@@ -1893,6 +1893,14 @@ async def test_a_graceful_shutdown_leaves_the_prompt_and_the_phase_row_resumable
     the sweep will RESUME is correct, because that phase really is still pending work.
     So the new write sits INSIDE the shipped ``if not is_app_shutting_down():`` scope.
     Neither cleanup runs here; the cancellation still propagates.
+
+    ⚠ THIS CASE WAS CORRECTLY **GREEN** ON THE TDD RED RUN, and that is recorded here
+    rather than left for a later reader to mistake for a vacuous fence. It asserts the
+    ABSENCE of a cancel write, which was trivially true before the write existed — its
+    job is to RED if the write ever escapes the gate, not to prove the write exists
+    (its four siblings do that). It was driven RED afterwards against a real plant that
+    moved the write outside the gate. The 194-09 lesson: read a RED run case-by-case,
+    never by count.
     """
     raised, expiry, _ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
         build_workflow_definition,
@@ -1980,4 +1988,272 @@ def test_the_cancel_arm_is_the_harness_engines_alone_and_deep_never_enters_it():
     assert _calls_named(deep_src, "cancel_phase") == 0, (
         "the Deep agent loop must not terminalize workflow phases — it runs no workflow "
         "and never enters the harness engine's cancel arm"
+    )
+
+
+# ── Plan 10 Task 2 — the fences (F-5 phase-keying, F-6 vocabulary, F-S shape) ──
+
+
+def _phase_status_literals_admitted_by(migration_name: str) -> set[str]:
+    """The status literals a migration's CHECK admits, read BELOW ``BEGIN;``.
+
+    ⚠ SCOPING BELOW ``BEGIN;`` IS LOAD-BEARING (inherited from plan 194-09). Migration
+    119's header QUOTES all seven literals in prose, so a whole-file scan would read
+    the documentation as if it were the constraint.
+    """
+    import pathlib
+    import re
+
+    path = (
+        pathlib.Path(__file__).resolve().parents[2]
+        / "supabase"
+        / "migrations"
+        / migration_name
+    )
+    text = path.read_text(encoding="utf-8")
+    assert "BEGIN;" in text, f"{migration_name} has no BEGIN; — the scoping is broken"
+    body = text.split("BEGIN;", 1)[1]
+    return set(re.findall(r"'([a-z_]+)'::text", body))
+
+
+@pytest.mark.asyncio
+async def test_the_engine_cancel_arm_leaves_every_other_phase_row_untouched(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """F-5 (V-18 sibling): the write can never reach a row the user did not interrupt.
+
+    THIS IS THE WHOLE REASON HOME A EXISTS. A run-keyed terminalize here would mark
+    whatever happens to be ``active`` — and on a race could repaint work the user
+    COMPLETED, whose outputs are already durable (D-07 / D-13). The clauses are
+    separated so each names a different defect:
+
+      (a) no cancel write may carry the RUN-keyed predicate or bind the run_id;
+      (b) the completed and pending rows' ids appear in NO recorded write at all.
+
+    ⚠ Clause (a) is the one the run-keyed plant fires, and clause (b) is NOT redundant
+    with it: a read-then-update-by-a-queried-id defect would leave (a) green and red
+    (b). Stated rather than implied, because a fence whose clauses cannot fail
+    independently is one fence wearing two hats (the 194-03 lesson).
+    """
+    _raised, _expiry, ids, run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+    )
+    completed_id, active_id, pending_id = ids
+
+    writes = _cancel_writes(mock_asyncpg_pool)
+    assert writes, "no cancel write was recorded — the fence would be vacuous"
+
+    # (a) never a bulk terminalize.
+    for sql, args in writes:
+        assert "workflow_run_id" not in sql, (
+            f"the engine arm's write went RUN-KEYED. That is the zombie arm's writer "
+            f"(`cancel_active_phases`) and it marks whatever happens to be `active` — "
+            f"here the phase_id is already known. SQL={sql!r}"
+        )
+        assert run_id not in args, (
+            f"a cancel write bound the RUN id ({run_id}) instead of the phase id; "
+            f"args={args!r}"
+        )
+
+    # (b) no other row is named anywhere in the drive.
+    every_arg = [a for _sql, args in mock_asyncpg_pool.calls for a in args]
+    assert completed_id not in every_arg, (
+        "the COMPLETED phase row was named in a write. Its output is already durable "
+        "and the stopped run must keep it (D-07 / D-13)."
+    )
+    assert pending_id not in every_arg, (
+        "a phase that never started was named in a write — only the interrupted row moves"
+    )
+    assert active_id in every_arg, (
+        "the interrupted row was never named at all — clause (b) would be vacuous"
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_engine_cancel_arm_composes_only_migration_119s_slug(
+    build_workflow_definition, mock_asyncpg_pool
+):
+    """F-6 (V-19): the arm writes ``cancelled`` — never ``failed``, never ``skipped``.
+
+    ⚠ SCOPED OVER THE COMPOSED VALUE, NEVER THE MODULE SOURCE. ``harness_engine.py``
+    legitimately names ``fail_phase`` / ``skip_phase`` and their statuses THREE LINES
+    BELOW the arm being fenced, so a raw source sweep would red on shipped, correct
+    code (the 193.2 F-3 lesson, and this phase's own repeated docblock-grep trap).
+    The scope is CHECKED rather than assumed: the case asserts those two shipped names
+    are still present in the source while the composed values contain neither, so if
+    the fence ever stops demonstrating that distinction it fails loudly instead of
+    quietly becoming a tautology.
+
+    The expected slug is DERIVED from the migrations by parsing, never re-typed:
+    119's literals minus 115's must be exactly ``{"cancelled"}``.
+    """
+    import pathlib
+
+    expected = _phase_status_literals_admitted_by(
+        "119_workflow_phases_cancelled.sql"
+    ) - _phase_status_literals_admitted_by("115_workflow_phases_recorded_not_sent.sql")
+    assert expected == {"cancelled"}, (
+        f"migration 119 minus 115 must add exactly one literal; got {expected!r}"
+    )
+    (slug,) = expected
+
+    _raised, _expiry, ids, _run_id = await _drive_engine_through_a_mid_phase_cancel(
+        build_workflow_definition,
+        mock_asyncpg_pool,
+        statuses=("completed", "active", "pending"),
+    )
+
+    # Every phase-status value the drive composed, other than the shipped mark-active.
+    written = [
+        sql
+        for sql, _args in mock_asyncpg_pool.calls
+        if "UPDATE workflow_phases" in sql and "SET status='active'" not in sql
+    ]
+    assert written, "the drive composed no terminal phase write — fence vacuous"
+    for sql in written:
+        assert f"SET status='{slug}'" in sql, (
+            f"the interrupted phase must be written with migration 119's slug "
+            f"({slug!r}); SQL={sql!r}"
+        )
+        assert "status='failed'" not in sql and "status='skipped'" not in sql, (
+            f"D-04: reusing `failed` or `skipped` was OFFERED AND REJECTED. The phase "
+            f"did not fail and was not skipped — it ran and a person ended the run "
+            f"underneath it. SQL={sql!r}"
+        )
+
+    # SCOPE PROOF — the fence is value-scoped, and here is the evidence.
+    engine_src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / "app"
+        / "services"
+        / "harness_engine.py"
+    ).read_text(encoding="utf-8")
+    assert "fail_phase" in engine_src and "skip_phase" in engine_src, (
+        "the module no longer names fail_phase/skip_phase, so this fence has stopped "
+        "demonstrating that it is scoped over the composed VALUE rather than the "
+        "source. Fix the fence's premise, do not delete the assertion."
+    )
+
+
+def test_the_new_write_is_shielded_in_its_own_try_and_the_raise_stays_last():
+    """F-S: the arm's SHAPE, parsed — shielded, self-guarded, and re-raising LAST.
+
+    Three mechanisms, each a separate assertion because each is a different defect:
+      1. the write is wrapped in ``asyncio.shield`` — cancellation is already in
+         flight, so an unshielded await would be cancelled BEFORE it wrote;
+      2. it has its OWN ``try/except`` that ``logger.exception``s — a cleanup failure
+         must not mask the escape;
+      3. the handler's LAST statement is a BARE ``raise`` — the cancellation still
+         propagates, and nothing may be appended after it.
+
+    ⚠ AST-PARSED, NEVER GREPPED, and the shape-detector carries a POSITIVE CONTROL:
+    it is first shown to find the SHIPPED ``asyncio.shield(_expire_pending_ask_user(…))``
+    with the identical walk. A detector that could not see the shipped call would be
+    proving nothing about the new one.
+    """
+    import ast
+    import pathlib
+
+    src = (
+        pathlib.Path(__file__).resolve().parents[1]
+        / "app"
+        / "services"
+        / "harness_engine.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    fn = next(
+        n
+        for n in ast.walk(tree)
+        if isinstance(n, (ast.AsyncFunctionDef, ast.FunctionDef))
+        and n.name == "run_workflow"
+    )
+
+    def _shielded_names(node) -> set[str]:
+        """Names of callables wrapped directly in ``asyncio.shield(...)``."""
+        out = set()
+        for c in ast.walk(node):
+            if (
+                isinstance(c, ast.Call)
+                and isinstance(c.func, ast.Attribute)
+                and c.func.attr == "shield"
+                and isinstance(c.func.value, ast.Name)
+                and c.func.value.id == "asyncio"
+            ):
+                for a in c.args:
+                    if isinstance(a, ast.Call) and isinstance(a.func, ast.Name):
+                        out.add(a.func.id)
+        return out
+
+    # POSITIVE CONTROL — the walk finds the shipped shielded cleanup.
+    assert "_expire_pending_ask_user" in _shielded_names(fn), (
+        "the shield detector cannot see the SHIPPED shielded expiry — it is broken, "
+        "and any verdict it gives about the new write is worthless"
+    )
+
+    handlers = [
+        h
+        for t in ast.walk(fn)
+        if isinstance(t, ast.Try)
+        for h in t.handlers
+        if any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Name)
+            and c.func.id == "cancel_phase"
+            for c in ast.walk(h)
+        )
+    ]
+    assert len(handlers) == 1, (
+        f"the phase terminalize must live in exactly ONE exception handler — the "
+        f"cancel/escape arm; found {len(handlers)}"
+    )
+    arm = handlers[0]
+
+    # It is the BaseException arm (D-06 / BUG-260605-01), not some narrower one.
+    assert isinstance(arm.type, ast.Name) and arm.type.id == "BaseException", (
+        f"the terminalize moved off the cancel/escape arm; it now sits under "
+        f"{ast.dump(arm.type) if arm.type else 'a bare except'}"
+    )
+
+    # 1. shielded.
+    assert "cancel_phase" in _shielded_names(arm), (
+        "the phase terminalize is NOT wrapped in asyncio.shield — cancellation is "
+        "already in flight and an unshielded await is cancelled before it writes"
+    )
+
+    # 2. its own try/except that logs.
+    inner = [
+        t
+        for t in ast.walk(arm)
+        if isinstance(t, ast.Try)
+        and any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Name)
+            and c.func.id == "cancel_phase"
+            for stmt in t.body
+            for c in ast.walk(stmt)
+        )
+    ]
+    assert len(inner) == 1, (
+        f"the terminalize must sit in its OWN try/except so a cleanup failure cannot "
+        f"mask the escape; found {len(inner)} enclosing try bodies"
+    )
+    logged = [
+        h
+        for h in inner[0].handlers
+        if any(
+            isinstance(c, ast.Call)
+            and isinstance(c.func, ast.Attribute)
+            and c.func.attr == "exception"
+            for c in ast.walk(h)
+        )
+    ]
+    assert logged, "the terminalize's except clause does not logger.exception the failure"
+
+    # 3. the bare re-raise is the LAST statement of the arm.
+    last = arm.body[-1]
+    assert isinstance(last, ast.Raise) and last.exc is None, (
+        f"the cancel/escape arm must END with a bare `raise` — cancellation may not be "
+        f"swallowed or delayed. Last statement is {type(last).__name__}."
     )
