@@ -1457,14 +1457,60 @@ async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
     """
     async with pool.acquire() as con:
         async with con.transaction():
+            # ── L-01 / RUN-01 — THE TERMINAL GUARD (added 2026-08-16) ─────────
+            #
+            # ⚠ THIS ENFORCES THE PROHIBITION THE DOCSTRING ABOVE ALREADY DECLARES,
+            # because that prohibition was prose and prose cannot bind a producer
+            # running on another worker. The docstring says the interleave is
+            # "BENIGN BY VALUE-IDENTITY" and that "THE ONE THING A CALLER MUST NEVER
+            # DO IS MAKE THE TWO WRITES DISAGREE". **Shipped code already breaks it.**
+            #
+            # Measured (Phase 194, SC#2 FAILED; re-confirmed at 194.1's UAT): at the
+            # shipped WORKER_COUNT=2, a Stop landing on worker A writes `cancelled`
+            # while worker B's still-running producer reaches its success arm and
+            # writes `completed` OVER IT — on roughly HALF of all stops. The user
+            # pressed Stop and the run reports that it finished.
+            #
+            # A terminal status is FINAL. The first terminal write wins; a later,
+            # DIFFERENT terminal value is refused. `status = $2` keeps the re-run
+            # idempotency the docstring promises (both cancel sites can land twice).
+            # Non-terminal states (`active`, `paused`, `cap_paused`) are untouched —
+            # they are exactly what this function exists to move a run OUT of.
+            #
+            # ⚠ WHAT THIS DOES **NOT** FIX, stated here so the guard is never read as
+            # more than it is: the far-worker producer KEEPS RUNNING. This makes the
+            # run REPORT honestly; it does not make the work STOP. Halting the
+            # producer (an in-loop status re-read, or a Redis cancel channel that
+            # reaches a producer not parked on an `ask_user:*` channel) is the
+            # separate, larger L-01 fix, and it is still OWED. Do not let a ticked
+            # RUN-01 be read as "the work stops" — it is not the same claim.
+            #
+            # ⚠ NOT A SECOND CONCERN (G-5, and this file fires hardest of any backend
+            # module at 18 phases): this narrows the WHERE of a status write the
+            # function already owns. Zero new writes, zero new params, no schema
+            # change, no migration — `status` was already the only column written.
             await con.execute(
-                "UPDATE workflow_runs SET status = $2 WHERE id = $1",
+                "UPDATE workflow_runs SET status = $2 "
+                "WHERE id = $1 "
+                "  AND (status IS NULL "
+                "       OR status NOT IN ('completed', 'failed', 'cancelled') "
+                "       OR status = $2)",
                 run_id,
                 status,
             )
             # Clear the per-thread lock anchor in the SAME transaction — no
             # dangling lock survives a terminal run (SC#2). Keyed by the FK
             # target (= this run id), so it only clears the thread this run owns.
+            #
+            # ⚠ DELIBERATELY **UNCONDITIONAL**, and it must stay that way even
+            # though the status write above can now be refused. The two are not
+            # coupled: a refused status write means the run was ALREADY terminal,
+            # in which case the first `finish_run` cleared this anchor and the
+            # statement no-ops on 0 rows (the idempotency the docstring promises).
+            # Gating the clear on the status write's row count would reintroduce
+            # exactly the dangling-lock failure the shared transaction exists to
+            # prevent — a thread stranded as locked because a second, refused
+            # terminalize skipped the clear.
             await con.execute(
                 "UPDATE threads SET active_workflow_run_id = NULL "
                 "WHERE active_workflow_run_id = $1",
