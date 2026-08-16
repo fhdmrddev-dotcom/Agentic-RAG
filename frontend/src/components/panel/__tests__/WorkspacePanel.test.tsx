@@ -30,6 +30,9 @@ import { axe } from "vitest-axe"
 import workspacePanelSource from "@/components/panel/WorkspacePanel?raw"
 import type { Todo, WorkspaceFile, PendingAsk, Phase, TaskRunIndexItem } from "@/types"
 import type { DerivedPanelItem } from "@/lib/workspacePanel"
+// ⚠ The REAL store — deliberately NOT mocked. See the selector block below: it is
+// what makes two mounts rendered for one thread share one source of truth.
+import { useStreamsStore } from "@/stores/streamsStore"
 import type { ThreadWorkflowState, PublishedWorkflow } from "@/lib/api"
 import { mockTodos, mockWorkspaceFiles, mockPendingAskWithRunId } from "./fixtures"
 
@@ -83,6 +86,38 @@ const useDerivedPanel = vi.fn()
 // ARGUMENT, not the resolver's internals (those are StreamsProvider's own tests).
 const stopThread = vi.fn()
 const useStreamActions = vi.fn()
+/**
+ * Phase 194.1 Plan 05 Task 2 — the TENTH and ELEVENTH keys, and needing them is
+ * itself the measurement rather than plumbing.
+ *
+ * The panel's Stop is no longer an inline `<button>`: it is the shared
+ * `<StopControl>`, which reads these two selectors off the store slice plan 03
+ * shipped. Left out of this explicit object literal they resolve to `undefined`
+ * and the whole file throws on the first panel render — exactly as the ninth key's
+ * comment above predicted about `useStreamActions`. So the fact that this mock
+ * needed two more keys is the proof that the panel's Stop became store-driven.
+ *
+ * ⚠ THEY ARE BACKED BY THE REAL ZUSTAND STORE, NOT BY `mockReturnValue(false)`,
+ * AND THAT CHOICE IS LOAD-BEARING FOR TASK 4. A constant-returning mock would make
+ * every mount's reading independent by construction, which is precisely the
+ * property the cross-mount case exists to DISPROVE — the case would then pass
+ * against a component that owned its flag locally. Backing them with the real
+ * store (`@/stores/streamsStore` is NOT mocked in this file) means two mounts
+ * rendered for one thread genuinely share one source, so a flag moved into either
+ * mount's own `useState` reds. The selector bodies below are copied verbatim from
+ * `StreamsProvider.tsx`'s own exports.
+ *
+ * ⚠ THE HONEST SCOPE OF THAT, stated rather than overclaimed: what this file drives
+ * is the READ topology (two mounts, one source). The WRITE is this suite's own,
+ * because `vi.mock` is FILE-GLOBAL and the real provider cannot be mounted beside a
+ * mocked one. The real `recordStopPress` — its 8s timer, its no-re-arm rule, its
+ * `clearTimeout` — is driven by `StopControl.test.tsx` and
+ * `StreamsProvider.stopping.test.ts`, and this file claims none of it.
+ */
+const useStoppingForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.stoppingThreads.has(threadId) : false))
+const useStopNotConfirmedForThread = (threadId: string | null): boolean =>
+  useStreamsStore((s) => (threadId ? s.stopNotConfirmed.has(threadId) : false))
 vi.mock("@/providers/StreamsProvider", () => ({
   useTodos: (...a: unknown[]) => useTodos(...a),
   useWorkspaceFiles: (...a: unknown[]) => useWorkspaceFiles(...a),
@@ -93,6 +128,8 @@ vi.mock("@/providers/StreamsProvider", () => ({
   useWorkflowLockForThread: (...a: unknown[]) => useWorkflowLockForThread(...a),
   useDerivedPanel: (...a: unknown[]) => useDerivedPanel(...a),
   useStreamActions: (...a: unknown[]) => useStreamActions(...a),
+  useStoppingForThread: (t: string | null) => useStoppingForThread(t),
+  useStopNotConfirmedForThread: (t: string | null) => useStopNotConfirmedForThread(t),
 }))
 
 // Stub the heavy timeline child (it reads the real provider hooks); the panel
@@ -171,6 +208,12 @@ function setHooks({
   // a measurement of THIS test's click and never of a previous test's.
   stopThread.mockReset()
   useStreamActions.mockReturnValue({ stopThread })
+  // Phase 194.1 Plan 05 — the stopping slice is PROVIDER-SCOPED in production, so it
+  // outlives every mount; in a test file it therefore also outlives every CASE. Reset
+  // it to the resting arm here for the same reason `stopThread` is reset above: a
+  // reading left behind by a previous case is indistinguishable from one this case
+  // caused.
+  useStreamsStore.setState({ stoppingThreads: new Set(), stopNotConfirmed: new Set() })
 }
 
 function setViewport(width: number) {
