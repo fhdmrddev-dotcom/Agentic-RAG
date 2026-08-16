@@ -1228,3 +1228,253 @@ def test_no_403_anywhere_on_the_runs_module(client, auth_headers):
         "the /runs module must never answer 403 — one collapsed 404 covers both "
         "'doesn't exist' and 'not yours' (T-062-01 / D-062-12)"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 code review — CR-01: the forward resolution must resolve the PRODUCER
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ THE DEFECT THESE CASES EXIST FOR. As shipped by 194-11 the forward-resolution
+# LEFT JOIN linked ``runs`` to ``workflow_runs`` on ``thread_id`` alone, scoped only by
+# ``r.status = 'streaming'`` — NO ``parent_run_id IS NULL``, NO ``ORDER BY``, NO
+# ``LIMIT`` — and the route then took ``next(...)`` over whatever Postgres happened to
+# return first. SUB-AGENT runs are inserted on the SAME thread with the SAME
+# ``'streaming'`` status (``task_service.py``'s ``insert_run`` writes
+# ``parent_run_id=parent_ctx.run_id``), and a harness phase's tool context is built with
+# ``parent_run_id=None`` and ``spawn`` threaded through PRECISELY so a phase can spawn
+# them (``harness/phase_types.py``). So a Stop pressed while a ``task_sub_agent`` phase
+# was in flight could rebind ``run_id`` to the SUB-AGENT, cancel that, leave the real
+# producer running — and return 204. A Stop that reports success while doing nothing is
+# the exact dishonesty this phase exists to remove, one level deeper.
+#
+# ⚠ WHY THE SHIPPED SUITE COULD NOT SEE IT, STATED RATHER THAN IMPLIED. Every 194-11
+# case seeds ``_FetchPool`` with EXACTLY ONE row, and ``_FetchPool`` answers with
+# whatever it was handed no matter what the SQL asks — so the ambiguity was not merely
+# untested, it was UNOBSERVABLE. That is the ``_FilteringBuilder`` lesson from the other
+# side: a double that does not INTERPRET the clause cannot red when the clause is
+# deleted. ``_JoinInterpretingPool`` below therefore evaluates the join's clauses, so
+# removing one changes the ANSWER rather than only the SQL text.
+
+
+class _JoinInterpretingPool:
+    """An asyncpg-pool double that INTERPRETS the forward-resolution join.
+
+    It models the three clauses CR-01 turns on — ``r.status = 'streaming'``,
+    ``r.parent_run_id IS NULL`` and ``ORDER BY r.started_at DESC``/``LIMIT 1`` — plus
+    LEFT JOIN semantics (a workflow row with no matching producer still comes back,
+    with NULL producer columns). Rows are returned in SEED order when the SQL carries no
+    ``ORDER BY``, which is how it models "whatever Postgres happens to return first":
+    every case below seeds the WRONG row first, so an unordered/unfiltered query picks
+    it and the case reds.
+
+    ⚠ IT REFUSES A QUERY IT DOES NOT RECOGNISE. A double that silently answered a
+    re-shaped statement would keep every case green while measuring nothing.
+    """
+
+    def __init__(self, *, wf_id, thread_id, runs):
+        self._wf_id = wf_id
+        self._thread_id = thread_id
+        self._runs = list(runs)
+        self.fetched: list = []
+
+    async def fetch(self, sql, *args):
+        self.fetched.append((sql, args))
+        assert "FROM workflow_runs" in sql and "LEFT JOIN runs" in sql, (
+            "the forward resolution no longer has the shape this double interprets — "
+            f"it would answer anything. SQL={sql!r}"
+        )
+        rows = [r for r in self._runs if str(r["thread_id"]) == str(self._thread_id)]
+        if "r.status = 'streaming'" in sql:
+            rows = [r for r in rows if r["status"] == "streaming"]
+        if "r.parent_run_id IS NULL" in sql:
+            rows = [r for r in rows if r.get("parent_run_id") is None]
+        if "ORDER BY r.started_at DESC" in sql:
+            rows = sorted(
+                rows, key=lambda r: (r["started_at"], str(r["run_id"])), reverse=True
+            )
+        joined = [
+            {
+                "wf_id": self._wf_id,
+                "thread_id": self._thread_id,
+                "producer_id": r["run_id"],
+                "producer_status": r["status"],
+            }
+            for r in rows
+        ]
+        if not joined:
+            # LEFT JOIN: the workflow row survives with NULL producer columns.
+            joined = [{
+                "wf_id": self._wf_id, "thread_id": self._thread_id,
+                "producer_id": None, "producer_status": None,
+            }]
+        if "LIMIT 1" in sql:
+            joined = joined[:1]
+        return joined
+
+    async def execute(self, sql, *args):  # pragma: no cover - not reached here
+        return None
+
+
+def _runs_row(*, thread_id, started_at, status="streaming", parent_run_id=None):
+    """One ``runs`` row for the interpreting pool. ``started_at`` is an ordinal."""
+    return {
+        "run_id": uuid4(),
+        "thread_id": thread_id,
+        "status": status,
+        "parent_run_id": parent_run_id,
+        "started_at": started_at,
+    }
+
+
+def test_cr01_a_stop_during_a_sub_agent_phase_cancels_the_producer_not_the_sub_agent(
+    client, auth_headers, monkeypatch
+):
+    """CR-01 (a) — a sub-agent ``runs`` row can never be resolved as the producer.
+
+    ⚠ THE SUB-AGENT IS SEEDED FIRST **AND** IS THE NEWEST, DELIBERATELY. It therefore
+    wins under BOTH spellings of the defect — an arbitrary-order pick and a naive
+    newest-first pick — so this case can only pass because of the
+    ``parent_run_id IS NULL`` clause, never because of the ordering. That isolation is
+    what makes the ordering fence (the sibling case below) a SECOND fence rather than
+    the same one written twice: ``assert`` short-circuits, and a clause whose only case
+    is one a sibling clause also satisfies has never actually been tested.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    producer = _runs_row(thread_id=thread_id, started_at=1)
+    sub_agent = _runs_row(
+        thread_id=thread_id, started_at=2, parent_run_id=producer["run_id"]
+    )
+    pool = _JoinInterpretingPool(
+        wf_id=wf_id, thread_id=thread_id, runs=[sub_agent, producer]
+    )
+    producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204, f"expected 204; got {res.status_code} {res.text}"
+    assert len(pool.fetched) == 1, (
+        f"expected ONE forward resolution; got {pool.fetched!r} — the case would be "
+        "vacuous if the arm never ran at all"
+    )
+    assert producer_spy.await_count == 1
+    passed = producer_spy.await_args.kwargs["run_id"]
+    assert str(passed) != str(sub_agent["run_id"]), (
+        "the Stop cancelled the SUB-AGENT. Its parent — the real producer — keeps "
+        "running while the route returns 204: a Stop that reports success while doing "
+        "nothing, which is the dishonesty this phase exists to remove"
+    )
+    assert str(passed) == str(producer["run_id"]), (
+        "the forward resolution must resolve the PRODUCER (parent_run_id IS NULL); it "
+        f"resolved {passed!r}"
+    )
+    assert workflow_spy.await_count == 0
+
+
+def test_cr01_the_producer_choice_is_deterministic_not_whatever_comes_back_first(
+    client, auth_headers, monkeypatch
+):
+    """CR-01 (b) — with TWO producer rows the newest is chosen, deterministically.
+
+    A leftover ``streaming`` row from a dead earlier producer on the same thread is not
+    hypothetical — it is exactly what the zombie arm exists to heal, and nothing removes
+    it before this query runs. Both rows here have ``parent_run_id IS NULL``, so the
+    sub-agent clause CANNOT satisfy this case: only the ``ORDER BY`` can. The stale row
+    is seeded FIRST, so an unordered result picks it.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    stale = _runs_row(thread_id=thread_id, started_at=1)
+    live = _runs_row(thread_id=thread_id, started_at=2)
+    pool = _JoinInterpretingPool(
+        wf_id=wf_id, thread_id=thread_id, runs=[stale, live]
+    )
+    producer_spy, _workflow_spy = _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204, f"expected 204; got {res.status_code} {res.text}"
+    assert producer_spy.await_count == 1
+    passed = producer_spy.await_args.kwargs["run_id"]
+    assert str(passed) == str(live["run_id"]), (
+        "the arm must pick the NEWEST live producer by an explicit ordering, never "
+        f"whatever the result set happened to yield first; it picked {passed!r}"
+    )
+
+
+def test_cr01_a_workflow_run_with_only_a_sub_agent_alive_takes_the_no_producer_arm(
+    client, auth_headers, monkeypatch
+):
+    """CR-01 (c) — filtering sub-agents out must not INVENT a producer.
+
+    With the sub-agent excluded there is no live producer at all, so the honest arm is
+    the workflow-side terminalize — not the shared runs-keyed writer, which would miss
+    ``RUN_TASKS``, update zero ``runs`` rows and 204 anyway. This is the LEFT-JOIN half
+    of the fix: narrowing the join must still return the workflow row.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    sub_agent = _runs_row(thread_id=thread_id, started_at=2, parent_run_id=uuid4())
+    pool = _JoinInterpretingPool(
+        wf_id=wf_id, thread_id=thread_id, runs=[sub_agent]
+    )
+    producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204, f"expected 204; got {res.status_code} {res.text}"
+    assert producer_spy.await_count == 0, (
+        "a sub-agent must never be handed to the shared cancel writer — it is not the "
+        "producer and cancelling it stops the wrong task"
+    )
+    assert workflow_spy.await_count == 1, (
+        "with no live producer the workflow run must still be terminalized"
+    )
+
+
+def test_cr01_the_forward_resolution_sql_excludes_sub_agents_and_is_deterministic(
+    client, auth_headers, monkeypatch
+):
+    """CR-01 (d) — the composed SQL carries all three narrowing clauses.
+
+    ⚠ SCOPED OVER THE SQL THE ROUTE COMPOSES, NEVER THE MODULE SOURCE — this route's
+    own docblock legitimately names ``parent_run_id`` and ``ORDER BY`` in prose, and a
+    raw source sweep would be satisfied by the documentation of the rule it defends.
+    Three separate assertions because each names a different defect; ``assert``
+    short-circuits, so each was driven RED by its own plant (see 194-REVIEW.md § Fix
+    Pass). The behavioural sibling cases above cover clauses 1 and 2; ``LIMIT 1``'s only
+    RED is here, and that is stated rather than left to be discovered.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    pool = _JoinInterpretingPool(
+        wf_id=wf_id, thread_id=thread_id,
+        runs=[_runs_row(thread_id=thread_id, started_at=1)],
+    )
+    _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204
+    assert len(pool.fetched) == 1, "the fence would be vacuous — no resolution ran"
+    sql, _args = pool.fetched[0]
+    assert "parent_run_id IS NULL" in sql, (
+        "the join admits SUB-AGENT runs: they carry the same thread_id and the same "
+        f"'streaming' status as the producer. SQL={sql!r}"
+    )
+    assert "ORDER BY" in sql, (
+        "the join has no explicit ordering, so which run is cancelled depends on the "
+        f"plan Postgres happens to choose. SQL={sql!r}"
+    )
+    assert "LIMIT 1" in sql, (
+        "the resolution must return at most one candidate — the route acts on a single "
+        f"row and must not silently discard the rest. SQL={sql!r}"
+    )

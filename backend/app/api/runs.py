@@ -1260,6 +1260,33 @@ async def cancel_run(
                 # shape ``delete_workflow_cascade`` has used since Phase 152
                 # (api/workflows.py:1483-1518), narrowed here to ONE workflow run.
                 # ``$N`` binds only — no f-string ever reaches this SQL (T-152-05-05).
+                #
+                # ⚠ CR-01 (194 code review) — THE JOIN MUST NARROW TO THE PRODUCER, AND
+                # THE PICK MUST BE DETERMINISTIC. As first shipped this join linked on
+                # ``thread_id`` + ``status = 'streaming'`` alone, with no ordering and no
+                # limit, and the route took ``next(...)`` over the result. SUB-AGENT runs
+                # live on the SAME thread with the SAME ``'streaming'`` status
+                # (``task_service.py``'s ``insert_run`` writes
+                # ``parent_run_id=parent_ctx.run_id``), and a harness phase's tool context
+                # is built with ``parent_run_id=None`` and ``spawn`` threaded through
+                # PRECISELY so a phase can spawn them. A Stop pressed during a
+                # ``task_sub_agent`` phase could therefore rebind ``run_id`` to the
+                # SUB-AGENT, cancel THAT, leave the real producer running — and still
+                # return 204. That is the silent success this whole fallback exists to
+                # remove, one level deeper.
+                #   * ``r.parent_run_id IS NULL`` — a sub-agent shell is never a producer.
+                #   * ``ORDER BY r.started_at DESC`` — a dead earlier producer can leave a
+                #     stale ``streaming`` row on the thread (that is what the zombie arm
+                #     heals); the LIVE producer is the most recently started one. The
+                #     ``r.run_id`` tiebreaker makes identical timestamps deterministic too
+                #     — the same discipline 193.2 needed on the library feeds.
+                #   * ``LIMIT 1`` + an INDEXED read below, never ``next(...)`` over an
+                #     arbitrarily-ordered result: the route acts on one row, so it must
+                #     say which one.
+                # ⚠ This NARROWS what the query can reach and widens nothing. On a
+                # service-role pool that bypasses RLS the WHERE clause is the access
+                # boundary; the three owner/anchor clauses above are unchanged and still
+                # gate every path into here.
                 from app.dependencies import get_pg_pool  # noqa: PLC0415
                 pool = await get_pg_pool()
                 _live = await pool.fetch(
@@ -1268,11 +1295,17 @@ async def cancel_run(
                     "FROM workflow_runs wr "
                     "LEFT JOIN runs r ON r.thread_id = wr.thread_id "
                     "AND r.status = 'streaming' "
-                    "WHERE wr.id = $1",
+                    "AND r.parent_run_id IS NULL "
+                    "WHERE wr.id = $1 "
+                    "ORDER BY r.started_at DESC NULLS LAST, r.run_id DESC "
+                    "LIMIT 1",
                     run_id,
                 )
-                _producer = next(
-                    (r for r in (_live or []) if r["producer_id"] is not None), None
+                # LEFT JOIN semantics: the workflow row survives with NULL producer
+                # columns when nothing matched, which is the no-producer arm below.
+                _row = _live[0] if _live else None
+                _producer = (
+                    _row if _row is not None and _row["producer_id"] is not None else None
                 )
                 if _producer is not None:
                     # Synthesize Step 1's row from the PRODUCER identity, so Steps
