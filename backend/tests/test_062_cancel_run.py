@@ -38,7 +38,7 @@ CLAUDE.md's rule 4.
 import pathlib
 import re
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.dependencies import get_supabase
 from app.main import app
@@ -673,4 +673,558 @@ async def test_no_cancel_path_writes_the_failed_or_skipped_vocabulary(monkeypatc
         "db/workflows.py no longer names 'failed'/'skipped' anywhere — this fence's "
         "value-scoping is no longer demonstrating anything and must be re-examined, "
         "not trusted"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Phase 194 Plan 11 (RUN-01 / SC#1) — the DELETE dual-id fallback
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ THE FINDING THESE CASES DEFEND, STATED HERE BECAUSE IT WAS RECORDED ONCE BEFORE
+# AND LOST. ``WorkflowLock.runId`` on the frontend carries TWO id types — some write
+# sites store a ``workflow_runs.id``, others a producer ``runs.run_id`` — while its own
+# JSDoc asserts only the first. ``DELETE /runs/{id}`` accepted only the second and the
+# client's ``cancelRun`` SWALLOWS 404, so a Stop resolved through the anchor id
+# SILENTLY SUCCEEDED WHILE DOING NOTHING. Phase 188 measured this and recorded it only
+# in a comment at ``WorkspacePanel.tsx:161-165``, where the next phase could not see it.
+#
+# ⚠ AND THE SERVER-SIDE HALF OF THE SAME SILENT SUCCESS: the shared cancel writer keys
+# ``RUN_TASKS`` and ``finalize_run_terminal`` on the PRODUCER ``runs.run_id``. Handing
+# it a ``workflow_runs.id`` misses the registry, takes the zombie arm, updates ZERO
+# ``runs`` rows and STILL returns 204. That is why V-01 asserts the ARGUMENT VALUE:
+# a case that only checked "the writer was called" would pass under the exact bug this
+# plan exists to fix.
+#
+# ⚠ THESE CASES SEED NOTHING IN ANY DATABASE. supabase is the in-file
+# ``_FilteringSupabase``, the pool is a tiny fetch double, Redis is a fake, and the two
+# cancel writers are patched at their own modules. Parallel-safe under CLAUDE.md rule 4.
+
+
+class _FilteringBuilder:
+    """A supabase builder that INTERPRETS its ``.eq()`` filters against seeded rows.
+
+    ⚠ THE INTERPRETATION IS THE WHOLE POINT AND A RECORDING DOUBLE WOULD NOT DO. F-10's
+    three plants each DELETE one ``.eq(...)`` / one ``if`` from production source; a
+    double that merely recorded the calls would keep returning its seeded row no matter
+    which filter vanished, so every plant would stay GREEN and all three fences would
+    ship inert. (194-09 hit exactly that shape from the other side: under its F-2 plant
+    a seeded double kept answering, so only the recorded ORDER moved.) Here the missing
+    filter must change the ANSWER, which is what makes a plant able to red at all.
+
+    Only ``select`` is evaluated; ``update`` is recorded and returns no data, matching
+    the shipped ``_RecordingBuilder`` above.
+    """
+
+    def __init__(self, sb, table):
+        self._sb = sb
+        self._table = table
+        self._filters: dict = {}
+        self._op = None
+
+    def select(self, *a, **k):
+        self._op = "select"
+        self._sb.selected.append(self._table)
+        return self
+
+    def update(self, payload=None, *a, **k):
+        self._op = "update"
+        self._sb.updates.append((self._table, payload))
+        return self
+
+    def insert(self, payload=None, *a, **k):
+        self._op = "insert"
+        return self
+
+    def eq(self, col, val):
+        self._filters[col] = val
+        self._sb.filters.append((self._table, col, val))
+        return self
+
+    def maybe_single(self, *a, **k):
+        return self
+
+    def single(self, *a, **k):
+        return self
+
+    def limit(self, *a, **k):
+        return self
+
+    def order(self, *a, **k):
+        return self
+
+    def execute(self):
+        res = MagicMock()
+        res.count = None
+        if self._op != "select":
+            res.data = None
+            return res
+        rows = [
+            r
+            for r in self._sb.tables.get(self._table, [])
+            if all(str(r.get(c)) == str(v) for c, v in self._filters.items())
+        ]
+        res.data = rows[0] if rows else None
+        return res
+
+
+class _FilteringSupabase:
+    """Seeded, filter-honouring supabase double for the dual-id fallback cases."""
+
+    def __init__(self, **tables):
+        self.tables = {k: list(v) for k, v in tables.items()}
+        self.filters: list = []
+        self.selected: list = []
+        self.updates: list = []
+
+    def table(self, name):
+        return _FilteringBuilder(self, name)
+
+
+class _FetchPool:
+    """An asyncpg-pool double whose ``fetch`` answers the forward-resolution SELECT.
+
+    Records ``(sql, args)`` so the ``$N``-bind and ``status = 'streaming'`` clauses can
+    be asserted on the SQL the route actually composes, rather than on the source text.
+    """
+
+    def __init__(self, rows):
+        self._rows = rows
+        self.fetched: list = []
+
+    async def fetch(self, sql, *args):
+        self.fetched.append((sql, args))
+        return list(self._rows)
+
+    async def execute(self, sql, *args):  # pragma: no cover - not reached here
+        return None
+
+
+class _CancelFakeRedis(_FakeRedis):
+    """``_FakeRedis`` plus the two ops ``publish_cancel_sentinel`` touches."""
+
+    async def smembers(self, *a, **k):
+        self.calls.append(("smembers", a, k))
+        return set()
+
+    async def publish(self, *a, **k):  # pragma: no cover - empty channel set
+        self.calls.append(("publish", a, k))
+        return 0
+
+
+_ME = "00000000-0000-0000-0000-000000000001"   # conftest's mock_user_data["id"]
+_OTHER = "00000000-0000-0000-0000-0000000000ff"
+
+
+def _install(sb, redis_double, monkeypatch):
+    """Point ``get_supabase`` (and, via conftest's mirror, the user-JWT client) and
+    ``get_redis`` at the doubles. Returns nothing; teardown is the caller's ``finally``.
+    """
+    from app.dependencies import get_redis
+
+    app.dependency_overrides[get_supabase] = lambda: sb
+    app.dependency_overrides[get_redis] = lambda: redis_double
+
+
+def _uninstall():
+    from app.dependencies import get_redis
+
+    app.dependency_overrides.pop(get_supabase, None)
+    app.dependency_overrides.pop(get_redis, None)
+
+
+def _spies(monkeypatch, pool):
+    """Patch the pool singleton and BOTH cancel writers at their own modules.
+
+    The route late-imports each one at call time, so patching the source module is what
+    makes the patch land (the ``_patch_workflow_writers`` discipline above).
+    """
+    monkeypatch.setattr("app.dependencies._pg_pool", pool)
+    producer_spy = AsyncMock(return_value="task_cancelled")
+    workflow_spy = AsyncMock()
+    monkeypatch.setattr(
+        "app.services.run_lifecycle._cancel_run_internals", producer_spy
+    )
+    monkeypatch.setattr(
+        "app.services.run_lifecycle.cancel_workflow_run_internals", workflow_spy
+    )
+    return producer_spy, workflow_spy
+
+
+def _anchored_world(*, wf_owner=_ME, thread_owner=_ME, anchor=None, wf_id=None,
+                    thread_id=None):
+    """Seed the three tables for a workflow-run id, with each owner independently set.
+
+    Each F-10 clause gets its OWN world by moving exactly ONE of ``wf_owner`` /
+    ``thread_owner`` / ``anchor`` — which is what makes the three plants able to red
+    three DIFFERENT cases instead of all reding the same one (the 194-03 lesson: four
+    REQUIRED plants that all red on one clause would have shipped a second clause
+    inert and indistinguishable from live).
+    """
+    wf_id = wf_id or str(uuid4())
+    thread_id = thread_id or str(uuid4())
+    sb = _FilteringSupabase(
+        runs=[],
+        workflow_runs=[{"id": wf_id, "user_id": wf_owner, "thread_id": thread_id}],
+        threads=[{
+            "id": thread_id,
+            "user_id": thread_owner,
+            "active_workflow_run_id": wf_id if anchor is None else anchor,
+        }],
+    )
+    return sb, wf_id, thread_id
+
+
+# ── V-01: the FORWARD resolution — asserted on the ARGUMENT VALUE ─────────────
+
+def test_v01_workflow_run_id_cancels_through_the_producer_id(
+    client, auth_headers, monkeypatch
+):
+    """V-01 — a ``workflow_runs.id`` reaches the shared writer as the PRODUCER id.
+
+    ⚠ ASSERTED ON THE ARGUMENT VALUE, AND ADDITIONALLY ON ITS INEQUALITY WITH THE ID
+    THE CLIENT SENT. A case that only checked "the writer was called" would pass under
+    the exact bug this plan exists to fix — a ``workflow_runs.id`` handed straight
+    through, which misses ``RUN_TASKS``, takes the zombie arm, updates ZERO ``runs``
+    rows and still 204s. "Called" is not the property; "called with the producer
+    identity" is.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    producer_id = uuid4()
+    pool = _FetchPool([{
+        "wf_id": wf_id,
+        "thread_id": thread_id,
+        "producer_id": producer_id,
+        "producer_status": "streaming",
+    }])
+    producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204, f"expected 204; got {res.status_code} {res.text}"
+    assert producer_spy.await_count == 1, (
+        "a live producer must be cancelled through the shared writer exactly once "
+        f"(awaited {producer_spy.await_count}×)"
+    )
+    passed = producer_spy.await_args.kwargs["run_id"]
+    assert str(passed) == str(producer_id), (
+        "the shared writer must receive the PRODUCER runs.run_id resolved by the LEFT "
+        f"JOIN; it received {passed!r}"
+    )
+    assert str(passed) != str(wf_id), (
+        "the workflow_runs.id the client sent must NEVER reach the shared writer — "
+        "that is the silent 204-over-a-no-op this plan removes"
+    )
+    # the producer's OWN status, not a synthesized None: this route READS row['status']
+    # as Step 2's terminal check (the ask_user fallback's None shape would be wrong).
+    assert producer_spy.await_args.kwargs["status"] == "streaming"
+    assert workflow_spy.await_count == 0, (
+        "with a live producer the workflow-side composition must NOT also run — the "
+        "producer's own CancelledError handler finalizes"
+    )
+
+
+def test_v01_forward_resolution_sql_binds_and_scopes_the_live_producer(
+    client, auth_headers, monkeypatch
+):
+    """The forward-resolution SELECT uses ``$N`` binds and scopes to a LIVE producer.
+
+    Two clauses, asserted separately on the SQL the route COMPOSES (never on the module
+    source, so a docblock quoting either token cannot satisfy this): the run id arrives
+    as a bind parameter — no f-string reaches SQL (T-152-05-05 / T-091-03) — and the
+    join is restricted to ``status = 'streaming'``, which is the only thing that makes
+    the resolved id a LIVE producer rather than any historical run on the thread.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    producer_id = uuid4()
+    pool = _FetchPool([{
+        "wf_id": wf_id, "thread_id": thread_id,
+        "producer_id": producer_id, "producer_status": "streaming",
+    }])
+    _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204
+    assert len(pool.fetched) == 1, f"expected ONE forward-resolution fetch; got {pool.fetched}"
+    sql, args = pool.fetched[0]
+    assert "$1" in sql, f"the run id must be a bind, never interpolated; SQL was {sql!r}"
+    assert str(wf_id) not in sql, (
+        "the workflow_runs.id must NOT appear inside the SQL text — that would be an "
+        f"f-string on a user-supplied value; SQL was {sql!r}"
+    )
+    assert str(args[0]) == str(wf_id), "the id must be bound as $1"
+    assert "status = 'streaming'" in sql, (
+        "the LEFT JOIN must scope to a LIVE producer row; SQL was " f"{sql!r}"
+    )
+
+
+# ── V-01b: no live producer → the ONE exported composition, never the writer ──
+
+def test_v01b_no_live_producer_calls_the_exported_workflow_composition(
+    client, auth_headers, monkeypatch
+):
+    """No live producer → plan 194-09's exported composition, keyed on the WORKFLOW id.
+
+    ⚠ AND THE SHARED WRITER MUST NOT RUN. There is nothing in ``RUN_TASKS`` to cancel,
+    and ``finalize_run_terminal`` would update ZERO ``runs`` rows — a 204 over a no-op,
+    which is the same silent success one level down. The honest act is to write the
+    terminal state the workflow run will otherwise never get, through the ONE
+    composition (D-08/D-10) rather than a re-composed second writer.
+    """
+    sb, wf_id, thread_id = _anchored_world()
+    pool = _FetchPool([{
+        "wf_id": wf_id, "thread_id": thread_id,
+        "producer_id": None, "producer_status": None,
+    }])
+    producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204, f"expected 204; got {res.status_code} {res.text}"
+    assert workflow_spy.await_count == 1, (
+        "the no-producer arm must terminalize the workflow run exactly once "
+        f"(awaited {workflow_spy.await_count}×)"
+    )
+    assert str(workflow_spy.await_args.kwargs["workflow_run_id"]) == str(wf_id)
+    assert producer_spy.await_count == 0, (
+        "the shared runs-keyed writer must NOT be handed a workflow_runs.id — it "
+        "would miss RUN_TASKS, update zero runs rows, and 204 anyway"
+    )
+
+
+# ── V-02 / V-03: the authorization boundary — one case per clause ─────────────
+#
+# ⚠ THREE CLAUSES, THREE CASES, THREE PLANTS — ONE PER CLAUSE, DELIBERATELY. F-10 as
+# specified asked for two plants; three ship, because PATTERNS § S1 names THREE clauses
+# and a single "cross-user → 404" case cannot isolate any of them: on a REALISTIC
+# cross-user world (the workflow run AND its thread both owned by the attacker's
+# victim) clauses (a) and (b) each block the request on their own, so deleting either
+# one leaves the case GREEN and the fence ships inert. Each case below therefore moves
+# EXACTLY ONE of the three inputs, so exactly one clause is load-bearing in it.
+#
+# ⚠ AND THE HONEST COST OF THAT ISOLATION IS STATED RATHER THAN HIDDEN: the worlds in
+# the (a) and (b) cases are only reachable if a DIFFERENT invariant has already broken
+# (a thread anchored to a workflow run its own owner did not start). That is precisely
+# what defence in depth is for — a clause whose only test is a world where a sibling
+# clause also holds has never actually been tested. The realistic both-clauses world is
+# driven too, in its own case below, and is labelled as covering both.
+
+
+def test_v02_cross_user_workflow_run_id_is_404_not_403(
+    client, auth_headers, monkeypatch
+):
+    """V-02 / F-10 clause (a) — a ``workflow_runs`` row owned by another user → 404.
+
+    ISOLATES the ``.eq("user_id", …)`` on the ``workflow_runs`` select: the thread here
+    IS the caller's and IS anchored to the id, so clauses (b) and (c) both pass and
+    clause (a) is the only thing standing between an attacker-chosen uuid and a cancel
+    on a service-role pool that bypasses RLS. Phase 190's CR-01 was a real credential
+    exposure that 19 plans of RED-first self-checking missed.
+
+    ⚠ **404, NEVER 403** — asserted on the status AND on the body, because a 404 whose
+    detail differs from the shipped *doesn't exist* response is still an existence leak
+    (T-062-01 / D-062-12).
+    """
+    sb, wf_id, _tid = _anchored_world(wf_owner=_OTHER)
+    _spies(monkeypatch, _FetchPool([]))
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 404, f"expected 404; got {res.status_code} {res.text}"
+    assert res.status_code != 403, "this route must never answer 403 (D-062-12)"
+
+
+def test_v02b_thread_owned_by_another_user_is_404(
+    client, auth_headers, monkeypatch
+):
+    """F-10 clause (b) — the ``threads`` anchor read's owner filter, in isolation.
+
+    The ``workflow_runs`` row IS the caller's here and the anchor DOES equal the id, so
+    clauses (a) and (c) both pass; only ``.eq("user_id", …)`` on the ``threads`` read
+    refuses. Without it the anchor of a thread the caller does not own would confirm a
+    cancel.
+    """
+    sb, wf_id, _tid = _anchored_world(thread_owner=_OTHER)
+    _spies(monkeypatch, _FetchPool([]))
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 404, f"expected 404; got {res.status_code} {res.text}"
+
+
+def test_v03_non_anchor_workflow_run_id_is_404(client, auth_headers, monkeypatch):
+    """V-03 / F-10 clause (c) — owned by the caller but NOT the thread's live anchor.
+
+    Both owner filters pass here; only the equality check refuses. Only a thread's
+    CURRENT workflow run may be stopped through this door — a stale id from a previous
+    run of the same thread must not reach the cancel path.
+    """
+    sb, wf_id, _tid = _anchored_world(anchor=str(uuid4()))
+    _spies(monkeypatch, _FetchPool([]))
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 404, f"expected 404; got {res.status_code} {res.text}"
+
+
+def test_v02_realistic_cross_user_world_is_also_404(
+    client, auth_headers, monkeypatch
+):
+    """The REALISTIC cross-user world — run AND thread both owned by the victim → 404.
+
+    ⚠ LABELLED AS COVERING BOTH (a) AND (b) RATHER THAN EITHER. This is the shape an
+    attacker can actually reach today, and it is exactly why it CANNOT isolate a clause:
+    delete (a) and (b) still refuses; delete (b) and (a) still refuses. It is driven
+    because it is the real threat, and the two isolating cases above exist because this
+    one alone would let a plant on either clause ship GREEN.
+    """
+    sb, wf_id, _tid = _anchored_world(wf_owner=_OTHER, thread_owner=_OTHER)
+    _spies(monkeypatch, _FetchPool([]))
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 404, f"expected 404; got {res.status_code} {res.text}"
+
+
+def test_the_dual_id_404_is_byte_identical_to_the_shipped_doesnt_exist_404(
+    client, auth_headers, monkeypatch
+):
+    """V-02's honesty half — *not yours* and *doesn't exist* produce the SAME response.
+
+    Both bodies are compared, not only both statuses. A collapsed 404 that carried a
+    distinguishing detail would still leak existence, and this is the one property the
+    two shipped fallbacks on this prefix were reviewed for (T-062-01 / D-062-12).
+    """
+    # (1) the shipped "doesn't exist": nothing seeded anywhere.
+    empty = _FilteringSupabase(runs=[], workflow_runs=[], threads=[])
+    _spies(monkeypatch, _FetchPool([]))
+    _install(empty, _CancelFakeRedis(), monkeypatch)
+    try:
+        missing = client.delete(f"/runs/{uuid4()}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    # (2) "not yours": a real workflow run, owned by somebody else.
+    sb, wf_id, _tid = _anchored_world(wf_owner=_OTHER, thread_owner=_OTHER)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        not_mine = client.delete(f"/runs/{wf_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert missing.status_code == not_mine.status_code == 404
+    assert missing.json() == not_mine.json(), (
+        "'not yours' and 'doesn't exist' must be INDISTINGUISHABLE; got "
+        f"{missing.json()!r} vs {not_mine.json()!r}"
+    )
+
+
+# ── The Deep path stays byte-identical: BRANCH, never replace (D-08) ──────────
+
+def test_the_producer_id_path_never_enters_the_fallback(
+    client, auth_headers, monkeypatch
+):
+    """A producer ``runs.run_id`` behaves exactly as before — the fallback never runs.
+
+    Asserted two ways, because either alone is weak: the shared writer receives the id
+    the client sent (unrebound), AND the ``workflow_runs`` table is never selected at
+    all. The second is what proves the Step-1 SELECT still comes FIRST and short-
+    circuits — "BRANCH, never replace" (D-08), the rule the ask_user fallback states
+    verbatim at ``runs.py:549-552``.
+    """
+    run_id = uuid4()
+    thread_id = str(uuid4())
+    sb = _FilteringSupabase(
+        runs=[{
+            "run_id": str(run_id), "user_id": _ME,
+            "status": "streaming", "thread_id": thread_id,
+        }],
+        workflow_runs=[],
+        threads=[],
+    )
+    pool = _FetchPool([])
+    producer_spy, workflow_spy = _spies(monkeypatch, pool)
+    _install(sb, _CancelFakeRedis(), monkeypatch)
+    try:
+        res = client.delete(f"/runs/{run_id}", headers=auth_headers)
+    finally:
+        _uninstall()
+
+    assert res.status_code == 204
+    assert producer_spy.await_count == 1
+    assert str(producer_spy.await_args.kwargs["run_id"]) == str(run_id), (
+        "the Deep path must pass the id the client sent, unrebound"
+    )
+    assert producer_spy.await_args.kwargs["status"] == "streaming"
+    assert "workflow_runs" not in sb.selected, (
+        "the fallback must engage only AFTER the Step-1 runs SELECT misses; it queried "
+        f"{sb.selected}"
+    )
+    assert pool.fetched == [], "no forward resolution may run on the Deep path"
+    assert workflow_spy.await_count == 0
+
+
+# ── T-194-11-05: the path parameter's typing was NOT relaxed ──────────────────
+
+def test_the_run_id_path_param_is_still_uuid_typed(client, auth_headers):
+    """T-194-11-05 — ``run_id: UUID`` is intact and BOTH id spaces are bare uuids.
+
+    ⚠ THIS IS WHERE THE q5r CROSS-TENANT NEAR-MISS LIVED: a ``UUID``-typed parameter
+    against a path-shaped id the producer actually mints. Accepting a second id space
+    is only safe because both spaces are bare uuid columns (``runs.run_id`` and
+    ``workflow_runs.id``), so no widening of the annotation was needed — and a one-line
+    assertion now is cheaper than rediscovering that. Asserted on the live signature
+    AND on the wire, so neither a relaxed annotation nor a lost validator can pass.
+    """
+    import inspect
+
+    from app.api.runs import cancel_run
+
+    annotation = inspect.signature(cancel_run).parameters["run_id"].annotation
+    assert annotation is UUID, (
+        f"run_id must stay UUID-typed; it is annotated {annotation!r}"
+    )
+    # and the validator is live on the wire — a path-shaped id is refused, not resolved
+    res = client.delete("/runs/some/path/shaped-id", headers=auth_headers)
+    assert res.status_code in (404, 422), (
+        f"a non-uuid path must never resolve to a run; got {res.status_code}"
+    )
+    res2 = client.delete("/runs/not-a-uuid", headers=auth_headers)
+    assert res2.status_code == 422, (
+        f"a non-uuid run_id must be rejected by validation; got {res2.status_code}"
+    )
+
+
+def test_no_403_anywhere_on_the_runs_module(client, auth_headers):
+    """The whole ``/runs`` module answers 404, never 403 — including the new arms.
+
+    Scoped over the module SOURCE on purpose here (unlike the value-scoped fences
+    above): the property is the ABSENCE of a status constant, so any occurrence at all —
+    in a branch or in prose claiming one — is the thing worth failing on.
+    """
+    src = (_REPO / "backend/app/api/runs.py").read_text(encoding="utf-8")
+    assert "HTTP_403" not in src, (
+        "the /runs module must never answer 403 — one collapsed 404 covers both "
+        "'doesn't exist' and 'not yours' (T-062-01 / D-062-12)"
     )
