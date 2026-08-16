@@ -354,8 +354,24 @@ untracked `.claude/` additions were **not staged, committed, reverted or cleaned
 `frontend/src/lib/toolMeta.ts`, `frontend/src/lib/__tests__/toolMeta.test.ts`,
 `frontend/src/components/chat/MessageItem.tsx`, `frontend/src/components/chat/RunCard.tsx`,
 `frontend/src/components/chat/__tests__/MessageItem.harnessBanner.test.tsx` — were **not read for
-edit, not staged, not committed and not touched**. Verified: `git diff --numstat` across all three
-of this plan's commits names only this plan's own five files.
+edit, not staged, not committed and not touched**. Verified **PER COMMIT** with
+`git show --numstat --format="" <sha>`:
+
+```
+77f7fc16  2  1  CLAUDE.md
+9cb10558  10 0  .claude/skills/.../workflow-run-surface.md   +  36 1  frontend/src/stores/streamsStore.ts
+2f119da1  36 1  BUG-260815-07-…md                            +  70 1  chat-stuck-on-starting-…md
+497014ba  418 0 194-05-SUMMARY.md
+```
+
+⚠ **PER COMMIT is the load-bearing word, and the reason is a measurement rather than pedantry:
+`194-07`'s commit `157329ef` (`feat(194-07): give outerBannerLabel an additive-default harness
+progress input`) landed BETWEEN this plan's third and fourth commits.** So a naive **range** diff —
+`git diff --numstat 77f7fc16~1 HEAD` — lists `frontend/src/lib/toolMeta.ts` and
+`frontend/src/lib/__tests__/toolMeta.test.ts` alongside this plan's files, and would read as a scope
+violation that did not happen. The per-commit form is the one that answers the question; the range
+form answers a different one. *Recorded so the next reader who runs the obvious command is not
+misled by their own output.*
 
 ## STATE / ROADMAP / REQUIREMENTS
 
