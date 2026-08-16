@@ -1044,3 +1044,90 @@ describe("194.1-03 R5 — both honesty arms still reach the screen with no place
     expect(useStreamsStore.getState().failedSendDrafts.get(THREAD)).toBe("hi")
   })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ⚠ 194.1 UAT ISSUE 6 — THE PHASE SPINE IS RE-READ WHEN A STOPPED RUN ENDS
+//
+// Driven by the operator 2026-08-16: after a Stop the chat read
+// `⊘ Stopped by you` while the panel went on reading `gather-usage — Running`
+// forever. The status, the wire and the `DB_PHASE_STATUS` mapping were all
+// already correct — `usePanelReconcile` simply never re-read them, because its
+// effect is keyed on `[threadId]` ONLY and a cancel tears down the SSE stream
+// before any terminal phase event can arrive.
+//
+// ⚠ The diagnosis was confirmed by a DISCRIMINATING PREDICTION made BEFORE the
+// UAT row was driven — "navigating away and back will show the panel correcting
+// itself" — and it held. So these cases pin a TRIGGER, not a status.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("194.1 issue 6 — the panel's phase spine is refreshed when a stopped run leaves streaming", () => {
+  /** The shape `reconcilePhases` derives its rows from. `active` is the DB
+   *  literal that maps to the client's `running`; `cancelled` is migration 119's
+   *  7th literal, which maps to its own member. */
+  const workflowFrame = (phaseStatus: string) => ({
+    definition_slug: "doc-qa",
+    active_workflow_run_id: null,
+    last_workflow_run_id: "wfr-1",
+    total_phases: 1,
+    current_phase_index: 0,
+    phases: [{ slug: "gather-usage", phase_index: 0, status: phaseStatus, phase_type: "llm_agent" }],
+  })
+
+  it("re-reads the phases so a stopped run stops reading as Running", async () => {
+    cancelHangs()
+    const { result } = renderActions()
+    await act(async () => {
+      result.current.setViewingThread(THREAD)
+    })
+    await waitFor(() => expect(useStreamsStore.getState().viewedThreadId).toBe(THREAD))
+
+    // The panel is holding the last thing the stream told it: still running.
+    act(() => {
+      useStreamsStore.getState().actions.replacePhasesForThread(THREAD, [
+        { slug: "gather-usage", index: 0, status: "running", subAgents: [], pendingAsk: null },
+      ] as never)
+    })
+    expect(useStreamsStore.getState().phasesByThread.get(THREAD)?.[0]?.status).toBe("running")
+
+    seedStreaming(THREAD)
+    seedBucket(THREAD, [assistant({ runStatus: "streaming", runId: PRODUCER_RUN_ID })])
+    act(() => {
+      void result.current.stopThread(THREAD)
+    })
+    expect(isStopping(THREAD)).toBe(true)
+
+    // The server now holds the truth Phase 194's `cancel_active_phases` wrote.
+    mockGetThreadWorkflow.mockResolvedValue(workflowFrame("cancelled"))
+
+    leaveStreaming(THREAD)
+
+    // ⚠ THE ASSERTION IS THE REFRESH, not the mapping. Without the trigger the
+    // store keeps `running` forever on this thread — which is exactly what the
+    // operator watched happen.
+    await waitFor(() =>
+      expect(useStreamsStore.getState().phasesByThread.get(THREAD)?.[0]?.status).toBe("cancelled"),
+    )
+  })
+
+  it("does NOT fetch for a thread the user is not looking at", async () => {
+    cancelHangs()
+    const { result } = renderActions()
+    await act(async () => {
+      result.current.setViewingThread("some-other-thread")
+    })
+    await waitFor(() => expect(useStreamsStore.getState().viewedThreadId).toBe("some-other-thread"))
+
+    seedStreaming(THREAD)
+    seedBucket(THREAD, [assistant({ runStatus: "streaming", runId: PRODUCER_RUN_ID })])
+    act(() => {
+      void result.current.stopThread(THREAD)
+    })
+
+    mockGetThreadWorkflow.mockClear()
+    leaveStreaming(THREAD)
+    await Promise.resolve()
+
+    // A background thread's panel is not on screen, and the shipped
+    // thread-switch reconcile refreshes it the moment it becomes visible.
+    expect(mockGetThreadWorkflow).not.toHaveBeenCalled()
+  })
+})

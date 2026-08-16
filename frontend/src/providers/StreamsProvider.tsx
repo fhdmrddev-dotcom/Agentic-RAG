@@ -3273,7 +3273,10 @@ export function StreamsProvider({ children }: PropsWithChildren) {
           ...stopNotConfirmed,
           ...harnessKickoffThreads,
         ])) {
-          if (!next.has(t)) clearStopStateForThread(t)
+          if (!next.has(t)) {
+            clearStopStateForThread(t)
+            refreshPhaseSpineAfterStop(t)
+          }
         }
       },
     )
@@ -3719,6 +3722,75 @@ export function useTasks(threadId: string | null): {
 // Phase 188 Plan 05 (SPEC Req 8 / D-188-02): the Phase-098-UAT `DB_PHASE_STATUS` map
 // MOVED to `@/lib/phaseState` — verbatim, with its provenance comment — and this file
 // now imports `phaseStatusFromDb` instead. The map is unchanged; only its address is.
+
+/**
+ * Phase 194.1 UAT issue 6 — REFRESH THE PHASE SPINE WHEN A RUN LEAVES STREAMING.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * THE DEFECT, and it was a MISSING TRIGGER rather than a wrong status
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Driven by the operator on 2026-08-16: after a Stop, the chat read
+ * `⊘ Stopped by you` while the workspace panel went on reading
+ * `gather-usage — Running` / `● Working` indefinitely. Two surfaces of one app
+ * disagreeing about whether a run was going.
+ *
+ * Both ends of the wire were already correct and that was MEASURED, not assumed:
+ * Phase 194's `cancel_active_phases` writes `cancelled`, and `DB_PHASE_STATUS`
+ * maps it to its own client member (`lib/phaseState.ts`, the 7th literal, added
+ * by migration 119). What was missing is that **nothing re-read it**.
+ * `usePanelReconcile`'s refresh effect is keyed on `[threadId]` ONLY — its own
+ * docblock says *"fires ONLY on thread-switch + the manual `reconcile()` escape
+ * hatch"* — and a cancel TEARS DOWN THE SSE STREAM, so no terminal phase event
+ * arrives either. The panel simply kept the last thing it had heard.
+ *
+ * ⚠ The diagnosis was confirmed by a DISCRIMINATING PREDICTION made before the
+ * row was driven: *"if this is right, navigating away and back will show the
+ * panel correcting itself."* It did — `gather-usage — Stopped`, `■ Stopped`.
+ * Same state, same data; the only difference was a trigger firing.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHY IT LIVES IN THE STOPPING-CLEAR SUBSCRIPTION AND NOWHERE ELSE
+ * ─────────────────────────────────────────────────────────────────────────────
+ * The loop above already walks exactly the threads that need this — the union of
+ * `stoppingThreads ∪ stopNotConfirmed ∪ harnessKickoffThreads` — at exactly the
+ * moment they leave `streamingThreads`, and it does so over the SLICE every one
+ * of the four exit routes writes (see effect #1b's docblock). A run that ends
+ * NORMALLY is not in that union and does not need this: its `phase_completed`
+ * SSE already updated the store. **So the refresh is scoped to the runs whose
+ * terminal events went missing, which is precisely the defect.**
+ *
+ * ⚠ SCOPED TO THE VIEWED THREAD ON PURPOSE. A background thread's panel is not
+ * on screen, and the shipped thread-switch reconcile refreshes it the moment it
+ * becomes visible — so fetching for it would be work nobody can see.
+ *
+ * ⚠ THIS DOES NOT TOUCH THE TERMINAL READING, and effect #1b's L-01 boundary
+ * still binds unchanged. This re-reads `workflow_phases` from the server; it does
+ * not suppress, delay or rewrite what the run says about itself. When L-01 fires
+ * — a producer on the other worker writing `completed` over the cancel — this
+ * will surface the phase as `cancelled` beside a `✓ Complete` run, which is the
+ * disagreement HONESTLY RENDERED and must not be smoothed over.
+ *
+ * ⚠ BEST-EFFORT BY CONTRACT, and the honest limit is stated rather than implied:
+ * the server write and this read are not ordered with respect to each other, so a
+ * refetch that loses the race reads the pre-cancel row. The shipped
+ * thread-switch reconcile remains the backstop it always was — this makes the
+ * common case right, it does not make the read authoritative. A failure is
+ * swallowed for the same reason: the panel was already stale, and a rejected
+ * background fetch must never surface as an error the user cannot act on.
+ */
+function refreshPhaseSpineAfterStop(threadId: string): void {
+  if (useStreamsStore.getState().viewedThreadId !== threadId) return
+  void reconcilePhases(threadId)
+    .then((phases) => {
+      // Re-check: the user may have navigated away during the fetch, and the
+      // thread they moved TO has already reconciled itself on the switch.
+      if (useStreamsStore.getState().viewedThreadId !== threadId) return
+      useStreamsStore.getState().actions.replacePhasesForThread(threadId, phases)
+    })
+    .catch((err) => {
+      console.warn("[StreamsProvider] phase-spine refresh after stop failed", err)
+    })
+}
 
 async function reconcilePhases(threadId: string, signal?: AbortSignal): Promise<Phase[]> {
   const wf = await getThreadWorkflow(threadId, signal)
