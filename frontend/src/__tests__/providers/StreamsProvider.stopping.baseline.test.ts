@@ -197,7 +197,14 @@ describe("194.1-01 case 1 — the bucket-scan resolution WORKS today", () => {
   it("stopThread hands cancelRun the producer run id off the streaming assistant row", async () => {
     const { result } = renderActions()
     seedBucket(THREAD, [
-      assistant({ runStatus: "done", runId: "run-OLD-must-not-win" }),
+      // ⚠ `"completed"`, not `"done"`. The `Message.runStatus` union is
+      // `"streaming" | "completed" | "failed" | "cancelled" | "timed_out"` — the
+      // SSE terminal KIND is `"done"` (`onTerminal("done")`) and the persisted
+      // STATUS is `"completed"`. Two different vocabularies for one moment, and
+      // the first draft of this file used the wrong one; caught by `tsc -p
+      // tsconfig.app.json`, which is also why the bare `--noEmit` form (checking
+      // ZERO files in this repo) is not an acceptable substitute.
+      assistant({ runStatus: "completed", runId: "run-OLD-must-not-win" }),
       assistant({ runStatus: "streaming", runId: PRODUCER_RUN_ID }),
     ])
 
@@ -234,7 +241,7 @@ describe("194.1-01 case 2 — the silent no-op is REAL (the defect R6 repairs)",
   it("a bucket with NO streaming assistant is equally silent", async () => {
     const { result } = renderActions()
     seedBucket(THREAD, [
-      assistant({ runStatus: "done", runId: "run-finished" }),
+      assistant({ runStatus: "completed", runId: "run-finished" }),
       assistant({ runStatus: "failed", runId: "run-broken" }),
     ])
 
