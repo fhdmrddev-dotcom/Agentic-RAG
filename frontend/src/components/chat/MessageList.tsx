@@ -3,6 +3,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageItem } from "./MessageItem"
 import { MessageSkeleton } from "./MessageSkeleton"
 import { RunStatusStrip } from "./RunStatusStrip"
+import { ThreadRunLine } from "./ThreadRunLine"
 import { useFollowScroll } from "@/hooks/useFollowScroll"
 import { unifiedStepCount } from "@/lib/stepCount"
 import { dedupMessagesByRunId } from "@/lib/dedupMessages"
@@ -19,6 +20,20 @@ interface Props {
   showSuggestions?: boolean
   /** Phase 063 (Pattern 4 / D-063-04): forwarded to MessageItem; clicked from the Resume button on failed-run assistant bubbles. */
   onResume?: (message: Message) => void
+  /**
+   * Phase 194.1 Plan 06 (RUN-01 / D-15) — the ONE prop this plan adds, and the only
+   * movement its D-03 stop condition allows on this interface.
+   *
+   * It exists so `ThreadRunLine` can be mounted at LIST level rather than inside the
+   * transcript. That placement is the decision, not an implementation detail: after
+   * plan 03 a HARNESS run inserts no assistant node at all, so there is no message for
+   * a run reading to hang off — and the returning reading must survive a stop that has
+   * already NULLed `threads.active_workflow_run_id`.
+   *
+   * Optional and nullable on purpose. Every existing call site keeps working, and a
+   * `null` thread renders nothing and buys no round trip (asserted, not assumed).
+   */
+  threadId?: string | null
 }
 
 /**
@@ -42,7 +57,7 @@ function formatFloatingElapsed(createdAt: string | undefined): string | null {
   return `${m}m ${s}s`
 }
 
-export function MessageList({ messages, isStreaming, isLoading = false, onSendMessage, showSuggestions, onResume }: Props) {
+export function MessageList({ messages, isStreaming, isLoading = false, onSendMessage, showSuggestions, onResume, threadId }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const prevCountRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -187,6 +202,24 @@ export function MessageList({ messages, isStreaming, isLoading = false, onSendMe
             )
           })
         )}
+
+        {/* Phase 194.1 Plan 06 (RUN-01 / R4 + R5 — D-15): the run-anchored line.
+            AFTER the messages map and BEFORE the auto-scroll anchor, so it is at
+            LIST level — not inside the transcript — and `bottomRef` still lands at
+            the true bottom of the scrollable content.
+
+            ⚠ IT IS A SIBLING OF THE FLOATING CHIP BELOW, NOT A REPLACEMENT FOR IT
+            (D-17). That chip's `RunStatusStrip` is gated on `showJumpToLive`, i.e.
+            it appears only once you have scrolled away — a different affordance,
+            byte-untouched by this plan.
+
+            ⚠ LIST LEVEL RATHER THAN MESSAGE LEVEL IS LOAD-BEARING. After plan 03 a
+            harness kickoff inserts NO assistant node, so there is no message for a
+            run reading to anchor to; and a stop NULLs the thread's live run anchor,
+            so the returning reading has to come from the persisted row. Both facts
+            point at the same placement. */}
+        <ThreadRunLine threadId={threadId ?? null} />
+
         <div ref={bottomRef} />
 
         {/* Phase 095 Plan 04 (D-03 hybrid, home #2): the floating "↓ Jump to live"

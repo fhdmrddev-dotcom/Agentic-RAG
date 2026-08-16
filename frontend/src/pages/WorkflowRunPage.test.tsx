@@ -1351,6 +1351,26 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     )
   })
 
+  /**
+   * ⚠ ONE CLAUSE OF THIS CASE IS SUPERSEDED BY Phase 194.1 Plan 06, AND THE ORIGINAL IS
+   * QUOTED RATHER THAN DELETED (the 193.2 WR-05 habit — a retired assertion that leaves
+   * no trace is indistinguishable from coverage nobody wrote). It read:
+   *
+   *     expect(pageSource).toMatch(/function fmtElapsed/)
+   *
+   * That clause was TRUE when written and is FALSE as of `194.1-06`, which HOISTED
+   * `fmtElapsed` VERBATIM into `@/lib/fmtElapsed` because `components/chat/ThreadRunLine`
+   * became its second consumer and this tree already carried three elapsed formatters.
+   *
+   * ⚠ THE PROPERTY IT DEFENDED IS NOT WEAKENED, IT IS RE-AIMED, AND THAT DISTINCTION IS
+   * THE WHOLE POINT. The clause never guarded "the definition is in this file"; it guarded
+   * *"the label is produced by our own three-branch function rather than by an acquired
+   * date library"* — which is what the two `not.toMatch` needles above are about. So the
+   * replacement asserts the page still resolves the label through THAT function, now by
+   * import, and `lib/__tests__/runStepCount.test.ts` separately proves the moved body is
+   * byte-identical to the one that lived here. Between the two, the label's provenance is
+   * pinned harder than it was before the move, not more loosely.
+   */
   it("adds no date library and constructs no HTML", () => {
     const DATE_A = ["date", "-fns"].join("")
     const DATE_B = ["day", "js"].join("")
@@ -1358,11 +1378,19 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
     for (const needle of [DATE_A, DATE_B, RAW_HTML]) {
       expect(pageSource).not.toMatch(new RegExp(needle))
     }
-    expect(pageSource).toMatch(/function fmtElapsed/)
+    // SUPERSEDED clause, re-aimed — see the docblock. The page no longer DEFINES the
+    // formatter and must not: a re-declaration here would be the fourth copy again.
+    expect(pageSource).not.toMatch(/^function fmtElapsed/m)
+    expect(pageSource).toMatch(/import \{ fmtElapsed \} from "@\/lib\/fmtElapsed"/)
+    // …and it is still the thing producing the label, on BOTH shipped call sites.
+    expect(pageSource).toContain("fmtElapsed(end - anchorMs)")
+    expect(pageSource).toContain("fmtElapsed(nowMs - anchorMs)")
     // POSITIVE CONTROL — all three needles match the shapes they forbid.
     expect("import { formatDistance } from 'date-fns'").toMatch(new RegExp(DATE_A))
     expect("import dayjs from 'dayjs'").toMatch(new RegExp(DATE_B))
     expect("<p dangerouslySetInnerHTML={{ __html: x }} />").toMatch(new RegExp(RAW_HTML))
+    // …and the re-aimed clause catches a re-declaration (positive control).
+    expect("function fmtElapsed(ms: number) {}").toMatch(/^function fmtElapsed/m)
   })
 
   it("reads no panel-scoped colour token — this surface sits on the page background", () => {

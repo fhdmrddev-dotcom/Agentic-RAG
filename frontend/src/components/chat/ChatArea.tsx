@@ -563,6 +563,15 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
           </span>
         </div>
       )}
+      {/* Phase 194.1 Plan 06 (RUN-01 / D-15) — `threadId` is the ONE prop this plan
+          threads, and it is the SAME expression this file already computes for the
+          composer one screen up and for every per-thread store selector at the top of
+          the component. Reused rather than re-derived, so the transcript and the
+          composer can never disagree about which thread they are looking at.
+
+          It is what lets `MessageList` mount the run-anchored line at LIST level. No
+          state is added here: the line owns its own read and its own clock, which is
+          why this file's `useState` / `useEffect` counts are unmoved at 7 / 4. */}
       <MessageList
         messages={messages}
         isStreaming={isStreaming}
@@ -570,6 +579,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
         onSendMessage={onSendMessage}
         showSuggestions={agentMode !== "explorer"}
         onResume={onResume}
+        threadId={thread?.id ?? null}
       />
       {inputBar}
     </div>

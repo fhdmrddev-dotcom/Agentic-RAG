@@ -73,3 +73,73 @@ import-containment, not a before/after run.
 **Most likely home:** `SEED-056`.
 **Re-open trigger:** as above, plus — a phase that touches `useMessages`' action surface (which is
 already the recorded trigger for retiring `stopStream`, so the two are likely to arrive together).
+
+---
+
+## From plan `194.1-06` (2026-08-16)
+
+### `WorkflowsPage.test.tsx` (and `library/WorkflowCard.test.tsx`) fail NON-DETERMINISTICALLY inside the count gate — PRE-EXISTING, PROVED so by a real revert
+
+Four consecutive count-gate runs on the same tree, all at `total 3954` / `pinned total 3868`,
+with `WorkflowRunPage.test.tsx` reading **89 cases in every single one** and **no
+`[count-decrease]` in any of them**:
+
+| run | verdict | `failed` | failing FILES |
+|---|---|---|---|
+| 1 | VIOLATED | **7** | `WorkflowsPage.test.tsx`, `library/WorkflowCard.test.tsx` |
+| 2 | **`count gate OK`** | **0** | — |
+| 3 | VIOLATED | **5** | `WorkflowsPage.test.tsx` |
+| 4 | VIOLATED | **1** | `WorkflowsPage.test.tsx` |
+
+**Why they are provably not plan 06's — and this one is a REVERT, not diff-containment:**
+
+`git checkout <base> -- WorkflowRunPage.tsx MessageList.tsx ChatArea.tsx` (all three production
+files this plan modifies, restored to the wave base), then
+`GSD_VITEST_MAX_WORKERS=2 npx vitest run src/pages/WorkflowsPage.test.tsx`:
+
+```
+with plan 06's production changes:   3 failed | 52 passed  (55)
+with them REVERTED to the base:      3 failed | 52 passed  (55)   ← IDENTICAL
+```
+
+The tree was then restored from `HEAD` and the restore PROVED, not assumed:
+`git status --short` empty and `git diff --numstat HEAD` empty.
+
+Secondary containment, kept because it is independent of the revert: this plan's whole diff is
+eleven files, none of which is `WorkflowsPage.*`, `library/*` or anything either suite imports —
+`grep -rlE "WorkflowsPage|library/WorkflowCard"` over all five touched production modules returns
+**nothing**.
+
+⚠ **A SIBLING EXECUTOR WAS RUNNING ITS OWN COUNT GATE CONCURRENTLY, AND THERE IS DIRECT EVIDENCE
+RATHER THAN AN INFERENCE.** The gate writes its vitest JSON to `os.tmpdir()`; the reports
+interleaved with mine read **`total 3959`**, five cases above my tree's 3954. Those are plan
+`194.1-05`'s. `CLAUDE.md` records that at **three** concurrent test-running agents the gate goes
+non-deterministic *regardless of cap* — which is the shape of a `7 → 0 → 5 → 1` sequence on a
+frozen tree far better than a real defect is.
+
+**What is NOT claimed:** that these suites are green on a quiet tree. `194.1-BASELINE.md` §11
+measured `failed 0` twice at base, so something has since made them fragile; this plan did not
+measure what, and does not fix it. It is out of scope by the executor scope boundary.
+
+**Most likely home:** `SEED-056` (frontend vitest rot), or the concurrency note in `CLAUDE.md`.
+**Re-open trigger:** a `WorkflowsPage.test.tsx` failure observed on a QUIET tree with no sibling
+executor — at which point it is a real defect rather than oversubscription, and belongs to
+whichever phase owns `WorkflowsPage.tsx` next.
+
+### ⚠ A METHOD NOTE WORTH MORE THAN THE FINDING: a truncated gate run is RECOVERABLE
+
+I broke the project's *"capture the failing filenames BEFORE re-running anything"* rule — run 1's
+output was piped through `tail -25`, which discarded the names. `194.1-03` recorded being unable
+to recover from exactly this and therefore unable to prove its case innocent.
+
+**It is recoverable, and the fix should be reused rather than re-derived.** The gate runs vitest
+with `--reporter=json --outputFile=<os.tmpdir()>/vitest-count-gate-<pid>-<ts>.json`
+(`scripts/vitest-count-gate.cjs:2431-2445`) and **never deletes the file**. Every historical run on
+this machine is still on disk. Sorting by mtime and reading `testResults[].assertionResults[]`
+where `status === "failed"` recovered run 1's two filenames exactly — after the fact, from an
+artifact the gate had already written.
+
+So the rule stands (capture first; it is cheaper), but a plan that breaks it is **not** condemned
+to "I cannot prove those cases were innocent". Reading the artifact also distinguishes MY runs
+from a sibling's by `numTotalTests`, which is how the concurrency above was evidenced rather than
+supposed.

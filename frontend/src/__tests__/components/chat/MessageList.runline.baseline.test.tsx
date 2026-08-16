@@ -122,18 +122,64 @@ describe("194.1-01 — MessageList's Props carry NO threadId today (plan 07's be
    * 192.1 failure, where a renamed module was swept against the empty string and
    * reported green.
    */
+  /**
+   * ⚠ SUPERSEDED IN PLACE BY Phase 194.1 Plan 06 — ORIGINAL QUOTED, NEVER DELETED
+   * (the 193.2 WR-05 habit: a retired assertion that leaves no trace is
+   * indistinguishable from coverage nobody wrote).
+   *
+   * It read:
+   *
+   *     expect(src.split("\n").length).toBe(235)
+   *
+   * with the note: *"`wc -l` reads 234; `split("\n")` counts SEGMENTS and the file
+   * ends with a trailing newline, so it is one more."*
+   *
+   * Plan 06 added the `threadId` prop and the list-level `<ThreadRunLine …/>`
+   * mount, so the file is longer. **The pin is re-aimed rather than dropped**: an
+   * exact figure is what makes the `?raw` import provably the right file, and the
+   * empty-string trap it guards (the 192.1 failure) is real. It is now asserted as
+   * a FLOOR plus an identity check on the two things plan 06 actually added, which
+   * cannot pass over an empty or wrong file and does not have to be re-typed on
+   * every future edit.
+   */
   it("the swept source is non-empty and is the right file", () => {
     const src = messageListSource as string
     expect(typeof src).toBe("string")
     expect(src.length).toBeGreaterThan(4000)
     expect(src).toContain("export function MessageList")
-    // `wc -l` reads 234; `split("\n")` counts SEGMENTS and the file ends with a
-    // trailing newline, so it is one more. Both are right about different
-    // questions; `194.1-BASELINE.md` §3 publishes the `wc -l` figure.
-    expect(src.split("\n").length).toBe(235)
+    // SUPERSEDED: was `toBe(235)` at plan 01's capture. Measured after plan 06: 268
+    // segments (267 by `wc -l`). Recorded beside the original rather than over it.
+    expect(src.split("\n").length).toBeGreaterThanOrEqual(235)
+    // …and the identity of the growth, so the floor cannot drift into vagueness.
+    expect(src).toContain("<ThreadRunLine")
   })
 
-  it("the declared Props interface has no `threadId` member", () => {
+  /**
+   * ⚠ SUPERSEDED IN PLACE BY Phase 194.1 Plan 06 — ORIGINAL QUOTED, NEVER DELETED.
+   * The case was titled *"the declared Props interface has no `threadId` member"*
+   * and its operative line was:
+   *
+   *     expect(body).not.toMatch(/\bthreadId\b/)
+   *
+   * That was TRUE at plan 01's capture and is FALSE as of plan 06, which adds
+   * exactly one prop. **The inversion is the point of the capture** — this is the
+   * "before" the baseline existed to hold, and flipping it in place is how the
+   * change is proved to have happened rather than merely claimed.
+   *
+   * ⚠ AND IT IS NOW STRONGER THAN A BARE PRESENCE CHECK: the plan's D-03 stop
+   * condition allows this interface to move by EXACTLY ONE member, so the case
+   * asserts the count as well as the name. A second prop smuggled in later reds
+   * here, which a `toMatch(/threadId/)` alone would not have caught.
+   *
+   * ⚠ ONE PREDICTION IN THE PLAN IS MEASURED FALSE AND CORRECTED HERE RATHER THAN
+   * REPEATED. `194.1-06-PLAN.md` task 3 says *"Two are legitimately inverted (the
+   * `data-testid` absence, and the Props carries no `threadId` source fence)"*.
+   * The `data-testid` cases did **NOT** invert — all three stayed GREEN — because
+   * they render `MessageList` with no `threadId`, so the new line correctly renders
+   * nothing. The second inverted case was the LINE-COUNT pin above, which the plan
+   * did not anticipate. *A prediction about which assertion will red is not a run.*
+   */
+  it("the declared Props interface carries `threadId` — and exactly one new member", () => {
     const src = messageListSource as string
     const match = src.match(/interface Props \{([\s\S]*?)\n\}/)
     expect(match).not.toBeNull()
@@ -141,12 +187,29 @@ describe("194.1-01 — MessageList's Props carry NO threadId today (plan 07's be
     const body = match![1]
     expect(body.length).toBeGreaterThan(50)
     // The six shipped members, so this fence is anchored to a body it actually
-    // parsed rather than to any block that happened to match.
+    // parsed rather than to any block that happened to match. All six SURVIVE.
     expect(body).toContain("messages: Message[]")
     expect(body).toContain("isStreaming: boolean")
     expect(body).toContain("onResume?")
 
-    expect(body).not.toMatch(/\bthreadId\b/)
+    // SUPERSEDED: was `expect(body).not.toMatch(/\bthreadId\b/)`.
+    expect(body).toMatch(/\bthreadId\b/)
+
+    // D-03: the member count moved by EXACTLY ONE, 6 → 7. Members are counted by
+    // their declaration lines, so the docblocks between them do not inflate it.
+    const members = body
+      .split("\n")
+      .filter((l) => /^\s{2}[A-Za-z_$][\w$]*\??:/.test(l))
+      .map((l) => l.trim().split(/[?:]/)[0])
+    expect(members).toEqual([
+      "messages",
+      "isStreaming",
+      "isLoading",
+      "onSendMessage",
+      "showSuggestions",
+      "onResume",
+      "threadId",
+    ])
   })
 
   it("the same regex DOES find a planted threadId (positive control)", () => {
