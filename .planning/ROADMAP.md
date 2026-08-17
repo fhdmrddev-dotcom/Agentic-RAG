@@ -597,8 +597,8 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 195-01-PLAN.md — Wave 0/1: the LIVE SC#1 baseline in a commit that PREDATES every source change (D-16), the named `BASE_SHA`, and the wave-1 browser + `.docx`-reader probe (**blocking checkpoint** — the orchestrator drives it)
-- [ ] 195-02-PLAN.md — Wave 0/1: the characterization fences on the UNMOVED tree — `supersedes` in BOTH branches and the inert `data-variant` (**zero coverage repo-wide**, F5), the dead-link pair as two cases (P2), the run page's SILENT dead row (F8), and the count-gate adoption of FIVE suites
+- [x] 195-01-PLAN.md — Wave 0/1: the LIVE SC#1 baseline in a commit that PREDATES every source change (D-16), the named `BASE_SHA`, and the wave-1 browser + `.docx`-reader probe (**blocking checkpoint** — the orchestrator drives it)
+- [x] 195-02-PLAN.md — Wave 0/1: the characterization fences on the UNMOVED tree — `supersedes` in BOTH branches and the inert `data-variant` (**zero coverage repo-wide**, F5), the dead-link pair as two cases (P2), the run page's SILENT dead row (F8), and the count-gate adoption of FIVE suites
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
