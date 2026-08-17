@@ -61,6 +61,9 @@ at the Builder page level. Revisit pagination at ~500 rows.
 from __future__ import annotations
 
 import logging
+from typing import Any
+
+from fastapi import HTTPException, status
 
 from app.config import MODEL_CAPABILITIES, _infer_provider_for
 
@@ -226,8 +229,140 @@ def to_author_row(row: dict) -> dict:
     return {k: row.get(k) for k in _AUTHOR_ROW_FIELDS}
 
 
+# ── Phase 196 Plan 06 (AUTH-04 / SC#2 / D-09 / D-08) — the SAVE-PATH refusal ──────────
+#
+# ``config.model`` is validated by NOTHING today: not on save, not at publish, not at run.
+# A client-only picker list would reduce SC#2 to "cannot be selected through the FORM",
+# which any direct API call bypasses. The disable is courtesy; the server is the wall.
+#
+# THIS LIVES IN THE LEAF, NOT IN A PYDANTIC VALIDATOR, for three measured reasons:
+#   1. the check is ASYNC (it reads the 30s override cache); Pydantic v2 validators are sync;
+#   2. ``app/models/harness.py`` records that file's own standing rule — the draft save path
+#      persists ``model_dump(mode="json")``, so a derivation living in the model would be
+#      BAKED into the JSONB;
+#   3. D-08 requires an ALREADY-STORED unregistered value to stay saveable, which a
+#      parse-level invariant makes impossible — the day a registry row is retired, every
+#      stored definition naming it would stop parsing.
+
+
+def _phase_model_pairs(definition: Any) -> list[tuple[str, str]]:
+    """``[(phase_slug, model), ...]`` for every phase carrying a NON-EMPTY ``config.model``.
+
+    Accepts BOTH a parsed ``WorkflowDefinition`` (the request body) and a raw JSONB dict
+    (the stored row) — the grandfather comparison below has one of each in its hands, and
+    normalising here is what lets ONE comparison serve both. A blank/absent model, a phase
+    with no config, and a definition with no phases are all no-ops.
+    """
+    if definition is None:
+        return []
+    phases = definition.get("phases") if isinstance(definition, dict) else getattr(definition, "phases", None)
+    pairs: list[tuple[str, str]] = []
+    for phase in phases or []:
+        if isinstance(phase, dict):
+            slug = phase.get("slug") or ""
+            config = phase.get("config") or {}
+            model = config.get("model") if isinstance(config, dict) else None
+        else:
+            slug = getattr(phase, "slug", "") or ""
+            config = getattr(phase, "config", None)
+            model = getattr(config, "model", None) if config is not None else None
+        if isinstance(model, str) and model.strip():
+            pairs.append((str(slug), model))
+    return pairs
+
+
+async def registered_model_ids() -> set[str]:
+    """Every ``model_id`` the registry KNOWS — MEMBERSHIP, never availability.
+
+    ⚠ DERIVED FROM ``build_model_registry_rows`` — the SAME union the author picker reads —
+    and deliberately NOT from the narrower allowed-set helper in ``app.models.user_settings``
+    that backs ``/me/preferences``. Two incompatible ``enabled`` semantics ship today: an
+    ABSENT override row reads *enabled* to ``_registry_row`` (and to the RUNTIME
+    enforcement in ``run_model_resolution.py``) and *not offerable* to that other helper.
+    Using the narrower one here would refuse a SAVE for ~32 models the engine happily runs,
+    which is a different lie from the one AUTH-04 removes, not an absence of one. A grep for
+    that helper's name in this module must come back EMPTY.
+
+    ⚠ MEMBERSHIP, NOT AVAILABILITY — the set deliberately INCLUDES disabled and deprecated
+    rows. A disabled model is a RUN-time concern (D-10: the run falls back and says so);
+    making it a save-time refusal would mean disabling a model retroactively breaks every
+    stored workflow that names it, which is exactly the brittleness D-08 forbids.
+    """
+    rows = await build_model_registry_rows()
+    return {r["model_id"] for r in rows if r.get("model_id")}
+
+
+async def unregistered_phase_models(definition: Any) -> list[dict]:
+    """``[{"phase_slug", "model"}, ...]`` for phases naming a model the registry does not know.
+
+    Separated from the raise so a CALLER can ask the cheap question first — "is there any
+    offender at all?" — and only then pay for the owner-scoped read that ``previous`` needs.
+    That laziness is what keeps the ordinary autosave (measured: 239 of 257 stored phases
+    carry no model) at zero extra queries, and it is what lets the update door resolve
+    OWNERSHIP before it decides to refuse.
+    """
+    known = await registered_model_ids()
+    return [
+        {"phase_slug": slug, "model": model}
+        for slug, model in _phase_model_pairs(definition)
+        if model not in known
+    ]
+
+
+async def assert_phase_models_registered(definition: Any, *, previous: Any = None) -> None:
+    """Refuse a NEWLY-INTRODUCED unregistered ``config.model`` with an object-shaped 400.
+
+    THE DETAIL IS AN OBJECT, NOT PROSE. ``api/workflows.py``'s own refusal register states
+    the rule in so many words — *the client branches on ``code``, never on this prose* — so
+    this joins that register (``code="unknown_model"``) rather than sitting above it as a
+    bare sentence. ``phase_slug`` and ``model`` ride along so the Builder can focus the
+    offending field instead of guessing which node is wrong. The ``message`` follows the
+    ``api/me_preferences.py`` prose register: name the model, name the remedy.
+
+    ``previous`` IS D-08's GRANDFATHER, and it is the whole reason this is route-level
+    policy. When supplied (the UPDATE door), a phase whose STORED counterpart — matched by
+    phase slug — already carries the identical value is SKIPPED: an operator retiring a
+    registry row must never make an existing workflow unsaveable. D-09 (refuse) and D-08
+    (do not brick) are both true exactly because the refusal is scoped to values the caller
+    is INTRODUCING.
+
+    ⚠ MEASURED BLAST RADIUS, 2026-08-18, live local DB: 270 definitions / 257 phases / 239
+    blank / 18 ``gpt-5.4`` (registry-known AND enabled) / **0 phases in the unknown state**.
+    The grandfather branch is therefore DEAD CODE today. It exists so that D-08's promise is
+    true the day it stops being dead, not because anything currently needs it.
+
+    Raises on the FIRST offender: the picker fixes one field at a time, and naming one
+    phase is more actionable than a list nobody reads.
+    """
+    offenders = await unregistered_phase_models(definition)
+    if not offenders:
+        return
+    # dict(...) — last wins on a duplicate slug. Slugs are the natural key of a phase and
+    # the canvas mints them unique; a duplicate would grandfather off the later phase,
+    # which is the same answer the stored row would give a re-save.
+    grandfathered = dict(_phase_model_pairs(previous)) if previous is not None else {}
+    for offender in offenders:
+        if grandfathered.get(offender["phase_slug"]) == offender["model"]:
+            continue
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "unknown_model",
+                "message": (
+                    f"'{offender['model']}' is not a model this deployment knows. "
+                    "Pick a model from the list, or leave it blank to use the run's model."
+                ),
+                "phase_slug": offender["phase_slug"],
+                "model": offender["model"],
+            },
+        )
+
+
 __all__ = [
     "_registry_row",
+    "assert_phase_models_registered",
     "build_model_registry_rows",
+    "registered_model_ids",
     "to_author_row",
+    "unregistered_phase_models",
 ]
