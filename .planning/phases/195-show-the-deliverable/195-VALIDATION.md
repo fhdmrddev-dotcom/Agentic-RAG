@@ -8,6 +8,13 @@ status: signed-off-conditional   # ⚠ 2026-08-17, plan 195-08 task 2. Every AUT
 nyquist_compliant: false         # ⚠ DELIBERATELY false, with the reason named rather than left to
                                  # silence. Flips to true only when 195-UAT.md carries U1-U6 and
                                  # every row is a PASS; a ⛔ row leaves it false with the row named.
+                                 # ⚠ AMENDED 2026-08-17 (195-08 task 3, AFTER the drive) — the two
+                                 # comment lines above are PRESERVED, never rewritten. D-20 HAS now
+                                 # been driven (`195-UAT.md`): 4 PASS · 0 FAIL · 2 ⛔. The flag STAYS
+                                 # false, and the two uncovered rows are NAMED: U1b (download+open on
+                                 # the POST-change surface — owed, no blocker) and U4 (multi-file
+                                 # newest-first — undrivable; no workflow run has ever produced 2+
+                                 # files). See § "Why nyquist_compliant stays false" → the amendment.
 wave_0_complete: true            # ⚠ set 2026-08-17 by plan 195-08. All five ❌ MISSING references
                                  # were authored, and the D-16 live baseline landed in a commit that
                                  # PREDATES every source change (the 188.1 rule, honoured in the only
@@ -450,3 +457,36 @@ same failure with a boolean on it.
 
 **Approval:** ⚠ **CONDITIONAL — every automated contract in this file is discharged and measured; the
 single manual G-4 row is OWED and is stated as a DECISION, never as a claim that everything ran.**
+
+---
+
+## ⚠ AMENDMENT, 2026-08-17 — D-20 WAS DRIVEN AFTER THIS SIGN-OFF WAS WRITTEN
+
+> **Everything above this line is PRESERVED VERBATIM, never rewritten.** It was written by plan
+> `195-08` **task 2**, at which point the D-20 checkpoint had not been driven — the sentence
+> *"which had not been driven when this sign-off was written"* was true then and is kept so the record
+> shows what was and was not known at each step. This amendment is task **3**'s.
+
+**`195-UAT.md` now exists and carries U1-U6.** The result:
+
+| | |
+|---|---|
+| **Tally** | **4 PASS · 0 FAIL · 2 ⛔** (one owed, one undrivable) |
+| **`nyquist_compliant`** | ⚠ **STAYS `false`** — the condition this file set was *"flips to `true` only if EVERY row carries a PASS"*, and two do not |
+| **Uncovered row 1** | **U1b — download the deliverable and OPEN it, on the POST-change surface.** ⛔ **OWED with NO blocking condition** — the reader is present, the control is live, the row was simply not run. **The FIRST row to run when UAT resumes** |
+| **Uncovered row 2** | **U4 — multi-file newest-first, including the mid-run no-`created_at` regime.** ⛔ **UNDRIVABLE, and the row's PREMISE is refuted:** no workflow run in the live DB has ever produced 2+ files. **Blocking condition:** a run that produces two or more |
+
+⚠ **What the drive found that this entire validation apparatus could not: a VISUAL REGRESSION on both
+live surfaces while every fence was green.** `FileRow`'s icon wrapper inherited the row's
+`line-height: 24px`, growing the run-page row **33 → 40 px** and the panel row **38 → 42 px** — breaking
+`195-03`'s own `must_have` (*"without any of them changing visually"*). **75 plants, a 20-case source
+sweep, `tsc` 33 and `failed 0` were all green throughout.** Class names, design tokens, glyph sizes and
+padding were all still correct; **only the computed line box was wrong, and that is geometry jsdom does
+not resolve.** Fixed inline as a G-3 fast-fix (commit `9c985537`) and re-measured live at **33 px /
+38 px — byte-exact with `195-BASELINE.md`**.
+
+> ⚠ **THE LESSON FOR THE NEXT VALIDATION AUTHOR, and it is this phase's strongest single finding:**
+> **a plant proves a fence can fire; it cannot prove the fence is watching the right property.** Every
+> geometric property of these three surfaces was asserted by class name — which is correct, deliberate
+> (`D-195-05-B`) and **blind to layout**. G-4 is not a ceremony on top of the fences; here it was the
+> only instrument that could see.
