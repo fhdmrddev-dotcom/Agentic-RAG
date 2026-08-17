@@ -949,7 +949,31 @@ const BASELINE = {
   // whose contract is 0 failing forever.
   "OutputFileCard.baseline.test.tsx": 21,
   "StopControl.baseline.test.tsx": 15,
-  "FilesSection.test.tsx": 11,
+  // 195-05 task 2 GREW this file 11 -> 22 as the panel adopted the shared row:
+  // arrow-key roving focus THROUGH that row (the ref-forwarding integration —
+  // `FileRow.test.tsx` unit-tests a ref passed TO the row; nothing tested a ref
+  // passed to its caller-supplied CHILD), the two mime-first branches, the
+  // code-extension coverage the shipped cases are structurally blind to (they
+  // use docx/pptx/xlsx only) with its negative control, the meta string, the
+  // deliberate glyph change, the panel's AA token, the full-path label, the
+  // shipped padding and preview-not-download. ADDITIONS ONLY —
+  // `git diff --numstat` read `272  0`, i.e. zero removed lines.
+  //
+  // ⚠ THE PIN MOVES IN THE SAME COMMIT AS THE TESTS, which is this script's own
+  // rule at the `phaseVocabulary` pin and the correction recorded at
+  // `fileIcon.test.tsx` two entries below. 195-03 left THAT file pinned at 11
+  // against an actual of 41 and the orchestrator had to correct it at the wave-2
+  // close; the reasoning ("a pin is a floor, never a census") is coherent and the
+  // conclusion is still wrong, because a pin that lags its actual means the
+  // difference can be DELETED with the gate green — here that would be all
+  // eleven cases above, including the only fence in the tree on the panel's
+  // light-theme AA token. A lagging pin is the gate going blind, not a
+  // conservative choice.
+  //
+  // 22 is read from THIS SCRIPT'S OWN printed `actual` column
+  // (`FilesSection.test.tsx  11  22  +11`), never hand-counted from `it(`
+  // literals.
+  "FilesSection.test.tsx": 22,
   // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /
   // tone / className / mimeType / the nine added extensions / the own-property
   // guard), ADDITIONS ONLY — `git diff` showed zero removed lines and all 11
