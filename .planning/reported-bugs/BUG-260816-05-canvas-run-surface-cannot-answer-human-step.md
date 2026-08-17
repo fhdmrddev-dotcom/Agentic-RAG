@@ -4,12 +4,15 @@ title: The canvas run surface PAINTS a waiting human step but hosts no way to an
 reported: 2026-08-16
 surface: Agentic-RAG
 severity: major
-status: deferred
+status: deferred   # ⚠ PARTIALLY ROUTED 2026-08-17 at `/gsd:discuss-phase 195` — the FILE half is
+                   # folded into 195; the ASK-RESPONDER half is still live and still owed. Status
+                   # stays `deferred` (NOT `folded`) on purpose: a `folded` record is invisible to
+                   # the open-report routing scan, and the ask half must still reach Phase 198.
 affected_areas: [frontend/workflow-run-surface, frontend/panel, human-in-the-loop]
-folded_into: null
+folded_into: "195 — FILE HALF ONLY (RUN-02/RUN-03). The ask-responder half is NOT folded and remains owed to Phase 198 / NODE-02."
 verified_closed_by: null
 related_seeds: [SEED-148, SEED-167]
-re_open_trigger: "Phase 198 / NODE-02 — its requirement text already says `llm_human_input` already exists — establish what it does and does not cover BEFORE building a form node. THIS REPORT IS PART OF THAT ESTABLISHING WORK and must be read at `/gsd:discuss-phase 198`. ⚠ ALSO re-open at Phase 195 / RUN-02 if that phase mounts anything run-scoped on `WorkflowRunPage.tsx`: the output-file mount and the ask responder are the same missing-surface class, and a phase already opening that file should be asked whether it takes both. Independently: the first operator report of a run appearing STUCK on the canvas — the waiting state is paint-only, so a run parked on an approval looks identical to a hung one from that surface."
+re_open_trigger: "Phase 198 / NODE-02 — its requirement text already says `llm_human_input` already exists — establish what it does and does not cover BEFORE building a form node. THIS REPORT IS PART OF THAT ESTABLISHING WORK and must be read at `/gsd:discuss-phase 198`. ⚠ THE 195 ARM OF THIS TRIGGER HAS FIRED AND WAS ANSWERED (2026-08-17): 195 does open `WorkflowRunPage.tsx` run-scoped, it was asked whether it takes both halves, and the operator ruled FILE HALF ONLY — mounting a responder is new user-facing capability inside a phase scoped to files. The ask half is therefore UNROUTED-BUT-OWED and Phase 198 is its only home. Independently: the first operator report of a run appearing STUCK on the canvas — the waiting state is paint-only, so a run parked on an approval looks identical to a hung one from that surface."
 reproduces_on:
   branch: develop
   commit: 25104616
@@ -61,6 +64,18 @@ canvas."* Today the canvas is a **viewer, not a place work can be finished**:
 | **answer** the human step | ❌ | ✅ |
 | see produced output files | ❌ (→ RUN-02, phase 195) | ✅ |
 | Stop the run | ✅ (new in 194.1) | ✅ |
+
+⚠ **CORRECTION ON MEASUREMENT, 2026-08-17 (`/gsd:discuss-phase 195`) — recorded beside the row above
+rather than over it.** The `see produced output files | ❌` cell is **WRONG**. `WorkflowRunPage.tsx`
+has listed and downloaded a run's files since **Phase 188-10** (`783daab5`, *"the deliverable region
+— listed and downloadable, never previewed"*): `useWorkspaceFiles(run.thread_id)` at `:432`,
+rendered at `:1015-1090` under `data-testid="run-deliverables"`. Measured in the live local DB the
+same day: **60 workflow-run threads carry exactly one produced file** and would show it. What is
+actually wrong there is a **second file UI** — the region hand-rolls its own `iconFor()` and rows
+instead of reusing the shipped presentation, which is RUN-03's concern, not RUN-02's. The cell was
+written from `SEED-148`'s 2026-08-10 grep for `output_files`, and that grep misses this region
+because it reads WORKSPACE files, not sandbox `output_files` — **a true grep for the wrong noun.**
+The rest of the table stands, and the ask-responder row in particular is unaffected.
 
 ## Hypothesized cause
 

@@ -60,6 +60,38 @@ success while withholding the deliverable is the least honest thing in the produ
 It also blocks the obvious next thing: **SEED-069** (living-document workflow output re-ingestion)
 starts from an output the user can see and act on. It cannot begin here.
 
+## ⚠ ANSWERED BY MEASUREMENT 2026-08-17 (`/gsd:discuss-phase 195`) — read this before the sections below
+
+The three questions below were answered at Phase 195's discuss-phase. **The measurements above, from
+2026-08-10, are LEFT STANDING rather than overwritten — the drift is the point.**
+
+1. **"Does a workflow run emit output files onto the wire at all?" — YES, and this is NOT a backend
+   gap.** `llm_emit` → `_handle_render_template` persists a real workspace file (`ws_write_file`,
+   thread-scoped) and emits `workspace_file_written` on the **producer** stream
+   (`tool_dispatcher.py:3550-3578`). `harness/phase_types.py:1161-1192` (`_ProducerStreamCtx`) exists
+   solely to re-point that stream id so the card appears mid-run. Live local DB: 86 `workspace_files`
+   rows, real 37-40 KB `.docx` deliverables on workflow-run threads through 2026-08-16.
+
+2. **⚠ THE `grep` ABOVE WAS TRUE AND MISLEADING — IT SEARCHED FOR THE WRONG NOUN.** `grep output_files`
+   over `WorkflowRunPage.tsx` returns nothing because the run surface reads **workspace files**, not
+   sandbox `output_files`. **The run surface HAS listed and downloaded a run's files since Phase
+   188-10** (`783daab5`, 2026-08 — i.e. it already existed when this seed was planted two days
+   later): `useWorkspaceFiles(run.thread_id)` at `:432`, rendered at `:1015-1090`. Measured: **60 of
+   61 file-bearing workflow-run threads would show their deliverable exactly.**
+
+3. **The real gap is the one this seed's own §"What already exists and must not be rebuilt" predicted
+   — RUN-03, not RUN-02.** There are **four** file presentations: `lib/fileIcon.tsx` (the declared
+   single source, consumed by `OutputFileCard` only), `FilesSection`'s own inline map + a copied
+   `formatBytes`, `WorkflowRunPage`'s own hand-rolled `iconFor()` + rows, and `lib/fileIcons.tsx` on
+   the documents side. **The run surface's own shipped region is one of the duplicates.**
+
+4. **"One file or many?" — and ⚠ the hero/working split this seed points at was RETIRED.** Phase
+   095.1 (D-095.1-06) reversed it: `OutputFileCard.variant` is inert, `is_hero` is written-but-unread.
+   60 of 61 runs produce exactly one file. Phase 195 ships one uniform quiet list and corrects both
+   stale records (ROADMAP SC#3 and the sketch-findings reference, which still names hero as the winner).
+
+Full working: `.planning/phases/195-show-the-deliverable/195-CONTEXT.md`.
+
 ## Three questions to answer before building
 
 1. **Does a workflow run emit output files onto the wire at all?** The `llm_emit` phase produces the
