@@ -33,7 +33,13 @@ from starlette.concurrency import run_in_threadpool
 from supabase import Client
 
 import app.dependencies as deps
-from app.config import MODEL_CAPABILITIES, _infer_provider_for, settings
+from app.config import (
+    _LLM_CALL_TIMEOUT_MAX_S,
+    _LLM_CALL_TIMEOUT_MIN_S,
+    MODEL_CAPABILITIES,
+    _infer_provider_for,
+    settings,
+)
 from app.dependencies import (
     get_redis,
     get_supabase,
@@ -134,6 +140,12 @@ _MODEL_CAP_COLUMNS = {
     "enabled",
     "deprecated",
     "deprecated_reason",
+    # Phase 196 (AUTH-04 / D-14): the operator-correctable forced-emission tier (7 -> 8).
+    # ⚠ SCOPE LINE, stated rather than left implicit: _ADD_MODEL_CAP_COLUMNS (the
+    # add-model-by-id path below) is deliberately NOT extended with emit_tier. The PATCH
+    # path is the correction knob D-14 asks for, and a newly added row can be PATCHed
+    # immediately — so nothing is unreachable, and the add path keeps its narrower surface.
+    "emit_tier",
 }
 
 # Phase 149 (WR-01): the per-column value-type contract for the PATCH write. A wrong-typed
@@ -148,6 +160,39 @@ _MODEL_CAP_INT_COLUMNS = {
     "max_output_tokens",
 }
 _MODEL_CAP_BOOL_COLUMNS = {"native_tools", "enabled", "deprecated"}
+
+# Phase 196 (AUTH-04 / T-196-IV2): the per-column CLOSED VOCABULARY for enum columns —
+# LAYER 3 of the A7 three-layer pin. The other two layers are the SQL CHECK
+# ``model_capabilities_overrides_emit_tier_check`` (migration 120) and
+# ``app.services.forced_emit._RUNGS_BY_TIER``; all three are asserted EQUAL in both
+# directions by backend/tests/unit/test_196_emit_tier_two_layer_pin.py.
+#
+# ⚠ WHY AN EQUALITY AND NOT JUST A GUARD: a tier the CHECK accepts and the ladder does not
+# recognise is rewritten to "coerce" by the boundary guard at forced_emit.py:377 — with no
+# exception, no audit row and no log line. The operator sets "guaranteed format", the write
+# succeeds, and the run silently degrades to best-effort. Drift here is not loud.
+_MODEL_CAP_ENUM_COLUMNS = {
+    "emit_tier": {"force_strict", "force", "coerce"},
+}
+
+# Phase 196 (T-196-IV2b — SEED-172 finding 3, folded by operator ratification): per-column
+# INCLUSIVE (min, max) bounds for the int columns. SEED-172 measured 0, negatives and
+# fat-fingered absurdities being accepted end-to-end today; a 0 context window or a 0
+# timeout is not a smaller configuration, it is a broken one.
+#
+# The timeout pair is IMPORTED from app.config rather than retyped, so the PATCH path and
+# the LLM_CALL_TIMEOUT_OVERRIDES env parser can never drift apart (they are the same
+# T-066-05 mitigation, reached by two different doors).
+#
+# ⚠ The other two pairs have NO shipped clamp to mirror — they are sanity caps chosen here,
+# and their only job is to reject 0, negatives and absurdities. They are deliberately far
+# above any real model (today's largest context window is ~2M tokens) so they can never
+# refuse a legitimate future model; do not tighten them into a curation policy.
+_MODEL_CAP_INT_BOUNDS: dict[str, tuple[int, int]] = {
+    "llm_call_timeout_seconds": (_LLM_CALL_TIMEOUT_MIN_S, _LLM_CALL_TIMEOUT_MAX_S),
+    "context_window_tokens": (1, 10_000_000),
+    "max_output_tokens": (1, 1_000_000),
+}
 
 # The single load-bearing security line: default-deny at the router (Pattern 1).
 router = APIRouter(
@@ -1379,6 +1424,31 @@ async def set_model_capability(
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"'{col}' must be an integer or null.",
+                )
+            # T-196-IV2b (SEED-172 finding 3): RANGE, not just type. A well-typed 0 or -1
+            # passed every check before Phase 196 and was written end-to-end; a 0 timeout
+            # fires the per-call timer instantly (every run `timed_out` — the T-066-05 DoS)
+            # and a 0 context window is not a smaller model, it is a broken row.
+            _lo, _hi = _MODEL_CAP_INT_BOUNDS[col]
+            if not (_lo <= val <= _hi):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"'{col}' must be between {_lo} and {_hi} (inclusive), or null.",
+                )
+        elif col in _MODEL_CAP_ENUM_COLUMNS:
+            # T-196-IV2: the closed vocabulary, refused BEFORE any DB touch. Without this
+            # branch an off-vocabulary tier would reach Postgres and die on a raw 23514
+            # (a 500 to the operator, not a 422) — and, worse, a tier the CHECK happened to
+            # accept would be written unvalidated against forced_emit._RUNGS_BY_TIER and
+            # degrade runs SILENTLY. See _MODEL_CAP_ENUM_COLUMNS for the three-layer pin.
+            _allowed = _MODEL_CAP_ENUM_COLUMNS[col]
+            if not isinstance(val, str) or val not in _allowed:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"'{col}' must be one of "
+                        f"{', '.join(sorted(_allowed))}, or null."
+                    ),
                 )
         elif col in _MODEL_CAP_BOOL_COLUMNS:
             if not isinstance(val, bool):
