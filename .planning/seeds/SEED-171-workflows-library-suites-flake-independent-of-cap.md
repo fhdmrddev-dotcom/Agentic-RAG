@@ -59,6 +59,36 @@ Plus 195-02's own eight runs earlier the same day: cap 2 gave `0, 0, 3, 2, 8`; c
    gate's *first* clause — no per-file decrease — has held in all eleven runs. Only the
    *zero-failing* clause trips.
 
+## ⚠ AMENDMENT 2026-08-17 (Phase 195-03) — a THIRD file, and it is NOT a timeout
+
+The two suites named above are not the whole set, and the failure mode is broader than
+`STACK_TRACE_ERROR`. Phase 195-03's run 4 of 5 was red at **`failed 9`**, filenames captured from the
+gate's persisted JSON **before** any re-run:
+
+| File | Count | Error kind |
+|---|---|---|
+| `WorkflowsPage.test.tsx` | 6 | `STACK_TRACE_ERROR` |
+| `WorkflowCard.test.tsx` | 2 | `STACK_TRACE_ERROR` |
+| **`WorkflowBuilderPage.session.test.tsx`** | **1** | ⚠ **`AssertionError` — NOT a timeout** |
+
+⚠ **The `AssertionError` matters more than the count.** Every failure recorded in the original
+eleven runs was `STACK_TRACE_ERROR`, which made "slow suite near a timeout boundary" a clean
+hypothesis. A genuine assertion failure on a byte-identical tree does not fit that shape, so **the
+hypothesis in the next section is now known to be incomplete** rather than merely unproven.
+
+**It also produced a false causal signal, which is the part worth not repeating.** Restoring the base
+`fileIcon.tsx` made the case pass — which *looked* like causation. It was not: four consecutive
+isolated runs with the modified file were **23/23 each**, so 7 of 8 samples were green and the file was
+byte-identical to base in the merged result. ⚠ **A single "revert made it pass" observation is not
+evidence against a flaky suite** — the sample size has to beat the flake rate before the direction of
+causation means anything.
+
+⚠ Note the count-gate script **already documents this exact file** at `:2401-2411` as a measured
+parallel-load flake, with a standing instruction to re-run before declaring red. That instruction
+covers the `pane click` case; whether this is the same case is **not yet checked**.
+
+---
+
 ## The shape of the defect, on the evidence available
 
 `WorkflowsPage.test.tsx` takes **92.67 s for one file** (83.64 s of it test time) at cap 1 in
