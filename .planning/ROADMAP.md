@@ -612,7 +612,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 195-07-PLAN.md — Wave 4: SC#2 proved — the four-file source sweep with length+identity guards and the adopted 27th plant (the stripper non-vacuity case), the chat-capability arm, and every pin this phase moved reconciled to the gate's own printed `actual`
+- [x] 195-07-PLAN.md — Wave 4: SC#2 proved — the four-file source sweep with length+identity guards and the adopted 27th plant (the stripper non-vacuity case), the chat-capability arm, and every pin this phase moved reconciled to the gate's own printed `actual`
 - [ ] 195-08-PLAN.md — Wave 4: the records — D-11's two stale documents (ROADMAP SC#3 + nine sites in the design record), D-17's hot-file ledger under the SAME-COMMIT SYNC RULE (two files ABSENT today), two seeds for the measured lies the phase declines, and **D-20 driven** — launch, watch, download, OPEN the file (**blocking checkpoint**)
 
 #### Phase 196: Registry-Backed Model Picker (canvas)
