@@ -1,13 +1,13 @@
 ---
 seed_id: SEED-171
-title: The workflows-library suites flake non-deterministically, independent of GSD_VITEST_MAX_WORKERS and of machine load — the count gate cannot reach 0 failing on demand
+title: THREE suites flake non-deterministically, independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
 created: 2026-08-17
 planted_during: Phase 195 Wave 1 post-merge gate (orchestrator)
 status: planted
 priority: high
 relates_to:
   - SEED-056 (vitest unit baseline cluster triage) — ⚠ **THIS IS THE SAME FAMILY, BUT THE DIAGNOSIS
-    HERE IS DIFFERENT AND STRONGER.** 056 triaged a rot SET. This seed records that two named suites
+    HERE IS DIFFERENT AND STRONGER.** 056 triaged a rot SET. This seed records that THREE named suites
     fail NON-DETERMINISTICALLY, which no per-file baseline can absorb, because the failing set is
     never the same twice.
   - CLAUDE.md § "Parallel execution" rule 2 — the `GSD_VITEST_MAX_WORKERS` rule. ⚠ **Its stated
@@ -19,7 +19,7 @@ relates_to:
 trigger_when: >
   Any phase needs `count gate OK` as a pass condition, OR anyone proposes to raise/lower
   `GSD_VITEST_MAX_WORKERS` as a remedy for red gate runs, OR `WorkflowsPage.test.tsx` /
-  `WorkflowCard.test.tsx` are edited for any reason.
+  `WorkflowCard.test.tsx` / `WorkflowBuilderPage.session.test.tsx` are edited for any reason.
 ---
 
 # The flake is in the suites, not in the cap
