@@ -2718,7 +2718,26 @@ const TARGETS = [
   // which does NOT exist yet and whose adoption belongs to plan 195-07, with 07's
   // numbers and 07's reasons"). That prediction is honoured here: this is the
   // third file-level entry in that directory, and no directory entry was added.
-  // Verified with `grep -n '"src/components/files"'` returning nothing.
+  //
+  // ⚠ HOW THAT IS VERIFIED — and the correction is RECORDED here rather than the
+  // trap quietly side-stepped, because it fired twice in five minutes.
+  //
+  // 195-07's acceptance criterion was a bare `grep -n` for the DOUBLE-QUOTED bare
+  // directory path, expected to return nothing. The first version of this comment
+  // wrote that path double-quoted while explaining that no such entry exists — so
+  // the grep matched its own explanation and read 1 instead of 0. The second
+  // version replaced it with a stricter regex, quoted in full — and matched THAT.
+  // A criterion phrased as "this string is absent" is UNSATISFIABLE the moment
+  // anything documents it. Same shape as 195-06 (a grep that cannot tell
+  // `not.toMatch(` from `toMatch(`) and as 187-24 (prose is never exempt), and it
+  // is why every arm of `FileRow.sweep.test.ts` reads STRIPPED code.
+  //
+  // The path is therefore written in BACKTICKS throughout this block, as 195-03's
+  // block above already does. The check that actually discriminates is an anchored
+  // regex matching a whole ARRAY-ELEMENT line — start-of-line, optional indent, the
+  // double-quoted bare directory path, a comma, end-of-line — which a prose mention
+  // structurally cannot satisfy because prose is preceded by `//`. Run against this
+  // file it exits 1: there is no bare-directory entry, only file-level ones.
   //
   // `ls`-confirmed before this line was written — a `TARGETS` path that does not
   // exist makes this gate ERROR at exit 2, not fail, for every later plan. The
