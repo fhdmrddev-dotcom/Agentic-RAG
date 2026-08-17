@@ -589,7 +589,19 @@ Plans:
   2. The presentation reuses `OutputFileCard` / `FilesSection` / `fileIcon` — no second file UI.
   3. Multiple produced files are handled with the shipped hero/working split, not a new pattern.
 
-**Plans**: TBD — `/gsd:plan-phase 195`
+⚠ **SC#3 NAMES A RETIRED PATTERN AND IS CORRECTED BY THIS PHASE — the original is preserved above rather than overwritten** (`195-CONTEXT.md` D-10 / D-11; `195-RESEARCH.md` confirmed it at `:589`). Phase **095.1 (D-095.1-06) REVERSED** the hero/working split by an operator-approved decision: `OutputFileCard`'s `variant` prop is *"INERT … no longer changes the rendered shape — every row renders the one quiet uniform style"* and `is_hero` is *written-but-unread*. **The criterion as it now reads:** *multiple produced files are handled with the ONE uniform quiet row — no hero, no second pattern — ordered newest-first client-side (D-12).* The scale fact that makes that right: **60 of 61 file-bearing runs have exactly ONE file**, so reviving a hero signal would build a pattern for a population of one. ⚠ The stale twin of this criterion lives in `.claude/skills/sketch-findings-agentic-rag/references/chat-tool-card-unification.md` at **nine sites** (not the four CONTEXT names) and is corrected in the same phase — left alone, the next UI phase builds a hero block from the design record. Plan `195-08` owns both corrections; this note is the planner's, written at `/gsd:plan-phase 195`.
+
+**Plans**: 8 plans in 4 waves
+
+Plans:
+- [ ] 195-01-PLAN.md — Wave 0/1: the LIVE SC#1 baseline in a commit that PREDATES every source change (D-16), the named `BASE_SHA`, and the wave-1 browser + `.docx`-reader probe (**blocking checkpoint** — the orchestrator drives it)
+- [ ] 195-02-PLAN.md — Wave 0/1: the characterization fences on the UNMOVED tree — `supersedes` in BOTH branches and the inert `data-variant` (**zero coverage repo-wide**, F5), the dead-link pair as two cases (P2), the run page's SILENT dead row (F8), and the count-gate adoption of FIVE suites
+- [ ] 195-03-PLAN.md — Wave 2: the shared module — `components/files/` (`FileRow` via Radix `asChild`/`Slottable`, `fileRowUtils`), the widened ONE icon path (`ribbon`/`tone`/`className`/`mimeType` + the nine missing extensions + the own-property guard), and the two-regime `byNewestFirst` whose missing-key arm is NEW GROUND (F7)
+- [ ] 195-04-PLAN.md — Wave 3: chat converts — `OutputFileCard` on the shared row with its public prop shape BYTE-IDENTICAL, so `MessageItem.tsx` (29 phases) and `ExecuteCodeBody.tsx` are never opened (F6/D-14 honoured structurally)
+- [ ] 195-05-PLAN.md — Wave 3: the panel converts — the copied `formatBytes` **and its own “keep byte-for-byte identical” confession** deleted, the mime-first `iconFor` deleted, listbox + roving focus + preview activation + Template badge unmoved
+- [ ] 195-06-PLAN.md — Wave 3: the run surface converts — the region on the shared row, D-02's honest heading (**three locations**), D-15's three-way empty state pinned, D-12 wired, and the TWO shipped fences that assert the duplication INVERTED IN PLACE with the originals quoted (F1; the suite is pinned EXACT)
+- [ ] 195-07-PLAN.md — Wave 4: SC#2 proved — the four-file source sweep with length+identity guards and the adopted 27th plant (the stripper non-vacuity case), the chat-capability arm, and every pin this phase moved reconciled to the gate's own printed `actual`
+- [ ] 195-08-PLAN.md — Wave 4: the records — D-11's two stale documents (ROADMAP SC#3 + nine sites in the design record), D-17's hot-file ledger under the SAME-COMMIT SYNC RULE (two files ABSENT today), two seeds for the measured lies the phase declines, and **D-20 driven** — launch, watch, download, OPEN the file (**blocking checkpoint**)
 
 #### Phase 196: Registry-Backed Model Picker (canvas)
 
