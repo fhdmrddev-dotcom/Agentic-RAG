@@ -1,9 +1,51 @@
 import { useState } from "react"
 import type { MouseEvent } from "react"
-import { Loader2, Download } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { fileIcon } from "@/lib/fileIcon"
+import { FileRow } from "@/components/files/FileRow"
 import { downloadSandboxOutput, DownloadError } from "@/lib/api"
+
+/**
+ * ── PHASE 195 PLAN 04 — THE INTERIOR MOVED HOUSE; NOTHING ELSE MOVED ────────
+ *
+ * This component's row markup is no longer written here. It comes from the ONE
+ * shared row (`components/files/FileRow.tsx`, Phase 195 plan 03), which this
+ * file drives with `asChild` — so the wrapper ELEMENT below is still supplied
+ * by this component, and the a11y contract of a chat output file is still an
+ * `<a href download target rel>` exactly as it has been since Phase 067.3.
+ *
+ * ⚠ WHAT DID **NOT** CHANGE, AND WHY EACH ONE IS LOAD-BEARING:
+ *
+ *  · **The public prop shape is byte-identical and the props interface stays
+ *    UNEXPORTED.** Both call sites (`MessageItem.tsx:158` and
+ *    `tool-bodies/ExecuteCodeBody.tsx:358`) pass only `file`, so widening the
+ *    surface buys nothing — and it would open `MessageItem.tsx`, which measures
+ *    29 phases with an UNDISCHARGED G-5 extraction obligation. D-14's decline is
+ *    honoured STRUCTURALLY here (there is nothing new to call), not by
+ *    discipline. Exporting the interface would itself be a public-surface
+ *    change (D-195-02-B).
+ *  · **D-13 holds: chat gained NO new affordance.** The presentation converted;
+ *    the capability did not. There is no new control, no new prop, no new
+ *    fetch, no new state. ⚠ These two are compatible and must not be conflated
+ *    — D-07 requires all three surfaces to converge on one presentation, and
+ *    D-13 forbids chat gaining a capability. This plan does the first only.
+ *  · The download call, its status-specific copy and its 3 s auto-clear stay in
+ *    THIS component. The shared row holds no business logic and is handed no
+ *    thread id, no file id and no URL, so it cannot fetch anything.
+ *
+ * **What this plan DELETED:** the local byte formatter (the shared row formats
+ * the size cell from `sizeBytes`, and `fileRowUtils` proved the hoist
+ * byte-identical) and the hand-written interior spans, which are now the shared
+ * row's children.
+ *
+ * ⚠ ONE MEASURED, DELIBERATE DIFFERENCE IN THE RENDERED BYTES, recorded rather
+ * than glossed: in the DEAD branch the name span's class TOKENS are emitted in a
+ * different ORDER (`font-mono truncate text-foreground/60` instead of
+ * `font-mono text-foreground/60 truncate`), because the shared row composes the
+ * dead skin as an override that `twMerge` resolves. Same token SET, same
+ * rendering — attribute-order only. Everything else about both branches, in
+ * every state exercised (live · size · size 0 · supersedes · both variants ·
+ * dead · downloading · both error kinds), is byte-for-byte what it was.
+ */
 
 // D-067.2-03: API_BASE for prepending the host on relative re-sign URLs emitted
 // by the backend's harvest_output_files (e.g. "/sandbox-outputs/{path}"). The
@@ -22,11 +64,12 @@ function resolveOutputUrl(url: string): string {
   return url
 }
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
+// ⚠ The local byte formatter that used to live here is GONE (Phase 195 plan
+// 04). The shared row renders the size cell from its `sizeBytes` prop using
+// `components/files/fileRowUtils`, whose helper was proved byte-identical to
+// this one's output before either surface adopted it (195-03, plants P2(d/e/f)
+// red both a boundary case AND a `?raw` byte-identity case). No second copy of
+// the KiB rounding survives in this file.
 
 // Relaxed prop shape (D-075.2-05 / D-075.2-06 / RESEARCH §Q4): finalOutputFiles
 // entries on the Message type carry `{ filename: string; url?: string }` with
@@ -77,10 +120,13 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
   const [downloading, setDownloading] = useState(false)
   const [downloadError, setDownloadError] = useState<{ status: number | "network"; message: string } | null>(null)
 
-  // Phase 095.1 Plan 05 (D-095.1-06): the per-extension icon (Plan 01 fileIcon,
-  // the ONE shared icon system — no second icon path). Uniform 30px glyph on
-  // every row — the hero 48px branch was removed with the hero split.
-  const icon = fileIcon(file.filename, 30)
+  // Phase 095.1 Plan 05 (D-095.1-06): the per-extension icon is a uniform 30 px
+  // glyph on every row — the hero 48 px branch was removed with the hero split.
+  // ⚠ PHASE 195 PLAN 04 — this component no longer calls the icon module at
+  // all: `density="chat"` on the shared row IS that call, parameterised rather
+  // than branched. Recorded beside the original note instead of over it, so the
+  // ONE-icon-path claim (SC#2) reads as a structural property and not as a
+  // convention two files happen to share.
 
   // Url-less dead state (D-07 / 095-VALIDATION.md D-07 dead-link row): a file
   // arriving without a `url` (older persisted entry, or a url-less emit) now
@@ -90,32 +136,20 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
   // unavailable" copy + the disabled style make the missing link legible.
   if (!file.url) {
     return (
-      <div
-        className="flex items-center gap-2.5 rounded-md ghost-border text-xs px-3 py-2 bg-muted/30"
-        data-variant={variant}
-        data-dead="true"
-      >
-        <span className="flex-shrink-0 opacity-70">{icon}</span>
-        <span className="flex-1 min-w-0 flex flex-col">
-          <span className="font-mono text-foreground/60 truncate">{file.filename}</span>
-          {file.supersedes && (
-            <span className="text-[10px] text-muted-foreground truncate">
-              Replaces: {file.supersedes}
-            </span>
-          )}
-        </span>
-        <span
-          className={cn(
-            "flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-medium flex-shrink-0",
-            "border-red-500/40 bg-red-500/10 text-red-400 cursor-not-allowed",
-          )}
-          aria-disabled="true"
-          title="Download unavailable — this file has no link"
-        >
-          <Download className="w-3 h-3" />
-          Download unavailable
-        </span>
-      </div>
+      // ⚠ `sizeBytes` is DELIBERATELY NOT PASSED. Today's dead branch renders no
+      // size cell even when the payload carries a `size`, and that absence is
+      // part of what D-08 asks to survive byte-identical. The affordance's
+      // element, its `aria-disabled` and its exact title and copy now come from
+      // the shared row's `dead` arm — which is a <span>, never a <button>, the
+      // property `OutputFileCard.baseline.test.tsx` case (d) pins at its source
+      // and `WorkflowRunPage.test.tsx:991` depends on downstream.
+      <FileRow asChild density="chat" trailing="dead" name={file.filename} supersedes={file.supersedes}>
+        <div
+          className="rounded-md ghost-border text-xs px-3 py-2 bg-muted/30"
+          data-variant={variant}
+          data-dead="true"
+        />
+      </FileRow>
     )
   }
 
@@ -141,47 +175,45 @@ export function OutputFileCard({ file, variant = "working" }: OutputFileCardProp
   }
 
   return (
-    <a
-      href={resolveOutputUrl(file.url)} /* preserved so right-click 'Save link as' has a real target — accepted 401 trade-off (D-067.3-R2-03) */
-      download={file.filename}
-      target="_blank"
-      rel="noopener noreferrer"
-      onClick={handleClick}
-      aria-disabled={downloading}
-      data-variant={variant}
-      className={cn(
-        // Phase 095.1 Plan 05 (D-095.1-06): the ONE quiet uniform row — the hero
-        // glow/gradient/large-icon/prominent-Download styling was removed with
-        // the hero split. Every file renders this same calm ghost-border row.
-        "flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition-colors group ghost-border",
-        downloading ? "opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
-        downloadError ? "border border-red-500/40" : "",
-      )}
+    // ⚠ THE ROW'S OWN CLASSES SPLIT IN TWO, AND THE SPLIT IS NOT ARBITRARY.
+    // Radix `mergeProps` JOINS `className` — it does NOT `twMerge` it
+    // (`react-slot`: `[slotProps, childProps].filter(Boolean).join(" ")`), so the
+    // shared row deliberately owns LAYOUT ONLY (`flex items-center gap-2.5`) and
+    // every other class this row has ever had — padding, radius, type scale,
+    // transition, the ghost border, the hover/disabled pair and the error
+    // border — stays HERE, on the anchor. Verified: no class left below competes
+    // with one the density owns, so the joined attribute is byte-identical to
+    // the single `cn(...)` this branch shipped before Phase 195.
+    // Plan 075.4-04 D-075.4-D2 — the supersedes subline (BUG-260523-03's UI
+    // side) and the in-row error line are now the shared row's `supersedes` and
+    // `errorText`. React escapes text children in both homes; no markup sink was
+    // introduced by the move (T-195-04-01).
+    <FileRow
+      asChild
+      density="chat"
+      name={file.filename}
+      sizeBytes={file.size}
+      supersedes={file.supersedes}
+      errorText={downloadError?.message ?? null}
+      trailing={downloading ? "spinner" : "download"}
     >
-      <span className="flex-shrink-0">{icon}</span>
-      <span className="flex-1 min-w-0 flex flex-col">
-        <span className="font-mono truncate text-foreground/80">
-          {file.filename}
-        </span>
-        {/* Plan 075.4-04 D-075.4-D2 — supersedes subline (closes BUG-260523-03 UI side).
-            React auto-escapes text content; no XSS surface introduced. */}
-        {file.supersedes && (
-          <span className="text-[10px] text-muted-foreground truncate">
-            Replaces: {file.supersedes}
-          </span>
+      <a
+        href={resolveOutputUrl(file.url)} /* preserved so right-click 'Save link as' has a real target — accepted 401 trade-off (D-067.3-R2-03) */
+        download={file.filename}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={handleClick}
+        aria-disabled={downloading}
+        data-variant={variant}
+        className={cn(
+          // Phase 095.1 Plan 05 (D-095.1-06): the ONE quiet uniform row — the hero
+          // glow/gradient/large-icon/prominent-Download styling was removed with
+          // the hero split. Every file renders this same calm ghost-border row.
+          "px-3 py-2 rounded-md text-xs transition-colors group ghost-border",
+          downloading ? "opacity-60 cursor-not-allowed" : "bg-muted/30 hover:bg-accent/40",
+          downloadError ? "border border-red-500/40" : "",
         )}
-        {downloadError && (
-          <span className="text-red-400 text-[10px] truncate">{downloadError.message}</span>
-        )}
-      </span>
-      {file.size != null && (
-        <span className="text-muted-foreground flex-shrink-0">{formatBytes(file.size)}</span>
-      )}
-      {downloading ? (
-        <Loader2 className="w-3.5 h-3.5 text-primary flex-shrink-0 animate-spin" />
-      ) : (
-        <Download className="w-3.5 h-3.5 text-primary flex-shrink-0" />
-      )}
-    </a>
+      />
+    </FileRow>
   )
 }
