@@ -39,7 +39,7 @@ the right vocabulary, stop it, and see what it produced.
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
-| 196 | Registry-Backed Model Picker (canvas) | 4/9 | In Progress|  |
+| 196 | Registry-Backed Model Picker (canvas) | 6/9 | In Progress|  |
 | 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
@@ -654,8 +654,8 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 196-05-PLAN.md — Wave 3: the picker leaf (D-04–D-08, D-12, D-15) — `modelFitness.ts`, `ModelField.tsx` (no state, no effect, fenced on its own source) and `useModelRegistry.ts`
-- [ ] 196-06-PLAN.md — Wave 3: the server refusal (D-09, SC#2) — 400 before any write on both draft doors, fired after ownership resolution, with D-08's grandfather so retiring a registry row never bricks an existing workflow
+- [x] 196-05-PLAN.md — Wave 3: the picker leaf (D-04–D-08, D-12, D-15) — `modelFitness.ts`, `ModelField.tsx` (no state, no effect, fenced on its own source) and `useModelRegistry.ts`
+- [x] 196-06-PLAN.md — Wave 3: the server refusal (D-09, SC#2) — 400 before any write on both draft doors, fired after ownership resolution, with D-08's grandfather so retiring a registry row never bricks an existing workflow
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

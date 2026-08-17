@@ -36,8 +36,67 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 4 of 9 — **Waves 1–2 COMPLETE (196-01…196-04), merged and gated.** Next: Wave 3
-(`196-05` + `196-06` in parallel, then `196-07` — see the serialisation note below).
+Plan: 6 of 9 — **Waves 1, 2 and 3a COMPLETE (196-01…196-06), merged and gated.**
+Next: Wave 3b (`196-07`), then Wave 4 (`196-08`), then Wave 5 (`196-09`).
+
+### Wave 3a close — 2026-08-17 (`196-05` + `196-06`)
+
+**Wave 3 was SPLIT, not serialised.** `196-05` and `196-07` both modify `scripts/vitest-count-gate.cjs`.
+Rather than serialise all three, `196-05` + `196-06` ran in parallel (no shared file) and `196-07` was
+deferred to fork from a base that **already contains** `196-05`'s gate edit — so the conflict cannot
+arise rather than merely being avoided. `196-07` depends only on `196-04`, so this costs nothing.
+
+**Gates.** tsc **33** (baseline, **0 in any phase-196 file**) · count gate **OK · total 4258 · failed 0 ·
+pinned 4184 · 87/87** · backend **211 failed / 4036 passed** — failures flat at the 211 baseline,
+passing **+11**. ⚠ Count-level comparison, not id-level.
+
+⚠⚠ **A FOURTH FLAKY SUITE WAS FOUND, AND IT BREAKS SEED-171's NAMED-THREE LIST.**
+`frontend/src/pages/WorkflowBuilderPage.canvas.test.tsx` showed `failed 1` on one gate run —
+**provably unmodified** (absent from both `git diff --numstat` against base and `git status`; nothing
+`196-05` wrote is imported by it). It is **NOT one of SEED-171's three**, and it is **NOT a timeout** —
+a plain `AssertionError: expected 0 to be greater than 0`. That is a **second** data point for
+CLAUDE.md's Phase-195 correction that the `STACK_TRACE_ERROR` signature is not a reliable tell.
+**`196-09` owes SEED-171 a fourth named file.** The cap was never adjusted. ⚠ The executor also
+recorded **slipping the triage protocol** by re-running before extracting the filename — the gate's
+persisted JSON retained run 1's report so nothing was lost, and the slip is logged rather than hidden.
+
+**`196-06` — the refusal, and a security subtlety the plan did not anticipate.** The plan's ordering
+requirement (*after ownership resolution* AND *before any write*) was **unsatisfiable as literally
+written**: `update_draft` has no ownership resolution before its write — ownership is the
+`created_by = $2` conjunct INSIDE the UPDATE (`backend/app/db/workflows.py:762-810`). Resolved with a
+lazy owner-scoped read. Two non-obvious properties fell out, both tested:
+1. A **non-owner falls through** to the existing 0-row UPDATE rather than raising — a pre-emptive 404
+   would have turned an owner's *published-row* PATCH from today's 409 into a 404.
+2. ⚠ **`get_definition` RETURNS GLOBAL PUBLISHED ROWS TO NON-OWNERS**, which is why the code compares
+   `created_by` explicitly instead of a bare `is not None`. **Grandfathering off someone else's global
+   row would have re-opened the cross-tenant oracle by a second route.**
+
+**`196-06` missed a criterion and recorded it rather than reinterpreting it:** `<15 changed lines` came
+in at **22** (9 code, 13 comment — the overage is entirely the comment explaining the fall-through).
+
+**D-08's grandfather branch is DEAD CODE BY MEASUREMENT, and honestly labelled so.** Re-derived today:
+**270 definitions** (242 at plan time — the operator authored 28 in between), 257 phases, 239 blank,
+18 `gpt-5.4`, **0 phases in the D-08 unknown state**, union 69. Implemented and tested anyway.
+**Re-open trigger: the first row observed carrying a `config.model` absent from
+`build_model_registry_rows()`.**
+
+⚠ **`196-05` MOUNTS NOTHING BY DESIGN** — the four free-text `AI model` inputs are untouched, so
+**AUTH-04 is NOT user-observable until `196-08`**. "A coerce model is distinguishable before selection"
+is proved as MARKUP ONLY; the human half is G-4 row **U-A2** in `196-VALIDATION.md`.
+
+⚠ **`FieldLabel` IS NOT IMPORTABLE and the plan assumed it was** — it is a private `function` inside
+`PhaseFormPanel.tsx`, and exporting it would make the panel↔picker edge a genuine **ESM cycle** once
+`196-08` mounts `ModelField`. `196-05` rendered the same two-audience structure locally with a stated
+reason, pinned by accessible-name assertions. **Recommendation carried to `196-08`: extract
+`FieldLabel` + `InfoHint` into their own module** — that is `196-08`'s file to touch.
+
+⚠ **More G-5 holes, all owed to `196-09` (D-23):**
+- `scripts/vitest-count-gate.cjs` → **`98 / 16 / 3110`, NO LEDGER ROW.** Sixteen phases have edited
+  **the file that enforces the guardrails**, and it is invisible to its own.
+- `backend/app/api/workflows.py` re-derives to **`36 / 18 / 1984`** against CLAUDE.md's `35 / 17 / 1962`
+  — stale by one phase already, `196-06`'s own commit being the 36th.
+- `backend/app/services/model_registry.py` (`2 / 1 / 368`) is absent with **three consumers already**;
+  owes a row the moment it reaches a third phase.
 
 ### Wave 2 close — 2026-08-17 (`196-04`)
 
