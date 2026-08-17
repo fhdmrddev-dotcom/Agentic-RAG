@@ -43,6 +43,7 @@ from app.db.workflows import (
     delete_workflow_cascade_preview,
     delete_workflow_definition,
     finish_run,
+    get_definition,
     list_draft_workflows,
     list_published_workflows,
     list_starter_workflows,
@@ -65,6 +66,11 @@ from app.services.harness import grounding, publish_service
 # ``LINT_CODES`` rides the SAME import (WR-05): the severity classifier below composes its
 # known-code set from the module that OWNS the codes rather than re-declaring the literals.
 from app.services.harness.reachability import LINT_CODES, lint_workflow
+# Phase 196 (AUTH-04 / SC#2 / D-09 / D-08) — the save-path model refusal. The LOGIC lives in
+# the leaf; this module contributes two call lines, which is a call-out and not a second
+# concern (see the G-5 note in 196-06-PLAN.md). Cycle-safe: model_registry imports app.config
+# at module scope and its admin/user_settings collaborators FUNCTION-LOCALLY.
+from app.services.model_registry import assert_phase_models_registered, unregistered_phase_models
 from app.services.operator_service import write_operator_audit
 # Phase 182 (CR-02) — the SAME owner-identity scrub every other folder/skill read path
 # applies (folders.py:20,34 / kb.py:123 / skills.py:218-222; SEED-091 / D-164-05 / D-165-05).
@@ -1165,6 +1171,10 @@ async def create_draft(
     user_id = _coerce_user_id(current_user)
     # Force draft status server-side — never trust the client's ``status``:
     body = body.model_copy(update={"status": "draft"})
+    # SC#2 / D-09: refuse a model this deployment does not know, BEFORE the write. A create
+    # has no prior definition, so there is nothing to grandfather (D-08) and every
+    # unregistered value is refused.
+    await assert_phase_models_registered(body)
     try:
         row = await create_workflow_definition(pool, definition=body, user_id=user_id)
     except asyncpg.exceptions.UniqueViolationError:
@@ -1273,6 +1283,18 @@ async def update_draft(
     pool = await get_pg_pool()
     user_id = _coerce_user_id(current_user)
     body = body.model_copy(update={"status": "draft"})
+    # SC#2 / D-09 / D-08 — AFTER ownership, BEFORE the write. Lazy: the stored row is read
+    # only when the body actually carries an unregistered model (measured 2026-08-18: 0 of
+    # 257 stored phases), so an ordinary autosave costs no extra query. ⚠ A row this caller
+    # does not OWN falls through to the write below rather than raising, so the 400 can
+    # never distinguish "not yours" from "bad model" — the 0-row UPDATE answers with today's
+    # byte-identical dull 404 (T-196-ORACLE). ``previous`` is D-08's grandfather.
+    if await unregistered_phase_models(body):
+        stored = await get_definition(pool, definition_id, user_id=user_id)
+        if stored is not None and str(stored.get("created_by")) == str(user_id):
+            await assert_phase_models_registered(
+                body, previous=_coerce_definition(stored.get("definition"))
+            )
     try:
         row = await update_workflow_definition(
             pool, definition_id, definition=body, user_id=user_id, token=if_match
