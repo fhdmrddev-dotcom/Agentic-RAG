@@ -522,7 +522,15 @@ G-5 fires — adapter pattern audit due
 
 ## `frontend/src/pages/WorkflowRunPage.tsx`
 
-**Re-derived 2026-08-17 (extraction):** `12 commits / 3 phases / 1101 L` · **G-5 FIRES** (3 phases vs threshold 3) — at threshold — honoured by construction (194.1).
+**RE-DERIVED 2026-08-17 AT PHASE 195 CLOSE (plan `195-08`):** `14 commits / 4 phases / 1156 L` · **G-5 FIRES** (4 phases vs threshold 3) — **PAST the threshold now, not at it** — honoured by construction (194.1, **195**). **⚠ ONE SEAM OF THE FIVE THIS SECTION NAMED HAS BEEN TAKEN — see "The seam, TAKEN" below.**
+
+> ⚠ **The extraction-time header is preserved verbatim beside the re-derivation, never over it**, because this file's own section is the one that records how fast a triple goes stale:
+>
+> **Re-derived 2026-08-17 (extraction):** `12 commits / 3 phases / 1101 L` · **G-5 FIRES** (3 phases vs threshold 3) — at threshold — honoured by construction (194.1).
+>
+> **It went stale the same day it was written** — Phase 195's three commits on this file landed hours later. The reading moved `12 → 14 commits`, `3 → 4 phases`, `1101 → 1156 lines`. Re-derive; do not quote.
+>
+> **Commands, run at `945b8b61`:** `git log --oneline -- frontend/src/pages/WorkflowRunPage.tsx | wc -l` → **14**; the numeric `sed` bucket recipe → `188 188.1 194.1 195` → **4**; `wc -l <f>` → **1156**. **Six-digit dated quick-task buckets: CHECKED, NONE EXIST** (`grep -E '^[0-9]{6}$'` over the bucket list returns empty) — stated so a reader can tell *"checked, none exist"* from *"nobody checked"*, which is this section's own standing request.
 
 ### Phases touched (verbatim)
 
@@ -531,6 +539,131 @@ G-5 fires — adapter pattern audit due
 ### G-5 status (verbatim)
 
 **G-5 FIRES AT EXACTLY THE THRESHOLD, and BOTH readings are stated so neither can be quoted as the other: TWO phases had touched this file when Phase 194.1 was scoped (below ≥3 — G-5 did NOT fire then, which is what D-04 recorded), and THREE have touched it including 194.1 (at the threshold — G-5 fires from here on).** Honoured BY CONSTRUCTION either way, no override; `.planning/STATE.md` records `Phase 194.1 — NONE`. **The measured reason: THE PAGE GAINED A CONTROL, NOT STATE OWNERSHIP.** `useState[(<]` **6 → 6** · `useEffect(` **7 → 7** · props **3 → 3** · `<StopControl` **0 → 1** · `workflowLock?.runId|cancelRun(` **0 → 0** · **zero deleted behaviour lines**, and **39 of the 46 added lines are the recorded-decision comment**. ⚠ **Until this phase, `grep -cE "onStop|stopThread|cancelRun|Stop"` over this file returned ZERO — the surface `▶ Run workflow` lands on had no Stop control of any kind**, which is `BUG-260816-01`'s second half and ROADMAP SC#2 for the phase. **The invariants that now bind this file:** (1) **the Stop is gated on the shipped `isTerminal` const already in scope and is NEVER re-derived** — ⚠ **five status cases, not two, and that is measured rather than argued: plant P1 (gating on `runStatus !== "completed"`) reds `⊘ Cancelled` and `✕ Failed` while `✓ Complete` STAYS GREEN**, so a `completed`-only pair of cases passes it outright. (2) **Direct flip — no sheet, no arm-to-confirm** (sketch 169-A); P3a and P3b each red, and P3b's ordering artefact is recorded rather than smoothed. (3) ⚠ **THE STOP IS RIGHT-*GROUPED* WITH THE SEAM LINK, NOT APPENDED AFTER IT, AND THE ARRANGEMENT IS LOAD-BEARING RATHER THAN TIDY:** `COPY_OPEN_THREAD` carries `ml-auto`, so a Stop appended after it would shove the seam link left every time the run went terminal — **G-4 row 2's *"the row twitches"* failure, built in.** Grouping pins the link's right edge; the shipped seam button is **byte-unchanged**; and the property is asserted by **CHILD ORDER** (`firstElementChild` is the slot, `lastElementChild` the seam link), **never by class name**. (4) **F1/F2 close the `src/pages` gap in the four-mount fence** — `WorkspacePanel.test.tsx`'s F-1/V-05 globs only `panel|chat|workflows`, so this mount would have been the ONE Stop outside the fence guarding the other three; **F2 was shown to red where F1 does not**, which is the only evidence it is not a redundant widening. (5) **`fmtElapsed` no longer lives here** — plan 06 hoisted it verbatim to `lib/fmtElapsed.ts` (one import added, seven lines removed, **both call sites byte-unchanged, zero behaviour lines changed**), and a byte-identity fence plus a boundary table both red on a one-character edit to the moved body. ⚠ **TWO LESSONS THIS FILE TAUGHT THE PHASE, recorded because they generalise: (a) plan 01's `expect(src.split("\n").length).toBe(1047)` line pin was ALREADY RED at plan 07's base and NOBODY COULD HAVE SEEN IT** — `src/components/chat` has no `TARGETS` entry, so that suite is **UNGATED** and the count gate never runs it. *A pin in an ungated suite is a pin nothing checks; if a phase pins a figure, pin it where the gate runs — or do not pin it.* **(b) a fence can red for a reason that has nothing to do with its subject:** `expectBandSentence` **sampled** where it had to **wait**, so under P1 it red on a band COUNT (an announcement race in a `useState` written from a `useEffect`) rather than on the gate the plant was aimed at — *a fence that reds for a reason other than its subject is not evidence for its subject*, and P1 had to be re-driven from scratch after the fix. **The count-gate pin on `WorkflowRunPage.test.tsx` is now 102 and is EXACT** (102 = 102 on the gate's own `actual`), unlike `WorkspacePanel.test.tsx`'s, which was found twelve cases behind. **Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST; the natural seam is named rather than implied — the run read + its poll, the phase/spec join, the elapsed anchor, the deliverable list and the canvas mount are five concerns in one 1101-line component. It inherits `12 / 3 / 1101`.**
+
+### The seam, TAKEN — Phase 195 (added 2026-08-17 by plan `195-08`)
+
+⚠ **RECORDED BESIDE THE PREDICTION ABOVE, NEVER OVER IT.** The G-5 paragraph closes by naming a seam:
+
+> *"the natural seam is named rather than implied — the run read + its poll, the phase/spec join, the elapsed anchor, **the deliverable list** and the canvas mount are five concerns in one 1101-line component."*
+
+**Phase 195 took exactly ONE of the five it named: the deliverable list.** The prediction was correct and is left standing as evidence that a named seam is worth more than a general "extraction due" — a later phase could pick it up because someone had written down which five.
+
+**What was taken, precisely.** The region's own byte formatter, its own basename, its own extension→glyph map, the three OOXML mime constants and its hand-rolled `<li><button>` row markup were **deleted** and replaced by a delegation to the shared `components/files/FileRow.tsx` (Radix `asChild`). Eight lucide file-glyph imports went with them. **This is the second-largest of the five concerns and the only one that was duplicated in two other files** — which is what made it the right one to take first, and it was taken because RUN-03 required it, not as a tidy-up.
+
+⚠ **The file got BIGGER, not smaller (1101 → 1156), and that is the honest reading.** The deleted duplication was outweighed by (a) the docblock recording the extraction and its constraints, (b) the D-02 heading constant with its historical literal quoted beside it, and (c) the `useMemo` ordering derivation. **A refactor that removes duplication is not obliged to remove lines**, and a section claiming otherwise would be inviting the next reader to measure the wrong thing. The concern count fell by one; the line count rose by 55.
+
+**THE FOUR CONCERNS THAT REMAIN, for the next phase that opens this file — the seam, restated on the current measurement:**
+
+1. **the run read + its poll** — the largest remaining concern
+2. **the phase/spec join**
+3. **the elapsed anchor**
+4. **the canvas mount**
+
+**Per G-5 the next phase adding a genuinely second concern still owes a refactor recommendation FIRST. It inherits `14 / 4 / 1156`, and G-5 now fires PAST the threshold rather than at it.**
+
+**The invariants Phase 195 added to this file, in addition to everything above:**
+
+1. ⚠ **THE REGION'S HEADING MAKES NO AUTHORSHIP CLAIM, AND THAT IS A PRODUCT RULE RATHER THAN COPY.** `COPY_DELIVERABLE_HEADING` reads **`Files in this run's workspace`**; the historical `What this run produced` is quoted verbatim beside the constant. The read is **thread-scoped** (there is no run-attribution column on `workspace_files`, and the field that *looks* like one — `run_claim` — is NULL on every row and belongs to Phase 141 template-asset isolation). A thread legitimately holds files this run did not write. Measured: thread-scope is exact for **60 of 61** file-bearing runs and visibly wrong for one. **A word-level sweep fences the `<h2>` against `/this run (produced|made|created)/i`, and it is ORDERED BEFORE the equality assertion** — a failing `expect` aborts the case, so an equality placed first would swallow every observation of the sweep firing.
+2. ⚠ **`COPY_NO_FILES_TERMINAL = "This run produced no files."` IS NOT THE SAME OVERCLAIM AND MUST NOT BE "FIXED".** A run is a subset of its thread, so an **empty** thread-scoped list *entails* the run produced nothing; the overclaim only bites in the non-empty direction. **D-15 ships both empty strings byte-identical** and a source fence pins each at exactly one occurrence. A plan that corrected this copy in the heading's name would break D-15. The reasoning is written into the page so the next reader does not correct it.
+3. ⚠ **THE THREE-WAY EMPTY STATE IS THE MOST-SEEN STATE ON THIS SURFACE — 161 of 222 runs hit it.** Live → *"No files yet — this run hasn't written anything."* · terminal → *"This run produced no files."* · **nothing at all while the first read is in flight**. Three plants red one arm each (force always-terminal, force always-live, delete the `filesLoading ? null :` guard).
+4. ⚠ **THE ORDERING IS `[...files].sort(byNewestFirst)`, NEVER `files.sort(...)`** — the provider hands out a stable array reference and an in-place sort mutates store state. **And the sort key is ABSENT on exactly the file the ordering exists to surface:** the reconciled GET supplies `created_at` on every row, but the live SSE payload carries `id/path/version/size/mime` only and the store **appends** it. A comparator that sorts a missing key LAST puts the just-produced deliverable at the BOTTOM, under the template it filled. Both regimes are pinned, **each fixture its own positive control** — a one-row list, or a list already in the right order, passes forever whether the page sorts or not.
+5. ⚠ **THE ID-LESS ROW'S DEAD AFFORDANCE IS A `<span aria-disabled>`, NEVER A `<button>`, AND THE ELEMENT CHOICE IS LOAD-BEARING.** A shipped fence asserts the region holds **zero** `<button>` elements on that arm; re-implementing the cue as a disabled button reds it. Plan `195-02` planted this exact change one wave early and *measured* that a `<span>` affordance leaves the zero-button contract green — the conversion then observed the identical shape.
+6. ⚠ **THE ORDERING IS SCOPED TO THIS PAGE ONLY.** The workspace panel keeps its shipped `path` ordering and **no decision authorises changing it** — stated so a reviewer can tell "scoped" from "forgotten".
+7. ⚠ **`StopControl.baseline.test.tsx` IMPORTS THIS FILE AS `?raw` AND GREPS IT, AND THAT SUITE WAS UNGATED UNTIL PHASE 195.** It is now gated (adopted at plan `195-02`), but the lesson stands: **a refactor of this file can red source-level fences that have nothing to do with its subject.** Assert it green after every edit here.
+8. ⚠ **FOUR IDENTIFIERS MUST NEVER APPEAR AS TOKENS IN THIS FILE — INCLUDING IN COMMENTS.** Raw-source absence fences assert this page names neither the panel's file-list component, nor the previewer, nor the viewed-thread selector hook, and that the Stop control appears exactly once. **Prose is not exempt** — the extraction docblock names all four in WORDS on purpose. This trap has now fired **seven** recorded times in this repository; do not "clarify" the docblock back into a red gate.
+
+---
+
+## `frontend/src/components/chat/OutputFileCard.tsx`
+
+**ADDED 2026-08-17 by plan `195-08`. Re-derived at `945b8b61`:** `8 commits / 7 phases / 219 L` · **G-5 FIRES** (7 phases vs threshold 3) — honoured by construction (**195**).
+
+> ⚠ **THIS FILE WAS ABSENT FROM `CLAUDE.md` ENTIRELY UNTIL THIS COMMIT** (`grep -c` → 0), while measuring **SEVEN phases** — more than double the threshold. It is the fourth file in three phases found to be invisible to its own guardrail by *measuring* rather than by reading (`StreamsProvider.tsx`, `ChatArea.tsx`, `PendingAskCard.tsx` before it). ⚠ **It was flagged as absent at Phase 195's WAVE 1 baseline and the flag is the only reason it is here** — nothing in the discuss-phase audit could see it, because the audit scans a table and the table had no row.
+
+**Commands, run at `945b8b61`:** `git log --oneline -- frontend/src/components/chat/OutputFileCard.tsx | wc -l` → **8**; the numeric `sed` bucket recipe → `075.2 075.4 075.7 095 095.1 155 195` → **7**; `wc -l <f>` → **219**. **Six-digit dated quick-task buckets: CHECKED, NONE EXIST.**
+
+### Phases touched
+
+**075.2 / 075.4 / 075.7 / 095 / 095.1 / 155 / 195** — 8 commits across 7 phases, **187 → 219 lines** at Phase 195.
+
+⚠ **The wave-1 baseline measured `7 / 6 / 187` and that figure is preserved here beside the current one**, because the delta is entirely this phase (`+1 commit, +1 phase, +32 lines`) and a reader comparing the two should be able to see that rather than infer it.
+
+### G-5 status
+
+**G-5 FIRES ON THE COUNT (7 phases) — honoured BY CONSTRUCTION, no override.** The extraction **IS** the requirement: RUN-03 says *no second file UI*, and Phase 195's structural first move was to lift the row markup out into a shared component before any surface was converted. There was no feature to do first.
+
+**What Phase 195 did to this file, and the property that made it cheap:** its interior was re-implemented on `components/files/FileRow.tsx` (`asChild`) while its **public prop shape stayed BYTE-IDENTICAL** — the `interface OutputFileCardProps` block's md5 is unchanged and the interface remains **unexported**. ⚠ **That is why neither call site was opened**, which matters more than it sounds: one of them is `MessageItem.tsx` at **29 phases with an UNDISCHARGED G-5 extraction obligation**. Opening it would have been the expensive half of the plan and would have owed a refactor recommendation first.
+
+⚠ **"Zero behaviour change" was proved on the RENDERED BYTES, not by the tests passing.** A before/after `outerHTML` capture across **23 states** (live plain/sized/zero-size/`supersedes`/both `variant` values/absolute url/extension-less/prototype-key/path-shaped/markup-shaped ×2/`.csv`/`.sh`; dead ×5; downloading; two error copies; plus the download call's *arguments* and the re-entrancy guard's call count) read **18/23 raw-identical and 23/23 once class-token ORDER is normalised away.** A conversion can satisfy 21 assertions and still move the DOM in ways none of them read.
+
+⚠ **THE ONE ACCEPTED DELTA, stated as a delta and never claimed as identity:** the dead branch's name span emits `font-mono text-foreground/60 truncate` as `font-mono truncate text-foreground/60` — **same token set, different attribute order**, arising inside the shared row's `twMerge` composition. CSS class order in the attribute has no effect on cascade resolution, so the rendering is identical. *"18/23 raw-identical" is written that way on purpose; "the conversion is byte-identical" would have been false.*
+
+**The invariants that now bind this file:**
+
+1. ⚠ **THE DEAD-LINK STATE IS `BUG-260523-03`'s CUE AND SURVIVES BYTE-IDENTICAL.** A file with no `url` renders the dead root: `data-dead="true"`, a red-bordered affordance, and *"Download unavailable — this file has no link"*. ⚠ **The affordance is a `<span aria-disabled>` and the row holds ZERO `<button>` elements** — the same contract the run page carries, held on **both** sides of the seam rather than by luck on one. The gate is the `if (!file.url)` branch itself: no anchor exists to click, so `aria-disabled` is presentational and never authorization.
+2. ⚠ **THE `Replaces:` SUBLINE IS WRITTEN IN BOTH BRANCHES AND BOTH ARMS MUST STAY INDEPENDENT.** Before Phase 195 the literal was written **twice** — once live, once dead — and *"a fence rendering only a `url`-bearing fixture structurally cannot see the dead branch."* It is now written **once**, inside the shared row. **The blast radius grew and that is the extraction working:** a one-character edit to the literal (`Replaces: ` → `Replaces:`) red **3** cases before and reds **4** now. **The independence survived** — deleting the live `supersedes` prop reds the live cases and leaves the dead one GREEN, and vice versa; the seam moved from *two blocks* to *two props* rather than vanishing.
+3. ⚠ **`variant` IS INERT AND `is_hero` IS UNREAD — since Phase 095.1 (`D-095.1-06`), by operator-approved decision.** `hero` and `working` render the same tag, the same class list and the same children; the backend still WRITES `is_hero` and nothing reads it. A plant adding `variant === "hero" ? "shadow-lg" : ""` reds one case, so the inert flag cannot silently become behaviour again. ⚠ **This is pinned on the RENDERED SHAPE, not on the source** — a conversion reintroducing a hero difference through a mechanism the assertions do not read (a wrapper the caller supplies) would not red here.
+4. ⚠ **THE `VITE_API_BASE_URL` READ, `resolveOutputUrl` AND THE PRESERVED STATIC `href` STAY LOCAL TO THIS FILE.** The shared row receives `name`, `sizeBytes`, `supersedes`, `errorText`, `trailing`, `density` — **no thread id, no file id, no URL**. There is no path by which the row could resolve or fetch another surface's file. ⚠ **`resolveOutputUrl` passes through any `url` not starting with `/`, so a `javascript:` value would be a real sink.** Pre-existing, byte-unchanged, and **ACCEPTED with its trigger restated: any change that lets a user or a connector supply `OutputFile.url`, or any phase opening `resolveOutputUrl` for another reason, adds a scheme allow-list in the same commit.**
+5. ⚠ **THE IN-ROW DOWNLOAD ERROR AUTO-CLEARS AFTER 3 s AND THE RUN PAGE'S DOES NOT.** Chat's error is in-row with a `setTimeout`; the run page's is section-level (`data-testid="run-download-error"`) with **no** auto-clear. **The asymmetry is deliberate**, not drift. ⚠ **The 3 s timing is UNCOVERED on purpose** (it needs fake timers and is not a `D-08` state) — the timer's *presence* is asserted, its *timing* is not.
+6. **The chat row is the ONE surface that keeps the full glyph:** `fileIcon()` at **30 px WITH the mono `.EXT` ribbon** and an inline category hex. The panel and the run page render a flat 16 px token-coloured glyph with no ribbon. **"One icon path" is a VISIBLE difference between surfaces, deliberately parameterised** (`ribbon` / `tone`), not a single appearance imposed on three places.
+
+**Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST. The natural seam, named rather than implied: this file is now three concerns in 219 lines — (a) the sandbox URL resolution + the download call + its re-entrancy guard, (b) the transient error state and its timer, and (c) the two-branch live/dead composition over the shared row. (c) is thin and is the part that just moved; (a) is the part with a security note attached to it and is the natural next cut. It inherits `8 / 7 / 219`.**
+
+---
+
+## `frontend/src/components/panel/FilesSection.tsx`
+
+**ADDED 2026-08-17 by plan `195-08`. Re-derived at `945b8b61`:** `7 commits / 4 phases / 298 L` · **G-5 FIRES** (4 phases vs threshold 3) — honoured by construction (**195**).
+
+> ⚠ **ALSO ABSENT FROM `CLAUDE.md` ENTIRELY UNTIL THIS COMMIT** (`grep -c` → 0). It sat at **3 phases — exactly at the threshold — invisible**, and Phase 195 made it the 4th.
+
+**Commands, run at `945b8b61`:** `git log --oneline -- frontend/src/components/panel/FilesSection.tsx | wc -l` → **7**; the numeric `sed` bucket recipe → `087 088 100 195` → **4**; `wc -l <f>` → **298**. **Six-digit dated quick-task buckets: CHECKED, NONE EXIST.**
+
+### Phases touched
+
+**087 / 088 / 100 / 195** — 7 commits across 4 phases, **277 → 298 lines** at Phase 195. The wave-1 baseline measured `6 / 3 / 277`; preserved here beside the current figure.
+
+### G-5 status
+
+**G-5 FIRES ON THE COUNT (4 phases) — honoured BY CONSTRUCTION, no override.** Same reason as the two files above: the extraction is the requirement.
+
+⚠ **THIS FILE IS THE REASON PHASE 195 EXISTS, AND IT SAID SO ABOUT ITSELF.** Its `formatBytes` carried a comment reading, verbatim:
+
+> `// Copied verbatim from OutputFileCard.tsx:24-28 (the plan instructs copy, not`
+> `// re-derive — the source fn is not exported). Keep byte-for-byte identical.`
+
+**A confession of a duplication, checked in, with an instruction to keep the copy in sync by hand.** It was deleted **with the function it described** — not before it, not after it. ⚠ *A tombstone comment is a duplication that has been noticed and not fixed; finding one is a stronger signal than finding the duplication itself, because it proves someone already knew.*
+
+**What Phase 195 deleted from this file:** the copied `formatBytes` **and its confession**, the inline mime-first `iconFor` with its own `codeExts` array, the three OOXML mime constants, and six lucide file-glyph imports. The section now delegates to the shared row (`asChild`, `density="panel"`).
+
+**The invariants that now bind this file — the section keeps the a11y root, the shared row supplies only the presentation:**
+
+1. ⚠ **THE SECTION OWNS `useViewingThread`, AND THE SHARED ROW MUST NEVER READ IT.** `grep -c useViewingThread` here → 3; on the shared row → **0**. A raw-source absence fence on the run page pins the same property from the other direction. **The shared row is PURELY PRESENTATIONAL and this is mechanically enforced, not a convention** — it may not call the viewed-thread hook and may not import or name the previewer.
+2. ⚠ **ACTIVATION IS PREVIEW, NEVER DOWNLOAD — AND THE ASYMMETRY WITH THE RUN PAGE IS DELIBERATE.** Clicking a panel row opens `FilePreview`; clicking a run-page row downloads. **The shared row therefore parameterises the ACTIVATION rather than hardcoding it** (a callback prop — never a preview import). The panel row contains zero `<a>`, zero `<button>`, no `lucide-download` and no `aria-disabled`.
+3. ⚠ **THE LISTBOX/OPTION ROLES AND THE ROVING `rowRefs` FOCUS LIVE HERE, SO THE SHARED ROW MUST FORWARD ITS REF.** The rows are `div[role="option"] tabindex` inside `role="listbox"`, and `rowRefs` drives ArrowDown/ArrowUp. ⚠ **THIS IS THE PROPERTY MOST LIKELY TO DIE SILENTLY AND IT NEARLY WENT UNTESTED.** The shared row's own suite tests a ref passed **to** the row; nothing tested a ref passed to the row's **caller-supplied child**, which is what `rowRefs` actually uses. **Had Radix's `Slot` swallowed that child ref, arrow-key navigation would have died for keyboard users only, with every shipped case and every shared-row case green.** It does not swallow it — but that is now a measurement, driven by a plant, not a hope.
+4. **The label is the FULL PATH in `font-mono`, never the basename** (the run page deliberately shows the basename); the padding stays `px-2.5 py-2` (38 px, against the run page's `px-2 py-2` / 33 px); the fresh-write flash, `TemplateUpload` and the Template badge (passed as `trailingSlot`, rendering BEFORE the size cell) all stay in the section. Each has a plant proving its case can fail.
+5. ⚠ **THE PANEL KEEPS `text-panel-muted-foreground`, AND THIS IS THE ONE INVARIANT A NORMAL TEST CANNOT DEFEND.** In the shipped **dark** theme `--muted-foreground` and `--panel-muted-foreground` are **byte-identical** (`220 16% 65%`) and they diverge **only in light**, where the panel token exists because the global one measured **4.01:1 — below the 4.5:1 AA floor** (`PanelSection.tsx:85`; the panel token measures 7.21:1). **So a real light-theme AA regression passes every `toHaveStyle`, every `getComputedStyle` and every dark-theme screenshot.** The only assertion that sees it is one on the **token NAME**. That reasoning is written into the suite's header so a future editor cannot "improve" it back into a resolved-colour check. **Never assert a resolved `rgb()` on this file.**
+6. **The glyph delta is recorded as a DECISION, in a passing case rather than in prose.** Adopting the shared map moved four categories — tables `file-spreadsheet → table`, code `file-code → code`, images `file-image → image`, unknown `file → file-text`; `docx`/`pptx` unchanged. ⚠ **The nine code extensions the shared map omitted (`sh` `bash` `sql` `yml` `yaml` `css` `jsx` `mjs` `tsx`) were added in the same phase**, verified mechanically against this file's real pre-conversion **14-entry** list — *"nine"* was the briefing's number and the measured list was longer. **Zero missing, zero mis-categorised**, and a plant deleting the nine rows reds a case in **this** suite, so the panel defends the fix independently.
+
+⚠ **The three `TS2304: Cannot find name 'WorkspaceFile'` errors in `__tests__/FilesSection.test.tsx` are PRE-EXISTING, are part of the baseline `tsc` count of 33, and were LEFT DELIBERATELY.** See the note under `CLAUDE.md`'s typecheck figure; fixing them takes the tree to 30.
+
+**Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST. The natural seam, named rather than implied: this file is now four concerns in 298 lines — (a) the viewed-thread read and the files list, (b) the listbox keyboard model and its roving refs, (c) the preview selection + `FilePreview` mount, and (d) the template upload + badge. (c) is the cleanest cut — it is the only one with its own child component already. It inherits `7 / 4 / 298`.**
+
+---
+
+## Why `MessageItem.tsx` and `RunCard.tsx` owe NOTHING from Phase 195
+
+*(Added 2026-08-17 by plan `195-08`. Recorded because it is a **structural** claim rather than luck, and because an absent entry would read as an oversight.)*
+
+Both files are present in `CLAUDE.md` and both fire G-5 — `MessageItem.tsx` at **57 / 29 / 856** with its extraction obligation **UNDISCHARGED**, `RunCard.tsx` at **21 / 9 / 608**. Phase 195 converted the component `MessageItem.tsx` renders, and touched **neither file**.
+
+**Why, mechanically:** `OutputFileCard`'s public prop shape stayed **byte-identical** — the props-interface block's md5 is unchanged, the interface is still unexported, and the exported function signature is unchanged. **Neither call site *could* have needed touching.** Proved three independent ways against a NAMED base SHA: a commit-to-commit `numstat` (empty), a working-tree `numstat` (empty), and **both files' md5s equal to the digests recorded at the phase's baseline**.
+
+⚠ **All three arms are required, and the reason is a measured defect in the obvious one.** `git diff --numstat <BASE> HEAD` compares two **commits** — a working-tree edit is invisible to it by construction. Phase 195 planted **one space byte** into `MessageItem.tsx` and drove it: the `<BASE> HEAD` form returned **EMPTY** with the plant applied, while the working-tree form and the md5 both fired. **A `numstat`-empty check passes trivially both when the base SHA is wrong AND when the edit is not yet committed.** Corroborated independently from a second worktree two waves later, which reproduced the identical planted digest.
+
+**What this means for the next phase:** ⚠ **if a future plan WIDENS `OutputFileCardProps`, `MessageItem.tsx` is opened — and it is a 29-phase file whose extraction obligation is UNDISCHARGED, so a refactor recommendation is owed FIRST.** The prop shape is the load-bearing boundary, not the component's internals.
+
+⚠ **`RunCard.tsx` is owed nothing here for a different reason, and it is not a clean one:** Phase 195 measured that its file badge **reads 0 for a real workflow deliverable** and declined to fix it (`SEED-169`). The file is untouched because the lie was *filed*, not because there was nothing wrong with it.
 
 ---
 
@@ -544,6 +677,15 @@ precisely the state a row-scanning audit cannot see. They now carry real rows in
 - `frontend/src/components/chat/StopControl.tsx` — **3 / 1 / 315** (re-derived 2026-08-17) — the ONE shared pressed-state component behind all four Stop mounts
 - `frontend/src/components/chat/ThreadRunLine.tsx` — **1 / 1 / 357** (re-derived 2026-08-17) — the run-anchored line, two states
 - `frontend/src/components/chat/ActiveRunsTray.tsx` — **2 / 1 / 164** (re-derived 2026-08-17)
+
+**Added 2026-08-17 by plan `195-08` — Phase 195's new and newly-hot module. Same rule: a THIRD phase earns a full section.**
+
+- `frontend/src/components/files/FileRow.tsx` — **1 / 1 / 275** (re-derived at `945b8b61`; buckets `195`; six-digit quick-task buckets: **checked, none exist**) — **the ONE row markup behind all three file surfaces** (chat's output card, the workspace panel's list, the workflow run page's deliverable region). Radix `asChild` + `Slottable`, so the **caller** supplies the wrapper element — an `<a>` in chat, a `div[role=option]` in the panel, a `<button>` on the run page — and the row supplies only the interior. Three densities (`chat` / `panel` / `run`) carry LAYOUT and TONE; they carry no behaviour. ⚠ **It is purely presentational BY ENFORCEMENT, not by convention:** raw-source absence fences on the run page forbid the viewed-thread hook and the previewer from ever appearing, so the activation is a **callback prop** and the row receives no thread id, no file id and no URL. ⚠ **It must forward its ref to the caller-supplied child** — the panel's roving keyboard focus depends on it, and that dependency is invisible from this file. **40 cases, gated.**
+- `frontend/src/components/files/fileRowUtils.ts` — **1 / 1 / 133** (re-derived at `945b8b61`; buckets `195`; six-digit buckets: **checked, none exist**) — the ONE `formatBytes` (hoisted **byte-identical** from its origin, with a `?raw` identity fence proving it), `baseName`, the `FileSource` discriminated type, and `byNewestFirst`. ⚠ **`byNewestFirst` must sort a MISSING `created_at` FIRST, not last** — the live SSE payload carries no timestamp, so a comparator sorting a missing key last puts the just-produced deliverable at the bottom of the list. **22 cases, gated.**
+- `frontend/src/lib/fileIcon.tsx` — **2 / 2 / 254** (re-derived at `945b8b61`; buckets `095 195`; six-digit buckets: **checked, none exist**) — was `1 / 1 / 105`; Phase 195 widened it into the ONE per-extension icon path for the whole app. Options: `ribbon` / `tone` / `className` / `mimeType`. ⚠ **The bare `text/` mime arm is a FALLTHROUGH and sits AFTER the extension lookup on purpose** — a literally-mime-first order regresses `script.py` served as `text/plain` from the Code glyph to a document one, which is a real combination the panel already handled correctly. Every *specific* mime branch is mime-first; only the bare fallthrough is not. ⚠ **An own-property guard on the map lookup is load-bearing** — `EXT_MAP["constructor"]` would otherwise return a function. **41 cases, gated.**
+  > ⚠ **THIS BULLET CARRIES THE LEDGER'S OWN STANDING LESSON AS ITS REASON FOR EXISTING.** At **2 phases** G-5 does **not** fire on this file, and by the letter of the rule it needs no entry at all. It gets one anyway, because `WorkflowsPage.tsx` escaped G-5 **for ten phases purely by not being written down**, and `OutputFileCard.tsx` — two sections above — was invisible at **seven**. **A file that is not in the ledger cannot be seen by the audit that would have added it.** The cheapest moment to write the row is before the guardrail needs it.
+
+⚠ **Phase 195's new TEST files are deliberately NOT listed as young files** (`files/__tests__/FileRow.test.tsx`, `files/__tests__/fileRowUtils.test.ts`, `files/__tests__/FileRow.sweep.test.ts`, `chat/__tests__/OutputFileCard.baseline.test.tsx`). **G-5 is about production concerns accreting in one module; a test file's growth is the gate's business, not the ledger's** — and all four are pinned FILE-LEVEL in `scripts/vitest-count-gate.cjs`, which is the mechanism that actually watches them. Stated rather than left silent, so their absence reads as a decision.
 
 ### The paragraph these rows replaced (verbatim)
 

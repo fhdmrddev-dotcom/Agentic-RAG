@@ -121,6 +121,67 @@ fresh worktree false-failed every plan:
    agents the gate goes non-deterministic regardless of cap, so keep it to ≤ 2.
    This is very likely what Phases 190-16/17/18 saw and misattributed to `userEvent` delay.
 
+   ---
+
+   ### ⚠ CORRECTION 2026-08-17 (Phase 195, plan `195-08`) — THE NUMBERS **AND** THE CAUSAL CLAIM. Both originals are preserved above, never overwritten.
+
+   **(a) THE NUMBERS ARE STALE AGAIN — the third rot, and it took TWO DAYS.** Re-derived on the main
+   working tree, quiet, no sibling agent, verdict line read verbatim rather than summarised:
+
+   ```
+     total                                      4096    4170     +74
+     total 4170  ·  failed 0  ·  pinned total 4096
+   count gate OK — 83/83 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | this rule says above | **measured 2026-08-17** |
+   |---|---|---|
+   | grand total | 3918 | **4170** |
+   | pinned total | 3868 | **4096** |
+   | pinned files | 75/75 | **83/83** |
+
+   Phase 195's own trajectory, published because the *rate* is the point and it has not slowed:
+   `3972 / 3898 · 75/75` (wave 1 baseline) → `4044` (+5 suites adopted) → `4136 · 82/82` →
+   `4147` → `4150` → **`4170 · 4096 · 83/83`**, identical on three separate runs.
+   **A growing number is still the gate WORKING.** ⚠ **Eight of this phase's nine suites were
+   UNGATED before it started** — `TARGETS` had no entry for `src/components/chat`, `src/lib` or
+   `src/components/panel` at all, so a green gate said nothing about four fifths of the phase.
+   **Adopting a suite raises the total; that is the desirable direction and must not be read as drift.**
+
+   **(b) ⚠ THE CAUSAL CLAIM ABOVE IS REFUTED, AND THIS IS THE CORRECTION THAT MATTERS —
+   ADJUSTING THE CAP IS MEASURED NOT TO FIX THESE FAILURES.** The paragraphs above attribute every
+   `STACK_TRACE_ERROR` to worker oversubscription and present the cap as the remedy. **Across ~15 gate
+   runs in Phase 195 that model did not hold.** Full evidence: **`.planning/seeds/SEED-171-workflows-library-suites-flake-independent-of-cap.md`.**
+
+   - **Cap 1 and cap 2 each produced clean runs AND red runs on byte-identical trees.** Plan `195-02`
+     measured 8 runs and concluded cap 1 was clean; **that conclusion was luck** — two cap-1 runs at
+     the wave close were red.
+   - **One suite flakes in ISOLATION, with nothing else on the box.** Oversubscription cannot explain
+     a single suite failing alone.
+   - **The failing SET is never the same twice, so there is no number to pin** and no per-file
+     baseline can absorb it.
+   - ⚠ **NOT EVERY FAILURE IS A TIMEOUT.** One was a plain `AssertionError: expected 1 to be +0`,
+     which breaks the "slow suite near a timeout boundary" hypothesis outright. **The
+     `STACK_TRACE_ERROR` signature is therefore NOT a reliable tell for "not a real defect"** — that
+     inference appears above and should not be relied on alone.
+   - **THREE suites are involved**, and they are named so a red run can be triaged in one step:
+     `src/pages/WorkflowsPage.test.tsx` · `src/components/workflows/library/WorkflowCard.test.tsx` ·
+     `src/pages/WorkflowBuilderPage.session.test.tsx`.
+
+   **⚠ KEEP THE CAP RULE — `GSD_VITEST_MAX_WORKERS=2` STANDS.** A cap still matters for two concurrent
+   agents, and nothing here refutes that. **What is corrected is what the cap CLAIMS TO FIX.** So:
+
+   > **If a gate run reds, do NOT reach for the cap.** Capture the failing filenames from the gate's
+   > **own persisted JSON report** *before* re-running anything, check the named file against
+   > `git diff --numstat <your base> HEAD` and `git status --short`, and if it is **byte-unchanged and
+   > one of SEED-171's three**, record it as an observation and move on. ⚠ **One green sample of a
+   > flaky suite is NOT proof of innocence** — say "provably unmodified", never "fine".
+
+   ⚠ **A CONSEQUENCE FOR PLANNING, not just for triage:** `count gate OK` is **not reliably reachable
+   on demand**, so a plan whose acceptance criterion is *"the gate is green"* has written a criterion
+   that can fail for reasons no plan controls. Pair it with the per-file deltas and the explicitly-run
+   in-scope suites, which are deterministic.
+
 3. **NEVER `rm -rf` a bootstrapped worktree, and never let git do it either.** A recursive delete
    FOLLOWS a junction and destroys the operator's real 1.7 GB `venv` — silently. `git worktree
    remove --force` does not fall into that trap but fails outright (`Invalid argument`) and leaves
@@ -344,10 +405,15 @@ wc -l <file>                                                           # lines
 | [`frontend/src/components/chat/MessageList.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessagelisttsx) | 19 / 8 / 267 | **FIRES** | honoured by construction (194.1) |
 | [`frontend/src/components/chat/ChatArea.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatchatareatsx) | 61 / 29 / 587 | **FIRES** | honoured by construction (194.1) — **strongest FE extraction case** |
 | [`frontend/src/components/panel/PendingAskCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelpendingaskcardtsx) | 10 / 5 / 629 | **FIRES** | honoured by construction (194.1) |
-| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 12 / 3 / 1101 | **FIRES** | at threshold — honoured by construction (194.1) |
+| [`frontend/src/pages/WorkflowRunPage.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcpagesworkflowrunpagetsx) | 14 / 4 / 1156 | **FIRES** | **one of five named seams TAKEN (195)** — the deliverable list; four remain, named in the detail file. ⚠ row read `12 / 3 / 1101 · at threshold` and went stale the SAME DAY |
+| [`frontend/src/components/chat/OutputFileCard.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatoutputfilecardtsx) | 8 / 7 / 219 | **FIRES** | honoured by construction (195) — ⚠ **was ABSENT from this table at SEVEN phases**; public props byte-identical, so `MessageItem.tsx` was never opened |
+| [`frontend/src/components/panel/FilesSection.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentspanelfilessectiontsx) | 7 / 4 / 298 | **FIRES** | honoured by construction (195) — ⚠ **was ABSENT at three (exactly at threshold)**; its own *"keep byte-for-byte identical"* copy-confession is now deleted |
 | `frontend/src/components/chat/StopControl.tsx` | 3 / 1 / 315 | no (1 phase) | young — owes a detail section the moment it reaches a 3rd phase |
 | `frontend/src/components/chat/ThreadRunLine.tsx` | 1 / 1 / 357 | no (1 phase) | young — owes a detail section the moment it reaches a 3rd phase |
 | `frontend/src/components/chat/ActiveRunsTray.tsx` | 2 / 1 / 164 | no (1 phase) | young — owes a detail section the moment it reaches a 3rd phase |
+| `frontend/src/components/files/FileRow.tsx` | 1 / 1 / 275 | no (1 phase) | young (195) — the ONE row markup behind all three file surfaces; ⚠ **must forward its ref to the caller-supplied child** or the panel's roving focus dies silently |
+| `frontend/src/components/files/fileRowUtils.ts` | 1 / 1 / 133 | no (1 phase) | young (195) — the ONE `formatBytes`/`baseName`/`byNewestFirst`; ⚠ a MISSING `created_at` must sort **FIRST**, not last |
+| `frontend/src/lib/fileIcon.tsx` | 2 / 2 / 254 | no (2 phases) | young (095, 195) — the ONE per-extension icon path; ⚠ **listed BELOW the G-5 threshold on purpose** — `WorkflowsPage.tsx` escaped G-5 for ten phases purely by not being written down |
 | `backend/app/services/run_transport.py` | 1 / 0 / 116 | no (0 phases) | young — the SSE transport leaf cut out of `threads.py`; ⚠ **its re-import in `threads.py` is load-bearing, see the detail file** |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.

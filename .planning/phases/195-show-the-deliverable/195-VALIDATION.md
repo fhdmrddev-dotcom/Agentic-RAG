@@ -1,9 +1,20 @@
 ---
 phase: 195
 slug: show-the-deliverable
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: signed-off-conditional   # ⚠ 2026-08-17, plan 195-08 task 2. Every AUTOMATED contract is
+                                 # discharged and measured. ONE manual row is OWED: D-20, the G-4
+                                 # lived-experience checkpoint (195-08 task 3). Conditional, not
+                                 # complete — see § "Why nyquist_compliant stays false".
+nyquist_compliant: false         # ⚠ DELIBERATELY false, with the reason named rather than left to
+                                 # silence. Flips to true only when 195-UAT.md carries U1-U6 and
+                                 # every row is a PASS; a ⛔ row leaves it false with the row named.
+wave_0_complete: true            # ⚠ set 2026-08-17 by plan 195-08. All five ❌ MISSING references
+                                 # were authored, and the D-16 live baseline landed in a commit that
+                                 # PREDATES every source change (the 188.1 rule, honoured in the only
+                                 # order that makes it worth anything).
+plants_estimated: 27             # 26 + the adopted stripper non-vacuity plant
+plants_driven: 75                # ⚠ MEASURED, ~2.9x the estimate. `expect` short-circuits, so a case
+                                 # with N substantive clauses needs N plants, not one.
 created: 2026-08-17
 source: 195-RESEARCH.md § "Validation Architecture" (committed f373aa28)
 ---
@@ -93,19 +104,38 @@ which reads like a pass at a glance** (194). Read the VERDICT line, never a summ
 
 Requirement → behaviour → proof. `⬜ pending` until execution stamps it.
 
-| Req | Behaviour | Test type | Automated command | File exists | Status |
-|---|---|---|---|---|---|
-| RUN-02 | A terminal run's produced file is listed, named, sized, downloadable from the run surface | unit (RTL) | `npx vitest run src/pages/WorkflowRunPage.test.tsx` | ✅ 102 cases | ⬜ |
-| RUN-02 | The region label makes no run-scope claim it cannot deliver (**D-02**) | unit | same file, heading cases `:897` + `:1023` | ✅ **both must be updated** | ⬜ |
-| RUN-02 | The three-way empty state survives the conversion (**D-15**) | unit | same file, `describe("… two empty states say different true things")` | ✅ 3 cases | ⬜ |
-| RUN-02 | Newest-first ordering, **BOTH regimes** (**D-12**) | unit | `npx vitest run src/components/files/__tests__/` | ❌ **Wave 0** | ⬜ |
-| RUN-02 | Live run: launch → watch → download → **OPEN THE FILE** (**D-20**) | **manual, operator-driven** | see § "The D-16 live baseline" | ❌ Wave 0 + close | ⬜ |
-| RUN-03 | Exactly ONE `formatBytes`, ONE icon path, ONE row markup, ONE download dispatcher | unit + **source sweep** | `npx vitest run src/components/files/__tests__/FileRow.sweep.test.ts` | ❌ **Wave 0** | ⬜ |
-| RUN-03 | `OutputFileCard`'s dead-link state survives byte-identical (**D-08**) | unit | `npx vitest run src/__tests__/components/MessageItem.finalOutputs.test.tsx -t "dead-link"` | ✅ `:111-124` | ⬜ |
-| RUN-03 | `OutputFileCard`'s `supersedes` subline survives byte-identical (**D-08**) | unit | — | ❌ **ZERO COVERAGE — Wave 0** | ⬜ |
-| RUN-03 | Panel keeps listbox/option + roving tabindex + preview activation + Template badge | unit | `npx vitest run src/components/panel/__tests__/FilesSection.test.tsx` | ✅ 11 (**ungated**) | ⬜ |
-| RUN-03 | Chat gains NO new file affordance (**D-13**) while its presentation converts (**D-07**) | **source sweep + git** | `FileRow.sweep.test.ts -t "chat capability"` + `git diff --numstat` | ❌ **Wave 0** | ⬜ |
-| RUN-03 | Run page still names neither `FilesSection`, `FilePreview` nor `useViewingThread` | source fence | `WorkflowRunPage.test.tsx -t "neither mounts the panel"` | ✅ **two arms INVERT** | ⬜ |
+⚠ **STAMPED 2026-08-17 by plan `195-08` task 2, from the plan SUMMARYs.** The `File exists` column is
+preserved **as written at planning time** and a second column records what shipped — so a reader can
+see which rows were authored during the phase rather than inherited. **Ten of eleven rows are ✅; the
+eleventh is D-20, which is a blocking human checkpoint and is stated as OWED rather than passed.**
+
+| Req | Behaviour | Test type | Automated command | File exists (planning-time) | **Shipped** | Status |
+|---|---|---|---|---|---|---|
+| RUN-02 | A terminal run's produced file is listed, named, sized, downloadable from the run surface | unit (RTL) | `npx vitest run src/pages/WorkflowRunPage.test.tsx` | ✅ 102 cases | **108** (`195-02` +3, `195-06` +3; two `it()`s INVERTED not deleted) | ✅ **PASS** |
+| RUN-02 | The region label makes no run-scope claim it cannot deliver (**D-02**) | unit | same file, heading cases `:897` + `:1023` | ✅ **both must be updated** | both updated + a **third** arm (the word-level sweep, ordered BEFORE the equality) | ✅ **PASS** |
+| RUN-02 | The three-way empty state survives the conversion (**D-15**) | unit | same file, `describe("… two empty states say different true things")` | ✅ 3 cases | 3 cases, both strings **byte-unchanged**; P1a/P1b/P1c red one arm each | ✅ **PASS** |
+| RUN-02 | Newest-first ordering, **BOTH regimes** (**D-12**) | unit | `npx vitest run src/components/files/__tests__/` | ❌ **Wave 0** | ✅ **AUTHORED** — `fileRowUtils.test.ts` 22 + `FileRow.test.tsx` 40 + 2 run-page cases; **each fixture its own positive control** | ✅ **PASS** |
+| RUN-02 | Live run: launch → watch → download → **OPEN THE FILE** (**D-20**) | **manual, operator-driven** | see § "The D-16 live baseline" | ❌ Wave 0 + close | ⚠ **WAVE-0 HALF DRIVEN** (`195-BASELINE.md` arms 0-3, PRE-change: launch, watch, download, byte-exact + CRC-clean OOXML). **The POST-change half is plan `195-08` task 3** | ⚠ **OWED — blocking checkpoint** |
+| RUN-03 | Exactly ONE `formatBytes`, ONE icon path, ONE row markup, ONE download dispatcher | unit + **source sweep** | `npx vitest run src/components/files/__tests__/FileRow.sweep.test.ts` | ❌ **Wave 0** | ✅ **AUTHORED** — 20 cases, driven RED **once per swept file**, 4 guarded `?raw` arms. ⚠ **No shared download dispatcher** (D-195-03-C — routing through a util drops a tenancy fence's grep to zero); the two seams stay at their callers **deliberately** | ✅ **PASS** |
+| RUN-03 | `OutputFileCard`'s dead-link state survives byte-identical (**D-08**) | unit | `npx vitest run src/__tests__/components/MessageItem.finalOutputs.test.tsx -t "dead-link"` | ✅ `:111-124` | ✅ + **split into four independent cases** in `OutputFileCard.baseline.test.tsx`, because the shipped pair asserts both clauses in one `it()` and **the first short-circuits the second** | ✅ **PASS** |
+| RUN-03 | `OutputFileCard`'s `supersedes` subline survives byte-identical (**D-08**) | unit | — | ❌ **ZERO COVERAGE — Wave 0** | ✅ **AUTHORED** — pinned in **BOTH** branches **independently** (deleting one leaves the other GREEN, measured both directions) | ✅ **PASS** |
+| RUN-03 | Panel keeps listbox/option + roving tabindex + preview activation + Template badge | unit | `npx vitest run src/components/panel/__tests__/FilesSection.test.tsx` | ✅ 11 (**ungated**) | **22** (+11, additions only, zero removed lines); **now GATED** (adopted `195-02`, pin raised `195-05`) | ✅ **PASS** |
+| RUN-03 | Chat gains NO new file affordance (**D-13**) while its presentation converts (**D-07**) | **source sweep + git** | `FileRow.sweep.test.ts -t "chat capability"` + `git diff --numstat` | ❌ **Wave 0** | ✅ **AUTHORED** — 4 selectable cases + **all THREE git/md5 forms** (see FINDING F-b). Prop-set exactness, the interface still unexported, byte-identity to a NAMED base | ✅ **PASS** |
+| RUN-03 | Run page still names neither `FilesSection`, `FilePreview` nor `useViewingThread` | source fence | `WorkflowRunPage.test.tsx -t "neither mounts the panel"` | ✅ **two arms INVERT** | ✅ inverted **IN PLACE** with originals quoted; P8a/P8b/P8c each red their own arm **separately** | ✅ **PASS** |
+
+**Zero pending markers remain IN THE MAP.** Ten ✅ PASS, one ⚠ OWED — and the OWED row is a **decision**
+(a blocking human checkpoint that has not yet been driven), never a claim that it ran.
+
+> ⚠ **A FOURTH INSTANCE OF FINDING F-d, IN THE ACT OF STAMPING THIS TABLE — recorded rather than
+> quietly worked around.** Plan `195-08`'s own acceptance criterion is *"zero `⬜` remaining in the
+> Per-Task Verification Map"*. A bare `grep -c "⬜"` reads **2**, and **both hits are prose ABOUT the
+> marker** — the legend at the top of this section, and this sentence's own earlier wording. **The map
+> itself contains none.** The criterion is unsatisfiable the moment the convention is explained, which
+> is exactly F-d's shape at instances 1-3 (`195-03`'s docblock, `195-06`'s `not.toMatch` grep,
+> `195-07`'s self-matching path regex). **Four instances in one phase; the pattern is now recorded in
+> two places rather than rediscovered a fifth time.** The discriminating check is a **column-anchored**
+> one — a pending marker inside a table cell, i.e. `grep -cE '^\|.*⬜'` → **0** — which prose
+> structurally cannot satisfy, because prose does not start a markdown table row.
 
 ---
 
@@ -207,17 +237,216 @@ through 2026-08-16). **AVOID the three bare-slug definitions** (`compliance-gap-
 
 ---
 
+## ⚠ THE DRIVEN PLANT TOTAL — **75**, against an estimate of **26 + 1**
+
+*(Recorded 2026-08-17 by plan `195-08` task 2, from the seven plan SUMMARYs. The estimate is preserved
+beside the measurement, never replaced.)*
+
+| | Plants |
+|---|---|
+| **Estimated** in § "The Plants" above | **26** |
+| The adopted 27th (the stripper non-vacuity plant) | **+1 = 27** |
+| ⚠ **ACTUALLY DRIVEN RED against production source** | **75** |
+
+| Plan | Driven | What the extras bought |
+|---|---|---|
+| `195-01` | 0 | a baseline, not a fence |
+| `195-02` | **9** | +3 over its named six: the four dead-link clauses were split into their own `it()`s (appending them would have re-created the short-circuit P2 exists to defeat), plus a 7th proving **D-20's third-surface record can fire** |
+| `195-03` | **19** | one plant per added extension (9), per mime branch (5), per `asChild` mechanism |
+| `195-04` | **7** | the six named + `UNIFICATION′`, which measured *what the extraction changed* rather than that the fences still fire |
+| `195-05` | **10** | every one of eleven new cases has a plant that reds it |
+| `195-06` | **15** | P5a/b1/b2/**c** separately, because a copy sweep and an equality must each be observed firing **alone** |
+| `195-07` | **15** | +9 over its named six — `expect` short-circuits, so a 3-clause arm needs 3 plants (the 194-10 / 194-12 lesson) |
+| **Total** | **75** | **≈ 2.9× the estimate** |
+
+⚠ **This project's history said the estimate would run low, and it did — by more than any prior phase.**
+194-10 needed six where two were named; 194-12 needed eleven. **The dominant cause is the same in every
+case and is worth carrying to the next VALIDATION author: `expect` short-circuits, so a case with N
+substantive clauses needs N plants, not one.** An estimate that counts *claims* will always undercount
+*plants*. **Counting clauses rather than claims is the cheap fix.**
+
+---
+
+## ⚠ FENCES THAT FAILED TO RED — every one a FINDING, with its resolution
+
+*"A fence that fails to red is a FINDING, not a formality"* — this file's own rule, applied to itself.
+**Four fired. None was waved through.**
+
+### F-a — ⚠ TWO PLANTS REPORTED **GREEN** AND THE FENCES WERE INNOCENT: the plant had not applied (`195-03`)
+
+P1(c) and P1(d) came back `41 passed`, which reads exactly like *"the fence is inert"* — the finding the
+plan asks to escalate. **It was not the fence.** The source files are **CRLF**, and the multi-line
+substitutions used bare `\n`, so they matched nothing. The single-line plants applied fine, which is
+what made the failure look **selective and credible**.
+
+**Resolution:** every subsequent plant harness `diff`s the file before and after and **aborts with
+`FATAL: plant did not apply` on an empty diff.** With `\r?\n`, P1(c) red 9 cases and P1(d) red 5.
+**Adopted by every later plan in the phase.**
+
+> ⚠ **THE GENERALISABLE LESSON: a plant that cannot apply proves exactly as little as a fence that
+> cannot fire — and it fails in the REASSURING direction.** The verification apparatus needs its own
+> verification.
+
+### F-b — ⚠ AN ACCEPTANCE CRITERION THAT COULD NOT FAIL: `git diff --numstat <BASE> HEAD` is BLIND to an uncommitted edit (`195-04`, re-driven `195-07`)
+
+The P7(a) plant — **one space byte** into `MessageItem.tsx`, verified `48,235 → 48,236` — was driven, and
+the criterion **did not fire**:
+
+| Form, with the plant applied | Output | Fires? |
+|---|---|---|
+| `git diff --numstat <BASE> HEAD -- <files>` | **EMPTY** | ❌ **NO** |
+| `git diff --numstat <BASE> -- <files>` (working-tree) | `1 1 …MessageItem.tsx` | ✅ yes |
+| `md5sum` | digest ≠ baseline | ✅ yes |
+
+`<BASE> HEAD` compares two **commits**; a working-tree edit is invisible to it by construction. ⚠ **The
+baseline's warning that *"a `numstat`-empty check passes trivially when the base SHA is wrong"* has a
+SECOND, previously unrecorded arm: it also passes trivially when the edit is not yet committed.**
+
+**Resolution:** the complete assertion is **all three forms**, plus a **positive control on the shape**
+(`git diff --numstat 7e5d1fb8~1 7e5d1fb8` → `94 3`) so its emptiness is not vacuous. Re-driven from a
+different worktree two waves later, which **reproduced the identical planted digest** — independent
+corroboration rather than an inherited claim.
+
+### F-c — ⚠ THREE ARMS OF THE SC#2 SWEEP PASSED VACUOUSLY ON THE EMPTY STRING (`195-07`)
+
+The adopted 27th plant broke the comment stripper to return `""`. Result: **`15 failed | 5 passed`.**
+The four non-vacuity guards red **as designed** — and **three arms passed while measuring nothing**:
+
+```
+✓ the KiB arithmetic itself lives in NONE of the four swept files
+✓ ARM 4b — no OTHER in-scope file declares an extension-to-glyph map
+✓ chat capability — no swept file renders raw markup
+```
+
+**They are the only three whose every substantive clause is an ABSENCE assertion.** This is the 192.1
+failure — a renamed module swept against `""`, passing green — **reproduced on purpose inside the very
+suite built to prevent it.**
+
+**Resolution:** the four length + identity + stripper-pair guards are what make them unshippable, and
+this plant is the **measured justification for their existence** rather than an argument for it.
+⚠ **The plan predicted only the four guards would red; ten further cases also red, because every other
+absence clause in the suite is PAIRED with a presence clause. Both the prediction and the measurement
+are published, and the measurement is the stronger result.**
+
+### F-d — ⚠ AN ACCEPTANCE GREP THAT TRIPS ON ITS OWN DOCUMENTATION — **THREE INSTANCES IN ONE PHASE, WHICH IS A PATTERN**
+
+**This is the finding with the widest reach, and it is recorded here because it is not about any one fence.**
+
+| # | Where | What happened |
+|---|---|---|
+| 1 | `195-03` | The first `FileRow` docblock **red its own acceptance greps** by explaining the constraints in prose that named the forbidden identifiers — and `fileIcon()` in a comment matches `fileIcon(` |
+| 2 | `195-06` | `grep -c "toMatch(/function formatBytes/)"` reads **3, not 0** — a substring grep cannot distinguish `not.toMatch(` from `toMatch(`. The property the criterion was *about* (no surviving assertion that the page contains either helper) held exactly |
+| 3 | `195-07` (**D-195-07-D**) | The criterion `grep -n '"src/components/files"'` matched **its own explanation** — then the stricter regex written to replace it **matched that too** |
+
+⚠ **THE CRITERION IS UNSATISFIABLE ONCE ANYTHING DOCUMENTS IT.** Three independent instances in one
+phase is a pattern, not bad luck — and it is the 187-24 trap (*prose is never exempt*) on its seventh
+recorded appearance in this repository.
+
+**Resolution, and the shape to reuse:** an **anchored ARRAY-ELEMENT regex** — `^\s*"<path>",\s*$` —
+which prose **structurally cannot satisfy**, because prose is preceded by `//`. And the deeper fix,
+which the whole SC#2 sweep is built on: **read STRIPPED code, never raw bytes.** Measured on this
+phase's own corpus, a raw sweep reds on `@/lib/fileIcon` / `FileSpreadsheet` / `codeExts` / `1024`
+tokens that exist **only in explanations** — *"the only way to make it green would be to delete the
+explanations."*
+
+> ⚠ **THE RULE FOR THE NEXT VALIDATION AUTHOR: a bare `grep -c` over a file that documents itself is
+> not an acceptance criterion.** Anchor it to a syntactic position prose cannot occupy, or assert the
+> property over stripped code.
+
+### Fences flagged as *likely inert* and CHECKED — none was
+
+Recorded because "checked and fine" is a different state from "not checked":
+**P1(c)** (the in-flight empty-state guard, a `not.toContain` that passes trivially on an unset loading
+flag) — **the fixture genuinely calls `setFiles([], true)`; verified by reading the fixture AND by the
+plant reding with the right message. No repair needed.** · **P3(d)** (the `forwardRef` case) — reds both
+ref cases. · **P1(e)** (the own-property guard case) — reds the prototype cases.
+
+### A gap that was NOT an inert fence but an ABSENT one (`195-05`)
+
+⚠ **Nothing in the tree tested a ref passed to the shared row's CALLER-SUPPLIED CHILD** — only one
+passed *to* the row. That is the one the panel's roving focus actually uses. **Had Radix's `Slot`
+swallowed it, arrow-key navigation would have died silently, for keyboard users only, with all 11
+shipped panel cases and all 40 shared-row cases green.** It does not — but that is now a measurement
+(plant P5(a)), not a hope.
+
+---
+
+## ⚠ THE `tsc` FLOOR — 33 vs 30, DECIDED EXPLICITLY
+
+*(Recorded 2026-08-17 by plan `195-08`. `195-05` and `195-06` each logged this item forward rather than
+acting on it; silence was named as the one unacceptable outcome, so here is the decision.)*
+
+**Measured at `945b8b61`: `npx tsc --noEmit -p tsconfig.app.json` → 33 errors, unmoved across the entire
+phase.** (A bare `tsc --noEmit` checks **zero** files here; the `-p tsconfig.app.json` is load-bearing.)
+
+⚠ **That 33 INCLUDES three PRE-EXISTING errors that are trivially fixable:**
+`src/components/panel/__tests__/FilesSection.test.tsx` `(149,19)`, `(159,19)`, `(168,19)` — each
+`TS2304: Cannot find name 'WorkspaceFile'`. The file casts fixtures `as unknown as WorkspaceFile` and
+**never imports the type**. `195-05` measured that fixing them yields **30**.
+
+**DECISION: LEAVE THEM. The floor stays 33.** Three reasons, in order of weight:
+
+1. ⚠ **This plan writes NO source code, and that is a structural property rather than a preference.**
+   `195-07` proved SC#2 with a **source sweep over a tree**. Editing a frontend file after that sweep
+   ran would mean the sweep had measured a tree that no longer exists — **the phase deliberately closed
+   with its source frozen**, and `files_modified` contains no path under `frontend/` or `backend/`.
+2. **A silent improvement is a hostile act on a parallel phase.** Every plan in Phase 195 carries an
+   acceptance criterion reading *"equals the `195-BASELINE.md` figure"*, i.e. **33**. `195-05` avoided
+   the trap deliberately — its eleven new fixtures are plain object literals with **no cast**, so they
+   add zero new errors. A drop to 30 would red a sibling's gate for a reason none of them could
+   diagnose.
+3. **It is out of scope by the scope-boundary rule** — a pre-existing error in a file this phase grew
+   but did not cause.
+
+⚠ **THE COST IS REAL AND IS STATED RATHER THAN GLOSSED:** the floor is now a number **three of whose
+errors are known, named, located and one import away from gone.** A floor that includes known-fixable
+errors trains readers to accept the floor rather than to shrink it.
+
+**Named condition for taking it (not a date):** **the next phase that opens
+`frontend/src/components/panel/__tests__/FilesSection.test.tsx` for any reason adds the missing
+`WorkspaceFile` import in the same commit and records the new floor of 30 BESIDE the 33** — beside,
+because every Phase-195 document quotes 33 and a reader meeting 30 must be able to tell a fix from a
+regression. ⚠ **`tsc` going DOWN is the only direction that is unambiguously good and the only one no
+gate watches.**
+
+---
+
 ## Validation Sign-Off
 
-- [ ] All tasks have automated verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all ❌ MISSING references above
-- [ ] No watch-mode flags anywhere
-- [ ] **All 26 plants observed RED against production source, each file restored md5-identical**
-- [ ] **The F1 fence INVERTED in place, suite still 102 EXACT**
-- [ ] **`StopControl.baseline.test.tsx` asserted green after every `WorkflowRunPage.tsx` edit** (P9)
-- [ ] **Both gate knobs run every wave — gated AND ungated** (the gate covers 1 of 5 suites)
-- [ ] Feedback latency < 40 s (quick)
-- [ ] `nyquist_compliant: true` set in frontmatter
+*(Stamped 2026-08-17 by plan `195-08` task 2.)*
 
-**Approval:** pending
+- [x] All tasks have automated verify or a Wave 0 dependency
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all ❌ MISSING references above — **all five authored** (`FileRow.test.tsx` 40, `fileRowUtils.test.ts` 22, `FileRow.sweep.test.ts` 20, the `supersedes` characterization, the run page's silent-dead-row capture); the D-16 live baseline landed in a commit that **PREDATES every source change**
+- [x] No watch-mode flags anywhere
+- [x] **All plants observed RED against production source, each file restored md5-identical** — ⚠ **75 driven, not 26+1**; see the table above. **Every restore verified by READING both digests**, after `195-04` measured an md5 helper false-passing on `[ "" = "" ]`
+- [x] **The F1 fence INVERTED in place** — ⚠ **the suite is 108, not 102.** The pin moved twice by ADDITION (`102 → 105` at `195-02`, `105 → 108` at `195-06`); **an inversion moves no number**, which is exactly why deletion was forbidden. The "still 102 EXACT" wording is preserved above and is **stale, not violated**
+- [x] **`StopControl.baseline.test.tsx` asserted green after every `WorkflowRunPage.tsx` edit** (P9) — 15/15 throughout; ⚠ **it was UNGATED when this file was written and is now GATED** (adopted `195-02`), closing the *"a pin in an ungated suite is a pin nothing checks"* gap
+- [x] **Both gate knobs run every wave — gated AND ungated** — ⚠ **the gate covered 1 of 5 suites at wave 1 and covers 9 of 9 now**; final verdict `count gate OK — 83/83 pinned files present, no per-file decrease, 0 failing.` · `total 4170 · failed 0 · pinned total 4096`
+- [x] Feedback latency < 40 s (quick)
+- [ ] ⚠ **`nyquist_compliant: true` — NOT SET. Deliberately left `false`, with the reason named.**
+
+### Why `nyquist_compliant` stays `false`
+
+**Exactly ONE row of the Per-Task Verification Map is not covered: D-20 —** *launch a real workflow →
+watch the run surface → download the produced `.docx` → **OPEN IT** → compare chat, panel and run page
+side by side.* It is the phase's **G-4 lived-experience** row, it is **manual by necessity** (opening a
+`.docx` cannot be asserted in jsdom, and wire format + screenshots are explicitly insufficient — 192,
+193.1 and 194 each recorded that lesson), and it is a **blocking human checkpoint** — plan `195-08`
+task 3, which had not been driven when this sign-off was written.
+
+⚠ **The PRE-change half IS driven and is not owed** (`195-BASELINE.md` arms 0-3): a workflow was
+launched, its empty state captured **before the file existed**, the populated row observed as a
+**transition** rather than a state found, and the deliverable downloaded to disk **byte-exact with
+`workspace_files.size_bytes`**, CRC-clean, carrying 5,843 characters of filled prose. **Zero arms
+blocked; zero ⛔.** What is owed is the **POST-change** half — the same journey on the converted
+surfaces.
+
+**Who flips this flag, and when:** whoever writes
+`.planning/phases/195-show-the-deliverable/195-UAT.md` with U1-U6 verdicts. ⚠ **It flips to `true` only
+if every row carries a PASS; a ⛔ row leaves it `false` with the blocked row named.** **A scoreboard
+that lists only what passed is not a scoreboard**, and a compliance flag set on an undriven row is the
+same failure with a boolean on it.
+
+**Approval:** ⚠ **CONDITIONAL — every automated contract in this file is discharged and measured; the
+single manual G-4 row is OWED and is stated as a DECISION, never as a claim that everything ran.**
