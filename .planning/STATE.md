@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: ready_to_plan
-last_updated: 2026-08-17T18:01:20.678Z
+last_updated: 2026-08-17T21:40:00.000Z
 last_activity: 2026-08-17
 progress:
   total_phases: 19
@@ -11,7 +11,7 @@ progress:
   total_plans: 85
   completed_plans: 87
   percent: 37
-stopped_at: Phase 195 complete (8/8) — ready to discuss Phase 196
+stopped_at: Phase 196 context gathered (53869ef4) — ready to plan Phase 196
 ---
 
 # Project State
@@ -36,9 +36,47 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 195 (show-the-deliverable) — EXECUTING
-Plan: 6 of 8 complete (Waves 1-3 closed; Wave 4 next — 195-07 + 195-08, the latter a blocking checkpoint)
+Phase: **196 (registry-backed-model-picker-canvas) — CONTEXT GATHERED 2026-08-17 (`53869ef4`)**
+Plan: 0 of TBD — **NEXT = `/gsd:plan-phase 196`**
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
+
+*(This block previously read "Phase: 195 (show-the-deliverable) — EXECUTING · Plan: 6 of 8 complete
+(Waves 1-3 closed; Wave 4 next — 195-07 + 195-08, the latter a blocking checkpoint)". 195 closed 8/8
+on 2026-08-17 (`d84b024e`); the reading is kept rather than overwritten, per this file's habit. The
+195 narrative that follows is retained because SEED-171 and the count-gate correction outlive the
+phase.)*
+
+⚠ **196's scope is WIDER THAN THE ROADMAP SAYS, BY AN EXPLICIT OPERATOR DECISION taken at
+discuss-phase — recorded, not smuggled.** The ROADMAP `Flags` line fences 196 to *"the canvas /
+workflow surface only"*. The operator folded **two open reported bugs on other surfaces**:
+**`BUG-260731-01`** (`severity: critical`, CONFIRMED 2026-08-17 — the Settings judge knob is inert;
+`app_settings` says `deepseek-v4-pro`, the judge runs `claude-opus-4-8`) and **`BUG-260718-04`**
+(`severity: major` — a thread does not remember its model). Both frontmatters now read
+`status: folded` / `folded_into: "196"`. **`BUG-260809-01` was reviewed and left `open`**, with the
+reason recorded in its `re_open_trigger`. The shared root that justifies one phase rather than three
+fixes: **a model control that lies about what will actually run.**
+
+⚠ **THE LOAD-BEARING MEASUREMENT, so no later plan re-derives it wrongly: NEITHER SHIPPED MODEL LIST
+IS "THE LIVE REGISTRY".** `MODEL_CAPABILITIES` (code → `verified_models`) = **61**; enabled
+`model_capabilities_overrides` (DB → `allowed_models`) = **34**; **overlap 26**. `allowed_models`
+cannot offer `gpt-5.5` — SEED-135's measured *working* judge; `verified_models` cannot offer
+`gemini-3.6-flash` — SEED-135's measured *failing* model — nor any of SEED-172's three hand-inserted
+LM Studio rows. **D-01 therefore adds a non-operator union endpoint** reusing `_registry_row`'s
+existing union (`admin.py:1054-1149`), which cannot itself be reused because its router returns a
+byte-identical 404 to non-operators. Corpus scale, also measured: **257 phases / 242 workflows, 239
+(93 %) blank, and the 18 explicit values are all `gpt-5.4`** — so the migration burden is one id.
+
+⚠ **G-5 AUDIT FINDING WORTH MORE THAN THIS PHASE — FIVE FILES 196 TOUCHES ARE ABSENT FROM THE
+HOT-FILE LEDGER, so the guardrail has never fired on any of them:** `backend/app/config.py`
+(**70 / 41 / 1275 — the second-hottest file measured anywhere in this project after `api/threads.py`
+at 76 phases**), `frontend/src/pages/SettingsPage.tsx` (34 / 21 / 1426), `backend/app/api/admin.py`
+(30 / 11 / 1718), `backend/app/services/harness/validator_kinds.py` (11 / 4 / 744) and
+`frontend/src/components/admin/ModelRegistryTab.tsx` (9 / 3 / 1083). Same invisibility failure as
+`WorkflowsPage.tsx` (ten phases) and `db/workflows.py` (seventeen). **196 writes rows only for the
+files it actually modifies (D-23); the rest are NAMED in `196-CONTEXT.md` D-22 so the next audit can
+see them.** **G-5 on `PhaseFormPanel.tsx` (re-derived `16 / 8 / 1167`) is HONOURED BY CONSTRUCTION —
+own component, one gated mount line — and NO guardrail override was taken. G-2 fired and was DECLINED
+on a reason** (the picker idiom ships twice already; re-drawing a shipped atom is the SEED-155 drift).
 
 ⚠ **WAVE 1 CLOSED WITH THE COUNT GATE RED, AND THAT IS A RECORDED DECISION, NOT AN OVERSIGHT
 (operator-approved 2026-08-17).** `195-01` (SC#1 CONFIRMED live pre-change) and `195-02` (9 plants
@@ -63,8 +101,14 @@ CLAUDE.md text and figures** (the gate quote `3918/3868` is also stale — measu
 
 **Consequence for the rest of this phase: later plans verify on per-file counts plus their own
 suites, NOT on a green grand verdict.** A plan reporting red MUST name the failing files before
-re-running.
-**Phase:** 196
+re-running. ⚠ **This consequence outlives Phase 195 and binds 196 too** — `count gate OK` is not
+reliably reachable on demand while SEED-171's three suites flake, so a 196 plan whose acceptance
+criterion is *"the gate is green"* has written a criterion no plan controls.
+
+**Prior phase:** **195 Show the Deliverable — ✅ COMPLETE 2026-08-17 (`d84b024e`), 8/8 plans, verified
+12/12; RUN-02 + RUN-03 ticked.** Its close corrected ROADMAP SC#3 (which named the hero/working split
+retired by Phase 095.1) and nine sites in the design record, and re-derived the count gate to
+**4170 · failed 0 · 4096 pinned · 83/83**.
 
 **Prior phase:** **194.1 Make the Stop Visible — ✅ COMPLETE AND VERIFIED 2026-08-16. 8 plans across 6 waves, all merged; UAT driven by the operator (5 of 5 rows, 5 PASS); one gap-closure fix; `194.1-VERIFICATION.md` written. NEXT = insert the L-01 phase (it has NO ROADMAP HOME and is recorded as OWED), then `/gsd:discuss-phase 195`.** ⚠ **RUN-01 REMAINS UNTICKED and that is a DECISION, not an omission** — `REQUIREMENTS.md` byte-unchanged, verified. The phase GOAL (make the Stop visible) is achieved on all six goal-backward checks; the REQUIREMENT's second clause (*"and the run reports honestly that it was stopped"*) fails on ~half of stops at `WORKER_COUNT=2` because `finish_run` has no terminal guard (L-01, inherited from 194's FAILED SC#2). ⚠ **Making the Stop visible made that lie MORE visible, which is correct** — a fence (`StreamsProvider.stopping.test.ts` plant P4) reds against any attempt to suppress it. ⚠ **The ~10-line terminal guard is what makes RUN-01 tickable**; see `.planning/reports/v3.7-CLOSE-AND-ABSORB.md` for the full close-and-absorb recommendation (ten items to absorb, no second workflow milestone). *(This line previously read "EXECUTED …, Plan 08 is at its blocking `human-verify` checkpoint with tasks 1-4 committed and task 5 — the three G-4 lived-experience rows — OWED BY THE OPERATOR", and before that)* ⚠ **The phase is NOT closed and RUN-01 is deliberately UNTICKED** (`REQUIREMENTS.md` byte-unchanged, verified at this commit) — plan 08 declined to tick it because the L-01 phase is not yet inserted. ⚠ **Every one of the 8 worktrees dispatched this phase arrived on the WRONG BASE — 7/7 on the executor plans plus the pattern's recurrence — each landing on `fda79214`, a master merge with NO descent from its dispatched SHA.** Every one was caught only by the explicit base assertion carried in the executor prompt, on top of Phase 192's 12/12. **The dispatch mechanism, not the executors, is where this lives.** *(This line previously read "SKETCHED (168-171 baked), SPEC'd (7 requirements, ambiguity 0.14) and CONTEXT GATHERED 2026-08-16 (`bc5c73da`). NEXT = `/gsd:plan-phase 194.1`, targeted at ~7 plans." and before that "INSERTED 2026-08-16, not planned yet. NEXT = `/gsd:sketch 194.1` (G-2 fires), then `/gsd:discuss-phase 194.1`" until the discuss step landed; before that "194 Stop a Running Workflow — PLANNED 2026-08-16 (`67e87b88`), 13 plans in 8 waves, plan-checker PASSED first iteration, zero blockers, NEXT = `/gsd:execute-phase 194`" before the insert; before that "194 … CONTEXT GATHERED", "193.2 From Authored to Runnable — ✅ CLOSED…" until 194 opened, and "193.1 Template-First Authoring"; all prior readings are kept.)*
 
