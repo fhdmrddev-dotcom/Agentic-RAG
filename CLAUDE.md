@@ -316,7 +316,7 @@ wc -l <file>                                                           # lines
 |---|---|---|---|
 | [`frontend/src/components/chat/ToolCallPanel.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschattoolcallpaneltsx) | 47 / 19 / 995 | ⚠ **FIRES** | extraction due — ⚠ row read `satisfied (075.7)` for ~19 phases |
 | [`frontend/src/components/chat/MessageItem.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrccomponentschatmessageitemtsx) | 57 / 29 / 856 | ⚠ **FIRES** | extraction due — ⚠ row read `satisfied (075.7)` for ~29 phases |
-| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 233 / 76 / 1322 | ⚠ **FIRES** | extraction due — **hottest file in the repo**; row read `9+` |
+| [`backend/app/api/threads.py`](docs/HOT-FILE-LEDGER.md#backendappapithreadspy) | 234 / 76 / 1273 | **FIRES** | **extraction TAKEN 2026-08-17** — SSE transport → `run_transport.py`; next seam named in the detail file |
 | [`frontend/src/providers/StreamsProvider.tsx`](docs/HOT-FILE-LEDGER.md#frontendsrcprovidersstreamsprovidertsx) | 84 / 33 / 4119 | **FIRES** | honoured by construction (194.1) — largest file in the frontend tree |
 | [`frontend/src/hooks/useMessages.ts`](docs/HOT-FILE-LEDGER.md#frontendsrchooksusemessagests) | 74 / 27 / 127 | ⚠ **FIRES** | extraction due — ⚠ row read `satisfied (075.7)` for ~27 phases |
 | [`backend/app/services/anthropic_service.py`](docs/HOT-FILE-LEDGER.md#backendappservicesanthropic_servicepy) | 11 / 10 / 354 | ⚠ **FIRES** | adapter-pattern audit due — row read `4+` |
@@ -348,6 +348,7 @@ wc -l <file>                                                           # lines
 | `frontend/src/components/chat/StopControl.tsx` | 3 / 1 / 315 | no (1 phase) | young — owes a detail section the moment it reaches a 3rd phase |
 | `frontend/src/components/chat/ThreadRunLine.tsx` | 1 / 1 / 357 | no (1 phase) | young — owes a detail section the moment it reaches a 3rd phase |
 | `frontend/src/components/chat/ActiveRunsTray.tsx` | 2 / 1 / 164 | no (1 phase) | young — owes a detail section the moment it reaches a 3rd phase |
+| `backend/app/services/run_transport.py` | 1 / 0 / 116 | no (0 phases) | young — the SSE transport leaf cut out of `threads.py`; ⚠ **its re-import in `threads.py` is load-bearing, see the detail file** |
 
 When a new phase enters discuss-phase, the orchestrator must scan PLAN.md `files_modified` against this ledger. Any match against a G-5-firing row means the discuss-phase produces a refactor recommendation as the first option, not the planned feature — and the phase reads that file's section in `docs/HOT-FILE-LEDGER.md` before planning, because that is where the named seam and the binding invariants live.
 

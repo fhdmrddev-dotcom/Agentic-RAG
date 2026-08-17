@@ -82,6 +82,8 @@ satisfied (075.7 — 2026-05-24)
 
 **Re-derived 2026-08-17 (extraction):** `233 commits / 76 phases / 1322 L` · quick-task buckets excluded: `260328`, `260405` · **G-5 FIRES** (76 phases vs threshold 3) — extraction due — **hottest file in the repo**; row read `9+`.
 
+**⚠ UPDATED THE SAME DAY — THE OBLIGATION WAS DISCHARGED, and the new triple is recorded BESIDE the one above, never over it: `234 commits / 76 phases / 1273 L`.** The phase count is unmoved at 76 because the discharge commit is tagged `refactor(threads)` — a non-numeric bucket, deliberately, since this was **not a phase** and inventing one would corrupt every future count. See **"G-5 discharge"** below.
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **233 commits / 76 phases / 1322 L**.
@@ -95,6 +97,36 @@ satisfied (075.7 — 2026-05-24)
 ### G-5 status (verbatim)
 
 G-5 fires — extraction due
+
+### G-5 discharge — 2026-08-17 (the SSE-transport cut)
+
+**The obligation above is DISCHARGED by an extraction, not by an argument.** ⚠ **And the verdict it replaces was wrong in a second way that the staleness marker alone does not capture: `extraction due` reads as *"nobody has ever cut this file"*, and that is FALSE.** Four extractions had already shipped — Phase 089 moved the agent loop to `agent_loop.py`, Phase 145 the run lifecycle to `run_lifecycle.py`, and Phase 162.5 moved the title subsystem, model resolution, workflow kickoff and the producer shell to four more modules. The file that once owned all of them owns none. *A stale verdict can mislead about the WORK as well as about the NUMBER.*
+
+**WHAT MOVED:** `_BACKGROUND_TASKS`, `_spawn`, `RUN_TASKS`, `TERMINAL_TYPES`, `_RUN_STATUS_TO_TERMINAL_TYPE`, `_emit`, `_emit_terminal` → **`backend/app/services/run_transport.py`**, a true leaf importing only `asyncio`, `json` and `uuid`.
+
+**THE MEASURED REASON — a test rather than an argument, and it is the strongest evidence on this ledger for any seam:**
+
+- **FOUR of the seven symbols had ZERO uses in `threads.py` outside their own definitions.** `_spawn`, `_BACKGROUND_TASKS`, `TERMINAL_TYPES` and `_RUN_STATUS_TO_TERMINAL_TYPE` existed in an HTTP route module *solely* so other modules could import them. `_emit_terminal` appeared only in its own docstring. Of the rest, `_emit` had 2 real call sites and `RUN_TASKS` 2.
+- **`RUN_TASKS` alone has ELEVEN production import sites across SEVEN modules** — `admin.py`, `evals.py` (×4), `runs.py` (×2), `main.py`, `run_lifecycle.py`, `run_producer.py` (×2) — **and most are LATE, function-local imports carrying explicit `avoid circular import` comments.** That is the smell: a leaf concern parked inside a module that pulls in half the service graph, so every consumer has to import it at call time to escape the cycle.
+
+**PROVED, NOT ASSERTED — four independent checks:**
+
+1. **The moved block is byte-identical.** A scripted diff of the 79 moved lines against `git show`'s pre-move text returns `YES`, and the move was driven by a script with **ten pre-move assertions** on the block's boundaries (`_BACKGROUND_TASKS` at 159, `_spawn` at 162, … `_emit_terminal` closing at 233) so a drifted line number aborts rather than silently cutting the wrong span.
+2. **One object, not two.** All seven symbols satisfy `app.api.threads.X is app.services.run_transport.X`.
+3. ⚠ **That identity check was DRIVEN RED against a real plant** — appending a duplicate `RUN_TASKS = {}` to `threads.py` flipped it to `False`. *An identity assertion that has never been shown to fail is not evidence*, and this one now has been.
+4. **The full backend suite's failure set is byte-identical before and after** — not merely the same count. `211 failed / 3964 passed / 29 skipped / 5 xfailed / 9 xpassed / 1 error` both times, and a `comm` diff of the **212 sorted failing node IDs** shows **zero newly-failing and zero newly-passing**. ⚠ **The "zero newly-passing" half matters as much as the other:** a test that started passing would have meant the suite was not really exercising the moved code.
+
+⚠ **THE HONEST CAVEAT ON THAT EVIDENCE, stated rather than smoothed: the backend baseline is RED, at 211 pre-existing failures.** This is a **characterization baseline** (the 188.1 discipline — it PREDATES the change), not a green gate. Spot-checked, the failures are environmental — `httpcore.ConnectError: [Errno 11001] getaddrinfo failed` — and they reproduce on an untouched tree; local Supabase/Redis were verified OPEN on 54322/54321/6379 first, so "infra is down" was excluded rather than assumed. **A green suite would be better evidence and we do not have one.**
+
+**THE FIGURES** (named blank/comment/docstring/code classifier, validated against a hand-counted control before any number was trusted): `threads.py` total **1323 → 1274**, **CODE 701 → 680**; `run_transport.py` 117 total / 33 CODE. **Subtree 1323 → 1391 (+5.1 %)** — far smaller than this project's frontend cuts (188.2 +67 %, 192 +126 %, 193 +124 %) because one concern landed in ONE module; **prose is 60.7 % of the new file**, dominant again, for the sixth cut running.
+
+**THE INVARIANTS THAT NOW BIND, and the first is a red line:**
+
+1. ⚠ **THE RE-IMPORT IN `threads.py` IS LOAD-BEARING AND MUST NOT BE "TIDIED" AWAY.** Every consumer still says `from app.api.threads import RUN_TASKS` / `_emit` / `_emit_terminal` / `_spawn`, and the tests that `patch("app.api.threads.RUN_TASKS")` still intercept **because the late-importing consumers read the attribute off `app.api.threads` at CALL time**. A linter that removes the `# noqa: F401` re-export, or a plan that repoints one consumer at `run_transport` directly **without moving that consumer's patch sites in the same commit**, breaks the patch surface silently — the tests would keep passing while patching an object nothing reads.
+2. **Consumers were deliberately NOT repointed.** Doing so is a legitimate follow-up, but it is a *different* change with a *different* risk profile, and bundling it would have destroyed the byte-identity evidence above.
+3. **`run_transport.py` must stay a leaf.** The moment it imports anything from `app.`, the cycle it was created to dissolve comes back.
+
+⚠ **WHAT IS NOT DISCHARGED — the obligation is REDUCED, not retired, and the next seam is NAMED rather than implied.** At 1273 lines / 680 code lines the file still hosts **five concerns**: thread CRUD (`list`/`create`/`rename`/`delete`), the message read + run-enrichment (`get_messages`, `_enrich_messages_with_runs`), `send_message`'s kickoff orchestration, and **the three pure-read reconcile endpoints**. **The named next seam is that third cluster** — `get_snapshot` (146 L), `get_thread_workflow` (263 L) and `list_active_runs` (66 L), ~475 lines that write NOTHING and share one concern (D-v2.5-03, *"Realtime is a hint, not truth"* — the surfaces the client re-fetches on reconnect). ⚠ **It was deliberately not taken here, for a measured reason: `patch("app.api.threads.get_pg_pool")` appears at 23 sites and `generate_thread_title` at 39**, so moving *routes* — as opposed to a leaf of unused symbols — changes which module those patches must target. **That is a planned refactor phase with its own baselines, not a chat-turn edit.** Per G-5 the next phase touching this file still owes a refactor recommendation as its FIRST option; **it inherits `234 / 76 / 1273`, and that figure goes stale on the next commit touching the file.**
 
 ---
 
