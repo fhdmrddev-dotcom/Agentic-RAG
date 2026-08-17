@@ -933,7 +933,17 @@ const BASELINE = {
   //       the original assertions are QUOTED IN PLACE, never deleted (the 194.1-07
   //       precedent recorded twenty lines above), and this pin moves only on a number read
   //       from the `actual` column — never to make a red gate go quiet.
-  "WorkflowRunPage.test.tsx": 105,
+  //       ⚠ 195-06 LANDED AND CASE 2 DID INVERT, exactly as predicted above. The
+  //       inversion itself moved NO number — an `it()` rewritten in place still counts
+  //       one — which is precisely why the plan inverted rather than deleted: a deletion
+  //       would have needed a pin LOWERING, and this file's own rule is that a pin never
+  //       comes down to quiet a gate. The `105 -> 108` below is the THREE cases 195-06
+  //       ADDED: the D-02 label-honesty sweep, and the two D-12 ordering cases (one per
+  //       `created_at` regime). Read from this script's own printed `actual` column
+  //       (`WorkflowRunPage.test.tsx  105  108  +3`), never hand-counted from `it(`
+  //       literals, and raised in the SAME COMMIT as the tests — a lagging pin is the
+  //       gate going blind (the 195-03 incident, corrected again in 195-05).
+  "WorkflowRunPage.test.tsx": 108,
   // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
   // ── number below is this script's own printed `actual` column across TWO agreeing ────
   // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
