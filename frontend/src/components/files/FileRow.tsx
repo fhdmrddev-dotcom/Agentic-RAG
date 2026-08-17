@@ -220,7 +220,18 @@ export const FileRow = forwardRef<HTMLElement, FileRowProps>(function FileRow(
   return (
     <Comp className={cn(d.rowClass, className)} ref={ref as never}>
       <Slottable>{children}</Slottable>
-      <span className={cn(d.iconClass, isDead && d.deadOverrides.iconClass)}>{icon}</span>
+      {/* ⚠ `inline-flex items-center` is LOAD-BEARING, not styling. Without it this
+          wrapper is a block box that inherits the row's `line-height: 24px`, so a
+          16px glyph sits in a 24px line box and every adopting row grows ~8px.
+          MEASURED in a browser at the Phase 195 D-20 UAT, against the pre-change
+          readings recorded in `195-BASELINE.md`:
+            run page  33px -> 40px   panel  38px -> 42px
+          No unit test saw it: the class names, the design tokens and the glyph
+          sizes were all still correct — only the computed line box was wrong, and
+          that is geometry jsdom does not resolve. Before the conversion each
+          surface rendered the glyph as a DIRECT child at `h-4 w-4`, with no
+          wrapper to inherit leading from. */}
+      <span className={cn("inline-flex items-center", d.iconClass, isDead && d.deadOverrides.iconClass)}>{icon}</span>
       <span className="flex-1 min-w-0 flex flex-col">
         {/* React escapes text children; `name` and `supersedes` are backend/
             model-derived and are rendered as TEXT only (T-195-03-01). */}
