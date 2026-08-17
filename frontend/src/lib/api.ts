@@ -5153,6 +5153,73 @@ export async function getModelRegistry(): Promise<ModelRegistryRow[]> {
   return body.models ?? []
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 196 (AUTH-04 / D-01) — the NON-OPERATOR author view of the same registry.
+//
+// `getModelRegistry` above is operator-only: `GET /admin/models` 404s a normal
+// author, by design and with no RLS backstop behind it. But a workflow author must
+// still see what models exist in order to pick one, and neither shipped list is the
+// live registry (`verified_models` misses every DB-only id; `allowed_models` misses
+// 35 code-registry ids). `GET /models/registry` is the second, NARROWER door: same
+// union, six allowlisted fields, authenticated but not operator-gated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One model as a workflow AUTHOR may see it — the six-field allowlist projection
+ *  served by `GET /models/registry`.
+ *
+ *  ⚠ This is deliberately a STANDALONE interface. It does not `extends` the operator
+ *  row and is not derived from it by a `Pick<…>` or any other mapped type — a grep
+ *  for either against this file must come back empty. The operator row carries
+ *  `deprecated_reason`, whose own doc-comment above declares it "operator context,
+ *  never shown to end users". A structural allowlist is what stops a field added to
+ *  the operator row later from travelling to every author by inheritance — the
+ *  Phase 190 CR-01 shape, where migration 116's RLS copy leaked a secret column
+ *  precisely by inheriting rather than allowlisting. The duplication is the point.
+ *
+ *  `emit_tier` is `null` when untracked, and `null` is NOT "unknown": the backend
+ *  ladder reads an absent tier as `coerce`, so a surface rendering this must say
+ *  `coerce` rather than blank (the same rule the operator row's field carries). */
+export interface AuthorModelRow {
+  model_id: string
+  provider: string
+  capability_source: string
+  enabled: boolean
+  deprecated: boolean
+  emit_tier: "force_strict" | "force" | "coerce" | null
+}
+
+/** Read the LIVE model registry as a non-operator author (`GET /models/registry`).
+ *
+ *  How this differs from `getModelRegistry` above, in three ways that all matter:
+ *  (1) it is NOT operator-gated — a plain authenticated author gets 200 where
+ *  `/admin/models` gives them a byte-identical 404; (2) every row is the six-field
+ *  author projection, never the operator row; (3) `run_default_model` is the model a
+ *  run would ACTUALLY inherit, resolved server-side through the run's own chain — it
+ *  is neither `app_settings.llm_model` (a different function, which is why the
+ *  registry's `is_default` is not exposed here) nor a hardcoded id, and it is `null`
+ *  rather than a guess when the chain cannot resolve.
+ *
+ *  The backend returns the same `{"models": [...]}` ENVELOPE as `/admin/models`, so
+ *  the same rule applies: unwrap `.models` HERE, never in the component — casting the
+ *  raw object would ship a `{models}` object into list state and crash the next
+ *  `.map` (CR-01 precedent). */
+export async function getAuthorModelRegistry(): Promise<{
+  models: AuthorModelRow[]
+  run_default_model: string | null
+}> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/models/registry`, { headers })
+  if (!res.ok) throw new ApiError("Failed to load the model registry.", res.status)
+  const body = (await res.json()) as {
+    models?: AuthorModelRow[]
+    run_default_model?: string | null
+  }
+  return {
+    models: body.models ?? [],
+    run_default_model: body.run_default_model ?? null,
+  }
+}
+
 /** Edit one model's capabilities (`PATCH /admin/models/{id}`, Plan 06). Sends only
  *  the changed fields. A 409 (the default/locked guard — e.g. disabling the pinned
  *  default) surfaces as `ApiError` carrying the server `detail` so the tab can show
