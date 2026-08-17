@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
-status: executing
-last_updated: "2026-08-17T11:17:28.253Z"
+status: ready_to_plan
+last_updated: 2026-08-17T18:01:20.678Z
 last_activity: 2026-08-17
 progress:
   total_phases: 19
   completed_phases: 7
   total_plans: 85
-  completed_plans: 79
+  completed_plans: 87
   percent: 37
+stopped_at: Phase 195 complete (8/8) — ready to discuss Phase 196
 ---
 
 # Project State
@@ -31,7 +32,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 195 — show-the-deliverable
+**Current focus:** Phase 196 — registry backed model picker (canvas)
 
 ## Current Position
 
@@ -63,7 +64,7 @@ CLAUDE.md text and figures** (the gate quote `3918/3868` is also stale — measu
 **Consequence for the rest of this phase: later plans verify on per-file counts plus their own
 suites, NOT on a green grand verdict.** A plan reporting red MUST name the failing files before
 re-running.
-**Phase:** **195 Show the Deliverable — PLANNED 2026-08-17 (`b2c3674f`), 8 plans in 4 waves, plan-checker PASSED on the first iteration with zero blockers. Ready to execute.** ⚠ **D-16 is ALREADY DISCHARGED and its commit `7d131463` PREDATES the plans** — `195-BASELINE.md` was driven live through Chrome on run `833e8e85`, and **SC#1 is CONFIRMED pre-change, so scope does not grow.** The phase writes NO Python and ships NO migration. **NEXT = `/gsd:execute-phase 195`.** ⚠ **195-01 and 195-08 are `autonomous: false` — their checkpoints need the orchestrator's browser, not a worktree executor**, and the operator has authorised both the deliverable download and a live workflow launch for the D-20 acceptance rows.
+**Phase:** 196
 
 **Prior phase:** **194.1 Make the Stop Visible — ✅ COMPLETE AND VERIFIED 2026-08-16. 8 plans across 6 waves, all merged; UAT driven by the operator (5 of 5 rows, 5 PASS); one gap-closure fix; `194.1-VERIFICATION.md` written. NEXT = insert the L-01 phase (it has NO ROADMAP HOME and is recorded as OWED), then `/gsd:discuss-phase 195`.** ⚠ **RUN-01 REMAINS UNTICKED and that is a DECISION, not an omission** — `REQUIREMENTS.md` byte-unchanged, verified. The phase GOAL (make the Stop visible) is achieved on all six goal-backward checks; the REQUIREMENT's second clause (*"and the run reports honestly that it was stopped"*) fails on ~half of stops at `WORKER_COUNT=2` because `finish_run` has no terminal guard (L-01, inherited from 194's FAILED SC#2). ⚠ **Making the Stop visible made that lie MORE visible, which is correct** — a fence (`StreamsProvider.stopping.test.ts` plant P4) reds against any attempt to suppress it. ⚠ **The ~10-line terminal guard is what makes RUN-01 tickable**; see `.planning/reports/v3.7-CLOSE-AND-ABSORB.md` for the full close-and-absorb recommendation (ten items to absorb, no second workflow milestone). *(This line previously read "EXECUTED …, Plan 08 is at its blocking `human-verify` checkpoint with tasks 1-4 committed and task 5 — the three G-4 lived-experience rows — OWED BY THE OPERATOR", and before that)* ⚠ **The phase is NOT closed and RUN-01 is deliberately UNTICKED** (`REQUIREMENTS.md` byte-unchanged, verified at this commit) — plan 08 declined to tick it because the L-01 phase is not yet inserted. ⚠ **Every one of the 8 worktrees dispatched this phase arrived on the WRONG BASE — 7/7 on the executor plans plus the pattern's recurrence — each landing on `fda79214`, a master merge with NO descent from its dispatched SHA.** Every one was caught only by the explicit base assertion carried in the executor prompt, on top of Phase 192's 12/12. **The dispatch mechanism, not the executors, is where this lives.** *(This line previously read "SKETCHED (168-171 baked), SPEC'd (7 requirements, ambiguity 0.14) and CONTEXT GATHERED 2026-08-16 (`bc5c73da`). NEXT = `/gsd:plan-phase 194.1`, targeted at ~7 plans." and before that "INSERTED 2026-08-16, not planned yet. NEXT = `/gsd:sketch 194.1` (G-2 fires), then `/gsd:discuss-phase 194.1`" until the discuss step landed; before that "194 Stop a Running Workflow — PLANNED 2026-08-16 (`67e87b88`), 13 plans in 8 waves, plan-checker PASSED first iteration, zero blockers, NEXT = `/gsd:execute-phase 194`" before the insert; before that "194 … CONTEXT GATHERED", "193.2 From Authored to Runnable — ✅ CLOSED…" until 194 opened, and "193.1 Template-First Authoring"; all prior readings are kept.)*
 
@@ -519,7 +520,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Executing Phase 195
+**Status:** Ready to plan
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
@@ -834,7 +835,7 @@ the browser and the read cannot be folded into the bind.
 ---
 
 **Phase (193, carried forward unedited):** **193 Authoring Doors + Template Placement — EXECUTED 2026-08-14, NOT YET COMPLETE**
-**Plan:** **10 of 11 plans have a SUMMARY.** `193-11` (the operator UAT checkpoint) is PART-DONE: its Task 1 and Task 3 are written, its Task 2 is 6 of 8 rows.
+**Plan:** Not started
 **Status:** ⏸ **ALL GATES RUN AND GREEN — blocked on human evidence, not on code.** `tsc -p tsconfig.app.json` **33 (baseline, unmoved all phase)** · count gate **exit 0 · total 3561 · failed 0 · 67/67 pinned** · code review **11 findings, ALL resolved** (10 fixed, 1 ruled+seeded) · security audit **50/51 closed, 0 code threats open** · verification **`human_needed`, 1/3**.
 **NEXT = drive UAT row U1, then U2**, with a person who has not used the Builder (`193-UAT.md`). Nothing else is owed by the code.
 
