@@ -5028,6 +5028,14 @@ export interface ModelRegistryRow {
   llm_call_timeout_seconds: number | null
   is_default: boolean
   is_locked: boolean
+  /** AUTH-04 / D-14: the forced-emission tier an OPERATOR asserts for this model. The SAME
+   *  WR-04 honesty rule as the numerics applies, with one addition the numerics do not need:
+   *  a model with no tracked tier reads `null`, and the tab renders that `null` as the
+   *  read-time `coerce` default rather than as blank. Blank would be a lie — the backend
+   *  ladder (`forced_emit.py`) does NOT treat an absent tier as "unknown", it treats it as
+   *  `coerce`, so a model showing "—" here would already be behaving as best-effort. All 37
+   *  rows shipping before migration 120 read `null`. */
+  emit_tier: "force_strict" | "force" | "coerce" | null
   /** The editable columns actually STORED as a DB override (OVR) vs inherited from the
    *  built-in registry (DEF). The tab renders per-field OVR/DEF and shows a Reset only on
    *  overridden fields; a Reset sends an explicit `null` for that field (clears to DEF, Plan
@@ -5047,6 +5055,9 @@ export interface ModelCapabilityPatch {
   max_output_tokens?: number
   native_tools?: boolean
   llm_call_timeout_seconds?: number
+  /** AUTH-04: an explicit `null` is a Reset (clears the override to DEF) — the same
+   *  explicit-null semantics every other column here carries. */
+  emit_tier?: "force_strict" | "force" | "coerce" | null
 }
 
 /** The request body for `POST /admin/models` (Plan 02 — the D-159-02 add-by-ID write).
