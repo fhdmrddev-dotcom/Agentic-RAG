@@ -39,7 +39,7 @@ the right vocabulary, stop it, and see what it produced.
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
-| 196 | Registry-Backed Model Picker (canvas) | 3/9 | In Progress|  |
+| 196 | Registry-Backed Model Picker (canvas) | 4/9 | In Progress|  |
 | 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
@@ -650,7 +650,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 196-04-PLAN.md — Wave 2: the union leaf + the non-operator route (D-01 / D-02 / D-03) — `_registry_row` extracted to a service leaf, `GET /models/registry` added beside `/features`, a six-field allowlist projection, and an honestly-computed `run_default_model`. ⚠ `GET /admin/models` stays a byte-identical 404, proven by contrast in the same file
+- [x] 196-04-PLAN.md — Wave 2: the union leaf + the non-operator route (D-01 / D-02 / D-03) — `_registry_row` extracted to a service leaf, `GET /models/registry` added beside `/features`, a six-field allowlist projection, and an honestly-computed `run_default_model`. ⚠ `GET /admin/models` stays a byte-identical 404, proven by contrast in the same file
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

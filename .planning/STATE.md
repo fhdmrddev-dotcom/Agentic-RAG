@@ -36,7 +36,42 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 3 of 9 — **Wave 1 COMPLETE (196-01, 196-02, 196-03), merged and gated.** Next: Wave 2 (`196-04`).
+Plan: 4 of 9 — **Waves 1–2 COMPLETE (196-01…196-04), merged and gated.** Next: Wave 3
+(`196-05` + `196-06` in parallel, then `196-07` — see the serialisation note below).
+
+### Wave 2 close — 2026-08-17 (`196-04`)
+
+**Gates.** tsc **33** (unchanged baseline, **0 in `api.ts`**) · count gate **OK · total 4197 · failed 0 ·
+pinned 4123 · 84/84** · backend **211 failed / 4025 passed** — failures unchanged at the 211 baseline,
+passing **+12** = exactly this plan's new tests. ⚠ Comparison is COUNT-level, not id-level.
+
+**The security criterion is proven by CONTRAST in ONE test with ONE identity** —
+`test_admin_models_still_404_for_the_same_identity` asserts 200 on `/models/registry` and a
+byte-identical `{"detail": "Not Found"}` on `/admin/models` in the same body, so the two claims cannot
+drift apart. `git diff` shows **zero** change to `admin.py`'s `APIRouter(prefix="/admin", …)`. The leak
+fence is **non-vacuous by measurement**: `_registry_row` emits **14** fields, `to_author_row` emits
+**6**, **8 dropped**.
+
+**Three acceptance greps failed on PROSE, not code** (`require_operator`, `gpt-5.4`,
+`enabled_model_allowed_set`, `INSERT INTO`, `Pick<ModelRegistryRow` each appeared once inside a comment
+explaining why the thing must NOT be there). Reworded rather than waived — *a fence a comment can trip
+is a fence that gets waived next time*. ⚠ The three measured `run_default_model` candidate ids the
+docstring can no longer name are **`deepseek-v4-flash`, `gpt-5.4-mini`, `gpt-5.4` — NO TWO AGREE**;
+recorded in `196-04-SUMMARY.md`.
+
+⚠ **`196-VALIDATION.md:78` names `::test_union_size`, which WILL NOT RESOLVE.** The shipped case is
+`test_union_size_is_code_registry_plus_db_only_rows` (`-k test_union_size` matches). Not renamed
+silently — VALIDATION.md is phase-level and outside that plan's `files_modified`.
+
+⚠⚠ **G-5 HOLE FOUND, AND IT IS THE LARGEST ONE IN THE PROJECT — `frontend/src/lib/api.ts` measures
+`169 / 97 / 6143` AND HAS NO LEDGER ROW AT ALL.** At **97 phases** it would be the **hottest file by
+phase count anywhere in the ledger**, ahead of `backend/app/api/threads.py` (76) — so G-5 has never
+once fired on it, purely by not being written down. This is the third instance of CLAUDE.md's own
+documented failure mode (`WorkflowsPage.tsx` escaped ten phases; `db/workflows.py` seventeen).
+⚠ **The rot rate reproduced INSIDE this phase:** `admin.py`'s figures, recorded by `196-01` four hours
+earlier as `30 / 11 / 1718`, already read `32 / 12 / 1733`. **`196-09` owes rows + detail sections for
+`api.ts`, `admin.py` and `config.py` under the same-commit sync rule, re-derived at close — never
+copied from any figure written above.**
 
 ### Wave 1 close — 2026-08-17
 
