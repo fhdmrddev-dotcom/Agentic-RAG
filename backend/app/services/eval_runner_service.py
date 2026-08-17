@@ -302,14 +302,20 @@ async def _judge_eval_answer(*, answer: str, expected_behavior: str, user_settin
     shot routes to the judge model's OWN provider, never ``user_settings.active_provider``
     (the provider-under-test — the Phase 133 ``306dd2d4`` bug class / Pitfall 1 / D-03).
     """
-    from app.config import get_model_capability, settings  # function-local
+    from app.config import get_model_capability  # function-local
+    from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
     from app.services.forced_emit import forced_emit  # function-local
     from app.services.harness.validator_kinds import (  # function-local, READ-ONLY reuse
         JudgeVerdict,
         resolve_judge_model,
     )
 
-    model = resolve_judge_model(settings)
+    # Phase 196 (D-17 / BUG-260731-01): resolve against the DB-backed effective settings
+    # (app_settings.harness_judge_model, surfaced via UserEffectiveSettings), NOT the
+    # env-level ``app.config.settings`` singleton — that attr is None on every install that
+    # sets the judge in the Settings UI, so the knob was inert and the judge silently fell
+    # back to claude-opus-4-8. Same discipline as skill_tuner.py:728-730.
+    model = resolve_judge_model(await load_app_settings_async())
     if model is None:
         return {"failure": "no judge model resolved (Settings.harness_judge_model unset)"}
     provider = (get_model_capability(model) or {}).get("provider")
@@ -611,6 +617,19 @@ async def _run_arm_body(
     # case_feedback — never fabricated, never counted in the rollup (advisory-only).
     case_feedback: str | None = None
     if status == "completed" and output.strip():
+        # Phase 196 (D-17 / BUG-260731-01) — HOISTED settings read, and the reason is the
+        # cost, not tidiness. ``load_app_settings_async`` hits the DB whenever the 30 s TTL
+        # is cold, and an eval MATRIX drives this body once per arm (2 arms x N cases), so
+        # a resolution left down in the graded branch would be re-taken on every pass. It is
+        # resolved ONCE here, above the judge shot and above the branch that used to hold
+        # it, into a local that the graded branch below reuses — and the same TTL cache
+        # collapses this read and ``_judge_eval_answer``'s own resolution into ONE DB read
+        # per arm. It is NOT hoisted further (into run_eval_job, above the `for case in
+        # cases` loop) because that would mean threading a new parameter through _run_arm
+        # and _run_arm_body — new surface, which this fix deliberately does not add.
+        from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
+
+        judge_app_settings = await load_app_settings_async()
         # Judge evidence channel (SEED-100): surface this arm's runtime tool receipts
         # (files produced, exit codes) so artifact-producing work is gradeable. The
         # persisted eval_results.output stays the PURE model answer — the evidence
@@ -636,13 +655,14 @@ async def _run_arm_body(
             verdict_state = "judge_error"
             verdict_reason = str(verdict["failure"])[:200]
         else:
-            from app.config import settings  # function-local
             from app.services.harness.validator_kinds import resolve_judge_model  # READ-ONLY reuse
             verdict_state = "graded"
             verdict_passed = bool(verdict.get("overall_passed"))
             verdict_score = verdict.get("overall_score")
             verdict_reason = (verdict.get("summary") or "")[:2000]
-            judge_model = resolve_judge_model(settings)
+            # Phase 196 (D-17): the RECORDED judge model must be the one the operator set,
+            # so it resolves off the hoisted DB-backed settings — never app.config.settings.
+            judge_model = resolve_judge_model(judge_app_settings)
             # EVAL-05d: lift the advisory per-CASE critique from the SAME emission (bounded).
             # It rides alongside — NEVER into — the verdict fields above; the rollup below
             # counts only verdict_state=='graded' + verdict_passed, never case_feedback.
