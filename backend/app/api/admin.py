@@ -1096,56 +1096,13 @@ async def set_visibility(
 # non-operators by the router-level require_operator (no RLS backstop — SC#4 / D-149-09).
 
 
-def _registry_row(model_id, cap, ovr, default_model, model_locked):
-    """Build one union registry row: OVR (DB-stored) values win over DEF (built-in) values,
-    with BOTH discernible via ``overridden_fields`` so the editor can render Reset (D-149-03).
-
-    ``cap`` is the built-in MODEL_CAPABILITIES entry (or None for a DB-only model); ``ovr``
-    is the model_capabilities_overrides row (or None for a pure DEF row). An OVR column is
-    applied only when NON-None (null-clears-to-DEF — the same overlay rule as
-    get_model_capability_async), so an operator's cleared field falls back to the built-in.
-    """
-    cap = cap or {}
-    ovr = ovr or {}
-
-    def _eff(col, default=None):
-        v = ovr.get(col)
-        if v is not None:
-            return v
-        return cap.get(col, default)
-
-    provider = ovr.get("provider") or cap.get("provider") or _infer_provider_for(model_id)
-    # DB-only OR any model carrying a stored override row → db_override; else the built-in.
-    source = "db_override" if ovr else "registry"
-    # Which editable columns are actually STORED (non-None) in the DB — the editor renders
-    # Reset only for fields that are overridden vs inherited from the built-in DEF.
-    overridden_fields = sorted(c for c in _MODEL_CAP_COLUMNS if ovr.get(c) is not None)
-
-    _enabled = ovr.get("enabled")
-    _deprecated = ovr.get("deprecated")
-    return {
-        "model_id": model_id,  # verbatim casing (Pitfall 6)
-        "provider": provider,
-        "capability_source": source,
-        "enabled": bool(_enabled) if _enabled is not None else True,
-        "deprecated": bool(_deprecated) if _deprecated is not None else False,
-        # IN-02: surface the stored deprecation reason so re-editing a deprecated model seeds
-        # the input from the current note (not blank) — a blur/enter no longer clobbers it.
-        "deprecated_reason": ovr.get("deprecated_reason"),
-        # WR-04: distinguish "not tracked in the registry" from a real 0. No built-in
-        # MODEL_CAPABILITIES entry carries context_window_tokens, so coalescing absent→0 made
-        # the tab read "Context 0 · DEF" for essentially every registry row (false — the value
-        # is simply not tracked, not zero). Return the RAW effective value or None; the tab
-        # renders None as "—" (not a concrete 0). Same for the sibling numeric fields.
-        "context_window_tokens": _eff("context_window_tokens"),
-        "max_output_tokens": _eff("max_output_tokens"),
-        "native_tools": bool(_eff("native_tools", False)),
-        "llm_call_timeout_seconds": _eff("llm_call_timeout_seconds"),
-        "is_default": model_id == default_model,
-        "is_locked": bool(model_locked) and model_id == default_model,
-        # Additive (Plan 07 extends the ModelRegistryRow type): per-field OVR-vs-DEF for Reset.
-        "overridden_fields": overridden_fields,
-    }
+# Phase 196 Plan 04 (D-02): ``_registry_row`` and the union loop that used to live HERE now
+# live in ``app.services.model_registry`` — ONE function, two callers, because the new
+# non-operator author route (``GET /models/registry``) must compute the SAME union without
+# widening this router's default-deny gate. Moved verbatim; imported function-locally below
+# (Pitfall 4). Nothing is re-imported at module scope here because no test imports
+# ``_registry_row`` / ``get_model_registry`` from this module — see that module's
+# PATCH SURFACE section.
 
 
 @router.get("/models")
@@ -1161,31 +1118,19 @@ async def get_model_registry(request: Request):
     ``llm_model_locked``). Floor-EXEMPT (the tab re-fetches — the /admin/runs + /admin/users
     poll precedent, D-07); ``audit_is_write=False`` marks it a read. The router gate is the
     sole authority — a non-operator gets a byte-identical 404 (SC#4 / D-149-09).
+
+    Phase 196 Plan 04 (D-02): the composition now lives in
+    ``app.services.model_registry.build_model_registry_rows`` so the non-operator author route
+    (``GET /models/registry``) computes the SAME union without widening this router's gate.
+    The response is byte-identical to before apart from the new ``emit_tier`` field (D-13).
     """
     request.state.audit_is_write = False
 
-    # Function-local imports (Pitfall 4 — keep the settings module off admin's load path).
-    from app.models.user_settings import _load_settings_from_db, load_all_model_overrides
+    # Function-local import (Pitfall 4 — keep the settings module off admin's load path; the
+    # leaf itself does the user_settings reads function-locally for the same reason).
+    from app.services.model_registry import build_model_registry_rows
 
-    settings_row = await _load_settings_from_db()
-    default_model = settings_row.get("llm_model") or ""
-    model_locked = bool(settings_row.get("llm_model_locked"))
-
-    overrides = await load_all_model_overrides()
-
-    rows = []
-    seen = set()
-    # DEF rows (built-in registry) overlaid with any OVR.
-    for model_id, cap in MODEL_CAPABILITIES.items():
-        rows.append(_registry_row(model_id, cap, overrides.get(model_id), default_model, model_locked))
-        seen.add(model_id)
-    # DB-only rows (in overrides, not in the built-in registry) — discovery-confirmed models.
-    for model_id, ovr in overrides.items():
-        if model_id in seen:
-            continue
-        rows.append(_registry_row(model_id, None, ovr, default_model, model_locked))
-
-    return {"models": rows}
+    return {"models": await build_model_registry_rows()}
 
 
 class AddModelRequest(BaseModel):
