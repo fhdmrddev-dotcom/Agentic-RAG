@@ -713,9 +713,19 @@ async def get_model_capability_async(model_id: str) -> "ModelCapability":
             base = dict(MODEL_CAPABILITIES.get(model_id, {}))
             if not base:
                 base = dict(_build_inferred_defaults(model_id, db_row.get("provider", _INFERENCE_FALLBACK_PROVIDER)))
-            # Overlay non-None DB fields
+            # Overlay non-None DB fields.
+            # Phase 196 (AUTH-04 / D-14): ``emit_tier`` joins the copy list, backed by the
+            # real column migration 120 adds. Before 120 the column did not exist, so adding
+            # the name here alone would have overlaid NULL for every row forever (RESEARCH
+            # Pitfall 1) — the list entry and the column ship together or not at all.
+            # ⚠ RESEARCH Pitfall 7, SURVIVES THIS CHANGE DELIBERATELY: the SYNC
+            # ``get_model_capability`` still never reads the DB, so
+            # ``get_model_capability("glm-4.7-flash")`` still returns
+            # ``capability_source="inferred"`` with NO emit_tier. Any surface that needs a
+            # DB-only model's tier must use THIS async path or the registry union payload.
             for field in ("llm_call_timeout_seconds", "context_window_tokens",
-                          "max_output_tokens", "native_tools", "deprecated"):
+                          "max_output_tokens", "native_tools", "deprecated",
+                          "emit_tier"):
                 db_val = db_row.get(field)
                 if db_val is not None:
                     base[field] = db_val

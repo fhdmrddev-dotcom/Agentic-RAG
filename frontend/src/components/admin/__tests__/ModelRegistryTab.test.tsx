@@ -39,6 +39,9 @@ function makeRow(overrides: Partial<ModelRegistryRow> = {}): ModelRegistryRow {
     llm_call_timeout_seconds: 600,
     is_default: false,
     is_locked: false,
+    // Phase 196 (AUTH-04): `null` is the shipped state for every pre-migration-120 row —
+    // the control renders it as the read-time `coerce` default, never as blank.
+    emit_tier: null,
     overridden_fields: [],
     ...overrides,
   }

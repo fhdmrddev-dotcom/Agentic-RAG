@@ -188,6 +188,9 @@ export function ModelRegistryTab({
                         Tools {showTechnical && <TechName>native_tools</TechName>}
                       </Th>
                       <Th>
+                        Document filling {showTechnical && <TechName>emit_tier</TechName>}
+                      </Th>
+                      <Th>
                         Enabled {showTechnical && <TechName>enabled</TechName>}
                       </Th>
                       <Th>Users see</Th>
@@ -343,6 +346,19 @@ function ModelRow({
           />
         </td>
 
+        {/* emit_tier — this tab's FIRST enum column (NUM_FIELDS is int-only, RowToggle is
+            boolean, so neither was reusable). D-15 / SEED-085: the operator reads the
+            user-facing sentence; the raw engine token appears only under the ⌥ reveal. */}
+        <td className="border-t border-border/40 px-3 py-2 align-middle">
+          <EmitTierControl
+            row={row}
+            busy={busy}
+            overridden={overridden.has("emit_tier")}
+            showTechnical={showTechnical}
+            onWrite={write}
+          />
+        </td>
+
         {/* enabled toggle. */}
         <td className="border-t border-border/40 px-3 py-2 align-middle">
           <RowToggle
@@ -376,7 +392,7 @@ function ModelRow({
       {/* The in-row 409 plain-language refusal — never a silent failure (D-149-09). */}
       {errorDetail && (
         <tr data-model-error={id}>
-          <td colSpan={NUM_FIELDS.length + 5} className="border-t-0 px-4 pb-2">
+          <td colSpan={NUM_FIELDS.length + 6} className="border-t-0 px-4 pb-2">
             <span className="text-[11px] font-medium text-destructive" role="alert">
               {errorDetail}
             </span>
@@ -386,7 +402,7 @@ function ModelRow({
 
       {showTechnical && (
         <tr>
-          <td colSpan={NUM_FIELDS.length + 5} className="border-t-0 px-4 pb-1 pt-0">
+          <td colSpan={NUM_FIELDS.length + 6} className="border-t-0 px-4 pb-1 pt-0">
             <span className="font-mono text-[9px] text-muted-foreground">
               {row.capability_source === "db_override" ? "db_override" : "registry"} ·{" "}
               {row.overridden_fields.length > 0
@@ -397,6 +413,98 @@ function ModelRow({
         </tr>
       )}
     </>
+  )
+}
+
+/** The three tier sentences, in the operator's words rather than the engine's.
+ *
+ *  ⚠ THESE STRINGS ARE SHARED BY CONSTRUCTION, NOT BY CONVENTION. The workflow-canvas model
+ *  picker renders the same three sentences; keeping one list here (rather than two lists that
+ *  happen to agree today) is what stops the two surfaces from drifting into describing the
+ *  same stored value differently. D-15 / SEED-085: the raw `emit_tier` token is an ENGINE
+ *  name and appears only under the ⌥ Technical-names reveal. */
+const EMIT_TIER_OPTIONS = [
+  { value: "force_strict", label: "Can fill a document — guaranteed format" },
+  { value: "force", label: "Can fill a document" },
+  { value: "coerce", label: "Best-effort only — may not fill a document" },
+] as const
+
+/** The per-row forced-emission tier control — this tab's first enum column.
+ *
+ *  ⚠ A `null` tier renders as `coerce`, NOT as blank. Blank would imply "unknown", and the
+ *  backend does not treat it that way: `forced_emit.py` reads `cap.get("emit_tier", "coerce")`,
+ *  so an untracked model is ALREADY behaving as best-effort. Showing "—" would hide a real,
+ *  active behaviour behind a shrug. The OVR/DEF tag is what distinguishes "an operator asserted
+ *  this" from "this is the default it falls back to". */
+function EmitTierControl({
+  row,
+  busy,
+  overridden,
+  showTechnical,
+  onWrite,
+}: {
+  row: ModelRegistryRow
+  busy: boolean
+  overridden: boolean
+  showTechnical: boolean
+  onWrite: (patch: ModelCapabilityPatch) => Promise<void>
+}) {
+  const effective = row.emit_tier ?? "coerce"
+
+  return (
+    <div className="flex min-w-[13rem] flex-col gap-1">
+      <div className="flex items-center gap-1.5">
+        <select
+          className="w-full rounded border border-border bg-background px-1.5 py-1 text-[11px] text-foreground disabled:opacity-50"
+          value={effective}
+          disabled={busy}
+          aria-label={`Document filling for ${row.model_id}`}
+          data-emit-tier={row.model_id}
+          onChange={(e) => {
+            const next = e.target.value as (typeof EMIT_TIER_OPTIONS)[number]["value"]
+            if (next !== row.emit_tier) void onWrite({ emit_tier: next })
+          }}
+        >
+          {EMIT_TIER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+        {overridden ? (
+          <span className="shrink-0 rounded bg-primary/15 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-primary">
+            ovr
+          </span>
+        ) : (
+          <span className="shrink-0 text-[9px] italic text-muted-foreground">def</span>
+        )}
+      </div>
+
+      {/* Reset appears ONLY on an overridden field and sends an explicit `null` — the same
+          explicit-null-is-Reset semantics the numeric cells use, honoured by the backend
+          guard loop's `if val is None: continue` arm. */}
+      {overridden && (
+        <button
+          type="button"
+          className="self-start text-[10px] text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+          disabled={busy}
+          onClick={() => void onWrite({ emit_tier: null })}
+        >
+          Reset to default
+        </button>
+      )}
+
+      {/* Open Question 2, answered here. Surfacing an already-doc-verified value makes no new
+          provider claim — but making it EDITABLE introduces an unverified assertion, and this
+          caption is the whole of what keeps that honest. Same register as RowToggle's
+          honest-lock docblock: say what the control does and does not guarantee. */}
+      <span className="text-[10px] leading-snug text-muted-foreground">
+        Setting this records what you believe the provider supports; nothing verifies it
+        against the provider.
+      </span>
+
+      {showTechnical && <TechName>emit_tier: {row.emit_tier ?? "null"}</TechName>}
+    </div>
   )
 }
 
