@@ -950,8 +950,29 @@ const BASELINE = {
   "OutputFileCard.baseline.test.tsx": 21,
   "StopControl.baseline.test.tsx": 15,
   "FilesSection.test.tsx": 11,
+  // ⚠ 195-03 task 1 GREW this file 11 → 41 and the pin is NOT being raised here.
+  // The +30 are the widening's own coverage (ribbon / tone / className /
+  // mimeType / the nine added extensions / the own-property guard), ADDITIONS
+  // ONLY — `git diff` shows zero removed lines and all 11 original titles
+  // intact. The pin is a FLOOR, never a census (`WorkspacePanel.test.tsx`'s
+  // note below records a pin that sat twelve cases stale while the gate stayed
+  // satisfied), so leaving it at 11 keeps the contract "no per-file DECREASE"
+  // exactly as strong while making the growth visible in the `actual` column
+  // rather than hidden behind a number someone re-typed.
   "fileIcon.test.tsx": 11,
   "MessageItem.finalOutputs.test.tsx": 11,
+  // ── Added in 195-03 task 3, in the SAME COMMIT as their TARGETS entries. ────
+  // Both numbers are THIS SCRIPT'S OWN printed `actual` column, on two agreeing
+  // runs (`total 4136 · failed 0 · count gate OK` both times) — never
+  // hand-counted from `it(` literals, which is the rule this script states
+  // about itself. The per-suite reasoning is recorded ONCE, at the matching
+  // `TARGETS` block near the bottom of this file (search `195-03`).
+  //
+  // ⚠ BOTH WERE MEASURED GREEN BEFORE ADOPTION (22 and 40, run individually and
+  // together), so the adoption imports ZERO rot into a gate whose contract is
+  // 0 failing forever.
+  "fileRowUtils.test.ts": 22,
+  "FileRow.test.tsx": 40,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
@@ -2547,6 +2568,29 @@ const TARGETS = [
   "src/components/panel/__tests__/FilesSection.test.tsx",
   "src/lib/__tests__/fileIcon.test.tsx",
   "src/__tests__/components/MessageItem.finalOutputs.test.tsx",
+  // ── Added in 195-03 task 3, in the SAME COMMIT as their BASELINE entries ────
+  //
+  // `src/components/files/` is a directory Phase 195 CREATED, and it holds the
+  // one row markup, the one byte formatter, the one basename and the one
+  // two-regime comparator that plans 05, 06 and 07 then convert three shipped
+  // surfaces onto. A suite guarding all of that which nothing runs in CI would
+  // be the phase's single most important falsification going unmeasured — the
+  // `194.1-BASELINE.md` §2 finding, where an ungated pin sat red for twelve
+  // cases and four clean gate reports could not have included it.
+  //
+  // ⚠ FILE-LEVEL, NOT THE BARE DIRECTORY `src/components/files`. A directory
+  // entry here would silently adopt every future suite in this phase's OWN new
+  // directory — including `FileRow.sweep.test.ts`, which does NOT exist yet and
+  // whose adoption belongs to plan 195-07, with 07's numbers and 07's reasons.
+  // That is the ownership trap this script argues against three times; being
+  // the directory's author is not a reason to spring it on oneself.
+  //
+  // Both paths were `ls`-confirmed before these lines were written (a TARGETS
+  // path that does not exist makes this gate ERROR at exit 2, not fail), and
+  // both bare filenames were confirmed unique tree-wide — the BASELINE key
+  // space is global.
+  "src/components/files/__tests__/fileRowUtils.test.ts",
+  "src/components/files/__tests__/FileRow.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
