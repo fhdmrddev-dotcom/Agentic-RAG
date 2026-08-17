@@ -681,7 +681,8 @@ async def test_judge_provider_independent(redis, supabase, pool, fake_loop_resul
     provider-under-test). ``forced_emit`` is patched at its SOURCE module
     (app.services.forced_emit.forced_emit) because _judge_eval_answer imports it
     function-locally — patching eval_runner_service.forced_emit would AttributeError."""
-    from app.config import get_model_capability, settings as app_settings
+    from app.config import get_model_capability
+    from app.models.user_settings import load_app_settings_async
     from app.services import eval_runner_service
     from app.services.harness.validator_kinds import JudgeVerdict, resolve_judge_model
 
@@ -702,7 +703,16 @@ async def test_judge_provider_independent(redis, supabase, pool, fake_loop_resul
     forced = AsyncMock(return_value={"emitted": fake_emitted, "failure": None})
 
     # The INDEPENDENT judge provider we EXPECT (derived from resolve_judge_model, not the run).
-    expected_judge_provider = (get_model_capability(resolve_judge_model(app_settings)) or {}).get("provider")
+    # Phase 196 (D-17 / BUG-260731-01): the judge model now resolves off the DB-backed
+    # effective settings (``app_settings.harness_judge_model`` — what the operator set in the
+    # Settings UI), NOT the env-level ``app.config.settings`` singleton this line used to read.
+    # The EXPECTATION must be derived through the SAME source or it pins a model the code no
+    # longer uses (it read ``claude-opus-4-8``/anthropic while the shot correctly routed to the
+    # operator's ``deepseek-v4-pro``/deepseek). The CLAIM under test is unchanged: the judge
+    # routes to the JUDGE model's own registry provider, never user_settings.active_provider.
+    expected_judge_provider = (
+        get_model_capability(resolve_judge_model(await load_app_settings_async())) or {}
+    ).get("provider")
 
     # provider-under-test = openai; its active_provider differs from the judge provider.
     us = SimpleNamespace(active_provider="openai")

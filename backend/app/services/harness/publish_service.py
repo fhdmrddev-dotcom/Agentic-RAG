@@ -1133,7 +1133,8 @@ async def _judge_golden_output(
 
     Returns the JudgeVerdict dict, or ``{"failure": <reason>}`` on an honest failure.
     """
-    from app.config import get_model_capability, settings
+    from app.config import get_model_capability
+    from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
     from app.services.harness.validator_kinds import (  # function-local
         JUDGE_RUBRIC_CORE,
         JudgeVerdict,
@@ -1145,7 +1146,13 @@ async def _judge_golden_output(
     # SAME registry default (claude-opus-4-8 / gpt-5.5) the in-run validator resolves;
     # never the run model (no self-judging; a coerce-tier run model never becomes the
     # publish blocker's weak link).
-    model = resolve_judge_model(settings)
+    #
+    # Phase 196 (D-17 / BUG-260731-01): the resolver is handed the DB-backed effective
+    # settings (app_settings.harness_judge_model — what the operator actually set in the
+    # Settings UI), NOT the env-level ``app.config.settings`` singleton whose attr is None
+    # on every UI-configured install. This gauntlet is a HARD WALL, so an inert knob here
+    # meant the publish grade was silently taken by a model the operator never chose.
+    model = resolve_judge_model(await load_app_settings_async())
     if model is None:
         return {"failure": "no judge model resolved (Settings.harness_judge_model unset)"}
 

@@ -531,9 +531,14 @@ async def _validate_llm_judge_rubric(output: dict, config: dict, ctx) -> GateRes
     # (claude-opus-4-8 / gpt-5.5) the publish path resolves.
     model = config.get("model") or getattr(ctx, "judge_model", None)
     if model is None:
-        from app.config import settings  # function-local
+        # Phase 196 (D-17 / BUG-260731-01) — ONLY the THIRD rung changes. Rungs 1 and 2
+        # (config.model, ctx.judge_model) are untouched above; the resolver is now handed
+        # the DB-backed effective settings (app_settings.harness_judge_model, what the
+        # operator set in the Settings UI) instead of the env-level app.config.settings
+        # singleton, whose attr is None on every UI-configured install.
+        from app.models.user_settings import load_app_settings_async  # function-local (Pitfall 4)
 
-        model = resolve_judge_model(settings)
+        model = resolve_judge_model(await load_app_settings_async())
     if model is None:
         return GateResult(
             False,
