@@ -13,12 +13,13 @@ executes. This file is the runtime half.
 THE CASES, in the order they are driven:
 
   A1  (RESEARCH assumption, driven FIRST and physically first in this file)
-      A fresh import of ``app.services.harness.phase_types`` succeeds and exposes the new
+      A fresh interpreter imports ``app.services.harness.phase_types`` AND awaits the new
       ``_effective_model_checked``. ``_resolve_enabled_model`` resolves
-      ``load_all_model_overrides`` LATE off ``app.api.threads``, so importing it into the
-      harness drags an ``app.api.threads`` import into the harness AT CALL TIME. If that were
-      a cycle the backend would not start. The mitigation is a REAL import in a test, not a
-      reading of the source.
+      ``load_all_model_overrides`` LATE off ``app.api.threads``, so the call drags a REAL
+      ``app.api.threads`` import into the harness AT CALL TIME. If that were a cycle the
+      backend would not start. The mitigation is a REAL import in a test, not a reading of
+      the source. ⚠ It runs in a SUBPROCESS — see that case's own docstring for the measured
+      reason (the ``sys.modules``-eviction form broke 23 tests in two other files).
 
   D-10 behaviour
       · a DISABLED per-phase model falls back to the run's model AND produces a notice;
@@ -47,8 +48,9 @@ the ENABLED fallback target and as the no-op control.
 """
 from __future__ import annotations
 
-import importlib
 import inspect
+import pathlib
+import subprocess
 import sys
 
 import pytest
@@ -63,45 +65,63 @@ ENABLED_MODEL = "gpt-5.4"    # enabled — the run's model / the fallback target
 # ── A1: the import-cycle guard, driven FIRST ──────────────────────────────────
 
 
-def test_a1_harness_import_cycle_guard_fresh_import(monkeypatch):
-    """A1: a FRESH import of the harness module succeeds and exposes the checked helper.
+_A1_SUBPROCESS = """
+import asyncio, importlib, inspect, types
 
-    Forces a genuine re-import by evicting the three modules that participate in the late
-    ``phase_types -> run_model_resolution -> app.api.threads`` resolution, then importing the
-    harness module from scratch. The previous module objects are restored afterwards so this
-    case cannot perturb any other test in the session.
+# 1. The harness module imports CLEAN in an interpreter where nothing is preloaded.
+m = importlib.import_module("app.services.harness.phase_types")
+assert inspect.iscoroutinefunction(m._effective_model_checked), "checked helper must be async"
 
-    A cycle here means the backend does not start, so this is the case whose red-to-green
-    transition matters most in this plan.
+# 2. And it RUNS — which is the half that actually tests A1. The resolver reaches
+#    `load_all_model_overrides` LATE off `app.api.threads`, so awaiting the helper performs a
+#    REAL `app.api.threads` import from inside the harness. A cycle raises right here.
+phase = types.SimpleNamespace(config=types.SimpleNamespace(model="gpt-5.4"), slug="s", phase_index=0)
+ctx = types.SimpleNamespace(
+    model="gpt-5.4", user_settings=types.SimpleNamespace(llm_model="gpt-5.4"),
+    redis=None, pool=None, run_id=None, producer_run_id=None, current_user={}, emit=None,
+)
+assert asyncio.run(m._effective_model_checked(phase, ctx)) == "gpt-5.4"
+print("A1-OK")
+"""
+
+
+def test_a1_harness_import_cycle_guard_fresh_interpreter():
+    """A1: the harness imports AND RUNS the checked helper in a genuinely fresh interpreter.
+
+    ``_resolve_enabled_model`` resolves ``load_all_model_overrides`` LATE off
+    ``app.api.threads`` (``run_model_resolution.py:53``), so awaiting the new helper performs a
+    REAL ``app.api.threads`` import from inside the harness AT CALL TIME. If that were a cycle
+    the backend would not start — which is why the mitigation is a real import rather than a
+    reading of the source.
+
+    ⚠ DRIVEN IN A SUBPROCESS, AND THE REASON IS MEASURED RATHER THAN STYLISTIC. The first
+    version of this case did what the plan literally asked: evict the three modules from
+    ``sys.modules``, re-import, then restore. That RESTORES the ``sys.modules`` keys but NOT
+    the parent package attribute — ``app.services.harness.phase_types`` keeps pointing at the
+    SECOND module object the re-import created. The resulting split brain broke **23 tests in
+    two other files** (`test_llm_emit_executor.py`, `test_185_detection.py`), each of which
+    monkeypatches one module object while the code under test lives in the other. Every one of
+    them passed in isolation, which is exactly what makes that failure mode expensive.
+
+    A subprocess is also STRICTLY STRONGER evidence: an interpreter with nothing preloaded is
+    the real "does the backend start" question, and it cannot perturb this session at all.
     """
-    names = (
-        "app.services.harness.phase_types",
-        "app.services.run_model_resolution",
-        "app.api.threads",
+    backend_dir = pathlib.Path(__file__).resolve().parents[2]
+    proc = subprocess.run(
+        [sys.executable, "-c", _A1_SUBPROCESS],
+        cwd=str(backend_dir), capture_output=True, text=True, timeout=300,
     )
-    saved = {n: sys.modules.get(n) for n in names}
-    try:
-        for n in names:
-            sys.modules.pop(n, None)
+    assert proc.returncode == 0, (
+        "A1 FAILED — the harness could not import or run the checked helper in a fresh "
+        f"interpreter (a cycle here means the backend does not start).\n{proc.stderr}"
+    )
+    assert "A1-OK" in proc.stdout
 
-        # The real import — not a source read. Any cycle raises here.
-        phase_types = importlib.import_module("app.services.harness.phase_types")
-        resolution = importlib.import_module("app.services.run_model_resolution")
 
-        assert hasattr(phase_types, "_effective_model_checked"), (
-            "the harness must expose the checked model helper after a fresh import"
-        )
-        assert inspect.iscoroutinefunction(phase_types._effective_model_checked), (
-            "the checked helper awaits the shipped resolver, so it must be async"
-        )
-        # The collaborator the late import reaches for must itself be importable fresh.
-        assert callable(resolution._resolve_enabled_model)
-    finally:
-        for n, mod in saved.items():
-            if mod is not None:
-                sys.modules[n] = mod
-            else:
-                sys.modules.pop(n, None)
+def test_a1_checked_helper_is_present_and_async(harness):
+    """The in-process half of A1 — the attribute exists on the module everyone else imports."""
+    assert hasattr(harness, "_effective_model_checked")
+    assert inspect.iscoroutinefunction(harness._effective_model_checked)
 
 
 # ── the stubs: a harness ctx with no live substrate at all ────────────────────
@@ -310,6 +330,42 @@ async def test_registry_read_failure_fails_open(monkeypatch, harness, carriers):
     assert resolved == DISABLED_MODEL, "a read blip returns the per-phase model UNCHANGED"
     assert not carriers.substeps, "no notice on a blip — nothing was actually substituted"
     assert not carriers.audits
+
+
+def test_phase_tool_context_carries_the_checked_model_when_given_one(harness):
+    """The DEVIATION fence (Rule 3 / Rule 1) — the fifth call site is NOT in an async def.
+
+    ``196-03-PLAN.md`` states all five ``_effective_model`` call sites *"already sit inside
+    ``async def``, so no signature changes"*. Measured, that is FALSE for one of them:
+    ``_build_phase_tool_context`` is SYNC and is called synchronously by fifteen shipped test
+    sites, so making it async is a signature change with a large blast radius, not a one-word
+    edit. It is also the load-bearing site — ``run_task_sub_agent`` reads ``parent_ctx.model``,
+    NOT the executor's local ``model`` — so it cannot simply be skipped either.
+
+    The seam taken instead is purely ADDITIVE: an optional keyword ``model``. The two
+    PRODUCTION callers are both inside ``async def`` and pass the model they already awaited;
+    every existing sync caller omits it and gets the shipped ``_effective_model`` fallback,
+    byte-identical. This case pins both arms so the fallback cannot quietly become the only
+    arm again.
+    """
+    import inspect as _inspect
+
+    sig = _inspect.signature(harness._build_phase_tool_context)
+    assert "model" in sig.parameters, "the checked model must have a way IN to the ToolContext"
+    assert sig.parameters["model"].default is None, (
+        "omitting it must keep every shipped sync call site byte-identical"
+    )
+    assert not _inspect.iscoroutinefunction(harness._build_phase_tool_context), (
+        "the builder stays SYNC — fifteen shipped call sites invoke it without await"
+    )
+
+    # Both production call sites hand the awaited model in; neither re-derives it.
+    src = _inspect.getsource(harness)
+    assert src.count("_build_phase_tool_context(phase, ctx, model=model)") == 2
+    assert "_build_phase_tool_context(phase, ctx)\n" not in src, (
+        "a production call site that omits the model would run the sub-agent on an "
+        "UNCHECKED id while the executor's own local was checked"
+    )
 
 
 def test_effective_model_is_still_sync_and_exported(harness):

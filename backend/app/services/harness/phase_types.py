@@ -395,7 +395,35 @@ def _effective_model(phase, ctx) -> str:
     return getattr(phase.config, "model", None) or getattr(ctx, "model", "") or ""
 
 
-def _build_phase_tool_context(phase, ctx) -> ToolContext:
+async def _effective_model_checked(phase, ctx) -> str:
+    """Phase 196 Plan 03 (D-10) — ``_effective_model`` routed through the SHIPPED
+    disabled-model resolver before a per-phase id ever reaches a provider.
+
+    INVARIANT: an ENABLED model is a STRICT no-op — same value, no notice, no receipt. A
+    DISABLED one is substituted and never silently: ONE ``model_fallback`` sub-step on the
+    producer stream the frontend already tails, plus ONE durable ``policy_applied`` receipt
+    naming both ids (no 25th audit kind — that kind already means exactly this).
+    FAIL-OPEN, a DECISION rather than an inherited default: a registry-read blip returns the
+    model unchanged, so a disabled model runs rather than the phase sinking — the shipped
+    chat posture. Failing closed would make an infrastructure hiccup look like an authoring
+    error. The import is FUNCTION-LOCAL (the resolver reaches ``app.api.threads`` late); A1
+    (no harness import cycle) is proven by a real fresh import in the 196-03 unit file.
+    """
+    from app.services.run_model_resolution import _resolve_enabled_model  # noqa: PLC0415 — late (A1)
+    org_default = getattr(getattr(ctx, "user_settings", None), "llm_model", "") or ""
+    resolved, notice = await _resolve_enabled_model(_effective_model(phase, ctx), org_default)
+    if not notice:
+        return resolved
+    await _emit_phase_substep(ctx, phase, status="model_fallback")
+    await _emit_audit(ctx, event_type="policy_applied", metadata={
+        "policy": "model_disabled_fallback", "phase": getattr(phase, "slug", None),
+        "disabled_model": notice.get("disabled_model"),
+        "fallback_model": notice.get("fallback_model"), "message": notice.get("message"),
+    })
+    return resolved
+
+
+def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolContext:
     """Build the ToolContext the sub-agent runs under for an LLM-agent phase.
 
     Carries the run substrate (redis / pool / supabase / user / thread) off the
@@ -452,7 +480,10 @@ def _build_phase_tool_context(phase, ctx) -> ToolContext:
         scoped_folder_path=getattr(ctx, "scoped_folder_path", None),
         emit=getattr(ctx, "emit", None),
         spawn=getattr(ctx, "spawn", None),
-        model=_effective_model(phase, ctx),
+        # 196-03 (D-10): the CHECKED model when an async caller resolved one — THIS is what
+        # the sub-agent runs on (run_task_sub_agent reads parent_ctx.model, not the caller's
+        # local). Omitted => the shipped sync fallback, byte-identical.
+        model=model if model is not None else _effective_model(phase, ctx),
         previous_files_in_run={},
         parent_run_id=None,
         per_run_task_semaphore=getattr(ctx, "per_run_task_semaphore", None),
@@ -526,7 +557,7 @@ async def _exec_llm_single(phase, accumulated_outputs: dict, ctx) -> dict:
             {"role": "user", "content": _first_phase_user_turn(accumulated_outputs, ctx)},
         ],
         tools=[],
-        model=_effective_model(phase, ctx),
+        model=await _effective_model_checked(phase, ctx),
         user_settings=getattr(ctx, "user_settings", None),
     )
     return {"text": content or ""}
@@ -545,7 +576,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 D-04 — layer-1 whitelist over the EFFECTIVE list so the budget-capped tools
     # the MODEL sees include read_skill_file when the phase carries a skill_snapshot.
     whitelist = frozenset(_effective_tools(phase))
-    model = _effective_model(phase, ctx)
+    model = await _effective_model_checked(phase, ctx)
 
     # D-05 layer 1 — the model only SEES the whitelisted, budget-capped tools.
     # WR-04 (091-08): this list is now PASSED to run_task_sub_agent as
@@ -561,7 +592,7 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
         whitelist, model, getattr(ctx, "user_settings", None)
     )
 
-    phase_ctx = _build_phase_tool_context(phase, ctx)
+    phase_ctx = _build_phase_tool_context(phase, ctx, model=model)
 
     # D-12 — align with the Explorer=8 cap when the config is the model default.
     max_steps = phase.config.max_steps
@@ -639,7 +670,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
     # 099 D-04 — layer-1 whitelist over the EFFECTIVE list (read_skill_file ∪ tools
     # when a snapshot is present), so each branch's budget-capped schemas include it.
     whitelist = frozenset(_effective_tools(phase))
-    model = _effective_model(phase, ctx)
+    model = await _effective_model_checked(phase, ctx)
     # WR-04 (091-08): pass the budget-capped list to each sub-agent (was discarded).
     # 101-06 WR-01: same render_template schema augmentation as _exec_llm_agent — the
     # shared _phase_tools_override helper guarantees the two paths cannot drift.
@@ -675,7 +706,7 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
 
     async def _one(question: str) -> dict:
         async with sem:  # composes with the shipped per-run + Redis-Lua caps
-            phase_ctx = _build_phase_tool_context(phase, ctx)
+            phase_ctx = _build_phase_tool_context(phase, ctx, model=model)
             # The sub-agent's USER turn (task_service.py:351) = the sub-question, the
             # actual substance to research — not the truncated slug label it was before.
             # Prefix the overall topic so the branch keeps the user's intent in view.
@@ -1231,7 +1262,7 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
     """
     definition = getattr(ctx, "definition", None)
     emitter = getattr(phase.config, "emitter", "render_template")
-    model = _effective_model(phase, ctx)
+    model = await _effective_model_checked(phase, ctx)
     run_id = getattr(ctx, "run_id", None)
     pool = getattr(ctx, "pool", None)
     # D-01 (SEED-082): the citation policy decides ONLY the post-verdict disposition
