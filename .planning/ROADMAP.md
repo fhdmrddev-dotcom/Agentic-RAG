@@ -564,6 +564,7 @@ Plans:
 **Plans**: 8 plans in 6 waves — **all 8 EXECUTED (2026-08-16)**, ⛔ **the three operator-driven G-4 rows are OWED and UNDRIVEN**
 
 Plans:
+
 - [x] 194.1-01-PLAN.md — Wave-0 baselines on the UNMOVED tree: the four Stop mounts, both resolvers, the kickoff placeholder, the transcript's silence, the approval's dispatchability + `194.1-BASELINE.md`
 - [x] 194.1-02-PLAN.md — Backend: widen the shipped, UNGATED `ThreadWorkflowState` with `last_run_status` / `last_run_created_at` / `last_run_updated_at` (**D-09 AMENDED** — no new route, no `CANVAS_GATED_PATHS` edit, no migration, no extra round trip)
 - [x] 194.1-03-PLAN.md — The whole provider/store change set: the stopping + not-confirmed + kickoff slices, the 8s provider-owned timer, the ONE slice-transition clear, R6 on BOTH resolvers, both false strings deleted, R5's kickoff gate **and** its 403 / network-failure repairs
@@ -594,12 +595,23 @@ Plans:
 **Plans**: 8 plans in 4 waves
 
 Plans:
+**Wave 1**
+
 - [ ] 195-01-PLAN.md — Wave 0/1: the LIVE SC#1 baseline in a commit that PREDATES every source change (D-16), the named `BASE_SHA`, and the wave-1 browser + `.docx`-reader probe (**blocking checkpoint** — the orchestrator drives it)
 - [ ] 195-02-PLAN.md — Wave 0/1: the characterization fences on the UNMOVED tree — `supersedes` in BOTH branches and the inert `data-variant` (**zero coverage repo-wide**, F5), the dead-link pair as two cases (P2), the run page's SILENT dead row (F8), and the count-gate adoption of FIVE suites
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 195-03-PLAN.md — Wave 2: the shared module — `components/files/` (`FileRow` via Radix `asChild`/`Slottable`, `fileRowUtils`), the widened ONE icon path (`ribbon`/`tone`/`className`/`mimeType` + the nine missing extensions + the own-property guard), and the two-regime `byNewestFirst` whose missing-key arm is NEW GROUND (F7)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 195-04-PLAN.md — Wave 3: chat converts — `OutputFileCard` on the shared row with its public prop shape BYTE-IDENTICAL, so `MessageItem.tsx` (29 phases) and `ExecuteCodeBody.tsx` are never opened (F6/D-14 honoured structurally)
 - [ ] 195-05-PLAN.md — Wave 3: the panel converts — the copied `formatBytes` **and its own “keep byte-for-byte identical” confession** deleted, the mime-first `iconFor` deleted, listbox + roving focus + preview activation + Template badge unmoved
 - [ ] 195-06-PLAN.md — Wave 3: the run surface converts — the region on the shared row, D-02's honest heading (**three locations**), D-15's three-way empty state pinned, D-12 wired, and the TWO shipped fences that assert the duplication INVERTED IN PLACE with the originals quoted (F1; the suite is pinned EXACT)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 195-07-PLAN.md — Wave 4: SC#2 proved — the four-file source sweep with length+identity guards and the adopted 27th plant (the stripper non-vacuity case), the chat-capability arm, and every pin this phase moved reconciled to the gate's own printed `actual`
 - [ ] 195-08-PLAN.md — Wave 4: the records — D-11's two stale documents (ROADMAP SC#3 + nine sites in the design record), D-17's hot-file ledger under the SAME-COMMIT SYNC RULE (two files ABSENT today), two seeds for the measured lies the phase declines, and **D-20 driven** — launch, watch, download, OPEN the file (**blocking checkpoint**)
 

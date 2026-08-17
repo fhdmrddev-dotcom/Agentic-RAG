@@ -1108,9 +1108,23 @@ verified by command, query or file:line above.
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> **All four resolved by the plan set** (`b2c3674f`), verified by the plan-checker at
+> `## VERIFICATION PASSED`. Each carries its resolving plan inline below. Recorded here rather than
+> left implicit, because this project's Dimension-11 convention is that an unmarked open question is
+> indistinguishable from an unanswered one.
 
 1. **Does the panel row visibly change when it adopts `fileIcon()`?** (A2)
+   **RESOLVED: 195-03** — the answer is **YES, and it is accepted as a DECISION rather than a no-op.**
+   Adopting `fileIcon` changes four glyph categories on the panel and run page
+   (`FileSpreadsheet→Table`, `FileCode→Code`, `FileImage→Image`, `File→FileText`), and `EXT_MAP` omitted
+   **nine** extensions the panel's MIME-first `iconFor` covered. `195-03` extends the map and adds a
+   `mimeType` input so no extension regresses; `fileIcon` gains `tone: "inherit"` (⚠ **not** `"muted"` —
+   a single `"muted"` value would hardcode either the panel token or the page token, and the page is
+   fenced against panel-scoped tokens). The residual delta is **surfaced to the operator at UAT
+   (195-08 U3), not decided for them** — which is the narrow-question path D-18 left open when it
+   declined a sketch.
    - *Known:* `fileIcon()` renders a stacked hex-coloured glyph + `.EXT` ribbon; the panel renders a
      flat 16 px `text-panel-muted-foreground` glyph chosen for AA contrast in Phase 088-05. The chat
      design record forbids the flat form; the panel design record specifies a compact row and says
@@ -1122,6 +1136,14 @@ verified by command, query or file:line above.
      reasons and this is narrower than a sketch.
 
 2. **Where does the download CALL live — the page or the row?**
+   **RESOLVED: 195-03** — **the call stays in each surface**, exactly as this section recommended, and
+   the `fileRowUtils.ts` docblock records why. ⚠ **The planner went further and DECLINED the
+   `downloadFrom(src, filename)` dispatcher this section sketched**, on a measured ground this section
+   did not state: `WorkflowRunPage.test.tsx:1450-1455` pins `downloadWorkspaceFile(runThreadId` at
+   exactly one occurrence, and that is a **TENANCY** property — download from the RUN's thread, never
+   the viewed one — not a style rule. Routing the call through a shared util would have forced
+   inverting a fence guarding a real security property. RUN-03 asks for one *presentation*; that is
+   what ships.
    - *Known:* `WorkflowRunPage.test.tsx:1450-1455` pins `downloadWorkspaceFile(` at **exactly one**
      occurrence in page source, and pins `downloadWorkspaceFile(runThreadId`. The section-level
      error (`data-testid="run-download-error"`, no auto-clear) already lives in the page, while chat's
@@ -1134,6 +1156,10 @@ verified by command, query or file:line above.
      two absence fences already require.
 
 3. **Adopt the three ungated suites into the gate, or record the decline?**
+   **RESOLVED: 195-02 task 3 — ADOPT, and five suites rather than three.** ⚠ Beyond the three named
+   here, `StopControl.baseline.test.tsx` is adopted too: it **greps raw `WorkflowRunPage.tsx`** and was
+   ungated, and the ledger's own recorded lesson is *"a pin in an ungated suite is a pin nothing
+   checks."* No decline is recorded because none is taken.
    - *Known:* all three are green (11/11/11); the script's own rule is that a decline needs a stated
      reason, because *"a decline with no recorded reason is indistinguishable from an oversight."*
    - **Recommendation:** adopt `FilesSection.test.tsx` (the phase converts that file, so its
@@ -1142,6 +1168,9 @@ verified by command, query or file:line above.
      otherwise record the decline with its reason.
 
 4. **Does `SeamCard`'s chip need its false docblock corrected?**
+   **RESOLVED: 195-08 — as a SEED, not a task**, exactly as recommended below. Touching `SeamCard.tsx`
+   would invite the very sweep § F9 exists to prevent, so the fifth presentation is recorded as a
+   **boundary** and its false docblock as a seeded follow-up carrying a concrete re-open trigger.
    - *Known:* `SeamCard.tsx:10` claims it *"reuses OutputFileCard's chip shape"*; it imports neither
      `fileIcon` nor `formatBytes`.
    - **Recommendation:** a one-line comment correction is a legitimate G-3 `/gsd:fast` candidate, or a
