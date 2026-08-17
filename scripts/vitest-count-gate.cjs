@@ -1912,6 +1912,36 @@ const BASELINE = {
   // owed rather than absorbed: folding an unrelated drift into a commit that did not cause
   // it is the thing this whole header argues against, and it is the reason 190-12, 190-15,
   // 190-16 and 192-01 each declined the same four. Owed as its own edit.
+  // ── Added in 196-03, in the SAME COMMIT as its `TARGETS` entry below ──────────────────
+  //
+  // THE REASON, stated rather than summarised (this script's own adoption rule requires one
+  // either way — a decline with no recorded reason is indistinguishable from an oversight):
+  // this suite is now the ONLY guard on the honest-notice half of D-10. Plan 196-03 routes
+  // every harness per-phase model through the shipped disabled-model resolver and surfaces a
+  // substitution as a `model_fallback` sub-step. `PhaseCard.tsx`'s `subStepMeta` has a
+  // forward-compat default arm that renders an UNMAPPED status as the word **"Working"** — so
+  // if the `SUBSTEP_META` entry were dropped, the notice would silently become the exact
+  // defect Phase 196 exists to remove, and nothing outside this suite would notice. An
+  // unpinned file is not a lightly-guarded one, it is an UNGUARDED one (the 188-12 statement).
+  //
+  // ⚠ BOTH KNOBS WERE NEEDED, and that was MEASURED rather than assumed: `src/components/panel`
+  // is reached above by three NAMED `__tests__/` files, and `PhaseCard.test.tsx` does not live
+  // under `__tests__/` at all — it was absent from this gate's printed file list entirely. The
+  // full derivation lives at the matching `TARGETS` entry and is not duplicated here, because
+  // two copies of a reason drift.
+  //
+  // ⚠ THE NUMBER IS READ FROM THIS SCRIPT'S OWN `actual` COLUMN, never hand-counted from `it(`
+  // and never quoted from a document: the run that added the `TARGETS` entry printed
+  // `PhaseCard.test.tsx  —  27  new` (verdict `count gate OK`, total 4197 · failed 0 ·
+  // pinned total 4096 · 83/83). Measured beside it so the delta is a real before/after rather
+  // than an assertion: the suite counted **24** at this plan's base — the pre-change file was
+  // restored and run standalone at `GSD_VITEST_MAX_WORKERS=2` to get that figure. The +3 is
+  // exactly this plan's own cases and nothing else: the `model_fallback` member added to the
+  // whole-union `SUBSTEPS` it.each (+1), the fixed-sentence/amber-node case (+1), and its
+  // positive control asserting the default arm STILL catches a genuinely unknown value as
+  // "Working" (+1). ⚠ That control is load-bearing: without it, a `model_fallback` riding the
+  // default arm would pass the first case and this pin would be guarding nothing.
+  "PhaseCard.test.tsx": 27,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -2744,6 +2774,34 @@ const TARGETS = [
   // bare filename `FileRow.sweep.test.ts` was confirmed unique tree-wide (`find`
   // returns exactly one match): the BASELINE key space is global.
   "src/components/files/__tests__/FileRow.sweep.test.ts",
+  // ── Added in 196-03, in the SAME COMMIT as its BASELINE pin above ───────────
+  //
+  // The TENTH occurrence of the two-knob trap, and the first that lands on a file
+  // shipped since Phase 101.1 rather than one the phase created.
+  // `src/components/panel/` is reached above by THREE NAMED FILES ONLY —
+  // `__tests__/PhaseReconcile.test.tsx`, `__tests__/PhaseTimeline.test.tsx` and
+  // `__tests__/FilesSection.test.tsx` — and `PhaseCard.test.tsx` does not live
+  // under `__tests__/` at all, so no entry above reached it. MEASURED, not
+  // assumed: it was absent from this gate's printed file list on the unmodified
+  // tree, and appeared as `— 27 new` on the first run after this line existed.
+  //
+  // WHAT IS UNGUARDED WITHOUT IT — the full reason is recorded ONCE at the
+  // matching `BASELINE` entry above (search `196-03`); in one line: this suite is
+  // now the only fence standing between the D-10 fallback notice and
+  // `subStepMeta`'s default arm, which renders an unmapped status as the word
+  // "Working" — i.e. silently.
+  //
+  // ⚠ TIMING: `ls`-confirmed before this line was written — a `TARGETS` path that
+  // does not exist makes this gate ERROR at exit 2, not fail, for every later
+  // plan. The bare filename was confirmed unique tree-wide
+  // (`git ls-files | grep -c 'PhaseCard.test.tsx$'` → 1): the BASELINE key space
+  // is global.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/panel` — the
+  // same reasoning this script already records seven times over. That directory
+  // holds suites this plan does not read, and adopting them would make Phase 196
+  // the owner of their future rot in a gate that requires 0 failing forever.
+  "src/components/panel/PhaseCard.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
