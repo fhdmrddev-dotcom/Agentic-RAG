@@ -4,12 +4,24 @@ title: CONFIRMED — the Settings judge-model knob IS inert; every judge consume
 reported: 2026-07-31
 surface: Agentic-RAG
 severity: critical
-status: open
+status: folded
 affected_areas: [backend/harness, workflows/publish-gauntlet, settings, eval/judge, observability]
-folded_into: null
+folded_into: "196"
 verified_closed_by: null
-related_seeds: [SEED-116, SEED-117]
-re_open_trigger: null
+related_seeds: [SEED-116, SEED-117, SEED-135]
+re_open_trigger: "FOLDED at /gsd:discuss-phase 196 (2026-08-17), on an EXPLICIT operator decision that
+  deliberately widens that phase's canvas-only scope fence — recorded as 196-CONTEXT.md D-17. Direction
+  chosen: route the four judge consumers off `app.config.settings` onto the DB-backed
+  UserEffectiveSettings the rest of the app uses. The report's alternative (declare the knob
+  system-level in the UI) was considered and REJECTED — it leaves the operator's stated goal, running a
+  cheaper judge, impossible. ⚠ THE REPORT'S OWN BINDING CONDITION CARRIES INTO THE PHASE: the fix MUST
+  ship a test that sets `app_settings.harness_judge_model` and asserts the RESOLVED model changes —
+  'the absence of that test is why this survived from 2026-07-31 to 2026-08-17'. Flip to `closed` ONLY
+  when that test exists and the three-row measurement above re-runs with resolve_judge_model returning
+  the operator's value. RE-OPEN if a judge consumer is later found still reading the env singleton, or
+  if 196 ships without the regression test. ⚠ Judge FITNESS (SEED-135 item 6 — `gemini-3.5-flash` is
+  `emit_tier: force` and still returned no verdict) is explicitly NOT claimed by 196 (D-16) and remains
+  deferred pending live verification of the sanitized-payload hypothesis."
 reproduces_on:
   branch: develop
   commit: a724f275

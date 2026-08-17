@@ -10,7 +10,15 @@ affected_areas: [skills/eval-engine, settings/engine-health, cloud-config, obser
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-040]
-re_open_trigger: null
+re_open_trigger: "Reviewed at /gsd:discuss-phase 196 (2026-08-17) — left OPEN, NOT folded
+  (196-CONTEXT.md D-19), while its two model-control siblings BUG-260731-01 and BUG-260718-04 WERE
+  folded into that phase. The distinction is not arbitrary: 196 fixes model CONTROLS that lie about
+  what will run; this is the eval ENGINE plus cloud configuration, and it belongs to the app-wide
+  SEED-040 / SEED-088 model-registry sweep that both the ROADMAP and REQUIREMENTS.md:110 fence out of
+  v3.7. ⚠ Note the partial overlap that does NOT amount to a fold: 196's D-17 makes the judge knob
+  actually reach the judge, so if any of the 8 provider failures here turn out to be 'the judge ran the
+  hardcoded claude-opus-4-8 on a provider with no key', 196 may change this report's symptoms without
+  claiming it. RE-CHECK after 196 ships, and route to the SEED-040/088 milestone otherwise."
 reproduces_on:
   branch: production
   commit: 4c9b487a
