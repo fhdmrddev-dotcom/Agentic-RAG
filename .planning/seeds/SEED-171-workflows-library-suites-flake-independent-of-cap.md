@@ -1,13 +1,13 @@
 ---
 seed_id: SEED-171
-title: THREE suites flake non-deterministically, independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
+title: FOUR suites flake non-deterministically, independent of GSD_VITEST_MAX_WORKERS and of machine load, and not every failure is a timeout — the count gate cannot reach 0 failing on demand
 created: 2026-08-17
 planted_during: Phase 195 Wave 1 post-merge gate (orchestrator)
 status: planted
 priority: high
 relates_to:
   - SEED-056 (vitest unit baseline cluster triage) — ⚠ **THIS IS THE SAME FAMILY, BUT THE DIAGNOSIS
-    HERE IS DIFFERENT AND STRONGER.** 056 triaged a rot SET. This seed records that THREE named suites
+    HERE IS DIFFERENT AND STRONGER.** 056 triaged a rot SET. This seed records that FOUR named suites
     fail NON-DETERMINISTICALLY, which no per-file baseline can absorb, because the failing set is
     never the same twice.
   - CLAUDE.md § "Parallel execution" rule 2 — the `GSD_VITEST_MAX_WORKERS` rule. ⚠ **Its stated
@@ -19,7 +19,8 @@ relates_to:
 trigger_when: >
   Any phase needs `count gate OK` as a pass condition, OR anyone proposes to raise/lower
   `GSD_VITEST_MAX_WORKERS` as a remedy for red gate runs, OR `WorkflowsPage.test.tsx` /
-  `WorkflowCard.test.tsx` / `WorkflowBuilderPage.session.test.tsx` are edited for any reason.
+  `WorkflowCard.test.tsx` / `WorkflowBuilderPage.session.test.tsx` / `WorkflowRunPage.test.tsx`
+  are edited for any reason.
 ---
 
 # The flake is in the suites, not in the cap
@@ -86,6 +87,40 @@ causation means anything.
 ⚠ Note the count-gate script **already documents this exact file** at `:2401-2411` as a measured
 parallel-load flake, with a standing instruction to re-run before declaring red. That instruction
 covers the `pane click` case; whether this is the same case is **not yet checked**.
+
+## ⚠ AMENDMENT 2 — 2026-08-17 (Phase 195 final gate) — a FOURTH file, and the timeout hypothesis is now clearly wrong
+
+The phase-closing gate run read **`failed 1`**, captured from the persisted JSON before any re-run:
+
+| File | Test | Error kind |
+|---|---|---|
+| **`src/pages/WorkflowRunPage.test.tsx`** | *"a reconcile leaves every visible node reading identical … when the tab wakes"* | ⚠ **`AssertionError: expected "vi.fn()" to be called at least once`** |
+
+**Why this one is worth recording separately: it is the first flake in a file the phase TOUCHED**, so it
+had to be cleared rather than assumed. It was, on evidence:
+
+- **Isolated: `108 passed (108)`, twice consecutively.** Load-dependent, not a defect.
+- **Per-file count `108/108`, delta 0** — nothing deleted.
+- **The test predates the phase.** `git show f2eef045:…` finds it at the phase's base, and
+  `git log -S` attributes it to **`345d85c5 test(188-08)`** — Phase 188. Phase 195 neither wrote nor
+  edited it.
+- Three earlier full-gate runs this phase read this same file at `108 / failed 0`.
+
+⚠ **Two of the four files now fail with `AssertionError`, not `STACK_TRACE_ERROR`** (this one and
+`WorkflowBuilderPage.session.test.tsx`). The "slow suite near a per-test timeout" hypothesis below
+explains the timeouts and **cannot explain these**. The common factor across all four is
+**concurrent-load sensitivity in async/effect-driven assertions** — `vi.fn()` expected-to-have-been-called,
+visibility/wake reconciles, and similar — which is a different defect class from a timeout and probably
+needs a different fix.
+
+**The flaky set is now FOUR:** `WorkflowsPage.test.tsx` · `WorkflowCard.test.tsx` ·
+`WorkflowBuilderPage.session.test.tsx` · `WorkflowRunPage.test.tsx`.
+
+⚠ **The procedural lesson is the durable one.** This failure was in a file the phase had just modified,
+which is exactly the case where "it's probably the known flake" is most tempting and most dangerous.
+What cleared it was four cheap, specific checks — isolate twice, read the per-file delta, `git show`
+the base, `git log -S` the authorship — not a re-run. **Keep that sequence; it is the difference
+between dismissing a flake and dismissing a regression.**
 
 ---
 
