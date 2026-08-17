@@ -1,9 +1,9 @@
 ---
 id: BUG-260731-01
-title: OPEN QUESTION — the Settings judge-model knob may be inert, because every judge consumer resolves it from the env-backed config.Settings singleton, not the DB app_settings row
+title: CONFIRMED — the Settings judge-model knob IS inert; every judge consumer resolves from the env-backed config.Settings singleton, so the judge silently runs the hardcoded fallback claude-opus-4-8 instead of the operator's choice
 reported: 2026-07-31
 surface: Agentic-RAG
-severity: major
+severity: critical
 status: open
 affected_areas: [backend/harness, workflows/publish-gauntlet, settings, eval/judge, observability]
 folded_into: null
@@ -17,6 +17,58 @@ reproduces_on:
 ---
 
 # BUG-260731-01: Is the `harness_judge_model` Settings knob actually wired to the judge shot?
+
+## ⚠ CONFIRMED 2026-08-17 — the decisive test ran, and the knob is INERT
+
+**This report no longer needs to be read as an open question.** The two readings below are resolved:
+the defect reading is correct. Measured on `develop` at `d84b024e`, immediately after the operator
+changed the knob through the Settings UI expecting it to reduce reliance on top-tier models.
+
+| Source | Value |
+|---|---|
+| `app_settings.harness_judge_model` — **what the operator set in the UI** | **`deepseek-v4-pro`** |
+| `settings.harness_judge_model` — the env singleton every judge consumer reads | **`None`** |
+| `resolve_judge_model(settings)` — **what the judge shot actually uses** | **`claude-opus-4-8`** |
+
+Commands, both from the repo root:
+
+```bash
+backend/venv/Scripts/python.exe -c "import sys; sys.path.insert(0,'backend');   from app.config import settings;   from app.services.harness.validator_kinds import resolve_judge_model;   print(getattr(settings,'harness_judge_model',None), resolve_judge_model(settings))"
+# -> None claude-opus-4-8
+
+# psycopg2 @ 127.0.0.1:54322
+select harness_judge_model from app_settings;   -- -> deepseek-v4-pro
+```
+
+**And nothing closes the gap at runtime.** `grep` for any write of the DB value onto the singleton
+(`setattr(settings, …)` / `settings.harness_judge_model = …`) returns **nothing**.
+`user_settings.py:910` loads the column into `UserEffectiveSettings` — the DB-backed object — but the
+four consumers tabulated below all import `app.config.settings`, which never receives it.
+
+### Why this is worse than "a setting does not apply"
+
+1. **The fallback is a TOP-TIER model.** The operator's stated goal was to *reduce* reliance on
+   expensive models; the inert knob means every eval judge and every publish-gauntlet judge has been
+   running `claude-opus-4-8`. The setting fails in the expensive direction, silently.
+2. **The publish gauntlet's judge is a HARD WALL.** Its verdict decides whether a workflow may
+   publish. An operator who believes they have changed the judge has changed nothing about a gate.
+3. **The UI confirms the write.** The value really does land in `app_settings` — so the Settings
+   surface reports success truthfully about the row and misleadingly about the effect.
+4. ⚠ **This also invalidates any prior tuning of the judge.** Every judge verdict recorded since the
+   knob shipped was produced by the fallback, whatever the row said.
+
+### What a fix must do
+
+Route the four consumers through the DB-backed settings (the same `UserEffectiveSettings` path the
+rest of the app uses) rather than `app.config.settings` — **or**, if the env singleton is deliberate
+for a system-level shot, make the Settings UI say so instead of offering a knob that does nothing.
+⚠ Either way the fix must include a test that sets the row and asserts the RESOLVED model changes;
+the absence of that test is why this survived from 2026-07-31 to 2026-08-17.
+
+---
+
+## The original report, preserved
+
 
 > **Read this as an open question, not a finding.** Two lines of evidence point in opposite
 > directions and neither has been closed out. A named decisive test is in
