@@ -54,18 +54,14 @@
 // again by 188-03 and 188-07). 188-UI-SPEC § Copywriting Contract names all four in full.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import {
-  ChevronLeft,
-  Download,
-  File as FileIcon,
-  FileCode,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  Presentation,
-} from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+// Phase 195 Plan 06 (RUN-03) — the ONE shared file row and the pure helpers behind it.
+// The eight lucide file-glyph imports that used to sit above are GONE with the local
+// mapping they fed; the glyph now resolves once, inside the shared row.
+import { FileRow } from "@/components/files/FileRow"
+import { baseName, byNewestFirst, formatBytes } from "@/components/files/fileRowUtils"
 // Phase 194.1 Plan 06 — the elapsed formatter, hoisted out of this file VERBATIM so the
 // chat run line consumes the shipped one instead of becoming a fourth copy. See the
 // docblock where it used to live (search `fmtElapsed NO LONGER LIVES HERE`).
@@ -147,45 +143,46 @@ const COPY_DOWNLOAD_FAILED = "Download failed — try again."
 // the globally-viewed-thread selector rather than from a prop, so mounting it here would
 // mean writing chat's viewed thread as a side effect of opening a run. Only the icon
 // mapping and the byte formatter are copied; both are pure.
-
-/** Byte-for-byte the panel's formatter (itself copied from the chat output card — the
- *  source function is not exported). Keep the three branches identical. */
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
-
-/** The last path segment. The row shows the NAME; the full path lives in `title=`. */
-function baseName(path: string): string {
-  return path.split("/").pop() || "download"
-}
-
-const OOXML_DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-const OOXML_PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-const OOXML_XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-/** The per-extension office icons, mirrored from the panel list. Extension first, then
- *  mime: the OOXML mimes are long and the path extension is the reliable signal. */
-function iconFor(file: WorkspaceFile) {
-  const mime = file.mime_type ?? ""
-  const ext = file.path.split(".").pop()?.toLowerCase() ?? ""
-  if (ext === "docx" || mime === OOXML_DOCX) return FileText
-  if (ext === "xlsx" || mime === OOXML_XLSX) return FileSpreadsheet
-  if (ext === "pptx" || mime === OOXML_PPTX) return Presentation
-  if (mime === "text/markdown" || ext === "md") return FileText
-  if (mime === "text/csv" || ext === "csv") return FileSpreadsheet
-  if (mime.startsWith("image/")) return FileImage
-  const codeExts = [
-    "py", "ts", "tsx", "js", "jsx", "mjs", "json", "sh",
-    "bash", "sql", "yml", "yaml", "html", "css",
-  ]
-  if (mime.startsWith("text/x-") || mime === "application/json" || codeExts.includes(ext)) {
-    return FileCode
-  }
-  if (mime.startsWith("text/")) return FileText
-  return FileIcon
-}
+//
+// ── ⚠ PHASE 195 PLAN 06 (RUN-03) — THE LAST SENTENCE ABOVE IS NO LONGER TRUE, AND IT IS
+//    KEPT RATHER THAN OVERWRITTEN so the drift is visible instead of erased. ────────────
+//
+//  · **"Only the icon mapping and the byte formatter are copied"** — they are no longer
+//    copied AT ALL. This file used to declare its own byte formatter, its own basename
+//    and its own extension/mime→glyph mapping (plus three long office-mime constants),
+//    every one of them a duplicate of the panel's, which was itself a duplicate of the
+//    chat output card's. All three copies are DELETED here; the presentation now comes
+//    from the ONE shared row in `components/files/`, and the formatter/basename/ordering
+//    helpers from the pure module beside it. That is the whole of RUN-03.
+//
+//  · **The first sentence still holds, and holds for the same reason.** The panel's file
+//    list is still not mounted here — it resolves its thread from the globally-viewed-
+//    thread selector rather than from a prop, so mounting it would write chat's viewed
+//    thread as a side effect of opening a run. What is shared is a PRESENTATIONAL row
+//    that is handed no thread id, no file id and no hook; it cannot resolve a thread, so
+//    adopting it cannot re-open that hazard.
+//
+//  · **The rows are still downloads and still promise no preview** — the paragraph above
+//    is unchanged and remains the decision.
+//
+//  · **ONE BEHAVIOUR CHANGED, deliberately, and it is an improvement rather than a
+//    side effect:** a row the listing gives with no id used to be a SILENT
+//    non-interactive element — a filename the user cannot act on, with nothing said
+//    about why. It now carries the shared row's shipped "no link" affordance (the same
+//    one the chat card has had since `BUG-260523-03`). ⚠ That affordance is a
+//    non-focusable `span` marked `aria-disabled`, NEVER a button, and the reason is
+//    mechanical rather than aesthetic: this region's shipped fence asserts that an
+//    id-less row leaves ZERO `button` elements in the region, and the only thing making
+//    that survive unification is the affordance not being one. It must not read as luck.
+//    The authorization gate is still the code-level early return inside `onDownload`,
+//    never the visual state.
+//
+// ⚠ EVERY COMPONENT AND HOOK NAMED IN THIS COMMENT IS NAMED IN WORDS ON PURPOSE. Four
+// shipped fences grep this file's RAW source for identifiers — the panel's file-list
+// component, the previewer, the viewed-thread selector hook and the stop control — and a
+// docblock is not exempt from a source sweep. Writing any of those four tokens in prose
+// reds a fence exactly as loudly as calling it would, and one of those fences lives in a
+// suite that has nothing to do with files.
 
 // ── The elapsed figure (D-188-18) ──────────────────────────────────────────────
 
@@ -430,6 +427,28 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
     isLoading: filesLoading,
     reconcile: reconcileFiles,
   } = useWorkspaceFiles(run?.thread_id ?? null)
+
+  /**
+   * D-12 — NEWEST FIRST, client-side, on THIS surface only.
+   *
+   * ⚠ THE SORT KEY IS ABSENT ON EXACTLY THE FILE THIS ORDERING EXISTS TO SURFACE, which
+   * is why the comparator is the shared two-regime one and not a bare timestamp compare.
+   * The reconciled GET supplies a creation timestamp on every row; the LIVE arrival does
+   * NOT (the streamed payload carries id/path/version/size/mime only) and the store
+   * APPENDS it. So a naive newest-first over the timestamp alone would put the
+   * just-produced deliverable LAST — the exact inverse of the intent. The shared
+   * comparator sorts a MISSING key FIRST for that reason, and its own unit suite pins
+   * both regimes.
+   *
+   * ⚠ SORTED ON A COPY. The provider hands out a stable array reference, so an in-place
+   * sort would mutate store state and re-render forever — the rule recorded at
+   * `canvasModel.ts:368`. The empty/loading branches below still read the ORIGINAL
+   * `files`, so nothing about the three-way empty state depends on this memo.
+   *
+   * The panel's own list keeps its shipped path ordering; no decision authorises changing
+   * it, and this ordering is scoped to the run surface deliberately.
+   */
+  const orderedFiles = useMemo(() => [...files].sort(byNewestFirst), [files])
 
   /**
    * ⚠ F5 (UAT 2026-08-05) — THE RUN-TIME WAITING READING WAS UNREACHABLE ON THIS SURFACE.
@@ -1039,46 +1058,60 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           )
         ) : (
           <ul role="list" className="mt-2 flex flex-col gap-0.5">
-            {files.map((file) => {
-              const Icon = iconFor(file)
+            {orderedFiles.map((file) => {
+              // The VISIBLE label is the basename; the full path lives in `title=`. Both
+              // come from the shared helper now, and so does the size — the accessible
+              // name below is assembled from that same output, so the words a screen
+              // reader hears and the words on screen cannot drift apart.
               const name = baseName(file.path)
               const size = formatBytes(file.size_bytes)
               const fileId = file.id
               return (
                 <li key={fileId ?? file.path}>
                   {fileId ? (
-                    <button
-                      type="button"
-                      onClick={() => onDownload(file)}
-                      title={file.path}
-                      aria-label={`Download ${name} (${size})`}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    // Phase 195-06: the PRESENTATION is the shared row; the control, the
+                    // activation and the skin stay here. `asChild` means the button below
+                    // IS the rendered element — the shared row does not wrap it, so the
+                    // "exactly one control per row" contract is untouched.
+                    // ⚠ The shared row's `run` density carries LAYOUT ONLY
+                    // (`flex items-center gap-2`), because Radix joins `className` rather
+                    // than twMerging it. Every class below is padding, radius, width,
+                    // alignment, hover or ring — none competes with it.
+                    <FileRow
+                      asChild
+                      density="run"
+                      name={name}
+                      // ⚠ Load-bearing: without it a file that arrives with a meaningful
+                      // mime type and NO extension falls to the default glyph.
+                      mimeType={file.mime_type}
+                      sizeBytes={file.size_bytes}
+                      trailing="download"
                     >
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/90">
-                        {name}
-                      </span>
-                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                        {size}
-                      </span>
-                      <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => onDownload(file)}
+                        title={file.path}
+                        aria-label={`Download ${name} (${size})`}
+                        className="w-full rounded-md px-2 py-2 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </FileRow>
                   ) : (
                     // A row the listing gave us with no id cannot be fetched — the raw
-                    // route would be built with an empty segment and 404. Show it as a
-                    // fact rather than as a control that does nothing when clicked.
-                    <div
-                      title={file.path}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left"
-                    >
-                      <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/90">
-                        {name}
-                      </span>
-                      <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                        {size}
-                      </span>
-                    </div>
+                    // route would be built with an empty segment and 404. It is shown as
+                    // a fact rather than as a control that does nothing when clicked.
+                    //
+                    // ⚠ `trailing="dead"` is what changed in Phase 195-06: the row used
+                    // to say NOTHING about why the filename could not be acted on. It now
+                    // carries the shared "no link" affordance — and that affordance is a
+                    // non-focusable `span` marked `aria-disabled`, never a control. This
+                    // region's shipped fence asserts an id-less row leaves ZERO `button`
+                    // elements here, and the ONLY reason that survives is the element
+                    // choice. Turning the affordance into a control would red it, and the
+                    // gate on a download is the early return inside `onDownload` — the
+                    // code — never the visual state.
+                    <FileRow asChild density="run" name={name} mimeType={file.mime_type} sizeBytes={file.size_bytes} trailing="dead">
+                      <div title={file.path} className="w-full rounded-md px-2 py-2 text-left" />
+                    </FileRow>
                   )}
                 </li>
               )
