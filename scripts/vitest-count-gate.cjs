@@ -1024,6 +1024,68 @@ const BASELINE = {
   // 0 failing forever.
   "fileRowUtils.test.ts": 22,
   "FileRow.test.tsx": 40,
+  // ══ Added in 195-07 task 3, in the SAME COMMIT that CREATES the file. ═══════
+  //
+  // (1) PLAN: `195-07` — Phase 195's single pin-reconciliation point, so no two
+  //     same-wave plans ever contend for this file.
+  //
+  // (2) `FileRow.sweep.test.ts`'s `TARGETS` entry and this `BASELINE` pin land in
+  //     the SAME COMMIT as the suite itself. That is this script's own rule
+  //     (`phaseVocabulary`), and it is also a hard requirement here: a `TARGETS`
+  //     path that does not exist makes this gate ERROR at exit 2 — not fail — for
+  //     every later plan and every later phase. The path was `ls`-confirmed and
+  //     the bare filename confirmed unique tree-wide (the BASELINE key space is
+  //     global) before these lines were written.
+  //
+  // (3) WHAT WOULD BE UNGUARDED WITHOUT IT: **three of the four in-scope source
+  //     files had NO source fence before Phase 195** — `FilesSection.tsx`,
+  //     `OutputFileCard.tsx` and `lib/fileIcon.tsx` were swept by nothing at all,
+  //     and only `WorkflowRunPage.tsx` carried one. After plans 04/05/06 converted
+  //     all three onto the shared row, SC#2 (*no second file UI*) is BELIEVED
+  //     rather than checked, and `FileRow.sweep.test.ts` is the only artefact that
+  //     checks it. Leaving it out of `TARGETS` would put the phase's single most
+  //     important falsification OUTSIDE CI — the `194.1-BASELINE.md` §2 shape,
+  //     where an ungated pin sat red for twelve cases while four clean gate
+  //     reports could not have included it.
+  //
+  // (4) EVERY PHASE-195 PIN, OLD → NEW, WITH THE PLAN THAT GREW IT. All five
+  //     raises had already landed when 195-07 ran; this plan VERIFIED each against
+  //     the printed `actual` column rather than re-raising it, and every one read
+  //     delta 0:
+  //
+  //       WorkflowRunPage.test.tsx          102 →  105 (195-02)  105 → 108 (195-06)
+  //       fileIcon.test.tsx                  11 →   41 (⚠ 195-03 left it at 11
+  //                                                     against an actual of 41;
+  //                                                     raised by the ORCHESTRATOR
+  //                                                     at the wave-2 close)
+  //       FilesSection.test.tsx              11 →   22 (195-05)
+  //       FileRow.test.tsx                    – →   40 (195-03, new)
+  //       fileRowUtils.test.ts                – →   22 (195-03, new)
+  //       OutputFileCard.baseline.test.tsx    – →   21 (195-02, new)
+  //       StopControl.baseline.test.tsx       – →   15 (195-02, adopted)
+  //       MessageItem.finalOutputs.test.tsx   – →   11 (195-02, adopted)
+  //       FileRow.sweep.test.ts               – →   20 (195-07, new — this entry)
+  //
+  //     ⚠ WHY EVERY PIN ENDS *AT* ITS ACTUAL RATHER THAN BELOW IT. The contract is
+  //     *no per-file DECREASE*, so an increase is permitted and a lagging pin never
+  //     reds — which is exactly the danger. A pin of 11 against an actual of 41
+  //     means thirty cases can be DELETED with the gate green. `fileIcon.test.tsx`
+  //     was in that state for a whole wave, and `WorkspacePanel.test.tsx`'s note
+  //     elsewhere in this file RECORDS a pin found twelve cases behind. A lagging
+  //     pin is the gate going blind, not a conservative choice.
+  //
+  // (5) 20 IS THIS SCRIPT'S OWN PRINTED `actual` COLUMN, read across TWO AGREEING
+  //     RUNS — never hand-counted from `it(` literals, which is the rule this
+  //     script states about itself and the reason it prints that column at all.
+  //     ⚠ Hand-counting would have been wrong here anyway, and by a MEASURED
+  //     margin: the suite's 20 cases come from 16 plain `it(` literals plus ONE
+  //     4-way `it.each` over the four swept sources. A grep counting both literal
+  //     forms reads **17**, three short of the truth; a grep counting only `it(`
+  //     reads 16, four short. The `actual` column reads 20.
+  //
+  // ⚠ MEASURED GREEN BEFORE ADOPTION (20 passed / 0 failed, run individually), so
+  // this adoption imports ZERO rot into a gate whose contract is 0 failing forever.
+  "FileRow.sweep.test.ts": 20,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
@@ -2642,6 +2704,27 @@ const TARGETS = [
   // space is global.
   "src/components/files/__tests__/fileRowUtils.test.ts",
   "src/components/files/__tests__/FileRow.test.tsx",
+  // ── Added in 195-07 task 3, in the SAME COMMIT that CREATES the file ────────
+  //
+  // `FileRow.sweep.test.ts` is the SC#2 source sweep — the one artefact in the
+  // tree that measures *no second file UI* rather than believing it. The full
+  // reasoning (why it exists, what is unguarded without it, and the OLD → NEW
+  // table for every Phase-195 pin) is recorded ONCE at the matching `BASELINE`
+  // entry above (search `195-07`); it is not duplicated here, because two copies
+  // of a reason drift.
+  //
+  // ⚠ FILE-LEVEL, NOT THE BARE DIRECTORY `src/components/files` — the very trap
+  // 195-03's block above names by anticipation ("including `FileRow.sweep.test.ts`,
+  // which does NOT exist yet and whose adoption belongs to plan 195-07, with 07's
+  // numbers and 07's reasons"). That prediction is honoured here: this is the
+  // third file-level entry in that directory, and no directory entry was added.
+  // Verified with `grep -n '"src/components/files"'` returning nothing.
+  //
+  // `ls`-confirmed before this line was written — a `TARGETS` path that does not
+  // exist makes this gate ERROR at exit 2, not fail, for every later plan. The
+  // bare filename `FileRow.sweep.test.ts` was confirmed unique tree-wide (`find`
+  // returns exactly one match): the BASELINE key space is global.
+  "src/components/files/__tests__/FileRow.sweep.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
