@@ -916,7 +916,42 @@ const BASELINE = {
   //       positive control each), which exist because `WorkspacePanel.test.tsx`'s F-1/V-05
   //       globs `components/panel|chat|workflows` and NOT `src/pages`: the fourth Stop mount
   //       would otherwise have been the one outside the fence guarding the other three.
-  "WorkflowRunPage.test.tsx": 102,
+  // 105 = 102 + Phase 195 Plan 02's THREE (2026-08-17). An EXTENSION, not a lowering —
+  //       nothing was deleted, and `git diff --diff-filter=D` on this plan is EMPTY, so
+  //       the `:24-45` deletion rule does not apply. ⚠ BOTH NUMBERS APPEAR HERE ON
+  //       PURPOSE: the OLD value is 102 and the NEW one is 105, recorded beside each other
+  //       rather than the old one overwritten, per this project's correction rule.
+  //       The figure is the GATE's OWN `actual` column on TWO agreeing runs
+  //       (`total 4044 · failed 0`, verdict `count gate OK` both times), never a hand
+  //       count — the rule this script states about itself.
+  //       The three: `195-02`'s pre-change capture of the id-less deliverable row — that
+  //       it is a FACT (name + size + `title` full path, and ZERO `<button>` in the
+  //       region), that it carries NO "Download unavailable" copy, and a positive control
+  //       proving that absence assertion can actually fail.
+  //       ⚠ CASE 2 IS EXPECTED TO INVERT WHEN PLAN 195-06 LANDS — the id-less arm gains
+  //       the shipped D-08 affordance when the region adopts the shared row. When it does,
+  //       the original assertions are QUOTED IN PLACE, never deleted (the 194.1-07
+  //       precedent recorded twenty lines above), and this pin moves only on a number read
+  //       from the `actual` column — never to make a red gate go quiet.
+  "WorkflowRunPage.test.tsx": 105,
+  // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
+  // ── number below is this script's own printed `actual` column across TWO agreeing ────
+  // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
+  // ── from `it(` literals, which is the rule this script states about itself. ──────────
+  //
+  // The per-suite reasoning — what each one guards, why it was invisible to this gate
+  // until now, and which bare directories were declined — is recorded ONCE, at the
+  // matching `TARGETS` block near the bottom of this file (search `195-02`). It is not
+  // duplicated here, because two copies of a reason drift.
+  //
+  // ⚠ ALL FIVE WERE MEASURED GREEN BEFORE ADOPTION (`195-BASELINE.md`: 11 / 11 / 15 / 11
+  // and the 21 this plan's task 1 created), so the adoption imports ZERO rot into a gate
+  // whose contract is 0 failing forever.
+  "OutputFileCard.baseline.test.tsx": 21,
+  "StopControl.baseline.test.tsx": 15,
+  "FilesSection.test.tsx": 11,
+  "fileIcon.test.tsx": 11,
+  "MessageItem.finalOutputs.test.tsx": 11,
   // 188 code-review fix pass (CR-03): 39 → 41. An EXTENSION, not a lowering — nothing was
   // deleted. The two added cases are the receipt's own reason for existing: `finish_run`
   // NULLs `threads.active_workflow_run_id` in the same transaction as the terminal status,
@@ -2422,6 +2457,96 @@ const TARGETS = [
   // the failure mode the rule exists to prevent. A later phase touching the layout launch
   // seam should adopt it deliberately, with its own measured number.
   "src/pages/WorkflowBuilderPage.session.test.tsx",
+  // ── Added in 195-02 (Phase 195 Wave 1), FIVE file-level entries, in the SAME ─────────
+  // ── COMMIT as the BASELINE pins below and as the suite this plan created. ───────────
+  //
+  // ⚠ PHASE 195 IS THE "LATER PHASE" THE COMMENT AT THE PANEL-DIRECTORY ENTRY ABOVE
+  //   RESERVED BY NAME. That comment reads: *"A later phase that wants CsvTablePreview /
+  //   FilePreview / FilesSection / PendingAskCard / Seam / TodosSection / VersionDiff /
+  //   WorkspacePanel{,.derived} inside the gate should adopt them deliberately, with its
+  //   own measured number."* Phase 195 CONVERTS `FilesSection.tsx`, so this is that
+  //   deliberate adoption — with its own measured number, read from this script's own
+  //   printed `actual` column across two agreeing runs.
+  //
+  // WHAT WAS MEASURED FIRST, rather than assumed (`195-BASELINE.md` § "Pre-change tree
+  // baselines"): **the gate covered ONE of this phase's five suites.** `TARGETS` had no
+  // entry for `src/components/chat`, `src/lib` or `src/components/panel`, and only
+  // `src/pages/WorkflowRunPage.test.tsx` was gated. So a green gate said nothing about
+  // four fifths of Phase 195 — the NINTH occurrence of the two-knob trap the entries
+  // above state as a rule.
+  //
+  // ⚠ TIMING IS NOT COSMETIC, and it was discharged rather than trusted: all five paths
+  // were confirmed with `ls` from `frontend/` before these entries were written (an entry
+  // pointing at a path that does not exist makes the gate ERROR — exit 2 — not fail, which
+  // would break every subsequent plan in this phase). `OutputFileCard.baseline.test.tsx`
+  // is created by THIS plan's task 1, in a commit that precedes this one in the same plan.
+  //
+  // ⚠ THE BASELINE KEY SPACE IS GLOBAL (bare filename). All five bare names were confirmed
+  // unique tree-wide with `git ls-files` before the pins below were written, so no two
+  // suites can collide silently on one number.
+  //
+  // ⚠ ADOPTING IMPORTS NO ROT: `195-BASELINE.md` measured all five green on the unmoved
+  // tree — 102 / 11 / 11 / 11 / 15 = 150 tests, 0 failing. The gate requires 0 failing
+  // forever, so an adoption is only safe when the adopted suites are already clean.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT EACH ONE — named per suite, because "adopt the
+  // phase's suites" is not a reason, it is a summary:
+  //
+  //  1. `OutputFileCard.baseline.test.tsx` — the FIRST direct coverage of
+  //     `OutputFileCard` anywhere in the tree. It is the only fence on the `supersedes`
+  //     subline (written TWICE in that component — once per branch — and covered by
+  //     NOTHING before this plan), on the inert `data-variant`, and on the dead-link
+  //     state's four clauses split so they cannot short-circuit each other. It is also
+  //     D-20's THIRD SURFACE: chat renders no file card at all for a workflow deliverable
+  //     (measured live, `195-BASELINE.md` arm 3), so this fixture is the phase's only
+  //     record of the chat row. Plan 195-04 converts the component's internals; without
+  //     this entry that conversion could drop any of those states with the gate green.
+  //  2. `FilesSection.test.tsx` — this phase CONVERTS `FilesSection.tsx` onto the shared
+  //     row. Its 11 cases are the whole contract for the panel's `role="listbox"` +
+  //     roving-`tabIndex` a11y shape, its preview activation and its fresh-write flash.
+  //     ⚠ And its icon path is MIME-first while `fileIcon` is extension-only, so the
+  //     conversion has a real behaviour delta these 11 cases are the first line against.
+  //  3. `fileIcon.test.tsx` — this phase WIDENS `fileIcon.tsx`. Its 11 cases pin the
+  //     ext→(colour, glyph) map and the `.EXT` ribbon; a widening that changes an
+  //     existing call site's output is exactly what they exist to catch.
+  //  4. `StopControl.baseline.test.tsx` — ⚠ P9's fence, and the one with the sharpest
+  //     reason. It greps `WorkflowRunPage.tsx?raw` and counts `/<StopControl/g` expecting
+  //     exactly 1, so it breaks for reasons unrelated to its own subject every time this
+  //     phase edits that page — and it was UNGATED, which is verbatim the lesson
+  //     `docs/HOT-FILE-LEDGER.md` records against this very page: *"A pin in an ungated
+  //     suite is a pin nothing checks."* That suite's own docblock (`:560-573`) records a
+  //     line-count pin sitting RED through a whole plan because no gate ran it.
+  //  5. `MessageItem.finalOutputs.test.tsx` — the only SHIPPED coverage of
+  //     `OutputFileCard`'s dead-link state (indirectly, through `MessageItem`), and the
+  //     suite that would notice if plan 195-04 accidentally opened `MessageItem.tsx` —
+  //     which D-13 forbids (chat gains no new file affordance).
+  //
+  // FILE-LEVEL, deliberately NOT the bare directories `src/components/chat`,
+  // `src/components/panel/__tests__`, `src/lib/__tests__` or `src/__tests__` — the same
+  // reasoning this script already records for the panel directory, `src/lib`, `src/pages`,
+  // `src/components/layout`, `src/components/settings` and `src/pages/__tests__`: those
+  // directories hold suites this phase does not read, and adopting them would make Phase
+  // 195 the owner of their future rot in a gate that requires 0 failing forever. Verified
+  // with `grep -n '"src/components/chat"'` returning nothing — no bare-directory entry was
+  // added by this plan.
+  //
+  // ── DECLINED, each with its reason, so a decline can never read as an oversight ──────
+  //  · The rest of `src/components/panel/__tests__` (CsvTablePreview, FilePreview,
+  //    PendingAskCard, Seam, TodosSection, VersionDiff, WorkspacePanel.derived) — Phase
+  //    195 reads none of them. `WorkspacePanel.test.tsx` and the two Phase-188 panel
+  //    suites are already adopted above by earlier phases; this plan adds only
+  //    `FilesSection.test.tsx`, the one file it converts.
+  //  · The rest of `src/components/chat/__tests__` and `src/__tests__/components/` —
+  //    same reason. This plan adopts the three chat-side suites that guard files Phase
+  //    195 opens (`OutputFileCard`, the `WorkflowRunPage.tsx?raw` grep, and the shipped
+  //    dead-link coverage) and no others.
+  //  · `src/lib/__tests__`'s other suites — `fileIcon.test.tsx` is the only one covering
+  //    a file this phase widens.
+  "src/components/chat/__tests__/OutputFileCard.baseline.test.tsx",
+  "src/components/chat/__tests__/StopControl.baseline.test.tsx",
+  "src/components/panel/__tests__/FilesSection.test.tsx",
+  "src/lib/__tests__/fileIcon.test.tsx",
+  "src/__tests__/components/MessageItem.finalOutputs.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

@@ -992,6 +992,137 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   })
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+describe("195-02 — the id-less deliverable row TODAY: a fact with no control and NO copy (pre-change capture)", () => {
+  /**
+   * ═══════════════════════════════════════════════════════════════════════════
+   * ⚠ THIS BLOCK CAPTURES BEHAVIOUR THAT PLAN 195-06 DELIBERATELY CHANGES.
+   * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * Today an id-less row on this page is a plain `<div title={file.path}>` with
+   * an icon, the name and the size — and **nothing else**
+   * (`WorkflowRunPage.tsx:1066-1082`). It is honest about not being a control
+   * (that is the shipped `:984-992` case's point) but it is **silent about
+   * WHY**: the user is shown a filename they cannot act on and is told nothing.
+   *
+   * **Plan 195-06 changes exactly that.** When the region adopts the shared row,
+   * the id-less arm inherits `OutputFileCard`'s shipped D-08 affordance — the
+   * `<span aria-disabled="true">` reading *"Download unavailable"* with the
+   * long-form title *"Download unavailable — this file has no link"*. Case 2
+   * below therefore **INVERTS** when 195-06 lands. That is the improvement, not
+   * a regression.
+   *
+   * ⚠ WHEN IT INVERTS, THE ORIGINAL ASSERTIONS ARE QUOTED VERBATIM IN PLACE,
+   *   NEVER DELETED — the `StopControl.baseline.test.tsx:513-573` precedent
+   *   (194.1-07), for the reason recorded there: *a capture that is deleted the
+   *   moment it inverts leaves no record that the old behaviour was ever real*
+   *   (193.2 WR-05). This block exists so plan 06's change is a MEASURED DELTA
+   *   rather than an unrecorded one, and a deleted capture measures nothing.
+   *
+   * ⚠ AND CASE 1 MUST NOT INVERT. The zero-`<button>` property is the one thing
+   *   about this row that 195-06 must PRESERVE: the shared component's dead
+   *   affordance is a `<span aria-disabled>`, not a `<button>`, which is why
+   *   the shipped `:991` assertion survives unification. That property is
+   *   pinned at its own source too, in
+   *   `src/components/chat/__tests__/OutputFileCard.baseline.test.tsx`
+   *   (*"(d) the dead row contains ZERO <button> elements"*), so the contract
+   *   is held on both sides of the seam rather than by luck on one.
+   *
+   * Its own fixture, deliberately NOT the shipped `orphan.docx` one: the delta
+   * plan 06 produces needs a home that belongs to THIS capture, and a directory
+   * segment in the path also records that the visible label is the BASENAME
+   * while the full path lives in `title=` (the run page derives a basename;
+   * chat does not — see the three-surface table in the OutputFileCard fixture).
+   */
+  const ID_LESS: WorkspaceFile = {
+    path: "output/orphan-deliverable.docx",
+    size_bytes: 2048,
+    mime_type: "",
+  } as WorkspaceFile
+  const ID_LESS_NAME = "orphan-deliverable.docx"
+  const ID_LESS_SIZE = "2.0 KB"
+  /** The copy the row does NOT carry today and WILL carry after 195-06. */
+  const D08_COPY = "Download unavailable"
+
+  /** The row element itself — the `<li>`'s only child. ⚠ SCOPED TO THE ROW ON
+   *  PURPOSE, and case 2 states why: a sweep of the whole region's
+   *  `textContent` is the failure mode P5 names, because the region legitimately
+   *  carries other prose (the two empty-state copies, the download-error line).
+   *  Returns `null` if the row is not there, which reds rather than passes. */
+  function idLessRow(): HTMLElement | null {
+    const region = screen.getByTestId("run-deliverables")
+    const li = region.querySelector('[role="list"] li')
+    return (li?.firstElementChild as HTMLElement | null) ?? null
+  }
+
+  beforeEach(() => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([ID_LESS])
+  })
+
+  it("shows the name, the size and the full path in `title` — and the region holds ZERO buttons", async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const row = idLessRow()
+    expect(row).not.toBeNull()
+    // A DIV, not a control. The tag is stated because it is the thing that makes
+    // the zero-button count true, and 195-06 must keep a non-button element here.
+    expect(row?.tagName).toBe("DIV")
+    expect(row?.textContent).toContain(ID_LESS_NAME)
+    expect(row?.textContent).toContain(ID_LESS_SIZE)
+    expect(row?.getAttribute("title")).toBe(ID_LESS.path)
+    // The visible label is the BASENAME; the full path is available without being it.
+    expect(row?.textContent).not.toContain("output/")
+    // Mirrors the shipped `:991` assertion, stated from THIS block's own fixture
+    // so plan 06's delta has a home that belongs to this capture.
+    expect(screen.getByTestId("run-deliverables").querySelectorAll("button")).toHaveLength(0)
+  })
+
+  it(`the ROW carries no "${D08_COPY}" — the absence plan 195-06 inverts`, async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const row = idLessRow()
+    expect(row).not.toBeNull()
+    /**
+     * ⚠ SCOPED TO THE ROW, NOT TO THE REGION — and the reason is measured, not
+     * stylistic. The region's terminal empty copy is *"This run produced no
+     * files."* and its error line carries whatever the API said; a region-wide
+     * `textContent` sweep is precisely the mis-scoped query P5 names, and it
+     * would red on correct code the moment any neighbouring prose happened to
+     * contain the needle. `idLessRow()` returns the `<li>`'s only child, so
+     * this assertion can only be satisfied by the row itself.
+     */
+    expect(row?.textContent ?? "").not.toContain(D08_COPY)
+    // The long-form title is absent too — pinned separately so the inversion
+    // records BOTH halves of what 195-06 adds, not just the visible words.
+    expect(row?.getAttribute("title")).not.toContain(D08_COPY)
+    expect(row?.querySelector('[aria-disabled="true"]')).toBeNull()
+  })
+
+  it("POSITIVE CONTROL — the same needle IS found in a string that contains it", async () => {
+    // Without this, case 2 is equally consistent with a query that can never
+    // find anything (192.1: three fences that defended nothing, one of them
+    // sweeping against the empty string and passing green). The shapes here
+    // mirror the page suite's own controls at `:955-958` / `:1073`.
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const row = idLessRow()
+    expect(row).not.toBeNull()
+    // (a) the row really is non-empty — a `not.toContain` over "" passes always.
+    expect((row?.textContent ?? "").length).toBeGreaterThan(0)
+    // (b) the needle is findable by the very operation case 2 uses.
+    const probe = document.createElement("div")
+    probe.textContent = `${ID_LESS_NAME} ${D08_COPY}`
+    probe.setAttribute("title", `${D08_COPY} — this file has no link`)
+    expect(probe.textContent ?? "").toContain(D08_COPY)
+    expect(probe.getAttribute("title")).toContain(D08_COPY)
+    // (c) and the aria-disabled probe finds an affordance when one exists.
+    const affordance = document.createElement("div")
+    affordance.innerHTML = `<span aria-disabled="true">${D08_COPY}</span>`
+    expect(affordance.querySelector('[aria-disabled="true"]')).not.toBeNull()
+  })
+})
+
 describe("WorkflowRunPage — the two empty states say different true things", () => {
   it("a LIVE run with no files says nothing has been written YET", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
