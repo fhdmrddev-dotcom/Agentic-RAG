@@ -36,7 +36,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 195 (show-the-deliverable) — EXECUTING
-Plan: 2 of 8 complete (Wave 1 closed; Wave 2 next)
+Plan: 3 of 8 complete (Waves 1-2 closed; Wave 3 next — 195-04/05/06 in parallel)
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
 
 ⚠ **WAVE 1 CLOSED WITH THE COUNT GATE RED, AND THAT IS A RECORDED DECISION, NOT AN OVERSIGHT

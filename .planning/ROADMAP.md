@@ -602,7 +602,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 195-03-PLAN.md — Wave 2: the shared module — `components/files/` (`FileRow` via Radix `asChild`/`Slottable`, `fileRowUtils`), the widened ONE icon path (`ribbon`/`tone`/`className`/`mimeType` + the nine missing extensions + the own-property guard), and the two-regime `byNewestFirst` whose missing-key arm is NEW GROUND (F7)
+- [x] 195-03-PLAN.md — Wave 2: the shared module — `components/files/` (`FileRow` via Radix `asChild`/`Slottable`, `fileRowUtils`), the widened ONE icon path (`ribbon`/`tone`/`className`/`mimeType` + the nine missing extensions + the own-property guard), and the two-regime `byNewestFirst` whose missing-key arm is NEW GROUND (F7)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

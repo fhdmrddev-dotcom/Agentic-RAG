@@ -950,16 +950,33 @@ const BASELINE = {
   "OutputFileCard.baseline.test.tsx": 21,
   "StopControl.baseline.test.tsx": 15,
   "FilesSection.test.tsx": 11,
-  // ⚠ 195-03 task 1 GREW this file 11 → 41 and the pin is NOT being raised here.
-  // The +30 are the widening's own coverage (ribbon / tone / className /
-  // mimeType / the nine added extensions / the own-property guard), ADDITIONS
-  // ONLY — `git diff` shows zero removed lines and all 11 original titles
-  // intact. The pin is a FLOOR, never a census (`WorkspacePanel.test.tsx`'s
-  // note below records a pin that sat twelve cases stale while the gate stayed
-  // satisfied), so leaving it at 11 keeps the contract "no per-file DECREASE"
-  // exactly as strong while making the growth visible in the `actual` column
-  // rather than hidden behind a number someone re-typed.
-  "fileIcon.test.tsx": 11,
+  // 195-03 task 1 GREW this file 11 → 41: the widening's own coverage (ribbon /
+  // tone / className / mimeType / the nine added extensions / the own-property
+  // guard), ADDITIONS ONLY — `git diff` showed zero removed lines and all 11
+  // original titles intact.
+  //
+  // ⚠ CORRECTION (orchestrator, wave-2 close). 195-03 left this pinned at 11
+  // and recorded the reasoning: *"The pin is a FLOOR, never a census
+  // (`WorkspacePanel.test.tsx`'s note below records a pin that sat twelve cases
+  // stale while the gate stayed satisfied), so leaving it at 11 keeps the
+  // contract 'no per-file DECREASE' exactly as strong."* The original wording is
+  // preserved here rather than deleted, because the reasoning is coherent and
+  // the conclusion is still wrong.
+  //
+  // It is wrong against THIS SCRIPT'S OWN RULE, stated at the `phaseVocabulary`
+  // pin above: *"the pin moves in the SAME COMMIT as the tests, because this gate
+  // only fails on a DECREASE, so a count that grows without its pin edit leaves
+  // the gate blind to the NEXT deleted test rather than red."* A pin of 11 against
+  // an actual of 41 means **thirty cases can be deleted and the gate stays green** —
+  // and those thirty include the nine-extension block, i.e. the fence 195-03 built
+  // to answer the icon-regression question would itself be undefended against
+  // deletion. `WorkspacePanel.test.tsx`'s note RECORDS a stale pin; it does not
+  // establish that stale is correct.
+  //
+  // 41 is read from THIS SCRIPT'S OWN printed `actual` column at the wave-2 close
+  // gate run (`fileIcon.test.tsx 11 41 +30`, `total 4136 · failed 0 ·
+  // count gate OK — 82/82`), never hand-counted from `it(` literals.
+  "fileIcon.test.tsx": 41,
   "MessageItem.finalOutputs.test.tsx": 11,
   // ── Added in 195-03 task 3, in the SAME COMMIT as their TARGETS entries. ────
   // Both numbers are THIS SCRIPT'S OWN printed `actual` column, on two agreeing
