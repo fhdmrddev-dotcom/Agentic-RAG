@@ -207,14 +207,20 @@ The rows that actually probe the new behaviour:
 
 > CLAUDE.md G-4: *"Operator-defined 'I'd recognize failure here' scenarios at scope-time (not
 > post-hoc). Chrome MCP drives all 3 at phase verification — wire format + screenshot are
-> insufficient."* Three surfaces, three moments.
+> insufficient."* Three surfaces, four moments.
+
+**✅ RATIFIED BY THE OPERATOR 2026-08-17, at plan time (before the planner ran) — not post-hoc.**
 
 | # | Surface | Scenario | Status |
 |---|---|---|---|
-| **U-A1** | Canvas | Open a saved workflow with an `llm_emit` step, **touch nothing**, close it — then verify **via DB** that `config.model` is byte-unchanged. *D-07's no-rewrite property, as a lived moment.* | ⬜ pending operator confirmation |
-| **U-A2** | Canvas | On an `llm_emit` step, pick `kimi-k2.6` (`coerce`) and see it distinguished from a `force_strict` model **before** committing the pick, in user words — not `emit_tier:` engine words. | ⬜ pending operator confirmation |
-| **U-B1** | Settings | Set the judge knob to a cheap model, run a **real** publish, and see **that model** named in the verdict receipt. *The knob the operator turns is the control the code obeys.* | ⬜ pending operator confirmation |
-| **U-C1** | Chat | Pick a non-default model in a thread, send a message, navigate away, come back, **refresh** — and see the model still selected. | ⬜ pending operator confirmation |
+| **U-A1** | Canvas | Open a saved workflow with an `llm_emit` step, **touch nothing**, close it — then verify **via DB** that `config.model` is byte-unchanged. *D-07's no-rewrite property, as a lived moment.* | ✅ ratified — ⬜ not yet driven |
+| **U-A2** | Canvas | On an `llm_emit` step, pick `kimi-k2.6` (`coerce`) and see it distinguished from a `force_strict` model **before** committing the pick, in user words — not `emit_tier:` engine words. | ✅ ratified — ⬜ not yet driven |
+| **U-B1** | Settings | Set the judge knob to a cheap model, run a **real** publish, and see **that model** named in the verdict receipt. *The knob the operator turns is the control the code obeys.* | ✅ ratified — ⬜ not yet driven |
+| **U-C1** | Chat | Pick a non-default model in a thread, send a message, navigate away, come back, **refresh** — and see the model still selected. | ✅ ratified — ⬜ not yet driven |
+
+⚠ **Chrome MCP drives all four at phase verification.** Wire format and screenshots are explicitly
+insufficient per G-4. U-A1's proof is a **DB read**, not a UI observation — the failure it catches
+is invisible on screen.
 
 ---
 
