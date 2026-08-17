@@ -1475,7 +1475,21 @@ select polname, polcmd, (select array_agg(rolname) from pg_roles where oid = any
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> ✅ **All five resolved at plan time, 2026-08-18.** The recommendations below were written before
+> the planner ran; each now carries the decision that was actually taken and the plan that carries
+> it. Nothing here is still open.
+>
+> | # | Question | RESOLVED — decision taken | Carried by |
+> |---|---|---|---|
+> | **Q1** | Which value D-06's *"today that would be X"* clause names | The route returns **`run_default_model`**, computed through the **run's own chain** (`load_app_settings_async` → `apply_user_model_default` → `resolve_workflow_ctx_model`). A `null` degrades the label to the bare sentence rather than asserting anything. ⚠ **`gpt-5.4` is NOT hardcoded** — `app_settings.llm_model` is `deepseek-v4-flash`, and hardcoding would have rebuilt the exact lie D-06 forbids | `196-04` |
+> | **Q2** | Does operator-editable `emit_tier` reopen provider-docs-first? | **No re-research.** An operator-set tier is treated as an **assertion, not a verified fact**, and a one-line caption in the Model Registry tab says so | `196-01` |
+> | **Q3** | Paginate the union route? | **No.** One fetch at the Builder page level via a leaf hook; revisit at ~500 rows | `196-04` |
+> | **Q4** | Does `_registry_row.is_default` reflect the run's inherited model or the chat default? | It reflects **neither reliably** — it is stamped from `app_settings.llm_model`, a *different* function from the one the run uses. **So `is_default` is omitted from the author row entirely**; that mismatch is precisely why it cannot answer Q1 | `196-04` |
+> | **Q5** | Is `harness_authoring_model` a fifth instance of the D-17 defect? | **Out of scope, seeded** — there is no inert knob to fix, because nothing offers the control, so nothing lies to an operator. Planted as **`SEED-173`**; re-open trigger: *the first time an authoring-model knob is added to the Settings UI* | `196-09` |
+
+**The original analysis, preserved as written:**
 
 1. **Which value does D-06's *"today that would be X"* clause name?**
    - **What we know:** `app_settings.llm_model` = `deepseek-v4-flash` today; the *sub-agent* default is `gpt-5.4-mini`; `gpt-5.4` is what 18 stored phases happen to carry. `_effective_model` inherits **`ctx.model`**, which `workflow_kickoff.py:485` sets from `resolve_workflow_ctx_model(user_settings)`.

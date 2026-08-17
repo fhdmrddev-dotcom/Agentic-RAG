@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
-status: ready_to_plan
-last_updated: 2026-08-17T21:40:00.000Z
-last_activity: 2026-08-17
+status: ready_to_execute
+last_updated: 2026-08-18T00:00:00.000Z
+last_activity: 2026-08-18
 progress:
   total_phases: 19
   completed_phases: 7
-  total_plans: 85
+  total_plans: 94
   completed_plans: 87
   percent: 37
-stopped_at: Phase 196 context gathered (53869ef4) — ready to plan Phase 196
+stopped_at: Phase 196 PLANNED — 9 plans in 6 waves, 0 blockers — ready to execute Phase 196
 ---
 
 # Project State
@@ -36,8 +36,31 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: **196 (registry-backed-model-picker-canvas) — CONTEXT GATHERED 2026-08-17 (`53869ef4`)**
-Plan: 0 of TBD — **NEXT = `/gsd:plan-phase 196`**
+Phase: **196 (registry-backed-model-picker-canvas) — PLANNED 2026-08-18**
+Plan: 0 of **9** — **NEXT = `/gsd:execute-phase 196`**
+
+⚠ **Wave 1 contains a `[BLOCKING]` OPERATOR ACTION.** Plan `196-01` is `autonomous: false`: migration
+`120_model_capabilities_overrides_emit_tier.sql` must be **pasted into the Supabase SQL editor**
+(never `supabase db push` / `db reset`), then `bash scripts/regenerate-full-schema.sh` with no
+`--reset`. The plan asks for it to be run **twice** — the `ADD COLUMN IF NOT EXISTS … CHECK (…)`
+idempotence has **no shipped precedent** (mig `081` has the CHECK, mig `099` has the guard; no file
+combines them), so it is measured rather than assumed.
+
+⚠ **`196-02` changes which model grades every publish.** Once the four judge consumers read DB-backed
+settings, the gauntlet judge becomes **`deepseek-v4-pro`** — the value already in
+`app_settings.harness_judge_model`. That is the fix working (BUG-260731-01), not a regression, but it
+is a live behaviour change on the operator's own box and is recorded here rather than discovered.
+
+*(Planning run 2026-08-17→18: research re-derived every CONTEXT.md figure against the live DB and
+reproduced all of them — 61/34/26/8, union 69, `emit_tier` 17·39·5, 242 definitions / 257 phases /
+239 blank, the judge three-row. Three findings changed the plan shape: **D-14 needs a MIGRATION**
+(`model_capabilities_overrides` has no `emit_tier` column), **`public.messages` has no `model` column**
+(it is JOIN-stamped from `runs.model`, and 121 live rows read `'unknown'`), and **two incompatible
+`enabled` semantics ship today** (66 vs 34). Plan-checker: **0 blockers, 3 warnings — all three
+fixed** before this entry was written. ⚠ The `check.decision-coverage-plan` gate returned
+`passed: true` **via `skipped: "no trackable decisions"`** — it could not parse CONTEXT.md's bolded
+`**D-01 …**` form, so it is **vacuous here**; all 23 ids were verified cited by direct grep instead.
+That is a gate that cannot fire, and is worth fixing before it reassures someone.)*
 **Milestone:** v3.7 Workflow Product Completion — **opened 2026-08-10**
 
 *(This block previously read "Phase: 195 (show-the-deliverable) — EXECUTING · Plan: 6 of 8 complete

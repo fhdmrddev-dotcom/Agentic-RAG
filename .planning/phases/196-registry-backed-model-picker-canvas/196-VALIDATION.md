@@ -62,40 +62,48 @@ never *"fine"*.
 
 ## Per-Task Verification Map
 
-> Plan/task IDs are assigned by `gsd-planner`. This table is the **criterion→proof** contract each
-> task must satisfy; the executor fills `Task ID` and `Status`. Sourced from RESEARCH §1229-1252.
+> This table is the **criterion→proof** contract each task must satisfy; the executor fills
+> `Task ID` and `Status`. Sourced from RESEARCH §1229-1252.
+>
+> ✅ **Plan and Wave columns reconciled 2026-08-18 to the plans the planner actually produced**
+> (`196-01`…`196-09`, waves 1–6). They previously carried RESEARCH §K.30's *proposed* decomposition
+> (`P-01`…`P-09`, waves 0–2), which the planner reshaped. Mapping, for anyone reading an older
+> reference: `P-01→196-01` · `P-02→196-04` · `P-04→196-05` **except the two panel-mount rows,
+> which became `196-08`** · `P-05→196-06` · `P-06→196-03` · `P-07→196-02` · `P-08→196-07` ·
+> `P-09→196-09`. **`P-03` has no successor plan** — the `TARGETS` additions were distributed into
+> whichever plan creates the new suite (`196-03`, `196-05`, `196-07`, `196-08`).
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | P-02 | 0 | AUTH-04 / SC#1 | T-196-AC1 | Union route returns the full 61∪8 registry union (re-derive the count; **69 was today's reading, not a target**) | integration | `pytest backend/tests/test_196_model_registry_route.py::test_union_size -x` | ❌ W0 | ⬜ pending |
-| TBD | P-02 | 0 | SC#1 | T-196-AC1 | Route readable by a **non-operator** (not 404) | integration | `…::test_non_operator_can_read -x` | ❌ W0 | ⬜ pending |
-| TBD | P-02 | 0 | SC#1 | **T-196-AC2** | ⚠ `GET /admin/models` STILL 404s a non-operator — the operator gate was **not widened** | integration | `…::test_admin_route_still_gated -x` | ❌ W0 | ⬜ pending |
-| TBD | P-02 | 0 | SC#1 | **T-196-LEAK** | Payload carries **only** the allowlisted projection — no `deprecated_reason`, no `overridden_fields`, no timeouts, no endpoint/base-url, no key material | integration | `…::test_field_allowlist -x` | ❌ W0 | ⬜ pending |
-| TBD | P-04 | 1 | AUTH-04 / SC#1 | — | `ModelField` renders **only** ids from the payload; **no free-text input path** | unit (render) | `vitest ModelField.test.tsx -t "registry-only"` | ❌ W0 | ⬜ pending |
-| TBD | P-04 | 1 | D-20 | — | The panel mounts it as **exactly 4 one-line gated mounts** | unit (source fence) | `vitest PhaseFormPanel.test.tsx -t "gated line"` | ⚠ **a NEW fence is owed** — the 193.1 fence at `PhaseFormPanel.test.tsx:481-497` is scoped to `<TemplateNameCheck` and **will not fire on a `ModelField` mount** | ⬜ pending |
-| TBD | P-04 | 1 | D-20 | — | Panel body gains **zero** `useMemo`/`useState`/`useEffect`/`.filter(`/`.map(` lines | CI grep on the diff | `git diff -U0 -- …/PhaseFormPanel.tsx \| grep '^+' \| grep -cE 'useMemo\|useState\|useEffect\|\.filter\(\|\.map\('` → must be `0` | ❌ W0 | ⬜ pending |
-| TBD | P-05 | 1 | **SC#2** | T-196-IV1 | `POST`/`PATCH /workflows` with `config.model="not-a-real-model"` → **400** | integration | `pytest backend/tests/test_196_save_refusal.py -x` | ❌ W0 | ⬜ pending |
-| TBD | P-05 | 1 | SC#2 / D-04 | — | A **blank** model still saves (zero-data-change invariant) | integration | `…::test_blank_still_saves -x` | ❌ W0 | ⬜ pending |
-| TBD | P-05 | 1 | SC#2 / D-08 | — | An already-stored **unknown** model still saves — retiring a registry row must not brick a workflow | integration | `…::test_stored_unknown_still_saves -x` | ❌ W0 | ⬜ pending |
-| TBD | P-04 | 1 | SC#2 / D-08 | — | Unknown value kept as `(current)` **and names its consequence** in user words | unit (render) | `vitest ModelField.test.tsx -t "unknown keeps and names"` | ❌ W0 | ⬜ pending |
-| TBD | P-04 | 1 | **D-07** | — | ⚠ Opening the form **never** calls `onChange`/`onPersist` — viewing is not editing | unit (render) | `vitest ModelField.test.tsx -t "does not rewrite on open"` | ❌ W0 | ⬜ pending |
-| TBD | P-06 | 1 | **D-10** | — | A **disabled** per-phase model falls back to the run model **with a notice** | unit | `pytest backend/tests/unit/test_196_harness_enabled_check.py -x` | ❌ W0 | ⬜ pending |
-| TBD | P-06 | 1 | D-10 | — | An **enabled** model is byte-identical — no fallback, no notice | unit | `…::test_enabled_is_noop -x` | ❌ W0 | ⬜ pending |
-| TBD | P-06 | 1 | **A1** | — | ⚠ `phase_types` imports fresh with **no import cycle** — RED test FIRST, before any other work in that plan | unit (import) | `…::test_no_import_cycle -x` | ❌ W0 | ⬜ pending |
-| TBD | P-02 | 0 | D-13 | — | `emit_tier` reaches the client on **every** union row | integration | `…test_196_model_registry_route.py::test_emit_tier_on_wire -x` | ❌ W0 | ⬜ pending |
-| TBD | P-01 | 0 | **D-14** | — | A DB `emit_tier` override **wins** over the code value | integration | `pytest backend/tests/test_196_emit_tier_overlay.py -x` | ❌ W0 | ⬜ pending |
-| TBD | P-01 | 0 | D-14 | **T-196-IV2** | An off-allowlist `emit_tier` PATCH → **422 before any DB touch** | integration | `…::test_bad_tier_422 -x` | ❌ W0 | ⬜ pending |
-| TBD | P-01 | 0 | **A7** | — | The migration's `CHECK` value set **equals** `set(_RUNGS_BY_TIER)` — two-layer pin, `test_audit_event_registration.py` style | unit | `…::test_check_matches_rungs -x` | ❌ W0 | ⬜ pending |
-| TBD | P-01 | 0 | SEED-172 (free) | T-196-IV2 | Numeric range guard on the registry PATCH path — `0`, negative, and absurd values rejected | integration | `…::test_numeric_range -x` | ❌ W0 | ⬜ pending |
-| TBD | P-04 | 1 | **D-12/D-15** | — | `llm_emit` distinguishes `coerce` from `force`/`force_strict` **in user words, before selection**; other step types do **not** group | unit (render) | `vitest ModelField.test.tsx -t "fitness"` | ❌ W0 | ⬜ pending |
-| TBD | **P-07** | 1 | **D-17 ⚠ BINDING** | — | **Each of the 4 consumers** resolves the model set in `app_settings` — set the row, assert the **RESOLVED** model changes. **RED-first, all four, + 1 control.** *The absence of this test is why the bug survived 2026-07-31 → 2026-08-17.* | unit ×4 + control | `pytest backend/tests/unit/test_196_judge_model_db_backed.py -x` | ❌ W0 — **BINDING** | ⬜ pending |
-| TBD | P-08 | 1 | **D-18** | — | A thread restores its last-used **enabled** model | unit (hook) | `vitest useComposerModel.test.ts` | ❌ W0 | ⬜ pending |
-| TBD | P-08 | 1 | D-18 | — | ⚠ `'unknown'` (**121 live rows**) and `undefined` (user rows) are **skipped** | unit (hook) | `…-t "skips unknown"` | ❌ W0 | ⬜ pending |
-| TBD | P-08 | 1 | D-18 / D-07 | — | A **disabled** last-used model falls back — reuses D-07's rule, does not invent a second | unit (hook) | `…-t "disabled falls back"` | ❌ W0 | ⬜ pending |
-| TBD | P-08 | 1 | D-18 | — | ⚠ `provider` is restored **first** or `ChatArea.tsx:201` clobbers the model | unit (hook) | `…-t "provider restored first"` | ❌ W0 | ⬜ pending |
-| TBD | P-08 | 1 | **G-5** | — | `ChatArea.tsx` `useState` **7→2** and `useEffect` **4→3** — G-5 honoured by **reduction**, not by argument | source count | `grep -c "useState\|useEffect" …/ChatArea.tsx` vs the pre-change baseline | ❌ W0 | ⬜ pending |
-| TBD | P-09 | 2 | **SC#3** | — | The app-wide sweep was **not** attempted — no plan's `files_modified` names `SettingsPage.tsx` or `ModelPillRow.tsx`, and `verified_models` is unchanged | negative fence | grep over the phase's `files_modified` + `git diff --stat` | ❌ W0 | ⬜ pending |
-| TBD | P-01 | 0 | **A3** | — | `scripts/check-deploy-drift.sh` passes — no new env var, no seed row, deploy artifacts unaffected | CLI | `bash scripts/check-deploy-drift.sh` | ✅ exists | ⬜ pending |
+| TBD | 196-04 | 2 | AUTH-04 / SC#1 | T-196-AC1 | Union route returns the full 61∪8 registry union (re-derive the count; **69 was today's reading, not a target**) | integration | `pytest backend/tests/test_196_model_registry_route.py::test_union_size -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-04 | 2 | SC#1 | T-196-AC1 | Route readable by a **non-operator** (not 404) | integration | `…::test_non_operator_can_read -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-04 | 2 | SC#1 | **T-196-AC2** | ⚠ `GET /admin/models` STILL 404s a non-operator — the operator gate was **not widened** | integration | `…::test_admin_route_still_gated -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-04 | 2 | SC#1 | **T-196-LEAK** | Payload carries **only** the allowlisted projection — no `deprecated_reason`, no `overridden_fields`, no timeouts, no endpoint/base-url, no key material | integration | `…::test_field_allowlist -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-05 | 3 | AUTH-04 / SC#1 | — | `ModelField` renders **only** ids from the payload; **no free-text input path** | unit (render) | `vitest ModelField.test.tsx -t "registry-only"` | ❌ W0 | ⬜ pending |
+| TBD | 196-08 | 5 | D-20 | — | The panel mounts it as **exactly 4 one-line gated mounts** | unit (source fence) | `vitest PhaseFormPanel.test.tsx -t "gated line"` | ⚠ **a NEW fence is owed** — the 193.1 fence at `PhaseFormPanel.test.tsx:481-497` is scoped to `<TemplateNameCheck` and **will not fire on a `ModelField` mount** | ⬜ pending |
+| TBD | 196-08 | 5 | D-20 | — | Panel body gains **zero** `useMemo`/`useState`/`useEffect`/`.filter(`/`.map(` lines | CI grep on the diff | `git diff -U0 -- …/PhaseFormPanel.tsx \| grep '^+' \| grep -cE 'useMemo\|useState\|useEffect\|\.filter\(\|\.map\('` → must be `0` | ❌ W0 | ⬜ pending |
+| TBD | 196-06 | 3 | **SC#2** | T-196-IV1 | `POST`/`PATCH /workflows` with `config.model="not-a-real-model"` → **400** | integration | `pytest backend/tests/test_196_save_refusal.py -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-06 | 3 | SC#2 / D-04 | — | A **blank** model still saves (zero-data-change invariant) | integration | `…::test_blank_still_saves -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-06 | 3 | SC#2 / D-08 | — | An already-stored **unknown** model still saves — retiring a registry row must not brick a workflow | integration | `…::test_stored_unknown_still_saves -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-05 | 3 | SC#2 / D-08 | — | Unknown value kept as `(current)` **and names its consequence** in user words | unit (render) | `vitest ModelField.test.tsx -t "unknown keeps and names"` | ❌ W0 | ⬜ pending |
+| TBD | 196-05 | 3 | **D-07** | — | ⚠ Opening the form **never** calls `onChange`/`onPersist` — viewing is not editing | unit (render) | `vitest ModelField.test.tsx -t "does not rewrite on open"` | ❌ W0 | ⬜ pending |
+| TBD | 196-03 | 1 | **D-10** | — | A **disabled** per-phase model falls back to the run model **with a notice** | unit | `pytest backend/tests/unit/test_196_harness_enabled_check.py -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-03 | 1 | D-10 | — | An **enabled** model is byte-identical — no fallback, no notice | unit | `…::test_enabled_is_noop -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-03 | 1 | **A1** | — | ⚠ `phase_types` imports fresh with **no import cycle** — RED test FIRST, before any other work in that plan | unit (import) | `…::test_no_import_cycle -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-04 | 2 | D-13 | — | `emit_tier` reaches the client on **every** union row | integration | `…test_196_model_registry_route.py::test_emit_tier_on_wire -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-01 | 1 | **D-14** | — | A DB `emit_tier` override **wins** over the code value | integration | `pytest backend/tests/test_196_emit_tier_overlay.py -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-01 | 1 | D-14 | **T-196-IV2** | An off-allowlist `emit_tier` PATCH → **422 before any DB touch** | integration | `…::test_bad_tier_422 -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-01 | 1 | **A7** | — | The migration's `CHECK` value set **equals** `set(_RUNGS_BY_TIER)` — two-layer pin, `test_audit_event_registration.py` style | unit | `…::test_check_matches_rungs -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-01 | 1 | SEED-172 (free) | T-196-IV2 | Numeric range guard on the registry PATCH path — `0`, negative, and absurd values rejected | integration | `…::test_numeric_range -x` | ❌ W0 | ⬜ pending |
+| TBD | 196-05 | 3 | **D-12/D-15** | — | `llm_emit` distinguishes `coerce` from `force`/`force_strict` **in user words, before selection**; other step types do **not** group | unit (render) | `vitest ModelField.test.tsx -t "fitness"` | ❌ W0 | ⬜ pending |
+| TBD | **196-02** | 1 | **D-17 ⚠ BINDING** | — | **Each of the 4 consumers** resolves the model set in `app_settings` — set the row, assert the **RESOLVED** model changes. **RED-first, all four, + 1 control.** *The absence of this test is why the bug survived 2026-07-31 → 2026-08-17.* | unit ×4 + control | `pytest backend/tests/unit/test_196_judge_model_db_backed.py -x` | ❌ W0 — **BINDING** | ⬜ pending |
+| TBD | 196-07 | 4 | **D-18** | — | A thread restores its last-used **enabled** model | unit (hook) | `vitest useComposerModel.test.ts` | ❌ W0 | ⬜ pending |
+| TBD | 196-07 | 4 | D-18 | — | ⚠ `'unknown'` (**121 live rows**) and `undefined` (user rows) are **skipped** | unit (hook) | `…-t "skips unknown"` | ❌ W0 | ⬜ pending |
+| TBD | 196-07 | 4 | D-18 / D-07 | — | A **disabled** last-used model falls back — reuses D-07's rule, does not invent a second | unit (hook) | `…-t "disabled falls back"` | ❌ W0 | ⬜ pending |
+| TBD | 196-07 | 4 | D-18 | — | ⚠ `provider` is restored **first** or `ChatArea.tsx:201` clobbers the model | unit (hook) | `…-t "provider restored first"` | ❌ W0 | ⬜ pending |
+| TBD | 196-07 | 4 | **G-5** | — | `ChatArea.tsx` `useState` **7→2** and `useEffect` **4→3** — G-5 honoured by **reduction**, not by argument | source count | `grep -c "useState\|useEffect" …/ChatArea.tsx` vs the pre-change baseline | ❌ W0 | ⬜ pending |
+| TBD | 196-09 | 6 | **SC#3** | — | The app-wide sweep was **not** attempted — no plan's `files_modified` names `SettingsPage.tsx` or `ModelPillRow.tsx`, and `verified_models` is unchanged | negative fence | grep over the phase's `files_modified` + `git diff --stat` | ❌ W0 | ⬜ pending |
+| TBD | 196-01 | 1 | **A3** | — | `scripts/check-deploy-drift.sh` passes — no new env var, no seed row, deploy artifacts unaffected | CLI | `bash scripts/check-deploy-drift.sh` | ✅ exists | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -112,14 +120,15 @@ never *"fine"*.
 - [ ] `frontend/src/components/workflows/PhaseFormPanel.test.tsx` — **a NEW four-line source fence** scoped to the `ModelField` mounts (the 193.1 fence does not cover them)
 - [ ] `frontend/src/hooks/__tests__/useComposerModel.test.ts` — ⚠ **UNGATED** until added to `TARGETS`
 - [ ] `frontend/src/components/chat/__tests__/ChatArea.model.test.tsx` — ⚠ **UNGATED** until added to `TARGETS`
-- [ ] `scripts/vitest-count-gate.cjs` — add the two ungated entries above to `TARGETS`, and **reconcile pinned totals to the gate's own printed `actual`, never to a number quoted in a document**
+- [ ] `scripts/vitest-count-gate.cjs` — add each new suite to `TARGETS`, and **reconcile pinned totals to the gate's own printed `actual`, never to a number quoted in a document**. ⚠ **Four plans touch this file** (`196-03`, `196-05`, `196-07`, `196-08`) — they sit in different waves, so each reconciles against the gate as it stands when that wave runs
 
 ⚠ **Author every test as patched/stubbed, not DB-inserting.** Idioms:
 `monkeypatch.setattr("app.models.user_settings._load_settings_from_db", …)` and patching
 `load_all_model_overrides`. This removes CLAUDE.md rule 4's serialisation constraint entirely.
-**P-01** (if an overlay test INSERTs) and **P-06** (if a harness test creates a real `workflow_runs`
-row) are the two that could accidentally become DB-mutating — **a `files_modified` check cannot see
-a database write.**
+**`196-01`** (if an overlay test INSERTs) and **`196-03`** (if a harness test creates a real
+`workflow_runs` row) are the two that could accidentally become DB-mutating — **a `files_modified`
+check cannot see a database write.** Both plans carry a `grep` acceptance criterion enforcing the
+patched-not-inserting rule.
 
 ---
 

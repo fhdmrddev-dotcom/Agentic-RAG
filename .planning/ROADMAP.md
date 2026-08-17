@@ -642,14 +642,31 @@ Plans:
 **Plans**: 9 plans in 6 waves. ⚠ **The canvas-only fence above is deliberately WIDENED by an operator decision recorded as `196-CONTEXT.md` `<domain>`**: two open reported bugs living on other surfaces were folded in, because a typed model box that nothing validates, a judge knob the judge never reads, and a composer picker that silently reverts are the same defect wearing three faces. The SEED-040 / SEED-088 app-wide sweep stays OUT (SC#3).
 
 Plans:
+**Wave 1**
+
 - [ ] 196-01-PLAN.md — Wave 1: `emit_tier` end-to-end (D-13 / D-14) — ⚠ **a migration `120_` is required and was NOT anticipated: `model_capabilities_overrides` has no `emit_tier` column**. Overlay copy, PATCH allowlist + enum guard, the operator-ratified SEED-172 numeric bounds, the client row type and the registry tab's first enum control. **`autonomous: false` — a `[BLOCKING]` operator SQL-editor paste**
 - [ ] 196-02-PLAN.md — Wave 1: the judge knob (D-17, `BUG-260731-01`, `severity: critical`) — four consumers routed off the env singleton onto DB-backed settings, behind the report's **BINDING** RED-first test ×4 plus a negative control. ⚠ Changes which model grades every publish on the operator's own box
 - [ ] 196-03-PLAN.md — Wave 1: the harness enabled-check (D-10) — the disabled-model fallback the chat path has had since Phase 149 and the harness has never had, with a visible sub-step and a `policy_applied` receipt, and the A1 import-cycle guard driven first
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 196-04-PLAN.md — Wave 2: the union leaf + the non-operator route (D-01 / D-02 / D-03) — `_registry_row` extracted to a service leaf, `GET /models/registry` added beside `/features`, a six-field allowlist projection, and an honestly-computed `run_default_model`. ⚠ `GET /admin/models` stays a byte-identical 404, proven by contrast in the same file
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 196-05-PLAN.md — Wave 3: the picker leaf (D-04–D-08, D-12, D-15) — `modelFitness.ts`, `ModelField.tsx` (no state, no effect, fenced on its own source) and `useModelRegistry.ts`
 - [ ] 196-06-PLAN.md — Wave 3: the server refusal (D-09, SC#2) — 400 before any write on both draft doors, fired after ownership resolution, with D-08's grandfather so retiring a registry row never bricks an existing workflow
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 196-07-PLAN.md — Wave 4: the composer restore (D-18, `BUG-260718-04`) — derived from the thread's last run-backed message, provider restored first; G-5 honoured by REDUCTION via `useComposerModel` (`useState` 7→2, `useEffect` 4→3)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 196-08-PLAN.md — Wave 5: the mounts (D-20) — four free-text `AI model` inputs become four one-line gated `ModelField` mounts, plus the NEW source fence the 193.1 fence structurally cannot cover
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 196-09-PLAN.md — Wave 6: the records (D-16, D-19, D-21, D-22, D-23) — ledger rows and detail sections re-derived in one batch pass, the two folded bugs flipped only on named evidence, three seeds with mechanical re-open triggers, and the SC#3 negative fence proven over the real diff
 
 #### Phase 197: Guided Authoring
