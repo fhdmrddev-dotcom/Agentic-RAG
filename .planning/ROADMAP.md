@@ -606,9 +606,9 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 195-04-PLAN.md — Wave 3: chat converts — `OutputFileCard` on the shared row with its public prop shape BYTE-IDENTICAL, so `MessageItem.tsx` (29 phases) and `ExecuteCodeBody.tsx` are never opened (F6/D-14 honoured structurally)
-- [ ] 195-05-PLAN.md — Wave 3: the panel converts — the copied `formatBytes` **and its own “keep byte-for-byte identical” confession** deleted, the mime-first `iconFor` deleted, listbox + roving focus + preview activation + Template badge unmoved
-- [ ] 195-06-PLAN.md — Wave 3: the run surface converts — the region on the shared row, D-02's honest heading (**three locations**), D-15's three-way empty state pinned, D-12 wired, and the TWO shipped fences that assert the duplication INVERTED IN PLACE with the originals quoted (F1; the suite is pinned EXACT)
+- [x] 195-04-PLAN.md — Wave 3: chat converts — `OutputFileCard` on the shared row with its public prop shape BYTE-IDENTICAL, so `MessageItem.tsx` (29 phases) and `ExecuteCodeBody.tsx` are never opened (F6/D-14 honoured structurally)
+- [x] 195-05-PLAN.md — Wave 3: the panel converts — the copied `formatBytes` **and its own “keep byte-for-byte identical” confession** deleted, the mime-first `iconFor` deleted, listbox + roving focus + preview activation + Template badge unmoved
+- [x] 195-06-PLAN.md — Wave 3: the run surface converts — the region on the shared row, D-02's honest heading (**three locations**), D-15's three-way empty state pinned, D-12 wired, and the TWO shipped fences that assert the duplication INVERTED IN PLACE with the originals quoted (F1; the suite is pinned EXACT)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
