@@ -39,7 +39,7 @@ the right vocabulary, stop it, and see what it produced.
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
-| 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
+| 196 | Registry-Backed Model Picker (canvas) | 3/9 | In Progress|  |
 | 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
@@ -644,9 +644,9 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 196-01-PLAN.md — Wave 1: `emit_tier` end-to-end (D-13 / D-14) — ⚠ **a migration `120_` is required and was NOT anticipated: `model_capabilities_overrides` has no `emit_tier` column**. Overlay copy, PATCH allowlist + enum guard, the operator-ratified SEED-172 numeric bounds, the client row type and the registry tab's first enum control. **`autonomous: false` — a `[BLOCKING]` operator SQL-editor paste**
-- [ ] 196-02-PLAN.md — Wave 1: the judge knob (D-17, `BUG-260731-01`, `severity: critical`) — four consumers routed off the env singleton onto DB-backed settings, behind the report's **BINDING** RED-first test ×4 plus a negative control. ⚠ Changes which model grades every publish on the operator's own box
-- [ ] 196-03-PLAN.md — Wave 1: the harness enabled-check (D-10) — the disabled-model fallback the chat path has had since Phase 149 and the harness has never had, with a visible sub-step and a `policy_applied` receipt, and the A1 import-cycle guard driven first
+- [x] 196-01-PLAN.md — Wave 1: `emit_tier` end-to-end (D-13 / D-14) — ⚠ **a migration `120_` is required and was NOT anticipated: `model_capabilities_overrides` has no `emit_tier` column**. Overlay copy, PATCH allowlist + enum guard, the operator-ratified SEED-172 numeric bounds, the client row type and the registry tab's first enum control. **`autonomous: false` — a `[BLOCKING]` operator SQL-editor paste**
+- [x] 196-02-PLAN.md — Wave 1: the judge knob (D-17, `BUG-260731-01`, `severity: critical`) — four consumers routed off the env singleton onto DB-backed settings, behind the report's **BINDING** RED-first test ×4 plus a negative control. ⚠ Changes which model grades every publish on the operator's own box
+- [x] 196-03-PLAN.md — Wave 1: the harness enabled-check (D-10) — the disabled-model fallback the chat path has had since Phase 149 and the harness has never had, with a visible sub-step and a `policy_applied` receipt, and the A1 import-cycle guard driven first
 
 **Wave 2** *(blocked on Wave 1 completion)*
 

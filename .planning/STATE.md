@@ -2,16 +2,15 @@
 gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
-status: ready_to_execute
-last_updated: 2026-08-18T00:00:00.000Z
-last_activity: 2026-08-18
+status: executing
+last_updated: "2026-08-17T20:56:03.310Z"
+last_activity: 2026-08-17
 progress:
   total_phases: 19
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 94
   completed_plans: 87
-  percent: 37
-stopped_at: Phase 196 PLANNED — 9 plans in 6 waves, 0 blockers — ready to execute Phase 196
+  percent: 42
 ---
 
 # Project State
@@ -32,24 +31,103 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 196 — registry backed model picker (canvas)
+**Current focus:** Phase 196 — registry-backed-model-picker-canvas
 
 ## Current Position
 
-Phase: **196 (registry-backed-model-picker-canvas) — PLANNED 2026-08-18**
-Plan: 0 of **9** — **NEXT = `/gsd:execute-phase 196`**
+Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
+Plan: 3 of 9 — **Wave 1 COMPLETE (196-01, 196-02, 196-03), merged and gated.** Next: Wave 2 (`196-04`).
 
-⚠ **Wave 1 contains a `[BLOCKING]` OPERATOR ACTION.** Plan `196-01` is `autonomous: false`: migration
-`120_model_capabilities_overrides_emit_tier.sql` must be **pasted into the Supabase SQL editor**
-(never `supabase db push` / `db reset`), then `bash scripts/regenerate-full-schema.sh` with no
-`--reset`. The plan asks for it to be run **twice** — the `ADD COLUMN IF NOT EXISTS … CHECK (…)`
-idempotence has **no shipped precedent** (mig `081` has the CHECK, mig `099` has the guard; no file
-combines them), so it is measured rather than assumed.
+### Wave 1 close — 2026-08-17
 
-⚠ **`196-02` changes which model grades every publish.** Once the four judge consumers read DB-backed
-settings, the gauntlet judge becomes **`deepseek-v4-pro`** — the value already in
-`app_settings.harness_judge_model`. That is the fix working (BUG-260731-01), not a regression, but it
-is a live behaviour change on the operator's own box and is recorded here rather than discovered.
+**Post-merge gates.** `tsc --noEmit -p tsconfig.app.json` → **33 errors, the pre-existing baseline,
+ZERO in any of the 7 frontend files this wave touched** (cross-referenced file-by-file, not assumed;
+the "exit 0" criterion two plans carried was unreachable at the base commit and was reported as
+per-file rather than massaged). Count gate → **`count gate OK` · total 4197 · failed 0 · pinned 4123 ·
+84/84** (CLAUDE.md's 2026-08-17 entry reads 4170/4096/83 — a growing number is the gate WORKING).
+Backend → **211 failed / 4013 passed**, failure count **identical to the pre-phase baseline of 211**
+while passing rose 3964 → 4013 (**+49** = the three plans' new tests). ⚠ **Counts were compared, not
+failing-test IDENTITY** — a swap cannot be excluded without a baseline re-run, which was judged
+unnecessary because the three branches touched **disjoint files** and tsc + count gate are clean.
+This limit is recorded rather than left implied.
+
+**Both mid-wave failure observations resolved GREEN in the merged tree** and were flakes, not defects:
+`196-02`'s `test_075_tool_args_progress::test_google_path_emits_code_so_far` (+1) and `196-03`'s
+eleven `test_085_ask_user_handler` cases. Neither agent was wrong to refuse to call them "fine" at
+the time — per CLAUDE.md they were recorded as *provably unmodified*, and the merge is what settled it.
+
+⚠ **THE MIGRATION WAS APPLIED BY THE ORCHESTRATOR, NOT PASTED INTO THE SQL EDITOR — record the
+mechanism, never the paraphrase.** Migration `120` was executed against the LIVE local Postgres at
+`postgresql://postgres:postgres@127.0.0.1:54322/postgres` via `backend/venv/Scripts/python.exe` +
+`psycopg2` with `autocommit=True`, on explicit operator authorisation. This honours CLAUDE.md: the
+rule forbids `supabase db push` / `db reset` because they wipe dev data; this ran exactly the
+statements the SQL editor would, against the same DB, with no reset and no data loss.
+
+✅ **IDEMPOTENCE IS NOW SETTLED BY MEASUREMENT, and Task 1's fallback restructuring is NOT needed.**
+Both runs SUCCEEDED and `pg_constraint` holds exactly **one** matching CHECK afterwards — because
+`ADD COLUMN IF NOT EXISTS` skips the entire clause *including its inline `CONSTRAINT … CHECK`*. This
+had **no shipped precedent** (mig `081` has the CHECK, mig `099` has the guard; no file combined
+them). Post-state: `emit_tier` `text` · nullable · no default; 37 rows, **0** non-null. Pre-state
+reproduced RESEARCH.md M-5 exactly (11 columns, no `emit_tier`, 37 rows).
+⚠ **Postgres renders the constraint as `= ANY (ARRAY[…])`, NOT `IN (…)`** — any future assertion must
+test for the three tier literals, never the substring `IN (`.
+
+⛔ **ONE ACCEPTANCE CRITERION IS UNMET AND OWED: `supabase/full-schema.sql` was NOT regenerated.**
+`scripts/regenerate-full-schema.sh` shells out to `docker exec <supabase_db_*> pg_dump`, and Docker is
+denied to the agent layer. The executor **correctly refused to hand-assemble a dump** — CLAUDE.md
+forbids hand-editing that file, and a stale-but-authoritative-looking bootstrap artifact is worse for
+a greenfield deploy than a missing one. Owed, from the repo root, **no `--reset`**:
+`bash scripts/regenerate-full-schema.sh`.
+
+⛔ **CLOUD PARITY OWED for migration 120** — paste into the CLOUD SQL editor in the same operation as
+any deploy of this code. `check-deploy-drift.sh` returned **PASS** and 120 carries no seed-like
+INSERT/UPDATE: that is measured evidence for RESEARCH assumption A3 (no env var, no seed row).
+
+⚠ **`196-02` HAS CHANGED WHICH MODEL GRADES EVERY PUBLISH — this is now live, not pending.** The
+gauntlet judge is **`deepseek-v4-pro`**, the value already in `app_settings.harness_judge_model`.
+That is the fix working (BUG-260731-01), not a regression, but it is a live behaviour change on the
+operator's own box. UAT row U-B1.
+
+**Two plan premises were measured FALSE and neither was massaged into passing:**
+1. `196-03`: the plan asserted *"the FIVE call sites, all inside `async def`"*. Site `:455` is inside
+   a **sync** `def _build_phase_tool_context`, called synchronously by fifteen shipped test sites —
+   and it is the load-bearing one, since `run_task_sub_agent` reads `parent_ctx.model`. Skipping it
+   would have left agent phases on the unchecked id. **So `grep -c '_effective_model_checked'` is 5,
+   not the asserted 6, and the `await` count is 4, not 5.** Both arms are now fenced.
+2. `196-02`: the plan said consumer 2 "sits inside a per-arm loop" and asked to hoist above it. No
+   loop textually contains it; hoisting to `run_eval_job` needs the signature change the same plan
+   forbids. Hoisted to the top of the grading block instead — the 30 s settings TTL collapses it to
+   **one** DB read per arm, which is what the `must_haves.truths` entry actually asserts.
+
+⚠ **`196-03` found the A1 test the plan SPECIFIED was itself a bug, and it hid well.** `sys.modules`
+eviction restores module keys but not the parent package attribute, leaving a second module object
+live — that broke **23 tests** across two files, **every one of which passed in isolation**. Rewritten
+to run in a subprocess in a fresh interpreter, which is strictly stronger evidence for A1's claim.
+
+⚠ **Two guards fired in `196-01` and both were CORRECT to fire.** The Phase-149 pin enumerating
+*exactly seven* editable columns broke on 7→8 — that set is the SQLi boundary, so it was **widened
+deliberately with the reason recorded, never weakened**. And two frontend fixtures broke on the new
+required field; `emit_tier` was kept **required** rather than optional, because optional would
+reintroduce the "absent means unknown" ambiguity the WR-04 honesty rule exists to kill.
+
+⚠ **`PhaseCard.test.tsx` was the TENTH two-knob trap** — it does not live under `__tests__/`, so the
+count gate had **never once executed it**. Now adopted into both knobs and pinned at 27 (pre-change
+count 24, measured by restoring the file and running it standalone).
+
+**Wave-numbering drift, harmless but noted:** ROADMAP prose says "9 plans in 6 waves" and places
+`196-07` in Wave 4 / `196-08` Wave 5 / `196-09` Wave 6; the plan FRONTMATTER (what `execute-phase`
+actually reads) says waves 3 / 4 / 5. The dependency graph is identical either way — `196-07` depends
+only on `196-04` — so execution follows the frontmatter.
+
+⚠ **Wave 3 will be PARTIALLY SERIALISED by an intra-wave `files_modified` overlap:** `196-05` and
+`196-07` both modify `scripts/vitest-count-gate.cjs`. They run one at a time; `196-06` shares no file
+with either and runs alongside.
+
+**Worktree teardown left three residual directories** under `.claude/worktrees/` (log-file handles
+held busy). **All junctions were detached first and ZERO reparse points remain**, so the source
+`backend/venv` and `frontend/node_modules` are intact and a later delete cannot follow a junction.
+Separately: **~76 stale `worktree-agent-*` branches** have accumulated from prior phases —
+pre-existing housekeeping, deliberately not touched mid-phase.
 
 *(Planning run 2026-08-17→18: research re-derived every CONTEXT.md figure against the live DB and
 reproduced all of them — 61/34/26/8, union 69, `emit_tier` 17·39·5, 242 definitions / 257 phases /
@@ -108,12 +186,15 @@ The post-merge gate reports **`failed 4`**, and every one of those failures was 
 **pre-existing flake in `WorkflowsPage.test.tsx` / `WorkflowCard.test.tsx`** — see **`SEED-171`**.
 
 The evidence the merge is nonetheless sound, each item measured rather than argued:
+
 - **No production source file has been changed by this phase at all.** The whole change set since base
   `f2eef045` is six files: three `.planning/` docs, two test files, and `scripts/vitest-count-gate.cjs`.
   `WorkflowsPage.tsx` / `.test.tsx` and `WorkflowCard.tsx` / `.test.tsx` are **byte-identical to base**.
+
 - **No per-file count decreased** in any of eleven runs; grand total invariant at **4044**.
 - **All five Phase-195 suites green**: `OutputFileCard.baseline` 21/21, `WorkflowRunPage` 105/105,
   `fileIcon` 11/11, `FilesSection` 11/11, `MessageItem.finalOutputs` 11/11.
+
 - **The failing SET is never the same twice** (cap 1 → 4 in one file; cap 2 → a different 2 plus 2 in
   another file; isolated → 2 of 55). All `STACK_TRACE_ERROR`.
 
@@ -587,7 +668,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Ready to plan
+**Status:** Executing Phase 196
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
