@@ -77,6 +77,47 @@ written from `SEED-148`'s 2026-08-10 grep for `output_files`, and that grep miss
 because it reads WORKSPACE files, not sandbox `output_files` — **a true grep for the wrong noun.**
 The rest of the table stands, and the ask-responder row in particular is unaffected.
 
+⚠ **SECOND CORRECTION — AT PHASE CLOSE, 2026-08-17 (plan `195-08`). Recorded BESIDE both the original
+row and the discuss-time note above, never over either.** The file half is now **DELIVERED**, and the
+delivery is a measurement rather than a claim:
+
+| row | as originally written | as it reads today |
+|---|---|---|
+| see produced output files | `❌ (→ RUN-02, phase 195)` | ✅ **and it reads the same as every other file row in the app** |
+
+**What Phase 195 actually changed, since "delivered" is doing real work in that sentence:**
+
+1. **SC#1 was measured ALREADY-SATISFIED before a line was edited** — driven live on two runs
+   (one pre-existing and terminal, one launched during the phase) at the commit that predates every
+   source change. The deliverable was listed, named, sized, downloaded to disk at **39,660 bytes —
+   byte-exact with `workspace_files.size_bytes`** — and verified a CRC-clean OOXML package carrying
+   5,843 characters of filled report prose. **So this row was wrong when it was written, and had been
+   wrong since Phase 188-10.**
+2. **What was genuinely broken is what the discuss-time note above identified: the SECOND file UI.**
+   The region hand-rolled its own byte formatter, its own basename, its own extension→glyph map and
+   its own row markup. All three surfaces — the chat output card, the workspace panel's file list and
+   this run-page region — now render from **one** shared row (`components/files/FileRow.tsx`), with a
+   source sweep that measures the "exactly one of each" claim rather than believing it.
+3. **The region's heading was an authorship claim the read cannot support**, and it was fixed:
+   *"What this run produced"* → **`Files in this run's workspace`**. The read is thread-scoped, so the
+   list can legitimately contain a template the user uploaded before launching. Naming *where* the
+   files are is the only thing the read can prove.
+4. **The id-less row gained the shipped dead-link cue** (`BUG-260523-03`'s affordance) instead of
+   sitting there silently, and the list is now **newest-first**, so a just-produced deliverable sits
+   above the template it filled.
+
+⚠ **THE ASK-RESPONDER HALF IS UNTOUCHED AND STILL OWED.** Nothing in Phase 195 mounted a responder;
+`PendingAskCard` / `PendingAskStack` still have exactly one production mount (`WorkspacePanel.tsx:71`)
+and `POST /runs/{runId}/ask_user_response` still has exactly one caller. **`status:` stays `deferred`
+and `re_open_trigger` is unchanged** — a `folded` record is invisible to the open-report routing scan,
+and this report must still reach `/gsd:discuss-phase 198` for NODE-02.
+
+⚠ **So the operator's own bar — *"the canvas is a place work can be FINISHED"* — is now HALF met, and
+saying which half is the point.** A user can launch a workflow, watch it, and take the deliverable
+away from the canvas. A user still cannot answer a human step there, and a run parked on an approval
+still looks identical to a hung one from that surface. **That second half is Phase 198's, and this
+report is its evidence.**
+
 ## Hypothesized cause
 
 Not a defect — an unbuilt mount. Hypothesis, not finding: `PendingAskStack` may be close to portable, since it

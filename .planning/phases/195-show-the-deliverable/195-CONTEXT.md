@@ -281,6 +281,33 @@ any NEW file affordance, emit-path reliability, in-app preview of Office documen
 
 ### Reusable Assets
 - **`lib/fileIcon.tsx`** — already the intended single icon source; needs consumers, not changes.
+
+  > ⚠ **CORRECTION, 2026-08-17 (plan `195-08`, at phase close) — recorded BESIDE the original bullet,
+  > never over it.** The bullet above is quoted verbatim: *"`lib/fileIcon.tsx` — already the intended
+  > single icon source; **needs consumers, not changes**."*
+  >
+  > **Phase 195 CHANGED it — additively — and the change was necessary, not cosmetic.** Adopting the
+  > module in the panel and the run page *without options* would have (a) discarded a deliberate
+  > **Phase 088-05 AA-contrast decision** (`PanelSection.tsx:85` records the light theme's global
+  > `--muted-foreground` at **4.01:1**, below the 4.5:1 floor, which is why
+  > `--panel-muted-foreground` exists at 7.21:1), and (b) **regressed nine code extensions**
+  > (`sh` `bash` `sql` `yml` `yaml` `css` `jsx` `mjs` `tsx`) from the panel's Code glyph to the shared
+  > module's `FileText` default, because `EXT_MAP` omitted them.
+  >
+  > **What shipped:** `fileIcon()` gained `ribbon` / `tone` / `className` / `mimeType` options, mime-first
+  > resolution for every *specific* mime branch, the nine missing extensions, and an own-property guard
+  > on the map lookup. **The first two parameters are unchanged** and all eleven original cases stayed
+  > green, so this is a widening, not a rewrite.
+  >
+  > ⚠ **D-05's *exactly ONE icon path* is UNCHANGED and was honoured** — there is one module, one
+  > `EXT_MAP`, and one import edge, proved by a source sweep rather than asserted. The correction is to
+  > the words *"not changes"*, not to the decision.
+  >
+  > ⚠ **A second, subtler correction to the same bullet's premise:** the module was *"already the
+  > intended single icon source"* but had exactly **one** consumer (`OutputFileCard`). "Intended" and
+  > "single" were true; **"source" was aspirational** — two other surfaces carried their own maps. A
+  > declared single source with one consumer and two shadow copies is the failure mode this phase
+  > exists to close, and it read as a reusable asset right up until it was measured.
 - **`useWorkspaceFiles(threadId)`** (`StreamsProvider`) — already wired on the run page and reconciled
   on (re)connect; the deliverable data path is DONE. `WorkflowRunPage.tsx:420-431` carries a comment
   recording that the reconcile is keyed on the SSE factory's `threadId` — read it before touching.

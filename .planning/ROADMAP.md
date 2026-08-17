@@ -588,9 +588,21 @@ Plans:
 
   1. A completed workflow that produced a file shows that file from the run surface.
   2. The presentation reuses `OutputFileCard` / `FilesSection` / `fileIcon` — no second file UI.
-  3. Multiple produced files are handled with the shipped hero/working split, not a new pattern.
+  3. Multiple produced files are handled with the ONE uniform quiet row — no hero, no second pattern — ordered newest-first client-side. ⚠ **CORRECTED 2026-08-17 by plan `195-08`; the original wording is quoted verbatim in the note below, never overwritten.**
 
-⚠ **SC#3 NAMES A RETIRED PATTERN AND IS CORRECTED BY THIS PHASE — the original is preserved above rather than overwritten** (`195-CONTEXT.md` D-10 / D-11; `195-RESEARCH.md` confirmed it at `:589`). Phase **095.1 (D-095.1-06) REVERSED** the hero/working split by an operator-approved decision: `OutputFileCard`'s `variant` prop is *"INERT … no longer changes the rendered shape — every row renders the one quiet uniform style"* and `is_hero` is *written-but-unread*. **The criterion as it now reads:** *multiple produced files are handled with the ONE uniform quiet row — no hero, no second pattern — ordered newest-first client-side (D-12).* The scale fact that makes that right: **60 of 61 file-bearing runs have exactly ONE file**, so reviving a hero signal would build a pattern for a population of one. ⚠ The stale twin of this criterion lives in `.claude/skills/sketch-findings-agentic-rag/references/chat-tool-card-unification.md` at **nine sites** (not the four CONTEXT names) and is corrected in the same phase — left alone, the next UI phase builds a hero block from the design record. Plan `195-08` owns both corrections; this note is the planner's, written at `/gsd:plan-phase 195`.
+⚠ **SC#3 NAMED A RETIRED PATTERN AND IS CORRECTED BY THIS PHASE — the original is preserved BESIDE the correction rather than overwritten** (`195-CONTEXT.md` D-10 / D-11; `195-RESEARCH.md` confirmed it at `:589`).
+
+> **THE ORIGINAL SC#3, VERBATIM:** *"Multiple produced files are handled with the shipped hero/working split, not a new pattern."*
+
+**Why it could not be satisfied:** Phase **095.1 (D-095.1-06) REVERSED** the hero/working split by an operator-approved decision. `OutputFileCard`'s `variant` prop is *"INERT … no longer changes the rendered shape — every row renders the one quiet uniform style"* (`OutputFileCard.tsx:59-66`) and `is_hero` is *written-but-unread* (`:54-57`) — the backend still WRITES it and nothing reads it. A criterion instructing the split therefore instructed code that no longer exists, and **a record that is present and WRONG answers the auditor and STOPS the audit**.
+
+**What the criterion now names, and it is what ships:** ONE uniform quiet row for every file — no hero, no grouping, no `kind` distinction — **ordered newest-first client-side** (D-12, `fileRowUtils.byNewestFirst`, pinned in BOTH `created_at` regimes by plan `195-06`). The decision is `195-CONTEXT.md` **D-10**.
+
+**The scale fact that makes it right, measured rather than argued:** **60 of 61 file-bearing runs have exactly ONE file** (the 61st is a chat thread carrying 19 `execute_code` PNGs, per D-01). Reviving a hero signal would build a pattern for a population of one — and would require inventing a hero flag on the workspace-file path, which has none.
+
+⚠ **The criterion was corrected BY the phase it belongs to, which is why the phase can satisfy it.** Correcting a stale criterion is not the same as moving a goalpost: the original named a pattern that had been retired by an operator-approved decision **four milestones before this phase was scoped**, and the correction names what shipped rather than what the phase found convenient.
+
+⚠ The stale twin of this criterion lives in `.claude/skills/sketch-findings-agentic-rag/references/chat-tool-card-unification.md` at **nine sites** (not the four CONTEXT names) and is corrected in the same phase — left alone, the next UI phase builds a hero block from the design record. Plan `195-08` owns both corrections. *(The paragraph above this line was the planner's, written at `/gsd:plan-phase 195`; plan `195-08` rewrote the criterion itself and quoted the original, because a note under an uncorrected criterion still leaves the criterion instructing retired code.)*
 
 **Plans**: 8 plans in 4 waves
 
