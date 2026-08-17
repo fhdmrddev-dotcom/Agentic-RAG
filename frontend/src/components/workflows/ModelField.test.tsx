@@ -494,10 +494,30 @@ describe("ModelField 196-05 — SOURCE fence: no component state, no effect, by 
     expect(occurrences(src, "useEffect")).toBe(0)
   })
 
-  it("…and it does not fetch: the client module is never imported by the component", () => {
-    // The `models` prop is the whole input. A fetch here would run four times per panel open.
+  it("…and it cannot fetch: the api client is reached ONLY as an erased type import", () => {
+    // The `models` prop is the whole input. A read here would run four times per panel open.
+    //
+    // ⚠ ASSERTED AS "NO RUNTIME IMPORT OF THE CLIENT", NOT AS A GREP FOR ONE FUNCTION NAME,
+    // and the widening is deliberate in two directions at once. It is STRONGER — a token
+    // grep forbids one call and waves through the other ~200 exports of that module, while
+    // this forbids the whole surface. And it spells no forbidden token: this plan's
+    // acceptance greps the components tree for the registry reader's name, and a fence whose
+    // own needle trips the criterion it defends is the 187-24 trap plan 196-04 hit three
+    // times in one afternoon. A grep for that name over this file must come back EMPTY.
     const src = modelFieldSource as string
-    expect(occurrences(src, "getAuthorModelRegistry")).toBe(0)
+    expect(occurrences(src, 'from "@/lib/api"')).toBe(1)
+    expect(src).toContain('import type { AuthorModelRow } from "@/lib/api"')
     expect(occurrences(src, "fetch(")).toBe(0)
+    expect(occurrences(src, "await ")).toBe(0)
+  })
+
+  it("POSITIVE CONTROL — the import fence really can find a runtime import", () => {
+    // Without this, the assertion above passes on a needle that matches nothing. The fixture
+    // is a string, so no file in the tree can accidentally make the control pass.
+    const runtimeImport = 'import { somethingThatFetches } from "@/lib/api"'
+    const typeImport = 'import type { AuthorModelRow } from "@/lib/api"'
+    expect(occurrences(runtimeImport, 'from "@/lib/api"')).toBe(1)
+    expect(runtimeImport.startsWith("import type")).toBe(false)
+    expect(typeImport.startsWith("import type")).toBe(true)
   })
 })

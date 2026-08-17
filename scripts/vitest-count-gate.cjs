@@ -120,6 +120,54 @@ const path = require("node:path")
 
 // ── The pin. Keyed by BARE filename (testResults[].name is an absolute path). ──
 const BASELINE = {
+  // ── 196-05 (AUTH-04 / D-04 … D-15) — THREE NEW FILES, each pinned in the SAME COMMIT ──
+  // ── that creates it, because a `BASELINE` key naming a path that does not yet exist ──
+  // ── makes this gate ERROR (exit 2) rather than fail. ──────────────────────────────────
+  //
+  // A `TARGETS` edit accompanies exactly ONE of the three, and which one is CHECKED rather
+  // than assumed. `modelFitness.test.ts` and `ModelField.test.tsx` live in
+  // `src/components/workflows`, already a DIRECTORY entry in the `TARGETS` array below, so
+  // they RAN the moment they existed and this script printed them as `— 18 new` and
+  // `— 32 new` before these lines were written. `useModelRegistry.test.ts` lives under
+  // `src/hooks`, which has NO directory entry anywhere in this script, so it needed both
+  // knobs — the reasoning is recorded beside its `TARGETS` line rather than duplicated here.
+  // TARGETS decides what RUNS, BASELINE what is GUARDED.
+  //
+  // ⚠ AN UNPINNED FILE IS NOT A LIGHTLY-GUARDED ONE, IT IS AN UNGUARDED ONE. All three
+  // numbers were READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that first executed
+  // them, never hand-counted from `it(` literals and never taken from a planning document —
+  // this plan's own text quotes none of them for exactly that reason.
+  //
+  // What would be unguarded without these three entries:
+  //
+  //   • `ModelField.test.tsx` (32) — ⚠ THE MOST LOAD-BEARING OF THE THREE. It carries the
+  //     ONLY mechanical guard on the no-write-on-open property: a SOURCE fence over the
+  //     component's own `?raw` text asserting zero component-state and zero effect tokens,
+  //     with a positive control run over an inline fixture that DOES contain them and a
+  //     non-vacuity floor. No shipped picker suite in this tree asserts that a form performs
+  //     no write when it is merely opened, and a form that rewrites a stored value as a side
+  //     effect of being LOOKED AT is a silent integrity change to a saved definition. Also
+  //     here: the hedged-vs-degraded inherit label in both arms (the whole of D-06's refusal
+  //     to assert a default the code does not implement), the `(current)` retention for a
+  //     disabled AND an unknown id, and the absence assertions — no free-text path, no
+  //     grouping without the deliverable flag, no engine token without the reveal — which
+  //     are the easiest kind of case to delete unnoticed.
+  //
+  //   • `modelFitness.test.ts` (18) — the whole-table properties of the tier vocabulary:
+  //     the three locked sentences, the demonstration that a containment assertion on them
+  //     is vacuous by construction (the strongest sentence CONTAINS the middle one), and
+  //     the two separate fallback paths a single coalesce would collapse into one — the
+  //     read-time default for an ABSENT tier and the boundary guard for an UNRECOGNISED
+  //     one, both landing on the weakest word rather than on blank.
+  //
+  //   • `useModelRegistry.test.ts` (11) — that a FAILED read resolves to a distinct member
+  //     and NOT to an empty success, with a positive control proving a genuinely empty
+  //     registry still reads as ready. Without it, a failed fetch would render as a
+  //     perfectly calm picker offering nothing but its inherit option — a defect that LOOKS
+  //     exactly like a correct render, which is why a reviewer cannot be the guard.
+  "ModelField.test.tsx": 32,
+  "modelFitness.test.ts": 18,
+  "useModelRegistry.test.ts": 11,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
@@ -2802,6 +2850,33 @@ const TARGETS = [
   // holds suites this plan does not read, and adopting them would make Phase 196
   // the owner of their future rot in a gate that requires 0 failing forever.
   "src/components/panel/PhaseCard.test.tsx",
+  // Added in 196-05 (AUTH-04 / D-06), in the SAME COMMIT that creates the file — the
+  // NINTH occurrence of the two-knob trap this array records as a rule, and the SECOND
+  // entry ever on `src/hooks/`.
+  //
+  // ⚠ THIS ENTRY IS WHAT MAKES THE PIN REACHABLE AT ALL. Unlike Tasks 1 and 2 of this
+  // plan — whose suites live in `src/components/workflows`, already a DIRECTORY entry at
+  // the top of this array, so they RAN the moment they existed — there is no `src/hooks`
+  // directory entry anywhere here. MEASURED before this line was written, not assumed:
+  // the only `src/hooks` path in this whole script is the FILE-LEVEL
+  // `useDraftPersistence.test.tsx` entry above, so without this line the gate would never
+  // EXECUTE this suite, and a falsification that does not run has falsified nothing
+  // (verification truth 14, round 5 of Phase 187).
+  //
+  // WHAT IS UNGUARDED WITHOUT IT — the full reason is recorded ONCE at the matching
+  // `BASELINE` entry (search `196-05`); in one line: this suite is the only thing standing
+  // between a FAILED registry read and a picker that renders as a calm, correct control
+  // offering nothing but its inherit option.
+  //
+  // ⚠ TIMING: a `TARGETS` path that does not yet exist makes this gate ERROR at exit 2,
+  // not fail, for every later plan — so it lands in the creating commit and nowhere else.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/hooks` — the same reasoning this
+  // script already records eight times over, and verbatim the reasoning recorded at the
+  // `useDraftPersistence.test.tsx` entry above. That directory holds dozens of suites this
+  // plan does not read, and adopting them would make Phase 196 the owner of their future
+  // rot in a gate that requires 0 failing forever.
+  "src/hooks/__tests__/useModelRegistry.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")
