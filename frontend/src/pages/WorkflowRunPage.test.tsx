@@ -159,6 +159,12 @@ vi.mock("@/components/workflows/WorkflowCanvas", () => ({
 
 import { WorkflowRunPage } from "./WorkflowRunPage"
 import pageSource from "./WorkflowRunPage?raw"
+// Phase 195 Plan 06 — the two shared modules the page now CONSUMES instead of copying.
+// The F1 fence below inverted, and an inverted absence arm is worth nothing without the
+// mirrored presence arm: these two imports are how "it moved" is told apart from "it
+// vanished". Each is length- AND identity-guarded at its use site.
+import utilsSource from "@/components/files/fileRowUtils?raw"
+import iconSource from "@/lib/fileIcon?raw"
 import { ApiError } from "@/lib/api"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 
@@ -894,7 +900,51 @@ describe("WorkflowRunPage — loading and error states", () => {
     renderPage()
     await screen.findByTestId("canvas-stub")
     const region = screen.getByTestId("run-deliverables")
-    expect(region.textContent).toContain("What this run produced")
+    // ⚠ Phase 195 (D-02) — this literal was "What this run produced" until the region's
+    // label was made honest about its scope. See the honesty case below for why, and
+    // `WorkflowRunPage.tsx`'s constant for the quoted original.
+    expect(region.textContent).toContain("Files in this run's workspace")
+  })
+
+  // ── Phase 195 Plan 06 (D-02, P5) — THE LABEL MUST NOT CLAIM AUTHORSHIP ───────────
+  it("labels the region by WHERE the files are and never claims the run produced them", async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const heading = screen.getByTestId("run-deliverables").querySelector("h2")
+    expect(heading).not.toBeNull()
+    /**
+     * (a) THE WORD-LEVEL SWEEP RUNS FIRST, AND THE ORDER IS LOAD-BEARING. An `expect`
+     * that fails aborts the case, so an equality placed above this would swallow it:
+     * every overclaiming copy reds the equality too, and the sweep would then never
+     * execute — a fence that cannot be OBSERVED firing is one nobody can distinguish
+     * from a fence that cannot fire. Sweep first, equality second, and each arm has a
+     * plant that reds IT (an overclaiming copy for this one; a merely-wrong-but-honest
+     * copy for the equality below).
+     *
+     * ⚠ AND IT IS SCOPED TO THE `<h2>` ON PURPOSE — a sweep
+     * of the region's whole `textContent` REDS ON CORRECT CODE. The terminal empty
+     * state legitimately reads *"This run produced no files."*, and that sentence is
+     * NOT an overclaim (an empty thread-scoped list does entail the run produced
+     * nothing — D-15 keeps it byte-identical). A region-wide needle would therefore
+     * fire on the one true sentence in the region. The proof of that is the last
+     * assertion in this case, not a promise.
+     */
+    expect(heading?.textContent ?? "").not.toMatch(/this run (produced|made|created)/i)
+    // (b) the equality. On its own this is weak — it passes on ANY wrong copy that
+    //     happens to be the one someone typed here too, which is why (a) exists.
+    expect(heading?.textContent).toBe("Files in this run's workspace")
+    // POSITIVE CONTROLS — three DIFFERENT overclaiming labels the sweep really catches.
+    // Without these, (b) is equally consistent with a regex that can never match.
+    for (const overclaim of [
+      "What this run produced",
+      "Files this run made",
+      "Everything this run created",
+    ]) {
+      expect(overclaim).toMatch(/this run (produced|made|created)/i)
+    }
+    // ...and the mis-scoping this case refuses is demonstrated, not asserted: the
+    // shipped terminal empty copy matches the very needle above.
+    expect(COPY_EMPTY_TERMINAL).toMatch(/this run (produced|made|created)/i)
   })
 })
 
@@ -981,6 +1031,59 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
     )
   })
 
+  // ── Phase 195 Plan 06 (D-12, P4) — THE REGION RENDERS NEWEST FIRST ───────────────
+  //
+  // The comparator has its own unit coverage in the shared module's suite. What CANNOT
+  // be proved there is that THIS REGION applies it, which is what these two cases are
+  // for — and they are two rather than one because the comparator has two regimes and
+  // the deliverable arrives in the second one.
+
+  it("orders the list newest first — the unsorted order and the rendered order DIFFER", async () => {
+    // ⚠ THE FIXTURE IS THE POSITIVE CONTROL. Given oldest-first input, a case over a
+    // one-row list — or over a list already in the right order — passes forever whether
+    // the page sorts or not (`PendingAskCard.test.tsx:205-222` is the shipped shape of
+    // this mistake). These two rows are supplied OLDEST FIRST on purpose, so "rendered
+    // order == supplied order" and "rendered order == newest first" cannot both be true.
+    setFiles([
+      { id: "f-old", path: "old.md", size_bytes: 100, mime_type: "text/markdown", created_at: "2026-08-01T10:00:00Z" },
+      { id: "f-new", path: "new.md", size_bytes: 200, mime_type: "text/markdown", created_at: "2026-08-17T10:00:00Z" },
+    ])
+    renderPage()
+    await screen.findByRole("button", { name: "Download new.md (200 B)" })
+    const rows = screen.getByTestId("run-deliverables").querySelectorAll('[role="list"] li')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].textContent).toContain("new.md")
+    expect(rows[1].textContent).toContain("old.md")
+    // Stated separately so this is a MEASUREMENT and not a coincidence of insertion
+    // order: the input really was the other way round.
+    expect(rows[0].textContent).not.toContain("old.md")
+  })
+
+  it("⚠ the JUST-PRODUCED file — the one with NO created_at — renders FIRST", async () => {
+    /**
+     * ⚠ THIS IS THE REGIME THE DELIVERABLE ACTUALLY ARRIVES IN, and it is the one a
+     * naive `created_at DESC` gets exactly backwards. The reconciled list read supplies
+     * a creation timestamp on every row; the LIVE arrival does not (the streamed
+     * payload carries id/path/version/size/mime only) and the store APPENDS it. So the
+     * file the run just wrote — the entire point of "show the deliverable" — is
+     * precisely the row with no sort key, and a comparator that parks a missing key at
+     * the END would bury it under the template it filled.
+     *
+     * The shared comparator sorts a MISSING key FIRST for that reason, and this case is
+     * what proves the REGION inherits that and not merely the module.
+     */
+    setFiles([
+      { id: "f-template", path: "Northwind-QBR-Template.docx", size_bytes: 38700, mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", created_at: "2026-08-17T09:00:00Z" },
+      { id: "f-live", path: "output/renewal-letter.docx", size_bytes: 18841, mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+    ])
+    renderPage()
+    await screen.findByRole("button", { name: DOWNLOAD_LABEL })
+    const rows = screen.getByTestId("run-deliverables").querySelectorAll('[role="list"] li')
+    expect(rows).toHaveLength(2)
+    expect(rows[0].textContent).toContain(DELIVERABLE_NAME)
+    expect(rows[1].textContent).toContain("Northwind-QBR-Template.docx")
+  })
+
   it("a row the listing gave with no id is shown as a fact, never as a dead control", async () => {
     setFiles([{ path: "orphan.docx", size_bytes: 100, mime_type: "" }])
     renderPage()
@@ -993,11 +1096,22 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
-describe("195-02 — the id-less deliverable row TODAY: a fact with no control and NO copy (pre-change capture)", () => {
+describe("195-02/195-06 — the id-less deliverable row: still no control, now NOT silent (capture + its inversion)", () => {
   /**
    * ═══════════════════════════════════════════════════════════════════════════
-   * ⚠ THIS BLOCK CAPTURES BEHAVIOUR THAT PLAN 195-06 DELIBERATELY CHANGES.
+   * ⚠ THIS BLOCK CAPTURED BEHAVIOUR THAT PLAN 195-06 DELIBERATELY CHANGED — AND
+   *   PLAN 195-06 HAS NOW LANDED. Case 2 inverted; cases 1 and 3 did not.
    * ═══════════════════════════════════════════════════════════════════════════
+   *
+   * ⚠ THE DESCRIBE TITLE CHANGED WITH IT, and the original is kept here rather
+   *   than overwritten: it read *"195-02 — the id-less deliverable row TODAY: a
+   *   fact with no control and NO copy (pre-change capture)"*. The "no control"
+   *   half is still true and is still asserted; the "NO copy" half is what
+   *   195-06 removed, so a title still claiming it would be a lie sitting above
+   *   a case that measures the opposite.
+   *
+   * Everything below is the block AS PLAN 195-02 WROTE IT, kept verbatim so the
+   * pre-change reasoning survives its own inversion. Read it in the past tense.
    *
    * Today an id-less row on this page is a plain `<div title={file.path}>` with
    * an icon, the name and the size — and **nothing else**
@@ -1078,25 +1192,63 @@ describe("195-02 — the id-less deliverable row TODAY: a fact with no control a
     expect(screen.getByTestId("run-deliverables").querySelectorAll("button")).toHaveLength(0)
   })
 
-  it(`the ROW carries no "${D08_COPY}" — the absence plan 195-06 inverts`, async () => {
+  it(`the ROW now CARRIES "${D08_COPY}" — the absence plan 195-06 inverted`, async () => {
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════
+     * ⚠ SUPERSEDED IN PLACE — PHASE 195 PLAN 06 (RUN-03). THIS CASE INVERTED.
+     * ═══════════════════════════════════════════════════════════════════════════
+     *
+     * It was titled *"the ROW carries no «Download unavailable» — the absence plan
+     * 195-06 inverts"*, and its three assertions read, VERBATIM:
+     *
+     *     expect(row?.textContent ?? "").not.toContain(D08_COPY)
+     *     expect(row?.getAttribute("title")).not.toContain(D08_COPY)
+     *     expect(row?.querySelector('[aria-disabled="true"]')).toBeNull()
+     *
+     * That was a true and deliberate PRE-CHANGE CAPTURE, authored by plan 195-02 so
+     * this plan's change would be a MEASURED DELTA rather than an unrecorded one. The
+     * originals are quoted rather than deleted for the reason recorded at
+     * `StopControl.baseline.test.tsx:513-573` (194.1-07): a capture deleted the moment
+     * it inverts leaves no record that the old behaviour was ever real (193.2 WR-05).
+     *
+     * ⚠ THE DELTA, IN ONE SENTENCE: the run page's id-less row went from a SILENT fact
+     * to a LEGIBLE unavailable one, and gained nothing else. Same element, same tag,
+     * same basename, same size, same full path in `title` — plus the affordance the
+     * chat card has carried since `BUG-260523-03`. The run density's dead overrides
+     * are empty, so even the name and icon colours are unchanged.
+     */
     renderPage()
     await screen.findByTestId("canvas-stub")
     const row = idLessRow()
     expect(row).not.toBeNull()
     /**
-     * ⚠ SCOPED TO THE ROW, NOT TO THE REGION — and the reason is measured, not
-     * stylistic. The region's terminal empty copy is *"This run produced no
-     * files."* and its error line carries whatever the API said; a region-wide
-     * `textContent` sweep is precisely the mis-scoped query P5 names, and it
-     * would red on correct code the moment any neighbouring prose happened to
-     * contain the needle. `idLessRow()` returns the `<li>`'s only child, so
-     * this assertion can only be satisfied by the row itself.
+     * ⚠ STILL SCOPED TO THE ROW, NOT TO THE REGION — the scoping reason is unchanged
+     * by the inversion and is measured, not stylistic. The region's terminal empty
+     * copy is *"This run produced no files."* and its error line carries whatever the
+     * API said; a region-wide `textContent` sweep is precisely the mis-scoped query
+     * P5 names. `idLessRow()` returns the `<li>`'s only child, so these assertions can
+     * only be satisfied by the row itself.
      */
-    expect(row?.textContent ?? "").not.toContain(D08_COPY)
-    // The long-form title is absent too — pinned separately so the inversion
-    // records BOTH halves of what 195-06 adds, not just the visible words.
-    expect(row?.getAttribute("title")).not.toContain(D08_COPY)
-    expect(row?.querySelector('[aria-disabled="true"]')).toBeNull()
+    expect(row?.textContent ?? "").toContain(D08_COPY)
+    // BOTH halves of what 195-06 adds are pinned, not just the visible words: the
+    // long-form title lives on the affordance element (the row's own `title` is still
+    // the file path — asserted in the case above, and unchanged by this).
+    const affordance = row?.querySelector('[aria-disabled="true"]')
+    expect(affordance).not.toBeNull()
+    expect(affordance?.getAttribute("title")).toContain(D08_COPY)
+    expect(affordance?.getAttribute("title")).toBe("Download unavailable — this file has no link")
+    /**
+     * ⚠ AND THE AFFORDANCE IS NOT A CONTROL. A reader who does not know why will read
+     * the sibling case's `toHaveLength(0)` sitting next to a VISIBLE download
+     * affordance as a bug, so it is stated here in words: a dead affordance is a
+     * STATEMENT OF FACT, not a control — there is nothing to activate, so there is
+     * nothing to focus. It is a `<span aria-disabled>`, which is the ONLY reason the
+     * shipped zero-button contract on this region survived unification, and
+     * `aria-disabled` is a PRESENTATIONAL guard and never an authorization one: the
+     * gate on a download is the early return inside the page's own handler.
+     */
+    expect(affordance?.tagName).toBe("SPAN")
+    expect(row?.querySelectorAll("button")).toHaveLength(0)
   })
 
   it("POSITIVE CONTROL — the same needle IS found in a string that contains it", async () => {
@@ -1151,7 +1303,9 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
     expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
     // The heading is still there — the region exists, it just makes no claim yet.
-    expect(region.textContent).toContain("What this run produced")
+    // ⚠ Phase 195 (D-02): this literal was "What this run produced". D-15's third arm
+    // and D-02's relabel land in ONE plan precisely because this assertion joins them.
+    expect(region.textContent).toContain("Files in this run's workspace")
   })
 })
 
@@ -1587,20 +1741,77 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   })
 
   it("neither mounts the panel's file list nor names it — it reads the viewed thread", () => {
+    /**
+     * ═══════════════════════════════════════════════════════════════════════════
+     * ⚠ SUPERSEDED IN PLACE — PHASE 195 (RUN-03). TWO ARMS OF THIS CASE INVERTED.
+     * ═══════════════════════════════════════════════════════════════════════════
+     *
+     * The two arms below used to read, VERBATIM:
+     *
+     *     expect(codeOf(pageSource)).toMatch(/function formatBytes/)
+     *     expect(codeOf(pageSource)).toMatch(/function iconFor/)
+     *
+     * with the comment *"...and the mirrored pieces really are here."* They asserted
+     * that this page DECLARES its own byte formatter and its own extension→glyph
+     * mapping — i.e. they asserted the duplication, and they were RIGHT to: the page
+     * really did carry a third copy of a formatter that also shipped in the chat
+     * output card and the panel file list, one of which apologised for itself in a
+     * comment. **RUN-03 removed exactly that duplication**, so the arms now assert its
+     * ABSENCE, and the mirrored positive arms below prove the shared module holds the
+     * behaviour instead of it having simply vanished.
+     *
+     * ⚠ THE ORIGINALS ARE QUOTED RATHER THAN DELETED, and the case is inverted rather
+     * than removed. Two reasons, both scars:
+     *   · `StopControl.baseline.test.tsx:513-573` (194.1-07) records the rule — *a
+     *     capture deleted the moment it inverts leaves no record that the old
+     *     behaviour was ever real* (193.2 WR-05). Someone reading this file in a year
+     *     should be able to see that three copies of one formatter genuinely shipped.
+     *   · This suite is pinned EXACT in the count gate. Deleting an `it(` trips
+     *     `[count-decrease]` and needs a pin LOWERING, which is authorised nowhere.
+     *
+     * The case TITLE is unchanged and still true: the page still does not mount the
+     * panel's file list and still does not name it. That half never inverted.
+     */
     // The panel list resolves its thread from the globally-viewed-thread selector rather
     // than from a prop, so mounting it here would WRITE chat state as a side effect of
-    // opening a run. Only its icon mapping and byte formatter are mirrored, and both are
-    // pure. The selector itself must not appear either — that is the mechanism.
+    // opening a run. The selector itself must not appear either — that is the mechanism.
     const PANEL_LIST = ["Files", "Section"].join("")
     const VIEWED = ["useViewing", "Thread"].join("")
     expect(pageSource).not.toMatch(new RegExp(PANEL_LIST))
     expect(pageSource).not.toMatch(new RegExp(VIEWED))
-    // ...and the mirrored pieces really are here.
-    expect(codeOf(pageSource)).toMatch(/function formatBytes/)
-    expect(codeOf(pageSource)).toMatch(/function iconFor/)
+    // ⚠ INVERTED (Phase 195): the mirrored pieces are GONE. Nothing is mirrored here
+    // any more — the presentation is shared, not copied.
+    expect(codeOf(pageSource)).not.toMatch(/function formatBytes/)
+    expect(codeOf(pageSource)).not.toMatch(/function iconFor/)
+    // ...and the page CONSUMES the shared ones instead of re-declaring them.
+    expect(codeOf(pageSource)).toMatch(/from "@\/components\/files\/fileRowUtils"/)
+    expect(codeOf(pageSource)).toMatch(/from "@\/components\/files\/FileRow"/)
+    /**
+     * THE MIRRORED POSITIVE ARMS — the behaviour did not evaporate, it MOVED, and this
+     * is where it moved to.
+     *
+     * ⚠ EACH `?raw` IMPORT CARRIES A LENGTH GUARD **AND** AN IDENTITY GUARD, and that
+     * is not ceremony: 192.1 measured a fence sweeping a renamed module against the
+     * EMPTY STRING and passing green. A `toMatch` over "" fails loudly, but a future
+     * `not.toMatch` added beside it would pass forever, so both guards are stated here
+     * once rather than assumed per-assertion.
+     */
+    expect(utilsSource.length).toBeGreaterThan(500)
+    expect(utilsSource).toContain("fileRowUtils")
+    expect(iconSource.length).toBeGreaterThan(500)
+    expect(iconSource).toContain("fileIcon")
+    // The formatter now lives in the shared pure module...
+    expect(utilsSource).toMatch(/export function formatBytes/)
+    expect(utilsSource).toMatch(/export function baseName/)
+    // ...and the ext→glyph mapping in the ONE shared icon module.
+    expect(iconSource).toMatch(/export function fileIcon/)
+    expect(iconSource).toMatch(/const EXT_MAP/)
     // POSITIVE CONTROLS — both assembled needles match the shapes they forbid.
     expect("import { FilesSection } from './FilesSection'").toMatch(new RegExp(PANEL_LIST))
     expect("const threadId = useViewingThread()").toMatch(new RegExp(VIEWED))
+    // ...and the two inverted arms really would catch a re-declaration coming back.
+    expect(codeOf("function formatBytes(b: number) {}")).toMatch(/function formatBytes/)
+    expect(codeOf("function iconFor(f: WorkspaceFile) {}")).toMatch(/function iconFor/)
   })
 
   it("promises no preview: the previewer is neither imported nor named", () => {
