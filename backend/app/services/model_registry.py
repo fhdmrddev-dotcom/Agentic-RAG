@@ -43,8 +43,9 @@ PATCH SURFACE (the acceptance bar):
 THE ``enabled`` SEMANTICS THIS MODULE ADOPTS, stated because a reviewer WILL compare counts:
 
   ``_registry_row`` treats an ABSENT override row as ``enabled: true`` (measured: 66 of 69
-  rows enabled). ``user_settings.enabled_model_allowed_set()`` treats an absent row as NOT
-  offerable (34). Both ship today; they are incompatible. ``_resolve_enabled_model`` — the
+  rows enabled). The allowed-set helper in ``app.models.user_settings`` that backs
+  ``/me/preferences`` treats an absent row as NOT offerable (34). Both ship today; they are
+  incompatible. ``_resolve_enabled_model`` — the
   RUNTIME enforcement in ``run_model_resolution.py`` — agrees with ``_registry_row``: it
   falls back only when an override row carries ``enabled=false``. This module therefore keeps
   ``_registry_row``'s semantics, so the picker and the harness cannot disagree about the same
