@@ -114,8 +114,30 @@ const COPY_OPEN_THREAD = "Open the chat thread"
  *  constant, so the two can never word the same fact differently. */
 const WAITING_TO_START = "Waiting to start"
 /** The deliverable region's identity. Not a claim about contents — the two empty
- *  states below carry that, and they differ because the truth differs. */
-const COPY_DELIVERABLE_HEADING = "What this run produced"
+ *  states below carry that, and they differ because the truth differs.
+ *
+ *  ── ⚠ PHASE 195 (D-02) — THE STRING CHANGED, AND THE OLD ONE IS QUOTED HERE RATHER
+ *     THAN ERASED, because the reason it was wrong is the interesting part. ─────────
+ *
+ *  It read, verbatim:  "What this run produced"
+ *
+ *  That is an authorship claim, and this region cannot support one. The list is read
+ *  THREAD-scoped (D-01: no run attribution column exists, and none was added — the
+ *  candidate field that looks like one is null on every row and belongs to a different
+ *  feature). A thread can legitimately hold files this run did not write: the template
+ *  a user uploaded before launching, and anything an earlier run or a chat turn on the
+ *  same thread left behind. Measured at planning time, thread-scope is exact for 60 of
+ *  the 61 file-bearing runs and visibly wrong for one — so the old label was a lie with
+ *  a small blast radius rather than a rare one, which is exactly the kind that survives
+ *  review. The new label names WHERE the files are, which is the thing the read can
+ *  actually prove, and leaves WHO WROTE THEM unclaimed.
+ *
+ *  ⚠ THE TWO EMPTY STRINGS BELOW ARE DELIBERATELY UNCHANGED and must stay that way.
+ *  "This run produced no files." looks like the same overclaim and is not: a run is a
+ *  subset of its thread, so an EMPTY thread-scoped list entails the run produced
+ *  nothing. The overclaim only bites in the NON-empty direction. D-15 ships both
+ *  strings byte-identical, and a source fence pins each at exactly one occurrence. */
+const COPY_DELIVERABLE_HEADING = "Files in this run's workspace"
 const COPY_NO_FILES_LIVE = "No files yet — this run hasn't written anything."
 const COPY_NO_FILES_TERMINAL = "This run produced no files."
 const COPY_DOWNLOAD_FAILED = "Download failed — try again."

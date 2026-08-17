@@ -894,7 +894,51 @@ describe("WorkflowRunPage — loading and error states", () => {
     renderPage()
     await screen.findByTestId("canvas-stub")
     const region = screen.getByTestId("run-deliverables")
-    expect(region.textContent).toContain("What this run produced")
+    // ⚠ Phase 195 (D-02) — this literal was "What this run produced" until the region's
+    // label was made honest about its scope. See the honesty case below for why, and
+    // `WorkflowRunPage.tsx`'s constant for the quoted original.
+    expect(region.textContent).toContain("Files in this run's workspace")
+  })
+
+  // ── Phase 195 Plan 06 (D-02, P5) — THE LABEL MUST NOT CLAIM AUTHORSHIP ───────────
+  it("labels the region by WHERE the files are and never claims the run produced them", async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const heading = screen.getByTestId("run-deliverables").querySelector("h2")
+    expect(heading).not.toBeNull()
+    /**
+     * (a) THE WORD-LEVEL SWEEP RUNS FIRST, AND THE ORDER IS LOAD-BEARING. An `expect`
+     * that fails aborts the case, so an equality placed above this would swallow it:
+     * every overclaiming copy reds the equality too, and the sweep would then never
+     * execute — a fence that cannot be OBSERVED firing is one nobody can distinguish
+     * from a fence that cannot fire. Sweep first, equality second, and each arm has a
+     * plant that reds IT (an overclaiming copy for this one; a merely-wrong-but-honest
+     * copy for the equality below).
+     *
+     * ⚠ AND IT IS SCOPED TO THE `<h2>` ON PURPOSE — a sweep
+     * of the region's whole `textContent` REDS ON CORRECT CODE. The terminal empty
+     * state legitimately reads *"This run produced no files."*, and that sentence is
+     * NOT an overclaim (an empty thread-scoped list does entail the run produced
+     * nothing — D-15 keeps it byte-identical). A region-wide needle would therefore
+     * fire on the one true sentence in the region. The proof of that is the last
+     * assertion in this case, not a promise.
+     */
+    expect(heading?.textContent ?? "").not.toMatch(/this run (produced|made|created)/i)
+    // (b) the equality. On its own this is weak — it passes on ANY wrong copy that
+    //     happens to be the one someone typed here too, which is why (a) exists.
+    expect(heading?.textContent).toBe("Files in this run's workspace")
+    // POSITIVE CONTROLS — three DIFFERENT overclaiming labels the sweep really catches.
+    // Without these, (b) is equally consistent with a regex that can never match.
+    for (const overclaim of [
+      "What this run produced",
+      "Files this run made",
+      "Everything this run created",
+    ]) {
+      expect(overclaim).toMatch(/this run (produced|made|created)/i)
+    }
+    // ...and the mis-scoping this case refuses is demonstrated, not asserted: the
+    // shipped terminal empty copy matches the very needle above.
+    expect(COPY_EMPTY_TERMINAL).toMatch(/this run (produced|made|created)/i)
   })
 })
 
@@ -1151,7 +1195,9 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
     expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
     // The heading is still there — the region exists, it just makes no claim yet.
-    expect(region.textContent).toContain("What this run produced")
+    // ⚠ Phase 195 (D-02): this literal was "What this run produced". D-15's third arm
+    // and D-02's relabel land in ONE plan precisely because this assertion joins them.
+    expect(region.textContent).toContain("Files in this run's workspace")
   })
 })
 
