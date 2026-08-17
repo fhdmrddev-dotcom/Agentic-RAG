@@ -135,6 +135,25 @@ const SUBSTEP_META: Record<EmitSubStep, SubStepMeta> = {
     textClass: "text-[hsl(var(--panel-status-active))]" },
   validated: { glyph: "✓", text: "Deliverable produced", node: "done",
     textClass: "text-[hsl(var(--panel-status-done))]" },
+  // Phase 196-03 (D-10) — an operator-DISABLED per-phase model was substituted for the
+  // run's model. `degraded` + the `recovering` amber: a substitution is degraded-but-honest,
+  // the same reading `recovering` already carries. It deliberately does NOT reuse the
+  // `recovering` STATUS — a narrated-emit recovery and a disabled-model substitution are
+  // different events, and collapsing them would put a lie on the run surface.
+  //
+  // ⚠ THE LABEL IS A FIXED PLAIN-TEXT CHILD (this file's XSS rule), so it CANNOT interpolate
+  // the two model ids — do not "improve" it into a template string. The specific ids live in
+  // the durable `policy_applied` audit receipt written by `_effective_model_checked` and in
+  // the backend log; the sentence below is true without them.
+  //
+  // ⚠ WHY THIS ENTRY EXISTS AT ALL (the A2 measurement, taken at planning time): `subStepMeta`
+  // below HAS a forward-compat default arm, and it renders `{ glyph: "•", text: "Working",
+  // node: "active" }`. Riding that default would have rendered a disabled-model substitution
+  // as the word "Working" — a SILENT notice, and therefore the very defect this phase exists
+  // to remove. The default arm stays (it is correct for a genuinely unknown future value);
+  // this member simply must not use it.
+  model_fallback: { glyph: "↯", text: "Switched to the run's model — this step's model is turned off",
+    node: "degraded", textClass: "text-accent-violet-text" },
 }
 
 function subStepMeta(s: EmitSubStep): SubStepMeta {

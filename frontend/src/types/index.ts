@@ -988,7 +988,12 @@ export interface TaskRunIndexItem {
  *  streams via `phase_substep` (status field). A sealed forced emit is ATOMIC (it
  *  cannot stream tokens), so the emit moment surfaces as these honest sub-steps on the
  *  EXISTING status-node rail instead of a static "Step 0 · working…" box. Optional —
- *  only a `llm_emit` fill phase ever carries one; every other phase leaves it undefined. */
+ *  most phases leave it undefined.
+ *
+ *  ⚠ THIS DOCBLOCK USED TO SAY *"only a `llm_emit` fill phase ever carries one"* AND
+ *  PHASE 196 MAKES THAT FALSE — corrected here rather than left as a stale claim.
+ *  `model_fallback` (196-03 / D-10) is streamed by EVERY llm phase type, not just the
+ *  fill one, and the render site was never gated on phase type anyway. */
 export type EmitSubStep =
   | "forcing"
   | "emitting"
@@ -996,6 +1001,9 @@ export type EmitSubStep =
   | "validating"
   | "rendering"
   | "validated"
+  /** Phase 196-03 (D-10) — an operator-DISABLED per-phase model was substituted for the
+   *  run's model. The ONE member a non-`llm_emit` phase can carry. */
+  | "model_fallback"
 
 /** Phase 101.1-04 (GAP-C / D-11) — the 5 distinguishable emit failure states the harness
  *  streams via `phase_substep` (failure field). Each renders failed-as-failed on the rail

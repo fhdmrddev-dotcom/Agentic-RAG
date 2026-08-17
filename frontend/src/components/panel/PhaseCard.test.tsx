@@ -39,6 +39,9 @@ const SUBSTEPS: EmitSubStep[] = [
   "validating",
   "rendering",
   "validated",
+  // Phase 196-03 (D-10). This array is meant to be the WHOLE union — a member missing here
+  // is a member the generic sub-row assertion never exercises.
+  "model_fallback",
 ]
 
 const FAILURES: EmitFailure[] = [
@@ -71,6 +74,33 @@ describe("PhaseCard — GAP-C emit sub-steps (D-11)  [owner: 101.1-04]", () => {
     const row = document.querySelector('[data-emit-substep="recovering"]')
     expect(row).toBeInTheDocument()
     expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  // ── Phase 196-03 (D-10) — the disabled-model fallback notice ────────────────────────
+  it("`model_fallback` renders the honest fixed sentence on a degraded (amber) node", () => {
+    render(<PhaseCard phase={fillPhase({ emitSubStep: "model_fallback" })} position={0} />)
+    const row = document.querySelector('[data-emit-substep="model_fallback"]')
+    expect(row).toBeInTheDocument()
+    // The FIXED plain-text child (XSS rule) — true without interpolating either model id.
+    expect(row?.textContent).toContain("Switched to the run's model")
+    expect(row?.textContent).toContain("this step's model is turned off")
+    // ⚠ It must NOT ride the forward-compat default arm — that renders the word "Working",
+    // which would make the notice silent (the exact defect Phase 196 removes).
+    expect(row?.textContent).not.toContain("Working")
+    // Degraded-but-honest: the same amber `recovering` already uses, NOT a failure.
+    expect(row?.querySelector(".text-accent-violet-text")).toBeInTheDocument()
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
+
+  it("the default arm still catches a genuinely unknown value as 'Working' (the positive control)", () => {
+    // The control that keeps the case above from being vacuous: if `model_fallback` were
+    // riding the default arm, BOTH cases would pass on the same code path. This one proves
+    // the default arm is still reachable AND still distinct from the mapped member.
+    const phase = fillPhase({ emitSubStep: "a_genuinely_unknown_substep" as unknown as EmitSubStep })
+    render(<PhaseCard phase={phase} position={0} />)
+    const row = document.querySelector('[data-emit-substep="a_genuinely_unknown_substep"]')
+    expect(row?.textContent).toContain("Working")
+    expect(row?.textContent).not.toContain("Switched to the run's model")
   })
 
   it("an UNKNOWN sub-step value falls back gracefully (never crashes, never a 'done' success)", () => {

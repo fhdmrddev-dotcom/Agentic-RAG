@@ -1122,7 +1122,10 @@ async def test_both_agent_executors_carry_the_instruction_into_the_system_prompt
 
     monkeypatch.setattr(pt, "run_task_sub_agent", _fake_sub_agent)
     monkeypatch.setattr(pt, "_phase_tools_override", lambda *a, **k: [])
-    monkeypatch.setattr(pt, "_build_phase_tool_context", lambda phase, ctx: object())
+    # 196-03: the builder gained an optional keyword `model` (the CHECKED per-phase
+    # model — run_task_sub_agent reads parent_ctx.model, not the executor's local), so
+    # this stub absorbs it. A 2-arg stub now raises TypeError inside the executor.
+    monkeypatch.setattr(pt, "_build_phase_tool_context", lambda phase, ctx, **_: object())
 
     ctx = SimpleNamespace(
         model="deepseek-v4-flash",
@@ -1158,7 +1161,10 @@ async def test_the_retry_feedback_stays_last_after_the_instruction(monkeypatch):
 
     monkeypatch.setattr(pt, "run_task_sub_agent", _fake_sub_agent)
     monkeypatch.setattr(pt, "_phase_tools_override", lambda *a, **k: [])
-    monkeypatch.setattr(pt, "_build_phase_tool_context", lambda phase, ctx: object())
+    # 196-03: the builder gained an optional keyword `model` (the CHECKED per-phase
+    # model — run_task_sub_agent reads parent_ctx.model, not the executor's local), so
+    # this stub absorbs it. A 2-arg stub now raises TypeError inside the executor.
+    monkeypatch.setattr(pt, "_build_phase_tool_context", lambda phase, ctx, **_: object())
 
     feedback = "Previous output failed validation: citations_required: 0/1. Fix it."
     ctx = SimpleNamespace(model="gpt-5.5", retry_feedback=feedback, inputs={})
