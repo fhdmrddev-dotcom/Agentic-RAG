@@ -28,6 +28,21 @@ interface; document ingestion is a manual file-upload flow.
 - External integrations / connectors follow the recorded MCP-first verdict — `docs/CONNECTOR-ARCHITECTURE.md` (MCP-first, first-party-thin, broad catalog sequenced with Open Platform; dated re-open trigger inside; pointer entry `D-v3.6-01`). No MCP client exists in the backend today; live outbound egress is Phase 190 (STRETCH).
 - **Provider-docs-first (evidence-based):** whenever work touches a specific provider (prompting, orchestration, context management, skill use, tool calls/tool use, streaming, structured output), research that provider's OWN official documentation first, then cross-check against our app's actual behavior with comparative analysis and real evidence (Supabase/DB, backend logs, LangSmith, live cross-provider UAT). Conventions do NOT transfer 1:1 between providers; keep provider-specific handling at the service boundary, never break the shared path. See `.planning/seeds/SEED-034-system-prompt-cross-provider-tool-use.md`.
 
+## CLAUDE.md context budget (MANDATORY)
+
+This file is loaded verbatim into the system prompt of **every session and every subagent**, and Claude Code **refuses to load it over 150,000 characters** — at which point every instruction here silently stops applying, to every agent, everywhere. Characters, not bytes: `wc -c` reads 197,197 for the file the harness called `194.9k` (the gap is multi-byte `—` `⚠` `✅`). Measure with the gate, never with `wc`.
+
+```bash
+node scripts/check-claude-md-size.cjs             # exit 0 clear · 1 over · 2 harness error
+node scripts/check-claude-md-size.cjs --history   # re-derive the growth curve from git
+```
+
+⚠ **It has already tripped once, and it was over for three commits before anyone noticed.** Measured (`--history` reproduces it): `43,269` (2026-08-12) → crossed 150k at `77f7fc16` (`153,108`) → `96d37730` (`155,132`) → `7b39dd5f` (**`194,908`**, `+39,776` in one commit) → split at `a882777b` back to `51,171`. Three single commits added `+21,450`, `+32,414` and `+39,776`. **The split bought headroom; it changed nothing structural**, so the trip recurs unmeasured.
+
+- **Hard limit 150,000 · warn band 120,000.** At the warn band the split is *scheduled*, not scrambled.
+- **Split by FUNCTION, never by deletion.** CLAUDE.md keeps the verdict / index / audit-scan-list; the narrative moves to `docs/<TOPIC>.md` under a **same-commit sync rule**. Precedents: `docs/HOT-FILE-LEDGER.md`, `docs/SANDBOX-PACKAGES.md`. ⚠ A hot file missing from a scan list is permanently invisible to its own guardrail — so the *table* stays complete and only the *prose* leaves.
+- **Two guards, and the local one is primary.** `.claude/hooks/claude-md-size-guard.js` (PostToolUse on `Write|Edit`) fires in the turn that authors the content; `.github/workflows/claude-md-size.yml` is the backstop. ⚠ CI alone is not enough here — `develop` ran **634 commits over 8 days without a push** while this file grew 43k → 195k, so an `on: push` gate could not have fired once in that window.
+
 ## Local dev infrastructure
 
 - **Supabase**: managed by Supabase CLI. `supabase start` boots Postgres + Auth + Storage + Realtime on Docker; configured to auto-start on Docker Desktop boot. ✅ **This auto-start claim was AUDITED and is TRUE** (2026-08-15): all twelve `supabase_*` containers carry `restart: unless-stopped`, measured with `docker inspect -f "{{.HostConfig.RestartPolicy.Name}}"`. It is recorded here because a session spent six wrong turns doubting it — the containers were coming back correctly the whole time and the fault was elsewhere (see the port-reservation trap below). One exception found by the audit: `supabase_edge_runtime_*` read `no` and was pinned; re-audit after any `supabase stop` + `supabase start`, since a recreated container can come back without a policy.
