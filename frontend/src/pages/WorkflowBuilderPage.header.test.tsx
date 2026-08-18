@@ -381,6 +381,52 @@ describe("Builder header, canvas flag OFF — three separate bands (D-181-01)", 
  *    words; `193-09` changed the structure. This literal stood unedited for nine phases before
  *    Phase 193 and is expected to stand again — any further re-capture is a behaviour change
  *    to explain in its own plan, not a test to update.
+ *
+ * ── ✅ NO THIRD RE-CAPTURE: TESTED AGAINST `197-10` ON 2026-08-18 AND THE PIN DID NOT MOVE ──
+ *
+ * `197-10` (D-19) was PLANNED as the third re-capture. Its own plan priced one, `197-CONTEXT.md`
+ * D-19 priced one, and `197-09` deliberately declined to touch the identity span so that this
+ * plan could pay for it in isolation. **It was not owed.** The disposition is recorded here in
+ * the same detail a re-capture would have been given, because "nothing happened" is a
+ * measurement and is worth exactly as much as a diff — and because the next author must be able
+ * to tell a pin that was TESTED against a change from one that was merely left alone.
+ *
+ *  • WHAT `197-10` CHANGED. The identity `<span>`'s child expression, and nothing else on the
+ *    surface: it now renders the workflow's NAME when the definition binds a non-empty one,
+ *    falling back to `meta.slug` and then to `"Untitled workflow"`. Before it, `meta.name`
+ *    appeared in no render position anywhere on the page.
+ *
+ *  • WHY BAND 3 IS UNMOVED, AND IT IS A FACT ABOUT THE FIXTURE. `openDraftBuilder` drives the
+ *    hand-authored `definition` above, which binds **no `name`** — so the slot still resolves
+ *    to `meta.slug`, still renders `vendor-brief`, and the captured literal is still the bytes
+ *    a flag-off user receives. ⚠ `draftRow.name` IS `"Vendor brief"`, but that is the ROW's
+ *    name and it feeds band 1's breadcrumb; only the DEFINITION reaches `meta`. Conflating the
+ *    two would predict a moved band 3 and be wrong.
+ *
+ *      | band            | tag deltas | non-empty text nodes |
+ *      |-----------------|------------|----------------------|
+ *      | 1 (breadcrumb)  | NONE       | 3 → 3, identical     |
+ *      | 2 (door band)   | NONE       | 4 → 4, identical     |
+ *      | 3 (save cluster)| NONE       | 4 → 4, identical     |
+ *
+ *    `git diff --numstat` on this file for `197-10`: **0 deletions.** The literal is untouched
+ *    and every band is byte-identical — measured by running this suite's own two byte-pin cases
+ *    against the changed page, not by inspection.
+ *
+ *  • ⚠ AND THE GREEN IS NOT VACUOUS, WHICH IS THE ONLY WAY THIS ENTRY IS WORTH ANYTHING. A pin
+ *    over a DEAD expression stays green too and proves nothing. `197-10 / D-19 — the drafted
+ *    header's identity slot` drives the SAME flag-off surface with a definition that DOES bind
+ *    a name and reads the name back out of the slot; it FAILS against the pre-change page
+ *    (`expected 'vendor-brief' to be 'Northwind QBR'`) and passes after. So the slot is live,
+ *    and this entry says "the fixture binds no name", never "the change did nothing".
+ *
+ *  • THE `TWO OF TWO` NOTE ABOVE IS VINDICATED, NOT SUPERSEDED. It predicted no third and there
+ *    was none; the literal now stands into a TENTH phase. The prediction keeps its force for the
+ *    next author: a further re-capture is still a behaviour change to explain in its own plan.
+ *    ⚠ It is also now known to be reachable — a definition that binds a name WILL move band 3's
+ *    text node. Whoever gives this suite's fixture a `name` owes the re-capture, and owes it
+ *    under the four-part procedure above (encoder validated first, capture driven twice, ONE
+ *    changed line, per-band delta table), not as a paste.
  */
 const FLAG_OFF_HEADER_MARKUP = [
   `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="builder-back" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">← Workflows</button><span class="text-[13px] font-medium text-foreground">Edit · Vendor brief v1</span><span data-testid="net-new-flag" title="Net-new surface — only GET /workflows/published + POST /workflows/{id}/publish are live today" class="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet">net-new</span></div>`,
@@ -947,5 +993,115 @@ describe("Builder header — useEffectiveFeatures() has ZERO non-test call sites
     )
     expect(planted).not.toBe(workflowsPageSource) // the plant actually landed
     expect(callSites(planted)).toBe(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 197-10 (D-19) — THE IDENTITY SLOT: the NAME when there is one, the SLUG when there
+// is not, and the SLUG again when the name is empty.
+//
+// WHY THESE CASES EXIST. Before `197-10` the header rendered `meta.slug` and the
+// workflow's name was displayed NOWHERE on this page, so shipping the arrival card's
+// editable name row would have put `northwind-qbr-fa65a43c` in the header against
+// `Northwind QBR` in the card, on one screen. The slot now prefers the name.
+//
+// ⚠ THE FIRST CASE IS ALSO THE POSITIVE CONTROL FOR THE BYTE PIN'S DISPOSITION. The
+// re-capture note below records that `FLAG_OFF_HEADER_MARKUP` band 3 did NOT move
+// under this change. That claim is only worth anything if the slot is LIVE — a dead
+// expression would leave the pin green too, and say nothing. This case drives the
+// same flag-off surface with a definition that DOES bind a name and reads the name
+// back out of the slot, so the unmoved pin is provably a fact about the FIXTURE and
+// not about a code path that never runs.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The identity slot itself — the first `<span>` of the flag-off `<header>` band, read
+ * positionally off the rendered tree rather than by a testid, because this plan is
+ * forbidden from adding a node or an attribute to that span (the byte pin sees it).
+ */
+function identitySlot(grid: Element, root: Element): Element {
+  const header = headerBandsAbove(grid, root).find((band) => band.tagName === "HEADER")
+  if (header === undefined) throw new Error("no <header> band above the grid")
+  const slot = header.querySelector("span")
+  if (slot === null) throw new Error("the <header> band carries no identity span")
+  return slot
+}
+
+/**
+ * Open the Builder over a definition of the caller's choosing. `beforeEach` re-arms
+ * `mockListDrafts` with the shared `draftRow` on every case, so overriding it here is
+ * scoped to one test and cannot leak into the byte pin.
+ *
+ * ⚠ The ROW's `name` ("Vendor brief") and the DEFINITION's `name` are different things
+ * and only the second one reaches `meta`. The row's name feeds the breadcrumb; the
+ * definition is what the store loads. Conflating them is the trap this helper avoids.
+ */
+async function openDraftWithDefinition(
+  overrides: Record<string, unknown>,
+  // `| null` mirrors `openDraftBuilder`'s own signature — `OFF_VARIANTS[].value` is
+  // declared nullable (the "no provider at all" variant), so narrowing it here would
+  // reject this function's own default argument.
+  value: { features: EffectiveFeatures; loading: boolean } | null = OFF_VARIANTS[0].value,
+) {
+  mockListDrafts.mockResolvedValue([{ ...draftRow, definition: { ...definition, ...overrides } }])
+  return openDraftBuilder(value)
+}
+
+describe("197-10 / D-19 — the drafted header's identity slot", () => {
+  it("renders the NAME, not the slug, when the definition binds one (flag OFF)", async () => {
+    const { container } = await openDraftWithDefinition({ name: "Northwind QBR" })
+    const slot = identitySlot(screen.getByTestId("builder-grid"), container)
+    expect(slot.textContent).toBe("Northwind QBR")
+    // Stated in both directions: the name is not merely PRESENT, the slug is GONE from
+    // the slot. A containment-only assertion would pass on a slot rendering both.
+    expect(slot.textContent).not.toContain("vendor-brief")
+  })
+
+  it("renders the SLUG when the definition binds no name at all (flag OFF)", async () => {
+    // This is the byte pin's own fixture, driven through the same door — which is why
+    // band 3 below is unmoved.
+    const { container } = await openDraftWithDefinition({})
+    expect(identitySlot(screen.getByTestId("builder-grid"), container).textContent).toBe(
+      "vendor-brief",
+    )
+  })
+
+  it("renders the SLUG when the name is the EMPTY STRING — 197-10's declared display fallback", async () => {
+    // ⚠ A NAMED DEVIATION from D-19's literal `meta.name ?? meta.slug`, pinned here so it
+    // cannot be "tidied" back into a coalesce by a later author. The arrival card's name
+    // row neither trims nor rejects the empty string (the server owns emptiness), so a
+    // coalesce would show an author who cleared the field a BLANK identity slot. This is
+    // a display fallback and nothing else: no store action, no request and no predicate
+    // reads it.
+    const { container } = await openDraftWithDefinition({ name: "" })
+    expect(identitySlot(screen.getByTestId("builder-grid"), container).textContent).toBe(
+      "vendor-brief",
+    )
+  })
+
+  it("D-15 — the slug is STILL in the definition the store would persist, at the same beat the header shows the name", async () => {
+    // The point of D-15 is that the slug — the key identity forks and versioning use —
+    // is UNTOUCHED by naming. A DOM assertion cannot prove that: once the slot prefers
+    // the name, the slug appears nowhere on screen, so its absence from the DOM is
+    // exactly what this change is supposed to cause. So it is read off the store instead,
+    // through the store's one observable export path — the definition the save loop puts
+    // on the wire (`selectDefinition`), driven by the shipped folder-binding write that
+    // `186-04`'s case next door already uses.
+    mockListFolders.mockResolvedValue([{ id: FOLDER_ID, name: FOLDER_NAME }])
+    mockUpdate.mockResolvedValue({ id: "draft-1", version: 1, token: "tok-2" })
+    await openDraftWithDefinition({ name: "Northwind QBR" }, FLAG_ON)
+
+    // The header is showing the NAME on this same render.
+    expect(screen.getByTestId("builder-header-bar").textContent ?? "").toContain("Northwind QBR")
+
+    fireEvent.change(await screen.findByTestId("project-folder-picker"), {
+      target: { value: FOLDER_ID },
+    })
+    await waitFor(() => expect(mockUpdate).toHaveBeenCalled(), { timeout: 5000 })
+    const body = mockUpdate.mock.calls[0][1] as { slug?: string; name?: unknown }
+    expect(body.slug).toBe("vendor-brief")
+    // And the name rode along unchanged — the display reads the store, it does not
+    // rewrite it.
+    expect(body.name).toBe("Northwind QBR")
   })
 })

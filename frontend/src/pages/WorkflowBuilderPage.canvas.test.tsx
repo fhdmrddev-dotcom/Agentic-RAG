@@ -4123,7 +4123,7 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
     )
   })
 
-  it("row 4 writes the name through the store, and the drafted header still shows the SLUG", async () => {
+  it("row 4 writes the name through the store, and the drafted header shows THAT name — one answer, not two", async () => {
     await draftAndArrive()
     const list = await openDecisions()
 
@@ -4141,8 +4141,30 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
         "Renewals brief",
       ),
     )
-    // ⚠ D-19 IS PLAN 197-10'S, NOT THIS ONE'S, and this line pins the boundary so a header
-    // change cannot be smuggled in here. The drafted header still renders `meta.slug`.
-    expect(screen.getAllByText("vendor-brief").length).toBeGreaterThan(0)
+    // ── ⚠ THIS ASSERTION WAS FLIPPED BY `197-10` ON 2026-08-18, AND IT FIRED AS DESIGNED ──
+    //
+    // It read `expect(screen.getAllByText("vendor-brief").length).toBeGreaterThan(0)` with the
+    // note: *"D-19 IS PLAN 197-10'S, NOT THIS ONE'S, and this line pins the boundary so a header
+    // change cannot be smuggled in here. The drafted header still renders `meta.slug`."*
+    //
+    // That was a SCOPE FENCE, not a claim about the product, and it did exactly the job it was
+    // planted for: `197-10` landed D-19 and this line went red in the same run, which is how a
+    // scope boundary is supposed to end its life. It is retired here rather than deleted,
+    // because the case it lives in — row 4's write — is the very thing D-19 makes visible.
+    //
+    // WHAT IT PINS NOW IS STRICTLY STRONGER. The old line proved the header was NOT showing the
+    // name; this one proves the header IS showing the name the author just typed, LIVE. Row 4
+    // and the identity slot read the SAME store value, so they agree by construction rather
+    // than by synchronisation, and this is the case that would fail if they ever stopped —
+    // the "never two answers to one question" rule, measured on one screen after one edit.
+    await waitFor(() =>
+      expect(screen.getByTestId("builder-header-bar").textContent ?? "").toContain(
+        "Renewals brief",
+      ),
+    )
+    // ⚠ Stated in both directions. The name being PRESENT somewhere would also be true of a
+    // header that rendered both, which is precisely the drift D-19 exists to prevent: the slug
+    // must be GONE from the identity slot, not merely outranked.
+    expect(screen.queryAllByText("vendor-brief")).toHaveLength(0)
   })
 })
