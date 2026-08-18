@@ -53,6 +53,7 @@ import {
   generateWorkflow,
   readTemplatePlaceholdersFromFile,
   uploadWorkflowTemplate,
+  type GenerateReadiness,
   type GenerateResult,
   type WorkflowTemplateAsset,
 } from "@/lib/api"
@@ -110,6 +111,17 @@ function mountHook(
 ) {
   const started: number[] = []
   const drafted: TemplateFirstDefinition[] = []
+  // 197-06 (D-13): `drafted` records the VALUE of argument one and is structurally blind to
+  // argument two — including to whether argument two was passed AT ALL. A `vi.fn` is added
+  // BESIDE it (never instead of it, so the shipped cases keep their spelling) because
+  // `mock.calls[i]` is the REAL arguments array: it is the only instrument in this file that
+  // can tell a one-argument call from a two-argument one carrying `undefined`, which is
+  // precisely the distinction D-13 turns on.
+  const onDraftedSpy = vi.fn(
+    (def: TemplateFirstDefinition, _readiness: GenerateReadiness | undefined) => {
+      drafted.push(def)
+    },
+  )
   // 193.1-07 (D-06): the descriptors the bind handed back. On the real page this callback IS
   // the shipped `onTemplateAttached`, so recording it here records exactly what reaches the
   // store's single writer.
@@ -124,13 +136,13 @@ function mountHook(
         store,
         builderPhase: props.builderPhase,
         onDraftStarted: () => started.push(1),
-        onDrafted: (def) => drafted.push(def),
+        onDrafted: onDraftedSpy,
         onTemplateBound: (asset) => bound.push(asset),
         ...args,
       }),
     { initialProps },
   )
-  return { view, store, started, drafted, bound }
+  return { view, store, started, drafted, bound, onDraftedSpy }
 }
 
 beforeEach(() => {
@@ -291,6 +303,153 @@ describe("useTemplateFirstDraft — a successful generation", () => {
       await view.result.current.onDraft()
     })
     expect(drafted[0].project_folder_id).toBeUndefined()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 3b — 197-06 (D-13): THE SERVER'S READINESS VERDICT SURVIVES THE HOOK BOUNDARY
+//
+// ⚠ THIS IS THE ONLY HOP IN D-13's FIVE-HOP CHAIN THAT COULD DROP THE VERDICT. The route
+// passes the dict through untouched, the client casts the body, the page state is two lines
+// — everything not carried past `onDraftedRef.current(…)` is lost, silently and with a green
+// typecheck on both sides of it. So the cases below assert the ARITY and the IDENTITY of the
+// second argument, not merely that a draft arrived.
+//
+// ⚠ AND THE LOAD-BEARING CASE IS THE ABSENT ONE. A response with no `readiness` key must
+// hand out `undefined` — never `{}`, never a synthesised passing status. That is the
+// difference between "the server said nothing" and "the server said it is fine", and it is
+// the whole reason the type has three representable states instead of two.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/** A verdict in the shape the widened route answers with, GREEN arm. */
+function readinessPresent(): GenerateReadiness {
+  return { business_requirement: { status: "present" } }
+}
+
+/** …and the MISSING arm, carrying the gate's own sentence verbatim (D-12). */
+function readinessMissing(message: string): GenerateReadiness {
+  return { business_requirement: { status: "missing", message } }
+}
+
+describe("useTemplateFirstDraft — the readiness verdict at the hook's output boundary", () => {
+  it("raises `onDrafted` with TWO arguments — the arity is the contract, not a convenience", async () => {
+    mockedGenerate.mockResolvedValue({
+      ok: true,
+      definition: definitionOf(),
+      readiness: readinessPresent(),
+    } as GenerateResult)
+    const { view, onDraftedSpy } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(onDraftedSpy).toHaveBeenCalledTimes(1)
+    // ⚠ THE RECORDED ARGUMENTS ARRAY, not the callback's declared parameter list. A one-
+    // argument call would still typecheck at every site and would read as `undefined` at
+    // the consumer — indistinguishable from an honestly-absent verdict.
+    expect(onDraftedSpy.mock.calls[0]).toHaveLength(2)
+  })
+
+  it("hands out the EXACT object the response carried — the client invents nothing", async () => {
+    const verdict = readinessMissing("This workflow has no business requirement.")
+    mockedGenerate.mockResolvedValue({
+      ok: true,
+      definition: definitionOf(),
+      readiness: verdict,
+    } as GenerateResult)
+    const { view, onDraftedSpy } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    // IDENTITY, not deep equality: `toBe` proves nothing was rebuilt, re-keyed or normalised
+    // on the way through. A copy would pass `toEqual` while having been through a hand that
+    // could have changed it.
+    expect(onDraftedSpy.mock.calls[0][1]).toBe(verdict)
+    // …and the value itself reached the consumer intact, arm and sentence.
+    expect(onDraftedSpy.mock.calls[0][1]?.business_requirement).toEqual({
+      status: "missing",
+      message: "This workflow has no business requirement.",
+    })
+  })
+
+  it("carries the GREEN arm through unchanged too — `present` is a verdict, not an absence", async () => {
+    mockedGenerate.mockResolvedValue({
+      ok: true,
+      definition: definitionOf(),
+      readiness: readinessPresent(),
+    } as GenerateResult)
+    const { view, onDraftedSpy } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(onDraftedSpy.mock.calls[0][1]?.business_requirement.status).toBe("present")
+  })
+
+  it("⚠ THE ABSENT-FIELD RULE — a response with NO `readiness` key hands out `undefined`, never `{}` and never a synthesised pass", async () => {
+    // The shipped response shape, byte for byte: `{ok, definition}` and nothing else. This is
+    // what EVERY generation answers with until the server half lands, and what a stale deploy
+    // answers with forever after.
+    mockedGenerate.mockResolvedValue({ ok: true, definition: definitionOf() } as GenerateResult)
+    const { view, onDraftedSpy } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    const handed = onDraftedSpy.mock.calls[0][1]
+    expect(handed).toBeUndefined()
+    // ⚠ THE THREE THINGS IT MUST NOT BE, spelled out rather than implied by the line above —
+    // each is a real defaulting mistake this hop could make and each reads as a pass at the
+    // consumer. `{}` is the `?? {}` default; the third is the synthesised green.
+    expect(handed).not.toEqual({})
+    expect(handed).not.toEqual(readinessPresent())
+    // …and the arity is STILL two, so "absent" is a value that travelled rather than an
+    // argument that was never passed. The two are indistinguishable at the consumer and only
+    // this assertion separates them at the producer.
+    expect(onDraftedSpy.mock.calls[0]).toHaveLength(2)
+  })
+
+  it("POSITIVE CONTROL — the absent-field assertion really would fire on a synthesised pass", () => {
+    // Non-vacuity for the case above: if this hop DID default the verdict, `toBeUndefined`
+    // would red. Proved here against a concrete stand-in rather than trusted.
+    const defaulted: GenerateReadiness | undefined = readinessPresent()
+    expect(() => expect(defaulted).toBeUndefined()).toThrow()
+    expect(() => expect({} as unknown).not.toEqual({})).toThrow()
+  })
+
+  it("raises NOTHING on an `ok:false` response, so no verdict can be read off a failure", async () => {
+    // The failure arm carries no `readiness` member on the type at all (T-197-07). This is the
+    // RUNTIME half of that fence: the callback is not reached, so there is no argument to read.
+    mockedGenerate.mockResolvedValue({
+      ok: false,
+      error: "Couldn't generate — the model refused.",
+    } as GenerateResult)
+    const { view, onDraftedSpy } = mountHook()
+    act(() => view.result.current.setDescribe("a weekly status report"))
+    await act(async () => {
+      await view.result.current.onDraft()
+    })
+    expect(onDraftedSpy).not.toHaveBeenCalled()
+    expect(onDraftedSpy.mock.calls).toHaveLength(0)
+  })
+
+  it("the AUTO-DRAFT path carries the verdict too — one funnel, not two", async () => {
+    // `autoDraft` funnels through the SAME single transition (D-187-14), so a verdict that
+    // survived the manual path but not this one would be a silent asymmetry between the two
+    // authoring entrances. Asserted rather than assumed.
+    const verdict = readinessMissing("This workflow has no business requirement.")
+    mockedGenerate.mockResolvedValue({
+      ok: true,
+      definition: definitionOf(),
+      readiness: verdict,
+    } as GenerateResult)
+    const { onDraftedSpy } = mountHook({
+      autoDraft: true,
+      initialDescribe: "a weekly status report",
+    })
+    await waitFor(() => expect(onDraftedSpy).toHaveBeenCalledTimes(1))
+    expect(onDraftedSpy.mock.calls[0][1]).toBe(verdict)
   })
 })
 
@@ -508,7 +667,21 @@ describe("useTemplateFirstDraft D-24(b) — the extracted module cannot import e
     // The other half of "the cut has one direction": no import back AND no reaching in. The
     // args interface is the whole surface, so a setter smuggled in would show up here.
     expect(templateFirstDraftSource).toMatch(/onDraftStarted: \(\) => void/)
-    expect(templateFirstDraftSource).toMatch(/onDrafted: \(definition: TemplateFirstDefinition\) => void/)
+    // 197-06 (D-13): the declaration WIDENED to two parameters and became multi-line, so this
+    // fence is re-spelled over the new shape rather than dropped. ⚠ IT STILL PINS BOTH ENDS —
+    // the definition parameter AND the readiness parameter — because the property it defends is
+    // "the whole surface is this args interface", and a fence loosened to `/onDrafted:/` would
+    // pass against a callback that had quietly grown a store setter.
+    expect(templateFirstDraftSource).toMatch(
+      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*\) => void/,
+    )
+    // POSITIVE CONTROL — the re-spelled matcher DISCRIMINATES. Against the shipped
+    // single-parameter spelling it must NOT match, or "the verdict crosses this boundary"
+    // would be a claim this fence passes without checking. A matcher that matches everything
+    // it is pointed at reads exactly like a fence that holds (this suite's own header rule).
+    expect("  onDrafted: (definition: TemplateFirstDefinition) => void").not.toMatch(
+      /onDrafted: \(\s*definition: TemplateFirstDefinition,\s*readiness: GenerateReadiness \| undefined,\s*\) => void/,
+    )
     // POSITIVE CONTROL for the shape of what would be wrong.
     expect("  setDraftId: (id: string | null) => void").toMatch(/setDraftId/)
     expect(templateFirstDraftSource).not.toMatch(/setDraftId/)

@@ -117,6 +117,10 @@ import {
   readTemplatePlaceholdersFromFile,
   uploadWorkflowTemplate,
 } from "@/lib/api"
+// 197-06 (D-13) — the response type's new arm, imported as a TYPE. The client half of this
+// concern already lives in that module; declaring a structurally-similar shape here would be
+// the `TemplateReadAnswer` mistake in a second place — two homes for one server answer.
+import type { GenerateReadiness } from "@/lib/api"
 import type { BuilderPhase, BuilderStore, TemplateAssetDescriptor } from "./builderStore"
 import type { TemplatePlaceholdersState } from "@/hooks/useTemplatePlaceholders"
 
@@ -317,8 +321,33 @@ export interface TemplateFirstDraftArgs {
    * The page's DRAFTED-view handoff, as ONE call site — the seed receipt (187-15 / 187-22) is
    * raised here and its two setters never reach this file. Called EXACTLY ONCE per successful
    * generation, with the definition as it was committed to the store.
+   *
+   * ── 197-06 (D-13) — THE SECOND ARGUMENT: THE SERVER'S READINESS VERDICT ────────────────
+   *
+   * ⚠ THE PARAMETER IS REQUIRED; ITS VALUE MAY BE `undefined`. That asymmetry is the whole
+   * point and it is the 192.1 rule this args interface already runs on (see `onTemplateBound`
+   * below): a required member makes the typechecker ENUMERATE the call sites, so a host that
+   * forgets the verdict is a compile error rather than a silently green screen. An optional
+   * parameter would let exactly one site hide.
+   *
+   * ⚠ **ABSENT TRAVELS AS ABSENT.** `undefined` here means the server said NOTHING — never
+   * that everything is fine. This module does not default it to `{}`, does not coerce it and
+   * does not synthesise a passing status when the key is missing. The type's own docblock
+   * carries the two shipped floors this obeys (`useModelRegistry`'s failed read, and
+   * `model_registry`'s absent override row); the mechanism here is simply that nothing is
+   * written between reading it off the response and handing it out.
+   *
+   * ⚠ **IT IS A SNAPSHOT, NOT LIVE STATE — the consumer's obligation, recorded at the
+   * producer.** `SeedReceiptProps.phases` (`SeedReceipt.tsx:147-172`) binds the identical
+   * contract in its own words: *an immutable SNAPSHOT of one `POST /generate` result, NEVER a
+   * live store selector.* This verdict is what the server said about THE GENERATION, so a
+   * consumer that re-derives it from the author's later edits is answering a different
+   * question with this value's authority.
    */
-  onDrafted: (definition: TemplateFirstDefinition) => void
+  onDrafted: (
+    definition: TemplateFirstDefinition,
+    readiness: GenerateReadiness | undefined,
+  ) => void
   /**
    * 193.1-07 (D-06) — the bind's descriptor, handed to the host's SINGLE writer.
    *
@@ -539,7 +568,13 @@ export function useTemplateFirstDraft(args: TemplateFirstDraftArgs): TemplateFir
         // SAME DOM batch as the graph, and REPLACED per generation rather than frozen for the
         // session (D-187-09). `autoDraft` funnels through here too, deliberately (D-187-14).
         // The two receipt states themselves stay on the page — see the header block.
-        onDraftedRef.current(def)
+        //
+        // 197-06 (D-13): the verdict is read off the SAME `result` the definition came from,
+        // and handed out UNTOUCHED. ⚠ No `?? {}`, no coercion, no synthesised pass — an
+        // absent verdict is a fact about what the server said and it survives this hop as
+        // `undefined`. This is the ONLY boundary in the chain that could drop it, which is
+        // why the whole of D-13's client work is this one argument.
+        onDraftedRef.current(def, result.readiness)
       } else {
         // ok:false is an HONEST failure — never a renderable broken draft.
         store.getState().setErrorState(result.error, result.detail)
