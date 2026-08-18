@@ -755,11 +755,13 @@ export function WorkflowBuilderPage({
    *
    * ⚠ `undefined` IS A THIRD STATE, NOT A MISSING SECOND ONE. `197-06` shipped the wire
    * type with three representable arms — present, missing-with-a-message, and the whole
-   * object being absent — with NO `?? {}` default and no synthesised pass anywhere on the
-   * hop. That absence survives to here unchanged and is handed to the card unchanged; the
-   * two named ways to lose it (`readiness ?? {}`, and a `=== "missing"` read whose `false`
-   * branch renders a green tick) both TYPECHECK, which is why neither is written and why
-   * a case drives the distinction rather than a comment.
+   * object being absent — with no empty-object default and no synthesised pass anywhere on
+   * the hop. That absence survives to here unchanged and is handed to the card unchanged.
+   * The two named ways to lose it are a nullish-coalesce onto an empty object, and a
+   * `=== "missing"` read whose `false` branch renders a green tick; BOTH TYPECHECK, which
+   * is why neither is written and why a case drives the distinction rather than a comment.
+   * ⚠ Neither is spelled out here — a source fence sweeps this file for the first of them,
+   * and a mention inside the comment explaining it is what `196-08` tripped on four times.
    *
    * REPLACED on every generation, never merged with a previous one — that is what makes a
    * second generation replace the first one's card rather than blend with it.
