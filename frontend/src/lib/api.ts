@@ -3427,10 +3427,30 @@ export interface WorkflowDraftWriteResult {
   token: string
 }
 
+/** Phase 197 (D-13) — the server's publish-readiness verdict for ONE generated draft.
+ *  THREE representable states, and the THIRD IS THE ABSENCE OF THIS WHOLE OBJECT:
+ *  `{status:"present"}` · `{status:"missing", message}` · the field not there at all.
+ *  ⚠ ABSENT MEANS THE SERVER SAID NOTHING — never that everything is fine. A
+ *  `readiness ?? {}` default, or a `=== "missing"` read whose false branch renders a
+ *  green tick, collapses that third state into the first. Both are the shipped floor
+ *  in one shape: `useModelRegistry`'s (a failed read is `status:"failed"`, never an
+ *  empty success) and `model_registry`'s (an ABSENT override row means ENABLED).
+ *  ⚠ ONE ENTRY, DELIBERATELY. Measured across the whole publish gauntlet, stage 1's
+ *  `business_requirement` is the ONLY definition-level predicate — nothing anywhere
+ *  refuses a publish for a missing knowledge-base binding, a missing document, the
+ *  AI-chosen name or the deliverable. A second key here would be a claim no gate makes.
+ *  ⚠ IT RIDES THE `ok:true` ARM ALONE. A failed generation carries no verdict
+ *  server-side, so reading one off the failure arm is a typecheck error here too. */
+export type GenerateReadiness = {
+  business_requirement:
+    | { status: "present" }
+    | { status: "missing"; message: string }
+}
+
 /** The structured result of POST /workflows/generate. The route returns HTTP 200
  *  even on a FAILED generation (`ok:false`) — read the body, never throw on it. */
 export type GenerateResult =
-  | { ok: true; definition: WorkflowDefinitionJSON }
+  | { ok: true; definition: WorkflowDefinitionJSON; readiness?: GenerateReadiness }
   | { ok: false; error: string; detail?: string }
 
 /** The body of POST /workflows/generate (D-103-CONF-2 / D-103-3 template supply). */
