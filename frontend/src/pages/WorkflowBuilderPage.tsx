@@ -1677,6 +1677,77 @@ export function WorkflowBuilderPage({
     [store],
   )
 
+  /**
+   * ── 197-09 (AUTH-02 / SC#1) — THE ARRIVAL CARD'S **LIVE** HALF ──────────────────────
+   *
+   * TWO CLASSES OF VALUE REACH THIS CARD AND THEY MUST NOT BE CONFLATED. `receiptPhases`
+   * and `readiness` are SNAPSHOTS of one generation (see their blocks above). Everything
+   * in this object is the opposite: what the definition says **NOW**, recomputed from
+   * `meta` on every render with NO mirrored page copy anywhere — the shipped
+   * `requirementIsAiProposed` idiom, and the same reason it gives: in the drafted view the
+   * definition is the single source of truth and a second copy is the drift D-14 forbids.
+   *
+   * A card that passed the snapshot fence by freezing EVERYTHING would fail the live
+   * fence, and vice versa. Both are pinned by cases in `canvas.test.tsx`.
+   *
+   * ⚠ IT LIVES **HERE**, ABOVE THE DESCRIBE SCREEN'S EARLY RETURN, AND THAT PLACEMENT IS
+   * A CORRECTNESS REQUIREMENT RATHER THAN A TIDINESS ONE. This component returns the
+   * pre-draft describe screen from a branch a few hundred lines below, so EVERY hook in
+   * this file sits above that branch — measured, and it was true of all of them before
+   * this plan. Declaring this memo where it is *consumed* (beside `graphColumn`) put a
+   * hook after that return, so the empty → drafted transition rendered more hooks than
+   * the render before it and React threw `Rendered more hooks than during the previous
+   * render`, taking eleven cases and eight uncaught exceptions with it. The card's own
+   * suite could never have seen this: it mounts the component directly.
+   *
+   * Each field, and why it is READ rather than re-derived:
+   *
+   *  • `folderName` — `boundFolderName`, the shipped header read. Its own comment records
+   *    that `folderNames` and `folderOptions` are built from the SAME mount-fetch array,
+   *    so *"unnameable"* and *"not offered"* are one condition — which is exactly the
+   *    row's contract (`null` when unbound or unresolvable). A second `.find()` over
+   *    `folderOptions` would be a second lookup that can disagree with the header chip.
+   *    ⚠ The fetch function is named by ROLE, never spelled: a shipped source guard counts
+   *    its occurrences in this file to prove no second fetch was added, and a mention in a
+   *    comment is indistinguishable from a call site to it (`196-08`, four times).
+   *  • `templateFilename` — the ONE `templateAsset` memo (`260814-q5r` hoisted it precisely
+   *    so two `.find()` calls over `meta.assets` could not drift). No second scan.
+   *  • `businessRequirement` / `name` — the `typeof … === "string"` narrow the requirement
+   *    input already uses. ⚠ `BuilderDefinition` deliberately does NOT declare `name`
+   *    (197-05 decision 2): it lands under the index signature and types as `unknown`, so
+   *    this narrow is the one read site and it is the shipped idiom, not a new one.
+   *  • `deliverableStepSlug` — `terminalEmitSlug` over the LIVE definition, so adding or
+   *    removing an emit step moves the row. `null` is an honest absence and is never a
+   *    slug that selects nothing.
+   *  • `readiness` — passed straight through, `undefined` and all. NO `?? {}`.
+   */
+  const decisions = useMemo<DecisionsListProps>(
+    () => ({
+      folderName: boundFolderName,
+      templateFilename: templateAsset?.filename ?? null,
+      businessRequirement:
+        typeof meta.business_requirement === "string" ? meta.business_requirement : "",
+      name: typeof meta.name === "string" ? meta.name : "",
+      deliverableStepSlug: terminalEmitSlug(definition),
+      readiness,
+      onChangeKb: focusKbPicker,
+      onChangeRequirement: focusRequirementInput,
+      onOpenStep: jumpToStep,
+      onChangeName: setWorkflowName,
+    }),
+    [
+      boundFolderName,
+      templateAsset,
+      meta,
+      definition,
+      readiness,
+      focusKbPicker,
+      focusRequirementInput,
+      jumpToStep,
+      setWorkflowName,
+    ],
+  )
+
   /** "Tidy up" — the CURRENT workflow's nudge key only, never the whole namespace. The
    *  arrangement is browser-local (D-184-02), so this writes nothing to the server and
    *  pushes no undo entry; the re-read goes through the same invalidation counter a nudge
@@ -1991,64 +2062,6 @@ export function WorkflowBuilderPage({
         {...(canvasEnabled ? { nameContext } : {})}
       />
     )
-
-  /**
-   * ── 197-09 (AUTH-02 / SC#1) — THE ARRIVAL CARD'S **LIVE** HALF ──────────────────────
-   *
-   * TWO CLASSES OF VALUE REACH THIS CARD AND THEY MUST NOT BE CONFLATED. `receiptPhases`
-   * and `readiness` are SNAPSHOTS of one generation (see their blocks above). Everything
-   * in this object is the opposite: what the definition says **NOW**, recomputed from
-   * `meta` on every render with NO `useState` mirror anywhere — the shipped
-   * `requirementIsAiProposed` idiom, and the same reason it gives: in the drafted view the
-   * definition is the single source of truth and a second copy is the drift D-14 forbids.
-   *
-   * A card that passed the snapshot fence by freezing EVERYTHING would fail the live
-   * fence, and vice versa. Both are pinned by cases in `canvas.test.tsx`.
-   *
-   * Each field, and why it is READ rather than re-derived:
-   *
-   *  • `folderName` — `boundFolderName`, the shipped header read. Its own comment records
-   *    that `folderNames` and `folderOptions` are built from the SAME `listFolders()`
-   *    array, so *"unnameable"* and *"not offered"* are one condition — which is exactly
-   *    the row's contract (`null` when unbound or unresolvable). A second `.find()` over
-   *    `folderOptions` would be a second lookup that can disagree with the header chip.
-   *  • `templateFilename` — the ONE `templateAsset` memo (`260814-q5r` hoisted it precisely
-   *    so two `.find()` calls over `meta.assets` could not drift). No second scan.
-   *  • `businessRequirement` / `name` — the `typeof … === "string"` narrow the requirement
-   *    input already uses. ⚠ `BuilderDefinition` deliberately does NOT declare `name`
-   *    (197-05 decision 2): it lands under the index signature and types as `unknown`, so
-   *    this narrow is the one read site and it is the shipped idiom, not a new one.
-   *  • `deliverableStepSlug` — `terminalEmitSlug` over the LIVE definition, so adding or
-   *    removing an emit step moves the row. `null` is an honest absence and is never a
-   *    slug that selects nothing.
-   *  • `readiness` — passed straight through, `undefined` and all. NO `?? {}`.
-   */
-  const decisions = useMemo<DecisionsListProps>(
-    () => ({
-      folderName: boundFolderName,
-      templateFilename: templateAsset?.filename ?? null,
-      businessRequirement:
-        typeof meta.business_requirement === "string" ? meta.business_requirement : "",
-      name: typeof meta.name === "string" ? meta.name : "",
-      deliverableStepSlug: terminalEmitSlug(definition),
-      readiness,
-      onChangeKb: focusKbPicker,
-      onChangeRequirement: focusRequirementInput,
-      onOpenStep: jumpToStep,
-      onChangeName: setWorkflowName,
-    }),
-    [
-      boundFolderName,
-      templateAsset,
-      meta,
-      definition,
-      readiness,
-      focusKbPicker,
-      focusRequirementInput,
-      jumpToStep,
-      setWorkflowName,
-    ],
-  )
 
   // D-183-03 — the strip renders ONLY when the flag resolves strictly on. With the
   // flag off `graphChild` IS the grid's first child, exactly as it ships today: no
