@@ -326,7 +326,15 @@ describe("DecisionsList — the three readiness arms", () => {
   })
 
   it("a MISSING verdict renders the server's own sentence, character for character", () => {
+    // ⚠ RE-SCOPED BY CR-01 (2026-08-18), on the commit that makes the new property true.
+    // `businessRequirement: ""` is now passed EXPLICITLY. It was inheriting `baseProps`'
+    // non-empty value, which meant this case rendered a `missing` verdict beside a written
+    // requirement and pinned that combination as correct — it asserted the incoherent
+    // state instead of detecting it. Nothing it proved is dropped: the server's sentence
+    // is still compared character for character. It is now proved in the state the verdict
+    // actually describes.
     renderList({
+      businessRequirement: "",
       readiness: { business_requirement: { status: "missing", message: MISSING_MESSAGE } },
     })
     expect(screen.getByTestId("decision-verdict-requirement").textContent).toBe(
@@ -337,7 +345,10 @@ describe("DecisionsList — the three readiness arms", () => {
   it("the missing verdict sits on ROW 3 and on no other row (D-20)", () => {
     // Only one row may borrow the gate's register, because stage 1's predicate is the
     // only definition-level one there is.
+    // ⚠ RE-SCOPED BY CR-01 — same reason as the case above; the D-20 placement claim is
+    // unchanged and is now made in a coherent state.
     renderList({
+      businessRequirement: "",
       readiness: { business_requirement: { status: "missing", message: MISSING_MESSAGE } },
     })
     const row = screen.getByTestId("decision-row-requirement")
@@ -581,7 +592,10 @@ describe("DecisionsList — model- and user-authored strings are escaped", () =>
 
   it("an HTML-looking SERVER verdict renders as text too", () => {
     const payload = ["<", "b", ">", "escalate", "<", "/b", ">"].join("")
+    // ⚠ RE-SCOPED BY CR-01 — the escaping claim is the point of this case and is untouched;
+    // it just needs the verdict to actually RENDER, which now requires the empty premise.
     const { container } = renderList({
+      businessRequirement: "",
       readiness: { business_requirement: { status: "missing", message: payload } },
     })
     expect(container.querySelector("b")).toBeNull()

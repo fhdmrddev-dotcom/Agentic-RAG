@@ -177,8 +177,34 @@ export function DecisionsList({
   // ABSENT is its own arm and resolves to `null` here, exactly as `present` does, so the
   // two are rendered identically downstream. Nothing below can distinguish them, which is
   // the property that stops an absence reading as a pass.
+  //
+  // ── THE FOURTH CONDITION IS A STALENESS GUARD, ADDED BY CR-01 (2026-08-18) ──────────
+  // `readiness` is a SNAPSHOT of one `POST /generate` (written once, in the page's
+  // `onDrafted` handler, and never recomputed); `businessRequirement` is LIVE off the
+  // definition. Without the guard the two halves of ONE row run on two clocks, and the
+  // stale half renders the gate's IMPERATIVE — "Add the Business requirement … before
+  // publishing" — underneath the requirement the author just added. Three clicks
+  // reproduced it: arrive with a `missing` verdict, press this row's own Change, type.
+  //
+  // ⚠ IT IS NOT A SECOND PREDICATE, AND CLAUSE 2 OF THE CHARTER ABOVE STILL HOLDS. This
+  // does not decide whether a requirement is durable, sufficient or publishable, and it
+  // re-implements no part of `business_requirement_missing` — that predicate has ONE home
+  // (`grounding.py`) and keeps it. What this expresses is narrower: a sentence computed
+  // over an input may not outlive a visible change to that input. The server still owns
+  // the verdict; this only stops the client from repeating it after its premise is gone.
+  //
+  // ⚠ THE INVERSE ARM IS DELIBERATELY SILENT, AND THAT IS A LIMITATION RATHER THAN A FIX.
+  // A `present` snapshot survives the author CLEARING the requirement, and the card then
+  // says nothing about a gate about to refuse. Silence is the `undefined` arm's own
+  // semantics — *the server did not say* — and it is not a pass, because absence and green
+  // already render identically here. Manufacturing a warning would require deciding
+  // publishability in this component. RE-OPEN TRIGGER: the first surface that needs the
+  // card to WARN rather than fall silent, at which point the verdict must be re-fetched or
+  // recomputed server-side, never derived here.
   const requirementVerdict =
-    readiness !== undefined && readiness.business_requirement.status === "missing"
+    readiness !== undefined &&
+    readiness.business_requirement.status === "missing" &&
+    businessRequirement === ""
       ? readiness.business_requirement.message
       : null
 

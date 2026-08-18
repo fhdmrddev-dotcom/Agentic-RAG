@@ -4058,9 +4058,17 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
      */
     const SERVER_SENTENCE =
       "This workflow has no business requirement, so the publish gauntlet will refuse it."
+    // ⚠ RE-SCOPED BY CR-01 (2026-08-18), and the re-scope is the finding. This case used
+    // `arrivalDef` UNCHANGED, whose `business_requirement` is the non-empty
+    // "summarize vendor risk" — so it drove a `missing` verdict against a definition that
+    // HAS a requirement, and pinned that combination as correct. The identical incoherence
+    // existed in `DecisionsList.test.tsx`'s fixture: it propagated from the component suite
+    // to the page suite, which is how the same blind spot came to exist at BOTH levels.
+    // The definition now carries the empty requirement the verdict actually describes;
+    // everything this case proved — the sentence arriving VERBATIM on row 3 — is unchanged.
     mockGenerate.mockResolvedValue({
       ok: true,
-      definition: structuredClone(arrivalDef),
+      definition: { ...structuredClone(arrivalDef), business_requirement: "" },
       readiness: { business_requirement: { status: "missing", message: SERVER_SENTENCE } },
     })
 
@@ -4072,6 +4080,52 @@ describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the tw
     expect(within(list).getByTestId("decision-verdict-requirement").textContent).toBe(
       SERVER_SENTENCE,
     )
+  })
+
+  it("⭐ CR-01 — the verdict does NOT outlive the edit this row itself invites", async () => {
+    /**
+     * THE THREE-CLICK REPRODUCTION, AT PAGE SCOPE — the seam neither side covered.
+     *
+     * The page holds `readiness` as a SNAPSHOT (written once in `onDrafted`, never
+     * recomputed) and reads the requirement LIVE. Both halves had good cases and NEITHER
+     * touched the other: the LIVE case's mock carries no `readiness` key at all, so its
+     * verdict node is `null` for a reason that has nothing to do with staleness; and the
+     * verdict cases never edited anything. The defect lived exactly in the gap.
+     *
+     * What the author saw before the fix: they press this row's own Change, type a
+     * requirement, watch the answer above update — and the gate's imperative "…so the
+     * publish gauntlet will refuse it" stays underneath it, while Publish un-blocks beside
+     * it. The card told them to add the thing they could see they had added.
+     */
+    const SERVER_SENTENCE =
+      "This workflow has no business requirement, so the publish gauntlet will refuse it."
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: { ...structuredClone(arrivalDef), business_requirement: "" },
+      readiness: { business_requirement: { status: "missing", message: SERVER_SENTENCE } },
+    })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // POSITIVE CONTROL — the verdict really is on screen first. Without this the assertion
+    // below would pass on a page that never rendered a verdict at all.
+    expect(within(list).getByTestId("decision-verdict-requirement").textContent).toBe(
+      SERVER_SENTENCE,
+    )
+
+    fireEvent.change(screen.getByTestId("business-requirement-input"), {
+      target: { value: "Produce a board-ready renewal brief every Monday." },
+    })
+
+    // The LIVE half moves…
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-requirement").textContent).toBe(
+        "Produce a board-ready renewal brief every Monday.",
+      ),
+    )
+    // …and the stale half is GONE rather than merely outranked.
+    expect(screen.queryByTestId("decision-verdict-requirement")).toBeNull()
   })
 
   it("⭐ ABSENT IS NOT A PASS — a response with NO readiness key renders no verdict at all", async () => {
