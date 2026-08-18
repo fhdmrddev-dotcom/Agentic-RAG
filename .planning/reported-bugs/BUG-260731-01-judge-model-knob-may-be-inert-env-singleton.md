@@ -4,12 +4,39 @@ title: CONFIRMED — the Settings judge-model knob IS inert; every judge consume
 reported: 2026-07-31
 surface: Agentic-RAG
 severity: critical
-status: folded
+status: closed
 affected_areas: [backend/harness, workflows/publish-gauntlet, settings, eval/judge, observability]
 folded_into: "196"
-verified_closed_by: null
-related_seeds: [SEED-116, SEED-117, SEED-135]
-re_open_trigger: "FOLDED at /gsd:discuss-phase 196 (2026-08-17), on an EXPLICIT operator decision that
+verified_closed_by: "196"
+closed_by_plan: "196-02"
+closed_on: 2026-08-18
+closing_evidence: "Both halves of this report's OWN binding condition are discharged, and each is named
+  rather than asserted. (1) THE TEST EXISTS: backend/tests/unit/test_196_judge_model_db_backed.py —
+  six functions / nine cases, one per consumer, observed RED against develop on all four
+  (`AssertionError: assert 'claude-opus-4-8' == 'deepseek-v4-pro'`, four times) BEFORE any production
+  line moved, with both controls GREEN at that point (the empty-row negative control parametrized
+  across all four, and the consumer-4 precedence control). Post-fix: 19 passed, every `assert` line
+  byte-identical to the RED run. (2) THE THREE-ROW MEASUREMENT RE-RAN, live against 127.0.0.1:54322 on
+  2026-08-18: app_settings.harness_judge_model = 'deepseek-v4-pro' (unchanged — nothing was written);
+  settings.harness_judge_model = None (unchanged — the field stays in config.py deliberately);
+  and `resolve_judge_model(await load_app_settings_async())` -> 'deepseek-v4-pro', where
+  `resolve_judge_model(settings)` returned 'claude-opus-4-8'. ALL FOUR consumers were rewired
+  (eval judge shot, recorded eval judge model, publish-gauntlet hard wall, in-run llm_judge_rubric
+  rung 3); `grep -c 'resolve_judge_model(settings)'` across the three service files returns 1 hit and
+  it is the `def` line the plan forbids changing — ZERO call sites remain. ⚠ LIVE CONSEQUENCE, named
+  rather than discovered: the publish-gauntlet judge on the operator's box is now `deepseek-v4-pro`,
+  not `claude-opus-4-8`. A real publish shot observed routing to that provider is UAT row U-B1 and is
+  NOT claimed here — a unit test cannot prove it. ⚠ Judge FITNESS (SEED-135 item 6) was explicitly NOT
+  claimed by 196 (D-16) and is untouched by this closure; that hypothesis has never been
+  live-verified. Related, deliberately left open: SEED-174 records TWO more resolvers of this exact
+  duck-typed shape, one of which (skill_proposer_service.py:366) is a genuine further instance that is
+  latent only because app_settings.skill_builder_model is currently empty."
+related_seeds: [SEED-116, SEED-117, SEED-135, SEED-174]
+re_open_trigger: "CLOSED 2026-08-18 by plan 196-02, on the evidence in `closing_evidence` above.
+  RE-OPEN if a judge consumer is ever again found reading `app.config.settings`, or if
+  `test_196_judge_model_db_backed.py` is deleted or weakened. ⚠ The ORIGINAL folding note is preserved
+  verbatim below, because it is what made the condition binding.
+  >>>> ORIGINAL (2026-08-17), verbatim: FOLDED at /gsd:discuss-phase 196 (2026-08-17), on an EXPLICIT operator decision that
   deliberately widens that phase's canvas-only scope fence — recorded as 196-CONTEXT.md D-17. Direction
   chosen: route the four judge consumers off `app.config.settings` onto the DB-backed
   UserEffectiveSettings the rest of the app uses. The report's alternative (declare the knob
@@ -29,6 +56,45 @@ reproduces_on:
 ---
 
 # BUG-260731-01: Is the `harness_judge_model` Settings knob actually wired to the judge shot?
+
+## ✅ CLOSED 2026-08-18 — plan `196-02`. The knob obeys.
+
+**All four judge consumers now resolve `harness_judge_model` from the DB-backed
+`UserEffectiveSettings` instead of the env-level `app.config.settings` singleton.** The full evidence
+is in the frontmatter's `closing_evidence`; the short form is that **the report's own binding
+condition demanded a test that sets the row and asserts the RESOLVED model changes, and that test
+exists, was observed RED on all four consumers before any production line moved, and the three-row
+measurement re-ran with `resolve_judge_model` returning the operator's value.**
+
+| Source | 2026-08-17 (the defect) | 2026-08-18 (after `196-02`) |
+|---|---|---|
+| `app_settings.harness_judge_model` | `deepseek-v4-pro` | `deepseek-v4-pro` — **unchanged; nothing was written** |
+| `settings.harness_judge_model` (env singleton) | `None` | `None` — **unchanged; the field stays in `config.py`** |
+| **what the judge actually uses** | **`claude-opus-4-8`** | ✅ **`deepseek-v4-pro`** |
+
+⚠ **`resolve_judge_model`'s body, signature and resolution order were NOT changed.** The defect lived
+entirely in **what the four consumers handed it** — it is duck-typed
+(`getattr(settings, "harness_judge_model", None)`), so it accepts either settings object without
+complaint, which is what made passing the wrong one silent by construction. *Fix the argument, never
+the resolver.*
+
+⚠ **The env-singleton resolution still returns `claude-opus-4-8` when asked directly. It is simply no
+longer what any consumer asks.**
+
+⚠ **TWO THINGS THIS CLOSURE DOES NOT COVER, named so they are not read into it:**
+
+1. **UAT row `U-B1` is OWED** — a real publish shot observed routing to `deepseek` in
+   `workflow_runs` / `harness_audit`. A unit test cannot prove it, and this closure does not claim it.
+2. **Judge FITNESS is untouched** (`SEED-135` item 6 — a registry-known, `emit_tier: force` model that
+   still returned no verdict). Phase 196 explicitly declined it (D-16) because the leading explanation
+   has **never been live-verified**; it remains an unverified hypothesis, not a cause.
+
+**And the class defect is bigger than this instance.** `SEED-174` records **two more resolvers of the
+identical duck-typed shape**, copied verbatim from this one — including
+`skill_proposer_service.py:366`, which reads the env singleton for a knob that **does** have a column
+and a UI control, and is latent today only because the operator's row happens to be empty.
+
+---
 
 ## ⚠ CONFIRMED 2026-08-17 — the decisive test ran, and the knob is INERT
 
