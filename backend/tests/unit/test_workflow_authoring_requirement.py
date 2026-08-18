@@ -1025,3 +1025,223 @@ async def test_a_retry_emit_is_stamped_identically_to_a_first_emit(monkeypatch):
     assert len(calls) == 2  # the shipped budget: 1 then 2, never 3
     assert result["ok"] is True
     assert _wd(result["definition"]).business_requirement_seeded_by_ai is True
+
+
+# ══ Phase 197 (AUTH-02 / D-13) — the SERVER'S OWN READINESS VERDICT ══════════════════════
+#
+# The arrival card RENDERS a verdict; it never DECIDES one (187-24). These cases pin the
+# three properties that make that posture checkable:
+#
+#   1. the success payload carries the verdict, derived from the ONE shipped predicate;
+#   2. the `missing` arm's sentence IS the shipped constant — asserted by identity against
+#      the imported name, never against a string re-typed here (which would be the second
+#      copy the whole D-12 arrangement exists to prevent);
+#   3. the four honest-failure arms carry NOTHING (T-197-07).
+#
+# ⚠ NOTHING HERE IS A FREQUENCY CLAIM (D-08, this module's header binds this section too).
+# Each case STUBS what the model emitted and asserts what the SERVER derives from it.
+
+# The two-token status vocabulary, closed on purpose: a third token would be a state the
+# publish gauntlet cannot produce.
+READINESS_STATUSES = frozenset({"present", "missing"})
+
+
+def _readiness_message_constant() -> str:
+    """The shipped sentence, fetched from its ONE home at call time.
+
+    Imported rather than re-typed for the reason the constant's own docblock gives: it
+    reaches the author VERBATIM (`blockedReason` relays it and D-182-06 forbids a
+    client-side message map), so a copy spelled in this file would be a second source free
+    to drift from the gate's actual words while every assertion stayed green.
+    """
+    from app.services.harness.grounding import BUSINESS_REQUIREMENT_MISSING_MESSAGE
+
+    return BUSINESS_REQUIREMENT_MISSING_MESSAGE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("requirement", "expected_status"),
+    [
+        pytest.param(
+            "Produce a client-ready renewal brief for a named account from our own records.",
+            "present",
+            id="a-stated-requirement-reads-present",
+        ),
+        pytest.param(_ABSENT, "missing", id="an-absent-key-reads-missing"),
+        pytest.param("", "missing", id="an-empty-string-reads-missing"),
+        pytest.param("   \n\t ", "missing", id="whitespace-only-reads-missing"),
+    ],
+)
+async def test_the_success_payload_carries_the_servers_own_readiness_verdict(
+    monkeypatch, requirement, expected_status
+):
+    """**D-13** — a freshly generated draft arrives carrying the server's verdict on
+    whether it can be published, in the server's own words.
+
+    The verdict is not a new rule. It is the ONE shipped publish predicate
+    (`grounding.business_requirement_missing`, publish stage 1's own) read a second time
+    at authoring time, so the client can render a truth the server already owns instead of
+    re-deriving one of its own in TypeScript.
+
+    ⚠ Both verdicts are exercised, so the case cannot pass over a derivation that is
+    unconditionally one value.
+    """
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(requirement)
+    )
+
+    assert result["ok"] is True
+    verdict = result["readiness"]["business_requirement"]
+    assert verdict["status"] in READINESS_STATUSES
+    assert verdict["status"] == expected_status
+
+
+@pytest.mark.asyncio
+async def test_the_missing_arm_relays_the_gates_own_sentence_and_the_present_arm_is_silent(
+    monkeypatch,
+):
+    """D-12 — the author sees the GATE'S words, and only when there is something to say.
+
+    Two halves of one contract:
+
+      * on `missing`, the message is the shipped constant **by identity** — the same
+        object publish stage 1 would show. Compared against the imported name, never
+        against a sentence spelled in this file.
+      * on `present`, the key is **ABSENT**, not `None`. A nullable field is a two-arm
+        read waiting to happen and the client's union depends on absence meaning absence.
+    """
+    constant = _readiness_message_constant()
+
+    missing = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(_ABSENT)
+    )
+    missing_verdict = missing["readiness"]["business_requirement"]
+    assert missing_verdict["message"] == constant
+    assert missing_verdict["message"] is constant  # the object, not a lookalike
+
+    present = await _generate_emitting(
+        monkeypatch,
+        _definition_dict_with_requirement(
+            "Produce a client-ready renewal brief for a named account from our own records."
+        ),
+    )
+    present_verdict = present["readiness"]["business_requirement"]
+    assert "message" not in present_verdict
+    assert set(present_verdict) == {"status"}
+
+
+@pytest.mark.asyncio
+async def test_the_readiness_payload_carries_exactly_one_entry_and_no_row_data(monkeypatch):
+    """**D-20 / T-197-04** — ONE verdict, and nothing else rides along.
+
+    D-20 is a MEASUREMENT, not an omission: every gauntlet stage was enumerated from
+    source and exactly one is a definition-level predicate. A payload carrying extra
+    greens for things nothing refuses a publish for would be claims the server cannot
+    make — strictly worse than no field at all.
+
+    The information-disclosure half is the same assertion read the other way: a verdict
+    that is exactly one status token plus one fixed server constant cannot carry a folder
+    name, a folder id, a user id or any other row's data. The sweep drives BOTH arms so a
+    payload that widened on only one of them still fails.
+    """
+    for requirement in (
+        _ABSENT,
+        "Produce a client-ready renewal brief for a named account from our own records.",
+    ):
+        result = await _generate_emitting(
+            monkeypatch, _definition_dict_with_requirement(requirement)
+        )
+        readiness = result["readiness"]
+        assert set(readiness) == {"business_requirement"}
+
+        verdict = readiness["business_requirement"]
+        assert set(verdict) <= {"status", "message"}
+        # Every leaf is a token or the shipped constant — nothing derived from a row.
+        for value in verdict.values():
+            assert isinstance(value, str)
+        # The stub user id the driver passes must not appear anywhere in the payload.
+        assert "u1" not in json.dumps(readiness)
+
+
+@pytest.mark.asyncio
+async def test_a_could_not_generate_failure_carries_no_readiness_verdict(monkeypatch):
+    """**T-197-07** — a failed generation makes NO claim about publishability.
+
+    The honest-failure arms return `{ok: False, error, detail}` and gain nothing here. A
+    verdict on a draft that does not exist would be the `SEED-159` shape — a value that
+    reads as an answer where there is none — and the arrival card's union would have to
+    defend against a state that means nothing.
+
+    This drives the retry-exhausted arm: two failed emits, the shipped 1-then-2 budget.
+    """
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+    _patch_user_settings(monkeypatch)
+    calls = _patch_emit(monkeypatch, [{"emitted": None, "failure": "validation_failed"}])
+
+    result = await _generate()
+
+    assert len(calls) == 2  # non-vacuity: the failure arm was really reached
+    assert result["ok"] is False
+    assert result["error"] == "could_not_generate"
+    assert "readiness" not in result
+    assert "definition" not in result  # the shipped rule: a failure carries no draft
+
+
+@pytest.mark.asyncio
+async def test_a_grounding_failure_carries_no_readiness_verdict(monkeypatch):
+    """T-197-07, a SECOND arm — because "no verdict on failure" is a property of the
+    control flow, not of one branch.
+
+    Grounding fidelity returns its own `ok: False` dict and returns it DIRECTLY, from a
+    point earlier than the success path's derivation. A verdict attached by a future edit
+    at the top of the function rather than at the bottom would pass the case above (whose
+    return is later still) and fail here.
+    """
+    import app.services.workflow_authoring as wa
+
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+    _patch_user_settings(monkeypatch)
+    _patch_emit(monkeypatch, [{"emitted": _wd(_named_definition_dict()), "failure": None}])
+
+    async def _fake_fidelity(*_args, **_kwargs):
+        return {"ok": False, "error": "grounding_failed", "detail": "planted violation"}
+
+    monkeypatch.setattr(wa, "_check_grounding_fidelity", _fake_fidelity)
+
+    result = await _generate()
+
+    assert result["ok"] is False
+    assert result["error"] == "grounding_failed"  # non-vacuity: the arm was reached
+    assert "readiness" not in result
+
+
+def test_the_generate_path_declares_no_predicate_and_no_message_of_its_own():
+    """**T-197-03 / 187-24** — the authoring path is a CONSUMER, never a second home.
+
+    `grounding.py`'s own section header states the rule: *the shared publish invariant —
+    one source, even trivial*. This case makes the posture mechanical rather than a claim
+    in a comment: the service module must contain NO assignment of the message constant
+    and NO definition of the predicate, and must import both from the one home.
+
+    Read off the SOURCE rather than off the module object, because a re-implementation
+    that happened to produce equal values would be invisible to a behavioural assertion —
+    and that silent second copy is exactly what this fences.
+    """
+    import inspect
+
+    import app.services.workflow_authoring as wa
+
+    source = inspect.getsource(wa)
+
+    assert not re.search(r"BUSINESS_REQUIREMENT_MISSING_MESSAGE\s*[:=]", source), (
+        "the authoring path declares its own copy of the gate's sentence"
+    )
+    assert "def business_requirement_missing" not in source, (
+        "the authoring path re-implements the shipped publish predicate"
+    )
+    assert "from app.services.harness.grounding import" in source, (
+        "the authoring path must consume the ONE home by import"
+    )
