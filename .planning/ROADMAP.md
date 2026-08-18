@@ -39,7 +39,7 @@ the right vocabulary, stop it, and see what it produced.
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
-| 196 | Registry-Backed Model Picker (canvas) | 8/9 | In Progress|  |
+| 196 | Registry-Backed Model Picker (canvas) | 9/9 | Complete   | 2026-08-18 |
 | 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
@@ -667,7 +667,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 196-09-PLAN.md — Wave 6: the records (D-16, D-19, D-21, D-22, D-23) — ledger rows and detail sections re-derived in one batch pass, the two folded bugs flipped only on named evidence, three seeds with mechanical re-open triggers, and the SC#3 negative fence proven over the real diff
+- [x] 196-09-PLAN.md — Wave 6: the records (D-16, D-19, D-21, D-22, D-23) — ledger rows and detail sections re-derived in one batch pass, the two folded bugs flipped only on named evidence, three seeds with mechanical re-open triggers, and the SC#3 negative fence proven over the real diff
 
 #### Phase 197: Guided Authoring
 

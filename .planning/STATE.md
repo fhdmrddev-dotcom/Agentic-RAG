@@ -36,7 +36,66 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 8 of 9 — **Waves 1–4 COMPLETE (196-01…196-08), merged and gated.** Next: Wave 5 (`196-09`).
+Plan: 9 of 9 — **ALL FIVE WAVES COMPLETE (196-01…196-09), merged and gated.** Next: verification.
+
+### Wave 5 close — 2026-08-18 (`196-09`) — PHASE EXECUTION COMPLETE
+
+**Final gates.** tsc **33** (the phase baseline, unmoved) · count gate **OK · total 4291 · failed 0 ·
+pinned 4217 · 89/89** · backend **211 failed / 4046 passed** · CLAUDE.md size gate **OK — 66,918 chars,
+44.6% of limit** (58,854 → 66,918 for eleven rows plus the correction; warn band 120,000 untouched).
+**G-7 clear** — 9 plans, 0 gap-closure.
+
+⚠ **THE FAILURE FLOOR HELD AT EXACTLY 211 THROUGH ALL FIVE WAVES**, while passing rose
+**3964 → 4046 (+82)**. Per-wave: 4013 → 4025 → 4036 → 4043 → 4046. ⚠ Every comparison was
+**COUNT-level, not id-level** — a swap cannot be excluded without baseline re-runs, judged unnecessary
+because each wave's branches touched disjoint files and tsc + count gate stayed clean throughout.
+
+**Same-commit sync rule VERIFIED MECHANICALLY by the orchestrator, not accepted on report:**
+**44 G-5-firing rows ↔ 44 detail sections, zero drift in either direction.** ⚠ The first check returned
+24 false "missing section" hits because `196-09`'s new sections use `###` while pre-existing peers use
+`##` — anchors resolve either way, so nothing is broken, but the levels are uneven and the sections now
+sit at the same depth as sub-headings like *"Phases touched (verbatim)"*. Cosmetic; not fixed at close.
+
+**Bug dispositions verified in FRONTMATTER, which is the routing index:**
+`BUG-260731-01` → **`closed`** (flipped on named evidence — four judge consumers rerouted, live judge is
+`deepseek-v4-pro`). `BUG-260718-04` → **still `folded`**, with the owed refresh row written into
+frontmatter rather than prose, because prose inside a `folded` record is invisible to the scan.
+
+⚠⚠ **A FINDING NO PLAN SCOPED, and it is a FIFTH instance of the `BUG-260731-01` asymmetry.**
+`skill_proposer_service.py:366` reads the **env singleton** for `skill_builder_model` — a knob that DOES
+have an `app_settings` column, a loader, and a Settings screen resolving it from effective settings.
+**It is latent ONLY because the live row is `''`.** Mechanical re-open trigger, one query:
+`SELECT skill_builder_model FROM app_settings WHERE skill_builder_model <> ''`. Recorded in SEED-174.
+
+⚠ **ELEVEN files had NO ledger row at ANY phase count**, `backend/app/config.py` at **42 phases** among
+them — structurally invisible to its own guardrail for the project's entire life. Six existing rows were
+stale. All 23 triples re-derived in ONE scripted sweep with raw output pasted into the summary; three
+that coincide with an earlier plan's reading are labelled **coincidences, not confirmations**.
+
+✅ **CLAUDE.md's "hottest file in the repository" superlative is CORRECTED, original struck through and
+preserved.** `frontend/src/lib/api.ts` **170 / 97 / 6154** vs `threads.py` **234 / 76 / 1273** — the
+verdict survives either counting convention (97 vs 76 generous; 81 vs 56 discarding ambiguous
+two-digit buckets).
+
+**Three deviations, argued rather than waived:** `SEED-173` was already taken (self-hosted inference,
+planted the day before) so the seeds ship as **174 / 175 / 176** — ⚠ **the drift seed `196-02` calls
+"SEED-174" is now SEED-175**. Test files got a named ledger mention instead of ~28 CLAUDE.md rows, on
+the Phase 195 precedent. `196-VALIDATION.md` was left **byte-unchanged** despite an orchestrator hint,
+because the plan makes byte-identity a mechanical criterion — the finding is restated for the verifier
+instead (`::test_union_size` will NOT resolve; `-k test_union_size` does).
+
+### ⛔ OWED AT PHASE CLOSE — none of these may be read as done
+
+| Owed | Why it is not done |
+|---|---|
+| `bash scripts/regenerate-full-schema.sh` (repo root, **no `--reset`**) | The script shells out to `docker exec … pg_dump` and **Docker is denied to the agent layer**. `supabase/full-schema.sql` is NOT regenerated — `196-01`'s one unmet acceptance criterion. The executor correctly refused to hand-assemble a dump. |
+| **Cloud parity for migration 120** | Operator-gated; paste into the CLOUD SQL editor in the same operation as any deploy. `check-deploy-drift.sh` → PASS, and 120 carries no seed-like INSERT/UPDATE (measured evidence for A3). |
+| **G-4 UAT rows U-A2 / U-B1 / U-C1 (+1)** | `U-A2` a `coerce` model distinguishable before selection (proved as MARKUP ONLY) · `U-B1` the judge is now `deepseek-v4-pro` · `U-C1` composer restore across REFRESH (not provable in jsdom). |
+| `FieldLabel` + `InfoHint` extraction | Explicitly DEFERRED by `196-08` with a three-arm re-open trigger in source. No cycle exists today. |
+
+⚠ **A PRODUCT DECISION AWAITING THE OPERATOR:** on a `loading` / `unavailable` registry read the AI
+model field is **ABSENT** from the phase form. `ModelField` cannot express *"I couldn't read the
+registry"*, and widening it was outside `196-08`'s scope. Candidate follow-up.
 
 ### Wave 4 close — 2026-08-17 (`196-08`) — ✅ **AUTH-04 IS NOW USER-OBSERVABLE**
 
