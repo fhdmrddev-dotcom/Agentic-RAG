@@ -248,3 +248,73 @@ is invisible on screen.
 - [ ] `nyquist_compliant: true` set in frontmatter
 
 **Approval:** pending
+
+---
+
+## G-4 UAT rows — DRIVEN 2026-08-18 (Chrome DevTools MCP, live app)
+
+Driven by the orchestrator against the running app (frontend `localhost:5173`, backend `:8000`,
+live local Postgres `:54322`). ⚠ **A prior probe reported the frontend "down" — that was WRONG:**
+Vite listens on `::1` (IPv6 loopback) only, and a `/dev/tcp/127.0.0.1/5173` check misses it. Recorded
+because the same mistake will otherwise be repeated.
+
+### U-A2 — a `coerce` model is distinguishable BEFORE selection — ✅ **PASS**
+
+Path driven: Workflows → filter **Still building** → ✎ Open (`northwind-qbr-b4eaea1c`, draft) →
+select Phase 2 (`llm_emit`, the only mount carrying `showFitness`) → read the **AI model** control.
+
+The control is a real `<select>` of **67 options** (66 models + the run-default row), carrying
+**three `<optgroup>`s in plain operator language, not `emit_tier` jargon**:
+
+| optgroup | count | membership check |
+|---|---|---|
+| `Can fill a document — guaranteed format` | 14 | `gpt-4.1`, `gpt-4o`, … |
+| `Can fill a document` | 39 | **`deepseek-v4-pro`** ✓ |
+| `Best-effort only — may not fill a document` | 13 | **`kimi-k2.6`** ✓, `gemini-3.6-flash`, `claude-opus-5` |
+
+**Verified by GROUP MEMBERSHIP, not by the group's mere existence** — `kimi-k2.6` (the only native
+`coerce` tier in the roster) resolves into *Best-effort*, while `deepseek-v4-pro` resolves into
+*Can fill a document*. ⚠ **`gemini-3.6-flash` — the exact id SEED-135 measured SILENTLY degrading a
+run — is now visibly grouped as Best-effort before the operator picks it.** That is AUTH-04's premise
+made observable.
+
+Also confirmed live: the first option reads **“Use the run's model — today that would be
+`deepseek-v4-flash`”** — `196-04`'s honestly-computed `run_default_model`, naming the actually-resolved
+id rather than the word "default".
+
+### U-B1 — the publish judge is now `deepseek-v4-pro` — ⚠ **PARTIAL**
+
+Measured against the live DB: `app_settings.harness_judge_model = 'deepseek-v4-pro'`. Combined with
+`196-02`'s four RED-first consumer tests, the resolution is proven. **NOT driven: a real publish
+gauntlet emitting a judge record naming that model.** A publish mutates the operator's library and
+spends real LLM calls on eight stages, so it is left as an explicit operator-gated action rather than
+run unasked. **Do not read this row as fully driven.**
+
+### U-C1 — composer restore across REFRESH — ❌ **FAILS AS WRITTEN, and the cause is NOT `196-07`**
+
+Row text: *"pick a non-default model in a thread, send a message, navigate away, come back, REFRESH,
+and see the model still selected."*
+
+**Restore-on-NAVIGATE verified working.** Opening thread *Weekly Report Generation* showed the composer
+at **`Ollama` / `qwen3-30b-a3b-instruct-2507@q4_k_xl`** — byte-matching that thread's last run in
+`runs` (`model`, `provider`). That is `196-07`'s derivation doing exactly what it claims.
+
+**Then F5 — and the THREAD ITSELF does not survive.** After reload (re-checked at 3.5 s and again at
+9.5 s to rule out a slow settle): `hasThreadContent: false`, the app is back on a **new chat**, and the
+composer shows the global default `deepseek` / `deepseek-v4-flash`.
+
+**Root cause, measured — thread selection is not persisted ANYWHERE:**
+- `location.href` stays bare `http://localhost:5173/` even with a thread open — **no per-thread URL**
+- `localStorage` holds only `chat_history_collapsed`
+- `sessionStorage` holds nothing thread-related
+
+⚠ **So the restore is never given the chance to run.** After a refresh you are in a *brand-new* thread,
+where showing the global default is CORRECT behaviour, not the reported defect. The blocker is a
+**different, unscoped capability — thread-selection persistence across reload** — which Phase 196 never
+scoped and could not have fixed.
+
+**Consequence for `BUG-260718-04`:** `196-07` and `196-09` were RIGHT to leave it `status: folded`.
+⚠ **But the report's close condition is UNREACHABLE AS WRITTEN, not merely undriven** — no amount of
+UAT can pass "REFRESH and see the model still selected" while refresh discards the thread. The report
+needs its close condition RESTATED (or split), and the refresh half re-pointed at the missing
+persistence capability. Recorded here rather than silently re-running the row.

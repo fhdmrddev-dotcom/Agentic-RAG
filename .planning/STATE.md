@@ -71,7 +71,13 @@ declare `seed_id: SEED-174`, both dated 2026-08-18:
 - `.planning/seeds/SEED-174-mcp-connections-connect-and-be-connected.md` — unrelated, planted the same
   day by a separate operator-directed process, with **essentially NO inbound references**.
 
-**Recommended fix: renumber the MCP-connections seed to `SEED-177`** — one file, two edits (frontmatter
+✅ **RESOLVED 2026-08-18 — the MCP-connections seed was renumbered to `SEED-177`** (file + `seed_id` +
+its one self-referencing heading). Verified: `grep -rh '^seed_id:' .planning/seeds/ | sort | uniq -d`
+returns **EMPTY** — zero duplicate ids anywhere. `SEED-174` now resolves to exactly one file (this
+phase's) and `SEED-177` to the MCP one. ⚠ That file is **UNTRACKED** (operator working artifact), so
+the rename lives on disk only and is recorded here rather than in git history.
+
+**Original recommendation, preserved: renumber the MCP-connections seed to `SEED-177`** — one file, two edits (frontmatter
 `seed_id` + filename), zero inbound references to chase. Renumbering this phase's seed instead would
 force edits to STATE.md, `SEED-175`, a test's failure message, and a historical SUMMARY. ⚠ **NOT DONE:
 it is an operator-owned artifact outside this phase's scope, so it awaits an explicit go-ahead.**
@@ -131,6 +137,50 @@ instead (`::test_union_size` will NOT resolve; `-k test_union_size` does).
 | **Cloud parity for migration 120** | Operator-gated; paste into the CLOUD SQL editor in the same operation as any deploy. `check-deploy-drift.sh` → PASS, and 120 carries no seed-like INSERT/UPDATE (measured evidence for A3). |
 | **G-4 UAT rows U-A2 / U-B1 / U-C1 (+1)** | `U-A2` a `coerce` model distinguishable before selection (proved as MARKUP ONLY) · `U-B1` the judge is now `deepseek-v4-pro` · `U-C1` composer restore across REFRESH (not provable in jsdom). |
 | `FieldLabel` + `InfoHint` extraction | Explicitly DEFERRED by `196-08` with a three-arm re-open trigger in source. No cycle exists today. |
+
+### G-4 UAT rows DRIVEN — 2026-08-18 (Chrome DevTools MCP, live app). Full detail in `196-VALIDATION.md`.
+
+⚠ **A PRIOR ORCHESTRATOR PROBE REPORTED THE FRONTEND "DOWN" AND WAS WRONG** — Vite listens on `::1`
+(IPv6 loopback) ONLY, so `/dev/tcp/127.0.0.1/5173` misses it while the app is running fine. Recorded
+because the same mistake will otherwise recur. Diagnose with `Get-NetTCPConnection -State Listen`.
+
+| Row | Verdict |
+|---|---|
+| **U-A2** — a `coerce` model distinguishable BEFORE selection | ✅ **PASS** |
+| **U-B1** — the publish judge is now `deepseek-v4-pro` | ⚠ **PARTIAL** |
+| **U-C1** — composer restore across REFRESH | ❌ **FAILS AS WRITTEN — cause is NOT `196-07`** |
+
+**U-A2 PASS, verified by GROUP MEMBERSHIP rather than a group's mere existence.** The AI-model control
+is a real 67-option `<select>` with three plain-language `<optgroup>`s — `Can fill a document —
+guaranteed format` (14) · `Can fill a document` (39) · `Best-effort only — may not fill a document`
+(13). **`kimi-k2.6`** (the only native `coerce` tier) lands in Best-effort; **`deepseek-v4-pro`** in
+"Can fill a document". ⚠ **`gemini-3.6-flash` — the exact id SEED-135 measured SILENTLY degrading a
+run — is now visibly Best-effort before selection.** The first option reads **"Use the run's model —
+today that would be `deepseek-v4-flash`"**, i.e. `196-04`'s honestly-computed `run_default_model`
+naming the actually-resolved id rather than the word "default".
+
+**U-B1 PARTIAL — do NOT read as driven.** `app_settings.harness_judge_model = 'deepseek-v4-pro'`
+confirmed against the live DB, which with `196-02`'s four RED-first consumer tests proves resolution.
+**A real publish gauntlet was NOT run** — it mutates the operator's library and spends real LLM calls
+across eight stages, so it stays operator-gated rather than run unasked.
+
+⚠⚠ **U-C1 — THE MOST CONSEQUENTIAL FINDING OF THE VERIFICATION, AND IT CHANGES A BUG'S DISPOSITION.**
+Restore-on-NAVIGATE **verified live**: thread *Weekly Report Generation* showed the composer at
+**`Ollama` / `qwen3-30b-a3b-instruct-2507@q4_k_xl`**, byte-matching that thread's last `runs` row —
+`196-07`'s derivation doing exactly what it claims. **Then F5, and THE THREAD ITSELF DOES NOT SURVIVE**
+(re-checked at 3.5 s and 9.5 s to rule out a slow settle): the app returns to a NEW chat showing the
+global default. **Root cause measured — thread selection is persisted NOWHERE:** `location.href` stays
+bare `/` even with a thread open (no per-thread URL), `localStorage` holds only
+`chat_history_collapsed`, `sessionStorage` holds nothing thread-related.
+**So the restore is never given the chance to run, and showing the default in a brand-new thread is
+CORRECT.** The blocker is a different, unscoped capability — **thread-selection persistence across
+reload** — which Phase 196 never scoped and could not have fixed.
+➜ `196-07` and `196-09` were RIGHT to leave `BUG-260718-04` at `status: folded`. ⚠ **But its close
+condition is UNREACHABLE AS WRITTEN, not merely undriven** — no UAT can pass *"REFRESH and see the
+model still selected"* while refresh discards the thread. **The report needs its close condition
+RESTATED OR SPLIT; do not simply re-drive U-C1.** This is now recorded in the report's
+`re_open_trigger` FRONTMATTER (verified still valid YAML, 13 keys, `status: folded`,
+`verified_closed_by: null`) — because prose inside a `folded` record is invisible to the routing scan.
 
 ⚠ **A PRODUCT DECISION AWAITING THE OPERATOR:** on a `loading` / `unavailable` registry read the AI
 model field is **ABSENT** from the phase form. `ModelField` cannot express *"I couldn't read the
