@@ -9,7 +9,7 @@ affected_areas: [workflows/publish-gauntlet, frontend/workflows, observability, 
 folded_into: null
 verified_closed_by: null
 related_seeds: [SEED-165]
-re_open_trigger: null
+re_open_trigger: "Considered at /gsd:discuss-phase 197 (2026-08-18) and DELIBERATELY NOT FOLDED — it shares SEED-163's root but is repair on the PUBLISH surface, while 197's SC#1 asks for the author to be ASKED, not better refused. Status stays `open` and `folded_into` stays null on purpose. Re-open at: the next phase touching the publish gauntlet's refusal copy, OR a second report of an author stuck on an unexplained refusal. See .planning/phases/197-guided-authoring/197-CONTEXT.md <deferred>."
 reproduces_on:
   branch: develop
   commit: 2986541f
