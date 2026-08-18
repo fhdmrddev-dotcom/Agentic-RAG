@@ -2428,6 +2428,28 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
     fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
   }
 
+  /**
+   * ⚠ 197-09 (AUTH-02 / D-02 / D-04) — THE RECEIPT IS NOW ONE PRESS AWAY, AND EVERY CASE
+   * IN THIS BLOCK GAINED THIS HELPER RATHER THAN LOSING AN ASSERTION.
+   *
+   * The page mounts `DraftArrivalCard` where it used to mount `SeedReceipt` — in place, so
+   * the graph column still has exactly three children. The card composes the receipt
+   * UNMODIFIED behind its first fold, which is CLOSED on arrival: sketch 174 measured that
+   * two separately-framed cards cost 284 px of chrome against one card's 149 px on a 780 px
+   * screen, leaving the workflow 47% of the height instead of 65%.
+   *
+   * So a case that read `seed-receipt` off the arrival DOM is now asking a question about a
+   * surface one press away. That is a BEHAVIOUR CHANGE TO EXPLAIN, declared here with its
+   * date and its reason, never a test quietly updated to make a red run green — the
+   * standing rule this phase's own D-05 criterion encodes. Nothing these cases asserted is
+   * dropped: each still checks exactly what it checked, with the fold opened first, and
+   * each now ALSO pins that the fold reveals the real receipt. That is strictly more.
+   */
+  async function openGroundingFold(): Promise<HTMLElement> {
+    fireEvent.click(await screen.findByTestId("draft-arrival-fold-grounding"))
+    return await screen.findByTestId("seed-receipt")
+  }
+
   beforeEach(() => {
     // The SERVER's KB-tool list rides on the bundle; the receipt derives nothing of its own.
     mockBundle.mockResolvedValue({
@@ -2444,7 +2466,13 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
     renderFresh()
     await draftIt()
 
-    const receipt = await screen.findByTestId("seed-receipt")
+    // 197-09 — the ARRIVAL is the card, and its heading is the receipt's own formatter
+    // rendered once at card level. Asserted BEFORE the fold is opened, so this case still
+    // pins "something honest arrives with the graph" independently of the disclosure.
+    const card = await screen.findByTestId("draft-arrival-card")
+    expect(within(card).getByTestId("draft-arrival-heading").textContent ?? "").toContain("2")
+
+    const receipt = await openGroundingFold()
     expect(within(receipt).getByTestId("seed-receipt-heading").textContent ?? "").toContain("2")
     // The grounded step is named — per-step with its cause, never a summary count.
     expect(within(receipt).getByTestId("seed-receipt-step-research")).toBeInTheDocument()
@@ -2456,17 +2484,24 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
   it("dismissing hides it, and it does not come back while you keep working", async () => {
     renderFresh()
     await draftIt()
-    const receipt = await screen.findByTestId("seed-receipt")
+    // 197-09 — the dismiss control is the CARD's now, rendered from the receipt's own
+    // shipped label and glyph constants. The receipt's duplicate is suppressed by CSS and
+    // by `display`, so it is not in the tab order; this case drives the one the author sees.
+    const card = await screen.findByTestId("draft-arrival-card")
 
-    fireEvent.click(within(receipt).getByTestId("seed-receipt-dismiss"))
-    await waitFor(() => expect(screen.queryByTestId("seed-receipt")).toBeNull())
+    fireEvent.click(within(card).getByTestId("draft-arrival-dismiss"))
+    await waitFor(() => expect(screen.queryByTestId("draft-arrival-card")).toBeNull())
+    // …and the composed receipt went with it, which is the property this case always had.
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
 
     // Keep working: flip to the canvas and back. The receipt stays gone.
     fireEvent.click(screen.getByTestId("builder-view-canvas"))
     await waitFor(() => expect(screen.getByTestId("canvas-node-research")).toBeInTheDocument(), LAZY)
     expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-card")).toBeNull()
     fireEvent.click(screen.getByTestId("builder-view-spine"))
     expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-card")).toBeNull()
   })
 
   it("appears on the autoDraft hand-off path too — it is a genuine AI seed", async () => {
@@ -2476,7 +2511,11 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
       initialDescribe: "summarise the supplier renewals every week",
       autoDraft: true,
     })
-    expect(await screen.findByTestId("seed-receipt")).toBeInTheDocument()
+    expect(await screen.findByTestId("draft-arrival-card")).toBeInTheDocument()
+    // 197-09 — and the receipt is genuinely composed on this path too, not just the card:
+    // one funnel, not two. A verdict or a receipt surviving the manual entrance but not the
+    // hand-off would be a silent asymmetry between the two authoring doors.
+    expect(await openGroundingFold()).toBeInTheDocument()
     expect(mockGenerate).toHaveBeenCalledTimes(1)
   })
 
@@ -2486,6 +2525,11 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
     await waitFor(() => expect(screen.getByTestId("builder-grid")).toBeInTheDocument())
     expect(screen.queryByTestId("seed-receipt")).toBeNull()
     expect(screen.queryByTestId("seed-receipt-heading")).toBeNull()
+    // 197-09 — the card inherits the receipt's STRUCTURAL gating exactly: it lives inside
+    // the same `canvasEnabled` branch, so flag-off there is no card, no fold and no
+    // decisions row either. No second gate was added and the shipped one was not removed.
+    expect(screen.queryByTestId("draft-arrival-card")).toBeNull()
+    expect(screen.queryByTestId("decisions-list")).toBeNull()
   })
 
   it("a draft with NOTHING grounded still gets a receipt, with no grounded list (D-187-10)", async () => {
@@ -2499,10 +2543,30 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
     renderFresh()
     await draftIt()
 
-    const receipt = await screen.findByTestId("seed-receipt")
-    expect(within(receipt).getByTestId("seed-receipt-heading")).toBeInTheDocument()
-    expect(within(receipt).queryByTestId("seed-receipt-grounded-list")).toBeNull()
-    expect(within(receipt).queryByTestId("seed-receipt-grounding")).toBeNull()
+    /**
+     * ⚠ 197-09 — THIS CASE'S SHAPE CHANGED AND THE CHANGE IS DECLARED, because reading it
+     * as "the receipt is gone" would be wrong in a way that matters.
+     *
+     * `groundingFoldSummary(0)` returns the EMPTY STRING, so a draft with nothing grounded
+     * renders NO grounding fold line at all — and therefore no path to the composed
+     * receipt. That is not a loss: with zero grounded steps the receipt's whole content is
+     * its heading and its closing sentence, and the card renders BOTH ITSELF, from the
+     * receipt's own shipped constants. There is nothing behind the fold to reveal, and a
+     * fold line that opens onto nothing is worse than no line.
+     *
+     * So the property is restated where it now lives: the arrival still happens, it still
+     * names the step count, and it still says nothing about grounding it cannot support.
+     */
+    const card = await screen.findByTestId("draft-arrival-card")
+    expect(within(card).getByTestId("draft-arrival-heading")).toBeInTheDocument()
+    expect(screen.queryByTestId("draft-arrival-fold-grounding")).toBeNull()
+    // The receipt is not mounted, so its grounded list and grounding paragraph are absent —
+    // the same two absences this case has always asserted, reached by construction.
+    expect(screen.queryByTestId("seed-receipt-grounded-list")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt-grounding")).toBeNull()
+    // POSITIVE CONTROL — the fold's absence is a property of THIS draft, not of the card:
+    // the decisions fold is always offered and is right there beside it.
+    expect(within(card).getByTestId("draft-arrival-fold-decisions")).toBeInTheDocument()
   })
 
   it("an HONEST generate failure produces no receipt at all", async () => {
@@ -2512,6 +2576,10 @@ describe("WorkflowBuilderPage 187-15 — the seed receipt arrives with the draft
 
     await screen.findByTestId("generate-error")
     expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    // 197-09 — and no card either. `showReceipt` is written in the `onDrafted` handler and
+    // nowhere else, so a failure cannot produce an arrival claim about a draft that does
+    // not exist (D-06, held by construction rather than by a second gate).
+    expect(screen.queryByTestId("draft-arrival-card")).toBeNull()
   })
 })
 
@@ -2591,20 +2659,40 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
   })
 
   /** Everything the card says, and every number it exposes — read as ONE value so a
-   *  case cannot accidentally assert on three of the four things that can move. */
+   *  case cannot accidentally assert on three of the four things that can move.
+   *
+   * ⚠ 197-09 — RE-SCOPED TO THE ARRIVAL SURFACE, AND IT READS **MORE** OF WHAT MOVES, NOT
+   * LESS. This block's fixture is deliberately ZERO-GROUNDED ("all three counts start at
+   * 0"), and `groundingFoldSummary(0)` returns the empty string — so the arrival card
+   * renders NO grounding fold line for it, and the composed receipt is not mounted at all.
+   * There is therefore nothing to open and nothing to read `data-*-count` off. Reading the
+   * receipt's attributes here is not "weakened by composition"; it is structurally
+   * impossible for THIS draft.
+   *
+   * What replaces it is a strictly sharper falsification of the very defect this block
+   * exists for. The old case asked *did a number on the receipt move?* — this one asks
+   * *did the fold line APPEAR?*, which is a visible bit rather than an attribute. If the
+   * page ever hands the card the live `phases` selector instead of the arrival snapshot,
+   * grounding one step takes `groundingFoldSummary` from `""` to a sentence and the whole
+   * line materialises on screen. That is CR-01's failure made unmissable.
+   *
+   * The receipt's three counts have NOT lost their fence: the 197-09 snapshot block below
+   * uses a fixture with a grounded step at arrival, opens the fold, and pins
+   * `data-grounded-count` / `-detected-count` / `-carried-count` across three real edits.
+   */
   type Arrival = {
     text: string
-    grounded: string | null
-    detected: string | null
-    carried: string | null
+    groundingFold: string | null
+    decisionsFold: string | null
   }
   function readReceipt(): Arrival {
-    const card = screen.getByTestId("seed-receipt")
+    const card = screen.getByTestId("draft-arrival-card")
+    const grounding = within(card).queryByTestId("draft-arrival-fold-grounding-summary")
+    const decisions = within(card).queryByTestId("draft-arrival-fold-decisions-summary")
     return {
-      text: card.textContent ?? "",
-      grounded: card.getAttribute("data-grounded-count"),
-      detected: card.getAttribute("data-detected-count"),
-      carried: card.getAttribute("data-carried-count"),
+      text: within(card).getByTestId("draft-arrival-heading").textContent ?? "",
+      groundingFold: grounding === null ? null : (grounding.textContent ?? ""),
+      decisionsFold: decisions === null ? null : (decisions.textContent ?? ""),
     }
   }
 
@@ -2644,13 +2732,21 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     })
     fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
 
-    await screen.findByTestId("seed-receipt")
+    // ⚠ 197-09 — the arrival is the CARD now; see `readReceipt`'s block above for why this
+    // block's zero-grounded fixture cannot reach the composed receipt at all.
+    await screen.findByTestId("draft-arrival-card")
     const arrival = readReceipt()
     // The draft really did start at zero — otherwise a mutation could move a count that
-    // was already non-zero and the comparison would be weaker than it looks.
-    expect(arrival.grounded).toBe("0")
-    expect(arrival.detected).toBe("0")
-    expect(arrival.carried).toBe("0")
+    // was already non-zero and the comparison would be weaker than it looks. ⚠ 197-09
+    // restates this in the arrival's own terms: zero grounded steps means the grounding
+    // fold line is ABSENT, and the decisions fold line is present regardless. Both halves
+    // matter — the second is the positive control proving the first absence is a property
+    // of the draft rather than of a card that failed to render its folds.
+    expect(arrival.groundingFold).toBeNull()
+    expect(arrival.decisionsFold).not.toBeNull()
+    // …and the receipt is genuinely not mounted, which is what makes the assertions below
+    // a statement about the SNAPSHOT rather than about a hidden node.
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
 
     fireEvent.click(screen.getByTestId("builder-view-canvas"))
     await waitFor(() => expect(screen.getByTestId("canvas-node-judge")).toBeInTheDocument(), LAZY)
@@ -2683,7 +2779,11 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     )
 
     // …and the receipt is a statement about the generation, so it did not move.
+    // ⚠ 197-09 — the sharp edge of this case: a page wired to the live selector would take
+    // `groundingFoldSummary` from `""` to a sentence right here, and the grounding fold
+    // line would MATERIALISE on the card. `toEqual` catches `null` → string.
     expect(readReceipt()).toEqual(arrival)
+    expect(screen.queryByTestId("draft-arrival-fold-grounding")).toBeNull()
   })
 
   it("CR-04 path 2 — a step the AUTHOR adds is not counted by the card's heading", async () => {
@@ -2722,6 +2822,9 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     // author turned this on, and the card must not say "was already set to".
     expect(screen.queryByTestId("seed-receipt-carried")).toBeNull()
     expect(readReceipt()).toEqual(arrival)
+    // ⚠ 197-09 — an ESCALATION is a grounding cause too, so a live-read card would sprout
+    // the grounding fold line here exactly as it would in path 1.
+    expect(screen.queryByTestId("draft-arrival-fold-grounding")).toBeNull()
   })
 
   it("SOURCE FENCE — the card is handed the arrival snapshot, and the snapshot is taken beside setDrafted", () => {
@@ -2740,13 +2843,29 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     const SETTER = ["setReceipt", "Phases(def.phases)"].join("")
     const TRANSITION = ["setDrafted", "(def)"].join("")
 
-    // The `<SeedReceipt …/>` element, extracted rather than searched for file-wide: the
+    // The receipt-bearing element, extracted rather than searched for file-wide: the
     // live selector is CORRECT on the canvas and the spine, which are the live ledger of
     // current governance. It is wrong on exactly one element, so the fence reads exactly
     // that one.
-    const element = builderSource.match(/<SeedReceipt\b[\s\S]*?\/>/)?.[0] ?? ""
+    //
+    // ⚠ 197-09 (D-02) — THE FENCE'S SUBJECT MOVED, AND IT IS RE-SCOPED RATHER THAN
+    // DELETED, for the third time and for the same reason as the two before it. The page
+    // now mounts `DraftArrivalCard`, which composes the UNMODIFIED receipt behind a fold,
+    // so `<SeedReceipt` no longer appears in this file at all and the old extraction
+    // returned the empty string — at which point `toContain(SNAPSHOT_PROP)` fails loudly
+    // and `not.toContain(LIVE_SELECTOR)` passes VACUOUSLY. Half a fence going quiet while
+    // the other half shouts is the worst available outcome, so the element is re-named.
+    //
+    // The property is unchanged and is the one that matters: whichever element carries the
+    // arrival snapshot must be handed `receiptPhases`, never the live `phases` selector.
+    // Composition moved the card one level up; it did not make the page's wiring safe.
+    const element = builderSource.match(/<DraftArrivalCard\b[\s\S]*?\/>/)?.[0] ?? ""
     // A regex that matched nothing would make every assertion below vacuous.
     expect(element).toContain("kbTools")
+    // …and the receipt is genuinely COMPOSED rather than mounted a second time here (D-02,
+    // whose other two proofs are `SeedReceipt.tsx` at `0 0` on numstat and the parent's own
+    // charter fence). A page that mounted both would satisfy every other line in this case.
+    expect(builderSource).not.toContain("<Seed" + "Receipt")
 
     expect(element).not.toContain(LIVE_SELECTOR)
     expect(element).toContain(SNAPSHOT_PROP)
@@ -2826,10 +2945,44 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     ).toHaveLength(1)
     // …and exactly one write on the page, inside the callback that raise reaches.
     expect(builderSource.match(new RegExp(SETTER.replace(/[().]/g, "\\$&"), "g")) ?? []).toHaveLength(1)
-    const CALLBACK = ["onDrafted", ": (def) => {"].join("")
+    //
+    // ⚠ 197-09 (D-13) — THE PAGE-SIDE HALF IS RE-SCOPED TOWARD A STRONGER PROPERTY, ON THE
+    // COMMIT THAT MAKES IT TRUE. The hook-side half was re-scoped at the wave-2 merge to
+    // pin the COMMA in `…current(def,` — asserting the raise demonstrably carries a second
+    // argument. This is the mirror of that, one hop later: `197-06` could only carry D-13's
+    // readiness verdict as far as the hook boundary, because a ONE-ARGUMENT inline callback
+    // assigns to a two-parameter signature with NO TypeScript error, so the page compiled
+    // perfectly while silently ignoring the verdict. This plan spends it into page state,
+    // and the shipped callback is now `(def, verdict) => {`.
+    //
+    // The lazy repair is `/onDrafted:/`, which would pass whether or not the page names the
+    // second parameter at all — retiring the guarantee on the commit that adds it, exactly
+    // as dropping the closing paren would have done on the hook side. Pinning the COMMA and
+    // the second identifier asserts strictly more than the shipped literal did: the handler
+    // still exists, is still the one the raise reaches, and now demonstrably RECEIVES the
+    // verdict. Deleting that parameter reds here, and `tsc` stays green while it does.
+    const CALLBACK = ["onDrafted", ": (def, "].join("")
     const atCallback = builderSource.indexOf(CALLBACK)
     expect(atCallback).toBeGreaterThan(-1)
+    // POSITIVE CONTROL — the re-spelled needle DISCRIMINATES rather than merely matching:
+    // it does not match the shipped single-parameter spelling this plan replaced. Without
+    // this, `toMatch`-style widening could have silently accepted the old shape.
+    expect(["onDrafted", ": (def) => {"].join("")).not.toContain(CALLBACK)
+    // The window was 200 and stayed 200 — re-derived, not assumed. Measured on the shipped
+    // file: the callback opens at 0 and `setReceiptPhases(def.phases)` lands at 44, with the
+    // verdict write immediately after it. All three writes are one snapshot in one batch.
     expect(builderSource.slice(atCallback, atCallback + 200)).toContain(SETTER)
+    // …and the verdict write is in that same batch, beside the other two. A page that
+    // captured it in an effect could observe an already-edited store — the CR-01 shape this
+    // whole case exists to refuse, applied to the value 197-06 added.
+    const VERDICT_SETTER = ["setReadiness", "(verdict)"].join("")
+    expect(builderSource.slice(atCallback, atCallback + 200)).toContain(VERDICT_SETTER)
+    // Exactly one write, so no second site can hand the card a later verdict…
+    expect(builderSource.match(new RegExp(VERDICT_SETTER.replace(/[().]/g, "\\$&"), "g")) ?? []).toHaveLength(1)
+    // …and it is never a store selector. `readiness` is a SNAPSHOT of one generation; read
+    // live it would narrate the author's own later edits in the server's voice.
+    expect(builderSource).not.toMatch(/=>\s*s\.readiness/)
+    expect(builderSource).not.toMatch(/readiness\s*\?\?\s*\{\}/)
   })
 })
 
@@ -2857,7 +3010,14 @@ describe("WorkflowBuilderPage 187-15 — source guards for the two mounts", () =
   })
 
   it("mounts each surface exactly once, and adds no helper or component beside them", () => {
-    expect(builderSource.match(/<SeedReceipt\b/g) ?? []).toHaveLength(1)
+    // ⚠ 197-09 (D-02 / T-197-24) — RE-SCOPED, AND THE NEW PAIR IS STRICTLY STRONGER. The
+    // page mounts the composing parent now; the receipt reaches the screen through it,
+    // unmodified. Pinning the parent at ONE alone would be weaker than the line it
+    // replaces, so the receipt's count is pinned at ZERO beside it: together they say the
+    // receipt is COMPOSED and not mounted a second time, which the old single line could
+    // not say at all. One card in the UI, two components underneath.
+    expect(builderSource.match(/<DraftArrivalCard\b/g) ?? []).toHaveLength(1)
+    expect(builderSource.match(/<SeedReceipt\b/g) ?? []).toHaveLength(0)
     expect(builderSource.match(/<StarterTemplatePicker\b/g) ?? []).toHaveLength(1)
     // The door writes into the describe box and nothing else — the seam is `setDescribe`,
     // never `initialDescribe` (an UPSTREAM prop that is not settable from inside the page).
@@ -3552,5 +3712,437 @@ describe("WorkflowBuilderPage — the business requirement reaches the PATCH bod
     )
     // And it is still on screen — the write did not quietly demote what it did not touch.
     expect(screen.getByTestId("business-requirement-ai-mark")).toBeInTheDocument()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 197-09 (AUTH-02 / ROADMAP SC#1 — D-01 / D-02 / D-06 / D-13 / D-14 / D-18 ·
+// T-197-03 / T-197-21 / T-197-24 / T-197-27) — THE ARRIVAL CARD, MOUNTED
+//
+// APPENDED. Plan 197-08 built `DraftArrivalCard` and mounted it nowhere; this block is the
+// page's half. It pins four things the component's own 35-case suite structurally CANNOT
+// see, because that suite mounts the component directly and hands it props:
+//
+//  1. THE THREE-CHILD GRID. The graph column is a three-row grid whose LAST child is pinned
+//     to the `minmax(0,1fr)` row. A FOURTH child auto-places into row 3 alongside it and
+//     the graph collapses to 0 px — sketch 172 measured exactly that, which is why the card
+//     REPLACED the receipt in place rather than joining it. Only a page-level case can
+//     count the children, and the count is asserted as a NUMBER: `toBeInTheDocument()` on
+//     the card passes just as happily with four.
+//  2. SNAPSHOT vs LIVE, KEPT APART. The card renders two classes of value that look
+//     identical in the DOM: what the server said about ONE generation (`receiptPhases`,
+//     `readiness`) and what the definition says NOW (the five decision answers). Conflating
+//     them is CR-01's shape for the FOURTH time. A card that passed the snapshot half by
+//     freezing everything would fail the live half, and vice versa — so both are here, and
+//     they are each other's control.
+//  3. THE VERDICT'S LAST HOP, WHICH `tsc` CANNOT CHECK. `197-06` widened the hook's
+//     `onDrafted` to carry the server's readiness verdict as a second argument, and
+//     recorded honestly that the page was still ignoring it — because a ONE-ARGUMENT inline
+//     callback assigns to a two-parameter signature with NO TypeScript error at all. ⚠ A
+//     GREEN TYPECHECK IS THEREFORE NOT EVIDENCE FOR THIS PLAN. These cases are: deleting
+//     the second parameter from the page's callback reds three of them while `tsc` stays
+//     at its 33-error baseline, and that was measured by planting the deletion, not
+//     reasoned about.
+//  4. THE TWO FOCUS SEAMS. Rows 1 and 3 hand the author to the control that already exists
+//     rather than mounting a second one, because *"a second, different answer to one
+//     question is drift"* — this page's own rule, beside *"ONE CONTROL, TWO MOUNT POINTS."*
+//     After the jump the header control and the row must read the SAME string, which is the
+//     U5 defect class made mechanical.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the two value classes stay apart", () => {
+  const ON = { features: { visual_workflow_canvas: true }, loading: false }
+
+  /** The one KB-reading tool in this block's server palette. */
+  const KB_TOOL = "search_documents"
+  /** A tool that reads no documents, so naming it grounds nothing. */
+  const PLAIN_TOOL = "execute_code"
+
+  /**
+   * A generated definition with ONE grounded step at arrival, so the grounding fold LINE
+   * exists and the composed receipt is reachable.
+   *
+   * ⚠ This is deliberately NOT the CR-04 block's zero-grounded fixture. That one cannot
+   * reach the receipt at all — `groundingFoldSummary(0)` is the empty string, so no fold
+   * line renders — which is why the receipt's three count attributes are fenced HERE and
+   * the fold line's non-APPEARANCE is fenced THERE. Between them the two fixtures cover
+   * both sides of one snapshot property, and neither could have covered both.
+   *
+   *  - `research` is `llm_agent` reaching for the KB tool → grounded at arrival.
+   *  - `judge` is `llm_agent` reaching only for a non-KB tool → the step the author edits.
+   *  - `brief` is `llm_emit` carrying `citation_policy: "draft"`, a member of the backend
+   *    Literal, chosen because the shipped default `"strict"` would start the carried count
+   *    above zero.
+   */
+  const arrivalPhases = [
+    {
+      slug: "research",
+      phase_index: 0,
+      config: { phase_type: "llm_agent", available_tools: [KB_TOOL] },
+    },
+    {
+      slug: "judge",
+      phase_index: 1,
+      config: { phase_type: "llm_agent", available_tools: [PLAIN_TOOL] },
+    },
+    { slug: "brief", phase_index: 2, config: { phase_type: "llm_emit", citation_policy: "draft" } },
+  ]
+  const arrivalDef = {
+    ...definition,
+    name: "Vendor risk brief",
+    project_folder_id: CORPUS_FOLDER_ID,
+    phases: structuredClone(arrivalPhases),
+  } as BuilderDefinition
+
+  const FOLDER_NAME = "Supplier contracts"
+  const OTHER_FOLDER_ID = "11111111-2222-3333-4444-555555555555"
+  const OTHER_FOLDER_NAME = "Board minutes"
+
+  beforeEach(() => {
+    mockBundle.mockResolvedValue({
+      tools: [KB_TOOL, PLAIN_TOOL],
+      folders: [],
+      skills: [],
+      degraded: [],
+      kb_tools: [KB_TOOL],
+    })
+    // TWO folders, so re-binding is a real choice rather than a no-op.
+    mockListFolders.mockResolvedValue([
+      { id: CORPUS_FOLDER_ID, name: FOLDER_NAME },
+      { id: OTHER_FOLDER_ID, name: OTHER_FOLDER_NAME },
+    ])
+    mockGenerate.mockResolvedValue({ ok: true, definition: structuredClone(arrivalDef) })
+  })
+
+  /** Draft through the ONE shipped forward path and wait for the card. */
+  async function draftAndArrive(): Promise<HTMLElement> {
+    render(
+      <EffectiveFeaturesProvider value={{ ...ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    await screen.findByTestId("describe-hint")
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "summarise the supplier renewals every week" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+    return await screen.findByTestId("draft-arrival-card")
+  }
+
+  /** Open the decisions fold and return the mounted list. */
+  async function openDecisions(): Promise<HTMLElement> {
+    fireEvent.click(await screen.findByTestId("draft-arrival-fold-decisions"))
+    return await screen.findByTestId("decisions-list")
+  }
+
+  /**
+   * THE ONE COUNTING EXPRESSION, declared once so the assertion and its positive control
+   * cannot drift into counting two different things. `children` is ELEMENTS only, which is
+   * what stops whitespace between JSX children from moving the number. The graph COLUMN is
+   * `builder-grid`'s first child — the flag-on wrapper `div`.
+   */
+  const countChildren = (host: Element) => host.children.length
+  const graphColumn = () => screen.getByTestId("builder-grid").children[0] as HTMLElement
+  const SPINE_LABEL = "Workflow phase spine (read-only)"
+
+  it("⭐ the graph column has EXACTLY three children, and the card is the middle one", async () => {
+    await draftAndArrive()
+
+    const column = graphColumn()
+    // THE FENCE, as a NUMBER. Sketch 172 measured that a FOURTH child strands the graph at
+    // 0 px; a presence check on the card cannot tell three from four.
+    expect(countChildren(column)).toBe(3)
+
+    // …and they are the three the layout expects, in order.
+    expect(column.children[0]).toHaveAttribute("data-testid", "builder-view-toggle")
+    expect(column.children[1]).toHaveAttribute("data-testid", "draft-arrival-card")
+    // The graph is LAST, which is what `[&>*:last-child]:row-start-3` pins to the 1fr row.
+    expect(column.children[2]).toBe(column.lastElementChild)
+    expect(column.children[2].getAttribute("aria-label")).toBe(SPINE_LABEL)
+  })
+
+  it("⭐ POSITIVE CONTROL — the counting expression really can report four", () => {
+    // Without this, `toBe(3)` above could be passing because `countChildren` is blind to
+    // the very thing it exists to detect. A local four-child fixture proves it is not.
+    const host = document.createElement("div")
+    for (const _ of [0, 1, 2, 3]) host.appendChild(document.createElement("span"))
+    host.appendChild(document.createTextNode("a stray text node"))
+    expect(countChildren(host)).toBe(4)
+
+    const three = document.createElement("div")
+    for (const _ of [0, 1, 2]) three.appendChild(document.createElement("span"))
+    expect(countChildren(three)).toBe(3)
+    expect(countChildren(three)).not.toBe(countChildren(host))
+  })
+
+  it("dismissing takes the column down to TWO children, with the graph still last", async () => {
+    const card = await draftAndArrive()
+    expect(countChildren(graphColumn())).toBe(3)
+
+    fireEvent.click(within(card).getByTestId("draft-arrival-dismiss"))
+    await waitFor(() => expect(screen.queryByTestId("draft-arrival-card")).toBeNull())
+
+    // A dismissed card renders NO NODE — which is exactly why the graph is pinned to row 3
+    // by `*:last-child` rather than trusted to occupy a slot.
+    const column = graphColumn()
+    expect(countChildren(column)).toBe(2)
+    expect(column.children[0]).toHaveAttribute("data-testid", "builder-view-toggle")
+    expect(column.lastElementChild?.getAttribute("aria-label")).toBe(SPINE_LABEL)
+  })
+
+  it("⭐ SNAPSHOT — three REAL post-arrival edits move nothing the card says about the generation", async () => {
+    const card = await draftAndArrive()
+    const heading = within(card).getByTestId("draft-arrival-heading").textContent ?? ""
+    const groundingLine =
+      within(card).getByTestId("draft-arrival-fold-grounding-summary").textContent ?? ""
+    expect(heading).toContain("3")
+    expect(groundingLine).not.toBe("")
+
+    // The composed receipt, opened once and read for its three counts — the numbers the
+    // CR-04 block's zero-grounded fixture cannot reach.
+    fireEvent.click(within(card).getByTestId("draft-arrival-fold-grounding"))
+    const receipt = await screen.findByTestId("seed-receipt")
+    const counts = {
+      grounded: receipt.getAttribute("data-grounded-count"),
+      detected: receipt.getAttribute("data-detected-count"),
+      carried: receipt.getAttribute("data-carried-count"),
+    }
+    expect(counts.grounded).toBe("1")
+
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-judge")).toBeInTheDocument(), LAZY)
+
+    // ── EDIT 1: switch a document-reading tool ON, on a step that was not grounded ──
+    fireEvent.click(screen.getByTestId("canvas-node-judge"))
+    await waitFor(
+      () => expect(screen.getByLabelText("Refine step: judge")).toBeInTheDocument(),
+      LAZY,
+    )
+    const chip = screen
+      .getAllByTestId("tool-option")
+      .find((el) => el.getAttribute("data-tool") === KB_TOOL)
+    if (!chip) throw new Error(`the panel offers no "${KB_TOOL}" chip`)
+    fireEvent.click(chip)
+    // POSITIVE CONTROL — the edit LANDED. Without it this case goes green the day the
+    // whitelist rail stops committing, which is a fence measuring nothing (WR-12).
+    await waitFor(() => expect(chip).toHaveAttribute("aria-pressed", "true"))
+
+    // ── EDIT 2: escalate the grounding dial on the same step ──
+    fireEvent.click(screen.getByTestId("governance-dial-strict"))
+    await waitFor(() =>
+      expect(screen.getByTestId("governance-dial-strict")).toHaveAttribute("aria-pressed", "true"),
+    )
+
+    // ── EDIT 3: the author adds a step ──
+    const nodes = () => document.querySelectorAll("[data-testid^='canvas-node-'][data-slug]").length
+    const before = nodes()
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+    await waitFor(() => expect(nodes()).toBe(before + 1))
+
+    // The card's PAST-TENSE sentences describe the GENERATION, so none of the three moved.
+    const after = screen.getByTestId("draft-arrival-card")
+    expect(within(after).getByTestId("draft-arrival-heading").textContent ?? "").toBe(heading)
+    expect(within(after).getByTestId("draft-arrival-fold-grounding-summary").textContent ?? "").toBe(
+      groundingLine,
+    )
+    const receiptAfter = screen.getByTestId("seed-receipt")
+    expect({
+      grounded: receiptAfter.getAttribute("data-grounded-count"),
+      detected: receiptAfter.getAttribute("data-detected-count"),
+      carried: receiptAfter.getAttribute("data-carried-count"),
+    }).toEqual(counts)
+  })
+
+  it("⭐ LIVE — row 1's answer follows the header's knowledge-base picker immediately", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+    // The generated binding, resolved to a NAME by the page's own mount fetch.
+    await waitFor(() =>
+      expect(within(list).getByTestId("decision-answer-knowledge-base").textContent).toBe(
+        FOLDER_NAME,
+      ),
+    )
+
+    // Re-bind through the ONE control — the header picker the row hands the author to.
+    fireEvent.change(screen.getByTestId("project-folder-picker"), {
+      target: { value: OTHER_FOLDER_ID },
+    })
+
+    // …and the row follows in the same beat. This is the MIRROR of the snapshot fence: a
+    // card that froze everything to pass that one would fail here.
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-knowledge-base").textContent).toBe(
+        OTHER_FOLDER_NAME,
+      ),
+    )
+    // ⚠ U5, MADE MECHANICAL — the header control and the row must agree. One screen with
+    // two answers to one question is exactly the drift these seams refuse.
+    expect((screen.getByTestId("project-folder-picker") as HTMLSelectElement).value).toBe(
+      OTHER_FOLDER_ID,
+    )
+  })
+
+  it("⭐ LIVE — row 3's answer follows the header's requirement input immediately", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+    const generated = within(list).getByTestId("decision-answer-requirement").textContent
+    expect(generated).not.toBe("")
+
+    fireEvent.change(screen.getByTestId("business-requirement-input"), {
+      target: { value: "Produce a board-ready renewal brief every Monday." },
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-requirement").textContent).toBe(
+        "Produce a board-ready renewal brief every Monday.",
+      ),
+    )
+    expect(screen.getByTestId("decision-answer-requirement").textContent).not.toBe(generated)
+    expect((screen.getByTestId("business-requirement-input") as HTMLInputElement).value).toBe(
+      "Produce a board-ready renewal brief every Monday.",
+    )
+  })
+
+  it("⭐ FOCUS SEAM — row 1's action focuses the SHIPPED picker, and both read the same answer", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // Nothing has focused it yet, so the assertion below is a measurement rather than a
+    // restatement of the initial condition.
+    expect(document.activeElement).not.toBe(screen.getByTestId("project-folder-picker"))
+
+    fireEvent.click(within(list).getByTestId("decision-action-knowledge-base"))
+
+    const picker = screen.getByTestId("project-folder-picker") as HTMLSelectElement
+    expect(document.activeElement).toBe(picker)
+    expect(document.activeElement).toHaveAttribute("data-testid", "project-folder-picker")
+    // The row DISPLAYS and JUMPS; it owns no control. Exactly ONE picker exists on screen —
+    // the T-197-21 property, and the reason a `getAllByTestId` length is asserted rather
+    // than a `getByTestId` (which would throw on two and read as a different failure).
+    expect(screen.getAllByTestId("project-folder-picker")).toHaveLength(1)
+    // …and after the jump the two surfaces agree, which is the U5 property.
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-knowledge-base").textContent).toBe(FOLDER_NAME),
+    )
+    expect(picker.selectedOptions[0]?.textContent).toBe(FOLDER_NAME)
+  })
+
+  it("⭐ FOCUS SEAM — row 3's action focuses the SHIPPED requirement input, and both read the same string", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+    const input = screen.getByTestId("business-requirement-input") as HTMLInputElement
+    expect(document.activeElement).not.toBe(input)
+
+    fireEvent.click(within(list).getByTestId("decision-action-requirement"))
+
+    expect(document.activeElement).toBe(input)
+    expect(document.activeElement).toHaveAttribute("data-testid", "business-requirement-input")
+    expect(screen.getAllByTestId("business-requirement-input")).toHaveLength(1)
+    expect(screen.getByTestId("decision-answer-requirement").textContent).toBe(input.value)
+  })
+
+  it("⭐ THE VERDICT LANDS — the server's `missing` sentence reaches row 3, VERBATIM", async () => {
+    /**
+     * D-13's whole point, and the hop `197-06` could not take.
+     *
+     * ⚠ THIS IS THE CASE THAT MAKES A GREEN TYPECHECK IRRELEVANT. Deleting the second
+     * parameter from the page's `onDrafted` callback is a change `tsc` accepts in SILENCE —
+     * a one-argument inline callback assigns to a two-parameter signature without error —
+     * so the page would compile perfectly while the author's screen quietly said nothing
+     * about a requirement the publish gauntlet is going to refuse. Measured, not assumed:
+     * planting that deletion reds this case and the two below it, at the same 33-error
+     * typecheck baseline.
+     */
+    const SERVER_SENTENCE =
+      "This workflow has no business requirement, so the publish gauntlet will refuse it."
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: structuredClone(arrivalDef),
+      readiness: { business_requirement: { status: "missing", message: SERVER_SENTENCE } },
+    })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // VERBATIM — the client authors no sentence of its own about readiness (D-16), and it
+    // borrows the gate's register on exactly one row (D-20).
+    expect(within(list).getByTestId("decision-verdict-requirement").textContent).toBe(
+      SERVER_SENTENCE,
+    )
+  })
+
+  it("⭐ ABSENT IS NOT A PASS — a response with NO readiness key renders no verdict at all", async () => {
+    // The live behaviour of every stale deploy, and of every generation before `197-02`'s
+    // server half. The three-state type exists so absence stays absence: a nullish-coalesce
+    // onto an empty object, and a `=== "missing"` read with a green `false` branch, BOTH
+    // typecheck — which is why this is a case and not a comment.
+    mockGenerate.mockResolvedValue({ ok: true, definition: structuredClone(arrivalDef) })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    expect(within(list).queryByTestId("decision-verdict-requirement")).toBeNull()
+    // …and the row itself is still there, saying what it chose. Absence silences the
+    // VERDICT, never the answer.
+    expect(within(list).getByTestId("decision-answer-requirement").textContent).not.toBe("")
+  })
+
+  it("⭐ POSITIVE CONTROL — an explicit `present` renders IDENTICALLY to an absent verdict", async () => {
+    // This is what makes the case above a measurement rather than a coincidence: if the two
+    // rendered differently, an author could tell them apart, and absence would become
+    // readable — as a failure, or worse, as a green tick.
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: structuredClone(arrivalDef),
+      readiness: { business_requirement: { status: "present" } },
+    })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    expect(within(list).queryByTestId("decision-verdict-requirement")).toBeNull()
+    // …and the query is capable of finding one — the `missing` case above proves it does.
+    expect(within(list).getByTestId("decision-row-requirement")).toBeInTheDocument()
+  })
+
+  it("row 5 hands the author to the step that makes the file — the ONE selection contract", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // `terminalEmitSlug` over the LIVE definition picks `brief`, the only `llm_emit`.
+    fireEvent.click(within(list).getByTestId("decision-action-deliverable"))
+
+    // The page's ONE selection callback opened the shipped panel — no second door
+    // (D-183-05: `jumpToStep` is selection only).
+    await waitFor(
+      () => expect(screen.getByLabelText("Refine step: brief")).toBeInTheDocument(),
+      LAZY,
+    )
+  })
+
+  it("row 4 writes the name through the store, and the drafted header still shows the SLUG", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    const field = within(list).getByTestId("decision-name-input") as HTMLInputElement
+    expect(field.value).toBe("Vendor risk brief")
+
+    fireEvent.change(field, { target: { value: "Renewals brief" } })
+
+    // The row is a pure projection of the store, so the value coming back out is proof the
+    // write LANDED rather than proof the input holds its own state. Row 4 is the one row
+    // that owns a field, and that is not an exception to the no-duplication rule: the name
+    // has no existing control anywhere, so this field is the FIRST answer, not a second.
+    await waitFor(() =>
+      expect((screen.getByTestId("decision-name-input") as HTMLInputElement).value).toBe(
+        "Renewals brief",
+      ),
+    )
+    // ⚠ D-19 IS PLAN 197-10'S, NOT THIS ONE'S, and this line pins the boundary so a header
+    // change cannot be smuggled in here. The drafted header still renders `meta.slug`.
+    expect(screen.getAllByText("vendor-brief").length).toBeGreaterThan(0)
   })
 })
