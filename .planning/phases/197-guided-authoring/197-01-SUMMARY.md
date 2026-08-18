@@ -341,3 +341,149 @@ deletion on any of the four rows is a **behaviour change to explain**, never a t
 correct response is to open the wave's plan and either (a) explain the behaviour change and declare
 the re-capture there with a date and a reason, or (b) revert the source change. Silently absorbing
 the deletion destroys the only evidence that the fast door is still fast.
+
+---
+
+## Task Commits
+
+1. **Task 1: the three shipped pre-draft baselines, green at the base SHA** — `4f3298c4` (test)
+2. **Task 2: the four gate baselines + six ledger triples, re-derived** — `2789c8fa` (test)
+3. **Task 3: the four standing numstat criteria + two exclusions** — `ba94ef92` (docs)
+
+## Files Created/Modified
+
+- `.planning/phases/197-guided-authoring/197-01-SUMMARY.md` — created; the phase's evidence record
+
+**No source file was modified.** Proof, run at the end of the plan:
+
+```bash
+$ git status --short
+                                                                   [empty]
+$ git diff --numstat 52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07 HEAD
+343     0       .planning/phases/197-guided-authoring/197-01-SUMMARY.md
+```
+
+**One path in the whole diff, and it is a planning document.** `files_modified: []` is genuinely
+empty — verified, not asserted.
+
+## Accomplishments
+
+- The phase base SHA is a **literal** every later wave substitutes, rather than a description each
+  re-derives (and possibly re-derives differently).
+- The D-05 fence is proved green **BEFORE** any source byte moved — 188.1's binding lesson, honoured
+  rather than quoted.
+- The phase's single largest triage hazard is now bounded: `WorkflowBuilderPage.canvas.test.tsx` is
+  BOTH one of SEED-171's five flaky suites AND a suite this phase extends, so a red run on it is
+  only interpretable against a verdict taken now. That verdict exists.
+- **A scope error in the plan's own backend baseline command was caught by measurement** — see
+  Deviations.
+
+## Decisions Made
+
+- **No second baseline capture was authored.** The shipped 193/193.1/187 fence predates this phase by
+  four phases; a capture taken today would postdate `197-CONTEXT.md` and manufacture the
+  drift condition the fence's own docblock names. This was the plan's instruction and it is recorded
+  as a decision because the tempting alternative (a fresh, phase-local capture) looks more rigorous
+  and is strictly weaker.
+- **The backend baseline is recorded at BOTH scopes**, with `backend/tests` (whole) flagged as the
+  comparable one, rather than silently substituting the plan's narrower command.
+
+## Deviations from Plan
+
+### Auto-fixed Issues
+
+**1. [Rule 2 — Missing Critical] The plan's backend baseline command measures a different scope than the figure it says to compare against**
+
+- **Found during:** Task 2
+- **Issue:** The plan's `<action>` item 3 names `pytest backend/tests/unit -q` and directs the
+  executor to compare against `197-RESEARCH.md`'s inherited **`211 failed / 4046 passed`**.
+  `211 + 4046 = 4257`, but `backend/tests/unit` collects only **2337**. Recording the unit-only
+  number under a heading that invites comparison with the whole-tree number would have written a
+  **rotted baseline into the artifact whose entire purpose is to prevent rotted baselines** — and
+  the first later wave to run `pytest backend/tests` would have read a 148-test "regression" or a
+  1767-test "improvement", neither of which happened.
+- **Fix:** Ran BOTH scopes and recorded both summary lines verbatim, with `--collect-only` (4301)
+  proving which one the inherited figure came from, plus a standing instruction naming
+  `backend/tests` as the comparable scope.
+- **Files modified:** none (the SUMMARY only)
+- **Verification:** `pytest tests -q` → `212 failed, 4041 passed, 33 skipped, 5 xfailed, 9 xpassed,
+  266 warnings, 1 error`; `pytest tests -q --collect-only` → `4301 tests collected`
+- **Committed in:** `2789c8fa`
+
+**2. [Rule 3 — Blocking] The count gate's first run died in its JSON reporter with `ENOSPC`, not on a test failure**
+
+- **Found during:** Task 2
+- **Issue:** First invocation exited **2** with
+  `Error: ENOSPC: no space left on device, write` inside `JsonReporter.writeReport`, followed by
+  `FATAL: the vitest report at …json is not valid JSON: Unexpected end of JSON input`. **The suites
+  themselves ran; the reporter could not write its ~1.5 MB report.** Volume `C:` was at **99% used
+  / 7.2 GB free** at that moment, with a concurrent `tsc` and a concurrent `pytest` on the box.
+- **Fix:** ⚠ **The cap was NOT touched** (CLAUDE.md CORRECTION 2026-08-17 — reaching for the cap on a
+  red gate is the refuted move). The failure was diagnosed as an environment condition rather than a
+  gate or test defect, the box was allowed to quiesce, and the gate was re-run **alone**. Free space
+  had recovered to **30 GB** by then, confirming transient pressure. The re-run returned
+  `count gate OK — 89/89 pinned files present, no per-file decrease, 0 failing`.
+- **Files modified:** none — no operator file was deleted to reclaim space
+- **Verification:** `df -h /c` before (`7.2G avail`) and after (`30G avail`); the clean verdict line
+  quoted in Task 2
+- **Committed in:** `2789c8fa`
+
+⚠ **Recorded rather than swept, because the failure MODE is worth knowing:** an `ENOSPC` in the
+reporter looks like a gate failure and reads as exit code 2, but it carries **no test verdict at
+all**. There were ~2.3 GB of stale `vitest-count-gate-*.json` reports accumulated in the OS temp
+directory from prior runs; **none was deleted** — reclaiming operator disk space is an operator
+action, not an executor's.
+
+---
+
+**Total deviations:** 2 auto-fixed (1 missing critical, 1 blocking)
+**Impact on plan:** Both strengthen the artifact this plan exists to produce. Deviation 1 in
+particular would have poisoned every later wave's backend comparison — precisely the class of error
+this plan was written to prevent. No scope creep: no source file was touched.
+
+## Issues Encountered
+
+None beyond the two deviations above. All three baseline suites and the count gate were green at the
+base SHA on a clean tree.
+
+## Next Phase Readiness
+
+**Ready. Every later plan in this phase can now run the D-05 criterion without re-deriving anything.**
+
+Standing obligations this plan hands forward:
+
+1. **Run the four numstat commands at every wave merge and at phase close.** They are copy-pasteable
+   above with the base SHA already substituted.
+2. **`197-10` owes a DECLARED, DATED re-capture** of `FLAG_OFF_HEADER_MARKUP` band 3 — and must state
+   that it is the **third** re-capture of a literal whose own note expects no third.
+3. **Use `backend/tests` (whole), not `backend/tests/unit`,** for any comparison against the
+   211/4046 lineage. Current measured baseline: **212 failed / 4041 passed / 1 error**.
+4. **Re-derive the six ledger triples at phase close.** Zero drift today; most of these six will be
+   touched during wave 2, so today's zero is not tomorrow's.
+5. ⚠ **`count gate OK` is not reliably reachable on demand.** A plan whose acceptance criterion is
+   "the gate is green" has written a criterion that can fail for reasons no plan controls. Pair it
+   with per-file deltas and the explicitly-run in-scope suites, which are deterministic.
+
+## Self-Check: PASSED
+
+| Claim | Command | Result |
+|---|---|---|
+| SUMMARY exists | `ls -la .planning/phases/197-guided-authoring/197-01-SUMMARY.md` | FOUND (27,364 bytes) |
+| Task 1 commit exists | `git log --oneline` | FOUND `4f3298c4` |
+| Task 2 commit exists | `git log --oneline` | FOUND `2789c8fa` |
+| Task 3 commit exists | `git log --oneline` | FOUND `ba94ef92` |
+| Base SHA present as a 40-char literal | `grep -c '52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07'` | 7 occurrences |
+| No source file modified | `git diff --numstat <base> HEAD` | one path, and it is this SUMMARY |
+| Working tree clean | `git status --short` | empty |
+
+## Threat Flags
+
+None. This plan crossed no trust boundary, installed no package, and modified no source file.
+`T-197-BASE` (Repudiation, the phase's own evidence trail) is **mitigated as planned** — the base
+SHA, three baseline verdicts and four gate baselines are recorded as literals with their commands
+beside them. `T-197-SC` (Tampering, package installs) remains **vacuous-with-reason**: no package
+was installed and none was proposed.
+
+---
+*Phase: 197-guided-authoring*
+*Completed: 2026-08-18*
