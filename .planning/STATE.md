@@ -2494,3 +2494,31 @@ blockers carried forward are the seven items under *Open at close* above.
 ### Roadmap Evolution
 
 - Phase **194.1 Make the Stop Visible** inserted after Phase **194** (2026-08-16) — **(URGENT)**. Phase 194 shipped and *verified on seven live runs* the durable half of RUN-01; its own UAT then found that a person cannot perceive any of it. Claims `BUG-260816-01` (composer/tray Stop give no feedback; `WorkflowRunPage.tsx` has **no Stop control at all** — `grep -cE "onStop|stopThread|cancelRun|Stop"` → **0**, measured at `2dc4f946`), `BUG-260816-02` (a stopped thread shows only the original prompt), and the two re-opened `BUG-260709-01` + `BUG-260610-01`. ⚠ **All four still carry `status: open` — the fold is discuss-phase's touchpoint and is NOT done yet; a `status:` that disagrees with the prose is the failure that hid a live bug here for two months.** **Routed to its own phase rather than a third gap-closure round on 194 (G-7)** — a missing control and a missing durable mark are capability, not repair of 194's own output. Same shape as 192 → 192.1 and 193 → 193.1. **G-2 fires: sketch before spec/discuss.**
+
+## Operator findings from live testing — 2026-08-18, filed OUT of Phase 197
+
+Reported while testing during the sketch session. **None is folded into 197** — that phase is the
+authoring surface (D-01); every one of these is the **chat run lifecycle**. Each was checked against
+source before filing, and two turned out to be different from how they first read.
+
+| id | finding | status |
+|---|---|---|
+| `BUG-260818-01` | **Resume replays the original prompt** instead of continuing. Confirmed: `resumeFromFailed` re-sends the preceding user message verbatim. ⚠ The thread CONTEXT is not lost — the label and the mechanism disagree. | open · major |
+| `BUG-260818-02` | **Resume drops the thread's selected model.** Confirmed one-line omission: `sendMessage` forwards `opts.model`/`opts.provider`; `resumeFromFailed` passes neither. ⚠ The REFRESH half is already `SEED-178` — not duplicated. | open · major |
+| `BUG-260818-03` | At the **15-iteration cap** the chat shows a stop. ⚠ **The Continue feature ALREADY EXISTS** (amber card → `POST /runs/{id}/continue`, resumes the SAME run with its dropped tool calls, capped at 3) **and did not render.** | open · major |
+| `SEED-179` | No way to turn **follow-up suggestions** off — Settings exposes only a READ-ONLY model label. Must suppress GENERATION, not just rendering. | planted · medium |
+| `SEED-180` | **Continue past the 3-continue cap and past context-window exhaustion**, via compaction rather than a dead end. | planted · **high** |
+| `SEED-181` | A thread cannot show **which skills are loaded**. ⚠ The capability question is ANSWERED — multiple skills DO accumulate per thread. The gap is visibility. | planted · medium |
+
+⚠ **TRIAGE 01/02/03 TOGETHER.** They are one control in one moment — a user today cannot tell Resume
+from Continue, and fixing one leaves the moment still lying.
+
+⚠ **The leading hypothesis on 03 is a standing project rule, not a one-off.** The Continue card's
+gate is a **live-SSE thread lock with no fetch-based reconcile**, and the `role='system'` carrier row
+is filtered out of `/messages` — so a reload or a dropped stream loses the gate permanently. That is
+D-v2.5-03 exactly: *Realtime is a best-effort hint, NOT a source of truth — always reconcile via
+fetch on (re)connect.*
+
+**Routing:** all three bugs are `status: open` + `surface: Agentic-RAG`, so the mandated
+reported-bugs scan surfaces them at the next `/gsd:discuss-phase`, `/gsd:new-milestone` and
+`/gsd:complete-milestone`. No further action is owed to route them.
