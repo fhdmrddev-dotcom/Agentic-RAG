@@ -122,6 +122,44 @@ What cleared it was four cheap, specific checks — isolate twice, read the per-
 the base, `git log -S` the authorship — not a re-run. **Keep that sequence; it is the difference
 between dismissing a flake and dismissing a regression.**
 
+## ⚠ AMENDMENT 3 — 2026-08-18 (Phase 196, plan `196-05`) — a FIFTH file, and a SECOND `AssertionError` in a suite the plan could not have reached
+
+`196-05`'s run 1 of 3 was red at **`failed 1`**. The filename was recovered from the gate's **own
+persisted JSON report** (`vitest-count-gate-44152-1787007892092.json`), and the cap was **never touched**
+(`GSD_VITEST_MAX_WORKERS=2` on every run in that plan).
+
+| File | Test | Error kind |
+|---|---|---|
+| **`src/pages/WorkflowBuilderPage.canvas.test.tsx`** | *"184-11 — with the flag OFF the panel receives NO rails key (D-14)"* → its own **POSITIVE CONTROL** | ⚠ **`AssertionError: expected 0 to be greater than 0`** |
+
+**Why it is clearable on evidence rather than on assumption:** the file appears in **neither**
+`git diff --numstat <plan base>..HEAD` (four files, all *created* by that plan) **nor**
+`git status --short` at the time of the run — and nothing the plan created is imported by it. All
+three new modules were leaves, and the mount that would connect them to `WorkflowBuilderPage` did not
+exist until plan `196-08`, two waves later.
+
+⚠ **THREE of the five files now fail with `AssertionError`, not `STACK_TRACE_ERROR`.** This is the
+second independent data point for Amendment 2's finding, and it should settle the triage rule:
+**the `STACK_TRACE_ERROR` signature is NOT a reliable tell for *"not a real defect"*.** The failing
+assertion here is a suite's own **positive control** — a case whose whole job is to prove the extractor
+can find what it looks for — which is about as far from a timeout signature as this set has produced.
+
+**The flaky set is now FIVE:** `WorkflowsPage.test.tsx` · `WorkflowCard.test.tsx` ·
+`WorkflowBuilderPage.session.test.tsx` · `WorkflowRunPage.test.tsx` ·
+**`WorkflowBuilderPage.canvas.test.tsx`**.
+
+⚠ **A PROCESS SLIP FROM THE SAME RUN, RECORDED BECAUSE IT WAS ONE.** `196-05` re-ran the gate **before**
+extracting the failing filename, which is exactly what the triage protocol forbids. Nothing was lost —
+the gate persists a JSON report per run and run 1's file was still on disk — but **the recovery worked by
+luck of retention, not by design.** Keep capturing the filenames first.
+
+⚠ **AND THE CONVERSE, from plan `196-08` in the same phase, because this seed must not be read as
+"red always means flake": a gate run at `failed 249` was REAL.** Nine `WorkflowBuilderPage`-mounting
+suites threw at mount because their `@/lib/api` mock factories did not declare a newly-added export.
+What distinguished it was **exactly the correct triage** — filenames from the persisted JSON before any
+re-run, each checked against the diff, the cap left alone — and the diff was **not** empty for the
+cause. *The procedure is what separates the two cases; the colour of the run is not.*
+
 ---
 
 ## The shape of the defect, on the evidence available
