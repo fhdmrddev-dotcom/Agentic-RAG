@@ -35,9 +35,59 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 9 of 9 — **ALL FIVE WAVES COMPLETE (196-01…196-09).** **VERIFIED: 3/3 ROADMAP success criteria.**
-Status `human_needed` — owed G-4 UAT rows only, NOT a code gap. Next: the owed rows, then close.
+Phase: **197 (guided-authoring) — CONTEXT GATHERED 2026-08-18** (`20dd4f1c`).
+Resume file: `.planning/phases/197-guided-authoring/197-CONTEXT.md`
+Status: ⚠ **NOT ready to plan — `/gsd:sketch 197` is OWED first.** `ROADMAP.md:677` flags **G-2**
+for this phase; the guardrail was surfaced before any question was asked and was **not overridden**.
+The discussion deliberately ran first so the sketch has a shape to draw, on the project's own
+precedent (`sketches/MANIFEST.md:514` — *"G-2 sketch, BEFORE plan-phase"*). **Next: `/gsd:sketch 197`,
+then `/gsd:plan-phase 197`.**
+
+⚠ **Phase 196 is CLOSED** — see the phase-close ledger below (every phase-scoped item discharged,
+G-4 rows driven, `BUG-260718-04` closed by split). The line that previously stood here read
+*"196 — EXECUTING … owed G-4 UAT rows"* and was **stale by one day**; it is corrected rather than
+deleted, because a stale Current Position is exactly what made a prior session propose re-running
+UAT that had already been driven.
+
+### Phase 197 — what the context locked (2026-08-18)
+
+**Domain:** a freshly AI-generated draft arrives with the decisions the AI made **visible and
+answerable in place**. The one-shot generation, the pre-draft describe screen and the publish gate
+are all **untouched** — this phase changes the ASKING, not the generating.
+
+**D-05 is the red line and it is FENCED, not judged:** the pre-draft describe screen is
+**byte-unchanged** (zero new controls / required input / gates), proved by whole-`innerHTML`
+captures taken **before** the change — 193.1's method, 188.1's lesson. This satisfies ROADMAP **SC#3**
+by construction. ⚠ The ROADMAP referenced *"Phase 197's D-05"* at **two** places (`:365`, `:677`)
+**before the decision existed**; the numbering was chosen so those pointers resolve.
+
+**Two findings measured during the discussion that a later reader should not re-derive:**
+
+1. ⚠ **`SeedReceipt.tsx` is a GOVERNANCE receipt, not a decisions receipt.** It lists ⛨-sealed steps
+   and why, and has no line for KB scope, template, requirement or name. Its docblock is enforced by
+   source fences with positive controls (*"authors no sentence of its own"*, *"declares no predicate
+   of its own"*, *"opens no request"*). **"Make the receipt answerable" is the wrong edit** — a
+   NEW SIBLING surface ships instead (D-02).
+2. ⚠ **A DECISION WAS REVERSED ON A MEASUREMENT, and both halves are preserved in the log.**
+   The deliverable row was to *"surface 193.2's suppression of an `llm_human_input` step"*.
+   **There is no suppression.** 193.2's fix is a **prompt clause** —
+   `workflow_authoring.py:141` tells the model not to add one, and its own comment at `:136-141`
+   binds it: *"A prompt clause reduces how often the model composes such a step; it can never
+   guarantee absence."* Nothing is removed ⇒ no event to surface ⇒ the human-step case was **never
+   a D-22 instance**.
+
+**⚠ G-5 fires on SIX of the six predicted files**, `frontend/src/lib/api.ts` hardest
+(**170 / 97 / 6154** — the hottest file in the repo, absent from the ledger for 97 phases). The
+recommendation was produced FIRST as G-5 requires: the new surface and its vocabulary module are
+**new files**, so the frontend half is honoured by construction (the 193.1 precedent). **`api.ts` is
+the one row not covered by construction.** Re-derive every triple before planning — five rows were
+found stale on 2026-08-17 and three read `satisfied`.
+
+**Reported-bugs touchpoint, discharged:** `BUG-260815-06` (major, open) was considered and
+**deliberately NOT folded** — it is repair on the publish surface while SC#1 asks for the author to
+be *asked*. Its `re_open_trigger` was written into the **frontmatter**, not only into CONTEXT.md,
+because a bug's `status:` frontmatter IS the routing index. `BUG-260809-02` and `BUG-260731-03` are
+recorded as **NOT closed by this phase** — a direct consequence of D-06 (fresh generations only).
 
 ### Verification — 2026-08-18
 
