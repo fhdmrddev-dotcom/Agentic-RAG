@@ -35,7 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: **197 (guided-authoring) — SKETCHED 2026-08-18** (`ca9bdc06`).
+Phase: **197 (guided-authoring) — SKETCHED 2026-08-18** (`ca9bdc06` · `fe5c955f` · `df27a372`).
 Resume file: `.planning/phases/197-guided-authoring/197-CONTEXT.md`
 Status: ✅ **G-2 DISCHARGED — sketches 172 + 173 built and committed. ⏸ AWAITING THE OPERATOR'S PICK
 before `/gsd:plan-phase 197`.** `ROADMAP.md:677` flags **G-2**; the guardrail was surfaced before any
@@ -76,7 +76,60 @@ frontmatter reads `status: closed`, `folded_into: quick-260809-klo`,
 `verified_closed_by: live-uat-2026-08-10-local-chrome-devtools-mcp` — and **that quick task shipped
 the very requirement input the sketches render**. D-06's recorded consequence does not exist.
 
-**Next: pick a variant on each sketch, then `/gsd:plan-phase 197`.**
+### Sketch 174 — the recommendation, and the shape planning should assume
+
+`.planning/sketches/174-the-line-that-opens/` (28 assertions, 0 failing). Built after the operator's
+two corrections, both of which changed the answer and are recorded rather than smoothed:
+
+1. *"It represents what the king looks like — I need the user-friendly version."* 172/173 are
+   analysis pages; **a sketch whose job is to let someone judge a screen has failed if the screen is
+   the smallest thing on the page.** 174 is the picture.
+2. *"You produce two cards … the area is very tight … information should not be dense but be enough
+   for the user to know what is happening."* **Correct, and it refuted the first recommendation.**
+   The receipt and a decisions card both say *here is what the AI just did*; splitting one thought
+   across two frames spends the graph's space, and collapsing the second only hid it.
+
+**THE SHAPE: ONE card.** The receipt's own heading, two openable lines, the receipt's own close.
+
+```
+Here's what I built — 5 steps                                    ✕
+  ▸ 3 steps must prove their sources                          why
+  ▸ 5 decisions I made for you                             review
+Everything else is yours to change. Nothing is saved or published yet.
+```
+
+Measured in a 780 px screen: **one card 149 px chrome / workflow 507 px (65%)**; two cards 284/363
+(47%); two cards opened 478/169 (22%). **Merging halves the arrival chrome.**
+
+⚠ **D-02 SURVIVES — this is a COMPOSITION change, not a charter change, and a plan must not blur
+them.** Nothing widens `SeedReceipt`; it stays the fenced leaf it is (*"authors no sentence of its
+own"*, *"declares no predicate of its own"*) and a **PARENT** composes its output with the decisions
+list. **One card in the UI, two components underneath.**
+
+⚠ **A FACT ABOUT THE SHIPPED SCREEN, surfaced only once the theme bug was fixed: today's
+`SeedReceipt` is ALWAYS FULLY OPEN** — both grounding paragraphs and every sealed row, on every
+draft. So the fold is an improvement to the arrival moment **even setting the five decisions aside**,
+and 174's tab 3 vs tab 1 is a before/after of the current screen rather than two proposals.
+
+### ⚠ A METHOD LESSON THIS SESSION PAID FOR
+
+172/173 shipped with 41 and 25 green structural assertions; 174 measured pixel heights on four
+screens. **None of them could see that every page was rendering in LIGHT mode** (Tailwind purges the
+base-layer `.dark` rule unless the literal string is in a SCANNED file — it was only in the
+assembler's wrapper), **or that the header's KB picker read "No knowledge base" while the card read
+"Vendor contracts"** (React sets a `<select>`'s value as a DOM property, lost on serialisation).
+Both were found by **taking a screenshot**, prompted by the operator saying the states looked the
+same. **Geometry proves composition; only looking proves appearance.** Screenshot before handing a
+sketch over.
+
+### Two scope questions planning must answer
+
+1. **Row 4 (name)** — the header renders the SLUG, so the workflow's name is displayed nowhere
+   today. This row would be its **first display**, not a second control.
+2. **Row 5 (deliverable)** — no field; derived from a terminal `llm_emit`. It reads as a fact with
+   no control, and making it editable is larger than the other four.
+
+**Next: `/gsd:plan-phase 197`, building 174's one-card shape.**
 
 ⚠ **Phase 196 is CLOSED** — see the phase-close ledger below (every phase-scoped item discharged,
 G-4 rows driven, `BUG-260718-04` closed by split). The line that previously stood here read
