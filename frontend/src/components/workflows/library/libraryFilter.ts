@@ -59,6 +59,36 @@ const defOf = (definition: unknown): DefShape | undefined =>
   (definition ?? undefined) as DefShape | undefined
 
 /**
+ * WR-01 (2026-08-18) — THE ONE DISPLAY-NAME RULE FOR THE LIBRARY.
+ *
+ * A workflow's name is what a person scans the library by; when it is missing the slug is
+ * the honest stand-in, because it is the identity the rest of the product already uses.
+ * Both constructors below route through this, so the two wire shapes cannot drift into two
+ * different answers to one question.
+ *
+ * ⚠ WHY `??` WAS NOT ENOUGH, and it is a regression Phase 197 introduced rather than an
+ * old oversight. `??` answers only for `null`/`undefined`. `197-05` shipped `setName`, the
+ * FIRST path by which a workflow's name can be EMPTIED, and an empty string sailed through
+ * to a card that renders the name with no fallback of its own — a blank title with nothing
+ * to click toward. `fromPublished` was worse: it read the field raw and had no fallback at
+ * all, so the same blank arrived by a second route.
+ *
+ * ⚠ THE JUSTIFICATION FOR ACCEPTING `""` AT THE WRITE PATH IS MEASURED FALSE, and this is
+ * a DISPLAY fallback precisely because of it. Those docblocks say *the server owns
+ * emptiness*; the server's rule is `business_requirement_missing`, which is about a
+ * different field. NOTHING refuses an empty workflow name — `db/workflows.py:764` writes it
+ * through with `SET name = $3`. A client-side trim here would be the second copy of a rule
+ * that has no first copy, so the author's stored value stays theirs and only the DISPLAY
+ * falls back.
+ *
+ * Whitespace-only counts as absent: the rule is about what the reader SEES, and three
+ * spaces render as nothing at all.
+ */
+export function libraryDisplayName(name: string | null | undefined, slug: string): string {
+  return typeof name === "string" && name.trim() !== "" ? name : slug
+}
+
+/**
  * A `/published` or `/starters` row → a `LibraryRow`. `PublishedWorkflow` carries no
  * version of its own, so the version is read out of the definition exactly as the shipped
  * card reads it (`WorkflowsPage.tsx:762`) — and stays `undefined` rather than defaulting to
@@ -73,7 +103,7 @@ export function fromPublished(
   return {
     id: row.id,
     slug: row.slug,
-    name: row.name,
+    name: libraryDisplayName(row.name, row.slug),
     version: typeof def?.version === "number" ? def.version : undefined,
     def,
     provenance,
@@ -99,7 +129,7 @@ export function fromDraft(row: WorkflowDraftRow): LibraryRow {
   return {
     id: row.id,
     slug: row.slug,
-    name: row.name ?? row.slug,
+    name: libraryDisplayName(row.name, row.slug),
     version: row.version,
     def: defOf(row.definition),
     provenance: "draft",

@@ -126,6 +126,7 @@ import {
   UNBOUND,
   chipCounts,
   filterLibrary,
+  libraryDisplayName,
   mergeLibrary,
 } from "@/components/workflows/library/libraryFilter"
 import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/library/libraryRow"
@@ -571,7 +572,9 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     setBuilderInitial({
       definition: (draft.definition ?? {}) as WorkflowDefinitionJSON,
       draftId: draft.id,
-      label: `Edit · ${draft.name ?? draft.slug} v${draft.version}`,
+      // WR-01 — the ONE library display-name rule; `??` here missed the empty string a
+      // `setName` edit can now produce, putting `Edit ·  v3` in the builder's own label.
+      label: `Edit · ${libraryDisplayName(draft.name, draft.slug)} v${draft.version}`,
       // 186-07: the ONE route that does not create — the drafts list itself now serves
       // the token (186-03), so an edit-in-place session is guarded from its first write.
       // `?? null` because a shelf row read before that field shipped simply has none, and

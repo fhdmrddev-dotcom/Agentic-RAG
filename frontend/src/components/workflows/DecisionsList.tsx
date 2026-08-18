@@ -87,8 +87,18 @@
  *
  * ── D-17 — ROW 4 EDITS IN PLACE ──
  * A controlled field whose value is the `name` prop and whose change handler forwards the
- * RAW value: no trimming, no empty-check. The store owns the write and the server owns
- * emptiness; a client rule here would be the second copy D-182-06 forbids.
+ * RAW value: no trimming, no empty-check. The store owns the write; a client rule here
+ * would be the second copy D-182-06 forbids.
+ *
+ * ⚠ CORRECTED BY WR-01 (2026-08-18), and the original is named rather than quietly
+ * rewritten: this docblock said *"the server owns emptiness"*, and that is MEASURED FALSE
+ * for this field. The server's rule is `business_requirement_missing`, which is about a
+ * DIFFERENT field; nothing anywhere refuses an empty workflow NAME, and `db/workflows.py`
+ * writes it through with `SET name = $3`. So an author clearing this field really did
+ * persist a blank title into the library. The no-trim policy SURVIVES the correction — it
+ * is still right that this component invents no validation rule — but it survives on the
+ * honest ground that the value is the author's, not on a server guarantee that does not
+ * exist. The blank is handled where it is READ, by `libraryDisplayName`.
  * `ForkNameDialog` is declined by D-17 — it exists for naming a copy that does not yet
  * exist, whereas here the name already exists and is being edited, and a modal for one of
  * five rows breaks the surface's own grammar.
