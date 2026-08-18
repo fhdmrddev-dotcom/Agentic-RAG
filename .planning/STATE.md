@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T15:20:00.000Z"
+last_updated: "2026-08-18T16:10:00.000Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
@@ -38,7 +38,8 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 Phase: 197 (guided-authoring) — **EXECUTED 11/11, NOT COMPLETE**
 Plan: 11 of 11 — every wave merged
 Status: **Verification returned `human_needed`. The phase is DELIBERATELY NOT MARKED COMPLETE.**
-Next action: drive `197-HUMAN-UAT.md` — **row U5 first**.
+Next action: drive `197-HUMAN-UAT.md` — **11 rows, row U5 first**. Rows 10 and 11 confirm the two
+review fixes on screen.
 
 **All 11 plans executed and merged** (waves 1-7). Verification: **3/3 ROADMAP success criteria
 verified in code, 11/11 plan must-haves verified, 0 gaps found.** The verifier re-ran the four D-05
@@ -50,26 +51,42 @@ are OWED — no human has driven this surface.** Every claim in this phase is js
 strings agree. Recommended first row: **U5** (the card's name row and the header must never give two
 answers — the exact defect sketch 174 shipped, caught only by looking).
 
-⚠ **TWO CODE-REVIEW FINDINGS ARE OPEN** (`197-REVIEW.md`, `d0ef74fb`), both found AFTER the plans
-closed and both recorded in the UAT file's Gaps section so neither can go quiet:
+✅ **BOTH CODE-REVIEW FINDINGS ARE NOW FIXED** (`197-REVIEW.md`, `d0ef74fb`), each RED-first, each
+with its accepted limitation written down rather than left implicit:
 
-- **CR-01 (Critical) — the readiness verdict goes stale on the one edit the card invites.**
-  `DecisionsList.tsx:180-184` derives the requirement verdict purely from the SNAPSHOT while the
-  answer directly above it is LIVE. Confirmed independently: `setReadiness` is written at exactly
-  one site (`WorkflowBuilderPage.tsx:886`) and never recomputed. Three clicks to reproduce. **This
-  is the CR-01 snapshot/live shape for the FIFTH time.** The phase fenced absence-is-not-a-pass on
-  the WIRE and left it unfenced on the EDIT — the LIVE fence and the verdict cases never overlap,
-  because the LIVE case's mock carries no `readiness` key at all.
-- **WR-01 (Warning) — clearing the name persists a blank library title.** `setName` accepts `""`;
-  the docblocks' *"the server owns emptiness"* is **measured FALSE for this field**. A regression
-  **this phase's own new write path introduced**. Fix is a display fallback at
-  `WorkflowCard.tsx:592` and `WorkflowsPage.tsx:574`, not a client-side trim.
+- **CR-01 (Critical) — the readiness verdict outlived its own premise.** `96a43ebd` (RED) →
+  `f017f08b` (fix). The verdict is a SNAPSHOT (`setReadiness` written once, at
+  `WorkflowBuilderPage.tsx:886`, never recomputed) rendered directly beneath a LIVE answer, so one
+  row ran on two clocks and told the author to add the requirement they had just added. Fixed with
+  a **staleness guard, not a second predicate** — `business_requirement_missing` keeps its one home
+  in `grounding.py`. ⚠ **The inverse arm stays SILENT by decision, with a re-open trigger:** a
+  `present` snapshot survives the author *clearing* the requirement; silence is the `undefined`
+  arm's own semantics and is not a pass, and manufacturing a warning would mean deciding
+  publishability on the client.
+  ⚠ **FOUR SHIPPED CASES WERE RE-SCOPED AND THAT IS THE REAL FINDING** — three in
+  `DecisionsList.test.tsx`, one in `WorkflowBuilderPage.canvas.test.tsx` — because they drove a
+  `missing` verdict against a fixture whose requirement was NON-EMPTY and **pinned the incoherent
+  state as correct**. The incoherence PROPAGATED from the component fixture to the page fixture,
+  which is how one blind spot came to exist at both levels. Nothing any case proved was dropped.
+- **WR-01 (Warning) — an empty name rendered a blank library title.** `f0cc6bb4` (RED) → `4e7326c7`
+  (fix). One rule, `libraryDisplayName`, consumed by BOTH row constructors and the builder's edit
+  label; **two different routes reached the same blank** (`fromDraft` used `??`, which answers only
+  for null/undefined; `fromPublished` read the field RAW with no fallback at all). ⚠ **A regression
+  THIS phase introduced** — `197-05` shipped the first path by which a name can be emptied — and
+  the docblock claim *"the server owns emptiness"* is **measured FALSE for this field**, now
+  corrected in place with the original named. Fixed where the value is READ, deliberately not by a
+  client-side trim.
+
+⚠ **WHY NEITHER WAS CAUGHT, which is the transferable part:** the LIVE fence and the verdict cases
+**never overlapped**. The LIVE case's mock carries no `readiness` key at all, so its verdict node
+was null for a reason unrelated to staleness; the verdict cases never edited anything. Both halves
+had good cases and the defect lived in the gap between them.
 
 **Recorded as NOT MET by the phase itself, rather than smoothed over:** `197-09`'s suite
 "zero deletions" criterion (measured 28), `197-11`'s Task-1 `grep -c … == 3` criterion (measured 9,
 falsified by the file's own house style), and `197-10`'s RED-first claim (2 of 4 cases, not 4).
 
-**Gates at HEAD:** count gate **OK · total 4447 · pinned 4328 · 92/92 · failed 0** · `tsc` **33**
+**Gates at HEAD:** count gate **OK · total 4455 · pinned 4328 · 92/92 · failed 0** (+8 from the two fixes' cases) · `tsc` **33**
 (baseline unmoved) · backend touched suite **47 passed** · deploy drift **PASS** · CLAUDE.md size
 **exit 0, 69,681 chars / 46.5%** · **G-7 clear (0 gap-closure rounds)** · no migrations.
 
@@ -79,12 +96,17 @@ absent from the plan's own nine-file list too: **a plan's `files_modified` is it
 can be incomplete exactly the way the table can.** Four of six named rows had drifted;
 `WorkflowBuilderPage.tsx` was stale by **258 lines inside one phase**.
 
-⚠ **HOUSEKEEPING — an executor left an ORPHANED uvicorn running** from the deleted `197-11`
+✅ **HOUSEKEEPING DONE — the orphaned uvicorn is killed and the directory removed.** An executor left one running from the deleted `197-11`
 worktree: `127.0.0.1:58879 --workers 2`, six python PIDs whose parent worktree no longer exists.
-It holds four gitignored log files open, which is why `teardown-worktree.sh` reported FAILED. The
-git registry is clean, the branch is merged, both junctions were detached and the source venv +
-node_modules are **verified intact**. What remains is an empty directory. The operator's own backend
-on port 8000 is a DIFFERENT process tree and was not touched.
+It held four gitignored log files open, which is why `teardown-worktree.sh` first reported FAILED.
+Killed by PID tree after confirming each command line named the worktree path; `teardown-worktree.sh`
+then reported **TEARDOWN OK**, with source venv + node_modules **verified intact**. The operator's own
+backend on port 8000 is a DIFFERENT process tree and was never touched.
+⚠ **`rm -rf` on the worktree was attempted and correctly REFUSED by the permission guard** — the
+project rule exists because a recursive delete follows the junction into the real 1.7 GB venv.
+⚠ **SIX OTHER unregistered worktree directories remain** under `.claude/worktrees/` from earlier
+phases (plus `baseline-135`). `git worktree list` shows only the main tree, so they are inert
+debris — not cleaned, because they predate this session.
 
 ### What plan-phase produced, and the three things it CORRECTED
 
