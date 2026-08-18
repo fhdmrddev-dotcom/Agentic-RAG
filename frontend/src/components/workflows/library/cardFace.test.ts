@@ -24,8 +24,17 @@ import cardFaceSource from "./cardFace?raw"
 
 import { cardFace, type CardFace, type CardMark } from "./cardFace"
 import type { LibraryRow } from "./libraryRow"
-import { STATE_DRAFT, STATE_RUNNABLE, STATE_STARTER } from "./libraryVocabulary"
-import { libraryRowOf } from "./__fixtures__/libraryScale"
+import {
+  RUN_FAILED,
+  RUN_NEVER,
+  RUN_STOPPED,
+  RUN_UNKNOWN,
+  RUN_WORKED,
+  STATE_DRAFT,
+  STATE_RUNNABLE,
+  STATE_STARTER,
+} from "./libraryVocabulary"
+import { FIXTURE_NOW, libraryRowOf } from "./__fixtures__/libraryScale"
 
 // ── 1 · the three provenances ────────────────────────────────────────────────────────
 
@@ -38,6 +47,12 @@ describe("the three faces", () => {
       state: STATE_RUNNABLE,
       mark: "ready",
       runnable: true,
+      // 192.2-04 — the scale fixture carries no run facts, so every row it builds resolves to
+      // the UNKNOWN arm ("the wire did not say"), which is the honest reading of a fixture that
+      // predates the feed. ⚠ It is NOT the never-run arm; §5 below is where that difference is
+      // asserted rather than assumed.
+      run: { kind: "unknown", word: RUN_UNKNOWN },
+      runWord: RUN_UNKNOWN,
     })
   })
 
@@ -134,7 +149,15 @@ describe("a missing value resolves to an explicit unknown, never to a blank", ()
     const withTime = cardFace(libraryRowOf({ updatedAt: "2026-08-12T09:30:00.000Z" }))
     const without = cardFace(libraryRowOf({ updatedAt: undefined }))
     expect(without).toEqual(withTime)
-    expect(Object.keys(without).sort()).toEqual(["lead", "mark", "runnable", "state", "version"])
+    expect(Object.keys(without).sort()).toEqual([
+      "lead",
+      "mark",
+      "run",
+      "runWord",
+      "runnable",
+      "state",
+      "version",
+    ])
   })
 
   it("an empty name and a missing version are INDEPENDENT absences", () => {
@@ -145,6 +168,8 @@ describe("a missing value resolves to an explicit unknown, never to a blank", ()
       state: STATE_RUNNABLE,
       mark: "ready",
       runnable: true,
+      run: { kind: "unknown", word: RUN_UNKNOWN },
+      runWord: RUN_UNKNOWN,
     })
   })
 })
@@ -159,13 +184,26 @@ describe("T-05 — the seam does not leak impurity", () => {
     expect(cardFaceSource).toContain("export function cardFace")
   })
 
+  /**
+   * ⚠ AMENDED IN 192.2-04, AND THE ORIGINAL IS QUOTED RATHER THAN OVERWRITTEN. This read
+   * `/^\s*import\s[^\n]*?from\s+"([^"]+)"/gm`, whose `[^\n]` CANNOT CROSS A LINE — so a braced
+   * multi-line import form was invisible to it and the "exact SET" fence silently swept a
+   * subset. MEASURED in `runFacts.test.ts`, whose five-name vocabulary import is written that
+   * way: the sweep read TWO specifiers where the module has THREE. `cardFace.ts`'s own imports
+   * are all single-line, so nothing here was ever wrong — the fence merely had a blind spot
+   * exactly where a future author is most likely to add one.
+   */
   const importedSpecifiers = (source: string): string[] =>
-    Array.from(source.matchAll(/^\s*import\s[^\n]*?from\s+"([^"]+)"/gm)).map((m) => m[1])
+    Array.from(source.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)"/gm)).map((m) => m[1])
 
   it("imports NOTHING but its two library neighbours", () => {
     // ⚠ Asserted as an exact SET rather than as two absences: a future import of a clock, a
     // store or a component is caught by this, and by no needle anyone thought to write.
-    expect(importedSpecifiers(cardFaceSource).sort()).toEqual(["./libraryRow", "./libraryVocabulary"])
+    expect(importedSpecifiers(cardFaceSource).sort()).toEqual([
+      "./libraryRow",
+      "./libraryVocabulary",
+      "./runFacts",
+    ])
   })
 
   it.each(["react", "@/lib/api"])("imports no %s", (specifier) => {
@@ -187,10 +225,109 @@ describe("T-05 — the seam does not leak impurity", () => {
     expect(cardFaceSource).not.toMatch(/\buse[A-Z]\w*\(/)
   })
 
-  it("is a FUNCTION OF ITS ROW ALONE — two calls on one row are deeply equal", () => {
+  it("is a FUNCTION OF ITS ROW AND ITS INSTANT — two calls on one row are deeply equal", () => {
+    // ⚠ THE NAME SAID "ITS ROW ALONE" UNTIL 192.2-04, AND THE AMENDMENT IS RECORDED RATHER THAN
+    // SMOOTHED. The face now carries the run truth, whose recency is measured against an
+    // instant — so `now` is a second input, defaulted to the clock exactly as `relativeChanged`
+    // does (P-1). It is passed EXPLICITLY here: letting the default run would make this case
+    // pass at one instant and flake at another the moment a fixture row carries a real run.
     const row: LibraryRow = libraryRowOf({ name: "Vendor Risk Review" })
-    expect(cardFace(row)).toEqual(cardFace(row))
+    expect(cardFace(row, FIXTURE_NOW)).toEqual(cardFace(row, FIXTURE_NOW))
     // …and it hands back a fresh object each time, so no caller can mutate another's face.
-    expect(cardFace(row)).not.toBe(cardFace(row))
+    expect(cardFace(row, FIXTURE_NOW)).not.toBe(cardFace(row, FIXTURE_NOW))
+  })
+})
+
+// ── 5 · the run arm reaches the face, with all three arms intact (192.2-04 / D-08) ───
+
+describe("the face carries the run truth, and it is the resolver's — not a second copy", () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const at = (msAgo: number) => new Date(FIXTURE_NOW - msAgo).toISOString()
+  const faceOf = (lastRunStatus: string | null | undefined, lastRunAt: string | null | undefined) =>
+    cardFace(libraryRowOf({ lastRunStatus, lastRunAt }), FIXTURE_NOW)
+
+  it.each([
+    ["completed", "worked", `${RUN_WORKED} 2 days ago`] as const,
+    ["failed", "failed", `${RUN_FAILED} 2 days ago`] as const,
+    ["cancelled", "stopped", `${RUN_STOPPED} 2 days ago`] as const,
+  ])("a %s run reaches the face as %s, with its word", (status, outcome, word) => {
+    const face = faceOf(status, at(2 * DAY))
+    expect(face.run.kind).toBe("ran")
+    expect(face.run).toMatchObject({ outcome })
+    expect(face.runWord).toBe(word)
+  })
+
+  it("ARM 2 — a row the backend says has NO run reaches the face as never-run", () => {
+    expect(faceOf(null, null)).toMatchObject({ run: { kind: "never" }, runWord: RUN_NEVER })
+  })
+
+  it("ARM 3 — a row whose feed carried no run keys reaches the face as unknown", () => {
+    expect(faceOf(undefined, undefined)).toMatchObject({
+      run: { kind: "unknown" },
+      runWord: RUN_UNKNOWN,
+    })
+  })
+
+  it("⚠ THE TWO ABSENCES DO NOT MEET ON THE FACE EITHER — T-13, one layer up", () => {
+    // The resolver keeps them apart; this asserts the FACE does not undo that on the way
+    // through. A `runWord` computed here with its own fallback is exactly how it would.
+    const never = faceOf(null, null)
+    const unknown = faceOf(undefined, undefined)
+    expect(never.run.kind).not.toBe(unknown.run.kind)
+    expect(never.runWord).not.toBe(unknown.runWord)
+    expect([never.runWord, unknown.runWord].every((w) => w.trim().length > 2)).toBe(true)
+    // …and neither reads as success, on the word or on the structure.
+    for (const face of [never, unknown]) {
+      expect(face.runWord).not.toContain(RUN_WORKED)
+      expect("outcome" in face.run).toBe(false)
+    }
+  })
+
+  it("an unrecognised status reaches the face as unknown, never as a tick", () => {
+    const face = faceOf("astonished", at(DAY))
+    expect(face.run.kind).toBe("unknown")
+    expect(face.runWord).toBe(RUN_UNKNOWN)
+  })
+
+  it("⚠ `runWord` IS ALWAYS `run.word` — the convenience field cannot drift from the arm", () => {
+    const everyArm = [
+      faceOf("completed", at(DAY)),
+      faceOf("failed", at(3 * DAY)),
+      faceOf("cancelled", null),
+      faceOf(null, null),
+      faceOf(undefined, undefined),
+      faceOf("who-knows", at(DAY)),
+    ]
+    expect(everyArm).toHaveLength(6)
+    for (const face of everyArm) expect(face.runWord).toBe(face.run.word)
+  })
+
+  it("the run arm is INDEPENDENT of provenance — a draft's failed golden run still reads", () => {
+    // A draft cannot be Run from the library, so its only runs are the publish gauntlet's
+    // golden ones. "Your test run failed" is the answer LIB-06 wants on a 69%-draft shelf.
+    const face = cardFace(
+      libraryRowOf({ provenance: "draft", lastRunStatus: "failed", lastRunAt: at(2 * DAY) }),
+      FIXTURE_NOW,
+    )
+    expect(face.state).toBe(STATE_DRAFT)
+    expect(face.runnable).toBe(false)
+    expect(face.runWord).toBe(`${RUN_FAILED} 2 days ago`)
+  })
+
+  it("the face SPELLS no run word of its own — every one is imported (T-06)", () => {
+    for (const word of [RUN_WORKED, RUN_FAILED, RUN_STOPPED, RUN_NEVER, RUN_UNKNOWN]) {
+      expect(cardFaceSource).not.toContain(`"${word}"`)
+    }
+    // …and it holds no status map: the database spellings appear nowhere in it.
+    for (const status of ["completed", "cancelled", "cap_paused"]) {
+      expect(cardFaceSource).not.toContain(status)
+    }
+  })
+
+  it("a MISSING run stamp still leaves the outcome legible on the face", () => {
+    // T-14 through the face: the word carries the outcome alone rather than a fabricated time.
+    const face = faceOf("completed", null)
+    expect(face.runWord).toBe(RUN_WORKED)
+    expect(face.runWord).not.toMatch(/NaN|Invalid|1970|ago/i)
   })
 })

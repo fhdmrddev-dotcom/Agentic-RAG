@@ -69,9 +69,29 @@
  * — `null` when the wire did not say, never fabricated). A face that computed its own recency
  * would be the second copy again, one field down. This module is deliberately BLIND to
  * `updatedAt`, and its suite asserts that a row missing it produces an identical face.
+ *
+ * ── 192.2-04: THE RUN ARM ARRIVES, AND THE PARAGRAPH ABOVE STILL HOLDS ───────────────────
+ * ⚠ THE FACE NOW CARRIES A TIME, AND THAT IS NOT A REVERSAL OF THE ⚠ ABOVE — IT IS A SECOND,
+ * DIFFERENT FACT. `updatedAt` is *when this row changed* (on a published row, the PUBLISH time,
+ * frozen there by design — D-17); the run arm is *when somebody last pressed Run, and what
+ * happened*. They visibly disagree on real data, measured on the live feed. The first is still
+ * `resolveIdentity`'s and this module is still blind to it; the second is D-01's line 2 and is
+ * resolved by `runFacts.ts`, which this module ASKS rather than re-derives — so there is still
+ * exactly one home per fact, which was always the rule rather than "no time here".
+ *
+ * ⚠ AND `now` IS A PARAMETER FOR THAT REASON. It defaults to the clock exactly as
+ * `relativeChanged` does (P-1): the page hoists ONE instant per render so every card agrees
+ * what time it is and two cards cannot straddle a band boundary, and a suite injects a fixed
+ * one and needs no clock mock. The face is a function of its row AND that instant; the older
+ * "function of its row alone" wording in the suite is amended rather than quietly dropped.
+ *
+ * ⚠ STILL NO PIXEL. `CardFace` grows two members and the card renders neither: Wave 4 owns
+ * what the row draws. The 192.2-02 characterization pin must pass UNEDITED after this plan,
+ * and that is the check that proves it.
  */
 import type { LibraryRow, Provenance } from "./libraryRow"
 import { STATE_DRAFT, STATE_RUNNABLE, STATE_STARTER } from "./libraryVocabulary"
+import { runFacts, type RunFact } from "./runFacts"
 
 /**
  * The face's mark, as a KEY. Business-facing by construction: none of the three is a lifecycle
@@ -109,6 +129,27 @@ export interface CardFace {
    * (`WorkflowsPage.tsx:14`, *"A DRAFT cannot be Run (publish is the test)"*).
    */
   runnable: boolean
+  /**
+   * Phase 192.2-04 — THE RUN TRUTH, as the three-armed value `runFacts` resolved (D-08).
+   *
+   * The ARM, not a word, is what the gutter mark keys off: D-01 gives the outcome a 3px mark
+   * and the constraint is *"colour, and never colour alone"*, so a consumer needs the
+   * discriminator to pick a colour AND `runWord` to say it. Handing over only a string would
+   * force the card to parse English back into a state, which is how a second copy of the
+   * mapping gets written.
+   */
+  run: RunFact
+  /**
+   * The same arm's WORD, re-surfaced so the card's JSX names ONE field rather than reaching
+   * through the union at a render site. Always exactly `run.word` — the suite asserts they
+   * cannot disagree, so this is a convenience and never a second source of the sentence.
+   *
+   * ⚠ EVERY ARM HAS ONE. There is no arm of `RunFact` for which this is empty, `null` or a
+   * blank string, and that totality is the D-08 guarantee stated at the field a consumer will
+   * actually read: *Worked 2 days ago* · *Failed last month* · *Stopped yesterday* ·
+   * *Never run* · *Not recorded*.
+   */
+  runWord: string
 }
 
 /**
@@ -135,9 +176,17 @@ const VERSION_PREFIX = "v"
  * `null`, which renders identically to the eye but drops a text node from the DOM — i.e. it would
  * be a change to the rendered output, and this plan's headline constraint is that there is none.
  * Whitespace names are Wave 4's to consider, along with what a `null` lead should say.
+ *
+ * @param row the normalized library row.
+ * @param now the instant the run arm's recency is measured against — hoist ONE per render
+ *   (P-1). Defaults to the real clock, the shipped `relativeChanged` signature.
  */
-export function cardFace(row: LibraryRow): CardFace {
+export function cardFace(row: LibraryRow, now: number = Date.now()): CardFace {
   const face = FACES[row.provenance]
+  // ⚠ ASKED, NOT RE-DERIVED. The status→outcome map, the three arms and the words all live in
+  // `runFacts.ts`; a `switch` here would be the second copy T-06 forbids, one field over from
+  // the state vocabulary this module already refuses to re-spell.
+  const run = runFacts(row, now)
 
   return {
     lead: row.name === "" ? null : row.name,
@@ -145,5 +194,7 @@ export function cardFace(row: LibraryRow): CardFace {
     state: face.state,
     mark: face.mark,
     runnable: face.runnable,
+    run,
+    runWord: run.word,
   }
 }
