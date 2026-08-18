@@ -1,10 +1,11 @@
 ---
 phase: 197
 slug: guided-authoring
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-08-18
+approved: 2026-08-18
 ---
 
 # Phase 197 — Validation Strategy
@@ -59,14 +60,28 @@ created: 2026-08-18
 
 ## Per-Task Verification Map
 
-> Filled by `gsd-planner`. Every task must reference a row from the Requirements → Test Map below
-> or declare a Wave 0 dependency.
+⚠ **This table is deliberately NOT duplicated here.** Every task in the eleven plans already carries
+its own `<acceptance_criteria>` and `<automated>` command, verified present on **every** task by
+`gsd-plan-checker` (2026-08-18). Re-typing ~28 rows into a second home would create exactly the
+drift this project keeps paying for — *"a second, different answer to one question."*
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| _pending planner_ | | | AUTH-02 | | | | | | ⬜ pending |
+**The map lives in the plans.** Read `197-01-PLAN.md` … `197-11-PLAN.md`.
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+| Plan | Wave | Tasks | depends_on | Requirement |
+|---|---|---|---|---|
+| `197-01` | 1 | 3 | — | AUTH-02 · **`files_modified: []` by design** |
+| `197-02` | 2 | 3 | 01 | AUTH-02 · backend readiness + D-14 fence |
+| `197-03` | 2 | 2 | 01 | AUTH-02 · `decisionsVocabulary.ts` |
+| `197-04` | 2 | 2 | 01 | AUTH-02 · `terminalEmitSlug` |
+| `197-05` | 2 | 2 | 01 | AUTH-02 · `setName` |
+| `197-06` | 2 | 3 | 01 | AUTH-02 · `api.ts` type + hook thread |
+| `197-07` | 3 | 3 | 03,04,05,06 | AUTH-02 · `DecisionsList` |
+| `197-08` | 4 | 3 | 07 | AUTH-02 · `DraftArrivalCard` |
+| `197-09` | 5 | 3 | 08,06 | AUTH-02 · the page mount |
+| `197-10` | 6 | 2 | 09 | AUTH-02 · D-19 header + pin disposition |
+| `197-11` | 7 | 3 | 10 | AUTH-02 · pins, ledger, close-out |
+
+*Status is tracked by `/gsd:execute-phase`, not here.*
 
 ---
 
@@ -177,13 +192,23 @@ reason and the blocking id. **A scoreboard that lists only what passed is not a 
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 60s
-- [ ] D-05 baseline run GREEN at the base SHA **before any source edit**, SHA recorded
-- [ ] Every source fence carries a positive control
-- [ ] `nyquist_compliant: true` set in frontmatter
+Checked against the eleven plans by `gsd-plan-checker`, 2026-08-18 (verdict:
+**VERIFICATION PASSED**, no blockers). ⚠ **`wave_0_complete` stays `false` — Wave 0 runs at
+EXECUTION, not at planning.** Ticking it here would be the kind of paperwork-ahead-of-reality this
+project has been bitten by.
 
-**Approval:** pending
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [~] Feedback latency < 60s — ⚠ **TWO ACCEPTED EXCEPTIONS, recorded rather than waved through:**
+      `197-01` task 2 and `197-11` task 1 each use the full count gate (~6-9 min) as their sole
+      automated verify. That is *literally their purpose* — they are the phase's opening and closing
+      baseline records, not dev-loop tasks. Every other task samples in-scope suites by path.
+- [ ] D-05 baseline run GREEN at the base SHA **before any source edit**, SHA recorded
+      — ⚠ **EXECUTION-TIME. Plan `197-01`, wave 1, alone, `files_modified: []`.**
+- [x] Every source fence carries a positive control — verified across `197-02/03/04/05/07/08`
+- [x] `nyquist_compliant: true` set in frontmatter
+
+**Approval:** approved 2026-08-18 (plan-checker: VERIFICATION PASSED, 11 plans, 4 non-blocking
+findings, 2 applied)

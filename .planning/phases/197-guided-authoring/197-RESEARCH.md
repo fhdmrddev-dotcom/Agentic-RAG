@@ -1507,9 +1507,22 @@ which is why its code compares `created_by` explicitly rather than `is not None`
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Row 5 — display-only, or jump-to-emit-step?** *(THE OPERATOR'S CALL)*
+⚠ **ALL SIX WERE RESOLVED AT PLAN-PHASE, 2026-08-18 — this heading is a trace, not an open list.**
+Two went to the operator and were answered; four were decided from measurement and are recorded in
+the plan that makes the call. Nothing below is still open. Resolutions:
+
+| # | Resolved by | Where it now lives |
+|---|---|---|
+| 1 | **operator's pick** — option (ii), jump | `197-CONTEXT.md` **D-18** · plans `197-04`, `197-07` |
+| 2 | **operator's pick** — yes, switch the header | `197-CONTEXT.md` **D-19** · plan `197-10` |
+| 3 | **DECLINED**, with a re-open trigger | `197-CONTEXT.md` **C-1** · plan `197-05` |
+| 4 | **NEW module** `decisionsVocabulary.ts`, re-exporting the three page constants | plan `197-03` |
+| 5 | honest absence + the jump; never *"no template"* on an `unknown` | plan `197-07` |
+| 6 | **BUILD IT** — one verdict today, the other four **absent, never green** | `197-CONTEXT.md` **D-20** · plans `197-02`, `197-06` |
+
+1. **Row 5 — display-only, or jump-to-emit-step?** *(RESOLVED: D-18 — operator picked option (ii))*
    - Known: `patchConfig` exists; `jumpToStep` exists; the Instructions field is already editable;
      `soulDeliverable` is not rendered on the Builder at all.
    - Unclear: whether the operator wants five rows that all *do something*, or four that do and one
@@ -1519,7 +1532,7 @@ which is why its code compares `created_by` explicitly rather than `is not None`
      dearest** — the sketch's pricing was based on a claim about `builderStore` that is measurably
      wrong.
 
-2. **Row 4 — does the header switch to the name?** *(THE OPERATOR'S CALL)*
+2. **Row 4 — does the header switch to the name?** *(RESOLVED: D-19 — operator picked yes, re-capture as its own task)*
    - Known: the header renders the slug; the name is displayed nowhere; the flag-off header is a
      byte-pinned literal whose own note says it expects no third re-capture.
    - Unclear: whether the operator will accept a rendered name/slug disagreement.
@@ -1527,14 +1540,14 @@ which is why its code compares `created_by` explicitly rather than `is not None`
      author edits which is then invisible everywhere except the row that edited it is not a
      satisfied D-15.
 
-3. **Does row 4 wear an AI-proposed mark?** *(D-15 calls this discretion; C-1 shows it is not free)*
+3. **Does row 4 wear an AI-proposed mark?** *(RESOLVED: C-1 — DECLINED, trigger recorded in `197-05`)*
    - Known: `name_seeded_by_ai` is a `PhaseSpec` field; `WorkflowDefinition` has no equivalent.
    - **Recommendation: DECLINE for this phase**, with the reason recorded — the row's own sentence
      already says the AI chose the name, so the mark states the same fact twice, and D-16 forbids it
      meaning anything more. Re-open trigger: an author reporting they could not tell whether they or
      the AI named a workflow.
 
-4. **D-10 — new module, or extend `templateFirstVocabulary.ts`?**
+4. **D-10 — new module, or extend `templateFirstVocabulary.ts`?** *(RESOLVED: a NEW `decisionsVocabulary.ts` — plan `197-03`)*
    - Known: four shipped precedents; ⚠ `REQUIREMENT_INVITATION` / `REQUIREMENT_AI_MARK_*` live in
      `WorkflowBuilderPage.tsx` (`:388`, `:428`, `:432`), not in a module.
    - **Recommendation: a NEW module** (`decisionsVocabulary.ts`) that **re-exports** the three
@@ -1542,13 +1555,13 @@ which is why its code compares `created_by` explicitly rather than `is not None`
      a locked string stops being locked"* (`builderStore.ts:147`). A new module also keeps the G-5
      "honoured by construction" argument intact.
 
-5. **What does row 2 show when no template is bound?**
+5. **What does row 2 show when no template is bound?** *(RESOLVED: honest absence + jump — plan `197-07`)*
    - Known: most drafts bind none; `templateAdmission` already models three states and its two call
      sites fall back **opposite ways** on `unknown`, deliberately.
    - **Recommendation:** state the honest absence (*"no document attached"*) and offer the jump. **Do
      not** render *"no template"* on an `unknown` — that is `templateAdmission`'s D-20 lesson.
 
-6. **Is the D-13 readiness field worth building for ONE row?**
+6. **Is the D-13 readiness field worth building for ONE row?** *(RESOLVED: BUILD IT — D-20, plans `197-02` / `197-06`)*
    - Known: exactly one of five rows has a server predicate.
    - Argument for: D-12/187-24 make the *mechanism* the point — the alternative is a client-side
      `!text.trim()`, which is the second copy the project has now removed twice. The field also
