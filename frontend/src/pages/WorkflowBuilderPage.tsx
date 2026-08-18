@@ -144,7 +144,7 @@
  * already had (141-B's operator correction), so this plan adds NO band anywhere: what
  * the page adds is the props those two rows render from.
  */
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
 import { listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
@@ -185,7 +185,12 @@ import { SelectedPhaseSlugProvider } from "@/components/workflows/SelectedPhaseS
 // file, so composing autosave into this page did not grow it.
 import { BuilderSaveRegion } from "@/components/workflows/BuilderSaveRegion"
 import { BuilderHeaderBar } from "@/components/workflows/BuilderHeaderBar"
-import { SeedReceipt } from "@/components/workflows/SeedReceipt"
+// 197-09 (AUTH-02 / D-02) — the arrival card that COMPOSES the receipt. `SeedReceipt` is
+// no longer imported here: this page mounts the parent, and the parent mounts the receipt
+// UNMODIFIED behind its first fold. That is the whole of D-02's composition rule at the
+// page level — one card in the UI, two components underneath.
+import { DraftArrivalCard } from "@/components/workflows/DraftArrivalCard"
+import type { DecisionsListProps } from "@/components/workflows/DecisionsList"
 import { StarterTemplatePicker } from "@/components/workflows/StarterTemplatePicker"
 import { useEffectiveFeaturesOptional } from "@/providers/EffectiveFeaturesProvider"
 import { cn } from "@/lib/utils"
@@ -234,7 +239,12 @@ import type { CanvasNode } from "@/components/workflows/canvasModel"
 // never requested with the flag off, and a value import of anything from that module
 // here would pull it into the main bundle and undo D-183-03's whole point.
 import type { CanvasNotice, CanvasSession } from "@/components/workflows/WorkflowCanvas"
-import type { WorkflowDefinitionJSON } from "@/lib/api"
+import type { GenerateReadiness, WorkflowDefinitionJSON } from "@/lib/api"
+// 197-09 (D-18) — WHICH step produces the deliverable. Rows 2 and 5 of the arrival card
+// both jump to it, so the page reads the ONE derivation rather than scanning for an emit
+// step itself: `soulDeliverable` answers *whether* a file is produced and this answers
+// *which step*, and re-implementing either here is the drift `soulData.ts` forbids.
+import { terminalEmitSlug } from "@/components/workflows/soulData"
 
 /** The read-only canvas, code-split behind the toggle (see the docblock). The module
  *  also exports a `default`, so the `.then(...)` shim below is belt-and-braces — it
@@ -731,6 +741,30 @@ export function WorkflowBuilderPage({
   // ONE generation and its copy is past-tense, so it must never read the live selector: see
   // `SeedReceipt`'s `phases` contract for why that made the card claim the author's own edits.
   const [receiptPhases, setReceiptPhases] = useState<readonly PhaseSpecJSON[]>([])
+  /**
+   * 197-09 (D-13 / T-197-03 / T-197-27) — THE SERVER'S READINESS VERDICT ABOUT **ONE**
+   * GENERATION, AND IT IS THE SAME CLASS OF VALUE AS `receiptPhases` ABOVE.
+   *
+   * ⚠ IT IS NOT STORE STATE AND MUST NEVER BECOME STORE STATE. Reading this verdict
+   * through a store SELECTOR would make the card narrate the AUTHOR's later edits in the
+   * server's voice — CR-01's shape for the fourth time, and the exact defect
+   * `receiptPhases` exists to have fixed (see its comment above and `SeedReceipt`'s
+   * `phases` contract). ⚠ The forbidden selector is named by ROLE here and never spelled
+   * out: a grep criterion sweeps this file's raw source for it, and `196-08` tripped that
+   * trap four times — once inside the comment written to explain the first three.
+   *
+   * ⚠ `undefined` IS A THIRD STATE, NOT A MISSING SECOND ONE. `197-06` shipped the wire
+   * type with three representable arms — present, missing-with-a-message, and the whole
+   * object being absent — with NO `?? {}` default and no synthesised pass anywhere on the
+   * hop. That absence survives to here unchanged and is handed to the card unchanged; the
+   * two named ways to lose it (`readiness ?? {}`, and a `=== "missing"` read whose `false`
+   * branch renders a green tick) both TYPECHECK, which is why neither is written and why
+   * a case drives the distinction rather than a comment.
+   *
+   * REPLACED on every generation, never merged with a previous one — that is what makes a
+   * second generation replace the first one's card rather than blend with it.
+   */
+  const [readiness, setReadiness] = useState<GenerateReadiness | undefined>(undefined)
   // 187-15 (Req 1 / D-187-05) — the ONE name context: values this page already holds, memoised
   // so the memoised `toCanvas` does not re-project every render. `assets` is DEFINITION-level
   // (a workflow's, never a phase's), which is why 187-04 gates the template tier on
@@ -806,9 +840,20 @@ export function WorkflowBuilderPage({
       setSelectedSlug(null)
       setDraftId(null)
     },
-    onDrafted: (def) => {
+    // ⚠ 197-09 (D-13) — THE LAST HOP, AND THE ONE A GREEN TYPECHECK CANNOT PROVE. `197-06`
+    // widened this callback to a SECOND parameter carrying the server's readiness verdict,
+    // and recorded that the page was still ignoring it — because a ONE-ARGUMENT inline
+    // callback assigns to a two-parameter signature with NO TypeScript error at all. The
+    // page therefore compiled perfectly while silently dropping the verdict. Naming the
+    // parameter here is what spends it into page state; the behaviour is pinned by a case
+    // in `canvas.test.tsx` that reds when this parameter is deleted, never by `tsc`.
+    //
+    // All three writes are ONE snapshot of ONE generation, taken in the same batch as the
+    // store's single `setDrafted` transition — see `readiness`' own block above.
+    onDrafted: (def, verdict) => {
       setShowReceipt(true)
       setReceiptPhases(def.phases)
+      setReadiness(verdict)
     },
     // ⚠ 193.1-07 (D-06 / S-3) — THE SHIPPED ATTACH HANDLER, REACHED THROUGH AN ARROW, and
     // the arrow is load-bearing rather than stylistic. `onTemplateAttached` is declared far
@@ -1569,6 +1614,69 @@ export function WorkflowBuilderPage({
    *  the D-183-05 contract's one callback, not a second way to open the panel. */
   const jumpToStep = useCallback((slug: string) => setSelectedSlug(slug), [])
 
+  /**
+   * ── 197-09 (AUTH-02 / D-14 / T-197-21) — THE TWO FOCUS SEAMS ────────────────────────
+   *
+   * THE ARRIVAL CARD'S ROWS DISPLAY THE CURRENT ANSWER AND HAND THE AUTHOR TO THE CONTROL
+   * THAT ALREADY EXISTS. They own no control and they write nothing. This page's own rule
+   * is the reason, and it is quoted rather than paraphrased because it is the whole
+   * argument (see `kbAffordance`'s docblock below): *"A second, different answer to one
+   * question is drift."* — and beside it, *"ONE CONTROL, TWO MOUNT POINTS."*
+   *
+   * Sketch 174 draws the same conclusion from the other end: *"Each decision hands you to
+   * the control already on the screen — nothing is duplicated."* It also recorded the
+   * failure a second control produces — its own header and card disagreed, because a
+   * `<select>`'s value is a DOM property lost on serialisation. In the real app both read
+   * `meta`, so that specific bug cannot recur; the CLASS (one screen, two answers to one
+   * question) is what these seams refuse.
+   *
+   * ⚠ `scrollIntoView` IS PART OF THE SEAM, NOT A FLOURISH. The header can be scrolled out
+   * of view on a narrow window, and a focus that scrolls nothing is a jump the author
+   * cannot see — the control takes the caret somewhere off-screen and the row appears to
+   * have done nothing. `block: "nearest"` is deliberate: it moves the viewport the minimum
+   * needed rather than yanking the header to the top of the screen.
+   *
+   * ⚠ BOTH REFS SIT ON NODES **INSIDE** THE EXISTING `canvasEnabled ? (…) : null`
+   * AFFORDANCES — the 193.2-09 placement, never a new node in `identityGroup`. A `ref`
+   * renders no DOM attribute, so the flag-off header byte pin cannot see one either way;
+   * the placement rule is what keeps that true if the element ever gains a visible
+   * attribute. Band 3 stays unmovable BY CONSTRUCTION rather than by care.
+   *
+   * ⚠ AND NEITHER SEAM WRITES. The two affordances keep their shipped store-writing calls
+   * exactly as they are — those two setter names are deliberately NOT spelled here,
+   * because a criterion counts their occurrences in this file to prove no third caller was
+   * added, and a mention inside the comment explaining that would defeat it (`196-08`).
+   * These callbacks move focus and do nothing else, which is what keeps ONE writer per
+   * question.
+   */
+  const kbPickerRef = useRef<HTMLSelectElement | null>(null)
+  const requirementInputRef = useRef<HTMLInputElement | null>(null)
+
+  const focusKbPicker = useCallback(() => {
+    const node = kbPickerRef.current
+    if (node === null) return
+    node.scrollIntoView({ block: "nearest", inline: "nearest" })
+    node.focus()
+  }, [])
+
+  const focusRequirementInput = useCallback(() => {
+    const node = requirementInputRef.current
+    if (node === null) return
+    node.scrollIntoView({ block: "nearest", inline: "nearest" })
+    node.focus()
+  }, [])
+
+  /** Row 4's writer — the store's own `setName`, reached through `getState()` inside a
+   *  callback (never as a rendered value, the shipped selector discipline). Row 4 is the
+   *  ONE row that owns a field rather than a jump, and that is not an exception to the
+   *  rule above: the name has NO existing control anywhere on this screen, so the row's
+   *  inline field is not a second answer — it is the first. D-17 declines `ForkNameDialog`
+   *  for the same reason (it exists for naming a copy that does not yet exist). */
+  const setWorkflowName = useCallback(
+    (nextName: string) => store.getState().setName(nextName),
+    [store],
+  )
+
   /** "Tidy up" — the CURRENT workflow's nudge key only, never the whole namespace. The
    *  arrangement is browser-local (D-184-02), so this writes nothing to the server and
    *  pushes no undo entry; the re-read goes through the same invalidation counter a nudge
@@ -1884,6 +1992,64 @@ export function WorkflowBuilderPage({
       />
     )
 
+  /**
+   * ── 197-09 (AUTH-02 / SC#1) — THE ARRIVAL CARD'S **LIVE** HALF ──────────────────────
+   *
+   * TWO CLASSES OF VALUE REACH THIS CARD AND THEY MUST NOT BE CONFLATED. `receiptPhases`
+   * and `readiness` are SNAPSHOTS of one generation (see their blocks above). Everything
+   * in this object is the opposite: what the definition says **NOW**, recomputed from
+   * `meta` on every render with NO `useState` mirror anywhere — the shipped
+   * `requirementIsAiProposed` idiom, and the same reason it gives: in the drafted view the
+   * definition is the single source of truth and a second copy is the drift D-14 forbids.
+   *
+   * A card that passed the snapshot fence by freezing EVERYTHING would fail the live
+   * fence, and vice versa. Both are pinned by cases in `canvas.test.tsx`.
+   *
+   * Each field, and why it is READ rather than re-derived:
+   *
+   *  • `folderName` — `boundFolderName`, the shipped header read. Its own comment records
+   *    that `folderNames` and `folderOptions` are built from the SAME `listFolders()`
+   *    array, so *"unnameable"* and *"not offered"* are one condition — which is exactly
+   *    the row's contract (`null` when unbound or unresolvable). A second `.find()` over
+   *    `folderOptions` would be a second lookup that can disagree with the header chip.
+   *  • `templateFilename` — the ONE `templateAsset` memo (`260814-q5r` hoisted it precisely
+   *    so two `.find()` calls over `meta.assets` could not drift). No second scan.
+   *  • `businessRequirement` / `name` — the `typeof … === "string"` narrow the requirement
+   *    input already uses. ⚠ `BuilderDefinition` deliberately does NOT declare `name`
+   *    (197-05 decision 2): it lands under the index signature and types as `unknown`, so
+   *    this narrow is the one read site and it is the shipped idiom, not a new one.
+   *  • `deliverableStepSlug` — `terminalEmitSlug` over the LIVE definition, so adding or
+   *    removing an emit step moves the row. `null` is an honest absence and is never a
+   *    slug that selects nothing.
+   *  • `readiness` — passed straight through, `undefined` and all. NO `?? {}`.
+   */
+  const decisions = useMemo<DecisionsListProps>(
+    () => ({
+      folderName: boundFolderName,
+      templateFilename: templateAsset?.filename ?? null,
+      businessRequirement:
+        typeof meta.business_requirement === "string" ? meta.business_requirement : "",
+      name: typeof meta.name === "string" ? meta.name : "",
+      deliverableStepSlug: terminalEmitSlug(definition),
+      readiness,
+      onChangeKb: focusKbPicker,
+      onChangeRequirement: focusRequirementInput,
+      onOpenStep: jumpToStep,
+      onChangeName: setWorkflowName,
+    }),
+    [
+      boundFolderName,
+      templateAsset,
+      meta,
+      definition,
+      readiness,
+      focusKbPicker,
+      focusRequirementInput,
+      jumpToStep,
+      setWorkflowName,
+    ],
+  )
+
   // D-183-03 — the strip renders ONLY when the flag resolves strictly on. With the
   // flag off `graphChild` IS the grid's first child, exactly as it ships today: no
   // wrapper element, no strip, no reserved space, nothing of the canvas in the DOM.
@@ -1938,13 +2104,35 @@ export function WorkflowBuilderPage({
       {/* 187-15 (Req 5 / 150-B) — above the graph, gated STRUCTURALLY by this branch: flag-off
           `kbTools` is `[]`, so an ungated receipt would report zero grounded steps on a workflow
           the run-time gate still binds. DISMISSED IT RENDERS NO NODE, which is why the graph is
-          pinned to the 1fr row by `*:last-child` rather than by auto-placement. */}
-      <SeedReceipt
+          pinned to the 1fr row by `*:last-child` rather than by auto-placement.
+
+          197-09 (AUTH-02 / D-01 / D-02 / D-06 / T-197-24) — THE CARD REPLACED THE RECEIPT
+          **IN PLACE**, and the two words are load-bearing. `graphColumn` still has exactly
+          THREE children: this strip, this card, `graphChild`. A FOURTH child auto-places
+          into row 3 while `[&>*:last-child]:row-start-3` forces the last one there too, so
+          the graph's `minmax(0,1fr)` row collapses to 0 px — sketch 172 measured it and the
+          class list above is what makes it structural. A case counts the children.
+
+          The receipt is not gone: `DraftArrivalCard` composes it UNMODIFIED behind its first
+          fold (D-02 — `SeedReceipt.tsx` is under a zero-insertion, zero-deletion criterion
+          for this whole phase and stays at `0 0`).
+
+          D-01 AND D-06 HOLD BY WHERE THIS SITS, not by a guard anyone has to write. D-01 —
+          guidance is on the draft, AFTER — because this branch exists only in the drafted
+          view, so nothing joins the generation's critical path and the fast door stays fast
+          (the D-05 red line). D-06 — FRESH GENERATIONS ONLY — because `open` is
+          `showReceipt`, which is set in the `onDrafted` handler and NOWHERE else: a
+          re-opened draft, a fork and a hand-built canvas workflow never see this card, which
+          is correct, because its claim (*an AI just made these decisions for you*) is true
+          at exactly one moment. ⚠ Do NOT add a second gate for D-06 and do NOT widen
+          `showReceipt`'s setters. */}
+      <DraftArrivalCard
         phases={receiptPhases}
         kbTools={kbTools}
         nameContext={nameContext}
         open={showReceipt}
         onDismiss={() => setShowReceipt(false)}
+        decisions={decisions}
       />
       {graphChild}
     </div>
@@ -1996,6 +2184,11 @@ export function WorkflowBuilderPage({
     >
       <span aria-hidden="true">📁</span>
       <select
+        // 197-09 — the arrival card's row 1 FOCUSES this control rather than mounting a
+        // second one. A `ref` renders no DOM attribute, so the flag-off header byte pin is
+        // blind to it — and this node already lives inside the `canvasEnabled` affordance,
+        // which is what makes that true by construction rather than by care.
+        ref={kbPickerRef}
         data-testid="project-folder-picker"
         aria-label="Knowledge base this workflow searches"
         value={boundFolderId}
@@ -2145,6 +2338,9 @@ export function WorkflowBuilderPage({
     >
       <span aria-hidden="true">✎</span>
       <input
+        // 197-09 — the arrival card's row 3 FOCUSES this control. Same placement rule as
+        // the KB picker's ref above: inside the affordance, never a node in `identityGroup`.
+        ref={requirementInputRef}
         type="text"
         data-testid="business-requirement-input"
         aria-label="Business requirement — the one line this workflow must satisfy"
