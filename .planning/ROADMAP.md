@@ -40,7 +40,7 @@ the right vocabulary, stop it, and see what it produced.
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
-| 197 | Guided Authoring | 8/11 | In Progress|  |
+| 197 | Guided Authoring | 9/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
@@ -705,7 +705,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 197-09-PLAN.md — Wave 5: the page — the card mounted IN PLACE of the receipt (`graphColumn` stays at exactly THREE children or the graph strands at 0 px), the readiness captured as a SNAPSHOT beside `receiptPhases`, and two focus seams onto the controls that already exist
+- [x] 197-09-PLAN.md — Wave 5: the page — the card mounted IN PLACE of the receipt (`graphColumn` stays at exactly THREE children or the graph strands at 0 px), the readiness captured as a SNAPSHOT beside `receiptPhases`, and two focus seams onto the controls that already exist
 
 **Wave 6** *(blocked on Wave 5)*
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T06:11:09.277Z"
+last_updated: "2026-08-18T09:35:00.000Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
   completed_phases: 9
   total_plans: 105
-  completed_plans: 96
+  completed_plans: 97
   percent: 47
 ---
 
@@ -36,11 +36,34 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 197 (guided-authoring) — EXECUTING
-Plan: 1 of 11
-`7b6d55bd` · `0f487877` · `f59daa4c`).
-Resume file: `.planning/phases/197-guided-authoring/197-01-PLAN.md`
-Status: Executing Phase 197
-Four non-blocking findings; **two applied**, two recorded as accepted. **Next: `/gsd:execute-phase 197`.**
+Plan: 9 of 11 complete (waves 1-5 done and merged)
+Resume file: `.planning/phases/197-guided-authoring/197-10-PLAN.md`
+Status: Executing Phase 197 — **next is Wave 6 (`197-10`), then Wave 7 (`197-11`)**
+
+⚠ **WAVE 5 WAS INTERRUPTED BY A MACHINE CRASH ON 2026-08-18 AND WAS RECOVERED, NOT RE-RUN.**
+The host laptop froze and rebooted mid-plan. The executor had committed all three of `197-09`'s
+tasks (`f96a3ed1` · `d0292223` · `4c16844e` · `36013a72`) into worktree
+`agent-a41a85c00039a1fe8`, which survived intact with its junctions attached and a clean
+`git status`. What the crash actually destroyed was the **completion commit and the merge**, so
+those were rebuilt: every mechanical claim in `197-09-SUMMARY.md` was **re-run at `36013a72`**
+rather than inherited, and the summary says so at its top. **The one thing not recoverable is the
+plan's RED-first evidence**, which now exists only in the executor's own commit messages.
+Merged to `develop` at `fabccd47`.
+
+**Gates at `fabccd47` (post-merge, main working tree):** `tsc -p tsconfig.app.json` **33** — the
+standing baseline, unmoved · count gate **`count gate OK` · total 4443 · pinned 4217 · 89/89 ·
+failed 0**, identical to the pre-merge reading, so the merge introduced no drift (wave 2 needed a
+`fix(197)` for exactly that, so it was checked rather than assumed).
+
+⚠ **`197-09` closed with ONE ACCEPTANCE CRITERION RECORDED AS FAILED, not reinterpreted:** its
+suite's *"zero deletions"* criterion measured **28**. A declared mount replacement necessarily
+edits the cases that read the old mount — the criterion belonged on the page file, and is left
+standing as a failure so the mis-scoping is visible. All four phase-level D-05 numstat criteria
+**PASS**, including `SeedReceipt.tsx` absent from the diff entirely.
+
+⚠ **OWED and carried forward into the phase close:** G-4 row **U1** (the composed receipt must
+*read* as one card — jsdom applies no CSS, so no case can prove it) and **U5**'s screen half (the
+focus jump is pinned mechanically but has not been seen by a person).
 
 ### What plan-phase produced, and the three things it CORRECTED
 
