@@ -36,7 +36,46 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 9 of 9 — **ALL FIVE WAVES COMPLETE (196-01…196-09), merged and gated.** Next: verification.
+Plan: 9 of 9 — **ALL FIVE WAVES COMPLETE (196-01…196-09).** **VERIFIED: 3/3 ROADMAP success criteria.**
+Status `human_needed` — owed G-4 UAT rows only, NOT a code gap. Next: the owed rows, then close.
+
+### Verification — 2026-08-18
+
+**Verdict: the phase GOAL — *"a step's model is chosen from the live registry, never typed"* — IS
+ACHIEVED**, verified independently against the shipped code, **not inferred from SUMMARY.md**.
+
+All three ROADMAP success criteria VERIFIED with evidence gathered in the verification session, and
+all nine plans' `must_haves` spot-checked against the files they claim to have produced (existence was
+not accepted as evidence). The four claims most worth challenging — because each was asserted by the
+agent that also wrote the code — were each independently confirmed:
+- the **6-of-14-field author projection** security boundary,
+- the **`created_by`-explicit non-owner fall-through** (a bare `is not None` would have been a
+  cross-tenant oracle, since `get_definition` returns global published rows to non-owners),
+- the **`useComposerModel` hook-count reduction**, and
+- **SC#3's negative fence proven NON-VACUOUS** — the same grep that finds nothing in
+  `SettingsPage.tsx` / `ModelPillRow.tsx` DOES match `PhaseFormPanel.tsx`, which IS in the real diff.
+  A fence swept against an empty set passes green while defending nothing; this one can fire.
+
+Live runs during verification: **75 backend + 138 frontend phase-196 tests pass**; tsc at the same 33
+pre-existing baseline with **0 in any phase-196 file**; migration 120 re-confirmed applied against the
+live local DB by direct psycopg2 query.
+
+⚠ **`human_needed` is owed-UAT ONLY.** U-A2 / U-B1 / U-C1 need a live browser or a live publish that no
+automated check in this environment substitutes for. **None is a code gap.**
+
+⚠ **NEW FINDING — A GENUINE SEED ID COLLISION, and a seed's `seed_id` IS its index.** Two files both
+declare `seed_id: SEED-174`, both dated 2026-08-18:
+- `.planning/seeds/SEED-174-authoring-model-knob-inert-by-absence.md` — **this phase's**, with MANY
+  inbound references (STATE.md above, `SEED-175`'s related-link, the drift test's failure message,
+  `196-09-SUMMARY.md`).
+- `.planning/seeds/SEED-174-mcp-connections-connect-and-be-connected.md` — unrelated, planted the same
+  day by a separate operator-directed process, with **essentially NO inbound references**.
+
+**Recommended fix: renumber the MCP-connections seed to `SEED-177`** — one file, two edits (frontmatter
+`seed_id` + filename), zero inbound references to chase. Renumbering this phase's seed instead would
+force edits to STATE.md, `SEED-175`, a test's failure message, and a historical SUMMARY. ⚠ **NOT DONE:
+it is an operator-owned artifact outside this phase's scope, so it awaits an explicit go-ahead.**
+Bookkeeping only — it does not affect AUTH-04.
 
 ### Wave 5 close — 2026-08-18 (`196-09`) — PHASE EXECUTION COMPLETE
 
