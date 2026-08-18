@@ -86,6 +86,11 @@ vi.mock("@/lib/supabase", () => ({
 
 import { ChatArea } from "../ChatArea"
 import { StreamsProvider } from "@/providers/StreamsProvider"
+// An ASSISTANT message renders run chrome that reaches for a Radix `Tooltip`, which throws
+// outside a provider. The app supplies one high in its tree; the harness must too. (The
+// control case below renders only a user message and never needed it — which is exactly the
+// kind of asymmetry that makes a control worth having.)
+import { TooltipProvider } from "@/components/ui/tooltip"
 
 const THREAD: Thread = {
   id: "thread-A",
@@ -106,13 +111,15 @@ function msg(over: Partial<Message>): Message {
 
 function renderChatArea() {
   return render(
-    <StreamsProvider>
-      <ChatArea
-        thread={THREAD}
-        onCreateThread={vi.fn().mockResolvedValue(THREAD)}
-        folders={[]}
-      />
-    </StreamsProvider>,
+    <TooltipProvider>
+      <StreamsProvider>
+        <ChatArea
+          thread={THREAD}
+          onCreateThread={vi.fn().mockResolvedValue(THREAD)}
+          folders={[]}
+        />
+      </StreamsProvider>
+    </TooltipProvider>,
   )
 }
 

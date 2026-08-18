@@ -69,7 +69,7 @@ export function ChatArea({ thread, onCreateThread, onTitleUpdate, folders, prefi
     setSelectedModel,
     deprecatedModels,
     handleProviderChange,
-  } = useComposerModel()
+  } = useComposerModel(thread?.id ?? null, messages)
   const [agentMode, setAgentMode] = useState<"default" | "explorer">("default")
   const [scopeFolderId, setScopeFolderId] = useState<string | null>(null)
   const justCreatedThreadRef = useRef<string | null>(null)

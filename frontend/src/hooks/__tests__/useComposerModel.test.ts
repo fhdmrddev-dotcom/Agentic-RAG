@@ -243,9 +243,13 @@ describe("useComposerModel — the restore, end to end", () => {
 
     act(() => result.current.handleProviderChange("anthropic"))
 
-    // Shipped behaviour, unchanged: a model id is not portable across providers.
+    // Shipped behaviour, unchanged: a model id is not portable across providers, so the
+    // model resets to that provider's FIRST — `claude-5-sonnet`, not the `claude-5-haiku`
+    // used elsewhere in this file. Written out because an earlier draft of this case
+    // asserted haiku and the implementation was right.
     expect(result.current.selectedProvider).toBe("anthropic")
-    expect(result.current.selectedModel).toBe("claude-5-haiku")
+    expect(result.current.selectedModel).toBe(ANTHROPIC.models[0])
+    expect(result.current.selectedModel).toBe("claude-5-sonnet")
     expect(result.current.models).toEqual(ANTHROPIC.models)
   })
 
