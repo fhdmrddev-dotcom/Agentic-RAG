@@ -345,6 +345,72 @@ describe("DecisionsList — the three readiness arms", () => {
     expect(screen.getAllByTestId("decision-verdict-requirement")).toHaveLength(1)
   })
 
+  // ── CR-01 (2026-08-18) — THE VERDICT MUST NOT OUTLIVE ITS OWN PREMISE ──────────────
+  //
+  // Found by the phase-197 code review, AFTER all eleven plans closed. The verdict is a
+  // SNAPSHOT of one `POST /generate`; the answer rendered directly above it in the same
+  // `<li>` is LIVE. `setReadiness` is written at exactly one site
+  // (`WorkflowBuilderPage.tsx:886`, inside `onDrafted`) and never recomputed — so the two
+  // halves of ONE row ran on two different clocks.
+  //
+  // ⚠ THE THREE CASES ABOVE COULD NOT CATCH THIS, AND THE REASON IS IN THE FIXTURE, NOT IN
+  // THE ASSERTIONS. `baseProps` supplies a NON-EMPTY `businessRequirement`, so the two
+  // "MISSING verdict" cases rendered a `missing` verdict beside a written requirement and
+  // pinned that combination as correct. They asserted the incoherent state rather than
+  // detecting it. Both are re-scoped below to the state a `missing` verdict actually
+  // describes — an empty requirement — and this block covers what they left uncovered.
+  //
+  // ⚠ THIS IS NOT A SECOND PREDICATE, and clause 2 of the charter still holds. The
+  // component does not decide whether a requirement is durable, sufficient or publishable;
+  // it does not re-implement `business_requirement_missing`. It withholds the SERVER's
+  // sentence once the input that sentence was computed over is visibly no longer what it
+  // was. That is a staleness guard on a snapshot, not a judgement about the content.
+
+  it("a MISSING verdict is WITHHELD once the author has written a requirement (CR-01)", () => {
+    // The three-click reproduction, at component scope: the snapshot still says `missing`
+    // because nothing re-runs it, but the live answer above now carries real text. Showing
+    // the gate's imperative here tells the author to add something they can SEE they added.
+    renderList({
+      businessRequirement: BUSINESS_REQUIREMENT,
+      readiness: { business_requirement: { status: "missing", message: MISSING_MESSAGE } },
+    })
+    expect(screen.getByTestId("decision-answer-requirement").textContent).toBe(
+      BUSINESS_REQUIREMENT,
+    )
+    expect(screen.queryByTestId("decision-verdict-requirement")).toBeNull()
+  })
+
+  it("POSITIVE CONTROL — the SAME snapshot still renders its sentence while the premise holds", () => {
+    // Without this, the case above would pass on a component that had simply stopped
+    // rendering the verdict at all. Same readiness object, same message, only the live
+    // answer differs — so the pair isolates the staleness guard and nothing else.
+    renderList({
+      businessRequirement: "",
+      readiness: { business_requirement: { status: "missing", message: MISSING_MESSAGE } },
+    })
+    expect(screen.getByTestId("decision-verdict-requirement").textContent).toBe(
+      MISSING_MESSAGE,
+    )
+  })
+
+  it("the INVERSE arm is SILENT, and the silence is deliberate rather than a fix (CR-01)", () => {
+    // ⚠ A KNOWN AND ACCEPTED LIMITATION, PINNED SO IT CANNOT DRIFT INTO A CLAIM.
+    // Snapshot says `present`; the author then CLEARS the requirement. The card says
+    // nothing about a gate that is now about to refuse. That silence is the `undefined`
+    // arm's own semantics — *the server did not say* — and it is NOT a pass: absence and
+    // green already render identically here, which is the property the arm above exists
+    // for. Manufacturing a warning would require this component to decide publishability,
+    // which is exactly the predicate clause 2 forbids and which lives in `grounding.py`.
+    // RE-OPEN TRIGGER: the first surface that needs the card to WARN rather than fall
+    // silent — at which point the verdict must be re-fetched or recomputed server-side,
+    // never derived here.
+    renderList({
+      businessRequirement: "",
+      readiness: { business_requirement: { status: "present" } },
+    })
+    expect(screen.queryByTestId("decision-verdict-requirement")).toBeNull()
+  })
+
   it("POSITIVE CONTROL — the affirmative detector fires across a SIBLING SEAM", () => {
     // The first draft of this detector read `container.textContent`, which concatenates
     // sibling text nodes with NO separator — so a planted mark sitting immediately after
