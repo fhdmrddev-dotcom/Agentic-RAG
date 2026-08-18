@@ -38,6 +38,11 @@ import { describe, it, expect, vi } from "vitest"
 import { render, screen, within, fireEvent } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
+import decisionsListSource from "./DecisionsList?raw"
+// THIS FILE'S OWN SOURCE, for the testid-coverage sweep in section 8 (the 187-20 idiom).
+// `?raw` hands back the file as a STRING and evaluates no module, so the self-reference
+// cannot introduce an import cycle — the same proven idiom as the line above it.
+import testSource from "./DecisionsList.test?raw"
 import { DecisionsList, type DecisionsListProps } from "./DecisionsList"
 import {
   DECISION_CHANGE_ACTION,
@@ -197,6 +202,13 @@ describe("DecisionsList — the row set is fixed", () => {
     expect(renderedRowTestIds()).toEqual(
       DECISION_ROW_ORDER.map((key) => `decision-row-${key}`),
     )
+    // …and the same claim read off the row KEY each `li` carries, so the order cannot
+    // pass by a testid that agrees with the tuple while the key underneath disagrees.
+    const list = screen.getByTestId("decisions-list")
+    const keys = [...list.querySelectorAll("[data-row-key]")].map((row) =>
+      row.getAttribute("data-row-key"),
+    )
+    expect(keys).toEqual([...DECISION_ROW_ORDER])
   })
 
   it("labels every row from the vocabulary, never from a literal here", () => {
@@ -508,5 +520,333 @@ describe("DecisionsList — model- and user-authored strings are escaped", () =>
     })
     expect(container.querySelector("b")).toBeNull()
     expect(screen.getByTestId("decision-verdict-requirement").textContent).toBe(payload)
+  })
+})
+
+// ── 7. THE CHARTER FENCES (the shipped `?raw` house idiom, adopted from SeedReceipt) ──
+
+describe("DecisionsList — the four charter clauses, each fenced", () => {
+  /** The component's source with COMMENTS REMOVED. Block comments go entirely; a line is
+   *  cut at the first `//` that begins the line or follows whitespace, which leaves regex
+   *  literals (whose `//` follows a backslash) and `://` intact.
+   *
+   *  ⚠ THIS IS WHAT MAKES THE PROSE FENCE HONEST. A component is allowed — required, even
+   *  — to EXPLAIN its own rules in a docblock, and a file-wide grep flags every such
+   *  explanation. That is the D-ITEM-183-02 trap that cost plans 185-09 and 185-10 three
+   *  false positives each. Over-stripping is the safe direction: removing a live literal
+   *  turns a fence red and is seen immediately, while leaving a commented one in place is
+   *  a silent pass. */
+  function withoutComments(src: string): string {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .split("\n")
+      .map((line) => {
+        const m = /(^|\s)\/\//.exec(line)
+        return m ? line.slice(0, m.index) : line
+      })
+      .join("\n")
+  }
+
+  /** Built fresh per use: a `/g` regex carries `lastIndex` across calls, and a stateful
+   *  guard is a guard that reports different answers to the same question. */
+  const stringLiteralRx = () =>
+    /"([^"\\\n]*(?:\\.[^"\\\n]*)*)"|'([^'\\\n]*(?:\\.[^'\\\n]*)*)'/g
+  /** JSX text — whatever sits between a closing `>` and the next `<`, with no brace in it
+   *  (a brace means it is an expression, which the literal sweep already covers). */
+  const jsxTextRx = () => />([^<>{}\n]*[A-Za-z]{2,}[^<>{}]*)</g
+
+  /**
+   * PROSE, not length. Two adjacent lowercase words AND a mark that only prose carries.
+   *
+   * ⚠ THE "MORE THAN N WORDS" HALF WAS TRIED AND REJECTED. A tailwind class string is
+   * many space-separated words — `min-w-0 flex-1 truncate font-medium text-foreground` is
+   * five — so a word-count arm fires on every `className` in the file, which is the
+   * correct code the fence sits beside. The punctuation arm does not: a class string
+   * carries no sentence-ending mark and no em dash, and the decimal inside
+   * `text-[12.5px]` is followed by a digit rather than by whitespace or end-of-string.
+   * A control below plants a real class string and proves the detector stays quiet on it.
+   */
+  const proseRx = () => /[.?!](\s|$)|—/
+  const isSentenceLike = (s: string) =>
+    /[a-z]{2,}\s+[a-z]{2,}/.test(s) && proseRx().test(s)
+
+  function authoredSentences(src: string): string[] {
+    const stripped = withoutComments(src)
+    const found: string[] = []
+    for (const m of stripped.matchAll(stringLiteralRx())) {
+      const value = m[1] ?? m[2] ?? ""
+      if (isSentenceLike(value)) found.push(value)
+    }
+    for (const m of stripped.matchAll(jsxTextRx())) {
+      const value = (m[1] ?? "").trim()
+      if (isSentenceLike(value)) found.push(value)
+    }
+    return found
+  }
+
+  // Needles assembled from parts so a grep of THIS guard file can neither satisfy nor
+  // break the greps it exists to protect.
+  const CACHE_HOOKS = [["use", "State"].join(""), ["use", "Ref"].join("")]
+  const API_SPECIFIER = ["@/lib", "/api"].join("")
+  const VOCABULARY_SPECIFIER = ["@/components/workflows", "/decisionsVocabulary"].join("")
+  const EMIT_PHASE_TYPE = ["llm", "_", "emit"].join("")
+  const RAW_HTML_PROP = ["dangerously", "SetInnerHTML"].join("")
+  /** A module-scope function declaration. The component is the ONLY one this file may
+   *  declare — a predicate has to live SOMEWHERE, and this is the property that says
+   *  there is nowhere for it to live. */
+  const declarationRx = () => /^\s*(export\s+)?function\s+\w+/gm
+
+  // ── FENCE 1 — it authors no sentence of its own ──────────────────────────────────
+
+  it("authors NO sentence of its own — every word an author reads is imported", () => {
+    expect(authoredSentences(decisionsListSource)).toEqual([])
+  })
+
+  it("POSITIVE CONTROL — it takes its sentences from the one copy home", () => {
+    // The half that makes the fence above mean something. An absent-sentence fence proves
+    // nothing on a file that renders nothing.
+    expect(decisionsListSource).toContain(VOCABULARY_SPECIFIER)
+    for (const identifier of [
+      "DECISION_ROW_ORDER",
+      "decisionRowLabel",
+      "DECISION_EDIT_LIMIT_NOTE",
+      "DECISION_KB_NONE",
+      "DECISION_DELIVERABLE_CHAT",
+    ]) {
+      expect(decisionsListSource).toContain(identifier)
+    }
+  })
+
+  it("POSITIVE CONTROL — the prose detector fires on a planted sentence, and is QUIET on a class string", () => {
+    // Both halves, because a detector that never fires and a detector that always fires
+    // are indistinguishable from a green run.
+    const planted = `const copy = ${JSON.stringify(DECISION_KB_NONE)}`
+    expect(authoredSentences(planted)).toEqual([DECISION_KB_NONE])
+    // …and the em-dash arm, which is the one that catches this surface's house style.
+    const emDashed = `const copy = ${JSON.stringify(DECISION_NAME_NONE)}`
+    expect(authoredSentences(emDashed)).toHaveLength(1)
+    // …and a JSX text node, the other spelling a sentence can take.
+    const jsxPlanted = `<p>${DECISION_TEMPLATE_NONE}</p>`
+    expect(authoredSentences(jsxPlanted)).toEqual([DECISION_TEMPLATE_NONE])
+    // ⚠ AND THE REJECTION. A real class string lifted out of the component: five
+    // space-separated words, a decimal, a slash and a colon. The detector must stay quiet
+    // on it, or it fires on the correct code it sits beside and gets deleted, not fixed.
+    const classString =
+      'className="min-w-0 flex-1 truncate font-medium text-[12.5px] placeholder:text-muted-foreground/70"'
+    expect(authoredSentences(classString)).toEqual([])
+    // …and prose living in a COMMENT is not copy, and must not be flagged.
+    expect(authoredSentences("// it says the documents it can read. plainly.")).toEqual([])
+    expect(authoredSentences("/* No documents — it reads nothing. */")).toEqual([])
+  })
+
+  // ── FENCE 2 — it declares no predicate of its own ────────────────────────────────
+
+  it("declares NO predicate of its own — the component is the only declaration", () => {
+    // THE PROPERTY, not a deny-list. The Phase-185 lesson says a deny-list cannot be made
+    // fail-closed by extension, so rather than naming the shapes a predicate could take
+    // this asserts there is nowhere for one to live.
+    const declared = decisionsListSource.match(declarationRx()) ?? []
+    expect(declared).toHaveLength(1)
+    expect(declared[0]).toContain("DecisionsList")
+    expect(decisionsListSource).not.toMatch(/^function\s+\w+/m)
+  })
+
+  it("POSITIVE CONTROL — it CONSUMES the shipped derivations rather than recomputing them", () => {
+    // It receives the producing step as a prop instead of deriving one, so the phase-type
+    // token that a client-side derivation would have to name appears nowhere.
+    expect(decisionsListSource).not.toContain(EMIT_PHASE_TYPE)
+    expect(decisionsListSource).toContain("deliverableStepSlug")
+    // …and it does not classify the readiness verdict either: it reads the discriminant
+    // the server sent and renders the server's own field.
+    expect(decisionsListSource).toContain("business_requirement")
+  })
+
+  it("those two fences are real — each pattern matches its planted literal", () => {
+    const PLANTED_PREDICATE = [
+      "function requirementIsDurable(",
+      "  requirement: string,",
+      "): boolean {",
+      "  return requirement.length > 40",
+      "}",
+    ].join("\n")
+    expect(PLANTED_PREDICATE).toMatch(/^function\s+\w+/m)
+    expect(PLANTED_PREDICATE.match(declarationRx()) ?? []).toHaveLength(1)
+    // …and the sweep really does see a SECOND declaration when one exists, which is the
+    // half that makes "no predicate can live here" a property rather than a hope.
+    const two = `${PLANTED_PREDICATE}\n\nexport function DecisionsList({`
+    expect(two.match(declarationRx()) ?? []).toHaveLength(2)
+    // …and it must NOT fire on the component's own arrow callbacks, which are correct.
+    expect("onChange={(e) => onChangeName(e.target.value)}").not.toMatch(declarationRx())
+  })
+
+  // ── FENCE 3 — it opens no request and names no route ─────────────────────────────
+
+  it("opens NO request and names NO route", () => {
+    expect(decisionsListSource).not.toMatch(/fetch\(/)
+    expect(decisionsListSource).not.toMatch(
+      /XMLHttpRequest|EventSource|navigator\.sendBeacon/,
+    )
+    // A string literal that STARTS with a path separator — the shape every route takes.
+    // Asserted as a property rather than as a list of route names.
+    expect(decisionsListSource).not.toMatch(/["']\/[a-z]/)
+  })
+
+  // ── FENCE 4 — the API contact is TYPE-ONLY, and it EXISTS ────────────────────────
+
+  it("its ONE contact with the API client is TYPE-ONLY", () => {
+    const apiLines = decisionsListSource
+      .split("\n")
+      .filter((line) => line.includes(API_SPECIFIER))
+    // POSITIVE CONTROL, and it is the half that matters most here: without it this fence
+    // passes because the import was DELETED rather than because it was type-only.
+    expect(apiLines.length).toBeGreaterThan(0)
+    for (const line of apiLines) {
+      expect(line.trimStart().startsWith("import type")).toBe(true)
+    }
+  })
+
+  it("those fences are real — each pattern matches its planted literal", () => {
+    expect('const r = await fetch("/x")').toMatch(/fetch\(/)
+    expect("new EventSource(url)").toMatch(
+      /XMLHttpRequest|EventSource|navigator\.sendBeacon/,
+    )
+    expect('const route = "/workflows/generate"').toMatch(/["']\/[a-z]/)
+    // …and the route needle must NOT fire on a tailwind opacity or a divide colour, both
+    // of which carry a slash inside the string rather than at its head.
+    expect('className="placeholder:text-muted-foreground/70"').not.toMatch(/["']\/[a-z]/)
+    expect('className="divide-y divide-border/50"').not.toMatch(/["']\/[a-z]/)
+    // …and a VALUE import of the API client is not an `import type` line.
+    const valueImport = `import { generateWorkflow } from "${API_SPECIFIER}"`
+    expect(valueImport.includes(API_SPECIFIER)).toBe(true)
+    expect(valueImport.trimStart().startsWith("import type")).toBe(false)
+  })
+
+  // ── FENCE 5 — no cache, and every authored string is a text child ────────────────
+
+  it("holds NO cache of its first props — a pure projection, fenced at the source", () => {
+    // A cache can only be built out of one of these two hooks, and neither is written
+    // here — which is what makes a SECOND generation replace the first one's card.
+    for (const hook of CACHE_HOOKS) expect(decisionsListSource).not.toContain(hook)
+  })
+
+  it("POSITIVE CONTROL — it is not simply hook-free; it reads every one of its props", () => {
+    // Without this the fence above passes on an empty file.
+    for (const prop of [
+      "folderName",
+      "templateFilename",
+      "businessRequirement",
+      "deliverableStepSlug",
+      "readiness",
+      "onChangeKb",
+      "onChangeRequirement",
+      "onOpenStep",
+      "onChangeName",
+    ]) {
+      expect(decisionsListSource).toContain(prop)
+    }
+  })
+
+  it("renders every authored string as a text child (T-197-19)", () => {
+    expect(decisionsListSource).not.toContain(RAW_HTML_PROP)
+  })
+
+  it("never turns an ABSENT verdict into an object it can read a pass out of", () => {
+    // The two shapes that collapse the third arm. Both are SOURCE properties, which is a
+    // far cheaper and far stronger proof than observing a negative about rendering.
+    expect(decisionsListSource).not.toMatch(/readiness\s*(\?\?|\|\|)\s*\{\}/)
+    expect(decisionsListSource).not.toMatch(/!!\s*readiness/)
+  })
+
+  it("does not trim or empty-check the name on its way out (D-17 / D-182-06)", () => {
+    expect(decisionsListSource).not.toMatch(/\.trim\(\)/)
+  })
+
+  it("those fences are real — each pattern matches its planted literal", () => {
+    expect("const [seeded, setSeeded] = useState(name)").toContain(CACHE_HOOKS[0])
+    expect("const firstName = useRef(name)").toContain(CACHE_HOOKS[1])
+    expect('<p dangerouslySetInnerHTML={{ __html: m }} />').toContain(RAW_HTML_PROP)
+    expect("const r = readiness ?? {}").toMatch(/readiness\s*(\?\?|\|\|)\s*\{\}/)
+    expect("const r = readiness || {}").toMatch(/readiness\s*(\?\?|\|\|)\s*\{\}/)
+    expect("const ok = !!readiness").toMatch(/!!\s*readiness/)
+    expect("onChangeName(e.target.value.trim())").toMatch(/\.trim\(\)/)
+  })
+})
+
+// ── 8. NO HANDLE SHIPS UNEXERCISED (the 187-20 / WR-13 sweep) ────────────────────────
+
+describe("DecisionsList — every rendered handle is queried by this suite", () => {
+  function withoutComments(src: string): string {
+    return src
+      .replace(/\/\*[\s\S]*?\*\//g, " ")
+      .split("\n")
+      .map((line) => {
+        const m = /(^|\s)\/\//.exec(line)
+        return m ? line.slice(0, m.index) : line
+      })
+      .join("\n")
+  }
+
+  /** Every spelling JSX admits for a STATIC `data-testid`. The character class excludes
+   *  `$`, `{` and `}` deliberately: a backtick-admitting variant extracts the TEMPLATE row
+   *  testid as though it were static and then demands a query for a literal string that
+   *  cannot exist. The template forms keep their own explicit acknowledgement below. */
+  const staticTestIdRx = () =>
+    /data-testid=(?:"([^"'{}$]+)"|\{\s*["']([^"'{}$]+)["']\s*\})/g
+  /** The `data-*` STATE attributes — always brace-valued, because state is an expression. */
+  const stateAttrRx = () => /\sdata-([a-z][a-z-]*)=\{/g
+
+  it("every STATIC testid the component renders is QUERIED by this suite", () => {
+    // IT MEASURES COVERAGE, NOT A MENTION: the suite's source is comment-stripped first,
+    // so a query sitting inside a comment or a discarded block cannot satisfy it. The
+    // needle is ASSEMBLED at runtime from each extracted name, so this guard's own source
+    // contains no literal call it could satisfy itself with.
+    const queried = withoutComments(testSource)
+    const ids = [...decisionsListSource.matchAll(staticTestIdRx())].map(
+      (m) => m[1] ?? m[2],
+    )
+    const unique = [...new Set(ids)]
+    // A regex that matched nothing would make every assertion below vacuous.
+    expect(unique.length).toBeGreaterThan(0)
+    expect(unique).toContain("decision-verdict-requirement")
+    expect(unique).toContain("decisions-limit-note")
+    // …and it must NOT have swallowed a template testid as though it were static.
+    for (const id of unique) expect(id).not.toContain("${")
+    for (const id of unique) {
+      expect(queried, `data-testid="${id}" is rendered but never queried`).toContain(
+        `ByTestId("${id}")`,
+      )
+    }
+  })
+
+  it("the TEMPLATE testids are not unguarded either — each is queried per row key", () => {
+    // A static extraction correctly cannot see `decision-row-${key}` or
+    // `decision-answer-${key}`. They are covered by name, once per key, by the helpers at
+    // the top of this file and by section 1's ordered-array case.
+    expect(decisionsListSource).toMatch(/data-testid=\{`decision-row-\$\{/)
+    expect(decisionsListSource).toMatch(/data-testid=\{`decision-answer-\$\{/)
+    const queried = withoutComments(testSource)
+    expect(queried).toContain("`decision-answer-${key}`")
+    expect(queried).toContain("`decision-row-${key}`")
+  })
+
+  it("every `data-*` STATE attribute it renders is QUERIED by this suite too", () => {
+    // The sibling class a `data-testid`-only extraction is blind to — and the exact class
+    // of surface hook `data-row-count` belongs to. Its own case, its own non-vacuity: a
+    // guard folded into its sibling can be deleted without the suite's count moving,
+    // which is the Phase-177 coverage-loss shape.
+    const queried = withoutComments(testSource)
+    const attrs = [
+      ...new Set(
+        [...decisionsListSource.matchAll(stateAttrRx())].map((m) => `data-${m[1]}`),
+      ),
+      // `data-testid` is excluded so the two halves cannot double-count: the case above
+      // owns it, and it is the only `data-*` here that is an IDENTIFIER, not state.
+    ].filter((a) => a !== "data-testid")
+    expect(attrs.length).toBeGreaterThan(0)
+    expect(attrs).toContain("data-row-count")
+    expect(attrs).toContain("data-row-key")
+    for (const attr of attrs) {
+      expect(queried, `${attr} is rendered but never queried`).toContain(`"${attr}"`)
+    }
   })
 })
