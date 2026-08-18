@@ -20,8 +20,43 @@
  * order, as literal on-screen strings. This suite asserts that inventory by VISIBLE TEXT, so a
  * refactor that keeps a `data-testid` alive while emptying the node it names still reds here.
  * The six atoms D-03 will CUT in Wave 4 are pinned exactly as hard as the eleven that stay:
- * this plan is a pure refactor, so Wave 4 — and only Wave 4 — is where this pin is deliberately
+ * `192.2-02` is a pure refactor, so Wave 4 — and only Wave 4 — is where this pin is deliberately
  * re-baselined.
+ *
+ * ══════════════════════════════════════════════════════════════════════════════════════════
+ * ── 192.2-05 (WAVE 4) — THE RE-BASELINE. IT IS AN INVERSION, NOT A LOOSENING. ────────────
+ * ══════════════════════════════════════════════════════════════════════════════════════════
+ *
+ * This is the wave the paragraph above nominated, and this is the ONE edit to this file that
+ * the phase sanctions. It lands in its own commit, with its own message, BEFORE the source
+ * change it describes — so it is observed RED first and the source is what turns it green.
+ *
+ * ⚠ **NO ASSERTION WAS DELETED.** Each of D-03's six CUT atoms flips from *asserted present* to
+ * **asserted ABSENT**, because an atom that merely stops being checked can come back silently
+ * while an atom asserted absent cannot. §6 below then sweeps all six across all three
+ * provenances in one place, so the subtraction is a property of the card rather than six
+ * scattered observations.
+ *
+ * THE DELTA, STATED AS COUNTS SO IT CAN BE AUDITED RATHER THAN BELIEVED:
+ *
+ *   atoms asserted PRESENT before → after   17 → 11      (the eleven KEEP atoms)
+ *   atoms asserted ABSENT  before → after    0 →  6      (D-03's six, exactly)
+ *   atoms ADDED by D-01                          +2      (the gutter, and line 2's run truth)
+ *
+ * ⚠ THREE SURVIVING ATOMS CHANGE THEIR LITERAL, AND NONE OF THEM DISAPPEARS. D-06 is folded
+ * into this wave, so atom 1's mark stops being an emoji and becomes the house icon component,
+ * atom 8's folder chip loses its leading emoji while keeping its name, and atom 10's state
+ * stops spelling the SYSTEM word (`published` / `draft`) and spells the BUSINESS word
+ * `cardFace` already returns. The atoms are all three still on the card and still asserted
+ * here; what moved is what they SAY. A reader auditing "exactly six atoms left" must count
+ * departures, not edits — and the departures are exactly §6's six.
+ *
+ * ⚠ ONE PLACEMENT MOVED AND IT IS RECORDED RATHER THAN ABSORBED. D-01 numbers the slots and
+ * puts the run truth on LINE 2; 179-C is silent on where the shipped identity line then sits,
+ * because that sketch did not render one at all. Line 2 therefore takes DOM position 2 in the
+ * name column and the identity line moves to position 3. `WorkflowCard.test.tsx`'s child-order
+ * assertions are updated in the same wave — which is exactly what asserting placement by child
+ * order was for: a move is visible instead of silent.
  *
  * ── THE FOUR ROWS, AND WHY THE FOURTH IS THE IMPORTANT ONE ───────────────────────────────
  * A published row, a draft and a starter cover the three provenance faces. The FOURTH is a row
@@ -31,6 +66,12 @@
  * renders, carrying no text) so that a later wave changing it is making a visible decision
  * instead of an accident.
  *
+ * ⚠ EVERY FIXTURE ROW CARRIES NEITHER RUN KEY, so all four resolve to D-08's **unknown** arm
+ * and say `Not recorded`. That is the honest reading of a fixture built before the feed existed
+ * (`libraryScale.ts:765-772` says so in its own words), and it makes this pin the place the
+ * stale-deploy arm is characterised. The other four arms are driven in `WorkflowCard.test.tsx`,
+ * which owns the run-arm matrix.
+ *
  * ⚠ THE ROWS COME FROM `libraryRowOf`, THE SHIPPED FIXTURE SEAM (`__fixtures__/libraryScale.ts`
  * :785), and the identity line from the REAL `buildIdentityIndex` / `resolveIdentity`. A
  * hand-built identity would pin what this file believes the resolver says; the real resolver
@@ -39,6 +80,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 
 const { mockDeleteDraft, mockCascade, mockPreview } = vi.hoisted(() => ({
   mockDeleteDraft: vi.fn(),
@@ -64,6 +106,10 @@ import {
   FORK_CONSEQUENCE,
   OWN_SHARED,
   OWN_YOURS,
+  RUN_UNKNOWN,
+  STATE_DRAFT,
+  STATE_RUNNABLE,
+  STATE_STARTER,
   oneOfLabel,
 } from "./libraryVocabulary"
 import { buildIdentityIndex, resolveIdentity, type RowIdentity } from "./rowIdentity"
@@ -109,6 +155,33 @@ const ROOT_TESTID = {
   draft: "draft-card",
 } as const
 
+/**
+ * D-03's six CUT atoms, by the `data-testid` each one owned on the resting card at the phase
+ * base. Five are the soul's; the sixth is the fork-consequence paragraph.
+ *
+ * ⚠ THE SIXTH IS CUT FROM THE RESTING CARD, NOT FROM THE PRODUCT — it explains a real
+ * consequence before a real act, and §1's relocation case proves it still arrives beside the
+ * fork verb. An id that stopped resolving ANYWHERE would be T-21, not the subtraction.
+ */
+const CUT_TESTIDS = [
+  "soul-purpose",
+  "soul-needs",
+  "soul-spine",
+  "soul-tier",
+  "soul-output",
+  "fork-consequence",
+] as const
+
+/** The literal strings the five soul atoms put on screen at the base (`192.2-01-SUMMARY.md` §3). */
+const CUT_STRINGS = [
+  "Assess a vendor against our security requirements before renewal.",
+  "needs kickoff_prompt",
+  "produces: Vendor Risk Review · file",
+] as const
+
+/** The emoji plane D-06 evicts. A card whose text matches this anywhere has an emoji on it. */
+const EMOJI = /[\u{1F300}-\u{1FAFF}]/u
+
 function renderCard(row: LibraryRow, over: Partial<WorkflowCardProps> = {}) {
   const props: WorkflowCardProps = {
     row,
@@ -119,6 +192,7 @@ function renderCard(row: LibraryRow, over: Partial<WorkflowCardProps> = {}) {
     onForkStarter: vi.fn(),
     onDeleted: vi.fn(),
     identity: identityFor(row),
+    now: FIXTURE_NOW,
     ...over,
   }
   render(<WorkflowCard {...props} />)
@@ -130,6 +204,11 @@ const identityParts = (card: HTMLElement): string[] =>
   Array.from(within(card).getByTestId("row-identity").children)
     .map((child) => child.textContent ?? "")
     .filter((text) => text !== "·")
+
+/** Open the `⋯` menu — the only place the relocated consequence sentence can be read. */
+const openOverflow = async (card: HTMLElement) => {
+  await userEvent.click(within(card).getByRole("button", { name: "Workflow actions" }))
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -159,21 +238,31 @@ describe("the corpus is what the atoms below are asserted against", () => {
     expect(identityFor(PUBLISHED).segs).toEqual(["Ready to run"])
   })
 
-  it("every fixture row ADMITS a template, so the AUTH-03 mark is on the line", () => {
+  it("every fixture row ADMITS a template and carries NEITHER run key", () => {
     // ⚠ Also read out of the failing diff. The mark is a SEGMENT of the identity line
     // (`WorkflowCard.tsx:568`), so a pin that omitted it would be asserting a line the card
     // does not render. Which ARM the fixture reaches is proved, not assumed (the 192 CR-01
     // defect: *both failure tests pinned the correct branch without entering the wrong one*).
     for (const row of ROWS) expect(templateAdmission(row.def)).toBe("admits")
+    // ⚠ 192.2-05 — and the run arm is proved the same way rather than assumed. `undefined` is
+    // D-08's *unknown*; `null` would be *never run*, a different arm and a different sentence.
+    for (const row of ROWS) {
+      expect(row.lastRunStatus).toBeUndefined()
+      expect(row.lastRunAt).toBeUndefined()
+    }
   })
 })
 
 // ── 1 · the published row — every atom, by visible text ──────────────────────────────
 
 describe("BASELINE — the resting PUBLISHED card", () => {
-  it("atoms 1-3 · the mark, the name, the version", () => {
+  it("atoms 1-3 · the mark, the name, the version — and the mark is NO LONGER AN EMOJI", () => {
     const card = renderCard(PUBLISHED)
-    expect(card).toHaveTextContent("📄")
+    // The atom SURVIVES: there is still exactly one provenance mark, at the head of line 1.
+    expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
+    // ⚠ WAS `expect(card).toHaveTextContent("📄")`. D-06: the mark is now the house icon
+    // component, so it contributes no text at all — which is what this asserts.
+    expect(card.textContent ?? "").not.toMatch(EMOJI)
     expect(within(card).getByText("Vendor Risk Review")).toBeInTheDocument()
     expect(within(card).getByText("v1")).toBeInTheDocument()
   })
@@ -193,9 +282,12 @@ describe("BASELINE — the resting PUBLISHED card", () => {
     expect(identity.own).toBe(OWN_YOURS)
   })
 
-  it("atom 8 · the folder chip", () => {
+  it("atom 8 · the folder chip — the name survives, the emoji does not", () => {
     const card = renderCard(PUBLISHED)
-    expect(card).toHaveTextContent("📁 " + FOLDER_NAME)
+    // ⚠ WAS `toHaveTextContent("📁 " + FOLDER_NAME)`. The chip is a KEEP atom; only its glyph
+    // changed, and D-06's rule is *no emoji on the card* rather than *no folder chip*.
+    expect(card).toHaveTextContent(FOLDER_NAME)
+    expect(card.textContent ?? "").not.toContain("\u{1F4C1}")
   })
 
   it("atom 9 · the overflow trigger", () => {
@@ -203,30 +295,62 @@ describe("BASELINE — the resting PUBLISHED card", () => {
     expect(within(card).getByRole("button", { name: "Workflow actions" })).toBeInTheDocument()
   })
 
-  it("atom 10 · the state pill", () => {
+  it("atom 10 · the state, IN BUSINESS WORDS — the system spelling reaches nobody", () => {
     const card = renderCard(PUBLISHED)
-    expect(within(card).getByText("published")).toBeInTheDocument()
+    // ⚠ WAS `getByText("published")`. D-06: `published` and `draft` are the system's words, in
+    // the system's data. The atom is still here; it finally says something a person means.
+    expect(within(card).getByText(STATE_RUNNABLE)).toBeInTheDocument()
+    expect(within(card).queryByText("published")).toBeNull()
   })
 
-  it("atoms 11-15 · the five soul atoms", () => {
+  it("NEW · D-01 line 2 — the run truth first, then the state, in that order", () => {
     const card = renderCard(PUBLISHED)
-    expect(within(card).getByTestId("soul-purpose")).toHaveTextContent(
-      "Assess a vendor against our security requirements before renewal.",
-    )
-    expect(within(card).getByTestId("soul-needs")).toHaveTextContent("needs kickoff_prompt")
-    expect(within(card).getByTestId("soul-spine")).toBeInTheDocument()
-    expect(within(card).getByTestId("soul-tier")).toHaveTextContent("Strict")
-    expect(within(card).getByTestId("soul-tier")).toHaveAttribute("data-tier", "STRICT")
-    // ⚠ Read out of this suite's own failing diff too. The fixture's chain ends in an
-    // `llm_emit` phase, so the deliverable is a FILE and the label is the workflow's name.
-    expect(within(card).getByTestId("soul-output")).toHaveTextContent(
-      "produces: Vendor Risk Review · file",
-    )
+    const line = within(card).getByTestId("row-answer")
+    // The fixture carries no run keys, so the honest arm is *unknown* — never a tick and never
+    // a fabricated time. THE WORD is what carries it (T-20: assert the word, not the class).
+    expect(line).toHaveTextContent(RUN_UNKNOWN)
+    expect(line).toHaveTextContent(STATE_RUNNABLE)
+    const text = line.textContent ?? ""
+    expect(text.indexOf(RUN_UNKNOWN)).toBeLessThan(text.indexOf(STATE_RUNNABLE))
   })
 
-  it("atom 16 · the fork consequence sentence", () => {
+  it("NEW · D-01 slot 1 — the 3px gutter exists and is keyed to the row's run arm", () => {
     const card = renderCard(PUBLISHED)
-    expect(within(card).getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
+    const gutter = within(card).getByTestId("run-gutter")
+    // The gutter is DECORATION over a fact stated in words one line down — it carries the arm
+    // as data so a later wave cannot let colour drift away from the sentence.
+    expect(gutter).toHaveAttribute("data-run", "unknown")
+    expect(gutter).toHaveAttribute("aria-hidden", "true")
+    expect(gutter.textContent).toBe("")
+  })
+
+  it("atoms 11-15 · CUT (D-03) — the five soul atoms have LEFT the resting card", () => {
+    const card = renderCard(PUBLISHED)
+    // ⚠ INVERTED, NOT DELETED. Each of the five was asserted PRESENT here at the phase base.
+    expect(within(card).queryByTestId("workflow-soul")).toBeNull()
+    for (const id of ["soul-purpose", "soul-needs", "soul-spine", "soul-tier", "soul-output"]) {
+      expect(within(card).queryByTestId(id)).toBeNull()
+    }
+    // …and by TEXT too, so a node that survived under a new id still reds here.
+    for (const literal of CUT_STRINGS) expect(card).not.toHaveTextContent(literal)
+    expect(card).not.toHaveTextContent("STRICT")
+    expect(card).not.toHaveTextContent("Strict")
+  })
+
+  it("atom 16 · CUT from the resting card — and RELOCATED beside the verb it explains (T-21)", async () => {
+    const card = renderCard(PUBLISHED)
+    // ⚠ WAS asserted present at rest. D-03 cuts it from the RESTING card.
+    expect(within(card).queryByTestId("fork-consequence")).toBeNull()
+    // ⚠ AND THIS HALF IS THE ONE THAT MATTERS. The sentence warns about a real consequence
+    // before a real act; deleting it from the product would be T-21. It now arrives at the
+    // moment it is needed, still wired to the control by `aria-describedby`.
+    await openOverflow(card)
+    const sentence = screen.getByTestId("fork-consequence")
+    expect(sentence).toHaveTextContent(FORK_CONSEQUENCE)
+    expect(screen.getByTestId("published-tweak")).toHaveAttribute(
+      "aria-describedby",
+      sentence.getAttribute("id"),
+    )
   })
 
   it("atom 17 · the one primary verb", () => {
@@ -239,10 +363,12 @@ describe("BASELINE — the resting PUBLISHED card", () => {
 // ── 2 · the draft — the OTHER face of every atom that varies ─────────────────────────
 
 describe("BASELINE — the resting DRAFT card", () => {
-  it("leads with the draft mark and carries the draft pill", () => {
+  it("leads with its own mark and says STILL BUILDING, never `draft`", () => {
     const card = renderCard(DRAFT)
-    expect(card).toHaveTextContent("📝")
-    expect(within(card).getByText("draft")).toBeInTheDocument()
+    expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
+    expect(card.textContent ?? "").not.toMatch(EMOJI)
+    expect(within(card).getByText(STATE_DRAFT)).toBeInTheDocument()
+    expect(within(card).queryByText("draft")).toBeNull()
   })
 
   it("says Yours through the feed-derived fallback, the wire having said nothing", () => {
@@ -258,21 +384,27 @@ describe("BASELINE — the resting DRAFT card", () => {
     expect(within(card).queryByTestId("fork-consequence")).toBeNull()
   })
 
-  it("still renders all five soul atoms", () => {
+  it("renders NONE of the five soul atoms — the draft is quiet too (D-03)", () => {
     const card = renderCard(DRAFT)
+    // ⚠ INVERTED from *"still renders all five soul atoms"*. A subtraction that only reached
+    // the published face would leave 69% of this library — the drafts — exactly as loud.
     for (const id of ["soul-purpose", "soul-needs", "soul-spine", "soul-tier", "soul-output"]) {
-      expect(within(card).getByTestId(id)).toBeInTheDocument()
+      expect(within(card).queryByTestId(id)).toBeNull()
     }
+    expect(within(card).queryByTestId("workflow-soul")).toBeNull()
   })
 })
 
 // ── 3 · the starter ──────────────────────────────────────────────────────────────────
 
 describe("BASELINE — the resting STARTER card", () => {
-  it("leads with the starter mark and carries the Starter pill", () => {
+  it("leads with its own mark and says SHARED STARTER — the full business word", () => {
     const card = renderCard(STARTER)
-    expect(card).toHaveTextContent("✨")
-    expect(within(card).getByText("Starter")).toBeInTheDocument()
+    expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
+    expect(card.textContent ?? "").not.toMatch(EMOJI)
+    // ⚠ WAS `getByText("Starter")`. The shipped vocabulary's word is `Shared starter`, and
+    // `cardFace` has returned it since 192.2-02 — the pill was simply not rendering it.
+    expect(within(card).getByText(STATE_STARTER)).toBeInTheDocument()
   })
 
   it("says Shared — it is not this reader's row", () => {
@@ -280,10 +412,12 @@ describe("BASELINE — the resting STARTER card", () => {
     expect(identityParts(card)[0]).toBe(OWN_SHARED)
   })
 
-  it("is runnable: it leads with Run and spends the consequence sentence", () => {
+  it("is runnable: it leads with Run, and its consequence sentence lives in the menu", async () => {
     const card = renderCard(STARTER)
     expect(within(card).getByTestId("published-run")).toHaveTextContent("▶ Run")
-    expect(within(card).getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
+    expect(within(card).queryByTestId("fork-consequence")).toBeNull()
+    await openOverflow(card)
+    expect(screen.getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
   })
 })
 
@@ -292,7 +426,7 @@ describe("BASELINE — the resting STARTER card", () => {
 describe("BASELINE — a row whose name is the empty string (WR-01)", () => {
   it("renders the title node, carrying no text — TODAY'S answer, pinned", () => {
     const card = renderCard(NAMELESS)
-    // Located by the mark's sibling position rather than by a testid: the title carries no
+    // Located by the version's sibling position rather than by a testid: the title carries no
     // test hook of its own, and inventing one here would change the file this plan refactors.
     const header = within(card).getByText("v1").parentElement
     expect(header).not.toBeNull()
@@ -305,12 +439,14 @@ describe("BASELINE — a row whose name is the empty string (WR-01)", () => {
 
   it("degrades readably: the row is still identifiable, still runnable, still complete", () => {
     const card = renderCard(NAMELESS)
-    expect(card).toHaveTextContent("📄")
+    expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
     expect(within(card).getByText("v1")).toBeInTheDocument()
     expect(identityParts(card)[0]).toBe(OWN_YOURS)
-    expect(within(card).getByText("published")).toBeInTheDocument()
+    expect(within(card).getByText(STATE_RUNNABLE)).toBeInTheDocument()
     expect(within(card).getByTestId("published-run")).toHaveTextContent("▶ Run")
-    expect(within(card).getByTestId("soul-purpose")).toBeInTheDocument()
+    // ⚠ WAS `getByTestId("soul-purpose")`. A nameless row is now carried by line 2 alone —
+    // which is precisely why line 2 has to be TOTAL over the arms (D-08).
+    expect(within(card).getByTestId("row-answer")).toHaveTextContent(RUN_UNKNOWN)
   })
 
   it("collides with nobody, so it spends no counter and no dangling separator", () => {
@@ -325,16 +461,46 @@ describe("BASELINE — a row whose name is the empty string (WR-01)", () => {
 
 describe("BASELINE — every resting atom, per provenance, in one place", () => {
   it.each([
-    ["published", PUBLISHED, "📄", "published", true] as const,
-    ["draft", DRAFT, "📝", "draft", false] as const,
-    ["starter", STARTER, "✨", "Starter", true] as const,
-  ])("%s renders its mark, its pill and its verb", (_label, row, mark, pill, runnable) => {
+    ["published", PUBLISHED, STATE_RUNNABLE, true] as const,
+    ["draft", DRAFT, STATE_DRAFT, false] as const,
+    ["starter", STARTER, STATE_STARTER, true] as const,
+  ])("%s renders its mark, its business word and its verb", (_label, row, state, runnable) => {
     const card = renderCard(row)
-    expect(card).toHaveTextContent(mark)
-    expect(within(card).getByText(pill)).toBeInTheDocument()
+    expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
+    expect(within(card).getByText(state)).toBeInTheDocument()
     expect(within(card).getByTestId(runnable ? "published-run" : "draft-open")).toBeInTheDocument()
-    // The five soul atoms and the folder chip are unconditional across all three faces.
-    expect(within(card).getByTestId("workflow-soul")).toBeInTheDocument()
-    expect(card).toHaveTextContent("📁 " + FOLDER_NAME)
+    // ⚠ WAS the five soul atoms and an emoji folder chip, asserted unconditional across all
+    // three faces. What is unconditional NOW is the gutter, line 2 and the chip's name.
+    expect(within(card).getByTestId("run-gutter")).toBeInTheDocument()
+    expect(within(card).getByTestId("row-answer")).toHaveTextContent(RUN_UNKNOWN)
+    expect(card).toHaveTextContent(FOLDER_NAME)
+    expect(card.textContent ?? "").not.toMatch(EMOJI)
+  })
+})
+
+// ── 6 · THE SUBTRACTION, AS ONE PROPERTY — D-03's six atoms, all three faces ─────────
+
+/**
+ * ⚠ THIS BLOCK IS THE POINT OF THE RE-BASELINE, AND IT IS WHY THE ASSERTIONS WERE INVERTED
+ * RATHER THAN REMOVED. T-18 is *"the gutter is added and nothing is cut"* — a card that got
+ * LOUDER, which is the exact opposite of what the operator approved. Six scattered `queryBy`
+ * nulls could each be quietly relaxed; one sweep over the named six, on every face, cannot.
+ */
+describe("D-03 — the six CUT atoms are absent from the resting card, on every face", () => {
+  it.each([
+    ["published", PUBLISHED] as const,
+    ["draft", DRAFT] as const,
+    ["starter", STARTER] as const,
+  ])("a resting %s card renders none of the six", (_label, row) => {
+    const card = renderCard(row)
+    for (const id of CUT_TESTIDS) expect(within(card).queryByTestId(id)).toBeNull()
+    for (const literal of CUT_STRINGS) expect(card).not.toHaveTextContent(literal)
+    // The tier chip renders UPPERCASE through CSS; both readings are excluded so a change of
+    // casing cannot smuggle it back.
+    expect(card).not.toHaveTextContent("STRICT")
+    expect(card).not.toHaveTextContent("Strict")
+    // POSITIVE CONTROL — the sweep is looking at a card that really did render, so the six
+    // nulls above are absences rather than a query pointed at nothing.
+    expect(within(card).getByTestId("row-answer")).toBeInTheDocument()
   })
 })
