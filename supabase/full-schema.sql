@@ -1281,8 +1281,17 @@ CREATE TABLE public.model_capabilities_overrides (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     deprecated boolean DEFAULT false NOT NULL,
-    deprecated_reason text
+    deprecated_reason text,
+    emit_tier text,
+    CONSTRAINT model_capabilities_overrides_emit_tier_check CHECK (((emit_tier IS NULL) OR (emit_tier = ANY (ARRAY['force_strict'::text, 'force'::text, 'coerce'::text]))))
 );
+
+
+--
+-- Name: COLUMN model_capabilities_overrides.emit_tier; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.model_capabilities_overrides.emit_tier IS 'Phase 196 (AUTH-04 / D-14). The forced-emission tier an OPERATOR asserts for this model, overlaid over the code registry by config.get_model_capability_async. NULL means "not tracked here" and is the shipped state for all 37 pre-120 rows — forced_emit.py then applies its read-time cap.get("emit_tier", "coerce") default, so NULL is byte-identical to today. The CHECK vocabulary is pinned EQUAL to set(_RUNGS_BY_TIER) in backend/app/services/forced_emit.py and to _MODEL_CAP_ENUM_COLUMNS["emit_tier"] in backend/app/api/admin.py by backend/tests/unit/test_196_emit_tier_two_layer_pin.py. A tier this CHECK accepted but the ladder rejected would be rewritten to "coerce" by the boundary guard at forced_emit.py:377 and the run would degrade SILENTLY — hence the closed set. D-122-04 still holds: emit_tier is the single source of truth; forced_emission and strict_json_schema are DEPRECATED-UNREAD and no derived view may re-read them.';
 
 
 --
