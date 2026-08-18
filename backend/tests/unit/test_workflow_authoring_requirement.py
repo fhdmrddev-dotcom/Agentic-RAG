@@ -1439,7 +1439,28 @@ _GENERATE_CALL_SITE = (
 
 #: Accepted by the request model, never sent by the call site above — with the measured
 #: reason, in the literal.
-ACCEPTED_BUT_NEVER_SENT: dict[str, str] = {}
+#:
+#: ⚠ THE ONE ENTRY HERE IS A CONFESSION OF A LIVE DEFECT, NOT A DISMISSAL OF ONE. The fence
+#: was landed with this mapping EMPTY and observed RED against it (the output is quoted in
+#: `197-02-SUMMARY.md`), which is why this file's half-B control is real rather than
+#: planted. It is allowlisted rather than fixed because wiring the channel means either
+#: widening the server's type or changing what the upload door mints — a change to the
+#: template-binding contract, which is `AUTH-03`'s surface and not `AUTH-02`'s.
+#:
+#: RE-OPEN TRIGGER: the next phase that takes up template binding. Deleting this entry
+#: without wiring the field reds the fence, which is the point.
+ACCEPTED_BUT_NEVER_SENT: dict[str, str] = {
+    "template_asset_id": (
+        "`SEED-157` instance 1, half-closed: 193.1-07 wired the placeholders arm and left "
+        "this one. MEASURED — the field is typed `UUID | None` while the Phase-193 upload "
+        "door mints a STORAGE PATH, so passing a real asset id is a 422 before the handler "
+        "runs (the identical defect found the same day on the grounding-bundle route, "
+        "`260814-q5r-SUMMARY.md`). The channel is UNWIRABLE AS TYPED, so the client cannot "
+        "send it and no amount of frontend work would change that. Wiring it is a "
+        "template-binding contract change — AUTH-03's surface, not AUTH-02's. RE-OPEN: the "
+        "next phase that takes up template binding"
+    ),
+}
 
 
 def _repo_root():
