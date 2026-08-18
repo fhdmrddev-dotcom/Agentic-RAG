@@ -20,10 +20,18 @@
  * ⚠ FOLDING `unknown` INTO `never` IS THE DEFECT, NOT A SIMPLIFICATION. It makes the product
  * state *"this has never run"* about a workflow that may have run a hundred times — a specific
  * false claim, printed confidently, about somebody's own work. Two arms cannot say it and a
- * boolean cannot say it. ⚠ AND THE APPROVED MOCKUP ITSELF HAS THAT BUG: `dev/SketchLibraryCard
- * .tsx`'s `runWords` claims "its own three-armed unknown" in its comment and ships two arms
- * plus a `Never run` catch-all. The sketch is the acceptance bar for the LANGUAGE; it is not
- * the acceptance bar for the resolution, and this module deliberately does not copy it.
+ * boolean cannot say it. ⚠ AND THE APPROVED MOCKUP ITSELF HAD THAT BUG: sketch 179 variant
+ * C's own `runWords` claimed "its own three-armed unknown" in its comment while shipping two arms
+ * plus a `Never run` catch-all. The sketch was the acceptance bar for the LANGUAGE; it was never
+ * the acceptance bar for the RESOLUTION, and this module deliberately did not copy it.
+ *
+ * ⚠ AMENDED 192.2-06 — THAT MOCKUP NO LONGER EXISTS. Its throwaway dev surface was torn down at
+ * this phase's close, in the one commit its own teardown note required. **THIS FILE IS THEREFORE
+ * THE ONLY HOME OF THE THREE-ARMED RESOLUTION** — a reader who goes looking for the sketch's
+ * version will not find it, and the two-armed shape is preserved only as prose, in
+ * `.planning/sketches/179-what-the-eye-lands-on-honestly/README.md` and in `192.2-04-SUMMARY.md`
+ * §2. The pointer is amended rather than deleted because nothing in this repository typechecks
+ * prose, and a dangling path is how a wrong pointer survives every gate.
  *
  * ── THE MAP IS CLOSED AND ITS DEFAULT IS NEVER SUCCESS (T-15) ────────────────────────────
  * `workflow_runs.status` admits SIX values today — `active` · `paused` · `cap_paused` ·

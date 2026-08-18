@@ -10,7 +10,7 @@ seeds: [SEED-155, SEED-184, SEED-185]
 bugs: [BUG-260815-08]
 built: 2026-08-19
 renders_real_components: true
-dev_route: "/sketch-card (main.tsx guarded pathname — DELETE with src/dev/SketchLibraryCard.tsx)"
+dev_route: "TORN DOWN 2026-08-19 by plan 192.2-06 — the route and its component were deleted in one commit, as this file required. It no longer exists; do not go looking for it."
 ---
 
 # Sketch 179: What the eye lands on, honestly
@@ -116,8 +116,40 @@ the written purpose is answerable for 14%.
 - **The fork-consequence paragraph** ("Opens a new private copy you can edit…") renders on every
   published card. Prime candidate for the cut.
 
-## ⚠ Teardown
+## ✅ Teardown — DISCHARGED 2026-08-19 (plan `192.2-06`, Task 1)
 
-This sketch touches source. Two things to delete in one commit when it closes:
-`frontend/src/dev/SketchLibraryCard.tsx` and the `/sketch-card` branch in `frontend/src/main.tsx`.
-Any non-`/sketch-card` visit is byte-identical to before.
+**The obligation this section recorded has been met, and the original wording is preserved below
+rather than overwritten** — this repository's house habit, because a teardown note that is edited
+into the past tense cannot be audited against what it actually promised.
+
+It said, verbatim:
+
+> This sketch touches source. Two things to delete in one commit when it closes:
+> `frontend/src/dev/SketchLibraryCard.tsx` and the `/sketch-card` branch in `frontend/src/main.tsx`.
+> Any non-`/sketch-card` visit is byte-identical to before.
+
+Both were deleted **in one commit**, as required. What was measured rather than asserted:
+
+| Claim | Evidence |
+|---|---|
+| the component is gone | `frontend/src/dev/` no longer exists (the directory held only that one file) |
+| the route is gone | `grep -rn "sketch-card\|SketchLibraryCard" frontend/src` → **no match, exit 1** |
+| `main.tsx` is back to its pre-sketch shape | `git diff 17a508d7 -- frontend/src/main.tsx` → **empty**, i.e. byte-identical to the last commit before the sketch |
+| nothing else depended on it | frontend typecheck error count unmoved at **33**, none under `library/` |
+
+⚠ **Two docblocks still POINTED at the deleted path and were amended in the same commit** —
+`library/runFacts.ts` and `library/WorkflowCard.tsx`. Nothing in this repository typechecks prose, so
+a dangling pointer is exactly the kind of wrong reference that survives every gate. Neither was
+deleted; both now say where the surface went.
+
+⚠ **The sketch itself is NOT torn down and must not be.** It is this phase's G-2 evidence and it
+carries the operator's verdict. Only the *source* surface went.
+
+⚠ **One thing this sketch got WRONG outlived it, and is recorded here so the drawing is never
+mistaken for the specification.** Variant C's own `runWords` carried the comment *"its own
+three-armed unknown"* above a function with **two arms and a `Never run` catch-all** — so an
+unrecognised status, and a feed carrying no run keys at all, both rendered *Never run*. That is a
+specific false claim about somebody's work, and the shipped code deliberately does **not** copy it.
+**The correct three-armed resolution lives in
+`frontend/src/components/workflows/library/runFacts.ts`**, whose docblock now says so. The sketch
+was the acceptance bar for the LANGUAGE; it was never the acceptance bar for the RESOLUTION.

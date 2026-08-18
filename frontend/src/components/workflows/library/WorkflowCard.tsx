@@ -149,7 +149,8 @@
  *      atom."
  *
  * That was true of 192, and 192.2's D-03 reverses it deliberately: **the subtraction IS the
- * feature.** Rendering the real component (sketch 179 variant A, the dev route `/sketch-card`)
+ * feature.** Rendering the real component (sketch 179 variant A, on a throwaway dev surface that
+ * 192.2-06 tore down at this phase's close — the route is gone, the verdict is not)
  * measured the shipped card at NINE information rows deep, and the operator picked variant C,
  * which spends four slots and cuts the rest. So the card-scale soul mount is GONE and five
  * atoms leave with it — purpose hero, needs, glyph-dot spine, tier chip, deliverable — plus the
