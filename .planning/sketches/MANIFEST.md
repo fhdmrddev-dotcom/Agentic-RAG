@@ -2182,6 +2182,16 @@ caption each, no tables, and a real 780 px screen.
 |---|------|----------------|--------|------|
 | 174 | the-line-that-opens | What does the decisions surface actually LOOK like — and which shape leaves the workflow visible? | *(open — the recommendation)* | phase-197, auth-02, decisions-surface, recommendation, user-facing-mockup, g2-sketch-gate |
 
+### Post-197 — the workflow journey (SEED-182 / 183 / 184)
+
+The operator's review after Phase 197 shipped. Three seeds, ONE journey — sketched together so the composing
+state and the persistent decisions panel are drawn in a settled density language instead of being redrawn after
+it settles. Build order chosen by the operator: **density first**.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 175 | what-the-eye-lands-on | What is the density language for the workflow library — what does a card lead with, what defers behind a click, and what does colour carry? | *(open — awaiting operator)* | seed-184, density, progressive-disclosure, library, workflow-card, colour, icons, g2-sketch-gate, measured-refutation |
+
 **The recommended shape:** the draft lands as it does today; under the receipt sits **one line** —
 *"I made 5 decisions for you"* — that opens on demand, and each row hands you to the control already
 on screen. Closed on arrival, so the D-05 fast door is untouched; owns no control, so nothing drifts;
