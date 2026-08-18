@@ -1401,6 +1401,72 @@ next phase adding a genuinely second concern owes a refactor recommendation FIRS
 
 ---
 
+## Phase 196 — the phase's GUARDRAIL RECORD (G-1 / G-2 / G-3 / G-4 / G-5 / G-7)
+
+*(Added 2026-08-18 by plan `196-09`. ⚠ **Why HERE and not only in a plan summary**, since the plan that
+wrote this offered both homes: this file already carries the **G-5** half of every phase's guardrail
+story, and G-2 and G-5 were the two rules that actually fired on Phase 196. Splitting one phase's
+guardrail verdicts across two documents is how a decline gets read as an omission later. A plan
+SUMMARY is a plan-level artifact; **a guardrail verdict is phase-level and outlives the plan**, so it
+belongs beside the G-5 sections it sits with.)*
+
+| Rule | Verdict | Reason |
+|---|---|---|
+| **G-1** phase chain cap | **did not fire** | 196 is not a `<base>.N` insert. |
+| **G-2** sketch before plan for UX | ⚠ **FIRED, and was DECLINED on a reason** — see D-21 below | |
+| **G-3** lightweight commands | **did not fire** | nine plans, a migration, a new route, four mounted pickers — far past `/gsd:fast`. |
+| **G-4** lived-experience UAT | **fired; four rows RATIFIED, none yet DRIVEN** — see below | |
+| **G-5** refactor between feature waves | ⚠ **FIRED on SIX ledger files and ELEVEN more that had no row** — honoured by construction in every case, one of them by REDUCTION | arithmetic in each section above |
+| **G-7** gap-closure round cap | **did not fire** | no gap-closure round has run on this phase. |
+
+### D-21 — G-2 fired and was DECLINED on a reason. No override is owed and none is recorded.
+
+**The picker idiom already ships TWICE** — `JudgeModelPicker.tsx` (Phase 137.1, sketch 024-A) and
+`ModelDefaultPreference.tsx` (Phase 167). **The acceptance bar therefore existed in CODE rather than
+in a drawing**, and re-drawing an atom that already ships is precisely the structural sketch-to-build
+drift `SEED-155` records: *a sketch that hand-writes its own CSS for a surface consuming an existing
+component is a drawing, not an acceptance bar.* **The operator was offered a sketch and did not take
+it.** Because the rule was honoured-with-a-reason rather than overridden, `.planning/STATE.md` records
+**no guardrail override for Phase 196 — and that absence is a measurement, not an omission.**
+
+⚠ **THE HONEST LIMIT OF THAT REASONING, stated rather than smoothed:** the decline is defensible for
+the `<select>` and its `(current)` idiom, which both shipped pickers have. **It is WEAKER for the
+`<optgroup>` fitness grouping, which NEITHER shipped picker has** — that is new visual vocabulary
+whose only acceptance evidence is a render test. `196-05` and `196-08` each recorded this about
+themselves, and it is carried here so the next phase touching the picker inherits the caveat rather
+than the verdict alone.
+
+### D-16 — judge FITNESS stayed OUT because of a MEASUREMENT GAP, not scope tidiness
+
+`gemini-3.5-flash` is **`emit_tier: force`**, **registry-known**, and **still returned a null verdict**
+at a real publish. **So `emit_tier` is NECESSARY BUT NOT SUFFICIENT for the judge role** — which means
+a "judge fitness" facet built on the registry's emission vocabulary would have been built on an
+unverified premise.
+
+⚠ **The leading explanation for that failure is a HYPOTHESIS that has NEVER been live-verified, and
+`SEED-135` rates it MEDIUM and forbids any document from citing it as fact until someone dumps the
+sanitized Google tool payload.** It is therefore not restated here, in either seed written at this
+close, or in either bug report — deliberately, and this sentence is the record that the omission is
+the rule being obeyed rather than an oversight.
+
+**What Phase 196 fixed instead is the judge WIRING (D-17)**, which is a different defect with its own
+measurement: the knob the operator turns is now the control the code obeys. Fitness remains SEED-135's.
+
+### G-4 — four rows ratified in `196-VALIDATION.md`, ALL FOUR still OWED
+
+**Driven at phase verification by Chrome MCP, not by any plan.** Recorded here because *"the plans are
+green"* and *"the rows ran"* are different claims, and this project's standing lesson is that closing a
+phase with owed manual rows is legitimate **only when stated as a decision**:
+
+| Row | What it must show | Why no plan could discharge it |
+|---|---|---|
+| **U-A1** | open a saved `llm_emit` step, touch nothing, close — `config.model` byte-unchanged **via DB** | now DRIVABLE for the first time (`196-08`); the suite pins the client half (`onChange`/`onPersist` zero-called across three stored values incl. an unknown one), which is real evidence and **not the same evidence** |
+| **U-A2** | a `coerce` model distinguished from `force_strict` **before** committing the pick, in user words | ⚠ proved as **MARKUP**, never as human experience — a render test cannot prove a person notices |
+| **U-B1** | set the judge knob, run a **real** publish, see **that model** named in the verdict receipt | the live judge is now `deepseek-v4-pro`; a unit test cannot prove a provider shot |
+| **U-C1** | pick a model, send, navigate away, return, **REFRESH** — model still selected | ⚠ **jsdom has no page reload.** This row is the sole thing standing between `BUG-260718-04` and `closed` |
+
+---
+
 ## Phase 196 — files NAMED by D-22 but deliberately left as names, and TEST files deliberately left unlisted
 
 *(Added 2026-08-18 by plan `196-09`. Stated so both omissions read as decisions rather than oversights.)*
