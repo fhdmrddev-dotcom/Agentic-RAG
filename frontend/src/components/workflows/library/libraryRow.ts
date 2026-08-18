@@ -113,6 +113,47 @@ export interface LibraryRow {
    */
   updatedAt: string | undefined
   /**
+   * Phase 192.2 (LIB-06 / D-07 / D-08) — WHEN THIS ROW LAST RAN, ISO-8601, exactly the string
+   * the server rendered. The recency half of the run truth ("Worked 2 days ago").
+   *
+   * camelCase for the reason `updatedAt` above states: the wire spelling is `last_run_at`, the
+   * normalized spelling is this one, and the two normalizers in `libraryFilter.ts` are the only
+   * place they meet.
+   *
+   * ⚠ THREE STATES, AND THE THIRD IS WHY THIS MEMBER IS NOT `string | undefined` LIKE ITS
+   * NEIGHBOUR. `updatedAt` deliberately collapses the wire's `null` into `undefined` — one
+   * "nothing to render" case is enough there. HERE THAT COLLAPSE WOULD BE THE DEFECT D-08
+   * NAMES BY NAME:
+   *
+   *   · `undefined` — THE WIRE DID NOT SAY. The key was absent from the payload, i.e. a
+   *     frontend deployed ahead of its backend. We do not know whether this ever ran.
+   *   · `null`      — THE BACKEND LOOKED AND THERE IS NO RUN. A different, stronger fact.
+   *   · a string    — it ran, at that instant.
+   *
+   * Folding the first two together makes the product assert *"this has never run"* about a
+   * workflow that may have run a hundred times. So this field carries the wire's own value
+   * VERBATIM, and `runFacts.ts` is the one module that reads the difference.
+   *
+   * Never substitute `Date.now()`, never fall back to "just now", never treat it as the epoch —
+   * the rule `updatedAt` states above, for the same reason.
+   *
+   * ⚠ AND IT IS NOT `updatedAt`. On a published row that field is the PUBLISH time and is
+   * frozen there by design (`api.ts`, D-17). They disagree on real data. Do not read one for
+   * the other and do not "fix" either.
+   */
+  lastRunAt: string | null | undefined
+  /**
+   * Phase 192.2 (LIB-06 / D-08) — the RAW status of that run, exactly as `workflow_runs.status`
+   * spells it (`active` · `paused` · `cap_paused` · `completed` · `failed` · `cancelled` today,
+   * and the column can gain a terminal state without this file changing).
+   *
+   * Deliberately NOT a union and deliberately NOT a business word. `runFacts.ts` owns the
+   * mapping and the vocabulary; this member is the unread wire value, so that a status nobody
+   * anticipated arrives intact and is resolved to an explicit unknown rather than being lost on
+   * the way in. Same three states as `lastRunAt` above, for the same reason.
+   */
+  lastRunStatus: string | null | undefined
+  /**
    * THE ORIGINAL WIRE OBJECT, KEPT WHOLE. See the ⚠ paragraph in this file's header —
    * `token` and the real `PublishedWorkflow` reach their handlers through here, and a
    * rebuilt object that drops one of them fails at runtime while typechecking clean.

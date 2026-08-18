@@ -762,6 +762,14 @@ function toLibraryRow(seed: Seed): LibraryRow {
     provenance: seed.provenance,
     isMine: seed.provenance === "draft" ? undefined : seed.mine,
     updatedAt: new Date(seed.updatedAt).toISOString(),
+    // Phase 192.2 (LIB-06 / D-08) — ⚠ `undefined`, WHICH IS THE *UNKNOWN* ARM, NOT THE
+    // *NEVER RUN* ONE. The scale corpus has no run facts, so every fixture row resolves to
+    // "the wire did not say" — the honest reading of a fixture that predates the feed. A suite
+    // that wants a run arm overrides these two through `libraryRowOf`, which is exactly the
+    // seam that exists for a row the corpus does not model. Setting `null` here instead would
+    // have made 107 rows CLAIM they had never run, which is a fact this fixture does not hold.
+    lastRunAt: undefined,
+    lastRunStatus: undefined,
     // The original wire object, kept whole (`libraryRow.ts:115-120`). The fixture cannot build
     // a real `PublishedWorkflow` without importing the API client, so it carries the fields the
     // handlers actually reach for and casts, exactly as the house builder at

@@ -14,8 +14,9 @@
  * REAL `resolveIdentity`, and every proposed variant is typed against the REAL `LibraryRow`.
  * A proposal that needs a field we do not have therefore fails `tsc`, not review.
  *
- * THE ONE FIELD THAT DOES NOT EXIST YET is declared in `ProposedRunFacts` below and marked
- * as owed. Everything else on screen is data the library already carries.
+ * THE ONE FIELD THAT DID NOT EXIST YET was declared in `ProposedRunFacts` below and marked as
+ * owed. ⚠ IT SHIPPED IN PHASE 192.2 and that declaration is gone; every field on screen is now
+ * data the library really carries. See the ⚠ block above `SketchRow`.
  */
 import { useState } from "react"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
@@ -37,13 +38,23 @@ const DAY = 24 * 60 * 60 * 1000
  * the library feeds do not join it, so `LibraryRow` carries no run facts at all today.
  * A LEFT JOIN LATERAL on `workflow_runs` + two keys on `PublishedWorkflow` /
  * `WorkflowDraftRow` is the whole backend half. Measured, not assumed.
+ *
+ * ⚠ SHIPPED IN PHASE 192.2 (plans 03 + 04), AND THE PARAGRAPH ABOVE IS KEPT RATHER THAN
+ * REWRITTEN so the forecast can be read beside what landed. `LibraryRow` now carries
+ * `lastRunAt` / `lastRunStatus` for real — as ISO-8601 STRINGS and a RAW status, not the epoch
+ * milliseconds and the closed three-value union this mockup guessed. `ProposedRunFacts` is
+ * therefore GONE and `SketchRow` is now plainly `LibraryRow` — which is the outcome this file's
+ * own header asks for: *"a proposal that needs a field we do not have fails `tsc`, not review"*,
+ * and the field now exists. The rendered pixels are unchanged: the three timestamps are the same
+ * instants, written as the strings the wire really carries and read back through `runMs`.
+ *
+ * ⚠ AND `runWords` BELOW IS THE T-13 DEFECT, IN THE APPROVED MOCKUP ITSELF. Its comment claims
+ * "its own three-armed unknown" and its code has TWO arms plus a `Never run` catch-all — so an
+ * unrecognised status, and a feed that carries no run keys at all, both render as *never run*
+ * about a workflow that may have run a hundred times. `library/runFacts.ts` deliberately does
+ * NOT copy that fallback; it is where the three arms actually exist.
  */
-type RunStatus = "completed" | "failed" | "cancelled"
-interface ProposedRunFacts {
-  lastRunAt?: number | null
-  lastRunStatus?: RunStatus | null
-}
-type SketchRow = LibraryRow & ProposedRunFacts
+type SketchRow = LibraryRow
 
 /** The measured worst case: 41 distinct workflows sharing ONE name. */
 const ROWS: SketchRow[] = [
@@ -55,7 +66,7 @@ const ROWS: SketchRow[] = [
       version: 2,
       updatedAt: new Date(FIXTURE_NOW - 2 * DAY).toISOString(),
     }),
-    lastRunAt: FIXTURE_NOW - 2 * DAY,
+    lastRunAt: new Date(FIXTURE_NOW - 2 * DAY).toISOString(),
     lastRunStatus: "completed",
   },
   {
@@ -66,7 +77,7 @@ const ROWS: SketchRow[] = [
       version: 1,
       updatedAt: new Date(FIXTURE_NOW - 40 * DAY).toISOString(),
     }),
-    lastRunAt: FIXTURE_NOW - 31 * DAY,
+    lastRunAt: new Date(FIXTURE_NOW - 31 * DAY).toISOString(),
     lastRunStatus: "failed",
   },
   {
@@ -89,13 +100,23 @@ const ROWS: SketchRow[] = [
       version: 4,
       updatedAt: new Date(FIXTURE_NOW - 1 * DAY).toISOString(),
     }),
-    lastRunAt: FIXTURE_NOW - 4 * 60 * 60 * 1000,
+    lastRunAt: new Date(FIXTURE_NOW - 4 * 60 * 60 * 1000).toISOString(),
     lastRunStatus: "completed",
   },
 ]
 
 const INDEX = buildIdentityIndex(ROWS)
 const noop = () => {}
+
+/**
+ * The shipped `lastRunAt` is an ISO-8601 STRING (`libraryRow.ts`), and `relTime` below measures
+ * epoch milliseconds. This is the one-line bridge, and it is deliberately NOT a second date
+ * parser: `null` and `undefined` both mean "no instant", and `Date.parse` of anything
+ * unreadable yields `NaN`, which `relTime` already handles the way line 147 handles it.
+ */
+function runMs(at: string | null | undefined): number | null {
+  return at == null ? null : Date.parse(at)
+}
 
 function relTime(ms: number | null | undefined): string | null {
   if (ms == null) return null
@@ -115,11 +136,11 @@ function stateWords(row: SketchRow): { word: string; tone: string } {
 /** The run truth, in words, with its own three-armed unknown. */
 function runWords(row: SketchRow): { word: string; tone: string } {
   if (row.lastRunStatus === "failed")
-    return { word: `Failed ${relTime(row.lastRunAt)}`, tone: "text-[#DC2626]" }
+    return { word: `Failed ${relTime(runMs(row.lastRunAt))}`, tone: "text-[#DC2626]" }
   if (row.lastRunStatus === "cancelled")
-    return { word: `Stopped ${relTime(row.lastRunAt)}`, tone: "text-[#9AA3B5]" }
+    return { word: `Stopped ${relTime(runMs(row.lastRunAt))}`, tone: "text-[#9AA3B5]" }
   if (row.lastRunStatus === "completed")
-    return { word: `Worked ${relTime(row.lastRunAt)}`, tone: "text-[#21C45D]" }
+    return { word: `Worked ${relTime(runMs(row.lastRunAt))}`, tone: "text-[#21C45D]" }
   return { word: "Never run", tone: "text-[#6B7383]" }
 }
 

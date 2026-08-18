@@ -67,6 +67,11 @@ const rowOf = (over: Partial<LibraryRow> = {}): LibraryRow => {
     provenance: "published",
     isMine: true,
     updatedAt: "2026-08-12T09:00:00.000000+00:00",
+    // Phase 192.2 (LIB-06 / D-08) — `undefined` is the *unknown* arm ("the wire did not say"),
+    // never the *never run* one (`null`). The identity line is deliberately blind to both:
+    // recency there is `updatedAt`, and the run truth is `cardFace`'s, one module over.
+    lastRunAt: undefined,
+    lastRunStatus: undefined,
     source: { id: `r-${seq}` } as unknown as LibraryRow["source"],
   }
   return { ...base, ...over }

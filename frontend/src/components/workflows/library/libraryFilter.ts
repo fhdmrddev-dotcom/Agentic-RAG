@@ -114,6 +114,15 @@ export function fromPublished(
     // collapses the wire's `null` and its absence into ONE value, so a consumer has a single
     // "nothing to render" case instead of two — and neither becomes a fabricated time.
     updatedAt: row.updated_at ?? undefined,
+    // LIB-06 / D-08 — ⚠ VERBATIM, AND THE ABSENT `?? undefined` IS THE WHOLE POINT. The line
+    // directly above collapses `null` into `undefined` on purpose; doing the same here would
+    // erase the difference between "the backend says there is no run" (`null`) and "the backend
+    // never mentioned runs at all" (`undefined`), and the second one rendered as the first is
+    // the product asserting *never run* about a workflow that may have run a hundred times.
+    // `runFacts.ts` is the one module that reads the difference; this line's job is to preserve
+    // it. Both fields pass through untouched — no default, no coalesce, no normalization.
+    lastRunAt: row.last_run_at,
+    lastRunStatus: row.last_run_status,
     source: row,
   }
 }
@@ -140,6 +149,14 @@ export function fromDraft(row: WorkflowDraftRow): LibraryRow {
     // microseconds where a JS `Date` keeps milliseconds, and anything that parses it
     // produces a value matching ZERO rows. This line reads the display field.
     updatedAt: row.updated_at ?? undefined,
+    // LIB-06 / D-08 — verbatim, for the reason spelled out in `fromPublished` above: the two
+    // absences are different facts and this normalizer is where they would be lost.
+    //
+    // ⚠ A DRAFT'S RUN IS ITS GOLDEN RUN. A draft cannot be Run from the library — publish is
+    // the test — so these two fields answer *"did your test run pass?"*, which on a shelf that
+    // is 69% drafts is the most useful thing the row can say.
+    lastRunAt: row.last_run_at,
+    lastRunStatus: row.last_run_status,
     source: row,
   }
 }

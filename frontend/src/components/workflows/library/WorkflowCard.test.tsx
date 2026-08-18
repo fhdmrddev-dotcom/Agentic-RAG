@@ -143,6 +143,12 @@ const rowOf = (provenance: Provenance, over: Partial<LibraryRow> = {}): LibraryR
   // card does not render the field yet — Plan 05 does — and `...over` lets a case pass
   // `undefined` to exercise the "the wire did not say" path.
   updatedAt: "2026-06-12T09:30:15.123456+00:00",
+  // Phase 192.2 (LIB-06 / D-08). REQUIRED for the same reason `updatedAt` is, and this builder
+  // is again the site `tsc` found. ⚠ `undefined` is the *unknown* arm — "the wire did not say"
+  // — and NOT the *never run* one, which is `null`. This card does not render the run truth
+  // yet (Wave 4 does); `...over` lets a case pass any of the three states.
+  lastRunAt: undefined,
+  lastRunStatus: undefined,
   source: { id: `row-${provenance}`, slug: "vendor-risk", name: "Vendor-risk review" } as unknown as LibraryRow["source"],
   ...over,
 })
