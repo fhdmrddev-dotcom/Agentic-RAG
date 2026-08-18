@@ -2772,17 +2772,54 @@ describe("WorkflowBuilderPage 187-22 — CR-04: nothing the author does afterwar
     //
     // A fence whose subject moved and which was not re-scoped is the WR-01 failure one
     // surface over: it keeps passing, against nothing.
-    const RAISE = ["onDrafted", "Ref.current(def)"].join("")
+    //
+    // ⚠ 197 WAVE-2 MERGE (197-06, D-13) — THE FENCE IS RE-SCOPED AGAIN, AND AGAIN TOWARD A
+    // STRONGER PROPERTY, NOT A WEAKER ONE. `197-06` widened the raise to carry the server's
+    // readiness verdict, so the shipped call is now `…(def, result.readiness)` and the old
+    // one-argument literal `…(def)` stopped matching. It failed on the POST-MERGE gate and
+    // not in any worktree, because the fence lives on this page's suite while its subject
+    // lives in the hook — the exact cross-plan blind spot the merge gate exists to catch.
+    //
+    // The lazy repair is to drop the closing paren and pin `…current(def` — which would keep
+    // passing whether or not the verdict is carried at all, retiring the guarantee on the
+    // commit that added it. Pinning the COMMA instead asserts strictly more than before: the
+    // raise still happens, still beside the transition, still exactly once — and now it
+    // demonstrably carries a second argument. A future plan that drops the verdict reds here.
+    const RAISE = ["onDrafted", "Ref.current(def,"].join("")
     const atTransition = templateFirstDraftSource.indexOf(TRANSITION)
     expect(atTransition).toBeGreaterThan(-1)
     // 500 chars is "the next few lines, comments included" — measured, not guessed: the
     // shipped comment block between the transition and the raise runs to ~330 characters on
     // its own. Wide enough to survive a re-worded comment, far too narrow to reach another
     // function.
-    expect(templateFirstDraftSource.slice(atTransition, atTransition + 500)).toContain(RAISE)
+    //
+    // ⚠ 197 WAVE-2 MERGE — THE WINDOW CONSTANT ROTTED, FOR THE SAME REASON THE COUNT-GATE
+    // PINS ROT: it was calibrated against a measurement that then changed. `197-06` added its
+    // D-13 reasoning to the comment block above the raise, taking the transition→raise
+    // distance from ~330 to a measured 850, and 500 stopped reaching. Re-derived, not
+    // guessed — every figure below was measured on the shipped file at the wave-2 merge:
+    //
+    //   raise                      850   ← must be INSIDE the window
+    //   else-branch setErrorState 1013   ← must be OUTSIDE it
+    //   deps-array close          1619
+    //   next useEffect            2046
+    //
+    // 900 is the only kind of number that is defensible here: above the thing it must see,
+    // below the nearest thing it must not. The 163-char margin is deliberately thin — this
+    // fence SHOULD fire again the next time someone writes 150 characters of prose into that
+    // block, because that is the fence noticing its own subject moved.
+    expect(templateFirstDraftSource.slice(atTransition, atTransition + 900)).toContain(RAISE)
     // POSITIVE CONTROL — the window really can miss, so the pass above is a measurement
     // rather than an artefact of an over-wide slice.
     expect(templateFirstDraftSource.slice(atTransition, atTransition + 20)).not.toContain(RAISE)
+    // NEGATIVE CONTROL, STRONGER THAN THE ONE IT REPLACES. The original justified 500 as "far
+    // too narrow to reach another function" — but the next function is 2046 away, so that
+    // clause was true of any window under 2000 and constrained almost nothing. The real
+    // adjacency claim is that the raise sits in the SUCCESS branch beside the transition, so
+    // the binding boundary is the ELSE branch's first statement, 10× closer. Pin that.
+    expect(
+      templateFirstDraftSource.slice(atTransition, atTransition + 900),
+    ).not.toContain("setError" + "State")
     // Exactly one raise, so no second site can hand the page a later state…
     expect(
       templateFirstDraftSource.match(new RegExp(RAISE.replace(/[().]/g, "\\$&"), "g")) ?? [],
