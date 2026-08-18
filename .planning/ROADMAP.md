@@ -40,7 +40,7 @@ the right vocabulary, stop it, and see what it produced.
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
-| 197 | Guided Authoring | 10/11 | In Progress|  |
+| 197 | Guided Authoring | 11/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
@@ -713,7 +713,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6)*
 
-- [ ] 197-11-PLAN.md — Wave 7: the records — three gate pins taken from the gate's own counts, nine hot-file ledger rows RE-DERIVED in one batch pass with `docs/HOT-FILE-LEDGER.md` synced in the same commit, every declared criterion run once more, and every declined decision given a written re-open trigger
+- [x] 197-11-PLAN.md — Wave 7: the records — three gate pins taken from the gate's own counts, nine hot-file ledger rows RE-DERIVED in one batch pass with `docs/HOT-FILE-LEDGER.md` synced in the same commit, every declared criterion run once more, and every declined decision given a written re-open trigger
 
 #### Phase 198: Node Vocabulary (research-first)
 
