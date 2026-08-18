@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T00:00:00.000Z"
+last_updated: "2026-08-18T08:30:00.000Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
@@ -35,13 +35,48 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: **197 (guided-authoring) — CONTEXT GATHERED 2026-08-18** (`20dd4f1c`).
+Phase: **197 (guided-authoring) — SKETCHED 2026-08-18** (`ca9bdc06`).
 Resume file: `.planning/phases/197-guided-authoring/197-CONTEXT.md`
-Status: ⚠ **NOT ready to plan — `/gsd:sketch 197` is OWED first.** `ROADMAP.md:677` flags **G-2**
-for this phase; the guardrail was surfaced before any question was asked and was **not overridden**.
-The discussion deliberately ran first so the sketch has a shape to draw, on the project's own
-precedent (`sketches/MANIFEST.md:514` — *"G-2 sketch, BEFORE plan-phase"*). **Next: `/gsd:sketch 197`,
-then `/gsd:plan-phase 197`.**
+Status: ✅ **G-2 DISCHARGED — sketches 172 + 173 built and committed. ⏸ AWAITING THE OPERATOR'S PICK
+before `/gsd:plan-phase 197`.** `ROADMAP.md:677` flags **G-2**; the guardrail was surfaced before any
+question was asked and was **not overridden**. The discussion deliberately ran first so the sketch had
+a shape to draw, on the project's own precedent (`sketches/MANIFEST.md` — *"G-2 sketch, BEFORE
+plan-phase"*).
+
+- `.planning/sketches/172-where-the-five-decisions-live/` — does the card OWN controls or POINT at
+  the shipped ones? Generated FROM the build; 41 assertions, 0 failing.
+- `.planning/sketches/173-one-row-five-ways/` — the row anatomy across all five D-07 rows; a
+  DRAWING, and it says so; 25 assertions, 0 failing.
+
+### ⚠ What the sketches MEASURED, and which the plan must not re-derive
+
+1. **Three of D-07's five rows already have a control on the drafted view** — `project-folder-picker`
+   and `business-requirement-input` in the header identity strip at **11 px**, plus the shipped
+   `AI-proposed` mark. So D-02's *"two receipts stacked"* is really **a second home for two shipped
+   controls**, against the page's own rule (`kbAffordance` docblock: *"A second, different answer to
+   one question is drift."*).
+2. ⚠ **The drafted header renders the SLUG, so the workflow's NAME appears nowhere at all.** Row 4 is
+   not "no control" — it is **no display**. D-15 leaves the slug alone, so the header would keep
+   showing the slug while a row edits the name: two strings, one invisible.
+3. ⚠ **Row 5 has NO FIELD.** `soulDeliverable()` derives it from a terminal `llm_emit`, so
+   "answering" it means editing a step — which D-03's `builderStore` write path does not express as
+   a row edit. **Price this before planning.**
+4. **A fourth child in the graph column STRANDS the graph** (collapses to 0 px under the
+   `last-child` row pin). Adding a fourth row fixes that and **not** the height: 662 px of chrome
+   leaves the graph 25 px at a 700 px column, unworkable below ~900 px.
+5. Card heights — A **368 px**, B **292 px** answered, C **357 px**; the D-03 limit line costs
+   **30 px**.
+
+**Sketch 174 (*"what dismissal costs"*) was proposed and FOLDED into 172-C**, where the question
+dissolves. **Re-open trigger: 172 lands on A or B.**
+
+⚠ **A CORRECTION TO `197-CONTEXT.md`, absorbed rather than re-opened** (operator's direction). Its
+`<deferred>` lists **BUG-260809-02** as *"(blocking) … NOT closed by this phase."* The report's
+frontmatter reads `status: closed`, `folded_into: quick-260809-klo`,
+`verified_closed_by: live-uat-2026-08-10-local-chrome-devtools-mcp` — and **that quick task shipped
+the very requirement input the sketches render**. D-06's recorded consequence does not exist.
+
+**Next: pick a variant on each sketch, then `/gsd:plan-phase 197`.**
 
 ⚠ **Phase 196 is CLOSED** — see the phase-close ledger below (every phase-scoped item discharged,
 G-4 rows driven, `BUG-260718-04` closed by split). The line that previously stood here read
