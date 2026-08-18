@@ -3,7 +3,7 @@ status: partial
 phase: 197-guided-authoring
 source: [197-VERIFICATION.md, 197-REVIEW.md]
 started: 2026-08-18T15:15:00Z
-updated: 2026-08-18T15:15:00Z
+updated: 2026-08-18T16:05:00Z
 ---
 
 ## Current Test
@@ -63,8 +63,8 @@ the name, not the slug.
 why_human: `197-10` shipped the identity expression that makes this possible; before it, `meta.name`
 appeared in no render position anywhere on the page. Requires driving the real inline-edit
 interaction and observing the rendered result.
-⚠ **See WR-01 below — clearing this field to empty is a KNOWN OPEN DEFECT.** Test the empty case
-deliberately; do not treat a blank library title as a UAT surprise.
+⚠ **Test the EMPTY case deliberately — it was a real defect (WR-01) and is now fixed.** Clearing
+the field must fall back to the slug in the library, never render a blank title. Row 11 covers it.
 result: [pending]
 
 ### 7. U7 — dismissal is an offer, not a wall
@@ -87,20 +87,37 @@ why_human: Visual legibility judgement. Inherits `193.2-09`'s owed sliver, which
 browser-UAT'd.
 result: [pending]
 
+### 10. U-CR01 — the verdict must not tell you to add what you just added
+expected: Draft a workflow that arrives with the requirement verdict showing (*"This workflow has
+no business requirement…"*). Press row 3's own **Change**, type a requirement. The answer updates
+**and the verdict sentence disappears** — it does not sit underneath the requirement you just wrote.
+why_human: Fixed and pinned at both component and page scope, but this is the one a person would
+have caught in a minute and three test suites did not. Worth ten seconds of confirmation.
+result: [pending]
+
+### 11. U-WR01 — clearing the name must not blank the library
+expected: Clear row 4's name field entirely, save, then open the Workflows library. The card shows
+the **slug**, never an empty title, and the builder's edit label reads `Edit · <slug> v<n>` rather
+than `Edit ·  v<n>`.
+why_human: The fix is a display fallback; only looking at the library confirms the card reads right.
+result: [pending]
+
 ## Summary
 
-total: 9
+total: 11
 passed: 0
 issues: 0
-pending: 9
+pending: 11
 skipped: 0
 blocked: 0
 
 ## Gaps
 
-⚠ **Two code-review findings are OPEN and were found AFTER the plans closed** (`197-REVIEW.md`,
-commit `d0ef74fb`). They are recorded here so a UAT session does not rediscover them as surprises,
-and so neither can go quiet:
+⚠ **Two code-review findings were found AFTER all eleven plans closed** (`197-REVIEW.md`, commit
+`d0ef74fb`). **BOTH ARE NOW FIXED**, each RED-first, with the reasoning and the accepted limitations
+recorded beside the code. They are kept here in full — with what was actually wrong, not just that
+something was — because rows 10 and 11 exist to confirm them on screen, and because how each was
+missed is more useful than the patch:
 
 ### CR-01 (Critical) — the readiness verdict goes stale on the one edit the card invites
 `DecisionsList.tsx:180-184` derives the requirement verdict purely from the SNAPSHOT, while the
@@ -115,7 +132,18 @@ requirement, so the card says nothing about a gate that is now about to refuse.
 absence-is-not-a-pass on the WIRE (three good cases) and left it unfenced on the EDIT — the LIVE
 fence and the verdict cases never overlap, because the LIVE case's mock carries no `readiness` key
 at all.
-status: open — routing not yet decided
+status: **FIXED 2026-08-18** — `96a43ebd` (RED) → `f017f08b` (fix). A staleness guard, not a
+second predicate: the verdict is withheld once the live requirement is non-empty.
+⚠ **The inverse arm stays SILENT by decision** with a written re-open trigger — a `present`
+snapshot survives the author *clearing* the requirement, and the card falls silent rather than
+manufacturing a warning it would have to derive. Re-open when a surface needs the card to WARN;
+then re-fetch or recompute server-side.
+⚠ **FOUR SHIPPED CASES WERE RE-SCOPED, and that is the real finding** — three in
+`DecisionsList.test.tsx` and one in `WorkflowBuilderPage.canvas.test.tsx` drove a `missing`
+verdict against a fixture whose requirement was NON-EMPTY, pinning the incoherent state as
+correct. The incoherence propagated from the component fixture to the page fixture, which is how
+the same blind spot came to exist at both levels. Nothing any of them proved was dropped.
+**U-CR01 below is the row that confirms it on screen.**
 
 ### WR-01 (Warning) — clearing the name persists a blank title
 `setName` (`builderStore.ts:823`) writes whatever string it is given, including `""` — no trim, no
@@ -127,4 +155,7 @@ behind `identityLabel`'s slug fallback, but `WorkflowCard.tsx:592` renders `{row
 fallback and `WorkflowsPage.tsx:574`'s `??` misses `""` → `Edit ·  v1`.
 ⚠ **This is a regression this phase introduced** — the write path that can empty the name is new
 (`197-05`). The fix is a display fallback at those two sites, not a client-side trim.
-status: open — routing not yet decided
+status: **FIXED 2026-08-18** — `f0cc6bb4` (RED) → `4e7326c7` (fix). One rule,
+`libraryDisplayName(name, slug)`, consumed by both row constructors and the builder's edit label.
+Fixed where the value is READ, deliberately not by a client-side trim. The false *"the server owns
+emptiness"* docblock is corrected in place with the original named. **U6 covers this on screen.**
