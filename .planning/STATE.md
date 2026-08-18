@@ -36,8 +36,60 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 6 of 9 — **Waves 1, 2 and 3a COMPLETE (196-01…196-06), merged and gated.**
-Next: Wave 3b (`196-07`), then Wave 4 (`196-08`), then Wave 5 (`196-09`).
+Plan: 7 of 9 — **Waves 1, 2, 3a and 3b COMPLETE (196-01…196-07), merged and gated.**
+Next: Wave 4 (`196-08` — the mount, where AUTH-04 first becomes user-observable), then Wave 5 (`196-09`).
+
+### Wave 3b close — 2026-08-17 (`196-07`)
+
+**Gates.** tsc **33** · count gate **OK · total 4277 · failed 0 · pinned 4203 · 89/89** · backend
+**211 failed / 4043 passed** — failures flat at the 211 baseline, passing **+7** = exactly this plan's
+backend cases.
+
+**The G-5-by-reduction claim is PROVEN, not asserted** (measured before/after):
+
+| | pre-Task-2 | post-Task-2 | post-Task-3 |
+|---|---|---|---|
+| `useState[(<]` | **7** | **2** | **2** |
+| `useEffect(` | **4** | **3** | **3** |
+
+⚠ **The third column is the load-bearing one: the FEATURE added no hook to the guarded file.** A naive
+D-18 would have written the restore effect into `ChatArea.tsx` and taken `useEffect` 4→5, failing
+Phase 194.1's own recorded measurement. Gate pins were verified ADDITIVE independently by the
+orchestrator: `git diff cd1690cc HEAD -- scripts/vitest-count-gate.cjs | grep -c '^-[^-]'` → **0**.
+
+**A tsc question was raised and RESOLVED by measurement rather than left ambiguous.** After this merge,
+4 errors appear in `frontend/src/components/chat/__tests__/ChatAreaMode.test.tsx` — a chat file. It is
+**byte-identical to the phase base** (`git diff --stat aa65101d HEAD` → empty; no phase-196 commit
+touched it; an earlier "differs" reading was a **CRLF artifact** of comparing `git show` output against
+a working-tree file). tsc's total has been **exactly 33 at all four phase measurements**, and `196-07`
+could not have removed errors elsewhere to mask new ones (`api.ts` verified error-free at waves 2 and
+3a; `ChatArea.tsx` never in the baseline list; `useComposerModel.ts` is new). **So the 4 sit INSIDE the
+pre-existing 33.** What changed is the MESSAGE: removing `models` from `ChatArea`'s Props means that
+already-stale fixture now fails for a different reason at the same 4 JSX sites — one error per site
+either way. Stale before this phase; part of the recorded baseline rot, not new breakage.
+
+⚠⚠ **A CLAUDE.md CLAIM IS REFUTED BY MEASUREMENT.** `frontend/src/lib/api.ts` measures
+**`170 / 97 / 6154`**. CLAUDE.md calls `backend/app/api/threads.py` at 76 phases *"the hottest file in
+the repository"* — **that is now FALSE.** Even discarding all sixteen ambiguous two-digit buckets
+leaves **81**, still ahead of 76. **`196-09` must CORRECT the sentence in CLAUDE.md, not merely add a
+row.** Also owed there: `settings.py` (16 phases) and a re-derive of `ChatArea.tsx`'s now-stale row.
+
+⚠ **The plan's justification for Task 1 was FACTUALLY WRONG, and the field shipped on different
+grounds with the error named.** The plan asserts a provider's `models` list *"is NOT filtered by
+registry `enabled`"*. **It IS** — `_build_providers` filters `disabled_ids` off the assembled list
+(`user_settings.py:712-713`), and `load_app_settings_async` warms the cache immediately before it runs.
+The field still earns its place (the restore's input is HISTORY, not the offered list, so a membership
+test conflates "disabled" with "not offered here"; and the existing filter is cache-warmth dependent) —
+but left unchallenged that sentence would have been inherited as a measured fact.
+
+**One design call beyond the plan's letter: the restore is a SEED WITH A CLOSING WINDOW** — it fires
+once per thread **and** is closed by any deliberate model/provider choice. Without the second
+condition, a thread with nothing to restore from would have the operator's fresh pick overwritten the
+moment the assistant's reply landed, reintroducing the exact defect class this plan removes.
+
+⛔ **REFRESH IS STILL OWED and `BUG-260718-04` was CORRECTLY LEFT AT `status: folded`, not flipped.**
+The bug's close condition is *"restores across navigate AND refresh"*. Navigate is covered by the
+per-thread re-restore case; **refresh is not provable in jsdom** and is G-4 row **U-C1** for Chrome MCP.
 
 ### Wave 3a close — 2026-08-17 (`196-05` + `196-06`)
 

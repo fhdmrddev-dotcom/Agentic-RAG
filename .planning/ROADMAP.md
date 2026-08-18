@@ -39,7 +39,7 @@ the right vocabulary, stop it, and see what it produced.
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
-| 196 | Registry-Backed Model Picker (canvas) | 6/9 | In Progress|  |
+| 196 | Registry-Backed Model Picker (canvas) | 7/9 | In Progress|  |
 | 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
@@ -659,7 +659,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 196-07-PLAN.md — Wave 4: the composer restore (D-18, `BUG-260718-04`) — derived from the thread's last run-backed message, provider restored first; G-5 honoured by REDUCTION via `useComposerModel` (`useState` 7→2, `useEffect` 4→3)
+- [x] 196-07-PLAN.md — Wave 4: the composer restore (D-18, `BUG-260718-04`) — derived from the thread's last run-backed message, provider restored first; G-5 honoured by REDUCTION via `useComposerModel` (`useState` 7→2, `useEffect` 4→3)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
