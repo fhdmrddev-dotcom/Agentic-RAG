@@ -537,10 +537,35 @@ def test_concurrency_token_sql_still_renders_from_to_char():
 
 
 def test_draft_select_keeps_the_token_alias_alongside_the_new_column():
-    """Both, on one row: ``… AS token, updated_at``. Not one derived from the other."""
+    """Both, on one row: ``… AS token, updated_at``. Not one derived from the other.
+
+    ⚠ AMENDED 2026-08-19 (Phase 192.2 / LIB-06, D-07) — RECORDED BESIDE THE ORIGINAL RATHER
+    THAN OVER IT, because the needle was not wrong so much as OVER-SPECIFIED, and the
+    distinction is what keeps this from reading as a fence being argued away. It was:
+
+        assert "AS token, updated_at " in source
+
+    ⚠ **The load-bearing character was the TRAILING SPACE**, which pinned that ``updated_at``
+    was the LAST column of the drafts SELECT — a property this test never claimed and never
+    needed. Phase 192.2 appends ``lr.last_run_at, lr.last_run_status`` to that same
+    projection, so the line now reads ``… AS token, updated_at,`` and the shipped needle went
+    red against a tree where **the property it names is perfectly intact**. That is the
+    187-24 trap in its other form: a needle judging one character more than its own sentence.
+
+    The needle is narrowed to the adjacency it actually asserts. It still fails if ``token``
+    and ``updated_at`` stop being two independently-projected columns on one row, which is
+    D-16's whole point (``token`` is ``to_char(updated_at …)`` in disguise and the cheap move
+    is to parse it — forbidden, because Postgres keeps microseconds and a JS ``Date`` keeps
+    milliseconds, so a re-rendered token matches ZERO rows). The behavioural half of that
+    property is pinned independently by
+    ``test_draft_updated_at_is_not_parsed_out_of_the_token`` directly below, which no
+    projection edit can satisfy by accident.
+    """
     source = _draft_source()
 
-    assert "AS token, updated_at " in source
+    assert "AS token, updated_at" in source
+    # NON-VACUITY — the needle must still catch the collapse it exists to forbid.
+    assert "AS token, updated_at" not in "SELECT id, to_char(updated_at) AS token FROM t"
 
 
 async def test_draft_updated_at_is_not_parsed_out_of_the_token(monkeypatch):

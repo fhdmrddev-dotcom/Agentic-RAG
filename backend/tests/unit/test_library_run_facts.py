@@ -81,8 +81,10 @@ the local pool (CLAUDE.md § Parallel execution, rule 4).
 
 from __future__ import annotations
 
+import ast
 import inspect
 import os
+import textwrap
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -430,6 +432,53 @@ def _draft_source() -> str:
     return inspect.getsource(db.list_draft_workflows)
 
 
+def _code_only(source: str) -> str:
+    """The executable half of an ``inspect.getsource`` blob — comments and docstring removed.
+
+    ⚠ THIS EXISTS BECAUSE THE ABSENCE NEEDLES BELOW WERE MEASURED WRONG WITHOUT IT, and the
+    trap is this repository's own recorded one (the "187-24 trap"): a module that DOCUMENTS a
+    clause reds a raw grep for it. ``list_starter_workflows``' docblock QUOTES
+    ``ORDER BY updated_at DESC`` while explaining why THIS feed deliberately does not use it,
+    so ``"ORDER BY updated_at" not in _starter_source()`` fails against a perfectly correct
+    tree. ``test_workflows_updated_at`` strips for the identical reason and says so.
+
+    Parsed rather than regexed: ``ast`` cannot mistake a ``#`` inside a SQL string literal for
+    a comment, and ``ast.unparse`` re-emits only the tree. ⚠ It also does NOT expand
+    ``_LAST_RUN_LATERAL_SQL`` — a NAME stays a name — which is exactly why the shared-constant
+    fences read the constant itself rather than a function's source.
+    """
+    tree = ast.parse(textwrap.dedent(source))
+    fn = tree.body[0]
+    body = getattr(fn, "body", [])
+    if (
+        body
+        and isinstance(body[0], ast.Expr)
+        and isinstance(body[0].value, ast.Constant)
+        and isinstance(body[0].value.value, str)
+    ):
+        fn.body = body[1:]
+    return ast.unparse(tree)
+
+
+def test_the_code_stripper_keeps_the_query_and_drops_the_prose():
+    """NON-VACUITY FOR THE STRIPPER ITSELF — without this, the fences it feeds could pass by
+    reading "". The pairing is the point: ``LIB-06`` is written into the feeds as a COMMENT,
+    so it must be visible raw and invisible stripped, while the query text does the reverse.
+    """
+    for accessor, needle in (
+        (_published_source, "list_published_workflows"),
+        (_starter_source, "list_starter_workflows"),
+        (_draft_source, "list_draft_workflows"),
+    ):
+        source = accessor()
+        code = _code_only(source)
+
+        assert needle in code, f"the stripper ate the function itself: {needle}"
+        assert "SELECT id, slug" in code, needle
+        assert "LIB-06" in source, needle
+        assert "LIB-06" not in code, f"the stripper left prose behind: {needle}"
+
+
 def test_all_three_feeds_project_both_run_facts():
     """The dropped-column guard. A projection that loses a column leaves every card blank."""
     for name, source in (
@@ -597,8 +646,12 @@ def test_the_starters_shelf_ordering_is_untouched():
     all. A needle that passes for a reason its author did not intend is worth re-stating
     explicitly, so this asserts the property directly: the SHELF clause is ``ORDER BY name``,
     and the lateral's ordering is over the RUN's key, never the shelf's.
+
+    ⚠ The absence half reads the STRIPPED source, because this feed's docblock QUOTES
+    ``ORDER BY updated_at DESC`` while explaining why it does not use it — the 187-24 trap,
+    measured red here before it was scoped.
     """
-    starter = _starter_source()
+    starter = _code_only(_starter_source())
 
     assert "ORDER BY name" in starter
     assert "ORDER BY updated_at" not in starter
@@ -611,12 +664,27 @@ def test_no_migration_was_added_by_this_phase():
 
     ``workflow_runs`` already holds every byte this phase reads. The fence is mechanical: the
     lateral is a pure SELECT, and neither feed module learned a write.
+
+    ⚠ The needles are STATEMENT HEADS, not bare verbs, and that scoping was measured rather
+    than reasoned: a bare ``"CREATE"`` needle fires on ``r.created_at`` and reds a correct
+    tree. A needle that cannot tell a column name from a DDL verb is judging spelling.
     """
     from app.db import workflows as db
 
     lateral = _lateral()
-    for verb in ("INSERT", "UPDATE", "DELETE", "ALTER", "CREATE"):
-        assert verb not in lateral.upper(), verb
+    for statement_head in (
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+        "ALTER TABLE",
+        "CREATE TABLE",
+        "CREATE INDEX",
+        "DROP ",
+    ):
+        assert statement_head not in lateral.upper(), statement_head
+    # POSITIVE CONTROL — the needles really do catch what they judge.
+    assert "CREATE INDEX" in "CREATE INDEX idx ON workflow_runs (definition_id)".upper()
+    assert lateral.upper().startswith("LEFT JOIN LATERAL (SELECT ")
 
     module_source = inspect.getsource(db)
     assert "ALTER TABLE workflow_runs" not in module_source

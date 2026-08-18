@@ -94,6 +94,80 @@ CONCURRENCY_TOKEN_SQL = (
     "to_char(updated_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"')"
 )
 
+# ── Phase 192.2 (LIB-06 / D-07) — the LAST-RUN LATERAL, in ONE place ─────────────────
+#
+# LIB-06's question is *does this one work*, and the answer already exists: measured against
+# the live local DB on 2026-08-19, ``workflow_runs`` holds **228 rows** (186 completed / 31
+# failed / 11 cancelled) across **48 distinct definitions**, and **all 228 carry a non-NULL
+# ``user_id``**. ⚠ NO MIGRATION, NO NEW COLUMN, NO NEW WRITE — the three library feeds simply
+# never read the table. This constant is the whole of the read.
+#
+# ⚠ ``LEFT``, AND ``LATERAL``, AND BOTH WORDS ARE LOAD-BEARING FOR A MEASURED REASON.
+#   • ``LEFT`` — 69% of the library (81 of 117 real rows) is drafts and only 48 definitions
+#     have ANY run, so an INNER join would silently HIDE most of the library. The card would
+#     answer "does this one work" by deleting everything that has not been tried.
+#   • ``LATERAL … LIMIT 1`` — one row per definition. A plain join to ``workflow_runs``
+#     multiplies rows by run count, and the live data makes that concrete rather than
+#     theoretical: one definition carries **24** runs, another **22**, another **20**. The
+#     library would render those workflows 24, 22 and 20 times.
+#
+# ⚠ THE SCOPE CLAUSE ``r.user_id = $1`` IS THE SECURITY BOUNDARY OF THIS JOIN, NOT A FILTER.
+# These feeds run on a service-role pool that BYPASSES RLS, so whatever the SQL returns is
+# what the caller gets — the mig-116 / CR-01 shape Phase 190's review caught. A GLOBAL
+# published row (``is_system_global``) is world-readable, and five of them carry 20 / 15 / 11
+# / 7 / 1 real runs belonging to ONE user; an UNSCOPED lateral would hand every other caller
+# that activity. Scoping by ``user_id`` is strictly NARROWER than scoping by ``org_id`` — a
+# user belongs to one org — so the cross-ORG case is excluded by construction rather than by
+# a second clause that could later be edited away. ⚠ A legacy run with a NULL ``user_id`` is
+# attributed to NOBODY (``NULL = $1`` is not true): fail-closed, never fail-open.
+#
+# ⚠ IT BINDS ``$1`` AND NEVER A NEW PLACEHOLDER. All three feeds ALREADY bind the caller as
+# ``$1``, so the join introduces no binding and cannot renumber the published feed's ``$2``
+# project filter. No f-string, no ``%``, no user input reaches this text (T-192.2-12).
+#
+# ⚠ THE OUTPUT COLUMNS ARE RENAMED AT THE SUBQUERY BOUNDARY, AND THAT IS NOT COSMETIC.
+# ``workflow_runs`` has ``id``, ``status`` AND ``updated_at``, and the outer queries carry all
+# three BARE — ``WHERE status = 'published'``, ``ORDER BY updated_at DESC, id DESC``. Exposing
+# them under their own names would make every one of those clauses AMBIGUOUS and each feed
+# would raise. ``AS last_run_at`` / ``AS last_run_status`` is what keeps the shipped WHERE and
+# ORDER BY byte-identical.
+#
+# ⚠ THE ORDER KEY IS THE RUN'S OWN ``created_at``, NEVER the definition's ``updated_at`` —
+# those are different facts and this phase must not conflate them (on a published definition
+# ``updated_at`` is the PUBLISH time, deliberately, because the row is immutable afterwards).
+# The ``, r.id DESC`` tiebreaker is the review-WR-03 lesson applied PROSPECTIVELY rather than
+# defensively: measured 2026-08-19 there are **0** ``(definition_id, created_at)`` collisions
+# in all 228 rows, so this fixes no observed reshuffle — it refuses to depend on a uniqueness
+# nothing enforces, since ``now()`` is transaction-scoped. ``workflow_runs.id`` is the PRIMARY
+# KEY, so the order is total.
+#
+# ⚠ ONE CONSTANT, NOT THREE COPIES, and the second reason is stated rather than left to be
+# discovered. The first reason is the obvious one — three feeds must agree on the ``lr.*``
+# aliases or a projection references a column its own join does not expose. The second:
+# ``test_workflows_updated_at`` reads ``inspect.getsource(list_starter_workflows)`` and
+# asserts ``"id DESC" not in`` it, to pin that the STARTERS SHELF stays alphabetical (D-16).
+# A lateral inlined there would red that fence with a SUBQUERY's ordering, which is not the
+# shelf's ordering — the 187-24 trap, a needle judging something it was never written to
+# judge. Keeping the join here leaves that fence judging exactly its own property, and
+# ``test_library_run_facts.test_the_starters_shelf_ordering_is_untouched`` re-pins the shelf
+# clause AND this constant's ordering so neither goes unguarded.
+#
+# NO INDEX, NO MIGRATION, and the evidence rather than the assurance: ``workflow_runs`` is
+# **228 rows** and already carries ``idx_workflow_runs_user_id``, which is the selective half
+# of this predicate (one user owns all 228 today, but the index is what the planner reaches
+# for as that changes). There is no index on ``definition_id`` and none is added — the
+# precedent is recorded in ``list_published_workflows``' own docstring: "NO expression index,
+# ZERO migration … sufficient at current scale". Re-open at ~10k runs.
+_LAST_RUN_LATERAL_SQL = (
+    "LEFT JOIN LATERAL ("
+    "SELECT r.created_at AS last_run_at, r.status AS last_run_status "
+    "FROM workflow_runs r "
+    "WHERE r.definition_id = wd.id AND r.user_id = $1 "
+    "ORDER BY r.created_at DESC, r.id DESC "
+    "LIMIT 1"
+    ") lr ON TRUE "
+)
+
 # harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
 # kinds → 16; migration 070 = +6 judge/publish/policy/ask_user-approval kinds → 22;
 # migration 114 = +1 armed action-risk pause kind → 23; migration 117 = +1 send-receipt
@@ -285,9 +359,24 @@ async def list_published_workflows(
         # ADDITIVE column on an existing NOT NULL field (full-schema.sql:1941) kept fresh
         # by the ``workflow_definitions_set_updated_at`` trigger — no migration, no new
         # column, and not one byte of the WHERE / ORDER BY / $N binding below is touched.
+        #
+        # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` join that SAME
+        # projection, and THE SENTENCE ABOVE APPLIES VERBATIM ONCE MORE — the projection
+        # widens; the predicate does NOT. The data is 228 rows that already exist in
+        # ``workflow_runs``, so there is no migration, no new column and no new write here
+        # either; what is new is only that the feed finally READS them.
+        # ⚠ The one thing 192.1's sentence does NOT cover, because ``updated_at`` needed no
+        # join at all: this arrives through ``_LAST_RUN_LATERAL_SQL``, and a JOIN is the one
+        # edit that can move rows INTO a result set. It is ``LEFT`` so never-run rows survive
+        # and ``LATERAL … LIMIT 1`` so no row multiplies, it reuses the ``$1`` bound below
+        # rather than adding a placeholder, and it is owner-scoped so a world-readable global
+        # row cannot leak another caller's activity. The full argument is on the constant.
         sql = (
-            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
-            "WHERE status = 'published' AND created_by = $1"
+            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
+            "lr.last_run_at, lr.last_run_status "
+            "FROM workflow_definitions wd "
+            + _LAST_RUN_LATERAL_SQL
+            + "WHERE status = 'published' AND created_by = $1"
         )
     else:
         sql = (
@@ -306,8 +395,19 @@ async def list_published_workflows(
             # projection widens; the predicate does NOT — this branch's
             # ``(is_system_global = true OR created_by = $1)`` is byte-identical to what
             # shipped, and ``test_dual_mode_wiring.py:256`` asserts that exact substring.
-            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
-            "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
+            #
+            # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` join it too,
+            # through the shared ``_LAST_RUN_LATERAL_SQL``. ⚠ THIS BRANCH IS THE ONE WHERE THE
+            # OWNER-SCOPE ON THE LATERAL EARNS ITS KEEP: it is the branch that returns
+            # ``is_system_global`` rows to EVERY caller, and five of those globals carry
+            # 20 / 15 / 11 / 7 / 1 real runs belonging to ONE user. An unscoped lateral here
+            # would be a cross-tenant read of run activity on a world-readable row. The
+            # predicate itself is still byte-identical, and the join adds columns only.
+            "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
+            "lr.last_run_at, lr.last_run_status "
+            "FROM workflow_definitions wd "
+            + _LAST_RUN_LATERAL_SQL
+            + "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
     params: list = [user_id]
     if project_folder_id is not None:
@@ -399,7 +499,9 @@ async def list_published_workflows(
     return [dict(r) for r in rows]
 
 
-async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
+async def list_starter_workflows(
+    pool: asyncpg.Pool, *, user_id: UUID | None = None
+) -> list[dict]:
     """Curated global starters — the Starters shelf feed (Phase 143 / WF-01, D-143-2).
 
     Returns the ``status='published' AND is_system_global=true`` definitions carrying the
@@ -416,6 +518,24 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     T-091-03) applies only to user-supplied values, of which this query has none
     (V5 — no injection surface). Returns the id/slug/name/definition the shelf card
     needs (mirrors ``list_published_workflows``' additive ``definition`` column).
+
+    ⚠ THE KEYWORD-ONLY ``user_id`` (Phase 192.2 / LIB-06, D-07) IS NOT A SCOPE ON THE SHELF —
+    IT IS THE SCOPE ON THE RUN FACTS, and the distinction is the whole security argument for
+    this signature change. The shelf's own three-clause predicate is untouched and still
+    returns the SAME curated globals to every caller; the id is bound as ``$1`` and consumed
+    ONLY inside ``_LAST_RUN_LATERAL_SQL``, so it decides whose ``last_run_at`` /
+    ``last_run_status`` this caller sees on a row everybody can see. The Starters shelf needs
+    it for the reason RESEARCH C-6 records: ``PublishedWorkflow`` is ONE model serving TWO
+    feeds, so a field added for ``/published`` and not mirrored here leaves every starter card
+    silently missing its run facts while the type says it has them (192.1 hit this exact trap
+    with ``updated_at``). Measured 2026-08-19: the live shelf is 3 rows, exactly ONE of which
+    has ever been run — both arms are real.
+
+    ⚠ DEFAULTED TO ``None``, AND THAT DEFAULT IS FAIL-CLOSED RATHER THAN CONVENIENT. With no
+    id the bind is SQL NULL, ``r.user_id = $1`` is never true, and every row comes back with
+    both facts NULL — "we do not know", never "everyone's runs". The default exists so the
+    shipped positional call ``list_starter_workflows(pool)`` (``test_starter_workflows.py``)
+    stays valid; it can only ever REMOVE information.
     """
     # Phase 192 (LIB-01 / D-04): ``created_by`` + ``is_system_global`` are projected FOR
     # SERVER-SIDE COMPUTATION ONLY — ``get_starter_workflows`` computes ``is_mine`` from the
@@ -449,11 +569,25 @@ async def list_starter_workflows(pool: asyncpg.Pool) -> list[dict]:
     # NOTHING ELSE MOVES: the three-clause ``WHERE`` and the whole projection are still
     # byte-identical to what shipped (this pool bypasses RLS, so that predicate is the access
     # boundary), and no migration is added — there is no index on ``name`` and never was.
+    #
+    # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` join that projection
+    # via the shared ``_LAST_RUN_LATERAL_SQL``. ⚠ NOTHING ABOUT THE SHELF ITSELF MOVES — the
+    # three-clause WHERE is byte-identical, ``ORDER BY name`` is byte-identical (D-16's
+    # divergence stands), and the ``$1`` bound below is read ONLY by the lateral. It is the
+    # ONE constant on purpose: a lateral inlined here would carry ``id DESC`` into this
+    # function's source and red ``test_workflows_updated_at``'s alphabetical-shelf fence with
+    # a SUBQUERY's ordering, which is not this shelf's ordering. See the constant's own
+    # comment; ``test_library_run_facts.test_the_starters_shelf_ordering_is_untouched``
+    # re-pins both halves so neither is left to that coincidence.
     rows = await pool.fetch(
-        "SELECT id, slug, name, definition, created_by, is_system_global, updated_at FROM workflow_definitions "
-        "WHERE status = 'published' AND is_system_global = true "
+        "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
+        "lr.last_run_at, lr.last_run_status "
+        "FROM workflow_definitions wd "
+        + _LAST_RUN_LATERAL_SQL
+        + "WHERE status = 'published' AND is_system_global = true "
         "AND definition->>'category' = 'starter' "
-        "ORDER BY name"
+        "ORDER BY name",
+        user_id,
     )
     return [dict(r) for r in rows]
 
@@ -698,9 +832,30 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # runs agree. ⚠ And note again what is NOT used as the tiebreaker: ``token`` on this
         # very row is ``updated_at`` in disguise, so it would break ties by the same field
         # that created them — ``id`` is the only column here that is unique by construction.
-        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at "
-        f"FROM workflow_definitions "
-        f"WHERE status = 'draft' AND created_by = $1 "
+        #
+        # ── Phase 192.2 (LIB-06 / D-07) — the run facts join this projection too ──────
+        #
+        # ⚠ A DRAFT CAN HAVE RUNS, AND THAT IS THE POINT RATHER THAN AN EDGE CASE. The
+        # publish gauntlet's GOLDEN RUN is a real ``workflow_runs`` row against a draft, and
+        # the live DB carries drafts with 3, 2 and 2 of them. "Your test run failed" is
+        # exactly the answer LIB-06 asks the library to give, so no ``is_golden_run`` filter
+        # is applied — a golden run IS a run of this draft.
+        #
+        # ⚠ AND NOTE WHICH COLUMN IS **NOT** BEING REUSED, because this function already
+        # carries the identical trap twice above. ``token`` is ``updated_at`` in disguise and
+        # ``updated_at`` is the DRAFT's edit time — neither is a run time, and a card that
+        # showed "changed 2 minutes ago" as "ran 2 minutes ago" would be lying about the one
+        # fact this phase exists to tell the truth about. ``last_run_at`` is the RUN's own
+        # ``created_at``, from a different table.
+        #
+        # The owner scope below is untouched and the lateral is scoped to the SAME ``$1``, so
+        # this feed's answer cannot widen: a caller sees their own drafts and their own runs
+        # of them, exactly as before plus two columns.
+        f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at, "
+        f"lr.last_run_at, lr.last_run_status "
+        f"FROM workflow_definitions wd "
+        + _LAST_RUN_LATERAL_SQL
+        + f"WHERE status = 'draft' AND created_by = $1 "
         f"ORDER BY updated_at DESC, id DESC",
         user_id,
     )
