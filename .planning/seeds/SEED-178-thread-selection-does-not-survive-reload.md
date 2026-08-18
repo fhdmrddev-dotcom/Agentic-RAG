@@ -6,6 +6,12 @@ planted_during: Phase 196 verification (G-4 row U-C1, driven live with Chrome De
 status: planted
 priority: medium
 relates_to:
+  - SEED-185 — ⚠ **THE ROOT. This seed is the THREAD-SHAPED INSTANCE of an app-wide gap.** Measured
+    2026-08-18: the frontend has NO router at all — no react-router dependency, no <Routes>, no
+    pushState anywhere; `App.tsx:126` is a single `useState<ActiveView>` over TWELVE views, none of
+    them addressable. "No per-thread URL" is not a chat defect; it is that there are no URLs.
+    ⚠ Fixing this seed alone would give threads a URL and leave workflows, runs, documents and the
+    control room with the same hole. Close them together.
   - BUG-260718-04 — the report this seed was SPLIT OUT OF. Its navigate half is closed by Phase 196;
     this seed carries the refresh half, which was never a model-selection defect at all.
   - Phase 196 D-18 / plan 196-07 — `frontend/src/hooks/useComposerModel.ts`, the restore this seed
