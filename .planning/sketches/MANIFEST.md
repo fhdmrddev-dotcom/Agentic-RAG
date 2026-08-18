@@ -2203,3 +2203,65 @@ collapsed-by-default**, and if 172-C wins, this is what it should be built as.
 Everything on 174 except the decisions line is the **real rendered DOM** — header, receipt, view
 toggle and the whole 5-step spine graph — so it looks like the product rather than like a drawing.
 14 assertions, 0 failing.
+
+### ⚠ 174 WAS REBUILT THE SAME HOUR — the operator caught the real defect
+
+The first cut of 174 drew **two cards**: the shipped receipt (*"Here's what I built — 5 steps"*)
+and a new one (*"I made 5 decisions for you"*), with the second collapsed to one line. The
+operator's response, recorded verbatim because it is the correct reading and the sketch had missed
+it:
+
+> *"you produce two cards … this means the spine [gets] a limited area … the area is very tight,
+> with exception of the one version where I can collapse … we always have to think about not
+> over-complicating the information … information should not be dense but be enough for the user to
+> know what is happening."*
+
+**Both cards say the same kind of thing — here is what the AI just did.** Splitting one thought
+across two frames spends the graph's space on chrome, and collapsing the second one only hides that.
+Collapsing was treating a symptom.
+
+**The shape is now ONE card**: the receipt's own heading, two openable lines, the receipt's own
+closing sentence.
+
+```
+Here's what I built — 5 steps                                    ✕
+  ▸ 3 steps must prove their sources                          why
+  ▸ 5 decisions I made for you                             review
+Everything else is yours to change. Nothing is saved or published yet.
+```
+
+Measured on 174's own page, in a 780 px screen:
+
+| | arrival chrome | the workflow gets |
+|---|---|---|
+| **one card, just landed** | **149 px** | **507 px — 65%** |
+| one card, decisions opened | 334 px | 321 px — 41% |
+| two cards, just landed | 284 px | 363 px — 47% |
+| two cards, opened | 478 px | 169 px — **22%** |
+
+**Merging halves the arrival chrome and hands the workflow 65% of the screen instead of 47%.**
+
+### ⚠ ONE CARD IS A COMPOSITION CHANGE, NOT A CHARTER CHANGE — D-02 SURVIVES INTACT
+
+This is the distinction a plan must not blur. `197-CONTEXT.md` D-02 refuses to widen `SeedReceipt`,
+and correctly — its docblock is fenced (*"authors no sentence of its own"*, *"declares no predicate
+of its own"*, *"imports nothing from the API client"*), and widening its charter costs exactly the
+guarantees that make it checkable.
+
+**Nothing in this shape widens it.** `SeedReceipt` stays the leaf it is; a **PARENT** composes its
+output and the decisions list into one visual card. **One card in the UI, two components
+underneath** — which is what D-02 asked for and what the operator asked for, at the same time.
+
+### The standing principle this session added
+
+> *"Information should not be dense, but enough for the user to know what is happening and how to
+> think."*
+
+Applied here as: **the collapsed state still states both facts** (`3 steps must prove their
+sources`, `5 decisions I made for you`) rather than hiding behind a bare *"details"* — a count and a
+fact per line, never a wall, and never a mystery either. Carry it into 197's copy review.
+
+⚠ **A method note for future sketches.** 172 and 173 are correct and are where the reasoning is
+checkable — but **a sketch whose job is to let someone judge a screen has failed if the screen is
+the smallest thing on the page.** 174 exists because that was true of both. Keep the analysis page,
+but ship a picture beside it.

@@ -1,16 +1,16 @@
 ---
 sketch: 174
 name: the-line-that-opens
-question: "What does the decisions surface actually LOOK like on the screen — and which shape leaves the workflow visible?"
+question: "What does the arrival moment LOOK like — and should 'here's what I built' and 'here's what I decided' be one card or two?"
 winner: null
-tags: [phase-197, auth-02, guided-authoring, decisions-surface, recommendation, user-facing-mockup, g2-sketch-gate]
+tags: [phase-197, auth-02, guided-authoring, decisions-surface, recommendation, one-card, user-facing-mockup, g2-sketch-gate]
 ---
 
-# Sketch 174: The line that opens
+# Sketch 174: One card, not two
 
-**This is the picture.** Sketches 172 and 173 work out *which shape is right and how we know*;
-this page shows only what you'd see. It exists because the operator said 172/173 carried a lot of
-information but did not show what the thing looks like — a fair read, and this is the fix.
+**This is the picture.** Sketches 172 and 173 work out *which shape is right and how we know*; this
+page shows only what you would see. It exists because the operator said 172/173 carried a lot of
+information but did not show what the thing looks like — a fair read.
 
 ## How to view
 
@@ -18,58 +18,85 @@ information but did not show what the thing looks like — a fair read, and this
 start .planning/sketches/174-the-line-that-opens/index.html
 ```
 
-Three tabs: **1 · The draft just landed** · **2 · You opened it** · **3 · If it were a full card
-instead**. The line really opens, and pressing *Change* on a row really lights up the control in
-the header. The screen is resizable from its bottom edge.
+Four tabs: **1 · One card, just landed** · **2 · Opened the decisions** · **3 · Two cards (what I
+drew first)** · **4 · Two cards, opened**. Every fold really opens; pressing *Change* on a row really
+lights up the control in the header. The screen is resizable from its bottom edge.
 
-Verified at 1440×900: no horizontal scroll, all three screens render the real 5-step spine, the
-disclosure opens and closes, and the jump focuses `business-requirement-input`. One console message,
-benign and inherited: the `file:` unique-origin notice (sketch 165 recorded the same).
+Verified at 1440×900: no horizontal scroll, all four screens render the real 5-step spine, both folds
+open and close, the jump focuses `project-folder-picker` and `business-requirement-input`, and the
+measurement recomputes on every fold. One console message, benign and inherited: the `file:`
+unique-origin notice.
 
-## The shape
+## ⚠ The operator caught the real defect, and it changed the recommendation
 
-The draft arrives exactly as it does today. Under the receipt there is **one line** — *"I made 5
-decisions for you"* — that opens into the five when you want it. Each row shows the decision, the
-answer the AI chose, and takes you to the control **already on the screen**.
+The first cut of this page drew **two cards**: the shipped receipt (*"Here's what I built — 5
+steps"*) and a new one (*"I made 5 decisions for you"*). Recorded verbatim, because it is correct:
 
-- **Nothing is duplicated.** Three of the five decisions already have a control (the knowledge base
-  and the requirement in the header, the template in the step panel). The line points at them
-  instead of growing a second copy — the page's own rule is *"a second, different answer to one
-  question is drift."*
-- **Nothing new blocks you.** It is closed when it arrives and it never gates anything, so the fast
-  door stays exactly as fast (the D-05 red line).
-- **The workflow stays visible.** That is the measured part, below.
+> *"you produce two cards … this means the spine [gets] a limited area … the area is very tight,
+> with exception of the one version where I can collapse … we always have to think about not
+> over-complicating the information … information should not be dense but be enough for the user to
+> know what is happening."*
 
-## Why this shape and not a card — measured on this page
+**Both cards say the same kind of thing — here is what the AI just did.** Splitting one thought
+across two frames spends the graph's space on chrome, and collapsing the second one only hides that.
 
-| | the decisions element takes | the workflow graph gets |
+So the shape is now **one card** with the receipt's own heading, two openable lines, and the
+receipt's own closing sentence:
+
+```
+Here's what I built — 5 steps                                    ✕
+  ▸ 3 steps must prove their sources                          why
+  ▸ 5 decisions I made for you                             review
+Everything else is yours to change. Nothing is saved or published yet.
+```
+
+Four lines. Open either one when you want it. Each decision hands you to the control **already on
+the screen** — nothing is duplicated.
+
+## Measured on this page, in a 780 px screen
+
+| | arrival chrome | your workflow gets |
 |---|---|---|
-| **1 · just landed** (one line) | **41 px** | **363 px** |
-| **2 · you opened it** | 237 px | 167 px |
-| **3 · a full card instead** | 276 px | **128 px** |
+| **1 · one card, just landed** | **149 px** | **507 px — 65%** |
+| 2 · one card, decisions opened | 334 px | 321 px — 41% |
+| 3 · two cards, just landed | 284 px | 363 px — 47% |
+| 4 · two cards, opened | 478 px | 169 px — **22%** |
 
-In a 780 px screen. Sketch 172 measured the same thing harder: with a full always-open card the
-graph gets **25 px at a 700 px column** and is not workable below ~900 px — so on a laptop, a second
-card doesn't shrink your workflow, it hides it. The collapsed line costs **41 px** instead of ~370,
-and the tall state only happens **because you asked for it**.
+**Merging halves the arrival chrome** (284 → 149 px) and hands the workflow **65% of the screen
+instead of 47%**. The tall state only ever happens because you asked for it.
+
+Sketch 172 measured the same thing harder from the other end: a full always-open card leaves the
+graph **25 px at a 700 px column**, unworkable below ~900 px.
+
+## ⚠ This is a COMPOSITION change, not a charter change — it does not violate D-02
+
+`197-CONTEXT.md` D-02 refuses to widen `SeedReceipt`, and correctly: its docblock is fenced
+(*"authors no sentence of its own"*, *"declares no predicate of its own"*, *"imports nothing from the
+API client"*) and widening its charter would cost exactly the guarantees that make it checkable.
+
+**Nothing here widens it.** `SeedReceipt` stays the leaf it is; a **parent** composes its output and
+the decisions list into one visual card. **One card in the UI, two components underneath** — which is
+what D-02 asked for and what the operator is asking for at the same time.
 
 ## What is real here
 
-Everything except the decisions line: the header (with its knowledge-base picker, requirement input
-and the shipped `AI-proposed` mark), the receipt, the view toggle, and **the whole step graph** are
-the real rendered DOM from the running code, dumped by sketch 172's emitter. That is what makes this
-look like the product rather than a drawing of it. The decisions line is the only proposal.
+The header (knowledge-base picker, requirement input, the shipped `AI-proposed` mark), the view
+toggle, the whole 5-step spine graph, and **the receipt's heading, its two sentences, its three
+sealed-step rows and its closing line** are the real rendered DOM from the running code. The receipt
+is **re-framed, not rewritten** — each fragment is extracted by its own `data-testid` and the
+extraction is asserted piece by piece, so a lost fragment fails the build instead of quietly
+vanishing from the card. `build.cjs`: **26 assertions, 0 failing**, including that the recommended
+screen contains **exactly one** arrival card.
 
-Every product sentence is parsed out of that dump, never re-typed. `build.cjs` asserts it — 14
-assertions, 0 failing.
+The only proposals are the two fold summary lines and the five decision rows.
 
 ## Two things it does not settle
 
 1. **Row 4 (name)** — the header shows the workflow's *slug*, so its **name appears nowhere** today.
-   This row would be the first place it shows at all, which is a small scope addition worth agreeing
-   deliberately.
-2. **Row 5 (deliverable)** has no field — it is derived from the last step, so it reads as a fact
-   with no *Change* link. Making it editable is a bigger change than the other four.
+   This row would be the first place it shows at all. A small scope addition worth agreeing
+   deliberately rather than inheriting.
+2. **Row 5 (deliverable)** has no field — it is derived from the last step, so it reads as a fact with
+   no *Change* link. Making it editable is a bigger change than the other four.
 
 ## Reproduce
 

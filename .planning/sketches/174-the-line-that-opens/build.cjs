@@ -1,27 +1,40 @@
 #!/usr/bin/env node
 /**
- * SKETCH 174 — THE RECOMMENDATION, DRAWN AS A SCREEN.
+ * SKETCH 174 — THE ARRIVAL MOMENT, DRAWN AS A SCREEN.
  *
  * ── WHY THIS PAGE EXISTS (operator, 2026-08-18) ──
- * Sketches 172 and 173 are analysis pages: tables, provenance contracts, measurement
- * readouts, three stages per tab. The operator's words: *"included a lot of information
- * and for me this was not — it represents what the king looks like. I need the
- * user-friendly version, but the control that does not break the workflow."*
+ * 172 and 173 are analysis pages: tables, provenance contracts, measurement readouts.
+ * The operator's read was that they *"included a lot of information"* and did not
+ * *"represent what the thing looks like"* — a request for the user-friendly version with
+ * **the control that does not break the workflow.** This page is the picture.
  *
- * That is a fair read. 172 and 173 answer "which shape is right and how do we know";
- * they do not show anyone what the product looks like. **This page shows only the
- * screen.** All of the reasoning stays where it belongs — in the two READMEs — and
- * nothing here is a table.
+ * ── AND THEN THE OPERATOR CAUGHT THE REAL DEFECT, WHICH THIS FILE NOW ANSWERS ──
+ * The first cut of this page drew **two cards**: the shipped receipt (*"Here's what I
+ * built — 5 steps"*) and a new one (*"I made 5 decisions for you"*). Their observation,
+ * recorded because it is the correct one:
  *
- * ── AND IT IS ALSO THE ANSWER TO 172's OWN MEASUREMENT ──
- * 172 measured that a second full card leaves the canvas 25 px at a 700 px column. All
- * three of its variants stack a ~370 px card above the graph, so all three pay that. The
- * shape drawn here is the one that does not: the decisions arrive as ONE LINE under the
- * receipt and open on demand. Collapsed it costs the canvas ~40 px instead of ~370 px.
+ *   > *"you produce two cards … this means the spine [gets] a limited area … the area is
+ *   > very tight, with exception of the one version where I can collapse … we always have
+ *   > to think about not over-complicating the information … information should not be
+ *   > dense but be enough for the user to know what is happening."*
  *
- * Everything on this page except the decisions line is the REAL rendered DOM dumped by
- * sketch 172's emitter — the header, the receipt, the view toggle and the whole spine
- * graph. That is what makes it look like the product rather than like a drawing of it.
+ * **Both cards say the same kind of thing — here is what the AI just did.** Splitting one
+ * thought across two containers spends the graph's space on chrome, and collapsing the
+ * second one only hides that. So the recommended shape is now **ONE card** with two
+ * openable sections, and the two-card version is kept beside it as the evidence for why.
+ *
+ * ⚠ **THIS IS A COMPOSITION CHANGE, NOT A CHARTER CHANGE — the distinction is load-bearing
+ * against D-02.** `197-CONTEXT.md` refuses to widen `SeedReceipt`, and correctly: its
+ * docblock is fenced (*"authors no sentence of its own"*, *"declares no predicate of its
+ * own"*, *"imports nothing from the API client"*) and widening its charter costs exactly
+ * the guarantees that make it checkable. Nothing here widens it. `SeedReceipt` stays the
+ * leaf it is; a PARENT composes its output and the decisions list into one visual card.
+ * One card in the UI, two components underneath — which is what D-02 asked for and what
+ * the operator is asking for at the same time.
+ *
+ * Every fragment of the receipt below is the REAL rendered DOM, extracted by its own
+ * `data-testid` and re-framed, never redrawn — and the extraction is asserted piece by
+ * piece so a missing fragment fails the build instead of quietly vanishing from the card.
  */
 const fs = require("node:fs")
 const path = require("node:path")
@@ -39,8 +52,8 @@ function assert(cond, label) {
 assert(fs.existsSync(DUMP), "sketch 172's dump is present — 174 renders the real screen from it")
 const dom = fs.existsSync(DUMP) ? JSON.parse(fs.readFileSync(DUMP, "utf8")) : {}
 
-/** Depth-counting element extractor — the same one 172 needed after a regex silently
- *  stopped a nesting level early. */
+/** Depth-counting element extractor — the one 172 needed after a regex silently stopped a
+ *  nesting level early. */
 function extractElement(html, marker, tag) {
   const at = (html || "").indexOf(marker)
   if (at === -1) return null
@@ -78,6 +91,25 @@ assert(RECEIPT.includes('data-testid="seed-receipt"'), "the real receipt is pres
 assert(TOGGLE.includes("Spine") && TOGGLE.includes("Canvas"), "the real view toggle is present")
 assert(SPINE.length > 5000, "the REAL spine graph is present — this is what makes it look like the product")
 assert(SPINE.includes("Pull the vendor filings"), "the spine renders the draft's real steps")
+
+/* ── The receipt, taken apart by its OWN test ids. Each piece stays byte-real. ── */
+const R = {
+  heading: extractElement(RECEIPT, 'data-testid="seed-receipt-heading"', "h2"),
+  dismiss: extractElement(RECEIPT, 'data-testid="seed-receipt-dismiss"', "button"),
+  grounding: extractElement(RECEIPT, 'data-testid="seed-receipt-grounding"', "p"),
+  carried: extractElement(RECEIPT, 'data-testid="seed-receipt-carried"', "p"),
+  list: extractElement(RECEIPT, 'data-testid="seed-receipt-grounded-list"', "ul"),
+  close: extractElement(RECEIPT, 'data-testid="seed-receipt-close"', "p"),
+}
+for (const [k, v] of Object.entries(R)) {
+  assert(!!v && v.length > 20, `receipt fragment "${k}" extracted from the real DOM`)
+}
+assert(
+  (R.list.match(/<li /g) || []).length === 3,
+  "the sealed-step list carries its real 3 rows — a re-framed receipt must lose nothing",
+)
+const SEALED_COUNT = (RECEIPT.match(/data-grounded-count="(\d+)"/) || [])[1]
+assert(SEALED_COUNT === "3", "the sealed count is read from the real card, never re-typed")
 
 /* ── The shipped copy, parsed. Nothing on this page re-types a product sentence. ── */
 function parse(re, label, src) {
@@ -118,9 +150,6 @@ const ROWS = [
 ]
 assert(ROWS.length === 5, "five decisions (D-07)")
 
-const SUMMARY = "I made 5 decisions for you"
-const SUMMARY_HINT = "review them"
-
 function decisionRow(r) {
   const mark = r.mark
     ? r.key === "requirement"
@@ -131,102 +160,150 @@ function decisionRow(r) {
     ? `<button type="button" data-jump="${r.key}" class="shrink-0 rounded px-1.5 py-px text-[11.5px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary">${esc(r.act)}</button>`
     : `<span class="shrink-0 text-[11px] text-muted-foreground/60">set by the last step</span>`
   return `<li class="flex items-baseline gap-2 py-[5px] text-[12.5px]">
-  <span class="w-[132px] shrink-0 text-muted-foreground">${esc(r.ask)}</span>
+  <span class="w-[128px] shrink-0 text-muted-foreground">${esc(r.ask)}</span>
   <span class="min-w-0 flex-1 truncate font-medium text-foreground">${esc(r.answer)}</span>
   ${mark}
   ${act}
 </li>`
 }
 
-/** COLLAPSED — one line. This is the whole recommendation. */
-function strip(open) {
-  return `<section data-decisions class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] ${open ? "py-3" : "py-2.5"}">
-  <button type="button" data-toggle-decisions class="flex w-full items-center gap-2 text-left focus:outline-none focus:ring-1 focus:ring-primary">
-    <span aria-hidden="true" class="shrink-0 text-[11px] text-muted-foreground transition-transform" style="${open ? "transform:rotate(90deg)" : ""}">▸</span>
-    <span class="min-w-0 flex-1 text-[12.5px] font-medium text-foreground">${esc(SUMMARY)}</span>
-    <span class="shrink-0 text-[11.5px] text-muted-foreground">${open ? "hide" : esc(SUMMARY_HINT)}</span>
-  </button>
-  <div data-decisions-body ${open ? "" : "hidden"}>
-    <ul class="mt-2 flex flex-col divide-y divide-border/50 border-t border-border/50 pt-1">
+const DECISION_ROWS = `<ul class="flex flex-col divide-y divide-border/50">
 ${ROWS.map(decisionRow).join("\n")}
-    </ul>
-    <p class="mt-2.5 text-[11.5px] leading-[1.5] text-muted-foreground">Changing one of these updates the draft. It won't re-write the steps that were built around the old answer.</p>
+</ul>
+<p class="mt-2 text-[11.5px] leading-[1.5] text-muted-foreground">Changing one of these updates the draft. It won't re-write the steps that were built around the old answer.</p>`
+
+/* ─────────────────────── the ONE card ─────────────────────── */
+
+/**
+ * One disclosure line. The SUMMARY is what the operator's rule asks for: enough to know
+ * what happened without being dense — a fact and a count, never a wall.
+ */
+function fold(id, summary, verb, inner, open) {
+  return `<div data-fold="${id}" class="border-t border-border/50 first:border-t-0">
+  <button type="button" data-fold-toggle class="flex w-full items-center gap-2 py-[7px] text-left focus:outline-none focus:ring-1 focus:ring-primary">
+    <span aria-hidden="true" class="shrink-0 text-[10px] text-muted-foreground" style="${open ? "transform:rotate(90deg)" : ""}">▸</span>
+    <span class="min-w-0 flex-1 text-[12.5px] text-foreground">${summary}</span>
+    <span class="shrink-0 text-[11.5px] text-muted-foreground">${open ? "hide" : verb}</span>
+  </button>
+  <div data-fold-body class="pb-2 pl-[18px]" ${open ? "" : "hidden"}>${inner}</div>
+</div>`
+}
+
+/**
+ * THE RECOMMENDED SHAPE. One card, the receipt's own heading and its own closing
+ * sentence, and two folds between them.
+ *
+ * The card frame is `SeedReceipt`'s own class string minus its entrance animation — so a
+ * built version is the shipped frame, not a second card treatment.
+ */
+function oneCard(open) {
+  const governance = `${R.grounding}\n${R.carried}\n${R.list}`
+  return `<section data-arrival class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-3 shadow-lg">
+  <div class="flex items-start gap-3 pb-1">
+    ${R.heading}
+    ${R.dismiss}
   </div>
+  <div class="border-t border-border/50">
+    ${fold("gov", `<strong class="font-semibold">${SEALED_COUNT} steps</strong> must prove their sources`, "why", governance, open.gov)}
+    ${fold("dec", `<strong class="font-semibold">${ROWS.length} decisions</strong> I made for you`, "review", DECISION_ROWS, open.dec)}
+  </div>
+  ${R.close}
 </section>`
 }
 
-/** The alternative, for comparison only — a full always-open card, i.e. what 172's three
- *  variants all cost. */
-const FULL_CARD = `<section data-decisions class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] py-4 shadow-lg">
-  <div class="flex items-start gap-3">
-    <h2 class="min-w-0 flex-1 text-[13.5px] font-semibold text-foreground">Here's what I decided for you — 5 things you can change</h2>
-    <button type="button" aria-label="Dismiss" class="inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40"><span aria-hidden="true">✕</span></button>
-  </div>
-  <ul class="mt-3 flex flex-col divide-y divide-border/50">
-${ROWS.map(decisionRow).join("\n")}
-  </ul>
-  <p class="mt-3 text-[12.5px] leading-[1.5] text-muted-foreground">Changing one of these updates the draft. It won't re-write the steps that were built around the old answer.</p>
-  <p class="mt-2 text-[12.5px] leading-[1.5] text-muted-foreground">Everything else is yours to change. Nothing is saved or published yet.</p>
+/** The two-card shape — the first cut of this page, kept as the evidence for the change. */
+function twoCards(decisionsOpen) {
+  const strip = `<section data-arrival class="w-full max-w-[720px] rounded-[14px] border border-border bg-card px-[18px] ${decisionsOpen ? "py-3" : "py-2.5"}">
+  <button type="button" data-fold-toggle class="flex w-full items-center gap-2 text-left focus:outline-none focus:ring-1 focus:ring-primary">
+    <span aria-hidden="true" class="shrink-0 text-[11px] text-muted-foreground" style="${decisionsOpen ? "transform:rotate(90deg)" : ""}">▸</span>
+    <span class="min-w-0 flex-1 text-[12.5px] font-medium text-foreground">I made 5 decisions for you</span>
+    <span class="shrink-0 text-[11.5px] text-muted-foreground">${decisionsOpen ? "hide" : "review"}</span>
+  </button>
+  <div data-fold-body class="mt-2 border-t border-border/50 pt-1" ${decisionsOpen ? "" : "hidden"}>${DECISION_ROWS}</div>
 </section>`
+  return `<div class="flex flex-col gap-2">${RECEIPT}${strip}</div>`
+}
 
 /* ─────────────────────── the screen ─────────────────────── */
 
-/** The whole Builder screen, at real proportions. `grid-rows` gains ONE auto row for the
- *  decisions element and the graph moves to row 4 — the minimum structural change. */
-function screen(decisions) {
+function screen(arrival) {
   return `<div class="flex h-full min-h-0 flex-col bg-background">
   ${HEADER}
-  <div class="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden [&>*:last-child]:row-start-4">
+  <div class="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden [&>*:last-child]:row-start-3">
     ${TOGGLE}
-    <div class="px-4 pt-3">${RECEIPT}</div>
-    <div class="px-4 pb-3 pt-2">${decisions}</div>
+    <div class="px-4 py-3">${arrival}</div>
     ${SPINE}
   </div>
 </div>`
 }
 
 const screens = {
-  landed: screen(strip(false)),
-  opened: screen(strip(true)),
-  card: screen(FULL_CARD),
+  one: screen(oneCard({ gov: false, dec: false })),
+  oneOpen: screen(oneCard({ gov: false, dec: true })),
+  two: screen(twoCards(false)),
+  twoOpen: screen(twoCards(true)),
 }
 
-assert(screens.landed !== screens.opened, "collapsed and opened differ")
-assert(screens.opened !== screens.card, "opened and the full card differ")
-assert(screens.landed.includes("Workflow phase spine"), "the spine is on the screen")
+assert(screens.one !== screens.oneOpen, "the one-card collapsed and opened states differ")
+assert(screens.one !== screens.two, "the one-card and two-card shapes differ")
+assert(screens.one.includes("Workflow phase spine"), "the spine is on the screen")
+assert(
+  screens.one.includes(R.list),
+  "the one card carries the receipt's REAL sealed-step list, unchanged",
+)
+assert(
+  screens.one.includes(R.close),
+  "the one card keeps the receipt's own closing sentence, unchanged",
+)
+assert(
+  (screens.one.match(/data-arrival/g) || []).length === 1,
+  "the recommended screen has exactly ONE arrival card — this is the whole point",
+)
+assert(
+  (screens.two.match(/data-arrival|data-testid="seed-receipt"/g) || []).length === 2,
+  "the comparison screen has two",
+)
+
+/* ─────────────────────── the page ─────────────────────── */
 
 const body = `
 <div class="s174-root">
   <div class="s174-head">
-    <div class="s174-kicker">Sketch 174 · Phase 197 · the recommendation, as a screen</div>
-    <h1>The line that opens</h1>
-    <p class="s174-lede">The draft lands the way it does today. Under the receipt there is <strong>one line</strong> —
-    <em>“${esc(SUMMARY)}”</em> — that opens into the five when you want it, and each one takes you to the control that is
-    already on the screen. Nothing new blocks you, nothing is duplicated, and the workflow stays visible.</p>
+    <div class="s174-kicker">Sketch 174 · Phase 197 · the arrival moment, as a screen</div>
+    <h1>One card, not two</h1>
+    <p class="s174-lede">When the draft lands, one card says what happened: <em>here's what I built</em>, and inside it two
+    lines you can open — <strong>what must prove its sources</strong>, and <strong>the ${ROWS.length} decisions I made for you</strong>.
+    Each decision takes you to the control that is already on the screen. Closed, it is four lines. Your workflow stays visible.</p>
   </div>
 
   <div class="s174-tabs">
-    <button class="s174-tab" data-tab="landed">1 · The draft just landed</button>
-    <button class="s174-tab" data-tab="opened">2 · You opened it</button>
-    <button class="s174-tab" data-tab="card">3 · If it were a full card instead</button>
+    <button class="s174-tab" data-tab="one">1 · One card, just landed</button>
+    <button class="s174-tab" data-tab="oneOpen">2 · Opened the decisions</button>
+    <button class="s174-tab" data-tab="two">3 · Two cards (what I drew first)</button>
+    <button class="s174-tab" data-tab="twoOpen">4 · Two cards, opened</button>
   </div>
 
   <p class="s174-cap" data-cap>—</p>
-  <div class="s174-screen" data-screen="landed">${screens.landed}</div>
-  <div class="s174-screen" data-screen="opened" hidden>${screens.opened}</div>
-  <div class="s174-screen" data-screen="card" hidden>${screens.card}</div>
+  <div class="s174-screen" data-screen="one">${screens.one}</div>
+  <div class="s174-screen" data-screen="oneOpen" hidden>${screens.oneOpen}</div>
+  <div class="s174-screen" data-screen="two" hidden>${screens.two}</div>
+  <div class="s174-screen" data-screen="twoOpen" hidden>${screens.twoOpen}</div>
 
-  <p class="s174-foot">Everything here except the decisions line is the <strong>real</strong> product — the header, the receipt
-  and the whole step graph are rendered from the running code, not redrawn. The reasoning behind the choice lives in sketches
-  <strong>172</strong> and <strong>173</strong>; this page is only the picture.</p>
+  <p class="s174-measure" data-measure>Measuring…</p>
+
+  <p class="s174-foot">Everything except the decisions rows is the <strong>real</strong> product — the header, the receipt's own
+  heading, sentences, sealed-step list and closing line, the view toggle, and the whole step graph are rendered from the running
+  code. The receipt is <strong>re-framed, not rewritten</strong>: one card in the UI, two components underneath, so the receipt
+  keeps the guarantees that make it checkable. Reasoning: sketches <strong>172</strong> and <strong>173</strong>.</p>
 </div>
 
 <script>
 (function(){
   var caps = {
-    landed: "The moment the draft arrives. One line under the receipt — the graph keeps its room.",
-    opened: "Opened. The five decisions, the AI's answers, and a way to change each one. Press a link and watch the control light up in the header.",
-    card: "The same five as an always-open card. Look at how much of your workflow is left below it — this is what a second card costs."
+    one: "The moment the draft arrives. One card, four lines. Everything else on screen is your workflow.",
+    oneOpen: "You opened the decisions. Press a link on any row and watch the control light up in the header — nothing is duplicated.",
+    two: "What I drew first: two cards, both saying 'here is what the AI just did'. Even collapsed, the second frame costs space and splits one thought in half.",
+    twoOpen: "Two cards with the decisions open. This is the tight area you spotted."
   };
   var tabs = document.querySelectorAll(".s174-tab");
   var screens = document.querySelectorAll(".s174-screen");
@@ -234,21 +311,23 @@ const body = `
     tabs.forEach(function(t){ t.classList.toggle("s174-tab-on", t.dataset.tab === id); });
     screens.forEach(function(s){ s.hidden = s.dataset.screen !== id; });
     document.querySelector("[data-cap]").textContent = caps[id];
+    measure();
   }
   tabs.forEach(function(t){ t.addEventListener("click", function(){ show(t.dataset.tab); }); });
-  show("landed");
 
-  // The line really opens.
+  // Every fold really opens.
   document.addEventListener("click", function(e){
-    var b = e.target.closest("[data-toggle-decisions]");
+    var b = e.target.closest("[data-fold-toggle]");
     if(!b) return;
-    var sec = b.closest("[data-decisions]");
-    var bodyEl = sec.querySelector("[data-decisions-body]");
-    var chev = b.querySelector("span[aria-hidden]");
-    var open = bodyEl.hidden;
-    bodyEl.hidden = !open;
-    chev.style.transform = open ? "rotate(90deg)" : "";
-    b.lastElementChild.textContent = open ? "hide" : "${esc(SUMMARY_HINT)}";
+    var body = b.parentElement.querySelector("[data-fold-body]");
+    if(!body) return;
+    var open = body.hidden;
+    body.hidden = !open;
+    b.querySelector("span[aria-hidden]").style.transform = open ? "rotate(90deg)" : "";
+    var verb = b.lastElementChild;
+    verb.dataset.verb = verb.dataset.verb || verb.textContent;
+    verb.textContent = open ? "hide" : verb.dataset.verb;
+    measure();
   });
 
   // A row really takes you to the shipped control.
@@ -265,6 +344,27 @@ const body = `
     t.style.outlineOffset = "2px";
     setTimeout(function(){ t.style.outline = ""; }, 1800);
   });
+
+  // How much of the screen is your workflow? Measured, not claimed.
+  function measure(){
+    var scr = document.querySelector(".s174-screen:not([hidden])");
+    var note = document.querySelector("[data-measure]");
+    if(!scr || !note) return;
+    var spine = scr.querySelector('[aria-label^="Workflow phase spine"]');
+    if(!spine) return;
+    var total = Math.round(scr.getBoundingClientRect().height);
+    var got = Math.round(spine.getBoundingClientRect().height);
+    var cards = 0;
+    scr.querySelectorAll('[data-arrival], [data-testid="seed-receipt"]').forEach(function(c){
+      cards += Math.round(c.getBoundingClientRect().height);
+    });
+    note.textContent = "Measured on this screen: the arrival card" +
+      (scr.dataset.screen.indexOf("two") === 0 ? "s take " : " takes ") + cards +
+      " px, and your workflow gets " + got + " px of " + total + " px — " +
+      Math.round(100 * got / total) + "% of the screen.";
+  }
+
+  show("one");
 })();
 </script>
 `
