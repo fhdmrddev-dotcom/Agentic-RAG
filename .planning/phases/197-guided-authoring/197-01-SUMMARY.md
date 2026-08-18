@@ -140,3 +140,112 @@ is the failure mode.
 
 `git status --short` after this task: **empty.** No file under `frontend/`, `backend/` or
 `scripts/` was touched.
+
+---
+
+## Task 2 — The four gate baselines, RE-DERIVED. Every number below was measured on this tree.
+
+### 1. The vitest count gate
+
+```bash
+GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs
+```
+
+**Verdict, verbatim — the last four lines of its own output, not a summary:**
+
+```
+  total                                      4217    4291     +74
+  total 4291  ·  failed 0  ·  pinned total 4217
+--------------------------------------------------------------
+count gate OK — 89/89 pinned files present, no per-file decrease, 0 failing.
+```
+
+| | `197-RESEARCH.md` §"How to read the count gate" | **measured 2026-08-18 at the base SHA** |
+|---|---|---|
+| grand total | 4291 | **4291** |
+| failed | 0 | **0** |
+| pinned total | 4217 | **4217** |
+| pinned files | 89/89 | **89/89** |
+
+**No drift — and that is the expected result, not a lucky one.** Phase 196 closed at exactly these
+figures and nothing has been committed to `frontend/` since. This is the one circumstance in which
+an inherited number and a measured number *should* agree; it was still re-derived rather than
+copied, because the only way to know which case you are in is to run the command.
+
+⚠ **A green gate is NOT reliably reachable on demand** (CLAUDE.md CORRECTION 2026-08-17 / SEED-171).
+This run came back clean on the second attempt; the first attempt did not fail a test, it died in
+its reporter — see the deviation below. **Later waves must not read "the base was green" as "green
+is guaranteed."**
+
+### 2. Frontend typecheck
+
+```bash
+cd frontend && npx tsc --noEmit -p tsconfig.app.json      # exit 2
+```
+
+**33 errors.** Counted with `grep -cE '^src/.*error TS'` over the captured output.
+
+⚠ **The `-p tsconfig.app.json` is load-bearing** — a bare `tsc --noEmit` checks ZERO files in this
+repo and would have recorded a meaningless `0`. Matches the inherited baseline of **33** exactly.
+All 33 are pre-existing and none is in this phase's scope.
+
+### 3. Backend pytest — ⚠ TWO scopes, and the plan's command is NOT the one the inherited figure came from
+
+This is a real finding, not bookkeeping. The plan's `<action>` names
+`backend/venv/Scripts/python.exe -m pytest backend/tests/unit -q` and tells the executor to compare
+against RESEARCH's **`211 failed / 4046 passed`**. **Those two are different scopes and are not
+comparable**, which was proved by running both:
+
+| scope | command | measured summary line | collected |
+|---|---|---|---|
+| **`tests/unit` — the plan's literal command** | `venv/Scripts/python.exe -m pytest tests/unit -q` | `63 failed, 2274 passed, 2 xfailed, 2 xpassed, 33 warnings in 435.97s (0:07:15)` | 2337 |
+| **`tests` — where the inherited figure comes from** ⭐ | `venv/Scripts/python.exe -m pytest tests -q` | `212 failed, 4041 passed, 33 skipped, 5 xfailed, 9 xpassed, 266 warnings, 1 error in 811.58s (0:13:31)` | **4301** (`--collect-only`) |
+
+`211 + 4046 = 4257`, which can only come from a **4301-test** collection — so the STATE.md/RESEARCH
+baseline is the **whole `backend/tests`** tree, integration included. Against that comparable scope
+the tree measures **212 failed / 4041 passed**: failures **+1**, passing **−5**. Both figures are
+recorded here so a later wave can pick the row matching whatever command it runs, instead of
+comparing a unit-only number against a whole-tree one and reporting a 148-test "improvement" that
+never happened.
+
+The `1 error` is `tests/integration/test_077_cross_cancel.py::test_cross_worker_cancel_via_zombie_heal`
+— an **error at setup**, i.e. an integration test that needs live Redis, not a failing assertion.
+
+**⭐ Standing instruction for every later plan in this phase: run `backend/tests` (whole), not
+`backend/tests/unit`,** if you intend to compare against the 211/4046 lineage. This phase's own
+backend surface (`workflow_authoring.py`, `grounding.py`, `workflows.py`) has unit tests in
+`tests/unit` **and** publish/grounding coverage that the whole-tree run reaches.
+
+### 4. The six G-5 ledger triples
+
+Re-derived with the ledger's own three commands, **subtracting six-digit dated quick-task buckets**
+from the phase count exactly as CLAUDE.md instructs:
+
+```bash
+git log --oneline -- <file> | wc -l                                    # commits
+git log --format=%s -- <file> | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' \
+  | sed -E 's/-.*//' | grep -E '^[0-9]+(\.[0-9]+)?$' | sort -u | wc -l  # phases (then subtract 6-digit)
+wc -l <file>                                                           # lines
+```
+
+| File | **measured (c / p / l)** | `197-CONTEXT.md` says | drift | dated buckets subtracted |
+|---|---|---|---|---|
+| `frontend/src/lib/api.ts` | **170 / 97 / 6154** | 170 / 97 / 6154 | none | `260405` `260814` |
+| `frontend/src/pages/WorkflowBuilderPage.tsx` | **42 / 13 / 2398** | 42 / 13 / 2398 | none | `260809` `260814` |
+| `backend/app/api/workflows.py` | **36 / 18 / 1984** | 36 / 18 / 1984 | none | `260814` |
+| `backend/app/services/harness/grounding.py` | **18 / 5 / 1252** | 18 / 5 / 1252 | none | `260814` |
+| `frontend/src/components/workflows/builderStore.ts` | **11 / 5 / 837** | 11 / 5 / 837 | none | `260809` |
+| `backend/app/services/workflow_authoring.py` | **12 / 6 / 572** | 12 / 6 / 572 | none | — |
+
+**All six agree, and all six FIRE G-5.** ⚠ The zero-drift result is *this measurement's* finding, not
+a licence to skip the next one: `WorkflowRunPage.tsx`'s row went stale **the same day** it was
+written, and five of the ledger's rows were found wrong when it was last re-derived in bulk. Each of
+these six goes stale on the **next commit that touches it**, which in this phase means most of them
+go stale during wave 2. **Re-derive at phase close; do not copy this table forward.**
+
+⚠ **`frontend/src/lib/api.ts` at 97 phases is the hottest file in the repository** and is the one
+row `197-CONTEXT.md` records as *not* covered by construction. D-13 widens the `/generate` response
+type it reads. Per Phase 196's measured lesson: **D-13 adds a TYPE, not a runtime export**, so it
+should not trigger the `196-08` failure mode (249 real failures from `@/lib/api` mock factories
+missing a newly-added runtime export) — but any plan that adds a **runtime** export to `api.ts`
+must budget one mock line per mounting suite.
