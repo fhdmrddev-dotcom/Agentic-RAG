@@ -1403,3 +1403,119 @@ def test_positive_control_the_checker_reports_a_synthetic_advertised_field():
     )
     # The real schema object is untouched — the control must not contaminate the fence.
     assert planted not in WF_SCHEMA["properties"]
+
+
+# ══ Phase 197 (AUTH-02 / D-14) — HALF B: THE REQUEST CONTRACT FENCE ══════════════════════
+#
+# The same pattern from the other side of the wire. Half A asks *"does the authoring path
+# ASK for everything its contract advertises?"*; half B asks *"does the client SEND
+# everything the server ACCEPTS?"* Both failures look identical from a user's seat — a
+# capability that exists in a type and nowhere in the product.
+#
+# ⚠ THIS FENCE'S POSITIVE CONTROL IS REAL, NOT PLANTED. It was landed with an EMPTY
+# allowlist and observed RED against a live, independently-recorded, currently-unclosed
+# instance in the tree — so it has been exercised against the wild rather than against
+# something its author invented. The RED output is quoted in this plan's SUMMARY. The
+# synthetic control in half A covers the complementary property (that it keeps firing once
+# every real instance is allowlisted).
+#
+# ⚠ THE NEEDLE TRAP, stated by ROLE because stating it by name would spring it: this fence
+# reads a FRONTEND SOURCE FILE and decides "sent" by membership. A comment added to that
+# file naming one of the request fields would therefore be read as evidence that the field
+# is sent, and the fence would go quietly green on an unwired channel. Comments are
+# stripped before the membership test for exactly this reason, and no plan may rely on
+# that stripping as a licence to name a field in prose over there.
+
+#: The ONE production call site of the generation route, as repo-relative path SEGMENTS —
+#: joined against a root derived from `__file__`, never an absolute path (a hard-coded one
+#: is wrong in every worktree, and this suite runs in worktrees routinely).
+_GENERATE_CALL_SITE = (
+    "frontend",
+    "src",
+    "components",
+    "workflows",
+    "useTemplateFirstDraft.ts",
+)
+
+#: Accepted by the request model, never sent by the call site above — with the measured
+#: reason, in the literal.
+ACCEPTED_BUT_NEVER_SENT: dict[str, str] = {}
+
+
+def _repo_root():
+    from pathlib import Path
+
+    # <root>/backend/tests/unit/<this file>
+    return Path(__file__).resolve().parents[3]
+
+
+def _generate_call_site_source() -> str:
+    """The call site's source with comments stripped — see the needle-trap note above."""
+    raw = _repo_root().joinpath(*_GENERATE_CALL_SITE).read_text(encoding="utf-8")
+    without_blocks = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*", " ", without_blocks)
+
+
+def _request_fields() -> set[str]:
+    from app.api.workflows import GenerateRequest
+
+    return set(GenerateRequest.model_fields)
+
+
+def _accepted_but_never_sent() -> set[str]:
+    source = _generate_call_site_source()
+    return {name for name in _request_fields() if name not in source}
+
+
+def test_the_generation_call_site_is_readable_and_really_is_the_call_site():
+    """NON-VACUITY for the fence below, and it needs three separate proofs.
+
+    A fence that reads a file by path can fail silently in three ways — the path stops
+    resolving, the file stops being the call site, or the comment stripping eats the code.
+    Each is checked rather than assumed:
+
+      * the file resolves and is non-empty;
+      * it really is a caller of the generation route (it names the client function);
+      * stripping removed something and left the CODE — a stripper that ate the file would
+        report every field as never-sent, and a stripper that did nothing would report
+        every field as sent.
+
+    ⚠ THE SURVIVAL CHECK IS OVER TOKENS, NEVER OVER A CHARACTER RATIO, and that is a
+    measurement rather than a preference. This call site is **32,762 raw characters and
+    8,048 stripped — 75% comment by character**, because the module documents every wire
+    decision it makes at length. A plausible-looking `len(stripped) > len(raw) // 2` guard
+    is therefore FALSE on the very file it is guarding, and would have to be re-tuned every
+    time someone documents something. A token that must survive cannot rot that way.
+    """
+    raw = _repo_root().joinpath(*_GENERATE_CALL_SITE).read_text(encoding="utf-8")
+    stripped = _generate_call_site_source()
+
+    assert raw.strip(), "the call site is empty or unreadable"
+    assert "generateWorkflow" in stripped, "this file is not the generation call site"
+    assert len(stripped) < len(raw), "comment stripping removed nothing"
+    for token in ("import", "export", "await", "function"):
+        assert token in stripped, f"comment stripping ate the code — {token!r} is gone"
+
+    fields = _request_fields()
+    assert len(fields) >= 4, "the request contract looks truncated"
+    # The checker must see BOTH verdicts on the real tree, or it proves nothing.
+    assert _accepted_but_never_sent() != fields, "no field reads as sent — the fence is blind"
+
+
+def test_every_accepted_request_field_is_either_sent_or_allowlisted_with_a_reason():
+    """**D-14 half B** — the request contract promises nothing the product never uses.
+
+    SET EQUALITY, for the same two-directional reason half A is: a field ADDED to the
+    request model and never wired reds on the commit that adds it, and an entry REMOVED
+    from the allowlist without the field being wired also reds.
+
+    ⚠ An entry here is a CONFESSION, not a fix. It records that the server accepts
+    something no user action can produce, with the measurement that explains why, and it
+    is the correct state only while wiring the channel would be a different phase's
+    contract change.
+    """
+    assert all(
+        isinstance(v, str) and v.strip() for v in ACCEPTED_BUT_NEVER_SENT.values()
+    ), "an allowlist entry without a reason is a silenced test in costume"
+
+    assert _accepted_but_never_sent() == set(ACCEPTED_BUT_NEVER_SENT)
