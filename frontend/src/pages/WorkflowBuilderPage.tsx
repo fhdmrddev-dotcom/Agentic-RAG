@@ -2426,10 +2426,39 @@ export function WorkflowBuilderPage({
     </span>
   ) : null
 
+  /**
+   * 197-10 (D-19) — THE ONE IDENTITY EXPRESSION. The workflow's NAME when it has one,
+   * the slug when it does not, the shipped fallback when it has neither.
+   *
+   * WHY IT MOVED. Before this, the header rendered the slug and `meta.name` appeared in no
+   * render position anywhere on this page — the workflow's name was displayed NOWHERE.
+   * D-15 accepted in words that "name and slug can disagree", but it was written before
+   * anyone had measured that absence, so what it accepted was a LATENT disagreement.
+   * Leaving the header on the slug ships a RENDERED one — `northwind-qbr-fa65a43c` in the
+   * header against `Northwind QBR` in the arrival card's row 4, on one screen. The card's
+   * row and this slot read the SAME live store value, so they agree by construction rather
+   * than by synchronisation.
+   *
+   * ⚠ THE SLUG IS NEVER WRITTEN. This expression only DISPLAYS. `slug` stays the key
+   * identity that forks and versioning use, minted once at generation; row 4's write path
+   * touches `meta.name` alone.
+   *
+   * ⚠ THE NON-EMPTY CHECK IS A DISPLAY FALLBACK, NOT A VALIDATION RULE — and it is a named
+   * deviation from D-19's literal `meta.name ?? meta.slug`, recorded rather than silent.
+   * Row 4's write neither trims nor rejects the empty string (the server owns emptiness),
+   * so an author who clears the field would otherwise be shown a blank identity slot. No
+   * store action, no request and no predicate learns anything from this check.
+   *
+   * The `typeof` narrowing is the idiom forty-five lines above: `name` is not declared on
+   * `BuilderDefinition` and lands under its index signature as `unknown`.
+   */
+  const identityLabel =
+    typeof meta.name === "string" && meta.name.length > 0 ? meta.name : (meta.slug ?? "Untitled workflow")
+
   const identityGroup = (
     <>
       <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
-        {meta.slug ?? "Untitled workflow"}
+        {identityLabel}
       </span>
       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
         draft
