@@ -84,6 +84,36 @@ satisfied (075.7 — 2026-05-24)
 
 **⚠ UPDATED THE SAME DAY — THE OBLIGATION WAS DISCHARGED, and the new triple is recorded BESIDE the one above, never over it: `234 commits / 76 phases / 1273 L`.** The phase count is unmoved at 76 because the discharge commit is tagged `refactor(threads)` — a non-numeric bucket, deliberately, since this was **not a phase** and inventing one would corrupt every future count. See **"G-5 discharge"** below.
 
+### ⚠ CORRECTION 2026-08-18 (Phase 196, plan `196-09`) — **"hottest file in the repo" is REFUTED BY MEASUREMENT.** The original claim is preserved above and in `CLAUDE.md`, never overwritten.
+
+The header line above, and the matching sentence in `CLAUDE.md`'s staleness paragraph, both call this file
+**"the hottest file in the repository"** at **76 phases**. That was the best available reading on 2026-08-17
+and it was wrong for a structural reason rather than a careless one: **the comparison set was the ledger
+table, and the actual hottest file has never been in it.**
+
+Measured 2026-08-18 with CLAUDE.md's own recipe, on this worktree, both files in one batch pass:
+
+| File | commits | phases | lines |
+|---|---:|---:|---:|
+| `backend/app/api/threads.py` | 234 | **76** | 1273 |
+| **`frontend/src/lib/api.ts`** | **170** | **97** | **6154** |
+
+**`frontend/src/lib/api.ts` is hotter by 21 phases and is 4.8× the size, and it had no row at all.**
+
+⚠ **The 97 is robust to the recipe's known noise, and both accountings are published so the next reader
+re-derives rather than trusts.** `api.ts`'s bucket list contains **sixteen** bare two-digit tokens
+(`03 07 08 11 12 13 15 16 27 29 31 32 46 48 49 56`) which may be pre-zero-padding-era phases or subject-line
+false positives. **Discarding all sixteen still leaves 81.** `threads.py` carries **twenty** such tokens,
+leaving **56** on the same strict accounting. So `api.ts` is hotter on the generous count (97 vs 76) **and**
+on the strict one (81 vs 56) — the verdict does not depend on which convention you pick, which is the only
+reason it is stated as a refutation rather than as a second reading.
+
+**The correction is recorded here and in `CLAUDE.md` in the same commit** (the same-commit sync rule), and
+`api.ts` now has a row and a section of its own. **Nothing about this file's own discharge changes** — the
+SSE-transport cut, its evidence and its load-bearing invariants all stand exactly as written below. What is
+corrected is a **superlative**, and superlatives derived from an incomplete scan list are precisely what this
+ledger exists to stop being believed.
+
 > ⚠ **THIS ROW WAS FOUND STALE AT EXTRACTION AND THE CORRECTION IS RECORDED BESIDE THE ORIGINAL, NEVER OVER IT.**
 > The verbatim cells below are the text as it stood in `CLAUDE.md`, and they are **wrong about this file's hotness**.
 > Measured at extraction: **233 commits / 76 phases / 1322 L**.
@@ -224,6 +254,46 @@ G-5 fires — adapter pattern audit due
 
 **G-5 FIRES ON THE COUNT — extraction due, and deliberately NOT taken in 190.** 14 phases is far past the ≥3 threshold, so the row states the fire rather than explaining it away. It is not honoured in 190 for a measured reason: 190's whole change to this file is **one function** — D-16's `ctx.is_golden_run` send gate plus a delegation to the connector registry — so it adds a call-out, not a concern. The five-plus concerns that make the file big (the emit path, the fill/render path, the ask_user path, the tool-context builders, the seven executors) are inherited from 091-102 and are untouched here. **The row exists so the NEXT phase inherits a measured count instead of re-deriving it — and per G-5, a phase that adds a SECOND concern to this file produces a refactor recommendation first.** The natural seam, named but not taken: one module per executor under `harness/phase_types/`, the same shape the 188.2 card cut used.
 
+### Phase 196 (plan `196-03`) — re-derived, and honoured by construction for the second consecutive phase
+
+**RE-DERIVED 2026-08-18 by plan `196-09`: `39 commits / 16 phases / 2424 L`** (was `38 / 15 / 2393` at the
+2026-08-17 extraction; six-digit dated quick-task buckets: **checked, none exist** on this file). ⚠ **Stale by
+one phase and 31 lines within a single day** — this ledger's most repeated finding, reproducing again.
+
+**What 196 did:** added **one** async helper, `_effective_model_checked`, which calls the shipped
+`_effective_model`, reads the org default off `ctx.user_settings.llm_model` and awaits Phase 149's
+`_resolve_enabled_model` through a **function-local** import. Every other edit is a call-site repoint.
+`_effective_model` itself is byte-unchanged, still sync and still exported — pinned by its own case.
+
+**Why G-5 is honoured rather than triggered:** the ledger's own test for this file is *does the change add a
+genuinely SECOND concern?* The five-plus concerns that make the file big (the emit path, the fill/render path,
+the ask_user path, the tool-context builders, the seven executors) are untouched. One function plus call-site
+edits is **a call-out, not a concern** — verbatim the test 190's clearance was recorded on. **The named seam,
+one module per executor under `harness/phase_types/`, still stands and was not taken.**
+
+**What now binds this file, and one of them is a signature widening the next editor will meet:**
+
+1. ⚠ **`_build_phase_tool_context` is no longer `(phase, ctx)`** — it takes an optional keyword,
+   `(phase, ctx, *, model=None)`. **This was a measured correction to `196-03`'s plan, which asserted all five
+   call sites sat inside `async def`. `:455` does not** — it is a **sync** function called synchronously by
+   **fifteen shipped test sites across seven files**, so making it async was never a one-word edit. It also
+   could not be skipped: `run_task_sub_agent` reads `parent_ctx.model`, **not** the executor's local `model`,
+   so `:455` is the site that actually decides which model an `llm_agent` / `llm_batch_agents` phase runs on.
+   ⚠ **A stub lambda of the form `lambda phase, ctx: …` now raises `TypeError`** — two in
+   `test_185_detection.py` did, and were widened to `lambda phase, ctx, **_: …`.
+2. **The disabled-model substitution FAILS OPEN, deliberately** — a registry-read blip lets a disabled model
+   run rather than sinking the phase, because an infrastructure hiccup must not look like an authoring error.
+   Recorded in the helper's own docstring, not only here.
+3. **An ENABLED model is a strict no-op** — same value, no sub-step, no audit row. Asserted with
+   `assert not carriers.substeps` / `assert not carriers.audits`, the `test_149_default_guard.py:86`
+   `assert not pool.calls` shape transposed onto both carriers.
+4. **No 25th `harness_audit` kind was added and no migration ships.** `_AUDIT_EVENT_TYPES` is byte-unchanged;
+   the substitution reuses `policy_applied`, which already means exactly this event.
+
+⚠ **The plan's own line budget was MISSED and is recorded as a miss rather than reinterpreted:** *"fewer than
+40 changed lines"* against **39 insertions / 47 total**. The budget was computed against a site inventory that
+turned out to be wrong (invariant 1 above); the SHAPE criterion G-5 actually cares about is met.
+
 ---
 
 ## `frontend/src/pages/WorkflowsPage.tsx`
@@ -282,6 +352,49 @@ G-5 fires — adapter pattern audit due
 
 ---
 
+### Phase 196 (plan `196-08`) — one hook call and one prop, in the shape the two leaf hooks beside it already use
+
+**RE-DERIVED 2026-08-18 by plan `196-09`: `42 commits / 13 phases / 2398 L`** (`CLAUDE.md`'s row read
+`41 / 12 / 2348`; quick-task buckets excluded: `260809`, `260814`). ⚠ **STALE — and this row's own text already
+predicted its own staleness** (*"the 2055 figure is measured at this task's BASE commit and goes stale inside
+this very task"*). Phase list gains `196`.
+
+**What 196 did:** the Builder became the ONE owner of the author-model-registry read. It calls
+`useModelRegistry()` once (`grep -c 'useModelRegistry'` here is exactly **2** — one import, one call), reads
+the app-wide `TechnicalNamesProvider` boolean, and passes a **single spread-conditional prop** down to
+`PhaseFormPanel`. Diff **+50 / −0**.
+
+**Why G-5 is honoured rather than triggered:** the page gains **a hook call and a prop**, in the identical
+shape of the two leaf hooks it already consumes. It gains no second concern — the Builder shell, the canvas
+mount, the publish gauntlet, the template/asset descriptor resolution and the save/concurrency machinery are
+all untouched. The named seam still stands and was not taken.
+
+**⚠ THE INVARIANT THIS PHASE ADDED IS AN ABSENCE, AND IT IS A DELIBERATE TRADE RATHER THAN AN OVERSIGHT:**
+the prop is passed **only on a `ready` registry read**. On `loading` / `unavailable` the AI model field is
+**absent from the step form entirely.** Passing `models: []` was weighed and rejected: `ModelField` would then
+render a calm, correct-looking control that offers nothing but its inherit option **and retains every stored
+model as `(current) — not in the registry`** — telling an author that a perfectly registered model is unknown
+and inviting them to change it. *An absent field writes nothing and says nothing false; a lying one does
+both.* **`ModelField` cannot express "I could not read the registry"** — it takes rows, not a reading. **A
+future phase that wants a degraded-but-present control must give the picker a third reading, deliberately, as
+its own change.**
+
+⚠ **A SECOND-ORDER CONSEQUENCE THAT COST 249 FAILING TESTS AND WILL RECUR:** because this page now reads the
+api client **at mount**, every suite that stubs `@/lib/api` with an explicit factory rather than
+`importOriginal` must **declare the new export**, or it throws at mount and takes the whole page down. Nine
+suites needed one line each — `WorkflowBuilderPage.canvas` (124 cases) · `.describe` (30) · `.session` (22) ·
+`.header` (20) · `.test` (15) · `WorkflowDoorSwitch.test` (15) · `.preDraft.baseline` (11) ·
+`WorkflowsPage.test` (10) · `WorkflowDoorSwitch.baseline.test` (2). **This is the `getGroundingBundle`
+precedent repeating one phase later**, and `WorkflowDoorSwitch.baseline.test.tsx` already carried a comment
+from the previous occurrence. ⚠ **A red gate here is NOT automatically a SEED-171 flake** — 249 failures
+naming one undeclared export was a real regression, and it was distinguished by correct triage (filenames read
+from the gate's own persisted JSON **before** any re-run; the worker cap never touched).
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation FIRST; it
+inherits `42 / 13 / 2398`.**
+
+---
+
 ## `backend/app/api/workflows.py`
 
 **Re-derived 2026-08-17 (extraction):** `35 commits / 17 phases / 1962 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (17 phases vs threshold 3) — extraction due — not taken in q5r (no 2nd concern).
@@ -293,6 +406,52 @@ G-5 fires — adapter pattern audit due
 ### G-5 status (verbatim)
 
 **G-5 FIRES ON THE COUNT — extraction due, and deliberately NOT taken in `260814-q5r`.** The measured reason: the file gains **one read route for the template concern it already owns** — it already hosts the Phase 193 upload door that MINTS the very `asset_id` this route reads, twenty lines above. A door that mints an id and a door that reads it are one concern, not two. ⚠ **The +94 lines are dominated by PROSE, and it is stated rather than smoothed:** the route's body is ~15 statements; the rest is the docblock recording why this route exists instead of a widened `?template_asset_id=` on `/grounding-bundle` (that parameter is typed `UUID | None` while these asset ids are Storage PATHS — a **measured 422**, `uuid_parsing` at `['query','template_asset_id']`), and why the `..` fence is load-bearing rather than belt-and-braces. **What now binds this file:** the new route's two fences are its ONLY authorization boundary (the workflow cluster reads through a service-role pool that bypasses RLS), and both were driven RED against real plants — deleting the owner-prefix clause was shown to return `{'read':'ok','placeholders':['their_secret']}` for another user's asset. **Per G-5 the next phase that adds a genuinely second concern here owes a refactor recommendation FIRST;** the natural seam is that this one module hosts the definition CRUD, the validate/lint surface, the grounding palette, the publish gauntlet, the run launcher and the template door. **⚠ RE-DERIVED AT PHASE 193.1's CLOSE (2026-08-15): `32 / 16 / 1813` → **34 commits / 17 phases / 1951 L**.** ⚠ **CONTEXT D-01's own discuss-time re-measurement of `33 / 1813` was ALREADY STALE when written — the third time this table has documented a figure going stale about itself, and it is stated rather than overwritten.** Phase list gains `193.1`. **G-5 fired and was honoured by construction for the second consecutive phase, on the same measured test:** 193.1 added `POST /workflows/template/placeholders` — a **third door in the template block this module already owns**, sitting beside `POST /{id}/template` (Phase 193) and `GET /{id}/template/placeholders` (q5r). A door that mints an id, a door that reads it by id, and a door that reads it from bytes are one concern, not three. **What now binds the new door, and it is structural rather than a guard:** it injects **NO Supabase client and NO pool**, which makes the q5r cross-tenant class unreachable **by construction** — asserted by a signature/AST fence driven RED against a planted `get_pg_pool()`. It also adds the **zip-bomb cap the shipped size gates never covered** (`zf.read()` was unbounded; a 10 MB OOXML container can hold a multi-GB `word/document.xml`), driven RED at ×10,000,000. ⚠ **A parse failure may NEVER be indistinguishable from "no placeholders"** — corrupt or renamed files are 422, and the honesty property was measured to rest on **two** independent container gates, not one: removing `validate_upload` alone did not produce the lie. **Per G-5 the next phase adding a genuinely second concern still owes a refactor recommendation FIRST;** it inherits `34 / 17 / 1951`. **⚠ RE-DERIVED AT PHASE 193.2's CLOSE (2026-08-15): `34 / 17 / 1951` — UNCHANGED, and the non-move is a measurement rather than an omission.** ⚠ **Phase 193.2 did NOT touch this file**, which is worth recording because `193.2-CONTEXT.md` D-02 listed it as one of the six files in scope (*"it re-emits whatever the helper now says"*) and the ROADMAP's own flags predicted **"G-5 will fire on `backend/app/api/workflows.py`"**. It did not need to: D-12 makes `_interactive_phase_failures` the single source of the refusal literal, consumed verbatim by BOTH the publish gate and `/validate` → `blockedReason`, so rewriting the words in `publish_service.py` changed both surfaces **without one line landing here**. *A file predicted to be edited and then measurably not edited is a fact worth writing down, because the next reader would otherwise assume the prediction held.* **Its inherited G-5 obligation therefore passes forward completely untouched**; the next phase adding a genuinely second concern still owes a refactor recommendation FIRST, and it still inherits `34 / 17 / 1951`. Re-derive with `git log --oneline -- backend/app/api/workflows.py | wc -l` → 34 and `wc -l <file>` → 1951 (the recipe's 19 buckets include `260814` and `quick`, both quick tasks — 17 phases).
+
+### Phase 196 (plan `196-06`) — re-derived, and honoured by construction for the third consecutive phase
+
+**RE-DERIVED 2026-08-18 by plan `196-09`: `36 commits / 18 phases / 1984 L`** (`CLAUDE.md`'s row read
+`35 / 17 / 1962`; quick-task bucket excluded: `260814`). ⚠ **`196-06` measured the identical triple at its own
+close and called the row *"stale again, and by one phase — this plan's own commit is the 36th"*. It is the
+FIFTH recorded staleness on this one file, and this close re-derived it independently rather than copying
+`196-06`'s figure — the two agree, and the agreement is stated as a re-derivation rather than as a citation.**
+
+**What 196 did:** both write doors — `create_draft` and `update_draft` — now refuse a **newly-introduced**
+unregistered `config.model` with an object-shaped 400, after ownership and before any write. **All of the
+logic lives in `backend/app/services/model_registry.py`**; this file's whole contribution is one import and two
+call sites — **9 code lines** (plus 13 comment lines).
+
+**Why G-5 is honoured rather than triggered:** this row's own named seam applies one test — *does this add a
+genuinely SECOND concern?* A validation on the definition CRUD this module already owns is **a call-out, not a
+concern**, the same verdict `260814-q5r`, `193.1` and `193.2` each reached on the same test. Taking the named
+five-way split of a 1984-line module inside a model-picker phase would be smuggling a refactor phase.
+
+**The invariants that now bind this file, and the first is the security one:**
+
+1. ⚠ **A PATCH from a caller who does NOT own the row must FALL THROUGH to the existing 0-row UPDATE, never
+   raise.** A 400 fired before ownership resolves is an **existence oracle wearing a different status code**.
+   The shipped shape asks the cheap question first (`unregistered_phase_models(body)`), and only then pays for
+   the owner-scoped read and the explicit `created_by == user_id` comparison. ⚠ **The bare `is not None` form
+   is WRONG and was rejected on measurement — `get_definition` also returns GLOBAL PUBLISHED rows to
+   non-owners**, so grandfathering off a stranger's global row would have re-opened the oracle by a second
+   route. Pinned by `test_a_non_owner_patch_carrying_an_unregistered_model_is_the_same_dull_404`, including
+   `isinstance(detail, str)` so a dict detail cannot creep in.
+2. ⚠ **The stored-row read must stay LAZY.** 239 of 257 stored phases carry no model, so an unconditional
+   pre-read would cost every autosave an extra query for a grandfather that can never apply — and it would
+   change the call sequence every mocked-pool route test in `test_186_concurrent_patch.py` depends on. Pinned
+   by `test_the_ordering_holds_for_a_blank_model_too`.
+3. **Not a pre-emptive 404, deliberately** — that would turn an **owner's** PATCH of their own **published**
+   row from today's `409 already_published` into a 404. Falling through preserves all three of today's
+   refusals byte-for-byte.
+4. ⚠ **The plan's `<15 changed lines` criterion was MISSED at 22 and is recorded as a miss, not
+   reinterpreted.** Split: **9 code / 13 comment**. The overage is entirely the comment recording *why* the
+   not-owned case falls through — the single most load-bearing line of reasoning in that plan.
+
+**The publish route at `:1057-1120` is byte-unchanged, and the gap that leaves is measured rather than
+waved at:** publish reads the **stored** definition, so a pre-196 definition could carry an unregistered model
+and publish without meeting the refusal. Measured population: **0 of 257 stored phases**. No eighth gauntlet
+stage was added — see **`SEED-176`**, which carries the mechanical re-open trigger.
+
+---
 
 ---
 
@@ -322,6 +481,69 @@ G-5 fires — adapter pattern audit due
 
 **G-5 FIRES ON THE COUNT (8 phases against a threshold of 3) — and it has now been honoured BY CONSTRUCTION three times running, which is why no extraction is due.** The row's standing order since 185 is *"the next surface that needs the panel gets its own component and one gated line"*. 185 obeyed it (23 ins / 6 del, only 4 insertions reaching the render body; the dial and its refusal live in `GovernanceSection.tsx`). 193 obeyed it. **193.1 obeyed it and PROVED it rather than promising it:** the three-bucket template name check ships as its own component `TemplateNameCheck.tsx` with sibling `templateNameBuckets.ts`, mounted by **ONE gated line at `:1116`** — panel diff **+31 / −0**, of which **zero** added lines contain `useMemo` / `useState` / `useEffect` / `.filter(` / `.map(`. **The one-line property is now MECHANICALLY GUARDED, not asserted:** a source fence splits the panel's `?raw` text, filters lines containing `<TemplateNameCheck`, asserts `toHaveLength(1)`, and asserts that same line carries both `pt === "llm_emit"` and `{...nameCheck}` — so neither a second mount nor an unpacked prop can land quietly. ⚠ **`193.1-CONTEXT.md` D-22 recorded this file as measuring `15 commits / 7 phases / 1136 L` at plan time; that is ALSO stale now** — stated beside the corrected figure rather than over it, per this table's habit. **Per G-5, a phase that adds a genuinely SECOND concern here owes a refactor recommendation FIRST; it inherits `16 / 8 / 1167`.**
 
+### Phase 196 (plan `196-08`) — the FOURTH honouring of the one-gated-line order, and a SECOND source fence
+
+**RE-DERIVED 2026-08-18 by plan `196-09`: `19 commits / 9 phases / 1216 L`** (`CLAUDE.md`'s row read
+`16 / 8 / 1167`; quick-task bucket excluded: `260814`). ⚠ **STALE, and it is the third consecutive close at
+which this file's row has been found stale** — `193.1-CONTEXT.md` D-22 read `15 / 7 / 1136`, the extraction
+read `16 / 8 / 1167`, and both were true when written. Phase list gains `196`.
+
+**What 196 did, and the headline is a DELETION:**
+
+| Grep on this file | before | after |
+|---|---:|---:|
+| `label="AI model"` | **4** (`:877`, `:913`, `:965`, `:1067`) | **0** |
+| `<ModelField` | 0 | **4** |
+| `useMemo(` · `useState[(<]` · `useEffect(` | 0 · 0 · 0 | **0 · 0 · 0** |
+| `.filter(` · `.map(` | 6 · 11 | **6 · 11** |
+
+Four free-text `<TextField label="AI model">` mounts became four one-line gated `<ModelField>` mounts, each
+`{...modelPicker}`-spread and each guarded by its own `pt === "…"` phase-type test. `showFitness` appears on
+**exactly one** line and it is the `llm_emit` one (D-12). The panel's diff is **+81 / −18**, and the 18 removed
+lines are the four deleted mounts plus two import/destructure lines — **this phase REPLACED a concern rather
+than adding a second one**, which is the strongest form the standing order has been honoured in.
+
+**⚠ THE NEW `<ModelField` FENCE IS A SECOND FENCE, NOT A WIDENING OF THE FIRST — and the reason belongs on
+this row because a reader who assumes otherwise will delete one of them.** The shipped 193.1 fence is scoped
+to **`<TemplateNameCheck`** (`toHaveLength(1)`, one gated line). It **could not have covered the picker**:
+it filters this file's `?raw` source for that one token and asserts a count of one, so a `<ModelField` mount
+is entirely outside the set it examines, and four of them would have landed with the 193.1 fence still green.
+The new fence collects the lines carrying the picker's tag, asserts the **sorted SET** of their `pt ===`
+guards equals `["llm_agent","llm_batch_agents","llm_emit","llm_single"]`, and adds an **ABSOLUTE zero** on
+`useMemo` / `useState` / `useEffect` in the panel body.
+
+- ⚠ **A `toHaveLength(4)` would NOT have been equivalent** — it passes a duplicated guard (two mounts both
+  gated `llm_single`) and a missing type alike. The set comparison fails both, and the positive control
+  exercises exactly those two shapes.
+- **Both halves were driven RED against real plants in production source** (a stripped `llm_agent` guard; a
+  real `useMemo` over `modelPicker.models`), then the file restored **md5-identical**. *A fence never seen red
+  is not evidence.*
+
+**The invariants that now bind this file:**
+
+1. ⚠ **`ModelFieldProps` MUST stay ALIASED on import** (`type ModelFieldProps as PickerProps`). The type's
+   name begins with the component's name, so `Pick<ModelFieldProps, …>` carries the literal `<ModelField`
+   token on a line that is **not a mount and has no `pt ===` guard** — the exact shape the fence exists to
+   reject. Unaliased, the mount count reads **5**. The alias is load-bearing, not cosmetic.
+2. ⚠ **Prose in this file can break its own guardrails.** The 187-24 trap fired **three times in one plan**
+   here: a docblock that wrote *"scoped to `<TemplateNameCheck`"* took the shipped fence 1 → 2 and turned it
+   red; a docblock listing the compute tokens it promised were absent took the added-line grep to 2; a mount
+   comment naming the registry hook took that grep to 3. **Every needle is now either named by role or built
+   at runtime in the test** (`"<" + "ModelField"`, `"use" + "Memo("`). No criterion was relaxed in any of them.
+3. **The Phase-103 helper sentence *"Leave blank to use the workspace default."* was WRONG, not merely old** —
+   there is no workspace default in the code. It now reads *"Leave blank to use the run's model."*, and the
+   assertion was updated to the shipped copy rather than loosened to a `/leave blank/i` regex that would have
+   accepted the lie coming back.
+4. **`FieldLabel` / `InfoHint` are still private to this file, and the extraction is DEFERRED on a reason
+   with a three-arm re-open trigger recorded in source** (`196-08`). `ModelField` renders the same
+   two-audience structure locally rather than importing them, because exporting them would make the pair a
+   genuine ESM cycle the moment the panel imports the picker — which it now does. ⚠ **A change to this file's
+   label structure must be mirrored in `ModelField.tsx`**, and the picker's rendered-role assertions
+   (`getByRole("combobox", { name: /ai model/i })`) are what stop that duplication from drifting silently.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation FIRST; it
+inherits `19 / 9 / 1216`, and that figure goes stale on the next commit touching the file.**
+
 ---
 
 ## `backend/app/db/workflows.py`
@@ -349,6 +571,43 @@ G-5 fires — adapter pattern audit due
 ### G-5 status (verbatim)
 
 **G-5 FIRES ON THE COUNT (7 phases) — honoured BY CONSTRUCTION, no override.** **The measured reason:** `_interactive_phase_failures` **already composed this exact message** before 193.2 — two identical string literals, one per arm, at `:527-528` and `:537-538` of the pre-change file. The phase changed **the WORDS**, not the existence of the composition. Proved rather than asserted: `git diff -U0` reports every hunk at **line 501 or beyond**, i.e. inside the helper, so **stage 2.5 (`:190-208`) and `_block` (`:434-468`) are byte-untouched** — no check added, removed or weakened, no stage added, no control flow moved, the `continue`/`break` loop shape and the returned `{phase, message}` keys preserved. **The invariants that now bind this file:** the refusal's **two arms share no COMPLETE SENTENCE and cannot be collapsed** (arm 1 is about the STEP — *remove it*; arm 2 about a step's FAILURE ROUTE — *change it*) — ⚠ **a fence asserting only `a != b` would have passed a real plant that changed arm 2's second sentence to arm 1's while leaving the strings unequal; the shared-sentence clause is the one that fired, and it was driven RED to prove it**; **no internal identifier, slug or step number reaches the copy** (the retired message named `llm_human_input` and `ask_user` at a person who can see neither word on the canvas — the `BUG-260809-02` failure class), and F-3 is scoped over the **composed message VALUE, never the module source**, because this file's own docblocks legitimately quote both identifiers; **the model-authored phase label is clamped and single-lined by `_clean_label` / `_LABEL_MAX_CHARS = 72` before it enters user copy, an aria label and a PERSISTED audit row** — XSS is not the threat here, length and honesty are, and a 10 KB name would otherwise have produced a 10 KB refusal; an empty label degrades to a **name-free TRUE sentence, never a bare slug**; no branch may imply the gate is exhaustive over *"steps that involve a person"*, because it is not. ⚠ **THE GATE STAYS, AND WIDENING IT IS NOT MERELY OUT OF SCOPE — IT IS FORBIDDEN BY A SHIPPED FENCE.** `test_the_armed_checkpoint_is_not_a_validator` (`:898-936`) asserts `_interactive_phase_failures(armed) == []` and its docblock records that extending the helper to name armed phases is **CONFLICT-1 Option B, REJECTED** — it would make every `external_action` workflow unpublishable. Measured beside it and worth not re-deriving: an unrefused `external_action` **cannot wedge a publish** (auto-continued at `harness_engine.py:837`; the send skipped at `phase_types.py` GATE 1), so `SEED-164`'s *"always asks approval"* is true of a LIVE run and misleading as a publish-path claim. **Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST; the natural next seam is the eight gauntlet stages versus the judge invocation versus the receipt writers. It inherits `17 / 7 / 1158`.** ⚠ **RE-DERIVED HOURS LATER AT PHASE 193.2's ACTUAL CLOSE (2026-08-15, after the code-review fix pass): `17 / 7 / 1158` → `19 commits / 7 phases / 1243 L`** — recorded beside, not over; stale on the same day it was written. **The two extra commits are WR-05 and WR-06, and WR-05 discharged a deferral this row's own phase had recorded as OWED.** ⚠ **AN INVARIANT WAS ADDED BY THAT FIX AND IT BINDS ANYONE EDITING THE STAGE-2.5 COMMENT: the sentence *"The full background-job publish that COULD validate interactive phases is the deferred Phase-103 rework"* is now QUOTED VERBATIM AS SUPERSEDED rather than deleted** — *a deferral that lives only in a deleted comment is exactly as invisible as one that was never written* — with the capability it names routed to `SEED-164`. ⚠ **And the fix recorded a second instance of this project's "a copy a machine cannot find is not a copy" lesson:** as shipped, that sentence was **split across two lines**, so a line-oriented `grep` for the phrase returned **NOTHING and read as "already fixed"**; it is now quoted **on one line on purpose**. (The first instance was `193.2-08`, where a verbatim rule written WRAPPED failed its own literal `grep -q`.) It inherits `19 / 7 / 1243`.
+
+---
+
+### Phase 196 (plan `196-02`) — one consumer rewired, and the gauntlet deliberately NOT extended
+
+**RE-DERIVED 2026-08-18 by plan `196-09`: `20 commits / 8 phases / 1250 L`** (`CLAUDE.md`'s row read
+`19 / 7 / 1243`; the raw recipe's 9th bucket is `quick`, a quick task, counted OUT exactly as this section
+already documents about itself). Phase list gains `196`.
+
+**What 196 did — ONE consumer, and it closes a critical bug.** `_judge_golden_output` (the gauntlet's
+**hard wall**) resolved its judge model from `app.config.settings`, the **env-backed** pydantic singleton,
+which is `None` on every box in this project. `BUG-260731-01` measured the consequence: the operator's
+`app_settings.harness_judge_model` was ignored and every publish was graded by the hardcoded fallback
+`claude-opus-4-8` — *a setting that fails in the expensive direction, silently, behind a gate.* This file's
+consumer now resolves through `await load_app_settings_async()`, the DB-backed `UserEffectiveSettings` the
+rest of the app uses.
+
+⚠ **`resolve_judge_model`'s body, signature and resolution order are UNCHANGED — the defect lived entirely in
+what the four consumers handed it.** It reads `getattr(settings, "harness_judge_model", None)`, which is
+duck-typed and therefore accepts **either** settings object without complaint; that is what made passing the
+wrong one silent by construction, and it is why the fix is at the call sites rather than in the resolver.
+
+⚠ **THE LIVE CONSEQUENCE, NAMED HERE RATHER THAN DISCOVERED LATER: the publish-gauntlet judge on the
+operator's box is now `deepseek-v4-pro`, not `claude-opus-4-8`.** That is the fix working. It is also a real
+behaviour change on a gate, and it is owed a real publish shot — UAT row **U-B1**, not claimable from a unit
+test.
+
+**Why G-5 is honoured rather than triggered:** the change is **one expression on one existing call site**
+inside a helper this file already owned. The 8-stage gauntlet gains no stage, its doubly-documented ordering
+is untouched, and `_block` and stage 2.5 are byte-unchanged. ⚠ **`196-06` explicitly DECLINED to add an
+eighth stage here for the unregistered-model gap** — a genuine second concern added to a doubly-documented
+ordering, to catch a population measured at **zero of 257 stored phases**, while D-10's run-time check already
+covers the dangerous half for every path. That decline is recorded with a mechanical re-open trigger in
+**`SEED-176`**, not left as an omission.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation FIRST; it
+inherits `20 / 8 / 1250`.**
 
 ---
 
@@ -506,6 +765,64 @@ G-5 fires — adapter pattern audit due
 
 ---
 
+### Phase 196 (plan `196-07`) — the ONE file in the phase where G-5 was honoured by REDUCTION, and the arithmetic is the record
+
+**RE-DERIVED 2026-08-18 by plan `196-09`: `63 commits / 30 phases / 571 L`** (`CLAUDE.md`'s row read
+`61 / 29 / 587`; six-digit dated quick-task buckets: **checked, none exist** on this file). Phase list gains
+`196`. ⚠ **The line count went DOWN, which no other row on this ledger records** — 587 → **571**.
+
+**The measurement, taken at THREE points with `grep -c` on the file itself and never copied forward:**
+
+| | pre-Task-2 | post-Task-2 (the extraction) | post-Task-3 (the feature) | bar |
+|---|---:|---:|---:|---|
+| `useState[(<]` | **7** | **2** | **2** | 7 → 2 ✅ |
+| `useEffect(` | **4** | **3** | **3** | 4 → 3 ✅ |
+| `onStop` | 0 | 0 | **0** | the shipped fence, still 0 ✅ |
+| `useComposerModel` | 0 | 2 | **2** | exactly 2 ✅ |
+| `wc -l` | 587 | 571 | **571** | — |
+
+⚠ **THE THIRD COLUMN IS THE ONE THAT MATTERS, and it is the whole argument for taking the seam FIRST.** The
+feature — `BUG-260718-04`'s per-thread model restore — added **no hook at all** to the guarded file: `useState`
+and `useEffect` are identical post-extraction and post-feature. **A naive D-18 would have written the restore
+effect into this file and taken `useEffect` 4 → 5**, failing the very measurement Phase 194.1 recorded on this
+row as its own honouring test. *This row's standing bar was met by making the file smaller, not by arguing the
+addition was small.*
+
+**WHAT MOVED:** the composer's whole provider/model machine → **`frontend/src/hooks/useComposerModel.ts`**,
+together with three pure exported functions — `deriveLastUsedModel`, `resolveRestoreTarget` and
+`applyRestoreInOrder`.
+
+**The invariants that now bind the new hook, and the first two are subtle enough to be worth not
+rediscovering:**
+
+1. ⚠ **The restore is a SEED with a CLOSING WINDOW, not a policy — and the closing condition is TWO-armed.**
+   *"Restore once per thread"* alone is insufficient: a thread with nothing to restore from never marks itself
+   settled (correctly — messages arrive asynchronously, so *"no answer yet"* must not be read as *"no answer
+   ever"*). The operator picks a model and sends; the reply lands carrying a different one; the effect
+   re-evaluates, now finds a target, and **overwrites the pick the operator just made** — a fresh instance of
+   the exact defect class the plan exists to remove. So **both** `setSelectedModel` (wrapped as `chooseModel`)
+   **and** `handleProviderChange` call `settle()`.
+2. ⚠ **`applyRestoreInOrder` is a separate exported function SOLELY so the ORDER is observable.** React
+   batches the two setState calls, so an end-state assertion passes against a reversed implementation right up
+   until `handleProviderChange` clobbers the restored model in production. The test asserts a **sequence** —
+   `expect(order).toEqual(["provider:openai", "model:gpt-5.5"])`.
+3. **`resolveRestoreTarget` refuses on TWO independent grounds with different owners** — *operator-disabled*
+   (D-07's set, delivered by the new `disabled_models` field on `GET /settings/providers`) and *not offered by
+   any provider*. Collapsing them would let the composer render a selection the `<select>` has no option for.
+4. ⚠ **A Phase-194.1 comment in this file asserted `7 / 4` and was CORRECTED IN PLACE, with the superseded
+   figure preserved beside the new one.** On this file the measurement **is** the guardrail: a stale figure
+   answers the next auditor with a number that was true once and **stops the audit**.
+
+⚠ **The `onStop` fence held at 0 across both tasks, and it is still only satisfiable because the `inputBar`
+comment names the retired prop WITHOUT SPELLING IT.** That constraint now has a sibling: `useComposerModel`
+must read **exactly 2**, and it read **3** on the first attempt because an explanatory comment named the hook.
+Fixed by rewording the prose, never by waiving the criterion.
+
+**Per G-5 this file remains the strongest frontend extraction case after `StreamsProvider.tsx`; the obligation
+is REDUCED by this phase, not retired. It inherits `63 / 30 / 571`.**
+
+---
+
 ## `frontend/src/components/panel/PendingAskCard.tsx`
 
 **Re-derived 2026-08-17 (extraction):** `10 commits / 5 phases / 629 L` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (194.1).
@@ -651,6 +968,540 @@ G-5 fires — adapter pattern audit due
 
 ---
 
+## Phase 196 — ELEVEN files that were ABSENT from this ledger, and every one of them fires G-5
+
+*(Added 2026-08-18 by plan `196-09`, discharging `196-CONTEXT.md` D-22 / D-23 for the subset Phase 196
+actually modified. **Every triple below was re-derived in ONE batch pass at this close** with `CLAUDE.md`'s
+own recipe — six-digit dated quick-task buckets subtracted — and **not one figure was copied** from D-22, from
+`196-RESEARCH.md` §K.30, or from any earlier plan's summary. Several agree with an earlier reading anyway;
+where they do, the agreement is a re-derivation and is stated as one.)*
+
+⚠ **THIS IS THE `WorkflowsPage.tsx` FAILURE MODE ELEVEN TIMES OVER, and it is the largest single instance this
+ledger has recorded.** Phase 196 modified 23 non-test source files. **Eleven of them had no row**, so the
+discuss-phase audit — which scans PLAN.md `files_modified` *against the `CLAUDE.md` table* — could not fire on
+any of them, ever, at any phase count. `WorkflowsPage.tsx` escaped for ten phases, `WorkflowDoorSwitch.tsx` for
+six, `db/workflows.py` for seventeen, `ChatArea.tsx` for twenty-eight. **`backend/app/config.py` escaped for
+forty-two, and `frontend/src/lib/api.ts` for ninety-seven.**
+
+---
+
+### `frontend/src/lib/api.ts`
+
+**Re-derived 2026-08-18 (plan `196-09`): `170 commits / 97 phases / 6154 L`** · quick-task buckets excluded:
+`260405`, `260814` · **G-5 FIRES HARDER THAN ANY FILE ON THIS LEDGER** (97 phases vs threshold 3) — **the
+hottest file in the repository, and it had no row at all.**
+
+⚠ **THIS ROW REFUTES A SENTENCE IN `CLAUDE.md`.** That file calls `backend/app/api/threads.py` at 76 phases
+*"the hottest file in the repository"*. **It is not.** The full argument, both accountings and the preserved
+original are in the `threads.py` section above under **"⚠ CORRECTION 2026-08-18"**; the short form is that
+`api.ts` wins on the generous count (**97 vs 76**) and on the strict two-digit-discarding count (**81 vs 56**),
+so the verdict does not depend on which convention you pick.
+
+**What it is:** the ONE typed HTTP client for the entire frontend — every route the app calls, every request
+and response type, in one 6154-line module. **Three plans of Phase 196 alone edited it** (`196-01` added
+`ModelRegistryRow.emit_tier` / `ModelCapabilityPatch.emit_tier`; `196-04` added `AuthorModelRow` +
+`getAuthorModelRegistry`; `196-07` added `disabled_models` to the providers response type).
+
+**Why G-5 is honoured by construction for Phase 196 regardless of the count:** all three edits are **purely
+additive** — `196-04`'s `git diff` shows **no `-` lines beyond the file header**, so `getModelRegistry`'s body
+and `ModelRegistryRow` are byte-unchanged. No existing call was retyped, renamed or repointed.
+
+**What binds this file, and the first is measured rather than advisory:**
+
+1. ⚠ **A NEW EXPORT HERE IS A BREAKING CHANGE FOR EVERY SUITE THAT STUBS `@/lib/api` WITH AN EXPLICIT
+   FACTORY.** Nine suites stub it that way, and an undeclared export **throws at mount** rather than returning
+   `undefined`. Adding `getAuthorModelRegistry` cost **249 failing tests** until nine mock factories declared
+   it (`196-08`); adding `getGroundingBundle` cost the same one phase earlier. *This is the file's single most
+   expensive property and it is invisible from inside the file.*
+2. **A client type must be STANDALONE, never a `Pick` or an `extends` of a richer server row.** `AuthorModelRow`
+   is a structural six-field interface rather than `Pick<ModelRegistryRow, …>`, deliberately, so a field added
+   to the operator row later **cannot travel to authors by inheritance**. `grep -c 'Pick<ModelRegistryRow\|extends ModelRegistryRow'`
+   is a live fence at 0.
+3. **The `.models` unwrap stays in the client** — callers receive the array, not the envelope.
+
+**THE NAMED SEAM, so the next refactor has somewhere to start rather than a 6154-line wall:** this module is
+already *de facto* partitioned by domain in its own ordering — threads/messages, documents/folders, skills,
+workflows/harness, settings/providers, admin/registry, connectors. **A per-domain split under
+`frontend/src/lib/api/` with a re-exporting barrel** preserves every `from "@/lib/api"` import site
+unchanged — which is what makes it takeable at all, given property 1 above. ⚠ **The barrel is not optional:
+repointing import sites and splitting the module in one commit would destroy the byte-identity evidence any
+such cut needs.** **Per G-5 the next phase touching this file owes a refactor recommendation FIRST.**
+
+---
+
+### `backend/app/config.py`
+
+**Re-derived 2026-08-18 (plan `196-09`): `71 commits / 42 phases / 1285 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (42 phases vs threshold 3) — **the second-hottest file
+measured anywhere in this project, and it was structurally invisible to its own guardrail for the project's
+entire life.**
+
+⚠ **THIS IS THE HEADLINE OF D-22 AND IT IS STATED PLAINLY RATHER THAN FOLDED INTO A LIST.** Forty-two phases
+have edited this module. G-5 has **never fired on it once**, not because anyone waived it but because the
+audit reads a table and this file was not in the table. That is the identical invisibility failure
+`WorkflowsPage.tsx` (ten phases), `WorkflowDoorSwitch.tsx` (six) and `db/workflows.py` (seventeen) each
+suffered — and it ran four times longer here than in any of them. ⚠ **`196-01` recorded `70 / 41 / 1275` at
+its own close; this re-derivation reads `71 / 42 / 1285` the same day.** *A figure written at a plan's close
+goes stale on the next commit, and here it went stale inside the same phase.*
+
+**What it is — and this is why the count is so high:** the module hosts at least four separable concerns.
+(a) The env-backed `Settings` pydantic singleton and its validators — the infra/secrets tier. (b)
+**`MODEL_CAPABILITIES`**, the 61-row hardcoded model registry that is the source of truth for provider
+routing, `emit_tier`, `native_tools`, context windows and timeouts. (c) `get_model_capability` /
+`get_model_capability_async` — the read path, including the **DB overlay** from
+`model_capabilities_overrides`. (d) `apply_setup_overlay` and the `INFRA_KEYS` file-store overlay.
+
+**What Phase 196 did:** `196-01` appended `"emit_tier"` to the copy tuple in `get_model_capability_async`, so
+the operator's override reaches the read path (D-14). One entry, in one tuple.
+
+**What binds this file, and three of these are red lines:**
+
+1. ⚠ **THE SYNC `get_model_capability` STILL NEVER READS THE DB, AND THAT IS NOW PINNED RATHER THAN LEFT TO BE
+   REDISCOVERED.** `get_model_capability("glm-4.7-flash")` still returns `capability_source="inferred"` with no
+   `emit_tier`. `test_sync_path_still_never_reads_the_db` asserts exactly that, so a later reader **cannot
+   assume the overlay fixed both doors**. Only the async path is overlaid.
+2. ⚠ **`_build_inferred_defaults` MUST NOT LEARN TO READ `forced_emission` OR `strict_json_schema`** — D-122-04
+   forbids any derived view re-reading the deprecated flags. Measured at `196-01`'s close:
+   `git diff <base> HEAD -- backend/app/config.py | grep "^+" | grep -c "forced_emission\|strict_json_schema\|_build_inferred_defaults"`
+   → **0**.
+3. ⚠ **AN ID ABSENT FROM `MODEL_CAPABILITIES` SILENTLY RESOLVES `capability_source=inferred` AND LOSES
+   `emit_tier`** (SEED-040 / SEED-135). This is why the UAT roster rule insists on registry-backed ids: an
+   unregistered id measures a *weaker* configuration than the one that ships, and nothing says so at the call
+   site.
+4. **The timeout bounds are the single source for the PATCH door.** `admin.py`'s `_MODEL_CAP_INT_BOUNDS`
+   **imports** `_LLM_CALL_TIMEOUT_MIN_S` / `_MAX_S` from here rather than retyping them, asserted by an
+   equality test — so the write door and the env parser cannot drift.
+5. **`Settings.harness_judge_model` still exists here and is no longer read by any judge consumer.** It was
+   deliberately NOT deleted in `196-02`: removing a field while rewiring its consumers would have made a red
+   test ambiguous about which change caused it.
+
+**THE NAMED SEAM:** **`MODEL_CAPABILITIES` and its two readers want their own module** —
+`backend/app/services/model_registry.py` already exists (created by `196-04`) and is the natural home for the
+*composition* of code-registry ∪ DB rows; the raw table plus `get_model_capability{,_async}` is the cut that
+would take ~600 lines out of a 1285-line config module and leave the env/infra tier alone. ⚠ **The obstacle is
+named too, so the next phase does not discover it mid-cut: `from app.config import settings` and
+`from app.config import get_model_capability` are everywhere in the tree, so the cut must ship a re-export in
+`config.py` in the same commit** — the `run_transport.py` precedent above, whose load-bearing-re-import
+invariant applies here verbatim. **Per G-5 the next phase touching this file owes a refactor recommendation
+FIRST.**
+
+---
+
+### `frontend/src/types/index.ts`
+
+**Re-derived 2026-08-18 (plan `196-09`): `70 commits / 56 phases / 1154 L`** · quick-task bucket excluded:
+`260405` · **G-5 FIRES** (56 phases vs threshold 3) — **the third-hottest file measured anywhere in this
+project, behind only `api.ts` (97) and `config.py` (42)… and ahead of `config.py`, in fact. It had no row.**
+
+**What it is:** the ONE shared frontend type module — every domain model, every union the UI switches on. Its
+phase count is high for the same structural reason `api.ts`'s is: **almost any feature that adds a field
+touches it**, which is exactly the property that makes a hot-file count meaningful and exactly the property a
+missing row hides.
+
+**What Phase 196 did:** `196-03` added `"model_fallback"` to the `EmitSubStep` union.
+
+**Why G-5 is honoured by construction:** one member appended to one closed union. No type renamed, widened or
+removed.
+
+**⚠ WHAT BINDS THIS FILE: A UNION MEMBER ADDED HERE IS A CONTRACT THE RENDERING SIDE MUST HONOUR IN THE SAME
+COMMIT.** `EmitSubStep` is consumed by `PhaseCard.tsx`'s `SUBSTEP_META` map; a member without an entry renders
+as nothing, which on a run surface is a silent lie rather than a visible gap. `196-03` shipped both halves
+together and pinned the whole union with an `it.each` over `SUBSTEPS`, so a future member with no meta entry
+fails a test rather than a user.
+
+**THE NAMED SEAM:** per-domain type modules under `frontend/src/types/` with a re-exporting barrel — the same
+shape, the same barrel requirement and the same re-export invariant as `api.ts` above, and for the same
+reason: `from "@/types"` is everywhere. **Per G-5 the next phase touching this file owes a refactor
+recommendation FIRST.**
+
+---
+
+### `scripts/vitest-count-gate.cjs`
+
+**Re-derived 2026-08-18 (plan `196-09`): `100 commits / 16 phases / 3215 L`** · quick-task buckets excluded:
+`260807`, `260808`, `260814` · **G-5 FIRES** (16 phases vs threshold 3) — ⚠ **and this is the
+`WorkflowsPage.tsx` failure mode ON THE FILE THAT ENFORCES THE GUARDRAILS.**
+
+⚠ **Sixteen phases have edited the gate script and it has been invisible to its own guardrail for its entire
+life.** The trajectory inside Phase 196 alone is the ledger's staleness finding in miniature, and all three
+readings are kept: `196-05` measured **`98 / 16 / 3110`**, `196-07` **`99 / 16 / 3181`**, `196-08`
+**`100 / 16 / 3215`** — and this close re-derives the last independently and agrees.
+
+**What Phase 196 did:** `196-03` adopted `PhaseCard.test.tsx` (both knobs, pinned at 27); `196-05` added one
+`TARGETS` entry and three `BASELINE` pins; `196-07` added two `TARGETS` entries and two `BASELINE` pins;
+`196-08` **raised** one existing pin, `PhaseFormPanel.test.tsx` 24 → 38.
+
+**Why G-5 is honoured by construction:** every edit is an append to `TARGETS` or `BASELINE` plus its comment
+block. `196-05`'s and `196-07`'s diffs show **zero `-` lines** in the script.
+
+**What binds this file:**
+
+1. ⚠ **`TARGETS` AND `BASELINE` ARE TWO SEPARATE KNOBS AND ADOPTING A SUITE MEANS SETTING BOTH.** A `TARGETS`
+   entry makes a suite **run**; a `BASELINE` pin makes it **guarded**. A suite in `TARGETS` only is executed
+   and defended by nothing — which is precisely the state eight of Phase 195's nine suites were in.
+2. ⚠ **A PIN'S VALUE MUST BE READ FROM THE GATE'S OWN `actual` COLUMN, NEVER FROM A DOCUMENT** — including
+   from the plan that commissions it, and including from this ledger. `196-05` pinned `ModelField.test.tsx` at
+   **32**, not the 31 its first green run measured, because a later task added a case; the pin was set from
+   the column after that change.
+3. ⚠ **RAISING A PIN NECESSARILY PRODUCES ONE `-` LINE, and an orchestrator check of the form
+   `git diff … | grep -c '^-[^-]'` EXPECTING 0 IS WRONG.** A key cannot hold two values. **The gate's contract
+   is no per-file DECREASE and zero failing — never a fixed total and never a zero-deletion diff.** `196-08`
+   raised `PhaseFormPanel.test.tsx` 24 → 38 and would have been mis-flagged as a deletion by that check. The
+   property actually worth guarding is that **sibling plans' entries are untouched**, which is a per-key
+   assertion, not a line count.
+4. **A GROWING GRAND TOTAL IS THE GATE WORKING.** Phase 196's arc: `4123` (wave 2) → `4197` → `4258` →
+   `4277` → **`4291 · failed 0 · pinned 4217 · 89/89`**.
+
+**THE NAMED SEAM:** the script is **3215 lines of which the great majority is the comment register** that makes
+each pin auditable — and that register is the file's most valuable property, not its bloat. The honest cut is
+therefore **not** prose removal but **data/logic separation**: `TARGETS` + `BASELINE` + their registers into a
+sibling data module, leaving the runner, the report reader and the verdict formatter in the script. **Per G-5
+the next phase touching this file owes a refactor recommendation FIRST.**
+
+---
+
+### `backend/app/main.py`
+
+**Re-derived 2026-08-18 (plan `196-09`): `72 commits / 53 phases / 783 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (53 phases vs threshold 3) — absent from this ledger until
+now, at fifty-three phases.
+
+**What it is:** the FastAPI application factory — every `include_router`, the lifespan, the middleware stack.
+Its phase count is high for the structural reason that **every new route module must be registered here**,
+which makes it a natural chokepoint rather than an accreting concern.
+
+**What Phase 196 did:** `196-04` added one import name and one `include_router` line for the new
+`GET /models/registry` route.
+
+**Why G-5 is honoured by construction:** two lines, in the shape every prior router registration already uses.
+
+**What binds this file:** ⚠ **a router registered here inherits ONLY its own dependencies.** The new
+`model_registry` router carries **no prefix and no router-level dependency** — `Depends(get_current_user)`
+alone, deliberately, following the `me_preferences.py` precedent. **`admin.py`'s router-level operator
+default-deny is a property of THAT `APIRouter(prefix="/admin", …)` construction and does not extend to
+siblings**; `196-04` proved the wall had not moved by asserting the 200 and the 404 **in one test with one
+seeded identity**, so the two claims cannot drift apart and nobody can read the 200 as evidence the gate was
+widened to produce it.
+
+**THE NAMED SEAM:** none is proposed, and that is a verdict rather than an omission — a registration file with
+53 phases and 783 lines is doing exactly one thing 40-odd times. **The G-5 obligation is recorded so the count
+is inherited rather than re-derived; the next phase touching it should say the same thing unless the file has
+started to hold logic.**
+
+---
+
+### `backend/app/api/admin.py`
+
+**Re-derived 2026-08-18 (plan `196-09`): `32 commits / 12 phases / 1733 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (12 phases vs threshold 3) — absent from this ledger until now.
+
+⚠ **`196-01` recorded `30 / 11 / 1718` and `196-04` recorded `32 / 12 / 1733` FOUR HOURS LATER.** Both were
+accurate when written. This close re-derives the second independently and agrees. *The ledger's most-repeated
+finding, reproducing inside a single phase and inside a single afternoon.*
+
+**What it is:** the operator Control-Room API — the model registry CRUD, the kill switches, the audit ledger
+reads, the users roster, the feature-visibility map. Its router carries an **operator default-deny at the
+router level**, which is the file's most important property.
+
+**What Phase 196 did:** `196-01` added `_MODEL_CAP_ENUM_COLUMNS` and `_MODEL_CAP_INT_BOUNDS` beside their
+int/bool siblings plus one `elif` inside the existing guard loop; `196-04` **removed 87 lines and added 13** —
+`_registry_row` and the union composition moved OUT to `backend/app/services/model_registry.py`, leaving
+`get_model_registry` a thin call.
+
+**Why G-5 is honoured by construction:** `196-01` is two module constants and one `elif` inside a loop that
+already existed; `196-04` is **subtractive in the right direction**.
+
+**What binds this file, and the first is the SQLi boundary:**
+
+1. ⚠ **`_MODEL_CAP_COLUMNS` MUST STAY IN THIS MODULE.** Its members are **interpolated into the upsert's column
+   list** by `set_model_capability` (T-149-11), which makes that set the SQL-injection boundary. `196-04`
+   deliberately did **not** move it with `_registry_row` — the leaf imports it **function-locally** instead —
+   because moving the allowlist a hop away from the writer that enforces it is exactly the wrong direction.
+   The function-local form is also what keeps the `admin.py` → service → `admin.py` cycle from having to
+   resolve at import time.
+2. ⚠ **WIDENING THAT SET IS LEGITIMATE ONLY IN THE SAME COMMIT AS THE NEW COLUMN'S OWN GUARD.** `196-01` took
+   it 7 → 8 and **broke `test_149_model_write.py::test_columns_constant_is_exactly_the_seven_editable` — which
+   is the guard WORKING, not noise.** The pin was renamed to `..._the_eight_editable` and given a docstring
+   recording the rule and naming `_MODEL_CAP_ENUM_COLUMNS`.
+3. **The guard loop's two shipped properties are inherited, not re-implemented:** an explicit `None` is a
+   **Reset**, and the raise happens **before any DB touch**. The new `elif` sits inside that loop precisely so
+   it cannot lose either. Every refusal case asserts the recording pool's `.calls` is empty — *a guard that
+   raises after the upsert is not a guard, it is a log line.*
+4. ⚠ **`_infer_provider_for` IS NOT THIS MODULE'S** — it lives in `app.config` and `admin.py` merely imports
+   it (`:40`). `196-04`'s plan described it as an `admin.py` name that would "travel with" the extraction;
+   reading the source showed there was nothing to carry.
+
+**THE NAMED SEAM:** the module hosts the model-registry CRUD, the kill-switch grid, the audit reads and the
+users roster — **four operator concerns in one router**. The registry CRUD is the natural first cut and
+`196-04` has already taken the *composition* half of it. **Per G-5 the next phase adding a genuinely second
+concern here owes a refactor recommendation FIRST.**
+
+---
+
+### `backend/app/api/settings.py`
+
+**Re-derived 2026-08-18 (plan `196-09`): `30 commits / 16 phases / 616 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (16 phases vs threshold 3) — absent from this ledger until now.
+
+**What Phase 196 did:** `196-07` added `disabled_models` to the `GET /settings/providers` response — one
+comprehension over a dict the handler had **already awaited**, and one return key.
+
+**Why G-5 is honoured by construction:** one comprehension and one key, inside the handler that already
+performed exactly that read. No new query, no new import, no new cache.
+
+**⚠ WHAT BINDS THIS FILE — AND THE MOST IMPORTANT ENTRY IS A CORRECTION TO A PLAN'S STATED REASON, PRESERVED
+HERE BECAUSE IT WOULD OTHERWISE BE INHERITED AS A MEASURED FACT:**
+
+1. ⚠ **`196-07`'s plan asserted that *"a provider's `models` list is the OPERATOR's configured list and is NOT
+   filtered by registry `enabled`"*. THAT IS FALSE ON THIS TREE.** `_build_providers`
+   (`user_settings.py:712-713`, D-149-08) applies `if (disabled_ids) models = models.filter(...)` to the whole
+   assembled list, and `load_app_settings_async` (`:947-954`) **warms the all-rows override cache immediately
+   before** the sync builder runs, precisely so that filter can see disabled rows. `GET /providers` is on that
+   async path. **A disabled model IS already excluded from `p.models`.**
+2. **The field ships anyway, on a justification that survives measurement** — three reasons, none of them the
+   plan's: (a) the restore's INPUT is **a message from history**, not the offered list, so a membership test
+   against `p.models` conflates *"the operator disabled it"* with *"this provider never offered it"*, and D-18
+   asks for D-07's rule **by name**; (b) the existing filter is **cache-warmth dependent** — `disabled_ids` is
+   read from a module-level cache with a 30 s TTL that the *sync* loader does not warm, whereas the explicit
+   field is computed from the dict the handler itself just awaited; (c) it costs one comprehension over an
+   already-fetched dict.
+3. ⚠ **`verified_models` AND THE `/settings` RESPONSE ARE OUT OF BOUNDS FOR THE MODEL-PICKER WORK — this is
+   ROADMAP SC#3's scope fence and it lives at this file.** `196-07` touched the `/providers` handler **only**;
+   `deprecated_models` is byte-unchanged and pinned by its own adversarial case.
+4. **`resolved_harness_judge_model` (`:265-271`) is computed from the EFFECTIVE settings** — which is what made
+   the Settings screen show the operator's pick resolved correctly **while the judge shot the registry
+   default** for a year. `196-02` closed the asymmetry from the other side; this line was already right.
+
+**THE NAMED SEAM:** the module hosts the app-settings read/write, the provider roster and the per-user
+preference surface. At 616 lines it is the least urgent of this group. **Per G-5 the next phase adding a
+genuinely second concern owes a refactor recommendation FIRST.**
+
+---
+
+### `backend/app/services/harness/validator_kinds.py`
+
+**Re-derived 2026-08-18 (plan `196-09`): `12 commits / 5 phases / 749 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (5 phases vs threshold 3) — absent from this ledger until now.
+⚠ D-22 read `11 / 4 / 744`; **this is a re-derivation, not a copy**, and it moved.
+
+**What Phase 196 did:** `196-02` rewired **consumer 4** — the in-run `llm_judge_rubric` validator — off the
+env-backed `app.config.settings` singleton onto the DB-backed settings. **Exactly one hunk, at `:532-543`,
+inside `_validate_llm_judge_rubric`.**
+
+**What binds this file:**
+
+1. ⚠ **`resolve_judge_model`'s BODY, SIGNATURE AND RESOLUTION ORDER ARE UNCHANGED AND MUST STAY THAT WAY** —
+   `BUG-260731-01`'s defect lived entirely in **what the four consumers handed it**. It is duck-typed
+   (`getattr(settings, "harness_judge_model", None)`) and therefore accepts either settings object without
+   complaint, which is what made passing the wrong one silent by construction. **Fix the argument, never the
+   resolver.**
+2. **The rung order is `config["model"]` → `ctx.judge_model` → the resolved settings value.** `196-02` changed
+   **only the third rung**; a precedence control asserts the first rung still wins and never reads the row.
+3. ⚠ **THE FALLBACK LADDER AT `:83-86` STILL READS THE DEPRECATED-UNREAD `forced_emission` BOOL while the
+   emission ladder reads `emit_tier` (D-122-04).** This is a real drift and it was **deliberately not fixed**
+   inside a critical-bug plan: measured **0 of 61** registry rows disagree, both fallback candidates resolve
+   identically under either flag, and changing inert code beside a binding test would have made a red result
+   harder to attribute. **It is now a GATE rather than a note** — `backend/tests/unit/test_196_forced_emission_drift_trigger.py`
+   fires the day the drift stops being latent. Full reasoning: **`SEED-175`**.
+
+**THE NAMED SEAM:** the module holds the judge-model resolver, the verdict schema and the per-kind validator
+implementations. The resolver is a two-screen leaf with four consumers across three modules and is the obvious
+first cut — **but note that moving it changes `resolve_judge_model`'s import path at four sites and at every
+test that patches it.** **Per G-5 the next phase adding a genuinely second concern owes a refactor
+recommendation FIRST.**
+
+---
+
+### `backend/app/services/eval_runner_service.py`
+
+**Re-derived 2026-08-18 (plan `196-09`): `12 commits / 7 phases / 959 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (7 phases vs threshold 3) — absent from this ledger until now.
+
+**What Phase 196 did:** `196-02` rewired **consumers 1 and 2** — the eval judge **shot** and the judge model
+**recorded on the result row** — off the env singleton onto `await load_app_settings_async()`.
+
+**What binds this file:**
+
+1. ⚠ **CONSUMER 2 IS NOT INSIDE A LOOP, AND THE PLAN THAT SAID IT WAS COULD NOT BE EXECUTED AS WRITTEN.**
+   `196-02` instructed *"resolve once above the loop"*; **no loop textually contains the call.** It lives in
+   the `if status == "completed" and output.strip():` grading branch of **`_run_arm_body`**, a helper that
+   `run_eval_job`'s `for case in cases:` loop calls **twice per case** (WITH arm and WITHOUT arm). Hoisting to
+   `run_eval_job` needs a parameter threaded through `_run_arm` **and** `_run_arm_body` — exactly the signature
+   change the same plan forbids. The resolution was hoisted to the **top of the grading block** instead.
+2. **The property that actually mattered is satisfied and is arithmetic, not assertion:** `load_app_settings_async`
+   is **TTL-cached at 30 s**, so this hoisted read and consumer 1's own resolution microseconds later collapse
+   into **one** DB read per arm. Before: two `app.config.settings` reads per arm, zero DB reads. After: **at
+   most one DB read per arm — not two, and never one per consumer.**
+3. ⚠ **A TEST THAT DERIVES ITS EXPECTATION FROM THE ENV SINGLETON IS NOW WRONG BY CONSTRUCTION.**
+   `test_judge_provider_independent` computed its expected provider from `app.config.settings` and would have
+   **silently pinned the wrong model forever**. Its CLAIM — the judge routes to the judge model's own registry
+   provider and never to `user_settings.active_provider` — was never violated; only the derivation had rotted.
+   It now derives through the same source the code uses.
+
+**THE NAMED SEAM:** the module holds job orchestration, the per-arm runner, the judge shot and result
+persistence. **Per G-5 the next phase adding a genuinely second concern owes a refactor recommendation FIRST.**
+
+---
+
+### `frontend/src/components/admin/ModelRegistryTab.tsx`
+
+**Re-derived 2026-08-18 (plan `196-09`): `10 commits / 4 phases / 1191 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (4 phases vs threshold 3) — absent from this ledger until now.
+⚠ D-22 read `9 / 3 / 1083`; re-derived, it has moved on both axes.
+
+**What Phase 196 did:** `196-01` shipped the tab's **first enum column** — three user-facing sentences for the
+three `emit_tier` values, an OVR/DEF tag, a Reset that writes explicit `null`, and the raw token only under the
+⌥ Technical-names reveal. Neither existing primitive was reusable: `NUM_FIELDS` is int-only and `RowToggle` is
+boolean.
+
+**What binds this file:**
+
+1. ⚠ **`null` RENDERS AS `coerce`, NOT AS BLANK — and that is an honesty decision, not a display default.**
+   Blank would imply *"unknown"*, and the backend does not treat it that way: `forced_emit.py` reads
+   `cap.get("emit_tier", "coerce")`, so an untracked model is **already** behaving as best-effort. A `—` would
+   hide a live behaviour behind a shrug.
+2. **The control writes through the same `onSetCapability` chokepoint every other cell uses.** No second write
+   discipline was introduced.
+3. ⚠ **THE OPEN-Q2 CAPTION IS LOAD-BEARING COPY, quoted here verbatim so it cannot be trimmed as filler:**
+   *"Setting this records what you believe the provider supports; nothing verifies it against the provider."*
+   Surfacing an already-doc-verified value makes no new provider claim; making it **editable** introduces an
+   unverified operator assertion, and that sentence is the whole of this surface's answer to the
+   provider-docs-first rule.
+4. **No provider logo was added** (`grep -c '@lobehub/icons'` → 0) — the icon convention is a separate concern
+   and this tab does not open it.
+
+**THE NAMED SEAM:** the tab is a wide editable table whose column kinds (bool / int / enum / text) each carry
+their own render, guard and reset semantics. **One module per column kind** is the cut. **Per G-5 the next
+phase adding a genuinely second concern owes a refactor recommendation FIRST.**
+
+---
+
+### `frontend/src/components/panel/PhaseCard.tsx`
+
+**Re-derived 2026-08-18 (plan `196-09`): `11 commits / 7 phases / 522 L`** · six-digit dated quick-task
+buckets: **checked, none exist** · **G-5 FIRES** (7 phases vs threshold 3) — absent from this ledger until now.
+
+**What Phase 196 did:** `196-03` added one `SUBSTEP_META` entry for the new `"model_fallback"` sub-step —
+`node: "degraded"` with the `recovering` amber, because a model substitution is degraded-but-honest.
+
+**⚠ WHAT BINDS THIS FILE, AND IT IS AN HONESTY RULE RATHER THAN A STYLE ONE: `model_fallback` DELIBERATELY DOES
+NOT REUSE THE `recovering` STATUS.** It borrows the colour and not the word. A narrated-emit recovery and a
+disabled-model substitution are **different events**, and collapsing them would put a lie on the run surface —
+the operator would read *"recovering"* about a run that never faltered. The amber says *degraded*; the label
+says what actually happened.
+
+Second invariant: **`SUBSTEP_META` must stay total over `EmitSubStep`.** A union member with no entry renders
+as nothing, which on a run surface is a silent lie rather than a visible gap. The suite pins it with an
+`it.each` over the whole union, plus a positive control — and the file is **gated**, adopted into
+`scripts/vitest-count-gate.cjs` by `196-03` on **both** knobs at 27 cases (up from 24).
+
+**THE NAMED SEAM:** the card holds the phase header, the status vocabulary, the sub-step rail and the
+per-type body. The **sub-step meta table** is a data leaf and is the obvious first extraction. **Per G-5 the
+next phase adding a genuinely second concern owes a refactor recommendation FIRST.**
+
+---
+
+## Phase 196 — the phase's GUARDRAIL RECORD (G-1 / G-2 / G-3 / G-4 / G-5 / G-7)
+
+*(Added 2026-08-18 by plan `196-09`. ⚠ **Why HERE and not only in a plan summary**, since the plan that
+wrote this offered both homes: this file already carries the **G-5** half of every phase's guardrail
+story, and G-2 and G-5 were the two rules that actually fired on Phase 196. Splitting one phase's
+guardrail verdicts across two documents is how a decline gets read as an omission later. A plan
+SUMMARY is a plan-level artifact; **a guardrail verdict is phase-level and outlives the plan**, so it
+belongs beside the G-5 sections it sits with.)*
+
+| Rule | Verdict | Reason |
+|---|---|---|
+| **G-1** phase chain cap | **did not fire** | 196 is not a `<base>.N` insert. |
+| **G-2** sketch before plan for UX | ⚠ **FIRED, and was DECLINED on a reason** — see D-21 below | |
+| **G-3** lightweight commands | **did not fire** | nine plans, a migration, a new route, four mounted pickers — far past `/gsd:fast`. |
+| **G-4** lived-experience UAT | **fired; four rows RATIFIED, none yet DRIVEN** — see below | |
+| **G-5** refactor between feature waves | ⚠ **FIRED on SIX ledger files and ELEVEN more that had no row** — honoured by construction in every case, one of them by REDUCTION | arithmetic in each section above |
+| **G-7** gap-closure round cap | **did not fire** | no gap-closure round has run on this phase. |
+
+### D-21 — G-2 fired and was DECLINED on a reason. No override is owed and none is recorded.
+
+**The picker idiom already ships TWICE** — `JudgeModelPicker.tsx` (Phase 137.1, sketch 024-A) and
+`ModelDefaultPreference.tsx` (Phase 167). **The acceptance bar therefore existed in CODE rather than
+in a drawing**, and re-drawing an atom that already ships is precisely the structural sketch-to-build
+drift `SEED-155` records: *a sketch that hand-writes its own CSS for a surface consuming an existing
+component is a drawing, not an acceptance bar.* **The operator was offered a sketch and did not take
+it.** Because the rule was honoured-with-a-reason rather than overridden, `.planning/STATE.md` records
+**no guardrail override for Phase 196 — and that absence is a measurement, not an omission.**
+
+⚠ **THE HONEST LIMIT OF THAT REASONING, stated rather than smoothed:** the decline is defensible for
+the `<select>` and its `(current)` idiom, which both shipped pickers have. **It is WEAKER for the
+`<optgroup>` fitness grouping, which NEITHER shipped picker has** — that is new visual vocabulary
+whose only acceptance evidence is a render test. `196-05` and `196-08` each recorded this about
+themselves, and it is carried here so the next phase touching the picker inherits the caveat rather
+than the verdict alone.
+
+### D-16 — judge FITNESS stayed OUT because of a MEASUREMENT GAP, not scope tidiness
+
+`gemini-3.5-flash` is **`emit_tier: force`**, **registry-known**, and **still returned a null verdict**
+at a real publish. **So `emit_tier` is NECESSARY BUT NOT SUFFICIENT for the judge role** — which means
+a "judge fitness" facet built on the registry's emission vocabulary would have been built on an
+unverified premise.
+
+⚠ **The leading explanation for that failure is a HYPOTHESIS that has NEVER been live-verified, and
+`SEED-135` rates it MEDIUM and forbids any document from citing it as fact until someone dumps the
+sanitized Google tool payload.** It is therefore not restated here, in either seed written at this
+close, or in either bug report — deliberately, and this sentence is the record that the omission is
+the rule being obeyed rather than an oversight.
+
+**What Phase 196 fixed instead is the judge WIRING (D-17)**, which is a different defect with its own
+measurement: the knob the operator turns is now the control the code obeys. Fitness remains SEED-135's.
+
+### G-4 — four rows ratified in `196-VALIDATION.md`, ALL FOUR still OWED
+
+**Driven at phase verification by Chrome MCP, not by any plan.** Recorded here because *"the plans are
+green"* and *"the rows ran"* are different claims, and this project's standing lesson is that closing a
+phase with owed manual rows is legitimate **only when stated as a decision**:
+
+| Row | What it must show | Why no plan could discharge it |
+|---|---|---|
+| **U-A1** | open a saved `llm_emit` step, touch nothing, close — `config.model` byte-unchanged **via DB** | now DRIVABLE for the first time (`196-08`); the suite pins the client half (`onChange`/`onPersist` zero-called across three stored values incl. an unknown one), which is real evidence and **not the same evidence** |
+| **U-A2** | a `coerce` model distinguished from `force_strict` **before** committing the pick, in user words | ⚠ proved as **MARKUP**, never as human experience — a render test cannot prove a person notices |
+| **U-B1** | set the judge knob, run a **real** publish, see **that model** named in the verdict receipt | the live judge is now `deepseek-v4-pro`; a unit test cannot prove a provider shot |
+| **U-C1** | pick a model, send, navigate away, return, **REFRESH** — model still selected | ⚠ **jsdom has no page reload.** This row is the sole thing standing between `BUG-260718-04` and `closed` |
+
+---
+
+## Phase 196 — files NAMED by D-22 but deliberately left as names, and TEST files deliberately left unlisted
+
+*(Added 2026-08-18 by plan `196-09`. Stated so both omissions read as decisions rather than oversights.)*
+
+**`frontend/src/pages/SettingsPage.tsx` and `frontend/src/components/settings/ModelPillRow.tsx` stay
+named-only, by decision.** `196-CONTEXT.md` D-22 named them alongside the eleven above, and Phase 196
+**deliberately did not modify either** — that is ROADMAP **SC#3**'s scope fence, and this plan proved it with a
+negative fence over the phase's real diff rather than asserting it. Writing detail sections about code a
+model-picker phase does not touch would turn it into a documentation phase. **The re-open trigger already
+recorded stands: the next phase whose `files_modified` names either of them owes it a row and a section.**
+
+**Phase 196's TEST files are deliberately NOT given `CLAUDE.md` rows** — the same decision this ledger already
+records for Phase 195's four new test files, for the same reason: **G-5 is about production concerns accreting
+in one module; a test file's growth is the gate's business, not the ledger's**, and the mechanism that actually
+watches them is `scripts/vitest-count-gate.cjs` (frontend) plus the backend suite baseline. They are **named
+here** so a `grep` finds them and so the next refactorer knows where this phase's pins live:
+
+- Backend, created: `test_196_emit_tier_two_layer_pin.py` · `test_196_emit_tier_overlay.py` ·
+  `test_196_judge_model_db_backed.py` · `test_196_harness_enabled_check.py` ·
+  `test_196_model_registry_route.py` · `test_196_save_refusal.py` · `test_196_providers_disabled_models.py` ·
+  `test_196_forced_emission_drift_trigger.py`
+- Backend, repaired by this phase's own changes: `test_149_model_write.py` (the seven-column pin, widened to
+  eight — *its failing was the guard working*) · `test_eval_runner.py` (an expectation derived from the retired
+  singleton) · `test_185_detection.py` (two stub lambdas that predate the widened builder signature)
+- Frontend, created: `ModelField.test.tsx` · `modelFitness.test.ts` · `useModelRegistry.test.ts` ·
+  `useComposerModel.test.ts` · `ChatArea.model.test.tsx`
+- Frontend, edited: `PhaseCard.test.tsx` · `PhaseFormPanel.test.tsx` · `ModelRegistryTab.test.tsx` ·
+  `ModelRegistryTab.a11y.test.tsx` · and the nine `@/lib/api` mock factories repaired by `196-08` —
+  `WorkflowBuilderPage.canvas.test.tsx` · `WorkflowBuilderPage.describe.test.tsx` ·
+  `WorkflowBuilderPage.session.test.tsx` · `WorkflowBuilderPage.header.test.tsx` ·
+  `WorkflowBuilderPage.test.tsx` · `WorkflowBuilderPage.preDraft.baseline.test.tsx` ·
+  `WorkflowDoorSwitch.test.tsx` · `WorkflowDoorSwitch.baseline.test.tsx` · `WorkflowsPage.test.tsx`
+
+---
+
 ## Why `MessageItem.tsx` and `RunCard.tsx` owe NOTHING from Phase 195
 
 *(Added 2026-08-17 by plan `195-08`. Recorded because it is a **structural** claim rather than luck, and because an absent entry would read as an oversight.)*
@@ -684,6 +1535,66 @@ precisely the state a row-scanning audit cannot see. They now carry real rows in
 - `frontend/src/components/files/fileRowUtils.ts` — **1 / 1 / 133** (re-derived at `945b8b61`; buckets `195`; six-digit buckets: **checked, none exist**) — the ONE `formatBytes` (hoisted **byte-identical** from its origin, with a `?raw` identity fence proving it), `baseName`, the `FileSource` discriminated type, and `byNewestFirst`. ⚠ **`byNewestFirst` must sort a MISSING `created_at` FIRST, not last** — the live SSE payload carries no timestamp, so a comparator sorting a missing key last puts the just-produced deliverable at the bottom of the list. **22 cases, gated.**
 - `frontend/src/lib/fileIcon.tsx` — **2 / 2 / 254** (re-derived at `945b8b61`; buckets `095 195`; six-digit buckets: **checked, none exist**) — was `1 / 1 / 105`; Phase 195 widened it into the ONE per-extension icon path for the whole app. Options: `ribbon` / `tone` / `className` / `mimeType`. ⚠ **The bare `text/` mime arm is a FALLTHROUGH and sits AFTER the extension lookup on purpose** — a literally-mime-first order regresses `script.py` served as `text/plain` from the Code glyph to a document one, which is a real combination the panel already handled correctly. Every *specific* mime branch is mime-first; only the bare fallthrough is not. ⚠ **An own-property guard on the map lookup is load-bearing** — `EXT_MAP["constructor"]` would otherwise return a function. **41 cases, gated.**
   > ⚠ **THIS BULLET CARRIES THE LEDGER'S OWN STANDING LESSON AS ITS REASON FOR EXISTING.** At **2 phases** G-5 does **not** fire on this file, and by the letter of the rule it needs no entry at all. It gets one anyway, because `WorkflowsPage.tsx` escaped G-5 **for ten phases purely by not being written down**, and `OutputFileCard.tsx` — two sections above — was invisible at **seven**. **A file that is not in the ledger cannot be seen by the audit that would have added it.** The cheapest moment to write the row is before the guardrail needs it.
+
+**Added 2026-08-18 by plan `196-09` — Phase 196's six new production modules. Same rule: a THIRD phase earns a
+full section.** ⚠ **They are listed BELOW the G-5 threshold on purpose**, on the `fileIcon.tsx` precedent —
+`WorkflowsPage.tsx` escaped G-5 for ten phases, and `config.py` for forty-two, purely by not being written
+down. Each is named by **what it is the ONE home for**, because that is the property a later phase needs.
+
+- `backend/app/services/model_registry.py` — **3 / 1 / 368** (re-derived at this close; buckets `196`;
+  six-digit buckets: **checked, none exist**) — **the ONE union composition**: `build_model_registry_rows()`
+  (the code registry ∪ the DB override rows), `to_author_row()` (the six-key author allowlist),
+  `registered_model_ids()` (the MEMBERSHIP set) and `assert_phase_models_registered()` (the save-path refusal).
+  ⚠ **Already at THREE consumers in one phase** — the operator registry route, the author registry route and
+  both write doors. ⚠ **The author projection is an explicit ALLOWLIST, never a `del` of unwanted keys**:
+  `_registry_row` emits **14** fields, `to_author_row` emits **6**, **8 are dropped**, and the test asserts
+  **key-set EQUALITY** plus a raw-body substring backstop so a leak nested below row top level still fails.
+  ⚠ **The `enabled` semantics are `_registry_row`'s — an ABSENT override row means ENABLED** — which is what
+  the RUNTIME enforcement (`_resolve_enabled_model`) agrees with. The narrower offerable-set helper behind
+  `/me/preferences` disagrees (34 vs 69), and adopting it here would refuse a SAVE for ~32 models the engine
+  happily runs. *A picker narrower than the engine is a different lie, not an absence of one.*
+  ⚠ **MEMBERSHIP is not availability: a DISABLED model still SAVES** — making disabled a save-time refusal
+  would mean disabling a model retroactively breaks every workflow naming it.
+  ⚠ **`assert_phase_models_registered` raises on the FIRST offender, not on all of them** — deliberate, and a
+  verifier expecting an array of offenders on the wire will not find one.
+- `backend/app/api/model_registry.py` — **1 / 1 / 155** (buckets `196`) — **the ONE non-operator door onto the
+  registry union**, `GET /models/registry`. No prefix, no router-level dependency, `Depends(get_current_user)`
+  alone. ⚠ **`run_default_model` is COMPUTED, never guessed** — it walks the same chain `workflow_kickoff.py`
+  walks and **fails SOFT to `null`**, because an honest absence degrades a label while a 500 takes the whole
+  picker down. It deliberately does **not** read `_registry_row.is_default`, which answers a different
+  question. The three candidate ids measured at the time — `app_settings.llm_model` = `deepseek-v4-flash`, the
+  sub-agent default = `gpt-5.4-mini`, and the `gpt-5.4` that 18 stored phases happen to carry — **no two
+  agree**, which is the whole argument for computing it.
+- `frontend/src/components/workflows/ModelField.tsx` — **1 / 1 / 236** (buckets `196`) — **the ONE
+  registry-backed picker**, mounted four times by `PhaseFormPanel.tsx`. ⚠ **A pure function of its props: no
+  state, no effect, no fetch** — guarded behaviourally (zero calls on open) **and** structurally (a `?raw`
+  source fence forbidding `useState` / `useEffect` **and any RUNTIME import of `@/lib/api`**, with both
+  positive controls observed red). ⚠ **It renders the panel's two-audience label structure LOCALLY rather than
+  importing `FieldLabel`**, because the panel is the module that imports *it* — see the `PhaseFormPanel.tsx`
+  section. ⚠ **It cannot express "I could not read the registry"**; it takes rows, not a reading. The
+  unknown-value caption sits **outside** the `<select>`, because a native `<option>` cannot host markup —
+  which is also why fitness is `<optgroup>` grouping rather than a per-option suffix.
+- `frontend/src/components/workflows/modelFitness.ts` — **1 / 1 / 130** (buckets `196`) — **the ONE
+  tier→words vocabulary**, plus `EMIT_TIER_ORDER`, the read-time `coerce` default and the boundary guard.
+  ⚠ **An unrecognised tier resolves with `hasOwnProperty`, NEVER with `?? floor`** — a plain object literal
+  inherits `constructor` / `toString`, none of which is nullish, so a coalesce hands back a **FUNCTION** typed
+  as the table's value type. That is a shipped bug this project has already had (`phaseStatusFromDb`), and
+  this file exists partly so it is not had a third time. Words live here; the derivation lives on the server.
+- `frontend/src/hooks/useComposerModel.ts` — **2 / 1 / 367** (buckets `196`) — **the ONE composer
+  provider/model machine**, extracted out of `ChatArea.tsx` (which came out five `useState` and one
+  `useEffect` lighter). Exports `deriveLastUsedModel`, `resolveRestoreTarget` and `applyRestoreInOrder`. Its
+  three binding invariants — the two-armed closing window, the order-observable restore and the two independent
+  refusal grounds — are written out in the `ChatArea.tsx` section rather than duplicated here. ⚠ **The one to
+  watch: any future model-selection work in chat returns to this file.** ⚠ It aborts with a **`cancelled`
+  flag, not an `AbortController`** — `getAuthorModelRegistry` accepts no signal, so the sibling hook's shape
+  copied verbatim would have produced a controller that aborts nothing; the guard's real job is preventing a
+  state update after unmount, and it says so.
+- `frontend/src/hooks/useModelRegistry.ts` — **1 / 1 / 109** (buckets `196`) — **the ONE author-registry
+  fetch**, owned above the panel by `WorkflowBuilderPage.tsx`. ⚠ **A failed read is `status: "failed"`, NEVER
+  an empty success** — the whole point of the hook is that *"the registry is empty"* and *"I could not read the
+  registry"* must not be the same value, because the second rendered as the first tells an author that a
+  registered model is unknown. `grep -c 'getAuthorModelRegistry'` under `frontend/src/components/` is a live
+  fence at **0**: components do not fetch.
 
 ⚠ **Phase 195's new TEST files are deliberately NOT listed as young files** (`files/__tests__/FileRow.test.tsx`, `files/__tests__/fileRowUtils.test.ts`, `files/__tests__/FileRow.sweep.test.ts`, `chat/__tests__/OutputFileCard.baseline.test.tsx`). **G-5 is about production concerns accreting in one module; a test file's growth is the gate's business, not the ledger's** — and all four are pinned FILE-LEVEL in `scripts/vitest-count-gate.cjs`, which is the mechanism that actually watches them. Stated rather than left silent, so their absence reads as a decision.
 
