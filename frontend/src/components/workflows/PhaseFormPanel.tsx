@@ -59,9 +59,31 @@ import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
 // 196-08 (AUTH-04) — the registry-backed picker. ONE import, and the arrow points ONE WAY:
-// this panel imports the picker, the picker imports nothing from here. That is why the picker
-// renders the two-audience label structure locally instead of importing this file's private
-// `FieldLabel` — see the deferral recorded in that component's docblock.
+// this panel imports the picker, the picker imports nothing from here.
+//
+// ── THE `FieldLabel` EXTRACTION: CONSIDERED, AND DEFERRED ON A REASON ──────────────────────
+//
+// `FieldLabel` and `InfoHint` are private functions in THIS file, so the picker renders the
+// same two-audience structure locally rather than importing them. Plan 196-05 discovered that
+// (its `<interfaces>` assumed the primitive was importable; it is not) and recommended that
+// THIS plan extract both into their own module, because this is the file that owed the edit.
+//
+// ⚠ IT IS DELIBERATELY NOT TAKEN HERE, and the reason is the shape of this plan rather than
+// disagreement with the recommendation. The extraction is the right architecture: it removes a
+// real duplication and permanently forecloses the ESM cycle that exporting `FieldLabel` would
+// otherwise invite once the import above exists. But it is a refactor of a G-5 hot file that
+// would also rewrite the picker's rendered markup — a component whose 32-case suite pins that
+// markup — inside the one plan whose whole discipline is a capped diff under this file's
+// standing ONE GATED LINE order. Smuggling a refactor into the mount that makes AUTH-04 real
+// is how a narrow change stops being reviewable as one.
+//
+// NO CYCLE EXISTS TODAY: the arrow points one way, and nothing here exports a label primitive.
+//
+// ⚠ RE-OPEN TRIGGER, concrete so this is a deferral and not a drop — take the extraction in
+// the FIRST of these to happen: (a) any change to `FieldLabel`'s or `InfoHint`'s markup or
+// a11y contract, which would silently desynchronise the picker's local copy; (b) a THIRD
+// consumer needing the same two-audience label; or (c) any future need to import a primitive
+// from this file back into the picker, which is the move that would create the real cycle.
 //
 // ⚠ THE TYPE IS ALIASED ON IMPORT, AND THE ALIAS IS LOAD-BEARING RATHER THAN COSMETIC. A
 // generic written over the child's own props type — `Pick< the-props-type , … >` — puts the
