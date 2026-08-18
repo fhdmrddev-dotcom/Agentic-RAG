@@ -75,6 +75,14 @@ import {
   NO_PROJECT,
   OWN_SHARED,
   OWN_YOURS,
+  // 192.2-05 (LIB-06 / D-01 line 2 / D-08) — the five run words, imported for the same D-14
+  // reason as every other string here: a test that retypes `Never run` has forked the
+  // acceptance bar, and these five are the ones that must never be confusable with each other.
+  RUN_FAILED,
+  RUN_NEVER,
+  RUN_STOPPED,
+  RUN_UNKNOWN,
+  RUN_WORKED,
   STATE_DRAFT,
   STATE_RUNNABLE,
   STATE_STARTER,
@@ -1233,6 +1241,9 @@ function renderLibrary(rows: readonly LibraryRow[] = SCALE_ROWS) {
           onForkNewVersion={noop}
           onForkStarter={noop}
           identity={identityFor(row)}
+          // 192.2-05 (P-1) — the ONE hoisted instant, exactly as the page hands it down. A
+          // fixed one here also means these cases need no clock mock.
+          now={FIXTURE_NOW}
           onDeleted={noop}
         />
       ))}
@@ -1452,5 +1463,277 @@ describe("the shipped surface survives the 14th atom at scale", () => {
     expect(DERIVED.cards).toBe(106)
     expect(DERIVED.linesWithOneOfN).toBe(93)
     expect(DERIVED.duplicatedNames).toBe(14)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 192.2-05 Task 4 (LIB-06 / D-01 / D-08 — threats T-19, T-20, T-22) — DOES THIS ONE WORK?
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// Everything above proves the card is QUIETER. This block proves it now ANSWERS SOMETHING —
+// at the shape the operator's real library actually has, which is the whole reason LIB-06
+// exists rather than LIB-05 being extended.
+//
+// ⚠ THE MEASURED WORST CASE IS THE FIXTURE, NOT A CONVENIENT ONE. CONTEXT `<measurements>`:
+// **43 rows named `Compliance Gap Report`, across 41 DISTINCT slugs** — 41 separate workflows,
+// not 41 versions, so collapsing versions does not help (117 → 96). D-04 settles that the
+// identity line already tells them APART; LIB-06 is the different question — *which one is
+// worth running* — and three rows that differ ONLY by their last run is exactly that question
+// with everything else held constant.
+//
+// ⚠ EVERY ASSERTION BELOW IS ON VISIBLE TEXT (D-27). Rows are reached through the card's
+// shipped root testid and read by what they SAY; nothing here uses `getElementById`, which is
+// the rule Phase 192's own re-drive broke — the reason its UAT proved the code and not the task.
+
+/** The five arms as ROWS: same name, same version, same everything but the run. */
+const runRowOf = (
+  id: string,
+  lastRunStatus: string | null | undefined,
+  lastRunAt: string | null | undefined,
+): LibraryRow =>
+  rowOf("published", {
+    id,
+    slug: `compliance-gap-${id}`,
+    name: "Compliance Gap Report",
+    lastRunStatus,
+    lastRunAt,
+    source: {
+      id,
+      slug: `compliance-gap-${id}`,
+      name: "Compliance Gap Report",
+    } as unknown as LibraryRow["source"],
+  })
+
+const DAY_MS = 86_400_000
+const iso = (msAgo: number) => new Date(FIXTURE_NOW - msAgo).toISOString()
+
+/** The three rows the operator would be triaging: one worked, one failed, one never ran. */
+const WORKED = runRowOf("gap-worked", "completed", iso(2 * DAY_MS))
+const FAILED = runRowOf("gap-failed", "failed", iso(40 * DAY_MS))
+const NEVER = runRowOf("gap-never", null, null)
+
+/** Line 2's text for one rendered card — the SLOT, read as a person reads it. */
+const answerText = (card: HTMLElement): string =>
+  within(card).getByTestId("row-answer").textContent ?? ""
+
+/**
+ * Render an ARBITRARY set of rows as one shelf.
+ *
+ * ⚠ NOT `renderLibrary`, and the reason was measured rather than foreseen: that helper resolves
+ * each card's identity through a Map built over `SCALE_ROWS` alone, so a row this block
+ * constructs comes back `undefined` and the card throws on `identity.segs`. Read out of this
+ * block's own RED. The index here is built over the rows ACTUALLY rendered, by the REAL
+ * `buildIdentityIndex` / `resolveIdentity` — a hand-built identity would pin what this file
+ * believes the resolver says instead of what the card is really handed.
+ */
+function renderRows(rows: readonly LibraryRow[]) {
+  const index = buildIdentityIndex(rows)
+  return render(
+    <>
+      {rows.map((row) => (
+        <WorkflowCard
+          key={row.id}
+          row={row}
+          folderName={null}
+          onRun={noop}
+          onOpen={noop}
+          onForkNewVersion={noop}
+          onForkStarter={noop}
+          identity={resolveIdentity(index, row, FIXTURE_NOW)}
+          now={FIXTURE_NOW}
+          onDeleted={noop}
+        />
+      ))}
+    </>,
+  )
+}
+
+describe("LIB-06 — three same-named rows are told apart by their run, in words alone", () => {
+  it("the corpus really is the hard case: one name, three slugs, three different runs", () => {
+    // The control. Three DISTINCT names would make every case below pass for the wrong reason.
+    expect(new Set([WORKED.name, FAILED.name, NEVER.name]).size).toBe(1)
+    expect(new Set([WORKED.slug, FAILED.slug, NEVER.slug]).size).toBe(3)
+    expect([WORKED.version, FAILED.version, NEVER.version]).toEqual([3, 3, 3])
+    // …and they really do reach three different arms of `RunFact`, rather than three spellings
+    // of one. `undefined` / `null` / a terminal status are three inputs, not one.
+    expect(WORKED.lastRunStatus).toBe("completed")
+    expect(FAILED.lastRunStatus).toBe("failed")
+    expect(NEVER.lastRunStatus).toBeNull()
+  })
+
+  it("SC — the three cards are MUTUALLY DISTINGUISHABLE by their visible text", () => {
+    renderRows([WORKED, FAILED, NEVER])
+    const cards = screen.getAllByTestId("published-card")
+    expect(cards).toHaveLength(3)
+
+    const said = cards.map(answerText)
+    // The load-bearing assertion of this whole plan: three rows carrying ONE name say three
+    // different things. A card that rendered the same sentence three times would pass every
+    // presence check in this file and fail here.
+    expect(new Set(said).size).toBe(3)
+
+    expect(said[0]).toContain(RUN_WORKED)
+    expect(said[1]).toContain(RUN_FAILED)
+    expect(said[2]).toContain(RUN_NEVER)
+    // …and each one still says its state too, so line 2 is never half-empty.
+    for (const text of said) expect(text).toContain(STATE_RUNNABLE)
+  })
+
+  it("T-20 — the WORD carries it, not the colour: strip every class and they still differ", () => {
+    // The standing project rule is *colour is never the only carrier*. Asserting the class
+    // would satisfy a card that painted three bars and said one sentence, which is the defect.
+    renderRows([WORKED, FAILED, NEVER])
+    const cards = screen.getAllByTestId("published-card")
+    for (const card of cards) {
+      for (const node of Array.from(card.querySelectorAll("*"))) node.removeAttribute("class")
+    }
+    expect(new Set(cards.map(answerText)).size).toBe(3)
+  })
+
+  it("the gutter tracks the sentence — one derivation, never two switches", () => {
+    renderRows([WORKED, FAILED, NEVER])
+    const cards = screen.getAllByTestId("published-card")
+    const arms = cards.map((card) =>
+      within(card).getByTestId("run-gutter").getAttribute("data-run"),
+    )
+    expect(arms).toEqual(["worked", "failed", "never"])
+    // The gutter is decoration over the sentence: it is hidden from assistive tech precisely
+    // BECAUSE the sentence already says everything it encodes.
+    for (const card of cards) {
+      expect(within(card).getByTestId("run-gutter")).toHaveAttribute("aria-hidden", "true")
+    }
+  })
+
+  it("T-19 — the NAME still leads: it is the first text the card renders (D-02)", () => {
+    // Sketches 177 and 178 argued the name cannot be the differentiator; the operator chose C,
+    // which KEPT it as the lead and moved only the ENCODING. A card that demoted the name to
+    // line two has rebuilt variant B, which was not chosen — and would pass every case above.
+    renderRows([WORKED])
+    const card = screen.getByTestId("published-card")
+    const text = card.textContent ?? ""
+    expect(text.indexOf("Compliance Gap Report")).toBe(0)
+    expect(text.indexOf("Compliance Gap Report")).toBeLessThan(text.indexOf(RUN_WORKED))
+  })
+})
+
+describe("D-08 — the three arms on the card, and `unknown` is not `never` (T-22)", () => {
+  it("a NEVER-RUN DRAFT says so — the most common row on a shelf that is 69% drafts", () => {
+    // CONTEXT `<measurements>`: 81 of 117 rows are drafts, and a draft has by definition never
+    // been run (a draft cannot be Run at all — the page's own contract). This is the sentence
+    // the majority of the operator's library will carry.
+    const draft = rowOf("draft", { id: "d-never", lastRunStatus: null, lastRunAt: null })
+    const { card } = renderCard(draft, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_NEVER)
+    expect(answerText(card)).toContain(STATE_DRAFT)
+    // ⚠ NOT BLANK AND NOT A TICK — D-08's words. An absence rendered as nothing reads as fine.
+    expect(answerText(card)).not.toBe("")
+    expect(answerText(card)).not.toContain(RUN_WORKED)
+    expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "never")
+  })
+
+  it("an UNKNOWN-ARM row says `Not recorded` — never `Never run`, and never a time", () => {
+    // ⚠ THE STALE-DEPLOY ROW: a frontend ahead of its backend receives rows with NO run keys.
+    // Claiming *"never run"* about a workflow that has run a hundred times is the product
+    // asserting something false, which is worse than admitting a gap.
+    const row = runRowOf("gap-unknown", undefined, undefined)
+    const { card } = renderCard(row, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_UNKNOWN)
+    expect(answerText(card)).not.toContain(RUN_NEVER)
+    expect(answerText(card)).not.toContain("ago")
+    expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "unknown")
+  })
+
+  it("T-22 — `unknown` and `never` render DIFFERENT sentences and different gutters", () => {
+    // The pair, side by side in ONE render, because "they differ" is a claim about two rows
+    // and a suite that rendered them separately could pass on a card that said one thing.
+    renderRows([runRowOf("u", undefined, undefined), NEVER])
+    const [unknownCard, neverCard] = screen.getAllByTestId("published-card")
+    expect(answerText(unknownCard)).not.toBe(answerText(neverCard))
+    expect(within(unknownCard).getByTestId("run-gutter").getAttribute("data-run")).not.toBe(
+      within(neverCard).getByTestId("run-gutter").getAttribute("data-run"),
+    )
+  })
+
+  it("a STOPPED run is neither success nor failure, and says so in its own word", () => {
+    const row = runRowOf("gap-stopped", "cancelled", iso(1 * DAY_MS))
+    const { card } = renderCard(row, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_STOPPED)
+    expect(answerText(card)).not.toContain(RUN_WORKED)
+    expect(answerText(card)).not.toContain(RUN_FAILED)
+  })
+
+  it("an UNRECOGNISED status is never read as success — the default is honest, not optimistic", () => {
+    // `succeeded` is a plausible spelling this build does not map. It must land on `unknown`.
+    const row = runRowOf("gap-odd", "succeeded", iso(1 * DAY_MS))
+    const { card } = renderCard(row, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_UNKNOWN)
+    expect(answerText(card)).not.toContain(RUN_WORKED)
+    expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "unknown")
+  })
+})
+
+describe("WR-01 — a row with NO NAME still answers the question", () => {
+  it("the nameless row is carried by line 2 alone, and says two real things", () => {
+    // WR-01 was a shipped bug: an empty name blanked the library title. The card is quieter
+    // now, so a nameless row has LESS to fall back on — which makes line 2's totality the
+    // thing that keeps it readable rather than a nicety.
+    const nameless = rowOf("published", {
+      id: "p-nameless",
+      name: "",
+      lastRunStatus: "completed",
+      lastRunAt: iso(2 * DAY_MS),
+    })
+    const { card } = renderCard(nameless, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_WORKED)
+    expect(answerText(card)).toContain(STATE_RUNNABLE)
+    // Still identifiable, still actionable: the version defers to the right of the empty lead,
+    // and the row keeps its one verb.
+    expect(within(card).getByText("v3")).toBeInTheDocument()
+    expect(within(card).getByTestId("published-run")).toBeInTheDocument()
+  })
+
+  it("an empty name renders NO placeholder — the card does not invent a title", () => {
+    const nameless = rowOf("published", { id: "p-nameless-2", name: "" })
+    const { card } = renderCard(nameless, { now: FIXTURE_NOW })
+    // The house rule for absence across this subtree: render nothing, never a stand-in. A
+    // fabricated `Untitled` is a value that compares like a presence.
+    expect(card).not.toHaveTextContent(/untitled/i)
+    expect(card).not.toHaveTextContent(/unnamed/i)
+  })
+})
+
+describe("D-06 — no emoji and no system vocabulary reach the user, at scale", () => {
+  it("not one of the 106 rendered cards carries an emoji", () => {
+    // The card's own emoji were four; the sweep is over the RENDERED DOM rather than the
+    // source, so a glyph arriving from any consumed component would red here too.
+    renderLibrary()
+    const cards = screen.getAllByTestId(/^(published|starter|draft)-card$/)
+    expect(cards).toHaveLength(DERIVED.cards)
+    for (const card of cards) {
+      expect(card.textContent ?? "").not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+    }
+  })
+
+  it("POSITIVE CONTROL — the same sweep DOES catch a planted emoji", () => {
+    // Without this, the 106 clean cards above would pass on a broken regular expression.
+    const { container } = render(<div>{"\u{1F4C4} planted"}</div>)
+    expect(container.textContent ?? "").toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+  })
+
+  it("the three business words are what the shelf says — and no lifecycle token appears", () => {
+    renderLibrary()
+    const said = screen
+      .getAllByTestId("row-answer")
+      .map((node) => node.textContent ?? "")
+      .join(" ")
+    // Every rendered row's state is one of the three shipped business words…
+    for (const word of [STATE_RUNNABLE, STATE_DRAFT, STATE_STARTER]) {
+      expect(said).toContain(word)
+    }
+    // …and the system's own spellings reach nobody. `Starter` alone is a substring of
+    // `Shared starter`, so it is deliberately NOT swept here — the two lifecycle tokens
+    // D-06 names by name are.
+    expect(said).not.toMatch(/\bpublished\b/)
+    expect(said).not.toMatch(/\bdraft\b/)
   })
 })
