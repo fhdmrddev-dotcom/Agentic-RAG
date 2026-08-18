@@ -39,7 +39,7 @@ the right vocabulary, stop it, and see what it produced.
 | 193 | Authoring Doors + Template Placement | A user can tell the two doors apart before choosing, and can find where to supply a template | AUTH-01, AUTH-03 | 3 |
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
-| 196 | Registry-Backed Model Picker (canvas) | 7/9 | In Progress|  |
+| 196 | Registry-Backed Model Picker (canvas) | 8/9 | In Progress|  |
 | 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
@@ -663,7 +663,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 196-08-PLAN.md — Wave 5: the mounts (D-20) — four free-text `AI model` inputs become four one-line gated `ModelField` mounts, plus the NEW source fence the 193.1 fence structurally cannot cover
+- [x] 196-08-PLAN.md — Wave 5: the mounts (D-20) — four free-text `AI model` inputs become four one-line gated `ModelField` mounts, plus the NEW source fence the 193.1 fence structurally cannot cover
 
 **Wave 6** *(blocked on Wave 5 completion)*
 

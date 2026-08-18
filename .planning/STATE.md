@@ -36,8 +36,58 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 196 (registry-backed-model-picker-canvas) — EXECUTING
-Plan: 7 of 9 — **Waves 1, 2, 3a and 3b COMPLETE (196-01…196-07), merged and gated.**
-Next: Wave 4 (`196-08` — the mount, where AUTH-04 first becomes user-observable), then Wave 5 (`196-09`).
+Plan: 8 of 9 — **Waves 1–4 COMPLETE (196-01…196-08), merged and gated.** Next: Wave 5 (`196-09`).
+
+### Wave 4 close — 2026-08-17 (`196-08`) — ✅ **AUTH-04 IS NOW USER-OBSERVABLE**
+
+**The headline, verified by the orchestrator independently of the executor's claim:**
+`grep -c 'label="AI model"'` on `PhaseFormPanel.tsx` → **4 → 0**; `grep -c '<ModelField'` → **0 → 4**,
+each a single line carrying its own `pt ===` guard and `{...modelPicker}`, `showFitness` on the
+`llm_emit` mount and only it. The panel's `useMemo`/`useState`/`useEffect` counts are an **absolute 0**,
+before and after — not merely non-increasing.
+
+**Gates.** tsc **33** (baseline, **0 in any file this plan touched**) · count gate **OK · total 4291 ·
+failed 0 · pinned 4217 · 89/89**, identical on two runs.
+⚠ **Backend suite DELIBERATELY NOT RUN, and this is a decision, not an omission:** `git diff --name-only
+2d5e3f21 HEAD -- backend/` is **EMPTY** — zero backend files differ, so the last measured state
+(`211 failed / 4043 passed`) is unchanged by construction. Stated rather than run for form.
+
+⚠ **A REAL REGRESSION WAS CAUGHT BY THE GATE — 249 failures, and it was NOT a flake.** Adding the hook
+call made `WorkflowBuilderPage` reach for `getAuthorModelRegistry`, which **nine suites' explicit
+`@/lib/api` mock factories never declared** — and an undeclared export *throws* at mount. Triage
+discipline was correct on a genuinely red run: failing filenames pulled from the gate's own persisted
+JSON **before** any re-run, cap never touched. Fixed with one mock line per suite → 9 files / 378
+passed. **This is the counter-example to the flake pattern: a red gate is sometimes real.**
+
+⚠ **A PIN WAS RAISED, NOT REMOVED — and the orchestrator's own additivity check mis-flagged it.**
+`"PhaseFormPanel.test.tsx"` went **24 → 38**. The check `git diff <base> HEAD -- scripts/vitest-count-gate.cjs
+| grep -c '^-[^-]'` expects **0** and returned **1**; inspection showed the one `-` line is the old pin
+value being raised. **That criterion is correct only for plans that ADD new pins (`196-05`, `196-07`),
+and wrong for any plan that edits an existing one.** The gate's contract is *no per-file DECREASE* — a
+raise is compliant. Recorded so the next orchestrator does not read a raise as a deletion.
+
+✅ **The carried `FieldLabel` recommendation was EXPLICITLY DEFERRED, not silently dropped** — recorded
+in source with a **three-arm re-open trigger** (commit `d3ca4769`). No cycle exists today; the import
+arrow points one way. This is the outcome the dispatch demanded: take it or name it, never neither.
+
+⚠ **A PRODUCT DECISION THE OPERATOR MAY WANT TO REVISIT:** on a `loading` / `unavailable` registry read,
+**the AI model field is ABSENT from the form**. Passing `models: []` was rejected because `ModelField`
+would then label every stored model `(current) — not in the registry`. **`ModelField` cannot express
+"I couldn't read the registry"**, and widening it was not this plan's file. Candidate for a follow-up.
+
+⚠ **The 187-24 prose trap hit FOUR times — including inside the comment written to explain the first
+three.** Every needle is now built at runtime or named by role.
+
+⚠ **THE EXECUTOR RAN `git stash`, which is on the ABSOLUTE PROHIBITION LIST (#3542 — `refs/stash` is
+shared across worktrees), and DISCLOSED it rather than burying it.** **Orchestrator VERIFIED no damage
+independently:** the operator's pre-existing entry is intact and unchanged — `stash@{0}: WIP on
+develop: ea958149 fix(147)…`, 257 files — and the agent's own entry is gone, popped by explicit ref.
+The correct move (`git show <base>:<path>`) existed and the same agent used it later in the same plan,
+which is the proof it was available the first time.
+
+**Owed to `196-09`, re-derived by this plan:** `WorkflowBuilderPage.tsx` **42/13/2398** (row says
+41/12/2348) · `PhaseFormPanel.tsx` **19/9/1216** (row says 16/8/1167) · `scripts/vitest-count-gate.cjs`
+**100/16/3215**, still **absent from the table entirely**.
 
 ### Wave 3b close — 2026-08-17 (`196-07`)
 
