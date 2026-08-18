@@ -40,7 +40,7 @@ the right vocabulary, stop it, and see what it produced.
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
-| 197 | Guided Authoring | 1/11 | In Progress|  |
+| 197 | Guided Authoring | 6/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
@@ -689,11 +689,11 @@ Plans:
 
 **Wave 2** *(five plans in parallel — zero `files_modified` overlap, no plan mutates the DB)*
 
-- [ ] 197-02-PLAN.md — Wave 2: the backend — D-13's ONE server-derived readiness verdict on `/generate`'s single success return (imported from `grounding.py`, never re-declared; the four failure arms carry none), plus D-14's two-half fence whose positive control is a REAL live fourth D-22 instance
-- [ ] 197-03-PLAN.md — Wave 2: `decisionsVocabulary.ts` — D-09/D-10's one copy home as a true zero-import leaf, with D-07's five-row order exported as DATA and a D-20 fence proving no row falsely claims a publish requirement
-- [ ] 197-04-PLAN.md — Wave 2: `terminalEmitSlug` beside `soulDeliverable` — WHICH step produces the deliverable, deterministic tie-break, without re-answering the question `soulDeliverable` already owns (D-18)
-- [ ] 197-05-PLAN.md — Wave 2: `setName` — the phase's ONLY new store action (D-15), one key, untracked, no trim, no provenance flag (C-1 declined), with the slug fence asserted over the PATCH body
-- [ ] 197-06-PLAN.md — Wave 2: the wire — a TYPE-only arm on `api.ts` (the repo's hottest file: 170/99/6154) and the `onDrafted` widening that stops the verdict being dropped at the hook boundary; absence travels as absence
+- [x] 197-02-PLAN.md — Wave 2: the backend — D-13's ONE server-derived readiness verdict on `/generate`'s single success return (imported from `grounding.py`, never re-declared; the four failure arms carry none), plus D-14's two-half fence whose positive control is a REAL live fourth D-22 instance
+- [x] 197-03-PLAN.md — Wave 2: `decisionsVocabulary.ts` — D-09/D-10's one copy home as a true zero-import leaf, with D-07's five-row order exported as DATA and a D-20 fence proving no row falsely claims a publish requirement
+- [x] 197-04-PLAN.md — Wave 2: `terminalEmitSlug` beside `soulDeliverable` — WHICH step produces the deliverable, deterministic tie-break, without re-answering the question `soulDeliverable` already owns (D-18)
+- [x] 197-05-PLAN.md — Wave 2: `setName` — the phase's ONLY new store action (D-15), one key, untracked, no trim, no provenance flag (C-1 declined), with the slug fence asserted over the PATCH body
+- [x] 197-06-PLAN.md — Wave 2: the wire — a TYPE-only arm on `api.ts` (the repo's hottest file: 170/99/6154) and the `onDrafted` widening that stops the verdict being dropped at the hook boundary; absence travels as absence
 
 **Wave 3** *(blocked on Wave 2)*
 
