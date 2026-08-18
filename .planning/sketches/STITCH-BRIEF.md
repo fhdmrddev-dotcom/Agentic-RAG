@@ -148,6 +148,86 @@ what exists: sketches **160–163** (library + card identity), **172–174** (th
 
 ---
 
+## 6.5 ⭐ THE STANDING METHOD — RATIFIED BY THE OPERATOR 2026-08-18, AFTER SEEING SKETCH 177
+
+The exploration was run, the operator reacted, and the reaction **changes how this project designs
+from now on**. Their words:
+
+> *"I want you from now on to use a combination between Google Stitch and your sketches. What was
+> generated as mock examples with Google Stitch is very much closer to what I have in mind without
+> losing information. It is reducing the text — that is noise — but also keeping the focus of the
+> purpose of the workflows for users. We just want to adopt this mindset. I like it very much."*
+
+### The two-tool loop is now the default, not an experiment
+
+| Step | Tool | Produces | Is it an acceptance bar? |
+|---|---|---|---|
+| 1 | **Stitch** | direction — composition, hierarchy, rhythm, how little text a surface can carry | **No** |
+| 2 | **Operator** | reaction to the range | — |
+| 3 | **Normal sketch** under `.planning/sketches/` | the chosen direction **re-expressed against components that actually ship** | — |
+| 4 | that sketch, approved | **Yes** — this is the G-2 bar | **Yes** |
+
+⚠ **Steps 1 and 4 must never be collapsed.** Stitch redraws every surface from scratch and renders
+**zero** shipped components. Handing its HTML to a build phase is exactly the `SEED-155` failure
+(an approved sketch drew a card the components structurally could not render — four complaints,
+three phases, one seed). Stitch makes that failure *easier* to hit, not harder.
+
+**What this changes in practice:** a UI phase no longer starts at `/gsd:sketch`. It starts at Stitch
+for the language, and the sketch then *renders real components* in that language.
+
+### THE MINDSET, in the operator's own terms
+
+Two rules held together — **neither one alone**:
+
+1. **TEXT IS NOISE. CUT IT.** Prefer a state word to a sentence, a number to a phrase, one line to
+   two. Delete helper text that repeats what the control already shows. If a label and its value say
+   the same thing, keep the value.
+2. **THE PURPOSE MUST SURVIVE THE CUT.** The user must never lose *what this workflow is FOR and what
+   it is doing for them right now*. That line stays, in plain human language, at full weight.
+
+Fail on one side: a wall of prose. Fail on the other: a beautiful grid of nouns that says nothing
+about the work. **Few words, and the few that remain are about the user's purpose — never about the
+software's mechanism.**
+
+⚠ **Corollary, and Stitch itself got this wrong first time:** never print the mechanism to the user —
+no rule names, no internal state names, no ladder rungs, no "this name was derived". Show the value;
+hide how it was derived.
+
+This is now recorded in the Stitch design system's `designMd` (`assets/12493500246735489470`), so
+every future generation inherits it without being re-typed.
+
+### Coverage is COMPONENTS, not just pages
+
+Also ratified: *"use Stitch to map everything — not only the main pages but all the components in the
+workflow, including the canvas itself."* Page-level generation alone re-derives layout and leaves the
+atoms untouched. The component sheets live in `.planning/sketches/178-stitch-component-map/`.
+
+## 6.6 ⚠ THE LANGUAGE IS APP-WIDE, NOT WORKFLOW-ONLY — operator, 2026-08-19
+
+> *"The live panel, especially — that is in the chat area, not in the workflow space. This component
+> is used in the chat itself. So later on we might also modify other pages, [to] feel like the whole
+> application is connected altogether."*
+
+**This was checked against the code and it is not just true, it is stronger than stated:**
+
+| Claim | Measured |
+|---|---|
+| the panel lives in chat | `WorkspacePanel` is mounted by **`components/layout/ChatLayout.tsx:673`** — it has no mount in any workflow page |
+| chat drives it | `PausedRunCue` is rendered by **`components/chat/MessageItem.tsx`**; `panel/panelOpenSignal.ts` exists *only* so chat-side affordances can ask the panel to open ("the chat-side seam", Phase 087-02) |
+| it reaches a third surface | `components/metadata/DocumentDetailPanel.tsx` **reuses the WorkspacePanel sheet shape** — so the panel shell already spans chat, workflow **and documents** |
+| its vocabulary is shared | `PhaseCard` / `PhaseTimeline` are imported by `workflows/nodePresentation.ts`, `PhaseNodeCard.tsx`, `WorkflowCanvas.tsx` and `ProblemsTray.tsx` |
+
+⚠ **Consequence for the design work, and it invalidates a framing already published:** sketch 178
+labelled its panel sheet *"the live run panel"* as if workflow-scoped. **It is a cross-surface shell.**
+A change to it lands in chat first. Any sketch that redesigns it must be judged against the CHAT
+surface, not only the workflow one.
+
+⚠ **Consequence for coverage:** the mapping so far is workflow-only, and that is now a known gap. The
+next Stitch passes should cover **the chat surface** (`ChatArea`, `MessageItem`, `MessageList`,
+`MessageInput`, `RunCard`, `ToolCallPanel`, `ActiveRunsTray`, `StopControl`) and then **documents /
+settings / admin**, so one language runs through the whole application rather than stopping at the
+workflow door.
+
 ## 7. PRACTICAL
 
 View any sketch (Chrome MCP cannot open `file://`):

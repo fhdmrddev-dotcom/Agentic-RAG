@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Canvas Plane Component Sheet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-tertiary-fixed": "#002109",
+                    "surface-variant": "#303540",
+                    "surface-container": "#1b202a",
+                    "on-secondary": "#3b0091",
+                    "on-tertiary-fixed-variant": "#005321",
+                    "error": "#ffb4ab",
+                    "primary-fixed": "#e1e0ff",
+                    "outline": "#918f9c",
+                    "surface-container-low": "#171c26",
+                    "surface": "#0e131e",
+                    "primary": "#c3c4ff",
+                    "on-primary-fixed-variant": "#3b3d8f",
+                    "on-error-container": "#ffdad6",
+                    "tertiary": "#4ee478",
+                    "inverse-surface": "#dee2f1",
+                    "error-container": "#93000a",
+                    "on-tertiary": "#003915",
+                    "tertiary-fixed": "#6bfe8f",
+                    "secondary-fixed": "#e9ddff",
+                    "secondary-container": "#571ac2",
+                    "outline-variant": "#464651",
+                    "background": "#0e131e",
+                    "tertiary-fixed-dim": "#4be176",
+                    "on-primary-container": "#353789",
+                    "surface-container-lowest": "#090e18",
+                    "on-secondary-fixed": "#23005c",
+                    "inverse-primary": "#5355a9",
+                    "on-surface": "#dee2f1",
+                    "on-primary-fixed": "#0b0664",
+                    "surface-container-high": "#252a35",
+                    "surface-bright": "#343945",
+                    "on-tertiary-container": "#004c1e",
+                    "secondary": "#d0bcff",
+                    "on-secondary-container": "#c3abff",
+                    "surface-tint": "#c1c1ff",
+                    "on-error": "#690005",
+                    "on-surface-variant": "#c7c5d3",
+                    "primary-container": "#a3a5ff",
+                    "secondary-fixed-dim": "#d0bcff",
+                    "surface-dim": "#0e131e",
+                    "surface-container-highest": "#303540",
+                    "primary-fixed-dim": "#c1c1ff",
+                    "on-secondary-fixed-variant": "#5415c0",
+                    "tertiary-container": "#26c760",
+                    "inverse-on-surface": "#2b303c",
+                    "on-background": "#dee2f1",
+                    "on-primary": "#242478"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.25rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                    "full": "9999px"
+            },
+            "spacing": {},
+            "fontFamily": {
+                    "headline": [
+                            "Manrope"
+                    ],
+                    "display": [
+                            "Manrope"
+                    ],
+                    "body": [
+                            "Inter"
+                    ],
+                    "label": [
+                            "Inter"
+                    ]
+            },
+            "fontSize": {}
+    },
+        },
+      }
+    </script>
+<style>
+        /* Base styles */
+        body {
+            background-color: #0e131e;
+            color: #dee2f1;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 32px;
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Manrope', sans-serif;
+        }
+
+        /* Dot Grid Background */
+        .dot-grid {
+            background-image: radial-gradient(#A3A5FF 1px, transparent 1px);
+            background-size: 24px 24px;
+            background-color: #0e131e;
+            opacity: 0.8; /* Base opacity for the grid container */
+        }
+        
+        /* Subtle Vignette & Inner Shadow for Main Plane */
+        .canvas-vignette {
+            box-shadow: inset 0 0 100px rgba(14, 19, 30, 0.9),
+                        inset 0 0 20px rgba(14, 19, 30, 0.5);
+            pointer-events: none;
+        }
+
+        /* Node Component Styles */
+        .workflow-node {
+            background-color: #0D1117;
+            border: 1px solid #212631;
+            border-radius: 0.25rem; /* DEFAULT radius */
+            padding: 16px;
+            width: 220px;
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            color: #dee2f1;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.875rem; /* label-sm equivalent approx */
+        }
+
+        .workflow-node-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: #dee2f1;
+        }
+        
+        .workflow-node-icon {
+            color: #a3a5ff; /* primary-container */
+            font-size: 18px;
+        }
+
+        .workflow-node-meta {
+            color: #918f9c; /* outline */
+            font-size: 0.75rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* Node States */
+        .node-selected {
+            border-color: #c3c4ff; /* primary */
+            box-shadow: 0 0 0 1px #c3c4ff, 0 0 15px rgba(195, 196, 255, 0.2);
+            z-index: 10;
+        }
+
+        .node-drag {
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            transform: translateY(-4px);
+            border-color: #464651; /* outline-variant */
+            z-index: 20;
+        }
+
+        /* Snap Lines */
+        .snap-line-h {
+            position: absolute;
+            height: 1px;
+            background-color: #c3c4ff; /* primary */
+            left: -1000px;
+            right: -1000px;
+            top: 50%;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+        
+        .snap-line-v {
+            position: absolute;
+            width: 1px;
+            background-color: #c3c4ff; /* primary */
+            top: -1000px;
+            bottom: -1000px;
+            left: 50%;
+            opacity: 0.3;
+            pointer-events: none;
+        }
+
+        /* Edges (SVG Lines) */
+        svg.edges-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .edge-resting {
+            stroke: #464651; /* outline-variant */
+            stroke-width: 1.5;
+            fill: none;
+        }
+
+        .edge-selected {
+            stroke: #c3c4ff; /* primary */
+            stroke-width: 1.5;
+            fill: none;
+            stroke-dasharray: 4 4;
+            animation: march 1s linear infinite;
+        }
+        
+        .edge-executing {
+            stroke: #c3c4ff;
+            stroke-width: 2;
+            fill: none;
+            filter: drop-shadow(0 0 4px #c3c4ff);
+            stroke-dasharray: 8 8;
+            animation: flow 0.5s linear infinite;
+        }
+
+        @keyframes march {
+            to { stroke-dashoffset: -8; }
+        }
+        
+        @keyframes flow {
+            to { stroke-dashoffset: -16; }
+        }
+
+        /* Component Sheet Layout */
+        .sheet-section {
+            margin-bottom: 64px;
+        }
+        
+        .section-caption {
+            font-family: 'Manrope', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            color: #918f9c; /* outline */
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background antialiased">
+<div class="max-w-[1440px] mx-auto">
+<header class="mb-12">
+<h1 class="text-3xl font-headline font-black text-on-surface mb-2">Canvas Plane</h1>
+<p class="text-on-surface-variant text-sm font-body max-w-2xl">Component sheet detailing the primary interactive surface for workflow orchestration. Designed for high-frequency operators prioritizing spatial logic and clear status.</p>
+</header>
+<!-- 1. THE MAIN PLANE -->
+<section class="sheet-section">
+<div class="section-caption">1. The Main Plane (Interactive)</div>
+<div class="relative w-full h-[600px] border border-outline-variant rounded-lg overflow-hidden bg-surface flex items-center justify-center">
+<!-- Ground: 24px Dot Grid -->
+<div class="absolute inset-0 dot-grid opacity-[0.05]"></div>
+<!-- Edges Layer -->
+<svg class="edges-layer" viewbox="0 0 1000 600">
+<!-- Retrieve to Extract -->
+<path class="edge-resting" d="M 270 300 L 370 300"></path>
+<!-- Extract to Judge -->
+<path class="edge-resting" d="M 590 300 L 690 300"></path>
+<!-- Judge to Approve (Top Path) -->
+<path class="edge-resting" d="M 910 280 C 960 280, 960 150, 1010 150"></path>
+<!-- Judge to Reject (Bottom Path) -->
+<path class="edge-resting" d="M 910 320 C 960 320, 960 450, 1010 450"></path>
+<!-- Approve to Draft (Simulated out of view, just line extending) -->
+<path class="edge-resting" d="M 1230 150 L 1300 150"></path>
+</svg>
+<!-- Nodes -->
+<!-- Node 1: Retrieve (Resting) -->
+<div class="workflow-node" style="left: 50px; top: 250px; z-index: 2;">
+<div class="workflow-node-header">
+<span class="material-symbols-outlined workflow-node-icon" data-icon="search" style="font-variation-settings: 'FILL' 0;">search</span>
+<span>Retrieve Data</span>
+</div>
+<div class="text-on-surface-variant text-xs mb-2">Source: SQL DB A</div>
+<div class="workflow-node-meta">
+<span>Id: n_4f92</span>
+<span>Ready</span>
+</div>
+</div>
+<!-- Node 2: Extract (Drag State) -->
+<div class="workflow-node node-drag" style="left: 370px; top: 250px;">
+<!-- Snap Lines -->
+<div class="snap-line-h"></div>
+<div class="snap-line-v"></div>
+<div class="workflow-node-header">
+<span class="material-symbols-outlined workflow-node-icon" data-icon="content_cut" style="font-variation-settings: 'FILL' 0;">content_cut</span>
+<span>Extract Entities</span>
+</div>
+<div class="text-on-surface-variant text-xs mb-2">Model: Llama 3 8B</div>
+<div class="workflow-node-meta">
+<span>Id: n_7x21</span>
+<span>Ready</span>
+</div>
+</div>
+<!-- Node 3: Judge / Branch (Selected State) -->
+<div class="workflow-node node-selected" style="left: 690px; top: 250px;">
+<div class="workflow-node-header">
+<span class="material-symbols-outlined workflow-node-icon text-primary" data-icon="call_split" style="font-variation-settings: 'FILL' 1;">call_split</span>
+<span class="text-primary">Judge Confidence</span>
+</div>
+<div class="text-on-surface-variant text-xs mb-2">Condition: Score &gt; 0.85</div>
+<div class="workflow-node-meta">
+<span>Id: n_9p33</span>
+<span class="text-primary">Selected</span>
+</div>
+</div>
+<!-- Node 4a: Approve Path -->
+<div class="workflow-node" style="left: 1010px; top: 100px; z-index: 2;">
+<div class="workflow-node-header">
+<span class="material-symbols-outlined workflow-node-icon text-tertiary" data-icon="check_circle" style="font-variation-settings: 'FILL' 0;">check_circle</span>
+<span>Format Output</span>
+</div>
+<div class="text-on-surface-variant text-xs mb-2">Template: JSON Strict</div>
+<div class="workflow-node-meta">
+<span>Id: n_a112</span>
+<span>Ready</span>
+</div>
+</div>
+<!-- Node 4b: Reject Path -->
+<div class="workflow-node" style="left: 1010px; top: 400px; z-index: 2;">
+<div class="workflow-node-header">
+<span class="material-symbols-outlined workflow-node-icon text-error" data-icon="cancel" style="font-variation-settings: 'FILL' 0;">cancel</span>
+<span>Flag for Review</span>
+</div>
+<div class="text-on-surface-variant text-xs mb-2">Queue: Manual Tier 1</div>
+<div class="workflow-node-meta">
+<span>Id: n_r990</span>
+<span>Ready</span>
+</div>
+</div>
+<!-- Depth Vignette (Overlay) -->
+<div class="absolute inset-0 canvas-vignette"></div>
+<!-- Floating Toolbar -->
+<div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-surface-container-high border border-outline-variant rounded-full px-4 py-2 flex items-center gap-4 shadow-lg z-50">
+<button class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center p-1">
+<span class="material-symbols-outlined text-sm" data-icon="remove">remove</span>
+</button>
+<span class="text-label-sm font-body text-on-surface font-medium w-12 text-center">85%</span>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center p-1">
+<span class="material-symbols-outlined text-sm" data-icon="add">add</span>
+</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="text-label-sm font-body text-on-surface-variant hover:text-on-surface transition-colors font-medium">Fit</button>
+<div class="w-px h-4 bg-outline-variant mx-1"></div>
+<button class="text-on-surface-variant hover:text-on-surface transition-colors flex items-center justify-center p-1">
+<span class="material-symbols-outlined text-sm" data-icon="lock_open">lock_open</span>
+</button>
+</div>
+</div>
+</section>
+<!-- 2. CANVAS FURNITURE -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+<!-- EDGES -->
+<section class="sheet-section mb-0">
+<div class="section-caption">Edges &amp; Connections</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-8 flex flex-col gap-12">
+<div>
+<div class="text-xs text-on-surface-variant mb-4 font-body">Resting</div>
+<svg height="20" width="100%">
+<path class="edge-resting" d="M 0 10 L 100% 10"></path>
+<circle cx="0" cy="10" fill="#464651" r="3"></circle>
+<polygon fill="#464651" points="100%,10 95%,7 95%,13"></polygon>
+</svg>
+</div>
+<div>
+<div class="text-xs text-primary mb-4 font-body">Selected (Marching Ants)</div>
+<svg height="20" width="100%">
+<path class="edge-selected" d="M 0 10 L 100% 10"></path>
+<circle cx="0" cy="10" fill="#c3c4ff" r="3"></circle>
+<polygon fill="#c3c4ff" points="100%,10 95%,7 95%,13"></polygon>
+</svg>
+</div>
+<div>
+<div class="text-xs text-primary font-bold mb-4 font-body">Executing (Flow)</div>
+<svg height="20" width="100%">
+<path class="edge-executing" d="M 0 10 L 100% 10"></path>
+<circle cx="0" cy="10" fill="#c3c4ff" r="4"></circle>
+<polygon fill="#c3c4ff" points="100%,10 95%,6 95%,14"></polygon>
+</svg>
+</div>
+</div>
+</section>
+<!-- THE EMPTY & READ-ONLY PLANES -->
+<div class="flex flex-col gap-8">
+<section class="sheet-section mb-0">
+<div class="section-caption">The Empty Plane</div>
+<div class="relative w-full h-[180px] border border-outline-variant rounded-lg bg-surface flex items-center justify-center overflow-hidden">
+<div class="absolute inset-0 dot-grid opacity-[0.05]"></div>
+<div class="absolute inset-0 canvas-vignette"></div>
+<div class="flex flex-col items-center gap-3 z-10 cursor-pointer group">
+<div class="w-10 h-10 rounded-full border border-outline-variant bg-surface-container-high flex items-center justify-center text-on-surface-variant group-hover:border-primary group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined" data-icon="add">add</span>
+</div>
+<span class="text-sm font-body text-on-surface-variant group-hover:text-on-surface transition-colors">Drop first phase</span>
+</div>
+</div>
+</section>
+<section class="sheet-section mb-0">
+<div class="section-caption">The Read-Only Plane</div>
+<div class="relative w-full h-[180px] border border-outline-variant rounded-lg bg-surface-container-lowest flex items-center justify-center overflow-hidden">
+<!-- Dimmer dots -->
+<div class="absolute inset-0 dot-grid opacity-[0.02]"></div>
+<!-- Locked Header -->
+<div class="absolute top-4 left-1/2 transform -translate-x-1/2 flex items-center gap-2 text-on-surface-variant bg-surface-container/50 px-3 py-1 rounded border border-outline-variant/50 backdrop-blur-sm z-20">
+<span class="material-symbols-outlined text-xs" data-icon="lock" style="font-variation-settings: 'FILL' 1;">lock</span>
+<span class="text-[10px] font-bold tracking-wider font-body">LOCKED FOR EXECUTION</span>
+</div>
+<!-- Read-only Node -->
+<div class="workflow-node opacity-80" style="position: relative; left: 0; top: 0;">
+<div class="workflow-node-header text-on-surface-variant">
+<span class="material-symbols-outlined workflow-node-icon text-on-surface-variant" data-icon="analytics" style="font-variation-settings: 'FILL' 0;">analytics</span>
+<span>Aggregate Results</span>
+</div>
+<div class="text-on-surface-variant text-xs mb-2 opacity-50">Status: Pending</div>
+</div>
+</div>
+</section>
+</div>
+</div>
+</div>
+</body></html>

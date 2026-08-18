@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Aether Intelligence - Canvas Plane Component Sheet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-container": "#c3abff",
+                        "surface-container-lowest": "#090e18",
+                        "secondary-container": "#571ac2",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "inverse-on-surface": "#2b303c",
+                        "inverse-primary": "#5355a9",
+                        "surface-container-high": "#252a35",
+                        "on-surface": "#dee2f1",
+                        "on-surface-variant": "#c7c5d3",
+                        "tertiary-fixed": "#6bfe8f",
+                        "surface-tint": "#c1c1ff",
+                        "tertiary-fixed-dim": "#4be176",
+                        "tertiary-container": "#26c760",
+                        "on-error": "#690005",
+                        "on-primary": "#242478",
+                        "on-background": "#dee2f1",
+                        "on-secondary": "#3b0091",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "secondary": "#d0bcff",
+                        "outline": "#918f9c",
+                        "error-container": "#93000a",
+                        "on-tertiary-container": "#004c1e",
+                        "on-secondary-fixed": "#23005c",
+                        "inverse-surface": "#dee2f1",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "tertiary": "#4ee478",
+                        "on-tertiary-fixed": "#002109",
+                        "surface-container": "#1b202a",
+                        "primary-container": "#a3a5ff",
+                        "surface-dim": "#0e131e",
+                        "surface-container-low": "#171c26",
+                        "surface-bright": "#343945",
+                        "primary": "#c3c4ff",
+                        "on-primary-fixed": "#0b0664",
+                        "secondary-fixed": "#e9ddff",
+                        "primary-fixed": "#e1e0ff",
+                        "on-primary-container": "#353789",
+                        "error": "#ffb4ab",
+                        "surface-variant": "#303540",
+                        "background": "#0e131e",
+                        "on-tertiary": "#003915",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "surface": "#0e131e",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "surface-container-highest": "#303540",
+                        "outline-variant": "#464651",
+                        "on-error-container": "#ffdad6"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope", "sans-serif"],
+                        "display": ["Manrope", "sans-serif"],
+                        "body": ["Inter", "sans-serif"],
+                        "label": ["Inter", "sans-serif"]
+                    },
+                    backgroundImage: {
+                        'dot-grid': 'radial-gradient(circle at center, #212631 1px, transparent 1px)'
+                    },
+                    backgroundSize: {
+                        'dot-size': '24px 24px'
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: #060A0F;
+            color: #dee2f1;
+        }
+        
+        .dot-grid-bg {
+            background-image: radial-gradient(circle at 1px 1px, #212631 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        .canvas-node {
+            background-color: #0D1117;
+            border: 1px solid #212631;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+            transition: all 0.2s ease;
+        }
+
+        .canvas-node.selected {
+            border-color: #A3A5FF;
+            box-shadow: 0 0 0 1px #A3A5FF, 0 0 20px rgba(163, 165, 255, 0.15);
+        }
+
+        .canvas-node.dragging {
+            border-color: #c7c5d3;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        /* SVG Paths & Connections */
+        .connection-path {
+            fill: none;
+            stroke-linecap: round;
+            transition: stroke 0.3s ease, stroke-width 0.3s ease, opacity 0.3s ease;
+        }
+
+        /* State: At Rest */
+        .path-rest {
+            stroke: #464651;
+            stroke-width: 2px;
+        }
+
+        /* State: Hovered */
+        .path-hovered {
+            stroke: #918f9c;
+            stroke-width: 3px;
+        }
+
+        /* State: Selected */
+        .path-selected {
+            stroke: #A3A5FF;
+            stroke-width: 3px;
+            filter: drop-shadow(0 0 4px rgba(163, 165, 255, 0.4));
+        }
+
+        /* State: Flowing (Animated) */
+        .path-flowing {
+            stroke: #A3A5FF;
+            stroke-width: 2px;
+            stroke-dasharray: 8 8;
+            animation: dash-flow 1s linear infinite;
+        }
+
+        /* State: Not Taken */
+        .path-inactive {
+            stroke: #303540;
+            stroke-width: 2px;
+            stroke-dasharray: 4 4;
+            opacity: 0.5;
+        }
+
+        @keyframes dash-flow {
+            from { stroke-dashoffset: 16; }
+            to { stroke-dashoffset: 0; }
+        }
+
+        .payload-badge {
+            background-color: #0D1117;
+            border: 1px solid #303540;
+            border-radius: 9999px;
+            padding: 2px 10px;
+            font-size: 0.7rem;
+            color: #c7c5d3;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+        }
+        
+        .payload-badge.active {
+             border-color: #A3A5FF;
+             color: #A3A5FF;
+        }
+
+        /* Guidelines */
+        .alignment-guide {
+            position: absolute;
+            background-color: #A3A5FF;
+            opacity: 0.3;
+        }
+        .guide-h { height: 1px; width: 100%; left: 0; }
+        .guide-v { width: 1px; height: 100%; top: 0; }
+        
+        .section-caption {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.65rem;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #464651;
+            margin-bottom: 12px;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen p-12 overflow-x-hidden flex flex-col gap-24">
+<!-- 1. THE MAIN PLANE -->
+<section>
+<div class="section-caption">1. The Main Plane (Business Workflow)</div>
+<div class="relative w-full h-[600px] dot-grid-bg rounded-lg border border-[#212631]/50 overflow-hidden bg-[#090e18]">
+<!-- Alignment Guides (simulated during drag) -->
+<div class="alignment-guide guide-h top-[280px]"></div>
+<div class="alignment-guide guide-v left-[520px]"></div>
+<!-- Connections SVG Layer -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
+<!-- Find -> Pull (Rest) -->
+<path class="connection-path path-rest" d="M 280 150 C 350 150, 350 150, 420 150"></path>
+<foreignobject height="24" width="100" x="300" y="138">
+<div class="flex justify-center"><div class="payload-badge">312 contracts</div></div>
+</foreignobject>
+<!-- Pull -> Weigh (Flowing) -->
+<path class="connection-path path-flowing" d="M 660 150 C 730 150, 730 280, 800 280"></path>
+<foreignobject height="24" width="120" x="680" y="195">
+<div class="flex justify-center"><div class="payload-badge active">48 extracted findings</div></div>
+</foreignobject>
+<!-- Weigh -> Escalate (Hovered/Selected) -->
+<path class="connection-path path-selected" d="M 1040 280 C 1100 280, 1100 150, 1160 150"></path>
+<foreignobject height="24" width="80" x="1060" y="195">
+<div class="flex justify-center"><div class="payload-badge active">12 flagged</div></div>
+</foreignobject>
+<!-- Weigh -> Routine (Not Taken) -->
+<path class="connection-path path-inactive" d="M 1040 280 C 1100 280, 1100 400, 1160 400"></path>
+<foreignobject height="24" width="80" x="1060" y="325">
+<div class="flex justify-center"><div class="payload-badge opacity-50">36 routine</div></div>
+</foreignobject>
+<!-- Escalate -> Draft (Rest) -->
+<path class="connection-path path-rest" d="M 1400 150 C 1450 150, 1450 150, 1500 150"></path>
+</svg>
+<!-- Nodes Layer -->
+<div class="absolute inset-0" style="z-index: 2;">
+<!-- Node 1 -->
+<div class="canvas-node absolute w-60 p-4" style="left: 40px; top: 110px;">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-[#A3A5FF] text-[20px]" style="font-variation-settings: 'FILL' 1;">search</span>
+<h3 class="font-headline font-semibold text-[14px] text-on-surface">Find this quarter's vendor contracts</h3>
+</div>
+</div>
+<!-- Node 2 (Selected State) -->
+<div class="canvas-node selected absolute w-60 p-4" style="left: 420px; top: 110px;">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-[#A3A5FF] text-[20px]" style="font-variation-settings: 'FILL' 1;">save_as</span>
+<h3 class="font-headline font-semibold text-[14px] text-on-surface">Pull out renewal dates and liability caps</h3>
+</div>
+</div>
+<!-- Node 3 (Dragging State) -->
+<div class="canvas-node dragging absolute w-60 p-4" style="left: 800px; top: 240px; cursor: grabbing;">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-outline text-[20px]" style="font-variation-settings: 'FILL' 1;">balance</span>
+<h3 class="font-headline font-semibold text-[14px] text-on-surface">Weigh each contract against our risk policy</h3>
+</div>
+<div class="mt-4 pt-3 border-t border-[#212631]/50 text-xs font-body text-on-surface-variant flex items-center justify-between">
+<span>Fork Logic</span>
+<span class="text-primary-container font-medium">Over £2m?</span>
+</div>
+</div>
+<!-- Node 4a (Fork - Escalate) -->
+<div class="canvas-node absolute w-60 p-4" style="left: 1160px; top: 110px;">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-error text-[20px]" style="font-variation-settings: 'FILL' 1;">warning</span>
+<h3 class="font-headline font-semibold text-[14px] text-on-surface">Escalate to the risk committee</h3>
+</div>
+</div>
+<!-- Node 4b (Fork - Routine) -->
+<div class="canvas-node absolute w-60 p-4 opacity-60" style="left: 1160px; top: 360px;">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-outline text-[20px]" style="font-variation-settings: 'FILL' 1;">folder</span>
+<h3 class="font-headline font-semibold text-[14px] text-on-surface">File as routine</h3>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. CONNECTIONS ISOLATED SHOWCASE -->
+<section>
+<div class="section-caption">2. Connection States</div>
+<div class="grid grid-cols-5 gap-6">
+<!-- At Rest -->
+<div class="h-32 bg-[#090e18] rounded border border-[#212631]/50 flex items-center justify-center relative">
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<path class="connection-path path-rest" d="M 20 64 L 180 64"></path>
+<foreignobject height="24" width="100" x="50" y="52">
+<div class="flex justify-center"><div class="payload-badge">AT REST</div></div>
+</foreignobject>
+</svg>
+</div>
+<!-- Hovered -->
+<div class="h-32 bg-[#090e18] rounded border border-[#212631]/50 flex items-center justify-center relative">
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<path class="connection-path path-hovered" d="M 20 64 L 180 64"></path>
+<foreignobject height="24" width="100" x="50" y="52">
+<div class="flex justify-center"><div class="payload-badge">HOVERED</div></div>
+</foreignobject>
+</svg>
+</div>
+<!-- Selected -->
+<div class="h-32 bg-[#090e18] rounded border border-[#212631]/50 flex items-center justify-center relative">
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<path class="connection-path path-selected" d="M 20 64 L 180 64"></path>
+<foreignobject height="24" width="100" x="50" y="52">
+<div class="flex justify-center"><div class="payload-badge active">SELECTED</div></div>
+</foreignobject>
+</svg>
+</div>
+<!-- Flowing -->
+<div class="h-32 bg-[#090e18] rounded border border-[#212631]/50 flex items-center justify-center relative">
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<path class="connection-path path-flowing" d="M 20 64 L 180 64"></path>
+<foreignobject height="24" width="100" x="50" y="52">
+<div class="flex justify-center"><div class="payload-badge active">FLOWING</div></div>
+</foreignobject>
+</svg>
+</div>
+<!-- Not Taken -->
+<div class="h-32 bg-[#090e18] rounded border border-[#212631]/50 flex items-center justify-center relative">
+<svg class="absolute inset-0 w-full h-full pointer-events-none">
+<path class="connection-path path-inactive" d="M 20 64 L 180 64"></path>
+<foreignobject height="24" width="100" x="50" y="52">
+<div class="flex justify-center"><div class="payload-badge opacity-50">NOT TAKEN</div></div>
+</foreignobject>
+</svg>
+</div>
+</div>
+</section>
+<!-- 3. FLOATING CONTROLS & 4. EMPTY PLANE & 5. READ ONLY -->
+<div class="grid grid-cols-3 gap-12">
+<!-- Controls -->
+<section>
+<div class="section-caption">3. Floating Controls</div>
+<div class="h-48 bg-[#090e18] dot-grid-bg rounded border border-[#212631]/50 flex items-center justify-center">
+<div class="bg-[#0D1117] border border-[#212631] rounded-full px-2 py-1.5 flex items-center gap-1 shadow-lg">
+<button class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-[#1b202a] transition-colors">
+<span class="material-symbols-outlined text-[18px]">remove</span>
+</button>
+<span class="font-body text-[13px] font-medium text-on-surface w-12 text-center select-none">85%</span>
+<button class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-[#1b202a] transition-colors">
+<span class="material-symbols-outlined text-[18px]">add</span>
+</button>
+<div class="w-[1px] h-4 bg-[#212631] mx-1"></div>
+<button class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-[#1b202a] transition-colors" title="Fit to screen">
+<span class="material-symbols-outlined text-[18px]">fit_screen</span>
+</button>
+<button class="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-[#1b202a] transition-colors" title="Lock canvas">
+<span class="material-symbols-outlined text-[18px]">lock_open</span>
+</button>
+</div>
+</div>
+</section>
+<!-- Empty Plane -->
+<section>
+<div class="section-caption">4. Empty Plane</div>
+<div class="h-48 bg-[#090e18] dot-grid-bg rounded border border-[#212631]/50 flex items-center justify-center">
+<button class="flex flex-col items-center gap-3 group">
+<div class="w-12 h-12 rounded-full border border-[#303540] bg-[#0D1117] flex items-center justify-center group-hover:border-primary-container group-hover:bg-[#1b202a] transition-all duration-300">
+<span class="material-symbols-outlined text-outline group-hover:text-primary-container transition-colors">add</span>
+</div>
+<span class="font-body text-[14px] font-medium text-on-surface-variant group-hover:text-on-surface transition-colors">Start your workflow</span>
+</button>
+</div>
+</section>
+<!-- Read Only Plane -->
+<section>
+<div class="section-caption">5. Read-Only Plane</div>
+<div class="h-48 bg-[#090e18] dot-grid-bg rounded border border-[#212631]/50 flex items-start justify-center relative overflow-hidden">
+<!-- Locked Banner -->
+<div class="w-full bg-[#171c26] border-b border-[#212631] py-2 flex items-center justify-center gap-2 z-10">
+<span class="material-symbols-outlined text-[#918f9c] text-[16px]">lock</span>
+<span class="font-headline text-[12px] font-bold tracking-widest text-[#918f9c] uppercase">Locked for Execution</span>
+</div>
+<!-- Immutable Node Example -->
+<div class="canvas-node absolute w-48 p-3 opacity-80" style="top: 70px;">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-outline text-[16px]">check_circle</span>
+<h3 class="font-headline font-medium text-[12px] text-on-surface-variant">Validated Logic</h3>
+</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>

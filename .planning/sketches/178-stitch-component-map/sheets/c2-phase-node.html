@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Phase Node - Specimen Sheet</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "surface-bright": "#343945",
+                        "tertiary-fixed-dim": "#4be176",
+                        "tertiary": "#4ee478",
+                        "surface-container-high": "#252a35",
+                        "on-primary-container": "#353789",
+                        "on-secondary-container": "#c3abff",
+                        "surface-tint": "#c1c1ff",
+                        "surface-container-highest": "#303540",
+                        "tertiary-fixed": "#6bfe8f",
+                        "on-tertiary": "#003915",
+                        "error-container": "#93000a",
+                        "surface-variant": "#303540",
+                        "inverse-on-surface": "#2b303c",
+                        "error": "#ffb4ab",
+                        "surface": "#0e131e",
+                        "on-secondary": "#3b0091",
+                        "surface-container": "#1b202a",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-secondary-fixed-variant": "#5415c0",
+                        "outline": "#918f9c",
+                        "on-primary": "#242478",
+                        "tertiary-container": "#26c760",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "background": "#0e131e",
+                        "surface-container-lowest": "#090e18",
+                        "on-tertiary-fixed": "#002109",
+                        "on-tertiary-container": "#004c1e",
+                        "primary-container": "#a3a5ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "surface-dim": "#0e131e",
+                        "on-primary-fixed": "#0b0664",
+                        "on-surface": "#dee2f1",
+                        "primary-fixed": "#e1e0ff",
+                        "primary": "#c3c4ff",
+                        "inverse-primary": "#5355a9",
+                        "outline-variant": "#464651",
+                        "on-error": "#690005",
+                        "on-tertiary-fixed-variant": "#005321",
+                        "on-secondary-fixed": "#23005c",
+                        "on-background": "#dee2f1",
+                        "on-error-container": "#ffdad6",
+                        "inverse-surface": "#dee2f1",
+                        "secondary-container": "#571ac2",
+                        "secondary-fixed": "#e9ddff",
+                        "secondary": "#d0bcff",
+                        "surface-container-low": "#171c26",
+                        "on-surface-variant": "#c7c5d3"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "display": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #0e131e; color: #dee2f1; }
+        .node {
+            background-color: #0e131e;
+            border: 1px solid #212631;
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            padding: 0.75rem;
+            width: 16rem;
+            position: relative;
+        }
+        .node-icon-well {
+            width: 2rem;
+            height: 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0.25rem;
+            background-color: #1b202a;
+            margin-right: 0.75rem;
+            color: #c7c5d3;
+        }
+        .node-content { flex: 1; min-width: 0; }
+        .node-label { font-family: 'Inter', sans-serif; font-size: 0.875rem; font-weight: 500; color: #dee2f1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .node-sublabel { font-family: 'Inter', sans-serif; font-size: 0.75rem; color: #918f9c; margin-top: 0.125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .corner-marks { position: absolute; top: 0.25rem; right: 0.25rem; display: flex; gap: 0.125rem; }
+        .corner-mark { font-size: 0.875rem; color: #464651; }
+        
+        /* Specific States */
+        .node-hovered { border-color: #464651; background-color: #171c26; box-shadow: 0 0 0 1px #464651; }
+        .node-selected { border-color: #c3c4ff; box-shadow: 0 0 0 1px #c3c4ff; }
+        .node-dragging { transform: rotate(2deg) translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.5); border-color: #464651; opacity: 0.9; }
+        .node-problem { border-color: #ffb4ab; background-color: rgba(255, 180, 171, 0.05); }
+        .node-problem .node-icon-well { color: #ffb4ab; }
+        .node-locked .node-icon-well { opacity: 0.5; }
+        
+        /* Run States */
+        .node-waiting { opacity: 0.5; border-style: dashed; }
+        .node-running { border-color: #a3a5ff; box-shadow: 0 0 12px rgba(163, 165, 255, 0.2); animation: pulse-border 2s infinite; }
+        @keyframes pulse-border { 0% { box-shadow: 0 0 0 0 rgba(163, 165, 255, 0.4); } 70% { box-shadow: 0 0 0 6px rgba(163, 165, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(163, 165, 255, 0); } }
+        .node-succeeded { border-color: #4ee478; background-color: rgba(78, 228, 120, 0.05); }
+        .node-failed { border-color: #ffb4ab; background-color: rgba(255, 180, 171, 0.05); }
+        .node-skipped { border-style: dashed; border-color: #464651; opacity: 0.7; }
+        .node-paused { border-color: #ffd836; background-color: rgba(255, 216, 54, 0.05); }
+        
+        .timer { font-family: monospace; font-size: 0.75rem; color: #a3a5ff; position: absolute; right: 0.5rem; bottom: 0.5rem; }
+        .state-icon { position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); font-size: 1.25rem; }
+        
+        .node-succeeded .state-icon { color: #4ee478; }
+        .node-failed .state-icon { color: #ffb4ab; }
+        .node-paused .state-icon { color: #ffd836; }
+        
+        /* Branch Node */
+        .branch-node {
+            background-color: #0e131e;
+            border: 1px solid #212631;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            width: 16rem;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            clip-path: polygon(10% 0, 90% 0, 100% 50%, 90% 100%, 10% 100%, 0 50%);
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .section-title { font-family: 'Inter', sans-serif; font-size: 0.625rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #918f9c; margin-bottom: 1.5rem; border-bottom: 1px solid #212631; padding-bottom: 0.5rem; }
+        .caption { font-family: 'Inter', sans-serif; font-size: 0.625rem; color: #918f9c; margin-top: 0.5rem; text-align: center; }
+    </style>
+</head>
+<body class="p-12 md:p-24 antialiased selection:bg-primary selection:text-on-primary min-h-screen">
+<div class="max-w-6xl mx-auto space-y-24">
+<!-- Header -->
+<header class="mb-24">
+<h1 class="font-headline text-3xl font-bold tracking-tight text-on-surface mb-2">THE PHASE NODE</h1>
+<p class="font-body text-sm text-on-surface-variant max-w-2xl">Architectural specimen sheet. Deep Midnight theme. No paragraphs, just captions.</p>
+</header>
+<!-- 1. THE TYPES -->
+<section>
+<h2 class="section-title">1. THE TYPES</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">download</span></div>
+<div class="node-content">
+<div class="node-label">Retrieve</div>
+</div>
+</div>
+<div class="caption">RETRIEVE</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">content_cut</span></div>
+<div class="node-content">
+<div class="node-label">Extract</div>
+</div>
+</div>
+<div class="caption">EXTRACT</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">gavel</span></div>
+<div class="node-content">
+<div class="node-label">Judge</div>
+</div>
+</div>
+<div class="caption">JUDGE</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">draw</span></div>
+<div class="node-content">
+<div class="node-label">Draft</div>
+</div>
+</div>
+<div class="caption">DRAFT</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">call_split</span></div>
+<div class="node-content">
+<div class="node-label">Branch</div>
+</div>
+</div>
+<div class="caption">BRANCH</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">publish</span></div>
+<div class="node-content">
+<div class="node-label">Publish</div>
+</div>
+</div>
+<div class="caption">PUBLISH</div>
+</div>
+</div>
+</section>
+<!-- 2. NAME FALLBACKS -->
+<section>
+<h2 class="section-title">2. NAME FALLBACKS</h2>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">article</span></div>
+<div class="node-content">
+<div class="node-label">Vendor Renewal Risk Sweep</div>
+</div>
+</div>
+<div class="caption">LONG TEXT</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">event</span></div>
+<div class="node-content">
+<div class="node-label">Extract Renewal Dates</div>
+</div>
+</div>
+<div class="caption">MEDIUM TEXT</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">groups</span></div>
+<div class="node-content">
+<div class="node-label">Risk Committee Draft</div>
+</div>
+</div>
+<div class="caption">STANDARD TEXT</div>
+</div>
+</div>
+</section>
+<!-- 3. STATES -->
+<section>
+<h2 class="section-title">3. STATES</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<div class="flex flex-col items-center">
+<div class="node">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">description</span></div>
+<div class="node-content">
+<div class="node-label">At Rest</div>
+<div class="node-sublabel">No interaction</div>
+</div>
+<div class="corner-marks">
+<span class="material-symbols-outlined corner-mark" title="Grounded">public</span>
+</div>
+</div>
+<div class="caption">AT REST</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-hovered">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">description</span></div>
+<div class="node-content">
+<div class="node-label">Hovered</div>
+<div class="node-sublabel">Cursor over</div>
+</div>
+</div>
+<div class="caption">HOVERED</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-selected">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">description</span></div>
+<div class="node-content">
+<div class="node-label">Selected</div>
+<div class="node-sublabel">Active focus</div>
+</div>
+<div class="corner-marks">
+<span class="material-symbols-outlined corner-mark" title="External">open_in_new</span>
+</div>
+</div>
+<div class="caption">SELECTED</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-dragging">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">description</span></div>
+<div class="node-content">
+<div class="node-label">Dragging</div>
+<div class="node-sublabel">Being moved</div>
+</div>
+</div>
+<div class="caption">DRAGGING</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-problem">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">warning</span></div>
+<div class="node-content">
+<div class="node-label">Configuration Error</div>
+<div class="node-sublabel">Missing input</div>
+</div>
+</div>
+<div class="caption">PROBLEM</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-locked">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">lock</span></div>
+<div class="node-content">
+<div class="node-label">Locked Node</div>
+<div class="node-sublabel">Permission denied</div>
+</div>
+</div>
+<div class="caption">LOCKED</div>
+</div>
+</div>
+</section>
+<!-- 4. RUN STATES -->
+<section>
+<h2 class="section-title">4. RUN STATES</h2>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+<div class="flex flex-col items-center">
+<div class="node node-waiting">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">hourglass_empty</span></div>
+<div class="node-content">
+<div class="node-label">Pending Execution</div>
+<div class="node-sublabel">Queued</div>
+</div>
+</div>
+<div class="caption">WAITING</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-running">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">autorenew</span></div>
+<div class="node-content">
+<div class="node-label">Processing Data</div>
+<div class="node-sublabel">Extracting entities</div>
+</div>
+<div class="timer">00:15</div>
+</div>
+<div class="caption">RUNNING</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-succeeded">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">check_circle</span></div>
+<div class="node-content">
+<div class="node-label">Analysis Complete</div>
+<div class="node-sublabel">Found 12 items</div>
+</div>
+<span class="material-symbols-outlined state-icon">check</span>
+</div>
+<div class="caption">SUCCEEDED</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-failed">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">error</span></div>
+<div class="node-content">
+<div class="node-label">API Timeout</div>
+<div class="node-sublabel">Connection lost</div>
+</div>
+<span class="material-symbols-outlined state-icon">close</span>
+</div>
+<div class="caption">FAILED</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-skipped">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">next_plan</span></div>
+<div class="node-content">
+<div class="node-label">Conditional Bypass</div>
+<div class="node-sublabel">Not required</div>
+</div>
+</div>
+<div class="caption">SKIPPED</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node node-paused">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">person</span></div>
+<div class="node-content">
+<div class="node-label">Awaiting Approval</div>
+<div class="node-sublabel">Human review</div>
+</div>
+<span class="material-symbols-outlined state-icon">front_hand</span>
+<div class="corner-marks">
+<span class="material-symbols-outlined corner-mark" title="Human-in-loop">person</span>
+</div>
+</div>
+<div class="caption">PAUSED</div>
+</div>
+</div>
+</section>
+<!-- 5. THE BRANCH -->
+<section>
+<h2 class="section-title">5. THE BRANCH</h2>
+<div class="flex justify-center items-center py-8">
+<div class="flex flex-col items-center">
+<div class="relative flex items-center justify-center w-48 h-24">
+<!-- Custom shape for branch -->
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none" viewbox="0 0 192 96">
+<path d="M16 0 L176 0 L192 48 L176 96 L16 96 L0 48 Z" fill="#0e131e" stroke="#212631" stroke-width="2"></path>
+</svg>
+<div class="relative z-10 flex flex-col items-center">
+<span class="material-symbols-outlined text-xl text-outline mb-1">call_split</span>
+<div class="font-label text-sm font-medium text-on-surface">Evaluate Risk</div>
+</div>
+<!-- Outgoing paths labels -->
+<div class="absolute -right-24 top-0 font-label text-xs text-on-surface-variant flex items-center"><div class="w-16 h-px bg-outline-variant mr-2"></div> High Risk</div>
+<div class="absolute -right-24 bottom-0 font-label text-xs text-on-surface-variant flex items-center"><div class="w-16 h-px bg-outline-variant mr-2"></div> Standard</div>
+</div>
+<div class="caption mt-8">ROUTER NODE</div>
+</div>
+</div>
+</section>
+<!-- 6. ZOOM SCALING -->
+<section>
+<h2 class="section-title">6. ZOOM SCALING</h2>
+<div class="flex flex-col md:flex-row items-center justify-around gap-12 py-8">
+<div class="flex flex-col items-center">
+<div class="node transform scale-100 origin-center">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">database</span></div>
+<div class="node-content">
+<div class="node-label">Load Context</div>
+<div class="node-sublabel">Workspace: Legal</div>
+</div>
+</div>
+<div class="caption mt-4">100% (DEFAULT)</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node transform scale-75 origin-center">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">database</span></div>
+<div class="node-content">
+<div class="node-label">Load Context</div>
+<div class="node-sublabel">Workspace: Legal</div>
+</div>
+</div>
+<div class="caption mt-4">75% (COMPACT)</div>
+</div>
+<div class="flex flex-col items-center">
+<div class="node transform scale-50 origin-center">
+<div class="node-icon-well"><span class="material-symbols-outlined text-xl">database</span></div>
+<div class="node-content">
+<div class="node-label">Load Context</div>
+<div class="node-sublabel">Workspace: Legal</div>
+</div>
+</div>
+<div class="caption mt-4">50% (MICRO)</div>
+</div>
+</div>
+</section>
+</div>
+</body></html>
