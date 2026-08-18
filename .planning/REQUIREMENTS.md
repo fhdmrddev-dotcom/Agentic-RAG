@@ -21,6 +21,8 @@ Where a requirement's seed carries analysis, the seed is the spec input — read
 - [x] **LIB-04**: The create affordance is findable without scrolling past two shelves of existing workflows. *(SEED-136)*
 - [x] **LIB-05**: A user can tell one workflow from another at a glance — which row is which when many share a name, whose it is and what it was copied from, and which one changed most recently. *(Phase 192 UAT, operator 2026-08-12 — measured: 43 of 104 workflows share the name "Compliance Gap Report" across 41 slugs; 14 duplicated names in total. Distinct from LIB-02, which is about reading ONE card; this is about telling MANY apart.)*
 
+- [ ] **LIB-06**: A user can tell from the library whether a workflow actually **works** — when it last ran and whether that run succeeded — so a shelf of identically-named workflows can be **triaged**, not merely distinguished. *(Sketch 179, operator 2026-08-19. **Distinct from LIB-05**, which is satisfied: LIB-05 asks "which row is which" and the shipped identity line answers it (`3 share this name · changed 2 days ago`, confirmed rendering in sketch 179 variant A). LIB-06 asks "which of these is worth running", which nothing on the card answers today. Measured 2026-08-19 against the live DB: `business_requirement` is populated on **16 of 117** real rows (14%) and non-empty `phases` on **28 of 117** (24%), so neither can carry it — but **32 of 36 published rows have at least one run (89%)**, and `workflow_runs` already holds 228 rows (186 completed / 31 failed / 11 cancelled). The library feed simply does not join it.)*
+
 ### Authoring — the doors and the journey (AUTH)
 
 - [ ] **AUTH-01**: A user can tell the two authoring doors apart and predict what each will do, before choosing. *(SEED-147)*
