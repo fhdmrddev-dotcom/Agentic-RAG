@@ -29,6 +29,9 @@ vi.mock("@/lib/api", () => ({
   updateWorkflowDraft: mockUpdate,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
+  // reads the author model registry at mount and this factory must declare it.
+  getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
 }))
 
 import { WorkflowBuilderPage } from "./WorkflowBuilderPage"

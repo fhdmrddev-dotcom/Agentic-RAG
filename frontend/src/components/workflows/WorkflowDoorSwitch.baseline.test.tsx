@@ -86,6 +86,11 @@ vi.mock("@/lib/api", () => ({
   // the whole capture with it. Resolved to the same empty bundle the four shipped
   // `WorkflowBuilderPage.*` suites use, so nothing about the capture is invented here.
   getGroundingBundle: mockGroundingBundle,
+  // 196-08 (AUTH-04) — a SECOND member beyond the sketch harness's set, arriving for exactly
+  // the reason the comment above records for the first: the hosted Builder now reads the author
+  // model registry at mount, and an undeclared export throws there rather than returning
+  // undefined. The stub is an empty registry; these rows are about the door, not the picker.
+  getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
 }))
 
 import { WorkflowDoorSwitch, type WorkflowDoorSwitchProps } from "./WorkflowDoorSwitch"

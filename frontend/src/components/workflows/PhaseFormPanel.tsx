@@ -58,8 +58,20 @@ import { ExternalActionSection } from "./ExternalActionSection"
 import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
-// 196-08 (AUTH-04) — TYPE ONLY in this task; the value import arrives with the mounts.
-import type { ModelFieldProps } from "./ModelField"
+// 196-08 (AUTH-04) — the registry-backed picker. ONE import, and the arrow points ONE WAY:
+// this panel imports the picker, the picker imports nothing from here. That is why the picker
+// renders the two-audience label structure locally instead of importing this file's private
+// `FieldLabel` — see the deferral recorded in that component's docblock.
+//
+// ⚠ THE TYPE IS ALIASED ON IMPORT, AND THE ALIAS IS LOAD-BEARING RATHER THAN COSMETIC. A
+// generic written over the child's own props type — `Pick< the-props-type , … >` — puts the
+// component's opening-tag token on a line that is NOT a mount, because the props type's name
+// starts with the component's name. This phase's fence counts lines carrying that token, so an
+// unaliased reference reads as a FIFTH mount with no phase-type guard, which is precisely the
+// shape the fence exists to reject. Aliasing keeps "a line carrying the tag" and "a mount" the
+// same set. ⚠ The token is not spelled anywhere in this file's prose for the same reason — a
+// comment that describes a fence is counted BY it (the 187-24 trap; this very comment hit it).
+import { ModelField, type ModelFieldProps as PickerProps } from "./ModelField"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 // TYPE-ONLY, and erased at build. The child declares its OWN props; this panel exports no
 // props type for it, exactly as it exports none for the two sections above.
@@ -244,7 +256,7 @@ export interface PhaseFormPanelProps {
    * spread at each mount matches the component's contract by construction: a prop renamed in
    * `ModelField` becomes a typecheck error here instead of a silently dropped attribute.
    */
-  modelPicker?: Pick<ModelFieldProps, "models" | "runDefaultModel" | "showTechnical">
+  modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical">
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -801,6 +813,7 @@ export function PhaseFormPanel({
   onGovernanceChange,
   template,
   nameCheck,
+  modelPicker,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -916,15 +929,7 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {modelPicker && pt === "llm_single" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <TextField
                 label="Creativity"
                 hint="temperature — 0 is focused and repeatable, higher is more varied."
@@ -952,15 +957,7 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {modelPicker && pt === "llm_agent" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions the AI may take before it must stop."
@@ -1004,15 +1001,7 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {modelPicker && pt === "llm_batch_agents" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions each worker may take before it must stop."
@@ -1106,15 +1095,10 @@ export function PhaseFormPanel({
                 value={asStr(cfg.emitter, "render_template")}
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {/* D-12 — the fitness flag rides THIS mount and no other: on the three step
+                  types above the emission tier predicts nothing about the outcome, and a
+                  warning that predicts nothing trains people to ignore the ones that do. */}
+              {modelPicker && pt === "llm_emit" && <ModelField {...modelPicker} showFitness value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
               <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
               <SelectField
