@@ -107,6 +107,12 @@ const LIBRARY_SUBTREE_PATHS = [
   // dialog module is the one place in this subtree where the violation arrives by copying
   // rather than by invention (D-36).
   "./ForkNameDialog.tsx",
+  // ── 192.2-02 (LIB-06 / D-05): the G-5 discharge on `WorkflowCard.tsx` — its face leaf ──
+  // ⚠ LISTED IN THE COMMIT THAT CREATES IT, and the plan's `files_modified` did NOT name this
+  // file. Adding a module without listing it leaves it swept by NOTHING while every fence stays
+  // green — the *"a guardrail cannot see what is absent from its list"* failure this array's own
+  // docblock records. That is a correctness requirement, not a scope question.
+  "./cardFace.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -146,7 +152,11 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // 111 116 +5`. That is the corpus at 12 and the suite at 116, which is also D-35's
     // forecast landing (12 modules) with its own suite arithmetic superseded, exactly as
     // D-35 said to expect: *"re-derive the final number from the gate's own `actual` column"*.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(12)
+    // ⚠ 192.2-02 read it the same way, one phase later again: `expected [ './libraryRow.ts',
+    // …(12) ] to have a length of 12 but got 13` was OBSERVED before the 13 was written, and the
+    // FIVE forecast three paragraphs up held — five `it.each(LIBRARY_SUBTREE_PATHS)` sweeps ×
+    // one new module (`./cardFace.ts`, the G-5 discharge's face leaf) = +5 cases.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(13)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
