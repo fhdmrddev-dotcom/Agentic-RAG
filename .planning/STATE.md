@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T09:35:00.000Z"
+last_updated: "2026-08-18T10:10:00.000Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
   completed_phases: 9
   total_plans: 105
-  completed_plans: 97
+  completed_plans: 98
   percent: 47
 ---
 
@@ -36,9 +36,42 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 197 (guided-authoring) — EXECUTING
-Plan: 9 of 11 complete (waves 1-5 done and merged)
-Resume file: `.planning/phases/197-guided-authoring/197-10-PLAN.md`
-Status: Executing Phase 197 — **next is Wave 6 (`197-10`), then Wave 7 (`197-11`)**
+Plan: 10 of 11 complete (waves 1-6 done and merged)
+Resume file: `.planning/phases/197-guided-authoring/197-11-PLAN.md`
+Status: Executing Phase 197 — **Wave 7 (`197-11`, the records) is the last plan**
+
+**Wave 6 (`197-10`) merged at `e0ec7fd8`.** D-19 shipped: the drafted header renders the workflow's
+NAME when it has one — `meta.name` had appeared in no render position anywhere on the page, so the
+name was displayed nowhere, and row 4 was writing something the screen never showed.
+
+⚠ **The band-3 `FLAG_OFF_HEADER_MARKUP` disposition is BRANCH A — no third re-capture was forced.**
+`git diff --numstat` on `WorkflowBuilderPage.header.test.tsx` reads **`156 0`**: zero deletions, all
+three bands byte-identical, so the file's own *"THIS IS RE-CAPTURE TWO OF TWO, AND THE PHASE EXPECTS
+NO THIRD"* note is **vindicated rather than superseded**. The reason is a fact about the fixture —
+`openDraftBuilder` binds no `name` on the definition, so the slot still resolves to `meta.slug`.
+**The green was proved non-vacuous** by a new case driving the same flag-off surface with a
+definition that DOES bind a name (red before, green after).
+
+⚠ **One RED was REAL, not a SEED-171 flake, and the procedure is what separated them.** A fence
+`197-09` planted in `WorkflowBuilderPage.canvas.test.tsx` — *"D-19 IS PLAN 197-10'S, NOT THIS ONE'S
+… so a header change cannot be smuggled in here"* — went red in the same run that landed D-19,
+which is how a scope boundary is supposed to end its life. It was **retired, not deleted**, and
+replaced with a strictly stronger claim (the header shows the name the author just typed, live, and
+the slug is GONE from the slot). That file is not in `197-10`'s `files_modified`, so it is recorded
+as a Rule 3 deviation.
+
+⚠ **The base assertion fired for the NINTH time out of nine in this phase** — the worktree forked
+from `3781a3f`, not the dispatched base. Every executor prompt must keep carrying it.
+
+**Gates at `e0ec7fd8` (post-merge, main working tree):** `tsc` **33** — baseline unmoved · count
+gate **`count gate OK` · total 4447 · pinned 4217 · 89/89 · failed 0**, identical to the executor's
+own reading, so the merge introduced no drift.
+
+⚠ **OWED, carried into the close:** G-4 rows **U1**, **U5** and **U6**. jsdom proves the strings
+agree; only an eye proves the screen reads right. Also: `197-10` flagged
+`WorkflowBuilderPage.tsx`'s hot-file ledger row (`42 / 13 / 2398`) as **stale but deliberately not
+edited** — the ledger lives in `CLAUDE.md` + `docs/HOT-FILE-LEDGER.md`, shared artifacts a parallel
+worktree must not write. `197-11` owns that re-derive.
 
 ⚠ **WAVE 5 WAS INTERRUPTED BY A MACHINE CRASH ON 2026-08-18 AND WAS RECOVERED, NOT RE-RUN.**
 The host laptop froze and rebooted mid-plan. The executor had committed all three of `197-09`'s
