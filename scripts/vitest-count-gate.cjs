@@ -2067,6 +2067,50 @@ const BASELINE = {
   // "Working" (+1). ⚠ That control is load-bearing: without it, a `model_fallback` riding the
   // default arm would pass the first case and this pin would be guarding nothing.
   "PhaseCard.test.tsx": 27,
+  // ── Added in 197-11 (Wave 7, phase close) — THE THREE SUITES PHASE 197 CREATED ────────
+  //
+  // ⚠ ONE KNOB, NOT TWO, AND THAT IS WHY THE FILES WERE PLACED WHERE THEY WERE. All three
+  // live under `src/components/workflows`, which is a DIRECTORY entry at the top of the
+  // `TARGETS` array below, so this gate EXECUTED all three the moment they landed — exactly
+  // the `193-01` case, and deliberately not the two-knob path `src/pages` forces. **No
+  // `TARGETS` entry is added for any of them**; a second knob for a directory already covered
+  // would be a duplicate, not a belt-and-braces.
+  //
+  // ⚠ RUNNING IS NOT BEING PINNED. Until this commit all 111 cases below were deletable with
+  // the gate green — an unpinned file is not a lightly-guarded one, it is an UNGUARDED one
+  // (the 188-12 statement, which this script keeps re-learning).
+  //
+  // ⚠ ALL THREE NUMBERS ARE READ FROM THIS SCRIPT'S OWN `actual` COLUMN on the run that had no
+  // pin for them — never hand-counted from `it(`, never quoted from a plan document. That run
+  // printed, verbatim:
+  //     DecisionsList.test.tsx                        —      54     new
+  //     DraftArrivalCard.test.tsx                     —      35     new
+  //     decisionsVocabulary.test.ts                   —      22     new
+  //     total                                      4217    4447    +230
+  //     total 4447  ·  failed 0  ·  pinned total 4217
+  //   count gate OK — 89/89 pinned files present, no per-file decrease, 0 failing.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THESE THREE PINS — the invariant each one carries:
+  //   · `decisionsVocabulary.test.ts` (22) — the five rows' words, their readiness arms, and
+  //     the fact that the module is a TRUE LEAF (it imports nothing). ⚠ ONLY ROW 3 MAY CLAIM A
+  //     PUBLISH REQUIREMENT, because only row 3's sentence arrives on the wire from
+  //     `grounding.py`'s stage-1 `business_requirement_missing` — measured as the ONLY
+  //     definition-level publish predicate (D-20). A copy edit letting row 1, 2, 4 or 5 claim
+  //     one would tell an author the gauntlet enforces something nothing enforces.
+  //   · `DecisionsList.test.tsx` (54) — THREE ARMS, NEVER TWO. An ABSENT readiness must render
+  //     no verdict node at all, which is not the same as a green one. Collapsing the union to
+  //     a boolean re-introduces exactly the "unknown reads as satisfied" defect D-20 exists to
+  //     prevent, and a boolean cannot express the third arm.
+  //   · `DraftArrivalCard.test.tsx` (35) — THE SUPPRESSION LIST IS LOAD-BEARING. It must name
+  //     the receipt's four FRAME/DUPLICATE handles (`seed-receipt`, `-heading`, `-dismiss`,
+  //     `-close`) and NONE of its four CONTENT handles; naming a content handle silently
+  //     BLANKS the fold, and a blank fold renders green in every geometry assertion. A fence
+  //     in the suite sweeps the targeted handles in the source and asserts the set is exactly
+  //     those four. ⚠ G-4 row **U1 is still owed** on the appearance half: jsdom applies no
+  //     CSS, so the one-card composition is proved here by SOURCE assertion only.
+  "decisionsVocabulary.test.ts": 22,
+  "DecisionsList.test.tsx": 54,
+  "DraftArrivalCard.test.tsx": 35,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
