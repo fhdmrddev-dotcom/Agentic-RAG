@@ -1245,3 +1245,161 @@ def test_the_generate_path_declares_no_predicate_and_no_message_of_its_own():
     assert "from app.services.harness.grounding import" in source, (
         "the authoring path must consume the ONE home by import"
     )
+
+
+# ══ Phase 197 (AUTH-02 / D-14) — HALF A: THE EMIT CONTRACT FENCE ═════════════════════════
+#
+# THE SHAPE THIS CATCHES, stated as a pattern rather than as one field: an authoring
+# contract that ADVERTISES something the authoring path never asks for. That is the shape
+# behind `SEED-157`, `SEED-163` and the AI-chosen name — three independently-recorded
+# instances of one structural defect — so the fence is over the PATTERN, not over any
+# particular field.
+#
+# ⚠ A NAIVE FENCE IS WRONG HERE, and that is the whole reason this file gets an allowlist
+# rather than a one-line assertion. Measured: the emit tool advertises 15 top-level
+# properties and the prompt names 7. Eight are advertised-and-not-asked TODAY and most of
+# them are CORRECTLY so. A fence reading "every advertised field must be asked for" would
+# be red on arrival and would be deleted within a week.
+#
+# ⚠ THIS IS TWO-DIRECTIONAL. A field ADDED to the model and not consciously routed reds on
+# the commit that adds it; an entry REMOVED from the allowlist without the field being
+# asked for also reds. The allowlist therefore cannot be grown to silence the test without
+# a reason being written down — which is the only property that makes an allowlist worth
+# anything.
+
+#: Advertised by the emit tool, deliberately NOT asked for in the prompt — one entry per
+#: field, each carrying its reason IN THE LITERAL (the shipped `ADMISSION_CASES` idiom:
+#: a reason in a comment is not readable by the person who later wants to delete the row).
+ADVERTISED_BUT_NOT_ASKED: dict[str, str] = {
+    "output_target_folder": (
+        "098 additive-optional SHAPE ONLY (D-08, `models/harness.py:528`) — the column "
+        "exists so old JSONB rows validate; no shipped path reads it, so asking a model "
+        "to fill it would manufacture a value nothing consumes"
+    ),
+    "reingest_output": (
+        "098 additive-optional SHAPE ONLY (D-08, `models/harness.py:529`) — same reason "
+        "as the field above; a defaulted bool nothing acts on"
+    ),
+    "version_policy": (
+        "098 additive-optional SHAPE ONLY (D-08, `models/harness.py:530`) — a Literal "
+        "with a shipped default; a model choosing between two tokens nothing reads is "
+        "noise in the emit"
+    ),
+    "provenance": (
+        "098 net-new FLAG with a shipped default (D-08, `models/harness.py:531`) — a "
+        "provenance claim is a thing the SERVER decides, never a thing the model asserts "
+        "about itself; cf. the stamp this file already fences in both directions"
+    ),
+    "inputs": (
+        "the launch-form spec, authored on the visual canvas rather than at birth "
+        "(`models/harness.py:532`) — a generated draft that invented launch inputs would "
+        "hand the author a form nobody asked for"
+    ),
+    "assets": (
+        "template/reference refs, PRODUCED by the author-time binding door and consumed "
+        "by `template_asset_service.resolve_template_source` (`models/harness.py:533`) — "
+        "an asset ref names a real Storage path, so a model inventing one names a file "
+        "that does not exist"
+    ),
+    "business_requirement_seeded_by_ai": (
+        "the PROVENANCE stamp for the field above it — deliberately ignored from the "
+        "model in BOTH directions and written server-side after validation "
+        "(`workflow_authoring.py`, the 193.2 stamp block). Asking for it would invite "
+        "exactly the laundering T-193.2-03b exists to refuse"
+    ),
+    "category": (
+        "the Starters-shelf curation marker (`models/harness.py:575-581`) — it is in the "
+        "schema so the fresh-copy STARTER FORK can round-trip it through create_draft "
+        "without `extra='forbid'` raising; it is a curation fact, not an authoring choice"
+    ),
+}
+
+
+def _fields_named_in_prompt(properties) -> set[str]:
+    """The ASKED set: advertised property names that occur in the authoring prompt.
+
+    Deliberately crude — a membership test, not a parser — for the same reason
+    `_sentences_naming` above is crude: it is a PROPERTY EXTRACTOR. A field the prompt
+    mentions anywhere has been consciously routed; a field it never mentions has not.
+    """
+    prompt = _prompt()
+    return {name for name in properties if name in prompt}
+
+
+def _advertised_but_not_asked(schema: dict) -> set[str]:
+    """THE CHECKER, taking its schema as an argument so the positive control can hand it a
+    modified copy. A checker that could only ever read the real schema could never be
+    shown to fire.
+    """
+    properties = schema["properties"]
+    return set(properties) - _fields_named_in_prompt(properties)
+
+
+def test_every_advertised_but_not_asked_entry_carries_a_reason():
+    """The allowlist's ONLY defence is that a row costs an explanation to add.
+
+    An entry with an empty reason is a silenced test wearing the costume of a documented
+    decision, so emptiness is refused mechanically rather than by review.
+    """
+    assert ADVERTISED_BUT_NOT_ASKED, "an empty allowlist would make the fence below vacuous"
+    assert all(isinstance(v, str) and v.strip() for v in ADVERTISED_BUT_NOT_ASKED.values())
+
+
+def test_the_advertised_but_not_asked_set_is_exactly_the_reasoned_allowlist():
+    """**D-14 half A** — the emit contract advertises nothing unrouted.
+
+    SET EQUALITY, in both directions and on purpose:
+
+      * a property ADDED to `WorkflowDefinition` (and therefore to `WF_SCHEMA`, which is
+        the model's own `model_json_schema()`) that the prompt never mentions turns this
+        red **on the commit that adds it** — the D-22 shape, caught at authoring time
+        rather than discovered as a live gap months later;
+      * an entry REMOVED from the allowlist while the field is still unasked ALSO reds, so
+        the allowlist cannot be quietly emptied.
+
+    ⚠ It asserts nothing about which side any field SHOULD be on. That is a judgement, and
+    the allowlist is where the judgement is written down.
+    """
+    from app.services.workflow_authoring import WF_SCHEMA
+
+    properties = WF_SCHEMA["properties"]
+    asked = _fields_named_in_prompt(properties)
+
+    # non-vacuity, both ways — a corpus that collapsed to empty, or a prompt that
+    # mentioned nothing, would make the equality trivially satisfiable.
+    assert len(properties) >= 15, "the advertised contract looks truncated"
+    assert asked, "no advertised property is named in the prompt — the checker is blind"
+
+    assert _advertised_but_not_asked(WF_SCHEMA) == set(ADVERTISED_BUT_NOT_ASKED)
+
+
+def test_positive_control_the_checker_reports_a_synthetic_advertised_field():
+    """THE SYNTHETIC PLANT — proof the checker KEEPS firing once every real instance is
+    allowlisted.
+
+    Without it, the case above could pass forever because the checker had gone blind, and
+    an absence assertion over a blind checker is indistinguishable from a clean tree. This
+    is the standing rule from 192.1 and SC#3 in 196: every fence carries a control.
+
+    ⚠ The fabricated name is ASSEMBLED AT RUNTIME from fragments and appears nowhere in
+    this file as a contiguous literal. These fences read raw sources by membership, so a
+    needle spelled out in prose becomes a needle the fence then finds — the trap that hit
+    four times in `196-08`, once inside the comment written to explain the first three.
+    """
+    from app.services.workflow_authoring import WF_SCHEMA
+
+    planted = "_".join(("plant", "ed", "unrouted", "prop"))
+    assert planted not in _prompt(), "the plant must be genuinely unasked-for"
+    assert planted not in ADVERTISED_BUT_NOT_ASKED, "the plant must be genuinely unrouted"
+
+    modified = copy.deepcopy(WF_SCHEMA)
+    modified["properties"][planted] = {"type": "string"}
+
+    reported = _advertised_but_not_asked(modified)
+
+    assert planted in reported, "the checker cannot see a newly advertised, unasked field"
+    assert reported != set(ADVERTISED_BUT_NOT_ASKED), (
+        "the fence above would not have gone red on this plant"
+    )
+    # The real schema object is untouched — the control must not contaminate the fence.
+    assert planted not in WF_SCHEMA["properties"]
