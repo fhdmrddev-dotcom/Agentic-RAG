@@ -138,6 +138,53 @@ describe("normalize — two wire types, one row", () => {
     expect((row.source as WorkflowDraftRow).token).toBe(draftVendorFork.token)
   })
 
+  // ── WR-01 (2026-08-18) — AN EMPTY NAME IS NOT A NAME ────────────────────────────────
+  //
+  // Found by the phase-197 code review. `??` answers only for `null`/`undefined`, so an
+  // EMPTY-STRING name passed straight through to the card, which renders `{row.name}` with
+  // no fallback of its own — a blank library title with nothing to click toward.
+  //
+  // ⚠ IT IS A REGRESSION PHASE 197 INTRODUCED, and naming the cause matters more than the
+  // patch: `197-05` shipped `setName`, the first path by which a workflow's name can be
+  // EMPTIED. The docblocks justified accepting `""` with "the server owns emptiness", and
+  // that is MEASURED FALSE for this field — `grounding.py`'s rule is
+  // `business_requirement_missing`; nothing anywhere refuses an empty workflow NAME, and
+  // `db/workflows.py:764` writes it through with `SET name = $3`.
+  //
+  // The fix is a DISPLAY fallback, deliberately not a client-side trim: the author's stored
+  // value is theirs, and rejecting it here would be the second copy of a rule that has no
+  // first copy on the server.
+
+  it("WR-01 — an EMPTY draft name falls back to the slug, exactly as a null one does", () => {
+    const row = fromDraft({ ...draftVendorFork, name: "" })
+    expect(row.name).toBe("vendor-risk-review")
+  })
+
+  it("WR-01 — an EMPTY published name falls back too, and that arm had no fallback at all", () => {
+    // `fromPublished` read `row.name` RAW — it did not even have the `??` its sibling had,
+    // so a published workflow with an empty name was blank by a second, different route.
+    const row = fromPublished({ id: "p", slug: "quarterly-brief", name: "" }, "published")
+    expect(row.name).toBe("quarterly-brief")
+  })
+
+  it("WR-01 — a WHITESPACE-ONLY name falls back, because it reads blank to a person", () => {
+    // The rule is about what the reader SEES. A name of three spaces is not null, is not
+    // empty, and renders as nothing at all.
+    expect(fromDraft({ ...draftVendorFork, name: "   " }).name).toBe("vendor-risk-review")
+  })
+
+  it("POSITIVE CONTROL — a REAL name is never replaced by the slug", () => {
+    // Without this, the three cases above would pass on a function that had simply started
+    // returning the slug unconditionally.
+    expect(fromDraft({ ...draftVendorFork, name: "Vendor risk review" }).name).toBe(
+      "Vendor risk review",
+    )
+    expect(
+      fromPublished({ id: "p", slug: "quarterly-brief", name: "Quarterly brief" }, "published")
+        .name,
+    ).toBe("Quarterly brief")
+  })
+
   it("leaves version undefined rather than faking one when the definition has none", () => {
     const row = fromPublished({ id: "x", slug: "x", name: "X" }, "published")
     expect(row.version).toBeUndefined()
