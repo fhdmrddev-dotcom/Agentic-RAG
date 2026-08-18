@@ -223,6 +223,7 @@ import { templateAdmission } from "@/components/workflows/soulData"
 import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { deleteWorkflowDraft } from "@/lib/api"
 
+import { cardFace, type CardMark } from "./cardFace"
 import { CHIP_PREDICATES } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
 import {
@@ -330,12 +331,47 @@ const ROOT_TESTID = {
   draft: "draft-card",
 } as const satisfies Record<Provenance, string>
 
-/** Per-provenance decorative mark + status pill, all three carried over verbatim. */
-const FACE = {
-  published: { mark: "📄", pill: "published", pillClass: "border-primary/40 text-primary" },
-  starter: { mark: "✨", pill: "Starter", pillClass: "border-primary/50 bg-primary/15 text-primary" },
-  draft: { mark: "📝", pill: "draft", pillClass: "border-border text-muted-foreground" },
-} as const satisfies Record<Provenance, { mark: string; pill: string; pillClass: string }>
+/**
+ * Phase 192.2-02 (LIB-06 / D-05 / D-06) — WHAT USED TO BE THE `FACE` TABLE, NOW SPLIT IN TWO.
+ *
+ * The DECISION — which state a row is in, what leads, what defers — moved to `cardFace.ts`, the
+ * one presentation module the three library surfaces share (CONTEXT D-05; the G-5 obligation this
+ * file has carried since sketch 175). What is left here is the DRAWING: three maps keyed by the
+ * face's own mark, so the card names no provenance in its header render at all.
+ *
+ * ⚠ THE THREE EMOJI ARE KEPT ON PURPOSE, AND KEEPING THEM IS THE POINT OF THIS WAVE. D-06 records
+ * that they violate the single-source icon convention, and Wave 4 removes them. Removing them HERE
+ * would change pixels inside a refactor and break the characterization pin
+ * (`WorkflowCard.baseline.test.tsx`) that proves the refactor changed nothing. A seam that ships
+ * with a behaviour change attached cannot prove it is a seam.
+ */
+const MARK_GLYPH = {
+  ready: "📄",
+  starter: "✨",
+  building: "📝",
+} as const satisfies Record<CardMark, string>
+
+/**
+ * ⚠ THE SYSTEM VOCABULARY, ON DEATH ROW. `face.state` ALREADY CARRIES THE BUSINESS WORD
+ * (`Ready to run` / `Shared starter` / `Still building`) — this map exists ONLY to keep the pill
+ * rendering the raw lifecycle spellings it renders today, so that this plan moves no pixel.
+ *
+ * **WAVE 4 DELETES THIS CONSTANT AND RENDERS `face.state`.** That is a one-line edit here and
+ * nowhere else, which is the whole return on the extraction: the vocabulary defect D-06 names has
+ * exactly one place left to be fixed.
+ */
+const LEGACY_STATE_PILL = {
+  ready: "published",
+  starter: "Starter",
+  building: "draft",
+} as const satisfies Record<CardMark, string>
+
+/** The pill's colour, carried over verbatim. Chrome, so it stays with the card, not the face. */
+const STATE_PILL_CLASS = {
+  ready: "border-primary/40 text-primary",
+  starter: "border-primary/50 bg-primary/15 text-primary",
+  building: "border-border text-muted-foreground",
+} as const satisfies Record<CardMark, string>
 
 // ── Props ────────────────────────────────────────────────────────────────────────────
 
@@ -442,8 +478,16 @@ export function WorkflowCard({
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
 
-  const runnable = row.provenance !== "draft"
-  const face = FACE[row.provenance]
+  /**
+   * Phase 192.2-02 (LIB-06 / D-05) — THE ONE CALL THAT RESOLVES THIS ROW'S FACE.
+   *
+   * Everything this card leads with, defers or states about the row itself comes back from here:
+   * the lead, the version, the state word, the mark and whether the row can be run. The card
+   * decides none of it and re-derives none of it — the same discipline it already holds when it
+   * refuses to compute slugs, versions or the identity line.
+   */
+  const face = cardFace(row)
+  const runnable = face.runnable
 
   /**
    * D-13 / D-14 — the id of the one consequence sentence, derived from the ROW id. That
@@ -588,9 +632,9 @@ export function WorkflowCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span aria-hidden="true">{face.mark}</span>
-            <span className={NAME_CLASSES}>{row.name}</span>
-            {row.version !== undefined && <span className={VERSION_CLASSES}>v{row.version}</span>}
+            <span aria-hidden="true">{MARK_GLYPH[face.mark]}</span>
+            <span className={NAME_CLASSES}>{face.lead}</span>
+            {face.version !== null && <span className={VERSION_CLASSES}>{face.version}</span>}
           </div>
 
           {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────
@@ -710,7 +754,11 @@ export function WorkflowCard({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          <span className={PILL_BASE + face.pillClass}>{face.pill}</span>
+          {/* ⚠ `LEGACY_STATE_PILL`, not `face.state` — see that constant's docblock. Wave 4's
+              one-line edit is right here, and it is the only place D-06's vocabulary fix lands. */}
+          <span className={PILL_BASE + STATE_PILL_CLASS[face.mark]}>
+            {LEGACY_STATE_PILL[face.mark]}
+          </span>
         </div>
       </div>
 
