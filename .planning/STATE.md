@@ -36,15 +36,42 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 192.2 (does-this-one-work) — EXECUTING
-Plan: **3 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline) and Wave 2
-(`192.2-02` the G-5 discharge + `192.2-03` the run-facts join) COMPLETE. Wave 2 ran the two plans
-in PARALLEL worktrees and they merged clean at `00b81f63` / `7bd88426` — zero `files_modified`
-overlap (frontend vs backend), and only `192.2-03` touched Postgres, so CLAUDE.md rule 4 (serialize
-DB-MUTATING plans) was satisfied without serialising the wave.
-Next action: `/gsd:execute-phase 192.2` — run **Wave 3** (`192.2-04`, run facts wire → card
-vocabulary).
+Plan: **4 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
+(`192.2-02` the G-5 discharge + `192.2-03` the run-facts join) and Wave 3 (`192.2-04`, the run
+truth's wire→words path) COMPLETE. Wave 2 ran its two plans in PARALLEL worktrees and they merged
+clean at `00b81f63` / `7bd88426` — zero `files_modified` overlap (frontend vs backend), and only
+`192.2-03` touched Postgres, so CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied
+without serialising the wave. Wave 3 ran SEQUENTIALLY on the main working tree.
+Next action: `/gsd:execute-phase 192.2` — run **Wave 4** (`192.2-05`, the subtraction + the
+language: the card finally changes what it draws).
 
-⚠ **Carried into Wave 3, measured not assumed:**
+⚠ **Carried OUT of Wave 3 into Wave 4, measured not assumed:**
+- **`face.run` (the arm) and `face.runWord` (the sentence) already reach the card** — `cardFace.ts`
+  asks `runFacts.ts` and re-derives nothing. The gutter mark keys off `face.run.kind`, and the
+  three-way outcome colour off `face.run.outcome`. **Every arm carries a word**, which is what makes
+  D-01's *"colour, and never colour alone"* enforceable rather than aspirational.
+- ⚠ **`cardFace(row, now)` — HOIST ONE `now` PER RENDER.** `WorkflowCard.tsx` currently takes the
+  `Date.now()` default, which is harmless while nothing renders the band and is **P-1 the moment
+  Wave 4 draws it**: 107 rows each reading their own clock can straddle a band boundary and two
+  cards will disagree. The page already hoists one instant for `resolveIdentity` — pass the same one.
+- ⚠ **The run truth's three arms are `unknown` / `never` / `ran`, and `LibraryRow` types the two run
+  fields `string | null | undefined` — NOT the plan's `string | undefined`.** Collapsing `null` into
+  `undefined` (which is what the neighbouring `updatedAt` normalizer does deliberately) IS T-13. The
+  five words live in `libraryVocabulary.ts`: `Worked` · `Failed` · `Stopped` · `Never run` ·
+  `Not recorded`.
+- ⚠ **`Not recorded` is what an IN-FLIGHT run says today** — `active` / `paused` / `cap_paused` are
+  deliberately absent from the outcome map so they take the honest default. Re-open trigger: the
+  first phase that renders in-flight state on the library shelf.
+- ⚠ **The approved sketch's own `runWords` (`dev/SketchLibraryCard.tsx`) HAS the T-13 bug** — its
+  comment claims three arms, its code has two plus a `Never run` catch-all. The sketch is the
+  acceptance bar for the LANGUAGE, not for the RESOLUTION. Do not copy it.
+- ⚠ **`libraryVocabulary.ts` measures `8 / 4 / 584` and has NO hot-file-ledger row** — over the G-5
+  threshold and invisible to its own guardrail, the `WorkflowsPage.tsx` failure one layer down.
+  **Wave 5 owes it a row + a section.** `frontend/src/lib/api.ts` re-derived to **`172 / 99 / 6227`**
+  (CLAUDE.md carries `171 / 98 / 6174`); its 197 seam decline **HOLDS** — this plan's change was
+  `+53 / -0` with **zero** new runtime exports, so the re-open trigger did not fire.
+
+⚠ **Carried into Wave 3, and still true:**
 - `last_run_status` arrives **RAW** from the wire — a `switch` over it needs a TOTAL default arm.
 - An **absent** key is a THIRD state, distinct from `null`. D-08 forbids rendering either blank or green.
 - The starter word is **`Shared starter`**, not `Starter` — `cardFace.ts` imports the business words from
