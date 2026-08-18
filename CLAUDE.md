@@ -163,6 +163,56 @@ fresh worktree false-failed every plan:
    `src/components/panel` at all, so a green gate said nothing about four fifths of the phase.
    **Adopting a suite raises the total; that is the desirable direction and must not be read as drift.**
 
+   ---
+
+   ### ⚠ CORRECTION 2026-08-19 (Phase 192.2, plan `192.2-06`) — THE FOURTH ROT, AND IT TOOK TWO DAYS. Both prior sets of figures are preserved above, never overwritten.
+
+   Re-derived on the main working tree — quiet, no sibling agent, run from the **repo root**, verdict
+   line read **verbatim** rather than summarised:
+
+   ```
+     total                                      4328    4594    +266
+     total 4594  ·  failed 0  ·  pinned total 4328
+   count gate OK — 92/92 pinned files present, no per-file decrease, 0 failing.
+   ```
+
+   | | correction (a) above said (2026-08-17) | **measured 2026-08-19** |
+   |---|---|---|
+   | grand total | 4170 | **4594** |
+   | pinned total | 4096 | **4328** |
+   | pinned files | 83/83 | **92/92** |
+
+   ⚠ **READ THE DATES: `4170` was 2026-08-17 and this is 2026-08-19 — TWO DAYS, and `+424` cases.**
+   The rot before this took ONE day; the one before that, two. **The rate has not slowed, which is
+   exactly why this section publishes a trajectory rather than a number.** Phase 192.2's own arc, with
+   every increment attributed so none can be quoted as another: `4455 · 4328 · 92/92` (wave-1 baseline
+   — and note the **pinned** total was ALREADY 4328 there, so the `+139` that follows is entirely NEW
+   TEST CASES, not newly-adopted pins) → `4506` (`+24` characterization pin, `+22` `cardFace`, `+5`
+   fence sweeps) → `4574` (`+52` `runFacts`, `+11` `cardFace`, `+5` sweeps) → **`4594`** (`+15`
+   `WorkflowCard.test.tsx`, `+5` the pin's re-baseline). **Each step closes with no residual**, and
+   that arithmetic is what distinguishes GROWTH from DRIFT — an unexplained `+n` is the thing to
+   worry about, never a bigger number.
+
+   **A growing number is still the gate WORKING.** Its contract is *no per-file DECREASE* and *zero
+   failing*, **never a fixed grand total** — so a plan that reads a bigger figure than this paragraph
+   quotes has read the correct current one. Re-derive rather than doubt it:
+   `GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs`, **from the repo root**, and read the
+   verdict line, never a summary.
+
+   ⚠ **A DELIBERATE FILE DELETION IS THE ONE THING THAT CAN LEGITIMATELY DECREASE THE TOTAL — AND IT
+   DID NOT HERE, WHICH IS ITSELF THE FINDING.** `192.2-06` deleted `frontend/src/dev/SketchLibraryCard.tsx`
+   (244 L) and its route registration in `main.tsx`. **No pinned file decreased and 92/92 still resolve**,
+   because **no gated suite ever covered `src/dev/` at all**. So the gate could never have told anyone
+   that a dev-only surface had outlived its sketch — **the teardown obligation was carried by a note in
+   a sketch README and by nothing executable.** A plan that deletes a source file must therefore say
+   which side of the gate it was on; silence reads as *"unchanged"* and means *"unwatched"*.
+
+   ⚠ **THE CAP WAS NEITHER ADJUSTED NOR NEEDED.** It held at `2` on every run across all six plans of
+   the phase, and nothing red ever appeared — so SEED-171's triage procedure was never entered.
+   **Recorded as an observation, not as proof of innocence:** two of SEED-171's five named flaky suites
+   (`library/WorkflowCard.test.tsx`, `WorkflowsPage.test.tsx`) sat inside this phase's blast radius and
+   were EDITED by it, and both were green on the first run of every invocation.
+
    **(b) ⚠ THE CAUSAL CLAIM ABOVE IS REFUTED, AND THIS IS THE CORRECTION THAT MATTERS —
    ADJUSTING THE CAP IS MEASURED NOT TO FIX THESE FAILURES.** The paragraphs above attribute every
    `STACK_TRACE_ERROR` to worker oversubscription and present the cap as the remedy. **Across ~15 gate
