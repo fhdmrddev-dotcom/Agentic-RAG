@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T12:00:00.000Z"
+last_updated: "2026-08-18T06:11:09.277Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
   completed_phases: 9
   total_plans: 105
-  completed_plans: 87
-  percent: 42
+  completed_plans: 96
+  percent: 47
 ---
 
 # Project State
@@ -31,14 +31,15 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 197 — guided-authoring (PLANNED, 11 plans, awaiting execution)
+**Current focus:** Phase 197 — guided-authoring
 
 ## Current Position
 
-Phase: **197 (guided-authoring) — ✅ PLANNED 2026-08-18** (`75a89240` · `8cae3b7a` · `060792bd` ·
+Phase: 197 (guided-authoring) — EXECUTING
+Plan: 1 of 11
 `7b6d55bd` · `0f487877` · `f59daa4c`).
 Resume file: `.planning/phases/197-guided-authoring/197-01-PLAN.md`
-Status: ✅ **11 PLANS IN 7 WAVES · `gsd-plan-checker` VERDICT: VERIFICATION PASSED, NO BLOCKERS.**
+Status: Executing Phase 197
 Four non-blocking findings; **two applied**, two recorded as accepted. **Next: `/gsd:execute-phase 197`.**
 
 ### What plan-phase produced, and the three things it CORRECTED
@@ -61,9 +62,11 @@ never overwritten.**
    zero new store actions, zero new fields, zero backend, because `jumpToStep` is already wired
    (`WorkflowBuilderPage.tsx:1570`, `:1637`). **Row 4 is the expensive one** — `setName` does not
    exist (`:262-306`) and is the phase's ONLY new store action.
+
 2. ⚠ **`governanceVocabulary.ts` DOES NOT EXIST.** CONTEXT.md D-09 and RESEARCH.md both cite it as
    one of four shipped vocabulary-module precedents; only its *test* file is there — a cross-cutting
    sweep with no module behind it. **A phantom precedent was being reasoned from.**
+
 3. ⚠ **D-15's *"187 shipped `name_seeded_by_ai`, the provenance shape is already there"* is FALSE.**
    That is a **`PhaseSpec`** field (`harness.py:435`) — a *step*-name flag. `WorkflowDefinition` has
    no equivalent (15 fields, none of them it). So the mark was never a checkbox; it is a full new
@@ -86,6 +89,7 @@ greens (absent ≠ green — the three-arm `TemplateAdmission` precedent, `soulD
 - **D-18 — row 5 JUMPS to the terminal `llm_emit` step's *Instructions*.** Rejected: inline-editing
   the emit prompt, which puts *Instructions* in two places against the page's own rule
   (`WorkflowBuilderPage.tsx:2085`: *"A second, different answer to one question is drift."*).
+
 - **D-19 — the drafted header renders `meta.name ?? meta.slug`.** ⚠ **Priced, not discovered:** that
   line is inside **`FLAG_OFF_HEADER_MARKUP` band 3**, a literal that stood **nine phases**, was
   re-captured twice in 193, and whose own note expects **no third**. Plan `197-10` carries it as a
@@ -100,6 +104,7 @@ greens (absent ≠ green — the three-arm `TemplateAdmission` precedent, `soulD
    extends.** A red run there is **genuinely ambiguous**. Filenames from the gate's own persisted
    JSON **before any re-run**; each checked against `git diff --numstat`; **cap untouched**. Say
    *"provably unmodified"*, never *"fine"*.
+
 2. **`197-02` task 3 lands its fence RED ON PURPOSE.** `template_asset_id` is accepted by
    `GenerateRequest` (`workflows.py:1586`) and has **never once been sent** by any production call
    site — a **live, unclosed fourth D-22 instance**. The plan records the failure verbatim before
@@ -128,6 +133,7 @@ requires and is honoured by construction** (new files — the 193.1 precedent); 
 
 - `.planning/sketches/172-where-the-five-decisions-live/` — does the card OWN controls or POINT at
   the shipped ones? Generated FROM the build; 41 assertions, 0 failing.
+
 - `.planning/sketches/173-one-row-five-ways/` — the row anatomy across all five D-07 rows; a
   DRAWING, and it says so; 25 assertions, 0 failing.
 
@@ -138,15 +144,19 @@ requires and is honoured by construction** (new files — the 193.1 precedent); 
    `AI-proposed` mark. So D-02's *"two receipts stacked"* is really **a second home for two shipped
    controls**, against the page's own rule (`kbAffordance` docblock: *"A second, different answer to
    one question is drift."*).
+
 2. ⚠ **The drafted header renders the SLUG, so the workflow's NAME appears nowhere at all.** Row 4 is
    not "no control" — it is **no display**. D-15 leaves the slug alone, so the header would keep
    showing the slug while a row edits the name: two strings, one invisible.
+
 3. ⚠ **Row 5 has NO FIELD.** `soulDeliverable()` derives it from a terminal `llm_emit`, so
    "answering" it means editing a step — which D-03's `builderStore` write path does not express as
    a row edit. **Price this before planning.**
+
 4. **A fourth child in the graph column STRANDS the graph** (collapses to 0 px under the
    `last-child` row pin). Adding a fourth row fixes that and **not** the height: 662 px of chrome
    leaves the graph 25 px at a 700 px column, unworkable below ~900 px.
+
 5. Card heights — A **368 px**, B **292 px** answered, C **357 px**; the D-03 limit line costs
    **30 px**.
 
@@ -167,6 +177,7 @@ two corrections, both of which changed the answer and are recorded rather than s
 1. *"It represents what the king looks like — I need the user-friendly version."* 172/173 are
    analysis pages; **a sketch whose job is to let someone judge a screen has failed if the screen is
    the smallest thing on the page.** 174 is the picture.
+
 2. *"You produce two cards … the area is very tight … information should not be dense but be enough
    for the user to know what is happening."* **Correct, and it refuted the first recommendation.**
    The receipt and a decisions card both say *here is what the AI just did*; splitting one thought
@@ -209,6 +220,7 @@ sketch over.
 
 1. **Row 4 (name)** — the header renders the SLUG, so the workflow's name is displayed nowhere
    today. This row would be its **first display**, not a second control.
+
 2. **Row 5 (deliverable)** — no field; derived from a terminal `llm_emit`. It reads as a fact with
    no control, and making it editable is larger than the other four.
 
@@ -240,6 +252,7 @@ by construction. ⚠ The ROADMAP referenced *"Phase 197's D-05"* at **two** plac
    source fences with positive controls (*"authors no sentence of its own"*, *"declares no predicate
    of its own"*, *"opens no request"*). **"Make the receipt answerable" is the wrong edit** — a
    NEW SIBLING surface ships instead (D-02).
+
 2. ⚠ **A DECISION WAS REVERSED ON A MEASUREMENT, and both halves are preserved in the log.**
    The deliverable row was to *"surface 193.2's suppression of an `llm_human_input` step"*.
    **There is no suppression.** 193.2's fix is a **prompt clause** —
@@ -270,9 +283,11 @@ All three ROADMAP success criteria VERIFIED with evidence gathered in the verifi
 all nine plans' `must_haves` spot-checked against the files they claim to have produced (existence was
 not accepted as evidence). The four claims most worth challenging — because each was asserted by the
 agent that also wrote the code — were each independently confirmed:
+
 - the **6-of-14-field author projection** security boundary,
 - the **`created_by`-explicit non-owner fall-through** (a bare `is not None` would have been a
   cross-tenant oracle, since `get_definition` returns global published rows to non-owners),
+
 - the **`useComposerModel` hook-count reduction**, and
 - **SC#3's negative fence proven NON-VACUOUS** — the same grep that finds nothing in
   `SettingsPage.tsx` / `ModelPillRow.tsx` DOES match `PhaseFormPanel.tsx`, which IS in the real diff.
@@ -287,9 +302,11 @@ automated check in this environment substitutes for. **None is a code gap.**
 
 ⚠ **NEW FINDING — A GENUINE SEED ID COLLISION, and a seed's `seed_id` IS its index.** Two files both
 declare `seed_id: SEED-174`, both dated 2026-08-18:
+
 - `.planning/seeds/SEED-174-authoring-model-knob-inert-by-absence.md` — **this phase's**, with MANY
   inbound references (STATE.md above, `SEED-175`'s related-link, the drift test's failure message,
   `196-09-SUMMARY.md`).
+
 - `.planning/seeds/SEED-174-mcp-connections-connect-and-be-connected.md` — unrelated, planted the same
   day by a separate operator-directed process, with **essentially NO inbound references**.
 
@@ -540,8 +557,10 @@ requirement (*after ownership resolution* AND *before any write*) was **unsatisf
 written**: `update_draft` has no ownership resolution before its write — ownership is the
 `created_by = $2` conjunct INSIDE the UPDATE (`backend/app/db/workflows.py:762-810`). Resolved with a
 lazy owner-scoped read. Two non-obvious properties fell out, both tested:
+
 1. A **non-owner falls through** to the existing 0-row UPDATE rather than raising — a pre-emptive 404
    would have turned an owner's *published-row* PATCH from today's 409 into a 404.
+
 2. ⚠ **`get_definition` RETURNS GLOBAL PUBLISHED ROWS TO NON-OWNERS**, which is why the code compares
    `created_by` explicitly instead of a bare `is not None`. **Grandfathering off someone else's global
    row would have re-opened the cross-tenant oracle by a second route.**
@@ -566,10 +585,13 @@ reason, pinned by accessible-name assertions. **Recommendation carried to `196-0
 `FieldLabel` + `InfoHint` into their own module** — that is `196-08`'s file to touch.
 
 ⚠ **More G-5 holes, all owed to `196-09` (D-23):**
+
 - `scripts/vitest-count-gate.cjs` → **`98 / 16 / 3110`, NO LEDGER ROW.** Sixteen phases have edited
   **the file that enforces the guardrails**, and it is invisible to its own.
+
 - `backend/app/api/workflows.py` re-derives to **`36 / 18 / 1984`** against CLAUDE.md's `35 / 17 / 1962`
   — stale by one phase already, `196-06`'s own commit being the 36th.
+
 - `backend/app/services/model_registry.py` (`2 / 1 / 368`) is absent with **three consumers already**;
   owes a row the moment it reaches a third phase.
 
@@ -658,11 +680,13 @@ That is the fix working (BUG-260731-01), not a regression, but it is a live beha
 operator's own box. UAT row U-B1.
 
 **Two plan premises were measured FALSE and neither was massaged into passing:**
+
 1. `196-03`: the plan asserted *"the FIVE call sites, all inside `async def`"*. Site `:455` is inside
    a **sync** `def _build_phase_tool_context`, called synchronously by fifteen shipped test sites —
    and it is the load-bearing one, since `run_task_sub_agent` reads `parent_ctx.model`. Skipping it
    would have left agent phases on the unchecked id. **So `grep -c '_effective_model_checked'` is 5,
    not the asserted 6, and the `await` count is 4, not 5.** Both arms are now fenced.
+
 2. `196-02`: the plan said consumer 2 "sits inside a per-arm loop" and asked to hoist above it. No
    loop textually contains it; hoisting to `run_eval_job` needs the signature change the same plan
    forbids. Hoisted to the top of the grading block instead — the 30 s settings TTL collapses it to
@@ -1237,7 +1261,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Executing Phase 196
+**Status:** Executing Phase 197
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
@@ -1985,7 +2009,7 @@ plain. Do not verify a behaviour that does not exist.
 
 **Next action:** `/gsd:verify-work 192` when you want the owed rows driven — or proceed knowing they
 are owed. Downstream MUST read `192-CONTEXT.md` (**18** decisions) and `192-RESEARCH.md`, which **corrects six CONTEXT.md line numbers** measured at `HEAD = a0795512` — re-derive every line number, HEAD has moved.
-**Last activity:** 2026-08-17
+**Last activity:** 2026-08-18
 
 **Prior activity:** 2026-08-10 — **Phase 192 wave 1 executed and merged** (`5178100e`). `192-01`: five `WorkflowsPage`-covering suites adopted into BOTH count-gate knobs (pinned files 51 → 56, pinned total 2838 → 2910), zero source changed. `192-02`: D-04 ownership — `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, raw `created_by` fenced off the wire. Post-merge gate green: `tsc -p tsconfig.app.json` unmoved at **33**, count gate exit 0 / `failed 0`, new backend suite 17/17.
 

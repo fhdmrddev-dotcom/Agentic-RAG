@@ -40,7 +40,7 @@ the right vocabulary, stop it, and see what it produced.
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
-| 197 | Guided Authoring | Drafting from a description guides the decisions that matter | AUTH-02 | 3 |
+| 197 | Guided Authoring | 1/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
@@ -685,7 +685,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 197-01-PLAN.md — Wave 1: the D-05 red line as a MECHANICAL criterion, before any source edit — the shipped pre-draft baseline (it predates by four phases) run green at the base SHA, the four gate baselines re-derived, and the four numstat deletion criteria declared with their two exclusions
+- [x] 197-01-PLAN.md — Wave 1: the D-05 red line as a MECHANICAL criterion, before any source edit — the shipped pre-draft baseline (it predates by four phases) run green at the base SHA, the four gate baselines re-derived, and the four numstat deletion criteria declared with their two exclusions
 
 **Wave 2** *(five plans in parallel — zero `files_modified` overlap, no plan mutates the DB)*
 
