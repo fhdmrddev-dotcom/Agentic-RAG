@@ -40,7 +40,7 @@ the right vocabulary, stop it, and see what it produced.
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
-| 197 | Guided Authoring | 6/11 | In Progress|  |
+| 197 | Guided Authoring | 7/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
@@ -697,7 +697,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 197-07-PLAN.md — Wave 3: `DecisionsList` — five rows, always, in the exported order; each answer read LIVE off the definition; the three-arm readiness read where an absent verdict renders exactly what a green one does (nothing); rows 2+5 as ONE jump; row 4 an inline field (D-17)
+- [x] 197-07-PLAN.md — Wave 3: `DecisionsList` — five rows, always, in the exported order; each answer read LIVE off the definition; the three-arm readiness read where an absent verdict renders exactly what a green one does (nothing); rows 2+5 as ONE jump; row 4 an inline field (D-17)
 
 **Wave 4** *(blocked on Wave 3)*
 
