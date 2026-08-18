@@ -545,6 +545,34 @@ function gatesFor(phase: PhaseSpecJSON | null, kbTools: readonly string[]): Phas
     : []
 }
 
+/**
+ * 197-09 (AUTH-02) — HAND THE AUTHOR TO A CONTROL THAT ALREADY EXISTS.
+ *
+ * ⚠ FOCUS FIRST, SCROLL SECOND, AND THE ORDER IS A CORRECTNESS REQUIREMENT — MEASURED,
+ * NOT REASONED. Written the other way round, both arrival-card seams did nothing at all:
+ * jsdom does not implement `scrollIntoView`, the call threw, and the `focus()` on the next
+ * line never ran, so `document.activeElement` stayed on `<body>`. Two cases caught it.
+ *
+ * The lesson generalises well past the test environment: the FOCUS is the seam's whole
+ * job and the scroll is an assist, so an assist that throws must never be able to eat the
+ * job. The `typeof` guard makes that structural rather than a property of statement order.
+ *
+ * `block: "nearest"` is deliberate — it moves the viewport the minimum needed rather than
+ * yanking the header to the top of the screen, which on a jump the author did not ask for
+ * is disorienting. And a focus that scrolls NOTHING is a jump the author cannot see, which
+ * is why the assist exists at all.
+ *
+ * Module scope, not a component body: it closes over nothing and a per-render copy inside
+ * a `useCallback([])` would be a stale closure waiting to be believed.
+ */
+function handOffTo(node: HTMLElement | null) {
+  if (node === null) return
+  node.focus()
+  if (typeof node.scrollIntoView === "function") {
+    node.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }
+}
+
 /** The Builder's working definition shape (a refinement of the opaque
  *  `WorkflowDefinitionJSON` the api layer returns). */
 export interface BuilderDefinition {
@@ -1654,19 +1682,9 @@ export function WorkflowBuilderPage({
   const kbPickerRef = useRef<HTMLSelectElement | null>(null)
   const requirementInputRef = useRef<HTMLInputElement | null>(null)
 
-  const focusKbPicker = useCallback(() => {
-    const node = kbPickerRef.current
-    if (node === null) return
-    node.scrollIntoView({ block: "nearest", inline: "nearest" })
-    node.focus()
-  }, [])
+  const focusKbPicker = useCallback(() => handOffTo(kbPickerRef.current), [])
 
-  const focusRequirementInput = useCallback(() => {
-    const node = requirementInputRef.current
-    if (node === null) return
-    node.scrollIntoView({ block: "nearest", inline: "nearest" })
-    node.focus()
-  }, [])
+  const focusRequirementInput = useCallback(() => handOffTo(requirementInputRef.current), [])
 
   /** Row 4's writer — the store's own `setName`, reached through `getState()` inside a
    *  callback (never as a rendered value, the shipped selector discipline). Row 4 is the

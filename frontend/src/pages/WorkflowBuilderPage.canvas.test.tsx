@@ -3714,3 +3714,435 @@ describe("WorkflowBuilderPage — the business requirement reaches the PATCH bod
     expect(screen.getByTestId("business-requirement-ai-mark")).toBeInTheDocument()
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// Phase 197-09 (AUTH-02 / ROADMAP SC#1 — D-01 / D-02 / D-06 / D-13 / D-14 / D-18 ·
+// T-197-03 / T-197-21 / T-197-24 / T-197-27) — THE ARRIVAL CARD, MOUNTED
+//
+// APPENDED. Plan 197-08 built `DraftArrivalCard` and mounted it nowhere; this block is the
+// page's half. It pins four things the component's own 35-case suite structurally CANNOT
+// see, because that suite mounts the component directly and hands it props:
+//
+//  1. THE THREE-CHILD GRID. The graph column is a three-row grid whose LAST child is pinned
+//     to the `minmax(0,1fr)` row. A FOURTH child auto-places into row 3 alongside it and
+//     the graph collapses to 0 px — sketch 172 measured exactly that, which is why the card
+//     REPLACED the receipt in place rather than joining it. Only a page-level case can
+//     count the children, and the count is asserted as a NUMBER: `toBeInTheDocument()` on
+//     the card passes just as happily with four.
+//  2. SNAPSHOT vs LIVE, KEPT APART. The card renders two classes of value that look
+//     identical in the DOM: what the server said about ONE generation (`receiptPhases`,
+//     `readiness`) and what the definition says NOW (the five decision answers). Conflating
+//     them is CR-01's shape for the FOURTH time. A card that passed the snapshot half by
+//     freezing everything would fail the live half, and vice versa — so both are here, and
+//     they are each other's control.
+//  3. THE VERDICT'S LAST HOP, WHICH `tsc` CANNOT CHECK. `197-06` widened the hook's
+//     `onDrafted` to carry the server's readiness verdict as a second argument, and
+//     recorded honestly that the page was still ignoring it — because a ONE-ARGUMENT inline
+//     callback assigns to a two-parameter signature with NO TypeScript error at all. ⚠ A
+//     GREEN TYPECHECK IS THEREFORE NOT EVIDENCE FOR THIS PLAN. These cases are: deleting
+//     the second parameter from the page's callback reds three of them while `tsc` stays
+//     at its 33-error baseline, and that was measured by planting the deletion, not
+//     reasoned about.
+//  4. THE TWO FOCUS SEAMS. Rows 1 and 3 hand the author to the control that already exists
+//     rather than mounting a second one, because *"a second, different answer to one
+//     question is drift"* — this page's own rule, beside *"ONE CONTROL, TWO MOUNT POINTS."*
+//     After the jump the header control and the row must read the SAME string, which is the
+//     U5 defect class made mechanical.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+describe("WorkflowBuilderPage 197-09 — the arrival card is mounted, and the two value classes stay apart", () => {
+  const ON = { features: { visual_workflow_canvas: true }, loading: false }
+
+  /** The one KB-reading tool in this block's server palette. */
+  const KB_TOOL = "search_documents"
+  /** A tool that reads no documents, so naming it grounds nothing. */
+  const PLAIN_TOOL = "execute_code"
+
+  /**
+   * A generated definition with ONE grounded step at arrival, so the grounding fold LINE
+   * exists and the composed receipt is reachable.
+   *
+   * ⚠ This is deliberately NOT the CR-04 block's zero-grounded fixture. That one cannot
+   * reach the receipt at all — `groundingFoldSummary(0)` is the empty string, so no fold
+   * line renders — which is why the receipt's three count attributes are fenced HERE and
+   * the fold line's non-APPEARANCE is fenced THERE. Between them the two fixtures cover
+   * both sides of one snapshot property, and neither could have covered both.
+   *
+   *  - `research` is `llm_agent` reaching for the KB tool → grounded at arrival.
+   *  - `judge` is `llm_agent` reaching only for a non-KB tool → the step the author edits.
+   *  - `brief` is `llm_emit` carrying `citation_policy: "draft"`, a member of the backend
+   *    Literal, chosen because the shipped default `"strict"` would start the carried count
+   *    above zero.
+   */
+  const arrivalPhases = [
+    {
+      slug: "research",
+      phase_index: 0,
+      config: { phase_type: "llm_agent", available_tools: [KB_TOOL] },
+    },
+    {
+      slug: "judge",
+      phase_index: 1,
+      config: { phase_type: "llm_agent", available_tools: [PLAIN_TOOL] },
+    },
+    { slug: "brief", phase_index: 2, config: { phase_type: "llm_emit", citation_policy: "draft" } },
+  ]
+  const arrivalDef = {
+    ...definition,
+    name: "Vendor risk brief",
+    project_folder_id: CORPUS_FOLDER_ID,
+    phases: structuredClone(arrivalPhases),
+  } as BuilderDefinition
+
+  const FOLDER_NAME = "Supplier contracts"
+  const OTHER_FOLDER_ID = "11111111-2222-3333-4444-555555555555"
+  const OTHER_FOLDER_NAME = "Board minutes"
+
+  beforeEach(() => {
+    mockBundle.mockResolvedValue({
+      tools: [KB_TOOL, PLAIN_TOOL],
+      folders: [],
+      skills: [],
+      degraded: [],
+      kb_tools: [KB_TOOL],
+    })
+    // TWO folders, so re-binding is a real choice rather than a no-op.
+    mockListFolders.mockResolvedValue([
+      { id: CORPUS_FOLDER_ID, name: FOLDER_NAME },
+      { id: OTHER_FOLDER_ID, name: OTHER_FOLDER_NAME },
+    ])
+    mockGenerate.mockResolvedValue({ ok: true, definition: structuredClone(arrivalDef) })
+  })
+
+  /** Draft through the ONE shipped forward path and wait for the card. */
+  async function draftAndArrive(): Promise<HTMLElement> {
+    render(
+      <EffectiveFeaturesProvider value={{ ...ON, refetch: vi.fn() }}>
+        <div style={{ width: 1200, height: 800 }}>
+          <WorkflowBuilderPage />
+        </div>
+      </EffectiveFeaturesProvider>,
+    )
+    await screen.findByTestId("describe-hint")
+    fireEvent.change(screen.getByLabelText("business requirement"), {
+      target: { value: "summarise the supplier renewals every week" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: DESCRIBE_CTA }))
+    return await screen.findByTestId("draft-arrival-card")
+  }
+
+  /** Open the decisions fold and return the mounted list. */
+  async function openDecisions(): Promise<HTMLElement> {
+    fireEvent.click(await screen.findByTestId("draft-arrival-fold-decisions"))
+    return await screen.findByTestId("decisions-list")
+  }
+
+  /**
+   * THE ONE COUNTING EXPRESSION, declared once so the assertion and its positive control
+   * cannot drift into counting two different things. `children` is ELEMENTS only, which is
+   * what stops whitespace between JSX children from moving the number. The graph COLUMN is
+   * `builder-grid`'s first child — the flag-on wrapper `div`.
+   */
+  const countChildren = (host: Element) => host.children.length
+  const graphColumn = () => screen.getByTestId("builder-grid").children[0] as HTMLElement
+  const SPINE_LABEL = "Workflow phase spine (read-only)"
+
+  it("⭐ the graph column has EXACTLY three children, and the card is the middle one", async () => {
+    await draftAndArrive()
+
+    const column = graphColumn()
+    // THE FENCE, as a NUMBER. Sketch 172 measured that a FOURTH child strands the graph at
+    // 0 px; a presence check on the card cannot tell three from four.
+    expect(countChildren(column)).toBe(3)
+
+    // …and they are the three the layout expects, in order.
+    expect(column.children[0]).toHaveAttribute("data-testid", "builder-view-toggle")
+    expect(column.children[1]).toHaveAttribute("data-testid", "draft-arrival-card")
+    // The graph is LAST, which is what `[&>*:last-child]:row-start-3` pins to the 1fr row.
+    expect(column.children[2]).toBe(column.lastElementChild)
+    expect(column.children[2].getAttribute("aria-label")).toBe(SPINE_LABEL)
+  })
+
+  it("⭐ POSITIVE CONTROL — the counting expression really can report four", () => {
+    // Without this, `toBe(3)` above could be passing because `countChildren` is blind to
+    // the very thing it exists to detect. A local four-child fixture proves it is not.
+    const host = document.createElement("div")
+    for (const _ of [0, 1, 2, 3]) host.appendChild(document.createElement("span"))
+    host.appendChild(document.createTextNode("a stray text node"))
+    expect(countChildren(host)).toBe(4)
+
+    const three = document.createElement("div")
+    for (const _ of [0, 1, 2]) three.appendChild(document.createElement("span"))
+    expect(countChildren(three)).toBe(3)
+    expect(countChildren(three)).not.toBe(countChildren(host))
+  })
+
+  it("dismissing takes the column down to TWO children, with the graph still last", async () => {
+    const card = await draftAndArrive()
+    expect(countChildren(graphColumn())).toBe(3)
+
+    fireEvent.click(within(card).getByTestId("draft-arrival-dismiss"))
+    await waitFor(() => expect(screen.queryByTestId("draft-arrival-card")).toBeNull())
+
+    // A dismissed card renders NO NODE — which is exactly why the graph is pinned to row 3
+    // by `*:last-child` rather than trusted to occupy a slot.
+    const column = graphColumn()
+    expect(countChildren(column)).toBe(2)
+    expect(column.children[0]).toHaveAttribute("data-testid", "builder-view-toggle")
+    expect(column.lastElementChild?.getAttribute("aria-label")).toBe(SPINE_LABEL)
+  })
+
+  it("⭐ SNAPSHOT — three REAL post-arrival edits move nothing the card says about the generation", async () => {
+    const card = await draftAndArrive()
+    const heading = within(card).getByTestId("draft-arrival-heading").textContent ?? ""
+    const groundingLine =
+      within(card).getByTestId("draft-arrival-fold-grounding-summary").textContent ?? ""
+    expect(heading).toContain("3")
+    expect(groundingLine).not.toBe("")
+
+    // The composed receipt, opened once and read for its three counts — the numbers the
+    // CR-04 block's zero-grounded fixture cannot reach.
+    fireEvent.click(within(card).getByTestId("draft-arrival-fold-grounding"))
+    const receipt = await screen.findByTestId("seed-receipt")
+    const counts = {
+      grounded: receipt.getAttribute("data-grounded-count"),
+      detected: receipt.getAttribute("data-detected-count"),
+      carried: receipt.getAttribute("data-carried-count"),
+    }
+    expect(counts.grounded).toBe("1")
+
+    fireEvent.click(screen.getByTestId("builder-view-canvas"))
+    await waitFor(() => expect(screen.getByTestId("canvas-node-judge")).toBeInTheDocument(), LAZY)
+
+    // ── EDIT 1: switch a document-reading tool ON, on a step that was not grounded ──
+    fireEvent.click(screen.getByTestId("canvas-node-judge"))
+    await waitFor(
+      () => expect(screen.getByLabelText("Refine step: judge")).toBeInTheDocument(),
+      LAZY,
+    )
+    const chip = screen
+      .getAllByTestId("tool-option")
+      .find((el) => el.getAttribute("data-tool") === KB_TOOL)
+    if (!chip) throw new Error(`the panel offers no "${KB_TOOL}" chip`)
+    fireEvent.click(chip)
+    // POSITIVE CONTROL — the edit LANDED. Without it this case goes green the day the
+    // whitelist rail stops committing, which is a fence measuring nothing (WR-12).
+    await waitFor(() => expect(chip).toHaveAttribute("aria-pressed", "true"))
+
+    // ── EDIT 2: escalate the grounding dial on the same step ──
+    fireEvent.click(screen.getByTestId("governance-dial-strict"))
+    await waitFor(() =>
+      expect(screen.getByTestId("governance-dial-strict")).toHaveAttribute("aria-pressed", "true"),
+    )
+
+    // ── EDIT 3: the author adds a step ──
+    const nodes = () => document.querySelectorAll("[data-testid^='canvas-node-'][data-slug]").length
+    const before = nodes()
+    fireEvent.click(screen.getByTestId("canvas-insert-2"))
+    fireEvent.click(screen.getByTestId("step-type-choice-llm_single"))
+    await waitFor(() => expect(nodes()).toBe(before + 1))
+
+    // The card's PAST-TENSE sentences describe the GENERATION, so none of the three moved.
+    const after = screen.getByTestId("draft-arrival-card")
+    expect(within(after).getByTestId("draft-arrival-heading").textContent ?? "").toBe(heading)
+    expect(within(after).getByTestId("draft-arrival-fold-grounding-summary").textContent ?? "").toBe(
+      groundingLine,
+    )
+    const receiptAfter = screen.getByTestId("seed-receipt")
+    expect({
+      grounded: receiptAfter.getAttribute("data-grounded-count"),
+      detected: receiptAfter.getAttribute("data-detected-count"),
+      carried: receiptAfter.getAttribute("data-carried-count"),
+    }).toEqual(counts)
+  })
+
+  it("⭐ LIVE — row 1's answer follows the header's knowledge-base picker immediately", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+    // The generated binding, resolved to a NAME by the page's own mount fetch.
+    await waitFor(() =>
+      expect(within(list).getByTestId("decision-answer-knowledge-base").textContent).toBe(
+        FOLDER_NAME,
+      ),
+    )
+
+    // Re-bind through the ONE control — the header picker the row hands the author to.
+    fireEvent.change(screen.getByTestId("project-folder-picker"), {
+      target: { value: OTHER_FOLDER_ID },
+    })
+
+    // …and the row follows in the same beat. This is the MIRROR of the snapshot fence: a
+    // card that froze everything to pass that one would fail here.
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-knowledge-base").textContent).toBe(
+        OTHER_FOLDER_NAME,
+      ),
+    )
+    // ⚠ U5, MADE MECHANICAL — the header control and the row must agree. One screen with
+    // two answers to one question is exactly the drift these seams refuse.
+    expect((screen.getByTestId("project-folder-picker") as HTMLSelectElement).value).toBe(
+      OTHER_FOLDER_ID,
+    )
+  })
+
+  it("⭐ LIVE — row 3's answer follows the header's requirement input immediately", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+    const generated = within(list).getByTestId("decision-answer-requirement").textContent
+    expect(generated).not.toBe("")
+
+    fireEvent.change(screen.getByTestId("business-requirement-input"), {
+      target: { value: "Produce a board-ready renewal brief every Monday." },
+    })
+
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-requirement").textContent).toBe(
+        "Produce a board-ready renewal brief every Monday.",
+      ),
+    )
+    expect(screen.getByTestId("decision-answer-requirement").textContent).not.toBe(generated)
+    expect((screen.getByTestId("business-requirement-input") as HTMLInputElement).value).toBe(
+      "Produce a board-ready renewal brief every Monday.",
+    )
+  })
+
+  it("⭐ FOCUS SEAM — row 1's action focuses the SHIPPED picker, and both read the same answer", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // Nothing has focused it yet, so the assertion below is a measurement rather than a
+    // restatement of the initial condition.
+    expect(document.activeElement).not.toBe(screen.getByTestId("project-folder-picker"))
+
+    fireEvent.click(within(list).getByTestId("decision-action-knowledge-base"))
+
+    const picker = screen.getByTestId("project-folder-picker") as HTMLSelectElement
+    expect(document.activeElement).toBe(picker)
+    expect(document.activeElement).toHaveAttribute("data-testid", "project-folder-picker")
+    // The row DISPLAYS and JUMPS; it owns no control. Exactly ONE picker exists on screen —
+    // the T-197-21 property, and the reason a `getAllByTestId` length is asserted rather
+    // than a `getByTestId` (which would throw on two and read as a different failure).
+    expect(screen.getAllByTestId("project-folder-picker")).toHaveLength(1)
+    // …and after the jump the two surfaces agree, which is the U5 property.
+    await waitFor(() =>
+      expect(screen.getByTestId("decision-answer-knowledge-base").textContent).toBe(FOLDER_NAME),
+    )
+    expect(picker.selectedOptions[0]?.textContent).toBe(FOLDER_NAME)
+  })
+
+  it("⭐ FOCUS SEAM — row 3's action focuses the SHIPPED requirement input, and both read the same string", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+    const input = screen.getByTestId("business-requirement-input") as HTMLInputElement
+    expect(document.activeElement).not.toBe(input)
+
+    fireEvent.click(within(list).getByTestId("decision-action-requirement"))
+
+    expect(document.activeElement).toBe(input)
+    expect(document.activeElement).toHaveAttribute("data-testid", "business-requirement-input")
+    expect(screen.getAllByTestId("business-requirement-input")).toHaveLength(1)
+    expect(screen.getByTestId("decision-answer-requirement").textContent).toBe(input.value)
+  })
+
+  it("⭐ THE VERDICT LANDS — the server's `missing` sentence reaches row 3, VERBATIM", async () => {
+    /**
+     * D-13's whole point, and the hop `197-06` could not take.
+     *
+     * ⚠ THIS IS THE CASE THAT MAKES A GREEN TYPECHECK IRRELEVANT. Deleting the second
+     * parameter from the page's `onDrafted` callback is a change `tsc` accepts in SILENCE —
+     * a one-argument inline callback assigns to a two-parameter signature without error —
+     * so the page would compile perfectly while the author's screen quietly said nothing
+     * about a requirement the publish gauntlet is going to refuse. Measured, not assumed:
+     * planting that deletion reds this case and the two below it, at the same 33-error
+     * typecheck baseline.
+     */
+    const SERVER_SENTENCE =
+      "This workflow has no business requirement, so the publish gauntlet will refuse it."
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: structuredClone(arrivalDef),
+      readiness: { business_requirement: { status: "missing", message: SERVER_SENTENCE } },
+    })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // VERBATIM — the client authors no sentence of its own about readiness (D-16), and it
+    // borrows the gate's register on exactly one row (D-20).
+    expect(within(list).getByTestId("decision-verdict-requirement").textContent).toBe(
+      SERVER_SENTENCE,
+    )
+  })
+
+  it("⭐ ABSENT IS NOT A PASS — a response with NO readiness key renders no verdict at all", async () => {
+    // The live behaviour of every stale deploy, and of every generation before `197-02`'s
+    // server half. The three-state type exists so absence stays absence: a nullish-coalesce
+    // onto an empty object, and a `=== "missing"` read with a green `false` branch, BOTH
+    // typecheck — which is why this is a case and not a comment.
+    mockGenerate.mockResolvedValue({ ok: true, definition: structuredClone(arrivalDef) })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    expect(within(list).queryByTestId("decision-verdict-requirement")).toBeNull()
+    // …and the row itself is still there, saying what it chose. Absence silences the
+    // VERDICT, never the answer.
+    expect(within(list).getByTestId("decision-answer-requirement").textContent).not.toBe("")
+  })
+
+  it("⭐ POSITIVE CONTROL — an explicit `present` renders IDENTICALLY to an absent verdict", async () => {
+    // This is what makes the case above a measurement rather than a coincidence: if the two
+    // rendered differently, an author could tell them apart, and absence would become
+    // readable — as a failure, or worse, as a green tick.
+    mockGenerate.mockResolvedValue({
+      ok: true,
+      definition: structuredClone(arrivalDef),
+      readiness: { business_requirement: { status: "present" } },
+    })
+
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    expect(within(list).queryByTestId("decision-verdict-requirement")).toBeNull()
+    // …and the query is capable of finding one — the `missing` case above proves it does.
+    expect(within(list).getByTestId("decision-row-requirement")).toBeInTheDocument()
+  })
+
+  it("row 5 hands the author to the step that makes the file — the ONE selection contract", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    // `terminalEmitSlug` over the LIVE definition picks `brief`, the only `llm_emit`.
+    fireEvent.click(within(list).getByTestId("decision-action-deliverable"))
+
+    // The page's ONE selection callback opened the shipped panel — no second door
+    // (D-183-05: `jumpToStep` is selection only).
+    await waitFor(
+      () => expect(screen.getByLabelText("Refine step: brief")).toBeInTheDocument(),
+      LAZY,
+    )
+  })
+
+  it("row 4 writes the name through the store, and the drafted header still shows the SLUG", async () => {
+    await draftAndArrive()
+    const list = await openDecisions()
+
+    const field = within(list).getByTestId("decision-name-input") as HTMLInputElement
+    expect(field.value).toBe("Vendor risk brief")
+
+    fireEvent.change(field, { target: { value: "Renewals brief" } })
+
+    // The row is a pure projection of the store, so the value coming back out is proof the
+    // write LANDED rather than proof the input holds its own state. Row 4 is the one row
+    // that owns a field, and that is not an exception to the no-duplication rule: the name
+    // has no existing control anywhere, so this field is the FIRST answer, not a second.
+    await waitFor(() =>
+      expect((screen.getByTestId("decision-name-input") as HTMLInputElement).value).toBe(
+        "Renewals brief",
+      ),
+    )
+    // ⚠ D-19 IS PLAN 197-10'S, NOT THIS ONE'S, and this line pins the boundary so a header
+    // change cannot be smuggled in here. The drafted header still renders `meta.slug`.
+    expect(screen.getAllByText("vendor-brief").length).toBeGreaterThan(0)
+  })
+})
