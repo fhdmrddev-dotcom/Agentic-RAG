@@ -81,7 +81,35 @@ function extractElement(html, marker, tag) {
   return null
 }
 
-const HEADER = dom.headerAnswered || ""
+/**
+ * ⚠ A DUMP-FIDELITY REPAIR, AND THE SCREEN CONTRADICTED ITSELF WITHOUT IT.
+ *
+ * React sets a `<select>`'s value as a DOM **property**, never as an attribute — so
+ * serialising the real header to HTML loses the selection, and the picker re-renders
+ * showing its FIRST option: *"No knowledge base · searches everything"*. The card beside
+ * it says *"Vendor contracts"*. One screen, two answers, and the whole point of this
+ * sketch is that a decision has exactly one answer.
+ *
+ * The repair marks the option the emitter's own definition binds (`project_folder_id:
+ * "f2"`) as `selected`. It is the smallest possible edit to the real DOM and it makes the
+ * dump agree with the state it was captured in — asserted below, in both directions.
+ *
+ * ⚠ Caught by LOOKING at a screenshot. Three pages of geometry assertions all passed
+ * while the header quietly claimed the opposite of the card.
+ */
+const BOUND_FOLDER_ID = "f2"
+const HEADER = (dom.headerAnswered || "").replace(
+  `<option value="${BOUND_FOLDER_ID}">`,
+  `<option value="${BOUND_FOLDER_ID}" selected>`,
+)
+assert(
+  HEADER.includes(`<option value="${BOUND_FOLDER_ID}" selected>`),
+  "the bound knowledge base is marked selected — the header must not contradict the card",
+)
+assert(
+  HEADER !== dom.headerAnswered,
+  "…and the repair actually changed the DOM (a no-op replace would restore the contradiction silently)",
+)
 const RECEIPT = dom.receipt || ""
 const TOGGLE = extractElement(dom.gridAnswered, 'data-testid="builder-view-toggle"', "div") || ""
 const SPINE = extractElement(dom.gridAnswered, 'aria-label="Workflow phase spine', "section") || ""
@@ -267,7 +295,7 @@ assert(
 /* ─────────────────────── the page ─────────────────────── */
 
 const body = `
-<div class="s174-root">
+<div class="s174-root dark">
   <div class="s174-head">
     <div class="s174-kicker">Sketch 174 · Phase 197 · the arrival moment, as a screen</div>
     <h1>One card, not two</h1>

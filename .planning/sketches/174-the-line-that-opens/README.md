@@ -106,3 +106,30 @@ node .planning/sketches/174-the-line-that-opens/build.cjs
 # tailwind over body.generated.html, then:
 node .planning/sketches/174-the-line-that-opens/assemble.cjs
 ```
+
+## ⚠ Two defects found by LOOKING, after every measurement had passed
+
+Both were invisible to geometry assertions, and one of them is why the operator said the states
+*"look the same"*. Recorded because the lesson is the point: **three pages of green numbers did not
+notice that the pages did not look like the product.**
+
+1. **Every sketch page rendered in LIGHT mode.** The Deep Midnight tokens live in a base-layer
+   `.dark` rule, and Tailwind purges it unless the string `dark` appears in a **scanned** file. The
+   only scanned file is `body.generated.html`; the `class="dark"` on `<html>`/`<body>` lives in
+   `assemble.cjs`, which Tailwind never reads. Fixed by putting the token on the page root in all
+   three builds — and commented there as load-bearing, because it looks exactly like decoration.
+2. **The header contradicted the card.** React sets a `<select>`'s value as a DOM **property**, so
+   serialising the real header lost the selection and the picker re-rendered as *"No knowledge base ·
+   searches everything"* while the card beside it said *"Vendor contracts"* — one screen, two
+   answers to one question, on the sketch whose entire subject is that a decision has one answer.
+   Repaired by marking the bound option `selected`, asserted in both directions.
+
+## ⚠ And the fixed screens showed something about the SHIPPED receipt
+
+With the theme correct, tab 3 makes it plain: **today's receipt is always fully open.** It renders
+both grounding paragraphs and all three sealed rows unconditionally, every time a draft lands.
+
+So the one-card shape is not only a merge — **it makes that content foldable, which it is not
+today.** Tab 3 versus tab 1 is therefore an honest before/after of the current screen, not just a
+comparison of two proposals. Worth carrying into planning: the fold improves the arrival moment
+even setting the five decisions aside.

@@ -111,6 +111,27 @@ const BOUND_FOLDER = (() => {
   return m ? m[1] : ""
 })()
 
+/**
+ * ⚠ A DUMP-FIDELITY REPAIR (found 2026-08-18 by looking at a screenshot, after every
+ * geometry assertion on this page had passed).
+ *
+ * React sets a `<select>`'s value as a DOM **property**, never an attribute, so
+ * serialising the real header loses the selection and the picker re-renders showing its
+ * FIRST option — *"No knowledge base · searches everything"* — while the card beside it
+ * says *"Vendor contracts"*. One screen, two answers to one question, on the sketch whose
+ * entire subject is that a decision has exactly one answer.
+ *
+ * `dom.headerAnswered` is repaired ONCE here, so every variant on this page inherits it.
+ */
+dom.headerAnswered = dom.headerAnswered.replace(
+  '<option value="f2">',
+  '<option value="f2" selected>',
+)
+assert(
+  dom.headerAnswered.includes('<option value="f2" selected>'),
+  "the bound knowledge base is marked selected — the header must not contradict the card",
+)
+
 const AI_MARK = (() => {
   const m = dom.headerAnswered.match(/data-testid="business-requirement-ai-mark"[^>]*>([^<]*)</)
   assert(!!m, "the AI-proposed label is parsed out of the real mark")
@@ -392,7 +413,13 @@ const homesTable = ROWS.map(
 ).join("\n")
 
 const body = `
-<div class="s172-root">
+<!-- The "dark" token here is LOAD-BEARING, not decoration. Tailwind purges the base-layer
+     .dark rule unless the string appears in a SCANNED file, and the only scanned file is
+     body.generated.html - the class="dark" on html/body lives in assemble.cjs, which
+     Tailwind never reads. Without this token the Deep Midnight variables are stripped and
+     every sketch renders in LIGHT mode, which is not what this product looks like. Caught
+     by LOOKING at a screenshot, after three pages of geometry assertions had all passed. -->
+<div class="s172-root dark">
   <div class="s172-head">
     <div class="s172-kicker">Sketch 172 · Phase 197 Guided Authoring · G-2 gate · AUTH-02</div>
     <h1>Where the five decisions live</h1>

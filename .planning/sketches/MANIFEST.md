@@ -2265,3 +2265,39 @@ fact per line, never a wall, and never a mystery either. Carry it into 197's cop
 checkable — but **a sketch whose job is to let someone judge a screen has failed if the screen is
 the smallest thing on the page.** 174 exists because that was true of both. Keep the analysis page,
 but ship a picture beside it.
+
+### ⚠ ALL THREE PAGES RENDERED IN LIGHT MODE, AND EVERY MEASUREMENT PASSED ANYWAY
+
+Found 2026-08-18 by taking a screenshot, after the operator said the states *"look the same"*. Two
+defects, neither visible to a geometry assertion, both now fixed and both asserted:
+
+1. **The Deep Midnight theme was purged.** The tokens live in a base-layer `.dark` rule, and
+   Tailwind drops it unless the literal string `dark` appears in a **scanned** file. The only
+   scanned file is `body.generated.html`; the `class="dark"` on `<html>`/`<body>` lives in
+   `assemble.cjs`, which Tailwind never reads. **So every sketch page in this session was showing a
+   white mockup of a dark product** — which is very plausibly the whole of *"they look the same"*,
+   since a washed-out page flattens every distinction the variants were drawn to show.
+   **Fix:** the token now sits on the page root in all three builds, commented as load-bearing.
+   ⚠ **Check this on the next sketch** — it looks exactly like decoration and will be deleted by
+   someone tidying up.
+2. **The header contradicted the card.** React sets a `<select>`'s value as a DOM **property**, so
+   serialising the real header loses the selection: the picker re-rendered as *"No knowledge base ·
+   searches everything"* while the card beside it read *"Vendor contracts"*. One screen, two
+   answers to one question — on the sketches whose entire subject is that a decision has exactly
+   one answer. **Fix:** the bound option is marked `selected`, asserted in both directions.
+
+**The method lesson, and it is the one worth keeping.** 172 and 173 shipped with 41 and 25 green
+structural assertions, and 174 measured pixel heights on four screens. **Not one of them could see
+that the pages did not look like the product.** Geometry proves composition; only looking proves
+appearance. Take a screenshot before handing a sketch to an operator — this session's own record is
+that the operator's eye caught, in one sentence, what three instrumented builds could not.
+
+### ⚠ AND THE FIXED SCREENS SURFACED A FACT ABOUT THE SHIPPED RECEIPT
+
+With the theme correct, 174's tab 3 makes it plain: **today's `SeedReceipt` is always fully open.**
+It renders both grounding paragraphs and every sealed-step row unconditionally, on every draft.
+
+So the one-card shape is not merely a merge — **it makes that content foldable, which it is not
+today**, and tab 3 versus tab 1 is an honest before/after of the CURRENT screen rather than a
+comparison of two proposals. Carry into planning: the fold improves the arrival moment even setting
+the five decisions aside.
