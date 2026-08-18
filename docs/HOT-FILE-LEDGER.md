@@ -342,6 +342,8 @@ turned out to be wrong (invariant 1 above); the SHAPE criterion G-5 actually car
 
 **Re-derived 2026-08-17 (extraction):** `41 commits / 12 phases / 2348 L` · quick-task buckets excluded: `260809`, `260814` · **G-5 FIRES** (12 phases vs threshold 3) — honoured by construction (193.1 / 193.2).
 
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `41 / 12 / 2348` → `47 commits / 14 phases / 2656 L`** — recorded beside the previous value, never over it. `CLAUDE.md`'s cell read **`42 / 13 / 2398`** (the figure `197-01` measured at the phase base) and was stale by **5 commits / 1 phase / 258 L** by the time the phase closed — *inside a single phase*, which is this ledger's own repeated finding rather than a new one. ⚠ **`197-10` FOUND THE STALENESS AND CORRECTLY DECLINED TO FIX IT**, because the ledger is a shared artifact a parallel worktree must not write mid-wave; it handed the debt forward in its SUMMARY and this plan discharged it. **That decline is the pattern to copy, not an omission to criticise.** **G-5 fires (14 phases) and was honoured BY CONSTRUCTION for the THIRD consecutive phase**, on the same measured test the two before it used: 197's whole new surface — the arrival card, its decisions list and its vocabulary — landed in **THREE NEW FILES** under `src/components/workflows/`, and the page itself gained only a mount, a snapshot capture, two focus refs and **one identity expression** (`identityLabel`, D-19 — the first render position `meta.name` has ever had). **The obligation is still NOT discharged:** the page continues to host the Builder shell, the canvas mount, the publish gauntlet, the descriptor resolution and the save/concurrency machinery, so the next phase adding a genuinely second concern still owes a refactor recommendation FIRST. It inherits `47 / 14 / 2656`.
+
 ### Phases touched (verbatim)
 
 103 / 124 / 183 / 184 / 184.1 / 185 / 186 / 187 / 190 / 193, **plus the quick task `260809-klo`** (`1c58a3fb`) — **33 commits across 10 phases**, **2055 lines**. ⚠ **ADDED 2026-08-14 by quick task `260814-q5r`, and the reason it is here is the whole point of the row: TEN PHASES TOUCHED THIS FILE AND G-5 NEVER FIRED ONCE**, because the discuss-phase audit scans PLAN.md `files_modified` *against this table* — a hot file missing from the table is permanently invisible to its own guardrail. That is the identical failure `WorkflowsPage.tsx` suffered for ten phases and `WorkflowDoorSwitch.tsx` for six, both rows above. **That sentence is the reason this row exists and must survive future edits.** ⚠ One correction on measurement against the plan that commissioned it: the plan's `<guardrails>` table derived *10 phases* with the standard `sed` recipe, and that recipe actually returns **eleven** buckets here — the eleventh is `260809`, a QUICK TASK, not a phase. The phase count of 10 is correct as written and the derivation is corrected beside it, so the next reader is not surprised by their own command's output. Re-derive with: `git log --oneline -- frontend/src/pages/WorkflowBuilderPage.tsx | wc -l` → 33; `git log --format=%s -- <file> | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' | sed -E 's/-.*//' | sort -u` → the ten phases + `260809`; `wc -l <file>` → 2055 (at `4bb9c1ac`).
@@ -398,6 +400,8 @@ inherits `42 / 13 / 2398`.**
 ## `backend/app/api/workflows.py`
 
 **Re-derived 2026-08-17 (extraction):** `35 commits / 17 phases / 1962 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (17 phases vs threshold 3) — extraction due — not taken in q5r (no 2nd concern).
+
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `36 commits / 18 phases / 1984 L` — UNCHANGED from the value `CLAUDE.md` already carried, and that is the finding.** Phase 197 put a **new key on the `/generate` wire** (`readiness`, D-13) and **did not modify this file at all**: `git diff --numstat <phase-base> HEAD -- backend/app/api/workflows.py` is **EMPTY**. The reason is measured from source rather than assumed — the route declares **no `response_model`** (`@router.post("/generate", dependencies=[...])`, nothing else) and its body ends `return result`, passing the service dict straight through. So widening the service's success return was sufficient and this module learned nothing. ⚠ **A MEASURED NON-TOUCH IS A STRONGER STATEMENT THAN SILENCE**, which is why it is written here: a future reader asking *"did 197 grow the hottest route file in the workflow surface?"* gets *"no, and here is the command"* instead of an absence they must re-derive. **G-5 still fires at 18 phases and the extraction is still due** — this phase adds no argument either way, because it added no concern.
 
 ### Phases touched (verbatim)
 
@@ -458,6 +462,8 @@ stage was added — see **`SEED-176`**, which carries the mechanical re-open tri
 ## `backend/app/services/harness/grounding.py`
 
 **Re-derived 2026-08-17 (extraction):** `18 commits / 5 phases / 1252 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.1).
+
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `18 commits / 5 phases / 1252 L` — UNCHANGED, and MEASURED NOT MODIFIED.** `git diff --numstat <phase-base> HEAD -- backend/app/services/harness/grounding.py` is **EMPTY**. This is the ledger's best kind of row: the phase needed the publish predicate `business_requirement_missing` and its message on a second surface, and **because the predicate already had exactly ONE home it gained a second CONSUMER rather than a second COPY** — `workflow_authoring.py` imports `business_requirement_missing` and `BUSINESS_REQUIREMENT_MISSING_MESSAGE` function-locally (Pitfall-4 discipline) and builds the wire verdict from them. ⚠ **The invariant this file carries into 197 and must keep:** stage 1's `business_requirement_missing` is the **ONLY definition-level publish predicate** in the whole gauntlet — nothing anywhere refuses a publish for a missing knowledge-base binding, a missing document, a name or a deliverable. That measured fact is what licenses `decisionsVocabulary.ts` to let **row 3 alone** claim a publish requirement (D-20). A second definition-level predicate added here **owes the vocabulary a matching row in the same commit**, or the new gate ships invisible to the author it would block.
 
 ### Phases touched (verbatim)
 
@@ -615,6 +621,8 @@ inherits `20 / 8 / 1250`.**
 
 **Re-derived 2026-08-17 (extraction):** `12 commits / 6 phases / 572 L` · **G-5 FIRES** (6 phases vs threshold 3) — honoured by construction (193.2).
 
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `12 / 6 / 572` → `13 commits / 7 phases / 625 L`** — recorded beside the previous value. Quick-task buckets: **none** (this file has never been touched by a dated task). **G-5 fires (7 phases) and was honoured BY CONSTRUCTION:** the diff is `+56 / -3` and every added line serves ONE key on ONE return. `generate_workflow_definition`'s success arm went from `{"ok": True, "definition": …}` to `{"ok": True, "definition": …, "readiness": …}`, where `readiness` is built from an **imported** predicate, not a re-implemented one. ⚠ **THE KEY RIDES THE `ok: True` ARM ALONE** — a failed generation carries no server-side verdict, so the failure arm is byte-unchanged and the client type makes reading a verdict off it a typecheck error. **The seam the next refactor should take**, named rather than implied: this module is the orchestration seam between the NL describe path and the harness definition model; its grounding-assembly reads and its definition-shaping are already two concerns, and a third would be the moment to split them.
+
 ### Phases touched (verbatim)
 
 103 / 165 / 182 / 187 / 189 / **193.2 (193.2-05 `0e203d64`, 193.2-07 `0cb3faf4`)** — **11 commits across 6 phases**, **389 → 540 lines**. ⚠ **ADDED 2026-08-15 by plan `193.2-10`. THIS FILE WAS ABSENT FROM THIS TABLE UNTIL PHASE 193.2. Six phases touched it and G-5 never fired once, because the discuss-phase audit scans PLAN.md `files_modified` *against this table*. A hot file missing from the table is permanently invisible to its own guardrail.** ⚠ **ZERO quick-task buckets — the recipe returns exactly six and all six are phases.** ⚠ **This cell's figures went stale TWICE INSIDE ONE PHASE and both corrections are stated beside their originals:** `193.2-CONTEXT.md` D-01 and `193.2-BASELINE.md` §5 measured `9 / 5 / 389`; `193.2-05-SUMMARY.md` recorded `9 / 5 / 389` and it *"was already stale by two commits and 151 lines"* when `193.2-07` read it; `193.2-07-SUMMARY.md` then measured `11 / 6 / 540`, which is what HEAD still reads. *A figure written at a plan's close goes stale on the next commit that touches the file.* Re-derive with: `git log --oneline -- backend/app/services/workflow_authoring.py | wc -l` → 11; `git log --format=%s -- <file> | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' | sed -E 's/-.*//' | sort -u` → `103 165 182 187 189 193.2`; `wc -l <file>` → 540; `git show c1a6c122:<file> | wc -l` → 389.
@@ -642,6 +650,8 @@ inherits `20 / 8 / 1250`.**
 ## `frontend/src/components/workflows/builderStore.ts`
 
 **Re-derived 2026-08-17 (extraction):** `11 commits / 5 phases / 837 L` · quick-task buckets excluded: `260809` · **G-5 FIRES** (5 phases vs threshold 3) — honoured by construction (193.2).
+
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `11 / 5 / 837` → `12 commits / 6 phases / 907 L`** — recorded beside the previous value. **G-5 fires (6 phases) and was honoured BY CONSTRUCTION:** the diff is `+70 / -0` and it adds exactly one action, `setName`, a **FOURTH structural mirror** of the three shipped `meta` writers (`setProjectFolder` / `setBusinessRequirement` / `setTemplateAsset`) — same field class, same failure shape, same explicit `dirty` arming. It is the ONE write path for the workflow's name, so the guided-authoring surface routes through it instead of minting a second answer. ⚠ **THE INVARIANT THIS FILE NOW CARRIES, and it is a 422 if broken:** `selectDefinition` spreads `meta` **straight into the autosave PATCH body** and `WorkflowDefinition` is `extra="forbid"`, so any key an action puts on `meta` ships and a stray one destroys the write on the first autosave. ⚠ **`setName` writes exactly ONE `meta` key and never the slug** — the key identity, forks and versioning all key off. 193.2 deferred naming precisely because a rename that moved the slug was the risk; leaving it alone removes the risk entirely, at the recorded cost that **name and slug may disagree** (D-15), which LIB-05's shipped machinery already handles.
 
 ### Phases touched (verbatim)
 
@@ -991,6 +1001,8 @@ forty-two, and `frontend/src/lib/api.ts` for ninety-seven.**
 `260405`, `260814` · **G-5 FIRES HARDER THAN ANY FILE ON THIS LEDGER** (97 phases vs threshold 3) — **the
 hottest file in the repository, and it had no row at all.**
 
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `170 / 97 / 6154` → `171 commits / 98 phases / 6174 L`** — recorded beside the previous value, never over it. **It is still the hottest file in the repository**, now by 22 phases over `threads.py`. **THE SEAM WAS DECLINED, AS A NAMED DECISION WITH A WRITTEN TRIGGER (plan `197-06`)**, and the decline is defensible on a measured test rather than on convenience: the phase's entire change here is `+21 / -1` and it is **a TYPE and nothing else** — one exported `GenerateReadiness` union plus one existing union arm widened with an optional field. **No runtime export was added.** ⚠ That distinction was load-bearing and it was CONFIRMED rather than hoped: Phase `196-08` hit **249 genuine failures** when a newly-added *runtime* export was missing from nine suites' `@/lib/api` mock factories, and `197-01` predicted a type-only change could not fire it. The full count gate at this phase's close reads **`failed 0`** — the prediction held, measured. **Re-open trigger, verbatim: the next phase that adds a RUNTIME export to this file, or a second concern to it, owes the refactor recommendation FIRST.** ⚠ **And the standing budget rule survives the decline:** any plan that does add a runtime export here must budget **one mock line per mounting suite**, in the same commit.
+
 ⚠ **THIS ROW REFUTES A SENTENCE IN `CLAUDE.md`.** That file calls `backend/app/api/threads.py` at 76 phases
 *"the hottest file in the repository"*. **It is not.** The full argument, both accountings and the preserved
 original are in the `threads.py` section above under **"⚠ CORRECTION 2026-08-18"**; the short form is that
@@ -1117,6 +1129,11 @@ recommendation FIRST.**
 ---
 
 ### `scripts/vitest-count-gate.cjs`
+
+**⚠ RE-DERIVED AT PHASE 197's CLOSE (2026-08-18, plan `197-11`): `100 / 16 / 3215` → `101 commits / 17 phases / 3259 L`** · dated quick-task buckets excluded: `260807`, `260808`, `260814` — recorded beside the previous value, never over it. ⚠ **THIS ROW WENT STALE INSIDE THE PLAN THAT WROTE IT**: the figure was measured *after* 197's own gate commit landed, because a triple taken before it would have been wrong by one commit the moment the task finished. That is the self-staling this ledger documents about `WorkflowsPage.tsx`, `WorkflowCard.tsx` and `WorkflowBuilderPage.tsx`, now observed on the file that ENFORCES the guardrails.
+
+⚠ **A CORRECTION TO THIS ROW'S OWN WARNING, recorded beside it rather than over it.** The row says *"raising a pin necessarily deletes one line, so a `grep -c '^-[^-]'` expecting 0 is WRONG"*, and that remains true **for a RAISE**. **It does not generalise to an ADD.** Phase 197's edit here is `+44 / -0` on `git diff --numstat`: it added three BASELINE keys for suites that had never been pinned, so no old number existed to delete. **The distinction matters because the phase declared this file a zero-deletion EXCLUSION (`197-01`, exclusion 2) and then did not need it** — the exclusion was correct to declare in advance and was measurably unused, which is a different and better outcome than being consumed. Both facts are here so a future plan neither drops the exclusion nor assumes it must fire.
+
 
 **Re-derived 2026-08-18 (plan `196-09`): `100 commits / 16 phases / 3215 L`** · quick-task buckets excluded:
 `260807`, `260808`, `260814` · **G-5 FIRES** (16 phases vs threshold 3) — ⚠ **and this is the
@@ -1517,6 +1534,99 @@ Both files are present in `CLAUDE.md` and both fire G-5 — `MessageItem.tsx` at
 ⚠ **`RunCard.tsx` is owed nothing here for a different reason, and it is not a clean one:** Phase 195 measured that its file badge **reads 0 for a real workflow deliverable** and declined to fix it (`SEED-169`). The file is untouched because the lie was *filed*, not because there was nothing wrong with it.
 
 ---
+
+## Phase 197 — the files it CREATED, the one it found ABSENT, and the guardrail record
+
+**Re-derived 2026-08-18 at the phase's close, plan `197-11`, in ONE batch pass** with the recipe in
+`CLAUDE.md`, dated six-digit quick-task buckets subtracted. Nine files were named by the plan; **a
+tenth was found by measuring the phase's real diff rather than trusting the plan's list**, and it
+fires G-5.
+
+### `frontend/src/components/workflows/soulData.ts`
+
+**Measured 2026-08-18 (plan `197-11`): `9 commits / 7 phases / 373 L`** · buckets: `124 · 127 · 183 ·
+184 · 189 · 193 · 197`, no dated tasks · **G-5 FIRES** (7 phases vs threshold 3).
+
+⚠ **IT HAD NO ROW IN `CLAUDE.md` AND NO SECTION HERE, AT SEVEN PHASES** — and the plan that
+commissioned this re-derivation did not name it either. It was found by diffing the phase's actual
+source changes against the plan's nine-file list, which is the only method that can find this class
+of miss: **a hot file missing from the scan list is permanently invisible to its own guardrail**, so
+G-5 could never have fired on it at any count. That is the identical failure `backend/app/config.py`
+suffered for the project's entire life (Phase 196), `WorkflowsPage.tsx` for ten phases and
+`ChatArea.tsx` for twenty-eight. **The lesson this row adds to the pile: a plan's `files_modified`
+list is itself a scan list, and it can be incomplete in exactly the same way the table can.**
+
+⚠ **The invariant this file carries:** `templateAdmission` has **THREE states** and `unknown` is not
+`does-not-admit`. Two surfaces consume it under **opposite** unknown-fallbacks (the card goes silent,
+D-15; the Run modal keeps the control, D-20), so **a boolean cannot express D-20** and a later
+"tidy" collapsing the union would silently re-introduce "unknown reads as satisfied". The mechanical
+guard is `soulData.test.ts`, pinned at 36 and printing 49 at this phase's close.
+
+**The seam the next refactor should take:** this module carries both the workflow-soul projection and
+the template-admission verdict; those are two concerns and the second is the one with cross-surface
+consumers.
+
+### `frontend/src/components/workflows/decisionsVocabulary.ts` — young (1 phase)
+
+**Measured 2026-08-18: `1 commit / 1 phase / 226 L`.** The ONE five-row decision vocabulary: the words
+each row shows, and which rows have a readiness arm at all.
+
+⚠ **IT IS A TRUE LEAF — it imports nothing**, asserted by a source fence in its own suite, and that is
+what keeps it cheap to reason about. ⚠ **ONLY ROW 3 MAY CLAIM A PUBLISH REQUIREMENT.** Row 3's
+sentence arrives on the wire from `grounding.py`'s stage-1 `business_requirement_missing`, measured as
+the only definition-level publish predicate in the gauntlet; a copy edit letting row 1, 2, 4 or 5
+claim one would tell an author the gauntlet enforces something nothing enforces. Pinned at **22**.
+
+### `frontend/src/components/workflows/DecisionsList.tsx` — young (1 phase)
+
+**Measured 2026-08-18: `1 commit / 1 phase / 329 L`.** The ONE renderer for the five decision rows.
+
+⚠ **THE READINESS READ HAS THREE ARMS, NEVER TWO, AND THE THIRD IS ABSENCE.** An **absent** readiness
+renders no verdict node at all — which is *not* the same as a green one, because absent means the
+server said nothing. A `readiness ?? {}` default, or a `=== "missing"` read whose false branch draws a
+green tick, collapses the third state into the first. It is the same shipped floor as
+`useModelRegistry` (a failed read is `status: "failed"`, never an empty success) and `model_registry`
+(an ABSENT override row means ENABLED). Pinned at **54**.
+
+### `frontend/src/components/workflows/DraftArrivalCard.tsx` — young (1 phase)
+
+**Measured 2026-08-18: `1 commit / 1 phase / 338 L`.** The ONE arrival receipt — it **composes**
+`SeedReceipt` rather than widening it, which is why `SeedReceipt.tsx` closes the phase at `0 0` on
+`git diff --numstat` (criterion 3, D-02).
+
+⚠ **THE SUPPRESSION LIST IS LOAD-BEARING AND IT IS THE FIRST THING TO CHECK IN ANY EDIT.**
+`RECEIPT_SUPPRESSION_CLASS` must target the receipt's **four frame/duplicate handles**
+(`seed-receipt`, `seed-receipt-heading`, `seed-receipt-dismiss`, `seed-receipt-close`) and **NONE of
+its four content handles** (its two paragraph handles, its grounded-list handle, its per-step row
+handles). Naming a content handle **silently BLANKS the fold** — and a blank fold passes every
+geometry assertion, which is exactly why a source sweep in the suite asserts the targeted set is
+*exactly* those four. The dismiss handle is hidden with `display`, not opacity, so it leaves the tab
+order rather than becoming an invisible focusable control. ⚠ **G-4 row `U1` is OWED and the file
+cannot close it: jsdom applies no CSS**, so the one-card composition is proved here by SOURCE
+assertion only — only an eye proves it reads as one card. Pinned at **35**.
+
+### `frontend/src/components/workflows/useTemplateFirstDraft.ts` — young (2 phases)
+
+**Measured 2026-08-18: `5 commits / 2 phases / 630 L`** · buckets `193.1 · 197`. The pre-draft template
+concern `193.1-05` cut out of `WorkflowBuilderPage.tsx`.
+
+⚠ **It is listed BELOW the G-5 threshold ON PURPOSE, and for a second reason too: it was already
+NAMED inside another file's section here while having no row of its own, which is drift under the
+same-commit sync rule.** A file that exists only as a mention in someone else's narrative is not on
+the scan list. It owes a full section the moment it reaches a 3rd phase.
+
+### Phase 197 — the guardrail record
+
+- **G-5:** fired on seven rows. **Honoured by construction on three** (`WorkflowBuilderPage.tsx`,
+  `builderStore.ts`, `workflow_authoring.py`); **measured NOT MODIFIED on two**
+  (`backend/app/api/workflows.py`, `backend/app/services/harness/grounding.py` — the latter gained a
+  second CONSUMER rather than a second copy); **DECLINED with a written trigger on one**
+  (`frontend/src/lib/api.ts`, a type-only change). A seventh row, `soulData.ts`, was **added because
+  it was absent, not because it was new.**
+- **G-2 (sketch before plan for UX):** discharged before planning — sketch 174, operator-approved.
+- **G-7 (gap-closure round cap):** not reached; this phase ran no gap-closure round.
+- **G-4:** nine lived-experience rows defined at scope time in `197-VALIDATION.md`. **All nine are
+  OWED to the operator at close** — `197-11-SUMMARY.md` names them rather than assuming them.
 
 ## Young files — tracked, G-5 does not fire yet
 
