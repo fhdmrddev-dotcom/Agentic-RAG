@@ -117,7 +117,12 @@ def _patch_starters(monkeypatch, rows: list[dict]) -> None:
     async def _fake_pool():
         return object()
 
-    async def _fake_starters(pool):
+    # ⚠ ``**kwargs`` since Phase 192.2 (LIB-06 / D-07): ``/starters`` now hands the db layer
+    # the caller id its owner-scoped run-facts lateral binds as ``$1``. Matching
+    # ``_fake_published`` above, whose fake has always been tolerant for the same reason —
+    # a fake that is stricter than the seam it stands in for fails on the seam's growth, not
+    # on a defect.
+    async def _fake_starters(pool, **kwargs):
         return list(rows)
 
     monkeypatch.setattr(wf, "get_pg_pool", _fake_pool)
