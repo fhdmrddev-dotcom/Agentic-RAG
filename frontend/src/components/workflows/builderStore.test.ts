@@ -815,6 +815,159 @@ describe("builderStore — setBusinessRequirement writes into the PATCH body (BU
   })
 })
 
+// ── 14. Phase 197 (AUTH-02 · D-15) — the workflow's NAME is writable ────────────
+//
+// APPENDED, never edited, and — like sections 12 and 13 above — deliberately still ABOVE
+// the whole-suite network tripwire so the "exactly 0 calls" claim covers these too.
+//
+// WHY THIS SECTION EXISTS. `setName` is the ONE write path for the workflow's name and the
+// only store action Phase 197 creates. It inherits five properties from the three
+// `meta`-writing siblings that precede it, and each is driven as its own case rather than
+// assumed from the family resemblance — a fourth sibling that merely LOOKS like the other
+// three is exactly how one of the five silently goes missing.
+//
+// The load-bearing case is the SECOND one. D-15's whole content is that the key identity,
+// forks and versioning key off is NEVER written, and the object that proves it is
+// `selectDefinition`'s output — that is what reaches the PATCH body
+// (`useDraftPersistence.ts` calls exactly that), and `WorkflowDefinition` is
+// `extra="forbid"`, so a stray key there is a 422 that would destroy the write on the very
+// first autosave. Asserting on `meta` alone would fence an internal field instead of the
+// payload the server actually validates.
+
+/** Keys present in `after` and absent from `before`, sorted. */
+const addedKeys = (before: readonly string[], after: readonly string[]) =>
+  after.filter((k) => !before.includes(k)).sort()
+
+describe("builderStore — setName writes the name and NEVER the identity key (D-15)", () => {
+  it("writes meta.name verbatim", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setName("Northwind QBR")
+
+    expect(store.getState().meta.name).toBe("Northwind QBR")
+  })
+
+  it("leaves the slug identical and adds exactly one key to the PATCH body", () => {
+    const store = createBuilderStore(draft())
+    const before = selectDefinition(store.getState())
+    const slugBefore = before.slug
+    const keysBefore = Object.keys(before)
+    expect(slugBefore).toBe("risk-register")
+
+    store.getState().setName("Northwind QBR")
+
+    // The slug is the key identity, forks and versioning key off. D-15 leaves it alone.
+    expect(store.getState().meta.slug).toBe(slugBefore)
+
+    // Asserted over what actually SHIPS, not over `meta`: `selectDefinition` is what the
+    // autosave PATCH body is built from, and the endpoint's model forbids extra keys.
+    const after = selectDefinition(store.getState())
+    expect(after.slug).toBe(slugBefore)
+    expect(addedKeys(keysBefore, Object.keys(after))).toEqual(["name"])
+
+    // POSITIVE CONTROL, in this same block: without it the comparison above would pass
+    // just as happily if `addedKeys` could never report anything at all. Compare the same
+    // "before" key set against a locally-constructed object carrying ONE extra key and
+    // prove the comparison names it.
+    const withStray = { ...after, stray_key: true }
+    expect(addedKeys(keysBefore, Object.keys(withStray))).toEqual(["name", "stray_key"])
+  })
+
+  it("arms dirty in the SAME act, on a store whose phases reference did not change", () => {
+    const store = createBuilderStore(draft())
+    const phasesBefore = store.getState().phases
+    expect(store.getState().dirty).toBe(false)
+
+    store.getState().setName("Northwind QBR")
+
+    // This is the case that would fail if the action leaned on the `phases` subscription:
+    // that subscription arms `dirty` on a change to the phases REFERENCE and nothing else.
+    expect(store.getState().phases).toBe(phasesBefore)
+    expect(store.getState().dirty).toBe(true)
+  })
+
+  it("a non-drafted builder is a NO-OP — meta unchanged by reference, still clean", () => {
+    const store = createBuilderStore(null)
+    expect(store.getState().builderPhase).toBe("empty")
+    const metaBefore = store.getState().meta
+
+    store.getState().setName("Northwind QBR")
+
+    expect(store.getState().meta).toBe(metaBefore)
+    expect(store.getState().dirty).toBe(false)
+  })
+
+  it("is UNTRACKED — an undo restores STEPS and never the name (positive control inline)", () => {
+    const store = createBuilderStore(draft())
+    const depthBefore = past(store).length
+
+    store.getState().setName("N")
+    store.getState().setName("No")
+    store.getState().setName("Nor")
+
+    // `partialize` narrows the tracked slice to `phases` plus the two edit discriminators,
+    // so three name writes predict a stack depth of exactly zero pushes.
+    expect(past(store)).toHaveLength(depthBefore)
+
+    // The POSITIVE CONTROL: without it the assertion above would pass just as happily on a
+    // store where NOTHING is tracked at all.
+    store.getState().addPhaseOfType("llm_single")
+    expect(past(store)).toHaveLength(depthBefore + 1)
+
+    // And the property that matters to the author: undoing steps back over the STEP, while
+    // the workflow's name survives untouched.
+    store.getState().setName("Northwind QBR")
+    store.temporal.getState().undo()
+
+    expect(store.getState().phases).toHaveLength(3)
+    expect(store.getState().meta.name).toBe("Northwind QBR")
+  })
+
+  it("writes whitespace and the empty string THROUGH — the server owns emptiness", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setName("  ")
+    expect(store.getState().meta.name).toBe("  ")
+
+    store.getState().setName("")
+    expect(store.getState().meta.name).toBe("")
+
+    // A client that trimmed, nulled or defaulted here would be a second copy of a server
+    // predicate, which D-182-06 forbids. The store states what the author typed.
+  })
+
+  it("adds NO provenance key — C-1's declined mark, pinned mechanically", () => {
+    const store = createBuilderStore(draft())
+    const keysBefore = Object.keys(store.getState().meta)
+
+    store.getState().setName("Northwind QBR")
+
+    // Assembled at runtime from parts: this suite sweeps the store's RAW source for
+    // needles, and a spelled-out token in a test is one grep away from being mistaken for
+    // an implementation that carries it.
+    const provenanceToken = ["seeded", "by", "ai"].join("_")
+    const added = addedKeys(keysBefore, Object.keys(store.getState().meta))
+    expect(added.filter((k) => k.includes(provenanceToken))).toEqual([])
+    expect(added).toEqual(["name"])
+
+    // POSITIVE CONTROL: the filter really does catch such a key when one is present.
+    const planted = [...added, `name_${provenanceToken}`]
+    expect(planted.filter((k) => k.includes(provenanceToken))).toEqual([`name_${provenanceToken}`])
+  })
+
+  it("carries no other meta field away with it", () => {
+    const store = createBuilderStore(draft())
+
+    store.getState().setName("Northwind QBR")
+
+    const meta = store.getState().meta
+    expect(meta.slug).toBe("risk-register")
+    expect(meta.version).toBe(1)
+    expect(meta.business_requirement).toBe("Summarise the week's risks.")
+    expect(meta.project_folder_id).toBeNull()
+  })
+})
+
 describe("builderStore — zero network calls across the entire suite (D-184-03)", () => {
   it("the fetch spy recorded exactly 0 calls", () => {
     expect(fetchSpy).not.toHaveBeenCalled()
