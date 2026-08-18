@@ -215,6 +215,85 @@ decisions surface on the **drafted** view.
   already exists and is being edited. A modal for one of five rows breaks the surface's own
   grammar and adds a modal to a screen that just gained a card.
 
+### ⚠ LOCKED AT PLAN-PHASE (2026-08-18) — the two scope questions, now measured and answered
+
+These three entries were added **after** research measured what the discussion could only estimate.
+Where a measurement **refuted** an earlier claim, both halves are kept.
+
+- **D-18 — ROW 5 (THE DELIVERABLE) JUMPS TO THE TERMINAL `llm_emit` STEP'S *Instructions* FIELD.**
+  Operator's pick at plan-phase, from a costed choice.
+  ⚠ **The premise that made row 5 look expensive is REFUTED BY MEASUREMENT, and the original is
+  recorded rather than overwritten.** `sketch 173/README.md:76-79` states that `builderStore`'s write
+  path *"does not express a step edit as a row edit"*. **It does, exactly** — `patchConfig(slug, patch)`
+  (`builderStore.ts:281`, impl `:548-557`) merges a patch into one step's config through the pure
+  `patchPhaseConfig` op, bumps `editSeq`, and coalesces into the undo stack.
+  **Price: 3 files, ZERO new store actions, ZERO new fields, ZERO backend.** `jumpToStep` already
+  exists and is already wired as `onJumpToStep` for the problems tray
+  (`WorkflowBuilderPage.tsx:1570`, `:1637`). The only new code is one pure `terminalEmitSlug(def)`
+  beside `soulDeliverable`. **Row 5 is the CHEAPEST of the five, not the dearest.**
+  Rejected: *inline-editing the emit prompt on the row* — it puts *Instructions* in two places at
+  once, against the page's own rule quoted in the `kbAffordance` docblock
+  (`WorkflowBuilderPage.tsx:2085`): *"A second, different answer to one question is drift."*
+  ⚠ **Two facts the sketch did not have.** (1) `soulDeliverable` is `phases.some(...)` —
+  order-independent — **plus the workflow NAME**, so rows 4 and 5 are coupled today and a plan
+  treating them as independent produces a row 5 that changes when row 4 is edited and cannot say
+  why. (2) `WorkflowSoul` mounts on four surfaces, **none of them the Builder** — so row 5 is a
+  **first appearance**, like row 4, not a second control.
+
+- **D-19 — THE DRAFTED HEADER RENDERS `meta.name ?? meta.slug`. ROW 4 DISPLAYS AND EDITS THE NAME.**
+  Operator's pick at plan-phase. One expression at `WorkflowBuilderPage.tsx:2203`.
+  ⚠ **THE COST IS PRICED HERE SO IT IS NOT DISCOVERED BY A RED SUITE.** That line sits inside
+  **`FLAG_OFF_HEADER_MARKUP` band 3** in `WorkflowBuilderPage.header.test.tsx` — a literal that stood
+  unedited for **nine phases**, was re-captured **twice** in Phase 193, and whose own note
+  (`:2181-2184`) says the phase expects **no third**. This change forces that third re-capture.
+  **It is a declared, one-time, documented act following the procedure the baseline files already
+  establish — and it gets its own task**, never a silent edit inside another one.
+  **Why not leave the header on the slug:** D-15 accepted in words that *"name and slug can
+  disagree"*, but it was written before anyone had measured that the name appears **nowhere**. What
+  D-15 accepted was a **latent** disagreement; leaving the header alone ships a **rendered** one —
+  `northwind-qbr-fa65a43c` in the header against `Northwind QBR` in the row, on one screen. That is
+  the exact defect sketch 174 shipped and caught only by looking (G-4 row **U5**).
+  ⚠ **`slug` is NEVER written.** `setName` writes `meta.name` only — no such action exists today
+  (`builderStore.ts:262-306`), so **row 4 is the EXPENSIVE row**, and it is the only one needing a
+  new store action.
+
+- **D-20 — ⚠ D-11's REACH IS NARROWER THAN IT READS, MEASURED FROM SOURCE. D-11 IS NOT REVERSED;
+  ITS SCOPE IS CORRECTED, AND BOTH HALVES STAND.**
+  D-11 claims *"the rows ARE the publish requirements"*. Research enumerated **every** gauntlet stage
+  from source: stage 1 `business_requirement_missing` (`grounding.py:1007`) is the **only**
+  definition-level predicate. Stage 2 `lint_workflow` is purely structural (slugs / `phase_index`
+  contiguity / reachability, `reachability.py:111-190`); 2.5 is interactive phases; 2.6 is folder ⊆
+  plus unregistered tools/skills. **Nothing anywhere refuses a publish for a missing KB binding, a
+  missing template, an AI-chosen name, or the deliverable.**
+  **So D-11 is true of ROW 3 and of nothing else**, and two consequences bind the build:
+  1. **D-13's payload carries ONE verdict, never four invented greens.** An absent verdict must
+     still never render as *"everything is fine"* — the `useModelRegistry` floor.
+  2. **Rows 1, 2, 4 and 5 must NOT say *"before publishing"*.** That would be four false claims
+     about what the gate does. Only row 3 may borrow the gate's own sentence
+     (`BUSINESS_REQUIREMENT_MISSING_MESSAGE`), character-identical, per D-12.
+
+### ⚠ THREE CLAIMS IN THIS FILE THAT RESEARCH MEASURED AS FALSE
+
+Kept as corrections beside their originals — the originals above are **not** edited.
+
+- **C-1 · D-15's *"187 shipped `name_seeded_by_ai` — the provenance shape is already there"* is FALSE.**
+  `name_seeded_by_ai` is a **`PhaseSpec`** field (`harness.py:435`) — a **step**-name flag.
+  `WorkflowDefinition` has no equivalent (measured: 15 fields, none of them it). So *"whether the
+  name row wears the mark"* is **a full 193.2-07-pattern piece of work** (a new additive-optional
+  field stamped server-side), not the checkbox D-15's Claude's-Discretion line implies.
+  **Disposition — taken as the discretion CONTEXT.md already grants: DECLINE the mark on row 4,
+  with the reason recorded.** The row is already presented as something the AI chose, D-16 binds the
+  mark to mean *"a model wrote this"* and never *"this is good"*, and paying for a new stored field
+  to restate what the row's own sentence says is not worth a backend surface in this phase.
+  **Re-open trigger:** any phase that adds a definition-level provenance field for another reason —
+  row 4's mark comes along free at that point.
+- **C-2 · D-06's recorded consequence for `BUG-260809-02` does not exist.** The report's frontmatter
+  reads `status: closed`, `folded_into: quick-260809-klo`. STATE.md absorbed this correction on the
+  operator's direction; this file had not. **The `<deferred>` entry below is therefore wrong on its
+  face and is superseded by this line.**
+- **C-3 · `BUG-260815-01` is `closed`, `folded_into: "193.2"`** — not owed here. **No open bug
+  carries `folded_into: 197`.**
+
 ### Claude's Discretion
 
 - **Row order** among the five, and the exact wording of all five sentences — bounded by D-09
