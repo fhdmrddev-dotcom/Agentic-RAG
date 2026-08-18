@@ -2,7 +2,7 @@
 sketch: 175
 name: what-the-eye-lands-on
 question: "What is the density language for the workflow library — what does a card lead with, what defers behind a click, and what does colour carry?"
-winner: null
+winner: "B (cards + colour) — with A REJECTED as too dense and the colour SEMANTICS re-opened by the operator"
 tags: [density, progressive-disclosure, library, workflow-card, colour, icons, seed-184]
 seeds: [SEED-184]
 built: 2026-08-18
@@ -101,6 +101,38 @@ the failure is the useful part. What the data says actually separates two rows i
 
 Project earns the lead only once a library is genuinely spread across projects, which this one is not. A build of this
 direction should lead with **when + version**, with project as a chip.
+
+## VERDICT — operator, 2026-08-18
+
+**Direction: CALM.** Stated plainly — *"I like the idea of calm, for sure I'm desiring for calm."* That settles the
+question this sketch could not settle by measurement: **A is the densest and it is REJECTED.** *"the list is very
+dense."* Scannability-by-compression loses to calm; 39 px per row is not the goal.
+
+**Winner: B — the colourful card.** *"for the cards the colourful, option B is good — but also for filtration it is
+doing good."* So colour earns its place twice: it separates cards AND it makes the filter chips mean something.
+
+### ⚠ But the operator RE-OPENED what colour should encode, and that is a new question this sketch never asked
+
+> *"the cards seem to me all similar. There's no way to distinguish which one is best, which one is built, which one
+> is draft, which one belongs to something else. We should also colour code the categories."*
+
+B colours by **governance tier**. The operator wants colour to answer **lifecycle** (*built vs draft vs starter*) and
+**belonging** (*which project this is for*). Those are two more dimensions, and putting all three on colour at once is
+how a palette becomes noise. **That trade is sketch 176's job, not a tweak to this one.**
+
+### ⚠ And the scope grew — the operator is not convinced by the PAGE, not just the card
+
+> *"even the home page of the workflows is not aligned well — the header for the cards, and for the filter triggers and
+> search. I reported this before. And even the new button to create a new workflow is not good. Honestly I'm still not
+> convinced with this home page."*
+
+That is `BUG-260815-08` (**status: open**), reported 2026-08-15, whose own text already ruled: *"These are one design
+problem on one page and should be sketched together, not patched one control at a time."* It is now folded into
+sketch 176 rather than left as three control-level fixes.
+
+**What carries forward from this sketch:** calm over density · colour on the card · progressive disclosure (purpose
+defers behind a click) · and the measured finding that **the name cannot be the differentiator**, because 93% of rows
+share one.
 
 ## What this sketch deliberately does NOT answer
 

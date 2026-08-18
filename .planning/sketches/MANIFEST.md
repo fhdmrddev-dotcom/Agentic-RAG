@@ -2190,7 +2190,8 @@ it settles. Build order chosen by the operator: **density first**.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 175 | what-the-eye-lands-on | What is the density language for the workflow library — what does a card lead with, what defers behind a click, and what does colour carry? | *(open — awaiting operator)* | seed-184, density, progressive-disclosure, library, workflow-card, colour, icons, g2-sketch-gate, measured-refutation |
+| 175 | what-the-eye-lands-on | What is the density language for the workflow library — what does a card lead with, what defers behind a click, and what does colour carry? | **B — the colourful card.** CALM is the direction; **A REJECTED as too dense**. ⚠ Colour SEMANTICS re-opened: the operator wants lifecycle + belonging, not governance tier → 176 | seed-184, density, progressive-disclosure, library, workflow-card, colour, icons, g2-sketch-gate, measured-refutation |
+| 176 | the-workflows-home | What does the Workflows home page look like when it is CALM — and what should colour actually encode, when the operator cannot tell built from draft from starter from someone else's? (folds BUG-260815-08: header alignment, the uncoloured create button, the search box that does not read as one) | *(open — awaiting operator)* | seed-184, seed-155, bug-260815-08, workflows-home, colour-semantics, lifecycle, calm, header-alignment, g2-sketch-gate |
 
 **The recommended shape:** the draft lands as it does today; under the receipt sits **one line** —
 *"I made 5 decisions for you"* — that opens on demand, and each row hands you to the control already

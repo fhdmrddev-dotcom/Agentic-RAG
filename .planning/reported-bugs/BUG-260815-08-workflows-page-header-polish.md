@@ -4,12 +4,16 @@ title: Workflows page header — Build Workflow button is uncoloured, the projec
 reported: 2026-08-15
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflows, workflows/library, design-system]
-folded_into: null
+folded_into: sketch-176-the-workflows-home
 verified_closed_by: null
 related_seeds: [SEED-155, SEED-166]
-re_open_trigger: null
+re_open_trigger: >
+  If sketch 176 is not carried into a built phase, or if a build ships the page WITHOUT all three fixes
+  verified as GEOMETRY (button fill, one-row alignment at narrow width, search affordance), this report
+  re-opens. ⚠ Fix 2 in particular is a 2px defect that a screenshot cannot see — the sketch's own first
+  draft reproduced it (tops 395/397/397) and it was caught only by measuring.
 reproduces_on:
   branch: develop
   commit: d3a74202
@@ -71,3 +75,26 @@ header and toolbar live in `LibraryToolbar.tsx` rather than the page.
 - `SEED-155` — card density; the same page, the same operator, already open
 - `SEED-166` — the settings/menu information-architecture seed planted the same day
 - Phase 192 / 192.1 — the library extraction and its UAT row U8 (FAILED)
+
+
+## 2026-08-18 — FOLDED INTO SKETCH 176
+
+The operator raised this again after Phase 197, together with card differentiation
+(*"no way to distinguish which one is built, which one is draft, which one belongs to something
+else"*) and a blunter verdict: **"Honestly I'm still not convinced with this home page."**
+
+This report's own instruction — *"these are one design problem on one page and should be sketched
+together, not patched one control at a time"* — was followed. All three defects are fixed
+identically in every pane of `.planning/sketches/176-the-workflows-home/`, as a defect list rather
+than a variant, and each is verified as geometry:
+
+| # | Verified |
+|---|---|
+| 1 uncoloured button | filled primary, `rgb(163,165,255)` measured |
+| 2 alignment | one flex row, shared control height — `tops [414,414,414] · heights [38,38,38]`, no wrap at 980px |
+| 3 search affordance | bordered field + icon + focus ring, `type="search"` |
+
+⚠ **The sketch's OWN first draft reproduced defect 2** — `align-items:center` put the search 2px
+above the selects, because an `<input>` and a `<select>` do not resolve the same height from equal
+padding. Caught by measuring, not by looking. That is the strongest available evidence that this
+report was never a taste complaint.
