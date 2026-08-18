@@ -36,11 +36,26 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 192.2 (does-this-one-work) — EXECUTING
-Plan: **1 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline) COMPLETE.
-Next action: `/gsd:execute-phase 192.2` — run **Wave 2**. ⚠ **Wave 2 plan `192.2-03` is
-`autonomous: false`** (its tests touch the local Postgres; CLAUDE.md rule 4 forbids running it
-concurrently with another DB-touching plan). Wave 2's other plan, `192.2-02`, is the G-5 discharge
-and may run in parallel.
+Plan: **3 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline) and Wave 2
+(`192.2-02` the G-5 discharge + `192.2-03` the run-facts join) COMPLETE. Wave 2 ran the two plans
+in PARALLEL worktrees and they merged clean at `00b81f63` / `7bd88426` — zero `files_modified`
+overlap (frontend vs backend), and only `192.2-03` touched Postgres, so CLAUDE.md rule 4 (serialize
+DB-MUTATING plans) was satisfied without serialising the wave.
+Next action: `/gsd:execute-phase 192.2` — run **Wave 3** (`192.2-04`, run facts wire → card
+vocabulary).
+
+⚠ **Carried into Wave 3, measured not assumed:**
+- `last_run_status` arrives **RAW** from the wire — a `switch` over it needs a TOTAL default arm.
+- An **absent** key is a THIRD state, distinct from `null`. D-08 forbids rendering either blank or green.
+- The starter word is **`Shared starter`**, not `Starter` — `cardFace.ts` imports the business words from
+  `libraryVocabulary.ts:297-307` rather than re-spelling them, so there is exactly one place to change.
+- The mark map is **`FACE`**, not `ROW_FACE` (both the plans and CONTEXT.md name the latter; it does not exist).
+- `scripts/vitest-count-gate.cjs` lives at the **repo root**, not under `frontend/`; the plans' `| tail` form
+  makes a `MODULE_NOT_FOUND` exit **0**, so a broken invocation reads as a green gate.
+- ⚠ **The worktrees forked from `master`'s tip (`fda79214`), NOT from the dispatched `develop` base.** Both
+  executors' HEAD assertions caught it and reset. Every future executor prompt must carry the base SHA assertion.
+- ⚠ **`gsd-sdk query roadmap.update-plan-progress` returned `updated: true` and wrote ZERO bytes** to both
+  ROADMAP.md and STATE.md. Both files were hand-edited instead. Do not trust that verb's return value.
 
 ⚠ **The frontmatter plan/phase counts were CORRECTED here, and the correction is recorded rather
 than silently applied.** `82dd2efd` ("Phase 192.2 planned — 6 plans / 5 waves") added the phase and
