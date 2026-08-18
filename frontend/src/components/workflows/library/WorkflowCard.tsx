@@ -250,7 +250,11 @@
  * theirs.
  */
 import { Fragment, useRef, useState } from "react"
-import { Loader2, MoreHorizontal, Trash2 } from "lucide-react"
+// 192.2-05 (D-06) — `FileText` / `Sparkles` / `SquarePen` replace the three emoji marks and
+// `Folder` replaces the folder chip's. The house's shipped chrome set, which this file already
+// drew three marks from; see `MARK_ICON`'s docblock for why NOT `phaseGlyph()`.
+import { FileText, Folder, Loader2, MoreHorizontal, Sparkles, SquarePen, Trash2 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 
 import {
   DropdownMenu,
@@ -404,32 +408,46 @@ const ROOT_TESTID = {
  * file has carried since sketch 175). What is left here is the DRAWING: three maps keyed by the
  * face's own mark, so the card names no provenance in its header render at all.
  *
- * ⚠ THE THREE EMOJI ARE KEPT ON PURPOSE, AND KEEPING THEM IS THE POINT OF THIS WAVE. D-06 records
- * that they violate the single-source icon convention, and Wave 4 removes them. Removing them HERE
- * would change pixels inside a refactor and break the characterization pin
- * (`WorkflowCard.baseline.test.tsx`) that proves the refactor changed nothing. A seam that ships
- * with a behaviour change attached cannot prove it is a seam.
- */
-const MARK_GLYPH = {
-  ready: "📄",
-  starter: "✨",
-  building: "📝",
-} as const satisfies Record<CardMark, string>
-
-/**
- * ⚠ THE SYSTEM VOCABULARY, ON DEATH ROW. `face.state` ALREADY CARRIES THE BUSINESS WORD
- * (`Ready to run` / `Shared starter` / `Still building`) — this map exists ONLY to keep the pill
- * rendering the raw lifecycle spellings it renders today, so that this plan moves no pixel.
+ * ── 192.2-05 (D-06) — THE EMOJI ARE GONE, AND THE REPLACEMENT IS AN ARGUMENT ────────────
+ * ⚠ THREE EMOJI STOOD HERE UNTIL THIS WAVE — a page, a sparkle and a memo, one per mark — kept
+ * on purpose so 192.2-02 could prove it moved no pixel. D-06 records that they violate the
+ * single-source icon convention; this is where that is paid.
  *
- * **WAVE 4 DELETES THIS CONSTANT AND RENDERS `face.state`.** That is a one-line edit here and
- * nowhere else, which is the whole return on the extraction: the vocabulary defect D-06 names has
- * exactly one place left to be fixed.
+ * ⚠ THE THREE CHARACTERS ARE DELIBERATELY NOT SPELLED IN THIS PROSE, and their literals are
+ * recorded in `192.2-01-SUMMARY.md` §3 instead. D-06's acceptance check is a RAW GREP of the
+ * emoji plane over this file, and a docblock quoting them answers that grep on the very file
+ * that documents the rule — the 187-24 trap, which this file's header already records twice for
+ * the forbidden tooltip attribute and resolves the same way.
+ *
+ * ⚠ **THEY DO NOT BECOME `PHASE_GLYPHS` / `phaseGlyph()`, AND THE PLAN'S `files_modified`
+ * NAMING `lib/phaseGlyph.tsx` IS DECLINED RATHER THAN OBEYED.** That map is TOTAL OVER PHASE
+ * TYPES — `programmatic`, `llm_agent`, `llm_emit` … — and the skill's `icon-convention.md` §4
+ * forbids this exact move by name: *"Using a phase-type glyph as a category icon — a workflow
+ * is its SPINE (#36), not one step's mark"*, recorded after an audit caught four such drifts.
+ * `ready` / `starter` / `building` is a PROVENANCE axis; it has no shipped glyph vocabulary,
+ * and inventing one there would put a second concern inside a module whose exported key set is
+ * guarded to equal `soulData.PHASE_GLYPHS` exactly. The card also stopped consuming that map
+ * entirely when the glyph-dot spine left with D-03 — so the honest edit is that `phaseGlyph.tsx`
+ * is NOT TOUCHED by this plan.
+ *
+ * ⚠ **THEY BECOME `lucide-react` MARKS — THE HOUSE'S SHIPPED SET, NOT A SECOND ICON PATH.**
+ * This file already draws `MoreHorizontal`, `Trash2` and `Loader2` from it; the convention's
+ * single sources are `@lobehub/icons` for PROVIDERS and `PHASE_GLYPHS` for PHASE TYPES, and a
+ * library row's provenance is neither. Adding a fourth path would be the drift; reusing the
+ * chrome set the card is already made of is not.
+ *
+ * ⚠ THE MARK CARRIES NO MEANING COLOUR AND NO WORD OF ITS OWN. It is `aria-hidden`, muted, and
+ * everything it hints at is said in business words on line 2 — the shipped `PhaseNodeCard` rule
+ * (*"the WORD carries the meaning; tone is decoration"*), applied one surface over.
  */
-const LEGACY_STATE_PILL = {
-  ready: "published",
-  starter: "Starter",
-  building: "draft",
-} as const satisfies Record<CardMark, string>
+const MARK_ICON = {
+  ready: FileText,
+  starter: Sparkles,
+  building: SquarePen,
+} as const satisfies Record<CardMark, LucideIcon>
+
+/** The mark's chrome. Muted and small: it labels the row, it does not compete with the name. */
+const MARK_ICON_CLASSES = "h-3.5 w-3.5 flex-none text-muted-foreground"
 
 /**
  * Phase 192.2-05 (D-01 line 2) — THE STATE'S TONE, NOW THAT IT IS A WORD RATHER THAN A PILL.
@@ -634,7 +652,8 @@ export function WorkflowCard({
    * Everything this card leads with, defers or states about the row itself comes back from here:
    * the lead, the version, the state word, the mark and whether the row can be run. The card
    * decides none of it and re-derives none of it — the same discipline it already holds when it
-   * refuses to compute slugs, versions or the identity line.
+   * refuses to compute slugs, versions or the identity line — the mark it hands back is a KEY,
+   * never a glyph, so the icon convention has exactly ONE enforcement point (`MARK_ICON` above).
    *
    * ⚠ 192.2-05: `now` IS PASSED, NOT DEFAULTED — see the prop's own docblock (P-1). The face
    * now carries the run truth as well, so this call is where D-01's line 2 and its gutter both
@@ -688,6 +707,9 @@ export function WorkflowCard({
    * this whole phase exists to remove.
    */
   const owned = CHIP_PREDICATES.yours(row)
+
+  /** D-06's mark, resolved from the face's KEY — the card's one icon-convention decision. */
+  const MarkIcon = MARK_ICON[face.mark]
 
   /**
    * Phase 193-06 (AUTH-03 — D-13 / D-14 / D-15 / D-21) — CAN THIS ROW BE HANDED A TEMPLATE?
@@ -802,7 +824,7 @@ export function WorkflowCard({
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span aria-hidden="true">{MARK_GLYPH[face.mark]}</span>
+            <MarkIcon data-testid="row-mark" className={MARK_ICON_CLASSES} aria-hidden="true" />
             <span className={NAME_CLASSES}>{face.lead}</span>
             {face.version !== null && <span className={VERSION_CLASSES}>{face.version}</span>}
           </div>
@@ -828,7 +850,15 @@ export function WorkflowCard({
             <span aria-hidden="true" className="text-border">
               {ANSWER_SEPARATOR}
             </span>
-            <span className={STATE_TONE[face.mark]}>{LEGACY_STATE_PILL[face.mark]}</span>
+            {/* ⚠ D-06 — `face.state`, AND THE SYSTEM SPELLINGS ARE GONE FROM THIS FILE. It read
+                `LEGACY_STATE_PILL[face.mark]`, a map of `published` / `Starter` / `draft`: raw
+                lifecycle tokens rendered at the user. `cardFace` has returned the business word
+                since 192.2-02 — `Ready to run` / `Shared starter` / `Still building`, imported
+                from `libraryVocabulary.ts` and never re-spelled — and this is the one edit that
+                was left for it, which is the whole return on that extraction. The card now
+                spells NO lifecycle word anywhere; `row.provenance` reaches `cardFace` as an
+                input key and nothing else. */}
+            <span className={STATE_TONE[face.mark]}>{face.state}</span>
           </div>
 
           {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────
@@ -869,9 +899,17 @@ export function WorkflowCard({
             ))}
           </div>
 
+          {/* ⚠ D-06's FOURTH EMOJI, and it is evicted with the other three. The chip is a KEEP
+              atom — the project's NAME still renders, in the same place, at the same size — but
+              its leading folder character was an emoji on the card exactly like the provenance
+              marks were (again unspelled, for the reason `MARK_ICON`'s docblock gives), and
+              CONTEXT's constraint is *no emoji anywhere on the card*. Same house set, same
+              muted tone; `inline-block` becomes `inline-flex` only because the glyph is now a
+              sibling element rather than a character in the text run. */}
           {folderName && (
-            <span className="mt-0.5 inline-block text-[11px] text-muted-foreground">
-              📁 {folderName}
+            <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+              <Folder className="h-3 w-3 flex-none" aria-hidden="true" />
+              {folderName}
             </span>
           )}
         </div>

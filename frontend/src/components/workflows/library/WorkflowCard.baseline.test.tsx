@@ -205,6 +205,19 @@ const identityParts = (card: HTMLElement): string[] =>
     .map((child) => child.textContent ?? "")
     .filter((text) => text !== "·")
 
+/**
+ * D-01 line 2, as its own scope.
+ *
+ * ⚠ THE STATE WORD IS ASSERTED *IN ITS SLOT*, NEVER *SOMEWHERE ON THE CARD*, AND THE REASON WAS
+ * MEASURED RATHER THAN FORESEEN: on a row that collides on its name, `resolveIdentity` picks the
+ * STATE AXIS as the discriminator, so `Ready to run` legitimately appears twice — once here and
+ * once as a seg of the identity line. A card-wide `getByText` threw *"Found multiple elements"*.
+ * That duplication is a real observation about the shipped surface and is recorded in this
+ * plan's SUMMARY; it is NOT this suite's to hide, and scoping the query is how the suite asserts
+ * a SLOT rather than a coincidence.
+ */
+const answer = (card: HTMLElement): HTMLElement => within(card).getByTestId("row-answer")
+
 /** Open the `⋯` menu — the only place the relocated consequence sentence can be read. */
 const openOverflow = async (card: HTMLElement) => {
   await userEvent.click(within(card).getByRole("button", { name: "Workflow actions" }))
@@ -299,7 +312,7 @@ describe("BASELINE — the resting PUBLISHED card", () => {
     const card = renderCard(PUBLISHED)
     // ⚠ WAS `getByText("published")`. D-06: `published` and `draft` are the system's words, in
     // the system's data. The atom is still here; it finally says something a person means.
-    expect(within(card).getByText(STATE_RUNNABLE)).toBeInTheDocument()
+    expect(within(answer(card)).getByText(STATE_RUNNABLE)).toBeInTheDocument()
     expect(within(card).queryByText("published")).toBeNull()
   })
 
@@ -367,7 +380,7 @@ describe("BASELINE — the resting DRAFT card", () => {
     const card = renderCard(DRAFT)
     expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
     expect(card.textContent ?? "").not.toMatch(EMOJI)
-    expect(within(card).getByText(STATE_DRAFT)).toBeInTheDocument()
+    expect(within(answer(card)).getByText(STATE_DRAFT)).toBeInTheDocument()
     expect(within(card).queryByText("draft")).toBeNull()
   })
 
@@ -404,7 +417,7 @@ describe("BASELINE — the resting STARTER card", () => {
     expect(card.textContent ?? "").not.toMatch(EMOJI)
     // ⚠ WAS `getByText("Starter")`. The shipped vocabulary's word is `Shared starter`, and
     // `cardFace` has returned it since 192.2-02 — the pill was simply not rendering it.
-    expect(within(card).getByText(STATE_STARTER)).toBeInTheDocument()
+    expect(within(answer(card)).getByText(STATE_STARTER)).toBeInTheDocument()
   })
 
   it("says Shared — it is not this reader's row", () => {
@@ -430,8 +443,12 @@ describe("BASELINE — a row whose name is the empty string (WR-01)", () => {
     // test hook of its own, and inventing one here would change the file this plan refactors.
     const header = within(card).getByText("v1").parentElement
     expect(header).not.toBeNull()
+    // ⚠ `getAttribute("class")`, NOT `.className` — the mark at index 0 is an SVG element since
+    // D-06, and `SVGElement.className` is an `SVGAnimatedString` rather than a string, so the
+    // shipped `.includes` threw a `TypeError` rather than failing an assertion. Read out of the
+    // suite's own RED, not predicted.
     const title = Array.from(header!.children).find((child) =>
-      child.className.includes("truncate"),
+      (child.getAttribute("class") ?? "").includes("truncate"),
     )
     expect(title).toBeDefined()
     expect(title!.textContent).toBe("")
@@ -442,7 +459,7 @@ describe("BASELINE — a row whose name is the empty string (WR-01)", () => {
     expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
     expect(within(card).getByText("v1")).toBeInTheDocument()
     expect(identityParts(card)[0]).toBe(OWN_YOURS)
-    expect(within(card).getByText(STATE_RUNNABLE)).toBeInTheDocument()
+    expect(within(answer(card)).getByText(STATE_RUNNABLE)).toBeInTheDocument()
     expect(within(card).getByTestId("published-run")).toHaveTextContent("▶ Run")
     // ⚠ WAS `getByTestId("soul-purpose")`. A nameless row is now carried by line 2 alone —
     // which is precisely why line 2 has to be TOTAL over the arms (D-08).
@@ -467,7 +484,7 @@ describe("BASELINE — every resting atom, per provenance, in one place", () => 
   ])("%s renders its mark, its business word and its verb", (_label, row, state, runnable) => {
     const card = renderCard(row)
     expect(within(card).getByTestId("row-mark")).toBeInTheDocument()
-    expect(within(card).getByText(state)).toBeInTheDocument()
+    expect(within(answer(card)).getByText(state)).toBeInTheDocument()
     expect(within(card).getByTestId(runnable ? "published-run" : "draft-open")).toBeInTheDocument()
     // ⚠ WAS the five soul atoms and an emoji folder chip, asserted unconditional across all
     // three faces. What is unconditional NOW is the gutter, line 2 and the chip's name.
