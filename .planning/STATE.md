@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T10:10:00.000Z"
+last_updated: "2026-08-18T15:20:00.000Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
   completed_phases: 9
   total_plans: 105
-  completed_plans: 98
+  completed_plans: 100
   percent: 47
 ---
 
@@ -35,68 +35,56 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 197 (guided-authoring) — EXECUTING
-Plan: 10 of 11 complete (waves 1-6 done and merged)
-Resume file: `.planning/phases/197-guided-authoring/197-11-PLAN.md`
-Status: Executing Phase 197 — **Wave 7 (`197-11`, the records) is the last plan**
+Phase: 197 (guided-authoring) — **EXECUTED 11/11, NOT COMPLETE**
+Plan: 11 of 11 — every wave merged
+Status: **Verification returned `human_needed`. The phase is DELIBERATELY NOT MARKED COMPLETE.**
+Next action: drive `197-HUMAN-UAT.md` — **row U5 first**.
 
-**Wave 6 (`197-10`) merged at `e0ec7fd8`.** D-19 shipped: the drafted header renders the workflow's
-NAME when it has one — `meta.name` had appeared in no render position anywhere on the page, so the
-name was displayed nowhere, and row 4 was writing something the screen never showed.
+**All 11 plans executed and merged** (waves 1-7). Verification: **3/3 ROADMAP success criteria
+verified in code, 11/11 plan must-haves verified, 0 gaps found.** The verifier re-ran the four D-05
+numstat criteria, the backend suite, the five new frontend suites, the three page suites and every
+project gate **independently rather than trusting any SUMMARY**.
 
-⚠ **The band-3 `FLAG_OFF_HEADER_MARKUP` disposition is BRANCH A — no third re-capture was forced.**
-`git diff --numstat` on `WorkflowBuilderPage.header.test.tsx` reads **`156 0`**: zero deletions, all
-three bands byte-identical, so the file's own *"THIS IS RE-CAPTURE TWO OF TWO, AND THE PHASE EXPECTS
-NO THIRD"* note is **vindicated rather than superseded**. The reason is a fact about the fixture —
-`openDraftBuilder` binds no `name` on the definition, so the slot still resolves to `meta.slug`.
-**The green was proved non-vacuous** by a new case driving the same flag-off surface with a
-definition that DOES bind a name (red before, green after).
+⚠ **IT IS `human_needed`, NOT `passed`, AND THE REASON IS NOT A CODE GAP: all nine G-4 rows (U1-U9)
+are OWED — no human has driven this surface.** Every claim in this phase is jsdom proving that
+strings agree. Recommended first row: **U5** (the card's name row and the header must never give two
+answers — the exact defect sketch 174 shipped, caught only by looking).
 
-⚠ **One RED was REAL, not a SEED-171 flake, and the procedure is what separated them.** A fence
-`197-09` planted in `WorkflowBuilderPage.canvas.test.tsx` — *"D-19 IS PLAN 197-10'S, NOT THIS ONE'S
-… so a header change cannot be smuggled in here"* — went red in the same run that landed D-19,
-which is how a scope boundary is supposed to end its life. It was **retired, not deleted**, and
-replaced with a strictly stronger claim (the header shows the name the author just typed, live, and
-the slug is GONE from the slot). That file is not in `197-10`'s `files_modified`, so it is recorded
-as a Rule 3 deviation.
+⚠ **TWO CODE-REVIEW FINDINGS ARE OPEN** (`197-REVIEW.md`, `d0ef74fb`), both found AFTER the plans
+closed and both recorded in the UAT file's Gaps section so neither can go quiet:
 
-⚠ **The base assertion fired for the NINTH time out of nine in this phase** — the worktree forked
-from `3781a3f`, not the dispatched base. Every executor prompt must keep carrying it.
+- **CR-01 (Critical) — the readiness verdict goes stale on the one edit the card invites.**
+  `DecisionsList.tsx:180-184` derives the requirement verdict purely from the SNAPSHOT while the
+  answer directly above it is LIVE. Confirmed independently: `setReadiness` is written at exactly
+  one site (`WorkflowBuilderPage.tsx:886`) and never recomputed. Three clicks to reproduce. **This
+  is the CR-01 snapshot/live shape for the FIFTH time.** The phase fenced absence-is-not-a-pass on
+  the WIRE and left it unfenced on the EDIT — the LIVE fence and the verdict cases never overlap,
+  because the LIVE case's mock carries no `readiness` key at all.
+- **WR-01 (Warning) — clearing the name persists a blank library title.** `setName` accepts `""`;
+  the docblocks' *"the server owns emptiness"* is **measured FALSE for this field**. A regression
+  **this phase's own new write path introduced**. Fix is a display fallback at
+  `WorkflowCard.tsx:592` and `WorkflowsPage.tsx:574`, not a client-side trim.
 
-**Gates at `e0ec7fd8` (post-merge, main working tree):** `tsc` **33** — baseline unmoved · count
-gate **`count gate OK` · total 4447 · pinned 4217 · 89/89 · failed 0**, identical to the executor's
-own reading, so the merge introduced no drift.
+**Recorded as NOT MET by the phase itself, rather than smoothed over:** `197-09`'s suite
+"zero deletions" criterion (measured 28), `197-11`'s Task-1 `grep -c … == 3` criterion (measured 9,
+falsified by the file's own house style), and `197-10`'s RED-first claim (2 of 4 cases, not 4).
 
-⚠ **OWED, carried into the close:** G-4 rows **U1**, **U5** and **U6**. jsdom proves the strings
-agree; only an eye proves the screen reads right. Also: `197-10` flagged
-`WorkflowBuilderPage.tsx`'s hot-file ledger row (`42 / 13 / 2398`) as **stale but deliberately not
-edited** — the ledger lives in `CLAUDE.md` + `docs/HOT-FILE-LEDGER.md`, shared artifacts a parallel
-worktree must not write. `197-11` owns that re-derive.
+**Gates at HEAD:** count gate **OK · total 4447 · pinned 4328 · 92/92 · failed 0** · `tsc` **33**
+(baseline unmoved) · backend touched suite **47 passed** · deploy drift **PASS** · CLAUDE.md size
+**exit 0, 69,681 chars / 46.5%** · **G-7 clear (0 gap-closure rounds)** · no migrations.
 
-⚠ **WAVE 5 WAS INTERRUPTED BY A MACHINE CRASH ON 2026-08-18 AND WAS RECOVERED, NOT RE-RUN.**
-The host laptop froze and rebooted mid-plan. The executor had committed all three of `197-09`'s
-tasks (`f96a3ed1` · `d0292223` · `4c16844e` · `36013a72`) into worktree
-`agent-a41a85c00039a1fe8`, which survived intact with its junctions attached and a clean
-`git status`. What the crash actually destroyed was the **completion commit and the merge**, so
-those were rebuilt: every mechanical claim in `197-09-SUMMARY.md` was **re-run at `36013a72`**
-rather than inherited, and the summary says so at its top. **The one thing not recoverable is the
-plan's RED-first evidence**, which now exists only in the executor's own commit messages.
-Merged to `develop` at `fabccd47`.
+⚠ **`197-11` found a file at SEVEN phases with NO ledger row and NO detail section** —
+`frontend/src/components/workflows/soulData.ts` (`9 / 7 / 373`), which this phase modified. It was
+absent from the plan's own nine-file list too: **a plan's `files_modified` is itself a scan list and
+can be incomplete exactly the way the table can.** Four of six named rows had drifted;
+`WorkflowBuilderPage.tsx` was stale by **258 lines inside one phase**.
 
-**Gates at `fabccd47` (post-merge, main working tree):** `tsc -p tsconfig.app.json` **33** — the
-standing baseline, unmoved · count gate **`count gate OK` · total 4443 · pinned 4217 · 89/89 ·
-failed 0**, identical to the pre-merge reading, so the merge introduced no drift (wave 2 needed a
-`fix(197)` for exactly that, so it was checked rather than assumed).
-
-⚠ **`197-09` closed with ONE ACCEPTANCE CRITERION RECORDED AS FAILED, not reinterpreted:** its
-suite's *"zero deletions"* criterion measured **28**. A declared mount replacement necessarily
-edits the cases that read the old mount — the criterion belonged on the page file, and is left
-standing as a failure so the mis-scoping is visible. All four phase-level D-05 numstat criteria
-**PASS**, including `SeedReceipt.tsx` absent from the diff entirely.
-
-⚠ **OWED and carried forward into the phase close:** G-4 row **U1** (the composed receipt must
-*read* as one card — jsdom applies no CSS, so no case can prove it) and **U5**'s screen half (the
-focus jump is pinned mechanically but has not been seen by a person).
+⚠ **HOUSEKEEPING — an executor left an ORPHANED uvicorn running** from the deleted `197-11`
+worktree: `127.0.0.1:58879 --workers 2`, six python PIDs whose parent worktree no longer exists.
+It holds four gitignored log files open, which is why `teardown-worktree.sh` reported FAILED. The
+git registry is clean, the branch is merged, both junctions were detached and the source venv +
+node_modules are **verified intact**. What remains is an empty directory. The operator's own backend
+on port 8000 is a DIFFERENT process tree and was not touched.
 
 ### What plan-phase produced, and the three things it CORRECTED
 
