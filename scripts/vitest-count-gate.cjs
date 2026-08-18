@@ -168,6 +168,49 @@ const BASELINE = {
   "ModelField.test.tsx": 32,
   "modelFitness.test.ts": 18,
   "useModelRegistry.test.ts": 11,
+  // ── 196-07 (D-18 / BUG-260718-04) — TWO NEW FILES, pinned in the SAME COMMIT that ─────
+  // ── creates them. ADDITIVE beside 196-05's three keys directly above: nothing there ───
+  // ── was restructured, renumbered or removed. ─────────────────────────────────────────
+  //
+  // Both needed a `TARGETS` line as well as a pin — `src/hooks` and `src/components/chat`
+  // each have only FILE-LEVEL entries and no bare-directory entry, so neither suite would
+  // have executed at all. The reasoning is recorded beside those `TARGETS` lines rather
+  // than duplicated here. TARGETS decides what RUNS, BASELINE what is GUARDED.
+  //
+  // ⚠ BOTH NUMBERS WERE READ FROM THIS SCRIPT'S OWN `actual` COLUMN, on the run that first
+  // executed them (printed as `— 17 new` and `— 2 new`), never hand-counted from `it(`
+  // literals and never taken from a planning document — this plan's own text quotes
+  // neither, for exactly that reason.
+  //
+  // ⚠ AN UNPINNED FILE IS NOT A LIGHTLY-GUARDED ONE, IT IS AN UNGUARDED ONE. What would be
+  // unguarded without these two entries:
+  //
+  //   • `useComposerModel.test.ts` (17) — ⚠ THE LOAD-BEARING ONE. It carries the ONLY
+  //     mechanical guard on D-18's derivation, and three of its cases guard things nothing
+  //     else in this tree asserts. (a) THE TWO SKIPS: a `model` of `undefined` on user-role
+  //     rows (which have no run row and therefore no model) and the LITERAL `"unknown"`,
+  //     which is not a sentinel anybody invented — 121 live `runs` rows carry it, and
+  //     restoring it would put an id in the composer that no provider offers. The skip
+  //     cases place those rows AFTER the run-backed one, so a derivation that simply read
+  //     the last element fails rather than passes. (b) THE ORDER: `provider` is applied
+  //     BEFORE `model`, asserted as a SEQUENCE on the exported pure function the hook
+  //     itself calls. React batches the two setState calls, so an end-state assertion
+  //     would pass against a REVERSED implementation right up until `handleProviderChange`
+  //     clobbered the restored model in production — where the symptom is "fixed on mount,
+  //     broken after any provider interaction", the hardest shape there is to notice.
+  //     (c) THE DISABLED REFUSAL, which is what keeps the composer from pre-selecting a
+  //     model the runtime would refuse to run.
+  //
+  //   • `ChatArea.model.test.tsx` (2) — small on purpose and NOT redundant with the above.
+  //     It answers the one question a pure derivation cannot: does the restored value reach
+  //     the control an operator actually looks at. Its second case is a CONTROL, not a
+  //     duplicate — same component, same providers, only the messages differ, requiring the
+  //     global default instead. Without the pair, "the composer shows claude-5-haiku" is
+  //     satisfied by any picker that renders the last item of any list. It stays thin
+  //     because `ChatArea` mounts the real `StreamsProvider`, which is exactly why the
+  //     branch coverage lives in the hook suite and not here.
+  "useComposerModel.test.ts": 17,
+  "ChatArea.model.test.tsx": 2,
   // 187-25: PINNED NOW, because these two stopped being ordinary suites. Between
   // them they carry the whole Req-5 governance-honesty estate — CR-03's thirteen
   // carried-paragraph cases, CR-04's three post-arrival fences plus their leaf
@@ -2877,6 +2920,34 @@ const TARGETS = [
   // plan does not read, and adopting them would make Phase 196 the owner of their future
   // rot in a gate that requires 0 failing forever.
   "src/hooks/__tests__/useModelRegistry.test.ts",
+  // ── Added in 196-07 (D-18 / BUG-260718-04) — TWO entries, both in the SAME COMMIT ──────
+  // ── that creates their files. Additive beside 196-05's entry directly above; nothing ──
+  // ── there was restructured or removed. ────────────────────────────────────────────────
+  //
+  // ⚠ BOTH SUITES WERE UNGATED AND BOTH NEEDED A LINE — measured, not assumed.
+  // `grep -n '"src/components/chat'` over this script returns exactly two FILE-LEVEL
+  // entries (`OutputFileCard.baseline`, `StopControl.baseline`) and NO bare-directory
+  // entry, which is the same finding the comment at those lines already records. And
+  // `src/hooks` has no directory entry either — 196-05 hit that one line above. So neither
+  // of these two would have EXECUTED without its own line, and a falsification that does
+  // not run has falsified nothing.
+  //
+  // WHAT IS UNGUARDED WITHOUT THEM — full reason at the matching `BASELINE` entries
+  // (search `196-07`); in one line: between them they are the ONLY guards on D-18's
+  // derivation, including the two skips that no other suite in this tree asserts (a
+  // `model` of `undefined` on user-role rows, and the literal `"unknown"` that 121 live
+  // `runs` rows actually carry).
+  //
+  // ⚠ TIMING: a `TARGETS` path that does not yet exist makes this gate ERROR at exit 2 —
+  // not fail — for every later plan, so both land in their creating commit and nowhere
+  // else.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directories `src/hooks` or `src/components/chat`
+  // — verbatim the reasoning this script already records nine times over. Both directories
+  // hold dozens of suites this plan does not read, and adopting them wholesale would make
+  // Phase 196 the owner of their future rot in a gate that requires 0 failing forever.
+  "src/hooks/__tests__/useComposerModel.test.ts",
+  "src/components/chat/__tests__/ChatArea.model.test.tsx",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

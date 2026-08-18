@@ -2578,7 +2578,18 @@ export async function kickReembed(): Promise<ReembedProgress> {
   return res.json() as Promise<ReembedProgress>
 }
 
-export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[] }> {
+/**
+ * Phase 196 Plan 07 (D-18 / BUG-260718-04): `disabled_models` joins `deprecated_models` on this
+ * payload — the operator-DISABLED id set, so the composer's per-thread model restore can apply
+ * D-07's disabled rule BY NAME instead of inferring it from a provider's offered list.
+ *
+ * Both sets are OPTIONAL on the wire type and both are read with a `?? []` default at the call
+ * site. That is not defensive noise: an older backend answers without the key, and a degraded
+ * read must resolve to "no badge / no disabled ids" rather than to a crash in the chat composer.
+ * The two sets are INDEPENDENT — a deprecated model stays selectable (D-149-05); a disabled one
+ * is the thing the restore must refuse.
+ */
+export async function getProviders(): Promise<{ active: string; active_model: string; providers: { id: string; name: string; models: string[]; is_active: boolean }[]; deprecated_models?: string[]; disabled_models?: string[] }> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/settings/providers`, { headers, cache: "no-store" })
   if (!res.ok) throw new Error("Failed to get providers")
