@@ -42,6 +42,7 @@ import {
   entryInputKeys,
   soulDeliverable,
   templateAdmission,
+  terminalEmitSlug,
   type TemplateAdmission,
   type DefShape,
 } from "./soulData"
@@ -419,6 +420,210 @@ describe("soulData.templateAdmission — three states, never a boolean (D-21 / D
     expect(templateAdmission({ phases: [{ config: { phase_type: "programmatic" } }] })).toBe(
       "does-not-admit",
     )
+  })
+})
+
+// ── Phase 197-04 (AUTH-02 / D-18) — WHICH STEP PRODUCES THE DELIVERABLE ─────────
+//
+// `terminalEmitSlug` is NET-NEW LOGIC, not an extraction: no shipped derivation in this
+// module orders phases by `phase_index` for a PICK. `tierForDefinition` FOLDS over every
+// emit phase (strictest policy wins, deliberately order-independent) and `soulDeliverable`
+// uses `.some()` (order-independent by construction). So the ordering behaviour below was
+// driven RED-FIRST — the descending-order case was written and observed failing before the
+// implementation existed, and then again against a deliberate array-order plant, which is
+// the run that proves the case pins the ORDERING rather than merely the function's
+// existence. Both verdicts are quoted in 197-04-SUMMARY.md.
+//
+// ⚠ THE TIE-BREAK IS A DECLARED CONTRACT, NOT AN ARTEFACT OF `sort` STABILITY: greatest
+// `phase_index` wins; on a tie, or when ANY candidate lacks a usable numeric index, the
+// LAST candidate in ARRAY ORDER wins. Both fallbacks point the same way on purpose. Every
+// arm below is entered by a real case — the 192 CR-01 lesson (*both failure tests pinned
+// the correct branch without ever entering the wrong one*) applied rather than quoted.
+
+/** Two emit phases, ascending — the shape a well-formed multi-emit draft carries. */
+const twoEmitsAscending: DefShape = {
+  name: "Northwind QBR",
+  phases: [
+    { slug: "gather", phase_index: 0, config: { phase_type: "llm_agent" } },
+    { slug: "interim", phase_index: 1, config: { phase_type: "llm_emit" } },
+    { slug: "final", phase_index: 2, config: { phase_type: "llm_emit" } },
+  ],
+}
+
+describe("soulData.terminalEmitSlug — WHICH step makes the file (D-18)", () => {
+  it("two emit phases, phase_index ascending → the greater index's slug", () => {
+    expect(terminalEmitSlug(twoEmitsAscending)).toBe("final")
+  })
+
+  it("two emit phases with DESCENDING phase_index in array order → still the greater phase_index's slug", () => {
+    // ⚠ THE CASE THAT DISTINGUISHES THIS DERIVATION FROM `soulDeliverable`'s
+    // order-independent `.some()`, and the one written RED-FIRST. A naive
+    // "last element of the filtered array" would answer "draft" here; the array-order
+    // plant recorded in the SUMMARY produced exactly that.
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "final", phase_index: 7, config: { phase_type: "llm_emit" } },
+          { slug: "draft", phase_index: 2, config: { phase_type: "llm_emit" } },
+        ],
+      }),
+    ).toBe("final")
+  })
+
+  it("two emit phases with EQUAL phase_index → the LAST in array order (the declared tie-break)", () => {
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "first", phase_index: 3, config: { phase_type: "llm_emit" } },
+          { slug: "second", phase_index: 3, config: { phase_type: "llm_emit" } },
+        ],
+      }),
+    ).toBe("second")
+  })
+
+  it("candidates with a MISSING or non-numeric phase_index → the LAST in array order", () => {
+    // No index at all on either candidate.
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "first", config: { phase_type: "llm_emit" } },
+          { slug: "second", config: { phase_type: "llm_emit" } },
+        ],
+      }),
+    ).toBe("second")
+    // A non-numeric index the wire could still send, and NaN — both fail the
+    // `Number.isFinite` guard and must not silently win or lose a comparison.
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "first", phase_index: "2" as never, config: { phase_type: "llm_emit" } },
+          { slug: "second", phase_index: Number.NaN, config: { phase_type: "llm_emit" } },
+        ],
+      }),
+    ).toBe("second")
+  })
+
+  it("MIXED — one candidate indexed, one not → array order, never a half-comparison", () => {
+    // The declared resolution of the mixed case: a numeric comparison in which one operand
+    // does not exist is not a comparison. Stated as its own case because it is the arm a
+    // reader is most likely to "simplify" into "greatest index wins, treat missing as 0" —
+    // which would answer "indexed" here and silently change the jump target.
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "indexed", phase_index: 9, config: { phase_type: "llm_emit" } },
+          { slug: "unindexed", config: { phase_type: "llm_emit" } },
+        ],
+      }),
+    ).toBe("unindexed")
+  })
+
+  it("ONE llm_emit among several non-emit phases → the emit phase's slug", () => {
+    // Proves the filter FILTERS, rather than blindly taking position 0 or the last element.
+    // The emit sits in the MIDDLE, so both naive answers are wrong here.
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "calc", phase_index: 0, config: { phase_type: "programmatic" } },
+          { slug: "emit", phase_index: 1, config: { phase_type: "llm_emit" } },
+          { slug: "review", phase_index: 2, config: { phase_type: "llm_single" } },
+          { slug: "handoff", phase_index: 3, config: { phase_type: "external_action" } },
+        ],
+      }),
+    ).toBe("emit")
+  })
+
+  it("NO emit phase → null", () => {
+    expect(terminalEmitSlug(chatOnlyDef)).toBeNull()
+  })
+
+  it("a null / undefined definition → null, never throws", () => {
+    expect(() => terminalEmitSlug(null)).not.toThrow()
+    expect(() => terminalEmitSlug(undefined)).not.toThrow()
+    expect(terminalEmitSlug(null)).toBeNull()
+    expect(terminalEmitSlug(undefined)).toBeNull()
+  })
+
+  it("`phases` is not an array — the wire did not say → null", () => {
+    expect(terminalEmitSlug({})).toBeNull()
+    expect(terminalEmitSlug({ phases: null })).toBeNull()
+    expect(terminalEmitSlug({ phases: "nope" as never })).toBeNull()
+    expect(terminalEmitSlug({ phases: [] })).toBeNull()
+    // ⚠ The DOMINANT live shape — `definition` is a jsonb STRING SCALAR on 194 of 223
+    // rows and `libraryFilter`'s `defOf` casts it through UNPARSED (WR-07). It answers
+    // correctly only because arm (1) catches it: a string is truthy, `("…").phases` is
+    // `undefined`, `Array.isArray` is false. Pinned here so a future "tidy" of arm (1)
+    // cannot move the majority live shape into a different arm with this suite green.
+    expect(
+      terminalEmitSlug(
+        '{"phases":[{"slug":"emit","config":{"phase_type":"llm_emit"}}]}' as unknown as DefShape,
+      ),
+    ).toBeNull()
+  })
+
+  it("an emit phase whose slug is absent, non-string or empty is NOT a candidate → null", () => {
+    // T-197-13. The value's only purpose is to be handed to `jumpToStep`; a slug that
+    // selects nothing is strictly worse than an honest `null`, because a dead jump target
+    // looks like a working control that silently does nothing.
+    expect(terminalEmitSlug({ phases: [{ phase_index: 0, config: { phase_type: "llm_emit" } }] })).toBeNull()
+    expect(
+      terminalEmitSlug({
+        phases: [{ slug: 42 as never, phase_index: 0, config: { phase_type: "llm_emit" } }],
+      }),
+    ).toBeNull()
+    expect(
+      terminalEmitSlug({ phases: [{ slug: "   ", phase_index: 0, config: { phase_type: "llm_emit" } }] }),
+    ).toBeNull()
+    // …and an unusable slug does not disqualify a USABLE sibling.
+    expect(
+      terminalEmitSlug({
+        phases: [
+          { slug: "real", phase_index: 0, config: { phase_type: "llm_emit" } },
+          { slug: "", phase_index: 9, config: { phase_type: "llm_emit" } },
+        ],
+      }),
+    ).toBe("real")
+  })
+
+  it("a phase list declaring no `config` at all → null (the same silence WR-05 names)", () => {
+    expect(terminalEmitSlug({ phases: [{ slug: "a", phase_index: 0 }] })).toBeNull()
+    expect(terminalEmitSlug({ phases: [{ slug: "a", phase_index: 0, config: {} }] })).toBeNull()
+  })
+
+  it("answers a DIFFERENT question from soulDeliverable — they disagree on a real shape", () => {
+    // The non-duplication proof, mirroring the templateAdmission precedent above. This
+    // definition DOES make a file, so `soulDeliverable` is correct to say `file`; there is
+    // no step this card could point at, so `terminalEmitSlug` is correct to say `null`.
+    // If the two agreed on every shape, the new export would be a second answer to one
+    // question — the drift `soulData.ts:236-240` forbids by name.
+    const unusableSlugDef: DefShape = {
+      name: "Weekly status report",
+      phases: [{ slug: "  ", phase_index: 0, config: { phase_type: "llm_emit" } }],
+    }
+    expect(soulDeliverable(unusableSlugDef).kind).toBe("file")
+    expect(terminalEmitSlug(unusableSlugDef)).toBeNull()
+  })
+
+  it("is NAME-INDEPENDENT while soulDeliverable's label is not — the row-4/row-5 coupling, made checkable", () => {
+    // ⚠ The coupling a plan treating rows 4 and 5 as independent would rediscover the hard
+    // way: `soulDeliverable`'s label interpolates the workflow NAME, so editing the name row
+    // changes the deliverable row's LABEL. The jump TARGET must not move with it — that is
+    // why the card reads the two separately, and why this derivation never touches
+    // `def.name`.
+    const renamed: DefShape = { ...twoEmitsAscending, name: "Contoso QBR" }
+
+    expect(terminalEmitSlug(renamed)).toBe(terminalEmitSlug(twoEmitsAscending))
+    expect(terminalEmitSlug(renamed)).toBe("final")
+
+    const before = soulDeliverable(twoEmitsAscending)
+    const after = soulDeliverable(renamed)
+    expect(before.kind).toBe("file")
+    expect(after.kind).toBe("file")
+    if (before.kind === "file" && after.kind === "file") {
+      // Non-vacuity: the label genuinely MOVED, so the equality above is a real invariance
+      // claim and not two reads of something that never changes.
+      expect(after.label).not.toBe(before.label)
+    }
   })
 })
 
