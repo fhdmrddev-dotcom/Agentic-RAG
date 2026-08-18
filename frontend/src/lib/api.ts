@@ -1399,6 +1399,43 @@ export interface PublishedWorkflow {
    * add a second field to "fix" it.
    */
   updated_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-07 / D-08) — WHEN THIS ROW LAST RAN, ISO-8601 as the server
+   * rendered it. Joined from `workflow_runs` by a `LEFT JOIN LATERAL … LIMIT 1` that is
+   * OWNER-SCOPED (`r.user_id = $1`), so it answers *"did MY last run of this work?"* and
+   * never reports another caller's activity on a world-readable global row.
+   *
+   * ⚠ THIS IS NOT `updated_at`, AND THE TWO VISIBLY DISAGREE ON REAL DATA. `updated_at` on a
+   * published row is the PUBLISH time (see the ⚠ D-17 paragraph directly above); this is the
+   * last time anybody pressed Run. Measured on the live feed 2026-08-19, the first populated
+   * published row's run is two days LATER than its publish. Do not read one for the other.
+   *
+   * ⚠ THREE STATES, NOT TWO — the whole point of D-08. `undefined` means THE WIRE DID NOT SAY
+   * (a frontend deployed ahead of its backend: the key is simply absent from the payload).
+   * `null` means the backend looked and there is NO RUN. They are different facts and the
+   * client must not collapse them: the honest rendering of `null` is an explicit *never run*,
+   * and the honest rendering of `undefined` is an explicit *unknown* — never a fabricated
+   * time, never `new Date()`, never a blank, and never a green tick. This is the same rule
+   * `updated_at` states one field up, with one extra arm because absence here has two causes.
+   */
+  last_run_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-08) — the RAW status of the run `last_run_at` describes, exactly
+   * as `workflow_runs.status` spells it. The backend deliberately ships no business word: the
+   * library card owns the vocabulary (`library/runFacts.ts`), and a status word chosen here
+   * would be a second copy of it living on the wire.
+   *
+   * ⚠ THE COLUMN'S DOMAIN IS SIX VALUES AND IT CAN GROW WITHOUT THIS TYPE CHANGING —
+   * `active` · `paused` · `cap_paused` · `completed` · `failed` · `cancelled`
+   * (`supabase/migrations/057_workflow_runs.sql:19`, widened by `063_dual_mode_continue.sql`).
+   * It is therefore typed `string`, not a union: a union would make a new terminal state a
+   * COMPILE error in a client that is merely reading, while the real requirement is that the
+   * client keep working and say so. Any consumer mapping this to words needs a TOTAL default
+   * arm, and that arm must never be success.
+   *
+   * `undefined` / `null` carry the same two meanings as on `last_run_at` above.
+   */
+  last_run_status?: string | null
 }
 
 /** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
@@ -3405,6 +3442,22 @@ export interface WorkflowDraftRow {
    * `undefined` is "the wire did not say", rendered as no `changed` segment.
    */
   updated_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-07 / D-08) — when this DRAFT last ran, and what that run did.
+   * The mirror of the two fields on `PublishedWorkflow`; read their docblocks for the
+   * three-state rule, which is identical here and is the load-bearing part.
+   *
+   * ⚠ A DRAFT'S RUN IS ITS GOLDEN RUN, AND COUNTING IT IS DELIBERATE. A draft cannot be Run
+   * from the library — publish IS the test — so the only runs a draft has are the ones the
+   * publish gauntlet made. *"Your test run failed"* is exactly the answer LIB-06 asks for on
+   * a shelf that is 69% drafts, so the join does not exclude them.
+   *
+   * ⚠ AND NEITHER OF THESE IS `token`. See the ⚠ paragraph on that field above: it is opaque
+   * by contract and parsing it as a date breaks every later save. These two are display
+   * fields off a different table entirely.
+   */
+  last_run_at?: string | null
+  last_run_status?: string | null
 }
 
 /**
