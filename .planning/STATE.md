@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T16:10:00.000Z"
-last_activity: 2026-08-18
+last_updated: "2026-08-19T01:30:00.000Z"
+last_activity: 2026-08-19
 progress:
   total_phases: 19
   completed_phases: 9
@@ -34,6 +34,32 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Current focus:** Phase 197 — guided-authoring
 
 ## Current Position
+
+Phase: **192.2 (does-this-one-work) — PLANNED 2026-08-19, 6 plans / 5 waves, not yet executed**
+Next action: `/gsd:execute-phase 192.2` — ⚠ **Wave 2 plan `192.2-03` is `autonomous: false`**
+(its tests touch the local Postgres; CLAUDE.md rule 4 forbids running it concurrently with another
+DB-touching plan). Wave 2's other plan, `192.2-02`, is the G-5 discharge and may run in parallel.
+
+**Inserted from sketch 179**, which is the first sketch in this project to RENDER the shipped
+component rather than redraw it — and rendering it **overturned the phase's own premise**: the
+library card is not information-poor, it is nine rows deep, and it ALREADY answers LIB-05 on screen
+(`3 share this name · changed 2 days ago`). So 192.2 is **subtraction plus one field**, not a
+redesign. Winner: **variant C**, which ⚠ **partially refutes sketches 177/178** — it KEEPS the name
+as the lead and moves only the encoding.
+
+Measured against the live DB 2026-08-19: `business_requirement` **16/117 (14%)** and non-empty
+`phases` **28/117 (24%)** cannot carry the differentiator; **last run + outcome is on 32 of 36
+published rows (89%)**, and `workflow_runs` already holds **228 rows**. The backend half is a
+`LEFT JOIN LATERAL` — **no migration**.
+
+⚠ **G-5 on `WorkflowCard.tsx` is discharged in Wave 2, BEFORE the feature** (192.1's D-01 ordering).
+⚠ **A dev-only surface is live in source** — `/sketch-card` in `main.tsx` + `src/dev/SketchLibraryCard.tsx`
+— and Wave 5 (`192.2-06`) tears it down. It renders fixture data with no auth gate.
+
+---
+
+**Previously: Phase 197 (guided-authoring) — EXECUTED 11/11, NOT COMPLETE** (unchanged; its 9 owed
+UAT rows are still owed)
 
 Phase: 197 (guided-authoring) — **EXECUTED 11/11, NOT COMPLETE**
 Plan: 11 of 11 — every wave merged
