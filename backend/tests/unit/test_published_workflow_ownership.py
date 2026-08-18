@@ -81,7 +81,10 @@ def _patch_feeds(monkeypatch, *, published: list[dict], starters: list[dict]) ->
     async def _fake_published(pool, **kwargs):
         return list(published)
 
-    async def _fake_starters(pool):
+    # ⚠ ``**kwargs`` since Phase 192.2 (LIB-06 / D-07): ``/starters`` now hands the db layer
+    # the caller id its owner-scoped run-facts lateral binds as ``$1``. Matching
+    # ``_fake_published`` directly above, which has always been tolerant for the same reason.
+    async def _fake_starters(pool, **kwargs):
         return list(starters)
 
     monkeypatch.setattr(wf, "get_pg_pool", _fake_pool)
@@ -187,6 +190,18 @@ def test_published_workflow_field_set_excludes_created_by():
     this model must be argued for in a diff a reviewer reads, which is exactly the control
     the mig-116 / CR-01 shape needs. ``updated_at`` passes the model's own BINDING RULE for
     the rule's stated reason: it describes the ROW, never a person.
+
+    ⚠ Phase 192.2 (LIB-06 / D-07): the set GREW BY TWO — ``last_run_at`` + ``last_run_status``
+    — and the argument is made HERE rather than left to the diff, because that is what this
+    fence exists to force. Both describe the ROW; neither can ever carry an identifier. The
+    ONE thing that needed real thought is the join behind them: they are sourced from
+    ``workflow_runs``, a table that DOES carry ``user_id`` and ``org_id``, and the feeds run
+    on a service-role pool that bypasses RLS. **The lateral is therefore owner-scoped
+    (``r.user_id = $1``), so on a world-readable ``is_system_global`` row a caller sees THEIR
+    run of it and never another tenant's** — driven live against a real global row carrying 20
+    real runs by ``test_library_run_facts.test_another_users_runs_are_NOT_inherited_on_a_
+    world_readable_row``. No raw ``user_id`` is projected onto this model, so the sibling
+    disclosure fence below still holds by construction.
     """
     from app.api.workflows import PublishedWorkflow
 
@@ -198,6 +213,8 @@ def test_published_workflow_field_set_excludes_created_by():
         "is_mine",
         "is_system_global",
         "updated_at",
+        "last_run_at",
+        "last_run_status",
     }
     assert "created_by" not in PublishedWorkflow.model_fields
 

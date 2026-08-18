@@ -193,7 +193,39 @@ class PublishedWorkflow(BaseModel):
     ⚠ D-17 — ON A PUBLISHED ROW THIS IS THE PUBLISH TIME, AND THAT IS HONEST, NOT A BUG.
     ``workflow_definitions_block_published`` (``full-schema.sql:3764``) makes a published row
     immutable, so its ``updated_at`` is frozen at the publish flip — which IS the last time
-    it changed. Do NOT add a second field to "fix" this."""
+    it changed. Do NOT add a second field to "fix" this.
+
+    Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are ADDITIVE and
+    DEFAULTED on that same precedent — a frontend deployed AHEAD of this backend reads
+    ``undefined`` and renders *unknown*, which degrades rather than crashing or, worse,
+    fabricating. They answer LIB-06's question — *does this one work* — from ``workflow_runs``
+    rows that already exist (228 of them; **no migration, no new column, no new write**).
+
+    ⚠ THESE ARE **NOT** ``updated_at``, AND THE PARAGRAPH DIRECTLY ABOVE IS WHY THAT MATTERS.
+    On a published row ``updated_at`` is the PUBLISH time, deliberately. ``last_run_at`` is a
+    RUN's own ``created_at``, from a different table. A surface that showed one as the other
+    would be lying about the exact fact this field exists to tell the truth about. D-08's
+    three arms follow from the pair being independent: a real time + a real status is *it
+    worked / it failed*; BOTH ``null`` is *never run*; the keys ABSENT is *this backend cannot
+    say*. None of the three may render blank, a fabricated time, or a green tick.
+
+    ⚠ ``last_run_status`` IS A PLAIN NULLABLE ``str``, NEVER AN ENUM, AND THAT IS BINDING.
+    ``workflow_runs.status`` is written by the run lifecycle (six values today under the
+    table's CHECK); a seventh terminal state added by a later phase must flow through
+    verbatim, because a validation error here would 500 the LIBRARY — a read path the Phase
+    148 RUN CARVE-OUT deliberately leaves ungated for every user.
+
+    ⚠ ``last_run_at`` IS TYPED ``str`` FOR THE REASON ``updated_at`` IS, four paragraphs up:
+    a ``datetime``-typed field re-serializes through Pydantic and DROPS the fractional part
+    when microseconds are 0, so the wire string's width would vary with the clock. The plan
+    for this phase wrote ``datetime | None`` in one sentence and *"matching the ``updated_at``
+    precedent exactly"* in the next; the precedent wins, because it is the one backed by a
+    measurement.
+
+    THEY PASS THIS MODEL'S BINDING RULE FOR THE RULE'S OWN STATED REASON — they "describe the
+    ROW, never a person". ⚠ And the join behind them is OWNER-SCOPED (``r.user_id = $1``), so
+    on a world-readable ``is_system_global`` row a caller sees THEIR run of it and never
+    another tenant's; the raw ``user_id`` is never projected onto this model at all."""
 
     id: UUID
     slug: str
@@ -202,6 +234,8 @@ class PublishedWorkflow(BaseModel):
     is_mine: bool = False
     is_system_global: bool = False
     updated_at: str | None = None
+    last_run_at: str | None = None
+    last_run_status: str | None = None
 
 
 def _caller_uuid(current_user: dict) -> UUID | None:
@@ -296,7 +330,19 @@ class DraftRow(BaseModel):
     ``token`` is OPAQUE BY CONTRACT and parsing it is forbidden: Postgres keeps microseconds,
     a JS ``Date`` keeps milliseconds, and a parsed-and-re-rendered token matches ZERO rows —
     every later save then refuses as stale (probed live 2026-08-01). One field the server
-    compares byte-for-byte; one the client may format. Never collapse them."""
+    compares byte-for-byte; one the client may format. Never collapse them.
+
+    Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are ADDITIVE and
+    DEFAULTED, mirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE
+    language across its three shelves. See that model's docblock for the binding typing rules
+    (``str`` never ``datetime``; a plain nullable ``str`` never an enum) and for D-08's three
+    arms — they apply here verbatim.
+
+    ⚠ THERE ARE NOW **THREE** TIME-SHAPED FIELDS ON THIS ROW AND THEY ARE THREE DIFFERENT
+    FACTS. ``token`` is ``to_char(updated_at …)`` — opaque, never parsed. ``updated_at`` is
+    when the DRAFT was last edited. ``last_run_at`` is when it was last RUN, from
+    ``workflow_runs``, and a draft genuinely can have runs — the publish gauntlet's golden run
+    is one. Collapsing any pair of these is a lie in a different direction each time."""
 
     id: UUID
     slug: str
@@ -305,6 +351,8 @@ class DraftRow(BaseModel):
     definition: dict | None = None
     token: str
     updated_at: str | None = None
+    last_run_at: str | None = None
+    last_run_status: str | None = None
 
 
 # Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT gate /published or /starters. They are the Run
@@ -370,6 +418,19 @@ async def get_published_workflows(
     # immutable, so its ``updated_at`` is frozen at the publish flip. "changed <rel>" on a
     # published card therefore means "when it was published" — which IS when it last changed.
     # Do NOT add a second field to "fix" this.
+    #
+    # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are serialized here
+    # too, projected by the widened SELECT's ``LEFT JOIN LATERAL``. ⚠ THIS ROUTE DECLARES
+    # ``response_model=list[PublishedWorkflow]``, WHICH DROPS UNDECLARED KEYS **SILENTLY** —
+    # so a db layer that returns the columns and a model that does not declare them is a green
+    # backend test with an unchanged UI (T-192.2-11). Both halves ship together or neither
+    # does. Read with ``r.get(...)`` for the reason recorded two paragraphs up, and the time
+    # goes through the SAME ``_iso_or_none`` all three feeds share.
+    #
+    # ⚠ ``last_run_status`` IS PASSED THROUGH RAW, NOT NORMALISED, MAPPED OR TITLE-CASED.
+    # Whatever the run lifecycle wrote is what the library says; the words the card shows are
+    # the frontend's business, and a translation table here would be a second place for the
+    # vocabulary to drift.
     return [
         PublishedWorkflow(
             id=r["id"],
@@ -379,6 +440,8 @@ async def get_published_workflows(
             is_mine=(caller is not None and r.get("created_by") == caller),
             is_system_global=bool(r.get("is_system_global")),
             updated_at=_iso_or_none(r.get("updated_at")),
+            last_run_at=_iso_or_none(r.get("last_run_at")),
+            last_run_status=r.get("last_run_status"),
         )
         for r in rows
     ]
@@ -402,18 +465,34 @@ async def get_starter_workflows(
     route (the ``/drafts`` precedent) so a future path param can never shadow it.
     """
     pool = await get_pg_pool()
-    rows = await list_starter_workflows(pool)
+    # Phase 192.2 (LIB-06 / D-07): the caller id is resolved BEFORE the fetch and handed to
+    # the db layer, because the run-facts lateral is OWNER-SCOPED and binds it as ``$1``.
+    # ⚠ IT SCOPES THE RUN FACTS, NEVER THE SHELF: these rows are curated world-readable
+    # globals and every caller still gets exactly the same three of them. What the id decides
+    # is WHOSE ``last_run_at`` appears on a row everybody can see — without it, one user's run
+    # of a starter would be reported to every other user as though it were theirs. A caller
+    # whose id will not parse yields ``None`` here, which the lateral treats as matching
+    # nothing: the shelf renders "never run", never somebody else's run.
+    caller = _caller_uuid(current_user)
+    rows = await list_starter_workflows(pool, user_id=caller)
     # Phase 192 (D-04): ``is_mine`` is computed IDENTICALLY to /published, NOT hard-coded
     # ``False``. Under today's seeding it is always False here (mig 094 seeds ``created_by``
     # as the system user 00000000-0000-0000-0000-000000000001), but hard-coding would ship
     # that as an UNSTATED invariant — a later seeding change would make the field lie in
     # silence. Same fence as /published: the raw ``created_by`` dies in this expression.
-    caller = _caller_uuid(current_user)
+    # ⚠ Phase 192.2: ``caller`` is now resolved ABOVE the fetch (the lateral binds it), so it
+    # is the SAME value both here and in the query — one coercion, two consumers.
+    #
     # Phase 192.1 (D-15): ``updated_at`` is serialized here TOO, through the SAME
     # ``_iso_or_none`` helper /published uses. This is RESEARCH's correction C-6 in force —
     # ``PublishedWorkflow`` is ONE model serving TWO feeds, so a field added for the Published
     # shelf and not mirrored here would leave every Starters card silently missing its
     # "changed <rel>" segment while the type said it had one.
+    #
+    # Phase 192.2 (LIB-06 / D-07): ``last_run_at`` + ``last_run_status`` are mirrored here for
+    # exactly that reason, and it is not hypothetical on this shelf — measured 2026-08-19 the
+    # live starters shelf is 3 rows and ONE of them has a real run, so omitting them here
+    # would blank a card that genuinely has an answer.
     return [
         PublishedWorkflow(
             id=r["id"],
@@ -423,6 +502,8 @@ async def get_starter_workflows(
             is_mine=(caller is not None and r.get("created_by") == caller),
             is_system_global=bool(r.get("is_system_global")),
             updated_at=_iso_or_none(r.get("updated_at")),
+            last_run_at=_iso_or_none(r.get("last_run_at")),
+            last_run_status=r.get("last_run_status"),
         )
         for r in rows
     ]
@@ -1218,6 +1299,14 @@ async def list_drafts(
             # is opaque by contract. See DraftRow's docblock for why collapsing them breaks
             # every subsequent save.
             updated_at=_iso_or_none(r.get("updated_at")),
+            # Phase 192.2 (LIB-06 / D-07): a THIRD time-shaped field, and a third distinct
+            # fact — when this draft was last RUN, from ``workflow_runs``, not when it was
+            # last edited. Drafts do get runs (the publish gauntlet's golden run), so this is
+            # a real answer on this shelf and not a placeholder. ⚠ ``response_model=
+            # list[DraftRow]`` drops undeclared keys silently, so the model above and this
+            # builder move together or the column never reaches the client.
+            last_run_at=_iso_or_none(r.get("last_run_at")),
+            last_run_status=r.get("last_run_status"),
         )
         for r in rows
     ]
