@@ -2165,3 +2165,41 @@ here at the operator's direction rather than re-opening discuss-phase.
 3. **Whether row 5 becomes answerable at all.** Larger than the other four; all three 173 variants
    give it a stated fact instead of a control.
 4. **Hover, focus rings, pixel spacing** — a human comparison at UAT, driven by looking.
+
+### ⚠ SKETCH 174 ADDED THE SAME DAY — and the operator's critique that caused it
+
+172 and 173 are **analysis pages**: tables, provenance contracts, measurement readouts, three
+stages per tab. The operator's response was that they *"included a lot of information"* and did
+not *"represent what the thing looks like"* — a request for **the user-friendly version, with the
+control that does not break the workflow.**
+
+That is a fair read and it is recorded rather than argued with. **A sketch whose job is to let
+someone judge a screen has failed if the screen is the smallest thing on the page.** 172/173 keep
+their job — they are where the reasoning is checkable — and **174 is the picture**: three tabs, one
+caption each, no tables, and a real 780 px screen.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 174 | the-line-that-opens | What does the decisions surface actually LOOK like — and which shape leaves the workflow visible? | *(open — the recommendation)* | phase-197, auth-02, decisions-surface, recommendation, user-facing-mockup, g2-sketch-gate |
+
+**The recommended shape:** the draft lands as it does today; under the receipt sits **one line** —
+*"I made 5 decisions for you"* — that opens on demand, and each row hands you to the control already
+on screen. Closed on arrival, so the D-05 fast door is untouched; owns no control, so nothing drifts;
+**and the workflow stays visible.**
+
+Measured on 174's own page, in a 780 px screen:
+
+| state | decisions element | graph gets |
+|---|---|---|
+| just landed (one line) | **41 px** | **363 px** |
+| opened | 237 px | 167 px |
+| a full always-open card | 276 px | **128 px** |
+
+⚠ **This is also the answer to 172's own measurement.** All three of 172's variants stack a ~370 px
+card above the graph, so **all three pay the 25 px-at-700 px cost** — the shape that does not is the
+one that is closed until asked. 174 is therefore not a fourth peer of A/B/C; it is **172-C plus
+collapsed-by-default**, and if 172-C wins, this is what it should be built as.
+
+Everything on 174 except the decisions line is the **real rendered DOM** — header, receipt, view
+toggle and the whole 5-step spine graph — so it looks like the product rather than like a drawing.
+14 assertions, 0 failing.
