@@ -406,19 +406,28 @@ describe("D-13 / D-14 — one sentence, as real DOM text, wired by aria-describe
     expect(document.getElementById(describedBy as string)?.textContent).toBe(FORK_CONSEQUENCE)
   })
 
-  it("the sentence names BOTH halves — what you get AND what stays true", () => {
+  it("the sentence names BOTH halves — what you get AND what stays true", async () => {
     // Naming only the first half reproduces the exact surprise LIB-03 exists to end, so a
     // shortened rewrite is a regression even though it would read fine.
-    renderCard(PUBLISHED)
+    const { card } = renderCard(PUBLISHED)
+    await openOverflow(card)
     const sentence = screen.getByTestId("fork-consequence").textContent ?? ""
     expect(sentence).toBe(FORK_CONSEQUENCE)
     expect(sentence).toMatch(/new private copy/i)
     expect(sentence).toMatch(/stays live and unchanged/i)
   })
 
-  it("the sentence is visible WITHOUT opening the menu (it is not menu chrome)", () => {
-    renderCard(PUBLISHED)
-    expect(screen.getByTestId("fork-consequence")).toBeInTheDocument()
+  it("the sentence is NOT resting chrome — it arrives WITH the verb it describes (192.2-05)", async () => {
+    // ⚠ THIS CASE'S CLAIM IS INVERTED, NOT RELAXED, AND THE INVERSION IS THE DECISION.
+    // It read *"the sentence is visible WITHOUT opening the menu (it is not menu chrome)"* —
+    // true of 192, and reversed by 192.2's D-03: a two-line paragraph on every runnable row is
+    // most of what made the resting card nine information rows deep. It is CUT FROM THE
+    // RESTING CARD AND RELOCATED, never deleted (T-21) — so both halves are asserted here, and
+    // an implementation that simply dropped it fails the second half.
+    const { card } = renderCard(PUBLISHED)
+    expect(screen.queryByTestId("fork-consequence")).toBeNull()
+    await openOverflow(card)
+    expect(screen.getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
   })
 
   it("no control on the card carries a hover-only tooltip of that sentence", async () => {
@@ -459,8 +468,12 @@ describe("D-13 / D-14 — one sentence, as real DOM text, wired by aria-describe
  * were GREEN before the change and are regression pins, not new claims.
  */
 describe("192-13 — the consequence sentence is chosen by the row's real state", () => {
-  it("a published row the user has ALREADY forked says so, before the click", () => {
-    renderCard(PUBLISHED, { hasExistingFork: true })
+  it("a published row the user has ALREADY forked says so, before the click", async () => {
+    // ⚠ 192.2-05: *before the click* now means *in the menu, above the verb* — D-03 cut the
+    // sentence from the resting card, so it is read where the person is when it matters. The
+    // claim is unchanged: the row states the true consequence BEFORE the fork is committed.
+    const { card } = renderCard(PUBLISHED, { hasExistingFork: true })
+    await openOverflow(card)
     expect(screen.getByTestId("fork-consequence").textContent).toBe(FORK_CONSEQUENCE_EXISTING)
   })
 
@@ -477,15 +490,17 @@ describe("192-13 — the consequence sentence is chosen by the row's real state"
     expect(sentence?.textContent).toBe(FORK_CONSEQUENCE_EXISTING)
   })
 
-  it("with the prop ABSENT the shipped sentence is byte-identical — the default did not drift", () => {
+  it("with the prop ABSENT the shipped sentence is byte-identical — the default did not drift", async () => {
     // The regression pin. Every ordinary row must read exactly as it shipped; a state-aware
     // sentence that quietly became state-aware for EVERYONE is the same defect in a new coat.
-    renderCard(PUBLISHED)
+    const { card } = renderCard(PUBLISHED)
+    await openOverflow(card)
     expect(screen.getByTestId("fork-consequence").textContent).toBe(FORK_CONSEQUENCE)
   })
 
-  it("the new sentence arrives as ONE node of real text, and not as a tooltip", () => {
-    renderCard(PUBLISHED, { hasExistingFork: true })
+  it("the new sentence arrives as ONE node of real text, and not as a tooltip", async () => {
+    const { card } = renderCard(PUBLISHED, { hasExistingFork: true })
+    await openOverflow(card)
     // Still exactly one sentence on the card — the surface spends it once (D-13), and U5-b
     // (card density) is explicitly out of this round: no atom is added.
     expect(screen.queryAllByTestId("fork-consequence")).toHaveLength(1)
@@ -598,22 +613,36 @@ describe("D-18 — the draft delete arms first, then calls the single-draft endp
   })
 })
 
-// ── 7 · THE SOUL IS CONSUMED UNCHANGED (LIB-02) ──────────────────────────────────────
+// ── 7 · THE SOUL HAS LEFT THE RESTING CARD (192.2-05 / D-03) ─────────────────────────
 
-describe("LIB-02 — every row renders the shared soul, all five atoms", () => {
+/**
+ * ⚠ THIS BLOCK READ *"LIB-02 — every row renders the shared soul, all five atoms"* AND IT IS
+ * INVERTED RATHER THAN DELETED. That was true of 192 and D-03 reverses it: rendering the real
+ * component measured the shipped card at NINE information rows deep, and the operator picked
+ * sketch 179 variant C, which cuts five of them. **The subtraction IS the feature** — a wave
+ * that added the gutter and kept these rows delivered the opposite of what was approved (T-18).
+ *
+ * ⚠ `WorkflowSoul` ITSELF IS UNTOUCHED. It is CONSUMED, not owned, and still renders at
+ * `scale="run"` and `scale="pub"` on two surfaces outside this phase. What left is the CARD'S
+ * MOUNT of it, which is why the assertion below is about this card and names no component.
+ */
+describe("D-03 — no row renders the card-scale soul, and none of its five atoms", () => {
   it.each<[Provenance, LibraryRow]>([
     ["published", PUBLISHED],
     ["starter", STARTER],
     ["draft", DRAFT],
-  ])("a %s row shows purpose, needs, spine, tier and produces", (_p, row) => {
+  ])("a %s row shows no purpose, needs, spine, tier or produces", (_p, row) => {
     const { card } = renderCard(row)
-    const soul = within(card).getByTestId("workflow-soul")
-    expect(soul).toHaveAttribute("data-scale", "card")
+    expect(within(card).queryByTestId("workflow-soul")).toBeNull()
     for (const atom of ["soul-purpose", "soul-needs", "soul-spine", "soul-tier", "soul-output"]) {
-      expect(within(soul).getByTestId(atom)).toBeInTheDocument()
+      expect(within(card).queryByTestId(atom)).toBeNull()
     }
-    // The hero really carries the authored sentence, not an empty state.
-    expect(within(soul).getByTestId("soul-purpose").textContent).toBe(DEF.business_requirement)
+    // ⚠ BY TEXT AS WELL AS BY ID. The authored purpose sentence is what the hero carried; a
+    // node that survived under a different id would still red here.
+    expect(card).not.toHaveTextContent(DEF.business_requirement as string)
+    // POSITIVE CONTROL — the card really rendered, so the five nulls are absences rather than
+    // a query pointed at nothing. D-01's line 2 is what stands in their place.
+    expect(within(card).getByTestId("row-answer")).toBeInTheDocument()
   })
 })
 
@@ -630,8 +659,19 @@ describe("LIB-02 — every row renders the shared soul, all five atoms", () => {
  *
  * ⚠ THE COLUMN IS REACHED THROUGH THE LINE'S OWN `parentElement`, deliberately. Querying it
  * by `.min-w-0` would smuggle the class-name assertion back in through the selector.
+ *
+ * ⚠ **192.2-05 — THE INDEX MOVED BY ONE, DELIBERATELY, AND THIS IS WHY CHILD ORDER WAS THE
+ * RIGHT THING TO ASSERT.** D-01 numbers the card's slots and puts the run truth on LINE 2, so
+ * `row-answer` now sits at index 1 and the identity line at index **2**. Sketch 179-C is SILENT
+ * on the relative order — it rendered no identity line at all — so what governs is D-01, and
+ * burying the answer to *"does this one work?"* beneath a five-part identity line would make
+ * LIB-06's whole point the card's fourth line. D-08's sentence is amended with it: the line now
+ * sits *immediately after LINE 2 and BEFORE the folder chip*, still inside the `min-w-0` column,
+ * still exactly one per card. Every index below is updated in the same wave the source moved,
+ * and NOT ONE of these cases was deleted — a move that is visible is the whole return on having
+ * asserted the position at all.
  */
-describe("D-08 / D-11 — one identity line per card, at DOM position 2", () => {
+describe("D-08 / D-11 — one identity line per card, at DOM position 3", () => {
   it.each<[Provenance, LibraryRow]>([
     ["published", PUBLISHED],
     ["starter", STARTER],
@@ -645,7 +685,7 @@ describe("D-08 / D-11 — one identity line per card, at DOM position 2", () => 
     ["published", PUBLISHED],
     ["starter", STARTER],
     ["draft", DRAFT],
-  ])("on a %s row the line is child index 1 — after the name row, before the folder chip", (_p, row) => {
+  ])("on a %s row the line is child index 2 — after LINE 2, before the folder chip", (_p, row) => {
     const { card } = renderCard(row, { folderName: "Risk & Compliance" })
     // The length check first, so the RED for an absent line is an AssertionError rather than
     // a `getBy*` throw — an uninformative failure is a failure that teaches nothing.
@@ -654,24 +694,27 @@ describe("D-08 / D-11 — one identity line per card, at DOM position 2", () => 
     const column = line.parentElement as HTMLElement
     expect(column).not.toBeNull()
 
-    expect(column.children).toHaveLength(3)
+    expect(column.children).toHaveLength(4)
     // 0 — the name/version row, which really carries the name (so index 0 is not an accident)
     expect(column.children[0].textContent).toContain(row.name)
-    // 1 — D-08's position
-    expect(column.children[1]).toBe(line)
-    // 2 — the folder chip, still BELOW the line
-    expect(column.children[2].textContent).toContain("Risk & Compliance")
+    // 1 — D-01's line 2, asserted as the SAME NODE the answer testid resolves to, so this
+    //     index cannot be satisfied by any node that merely happens to sit there.
+    expect(column.children[1]).toBe(within(card).getByTestId("row-answer"))
+    // 2 — D-08's position, one lower than it was and still above the chip
+    expect(column.children[2]).toBe(line)
+    // 3 — the folder chip, still BELOW the line
+    expect(column.children[3].textContent).toContain("Risk & Compliance")
   })
 
-  it("with no folder chip the line is STILL child index 1, and is the column's last child", () => {
+  it("with no folder chip the line is STILL child index 2, and is the column's last child", () => {
     // The chip is conditional (`folderName && …`). Without this case, "before the folder chip"
     // would be untested on the majority of the operator's rows — measured in the fixture,
     // most rows carry no project at all.
     const { card } = renderCard(PUBLISHED, { folderName: null })
     const line = within(card).getByTestId("row-identity")
     const column = line.parentElement as HTMLElement
-    expect(column.children).toHaveLength(2)
-    expect(column.children[1]).toBe(line)
+    expect(column.children).toHaveLength(3)
+    expect(column.children[2]).toBe(line)
   })
 })
 
@@ -895,20 +938,23 @@ describe("AUTH-03 — the template mark, and the silence on either side of it", 
   })
 
   it("the mark does not disturb the provenance node's DOM position (D-08)", () => {
-    // 192.1 asserts the identity line at child index 1 BY CHILD ORDER, and the point of
-    // asserting by child order was that it does not move. Driven here on an ADMITTING row,
-    // because the shipped `it.each` above would still pass on a card that rendered the mark
-    // outside the line entirely.
+    // 192.1 asserts the identity line's position BY CHILD ORDER, and the point of asserting by
+    // child order is that a move is VISIBLE — 192.2-05's D-01 line 2 moved it from index 1 to
+    // index 2, and this case moved with it in the same wave. What is still asserted, and is
+    // what this case is actually about, is that the AUTH-03 mark changes NOTHING about it.
+    // Driven on an ADMITTING row, because the shipped `it.each` above would still pass on a
+    // card that rendered the mark outside the line entirely.
     expect(templateAdmission(PUBLISHED.def)).toBe("admits")
     const { card } = renderCard(PUBLISHED, { folderName: "Risk & Compliance" })
     // Length first, so an absent line reds as an AssertionError rather than a `getBy*` throw.
     expect(within(card).queryAllByTestId("row-identity")).toHaveLength(1)
     const line = within(card).getByTestId("row-identity")
     const column = line.parentElement as HTMLElement
-    expect(column.children).toHaveLength(3)
+    expect(column.children).toHaveLength(4)
     expect(column.children[0].textContent).toContain(PUBLISHED.name)
-    expect(column.children[1]).toBe(line)
-    expect(column.children[2].textContent).toContain("Risk & Compliance")
+    expect(column.children[1]).toBe(within(card).getByTestId("row-answer"))
+    expect(column.children[2]).toBe(line)
+    expect(column.children[3].textContent).toContain("Risk & Compliance")
     // …and the mark really is inside the line rather than beside it.
     expect(identityParts(line)).toContain(CARD_TEMPLATE_MARK)
   })
@@ -977,11 +1023,14 @@ describe("D-10 — a DRAFT gains lineage for the first time, and gains no senten
     expect(screen.queryByTestId("fork-consequence")).toBeNull()
   })
 
-  it("POSITIVE CONTROL — both selectors resolve on a PUBLISHED row", () => {
+  it("POSITIVE CONTROL — both selectors resolve on a PUBLISHED row", async () => {
     // The absence above is about the DRAFT, not about either query: on a runnable row the
-    // same two selectors find the same two shapes.
+    // same two selectors find the same two shapes. ⚠ 192.2-05 — the sentence's shape is now
+    // *in the menu*, so the control opens it; a control that stopped looking where the thing
+    // lives would stop controlling for anything.
     const { card } = renderCard(PUBLISHED)
     expect(within(card).queryAllByTestId("row-identity")).toHaveLength(1)
+    await openOverflow(card)
     expect(screen.getByTestId("fork-consequence")).toBeInTheDocument()
   })
 })
@@ -1026,11 +1075,16 @@ describe("D-14 — the card's own chrome paints no hover-only explanation", () =
   /** The attribute, assembled so this file does not itself answer a raw grep of the rule. */
   const TOOLTIP_SELECTOR = `[${["tit", "le"].join("")}]`
 
-  /** The card minus the soul it consumes unchanged — i.e. the markup this phase owns. */
-  const ownChromeTooltips = (card: HTMLElement): Element[] => {
-    const soul = within(card).getByTestId("workflow-soul")
-    return Array.from(card.querySelectorAll(TOOLTIP_SELECTOR)).filter((node) => !soul.contains(node))
-  }
+  /**
+   * The card's own chrome — which, since 192.2-05, is the WHOLE card.
+   *
+   * ⚠ THE EXCLUSION IS DISSOLVED, NOT WIDENED. It read *"the card minus the soul it consumes
+   * unchanged"* and filtered out three tooltip-bearing nodes the soul inherited from elsewhere.
+   * D-03 cut the card's soul mount, so there is nothing left to carve around and the honest
+   * shape is no filter at all — which makes this fence STRICTER than it was, never looser.
+   */
+  const ownChromeTooltips = (card: HTMLElement): Element[] =>
+    Array.from(card.querySelectorAll(TOOLTIP_SELECTOR))
 
   it.each<[Provenance, LibraryRow]>([
     ["published", PUBLISHED],
@@ -1046,13 +1100,19 @@ describe("D-14 — the card's own chrome paints no hover-only explanation", () =
     expect(ownChromeTooltips(card)).toEqual([])
   })
 
-  it("NON-VACUITY — the exclusion really is carved around three INHERITED nodes, not around zero", () => {
-    // Without this, the filter above would keep passing if it silently excluded the whole
-    // card, and "the identity line paints no tooltip" would be a claim about a no-op.
+  it("NON-VACUITY — the three INHERITED tooltips left with the soul, and nothing replaced them", () => {
+    // ⚠ THIS CASE PINNED THE SIZE OF THE EXCLUSION (`3` inherited nodes, all inside the soul),
+    // and 192.2-05 removed the thing being excluded. It is re-pointed rather than deleted,
+    // because what it guards is unchanged: that the block above is a claim about a REAL card
+    // and not about a filter that quietly swallowed everything.
     const { card } = renderCard(PUBLISHED)
-    const soul = within(card).getByTestId("workflow-soul")
-    expect(card.querySelectorAll(TOOLTIP_SELECTOR)).toHaveLength(3)
-    expect(soul.querySelectorAll(TOOLTIP_SELECTOR)).toHaveLength(3)
+    // The soul — and with it the only three tooltip-bearing nodes on this card — is gone.
+    expect(within(card).queryByTestId("workflow-soul")).toBeNull()
+    expect(card.querySelectorAll(TOOLTIP_SELECTOR)).toHaveLength(0)
+    // …and the card genuinely rendered, so the zero above is an absence rather than an
+    // empty query. Both of D-01's net-new nodes are here.
+    expect(within(card).getByTestId("row-answer")).toBeInTheDocument()
+    expect(within(card).getByTestId("run-gutter")).toBeInTheDocument()
   })
 
   it("POSITIVE CONTROL — the same selector and the same filter DO find a planted one", () => {
@@ -1072,8 +1132,10 @@ describe("D-11 — every shipped testid survives the 14th atom, verbatim", () =>
     const { card } = renderCard(PUBLISHED)
     expect(card).toHaveAttribute("data-testid", "published-card")
     expect(within(card).getByTestId("published-run")).toBeInTheDocument()
-    expect(screen.getByTestId("fork-consequence")).toBeInTheDocument()
     await openOverflow(card)
+    // ⚠ 192.2-05 — the id SURVIVES, which is what this block is about; what changed is where
+    // it resolves. D-03 moved the sentence into the menu, so it is read after the open.
+    expect(screen.getByTestId("fork-consequence")).toBeInTheDocument()
     expect(screen.getByTestId("published-tweak")).toBeInTheDocument()
     expect(screen.getByTestId("published-delete")).toBeInTheDocument()
   })
@@ -1341,7 +1403,7 @@ describe("SC#3 — a user can tell which workflow changed most recently", () => 
 })
 
 describe("the shipped surface survives the 14th atom at scale", () => {
-  it("one identity line per card, at DOM position 2, on every one of them", () => {
+  it("one identity line per card, at DOM position 3, on every one of them", () => {
     renderLibrary()
     const cards = screen.getAllByTestId(/^(published|starter|draft)-card$/)
     expect(cards).toHaveLength(DERIVED.cards)
@@ -1349,21 +1411,29 @@ describe("the shipped surface survives the 14th atom at scale", () => {
     for (const card of cards) {
       const lines = within(card).getAllByTestId("row-identity")
       expect(lines).toHaveLength(1)
-      expect((lines[0].parentElement as HTMLElement).children[1]).toBe(lines[0])
+      // ⚠ index 2, not 1 — D-01's line 2 takes position 2 on every one of the 106 rows, not
+      // only on the four the unit cases drive. See the block-level ⚠ at D-08 / D-11.
+      expect((lines[0].parentElement as HTMLElement).children[2]).toBe(lines[0])
     }
   })
 
-  it("all five soul atoms survive, and the sentence is spent exactly once per runnable row", () => {
+  it("D-03's six atoms are gone from all 106 rows, and D-01's two are on all of them", () => {
+    // ⚠ INVERTED FROM *"all five soul atoms survive, and the sentence is spent exactly once per
+    // runnable row"*. **THE SUBTRACTION IS THE FEATURE (D-03 / T-18)** — and asserting it AT
+    // SCALE is what makes it a property of the card rather than of four fixture rows. A wave
+    // that cut the atoms on the unit fixtures and left them on the real page would pass every
+    // case above this one.
     renderLibrary()
-    expect(screen.getAllByTestId("workflow-soul")).toHaveLength(DERIVED.cards)
+    expect(screen.queryAllByTestId("workflow-soul")).toHaveLength(0)
     for (const atom of ["soul-purpose", "soul-needs", "soul-spine", "soul-tier", "soul-output"]) {
-      expect(screen.getAllByTestId(atom)).toHaveLength(DERIVED.cards)
+      expect(screen.queryAllByTestId(atom)).toHaveLength(0)
     }
-    const runnable = SCALE_ROWS.filter((row) => row.provenance !== "draft").length
-    const sentences = screen.getAllByTestId("fork-consequence")
-    expect(sentences).toHaveLength(runnable)
-    // …and every one of them is the SHIPPED sentence, imported rather than retyped (D-14).
-    for (const node of sentences) expect(node.textContent).toBe(FORK_CONSEQUENCE)
+    // The sixth left the RESTING card only — no row shows it until its menu is opened, which
+    // the unit block above drives on a single card.
+    expect(screen.queryAllByTestId("fork-consequence")).toHaveLength(0)
+    // …and the two D-01 added are on EVERY row, drafts included: the gutter and line 2.
+    expect(screen.getAllByTestId("run-gutter")).toHaveLength(DERIVED.cards)
+    expect(screen.getAllByTestId("row-answer")).toHaveLength(DERIVED.cards)
   })
 
   it("the owner word is one of exactly two, on every line — no owner display name (D-09)", () => {

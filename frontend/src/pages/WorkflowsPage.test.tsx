@@ -129,6 +129,10 @@ import { WorkflowsPage } from "./WorkflowsPage"
 // measurement below. Nothing on the library surface renders it today, and the test that says
 // so would be worthless without a demonstration that the selector it uses can find a real one.
 import { HighlightTitle } from "@/lib/threadGroups"
+// 192.2-05 (D-03) — the tier derivation, asked DIRECTLY now that the card no longer renders a
+// chip to read it off. The claim (WR-03: strictest emit wins, order-independent) is unchanged;
+// what moved is that it is now tested at the derivation rather than through one surface.
+import { tierForDefinition } from "@/components/workflows/soulData"
 // 192-14 (U5) — the two consequence sentences, read from their ONE home rather than re-typed.
 // A test that hardcodes the copy cannot notice the card drifting off it, and the whole point
 // of the sentence is that it agrees with what the verb actually does.
@@ -706,39 +710,59 @@ describe("WorkflowsPage — the create affordance and the draft-cannot-Run contr
   })
 })
 
-describe("WorkflowsPage — card renders the shared WorkflowSoul (WUX-01, D10, no extra fetch)", () => {
-  it("a published card renders a WorkflowSoul (the card-scale soul + its derived tier chip)", async () => {
+/**
+ * ⚠ **THIS BLOCK READ *"card renders the shared WorkflowSoul"* AND 192.2-05's D-03 REVERSES IT.**
+ * Rendering the real component (sketch 179 variant A) measured the shipped card at NINE
+ * information rows deep, and the operator picked variant C, which cuts five of them — the
+ * purpose hero, the needs line, the glyph-dot spine, the tier chip and the deliverable. Both
+ * cases are RE-POINTED rather than deleted: what each one really guards (no ad-hoc trio came
+ * back; the page still makes exactly ONE fetch) is asserted here as hard as before.
+ *
+ * ⚠ `WorkflowSoul` AND ITS TIER DERIVATION ARE UNTOUCHED — they are CONSUMED by this page, not
+ * owned by it, and still render at `scale="run"` and `scale="pub"`. Their own coverage lives in
+ * `components/workflows/soulData.test.ts` and `deriveTier.test.ts`.
+ */
+describe("WorkflowsPage — D-03: the card is quiet, and the page still fetches once", () => {
+  it("a published card renders NO soul — and none of the pre-192 ad-hoc trio came back either", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    // The shared soul mounts at card scale (replacing the old TierBadge/PhaseChain trio).
-    const soul = within(cards[0]).getByTestId("workflow-soul")
-    expect(soul.getAttribute("data-scale")).toBe("card")
-    // And it carries the soul's derived tier chip + glyph-dot spine.
-    expect(within(cards[0]).getByTestId("soul-tier")).toBeInTheDocument()
-    expect(within(cards[0]).getByTestId("soul-spine")).toBeInTheDocument()
-    // The OLD ad-hoc trio is gone from the card body.
+    // ⚠ INVERTED. The card-scale soul mount left with D-03; five atoms left with it.
+    expect(within(cards[0]).queryByTestId("workflow-soul")).not.toBeInTheDocument()
+    expect(within(cards[0]).queryByTestId("soul-tier")).not.toBeInTheDocument()
+    expect(within(cards[0]).queryByTestId("soul-spine")).not.toBeInTheDocument()
+    // UNCHANGED, and still the point of the case: the OLD ad-hoc trio stays gone. A
+    // subtraction that quietly re-admitted the thing 192 removed would be no subtraction.
     expect(within(cards[0]).queryByTestId("tier-badge")).not.toBeInTheDocument()
     expect(within(cards[0]).queryByTestId("phase-chain")).not.toBeInTheDocument()
+    // POSITIVE CONTROL — the card really rendered. D-01's line 2 is what stands there now.
+    expect(within(cards[0]).getByTestId("row-answer")).toBeInTheDocument()
   })
 
-  it("a strict-policy def renders a different soul tier chip than a draft-policy def (derived, no per-card fetch)", async () => {
+  it("every card's answer comes from the FEED — one list fetch, and no per-card call", async () => {
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const cards = await screen.findAllByTestId("published-card")
-    const strictTier = within(cards[0]).getByTestId("soul-tier")
-    const looseTier = within(cards[1]).getByTestId("soul-tier")
-    expect(strictTier.getAttribute("data-tier")).toBe("STRICT")
-    expect(looseTier.getAttribute("data-tier")).toBe("LOOSE")
-    expect(strictTier.getAttribute("data-tier")).not.toBe(looseTier.getAttribute("data-tier"))
-    // The tier is derived: listPublishedWorkflows was the ONLY fetch (no per-card call).
+    // ⚠ RE-POINTED FROM THE TIER CHIP TO THE RUN TRUTH, and the claim is CONTEXT's constraint
+    // verbatim: *"Feed-level only. Run facts arrive with the list; no per-card fetch (107+
+    // rendered rows)."* The tier chip used to be this surface's window onto that rule; line 2
+    // is the window now, and the rule is the same rule.
+    expect(within(cards[0]).getByTestId("row-answer")).toBeInTheDocument()
+    expect(within(cards[1]).getByTestId("row-answer")).toBeInTheDocument()
+    expect(within(cards[0]).getByTestId("run-gutter")).toBeInTheDocument()
     expect(mockListPublished).toHaveBeenCalledTimes(1)
   })
 })
 
-describe("WorkflowsPage — soul tier picks the STRICTEST emit policy (WR-03, order-independent)", () => {
+describe("WorkflowsPage — the soul tier picks the STRICTEST emit policy (WR-03, order-independent)", () => {
   it("a [flag, strict, partial] multi-emit def derives STRICT regardless of phase order", async () => {
     // Old logic only overwrote on 'strict' after the first emit set the policy, so a
     // 'partial' following a 'flag' was dropped and order mattered. The shared soulData
     // derivation uses a deterministic stricter-wins comparison: the strict emit wins.
+    //
+    // ⚠ 192.2-05 — THE CLAIM IS UNCHANGED AND THE WINDOW ONTO IT MOVED. D-03 cut the tier chip
+    // from the card, so this case can no longer read the derivation off a rendered row. It
+    // asks `tierForDefinition` DIRECTLY instead, which is strictly stronger: it now tests the
+    // derivation rather than one surface's rendering of it. The page half of the case is kept
+    // too, and is now the D-03 assertion — this definition renders a card with no tier at all.
     const multiEmit = {
       id: "pub-multi",
       slug: "multi-emit",
@@ -754,10 +778,18 @@ describe("WorkflowsPage — soul tier picks the STRICTEST emit policy (WR-03, or
         ],
       },
     }
+    // The derivation, asked directly. `[flag, strict, partial]` — the strict emit wins
+    // whatever order the phases arrive in.
+    expect(tierForDefinition(multiEmit.definition as never).id).toBe("STRICT")
+
     mockListPublished.mockResolvedValue([multiEmit])
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const card = await screen.findByTestId("published-card")
-    expect(within(card).getByTestId("soul-tier").getAttribute("data-tier")).toBe("STRICT")
+    // …and the card says nothing about it, on a row whose tier is unambiguously STRICT. That
+    // is D-03: the tier is a real fact this surface deliberately no longer spends a slot on.
+    expect(within(card).queryByTestId("soul-tier")).not.toBeInTheDocument()
+    expect(card).not.toHaveTextContent("STRICT")
+    expect(within(card).getByTestId("row-answer")).toBeInTheDocument()
   })
 })
 
@@ -991,15 +1023,26 @@ describe("192-14 (U5 blocker) — forking a slug you ALREADY have a draft of ope
   it("the card SAID so before the click — and only on the row where the behaviour differs", async () => {
     // D-14, mechanically: the sentence and the verb agree in the SAME render. `vendor-risk` has
     // an existing draft, `quick-notes` does not, and both are published rows on one screen.
+    //
+    // ⚠ 192.2-05 (D-03) — *before the click* now means *in the menu, beside the verb*. The
+    // sentence was cut from the RESTING card and relocated to the moment it is needed; the
+    // claim is untouched, and the two rows are still read on ONE screen rather than in two
+    // renders, which is what makes "only on the row where the behaviour differs" mean anything.
     seedExistingFork()
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const forked = await publishedCardNamed("Vendor-risk review")
     const unforked = await publishedCardNamed("Quick notes")
 
-    expect(within(forked).getByTestId("fork-consequence")).toHaveTextContent(
-      FORK_CONSEQUENCE_EXISTING,
-    )
-    expect(within(unforked).getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
+    // Neither row spends the sentence at rest — the subtraction, asserted on the real page.
+    expect(within(forked).queryByTestId("fork-consequence")).not.toBeInTheDocument()
+    expect(within(unforked).queryByTestId("fork-consequence")).not.toBeInTheDocument()
+
+    const user = await openOverflow(forked)
+    expect(screen.getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE_EXISTING)
+    await user.keyboard("{Escape}")
+
+    await openOverflow(unforked)
+    expect(screen.getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
   })
 
   it("a STARTER is untouched: it still mints a fresh suffixed slug at v1 even when a draft shares its slug", async () => {
@@ -1014,10 +1057,13 @@ describe("192-14 (U5 blocker) — forking a slug you ALREADY have a draft of ope
     ])
     render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
     const card = await screen.findByTestId("starter-card")
-    // The sentence on a starter row is the ordinary one, same-slug draft or not.
-    expect(within(card).getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
+    // ⚠ 192.2-05 (D-03): the sentence is no longer resting chrome, so it is read where it now
+    // lives — in the menu, in the SAME open that then clicks the verb. The claim is unchanged:
+    // the sentence on a starter row is the ordinary one, same-slug draft or not.
+    expect(within(card).queryByTestId("fork-consequence")).not.toBeInTheDocument()
 
     const user = await openOverflow(card)
+    expect(screen.getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
     await user.click(screen.getByTestId("use-starter"))
     // 192.1-07 (D-19 / D-12): a starter fork ALWAYS creates, so it ALWAYS asks — there is no
     // "the copy you already started" on a fresh auto-suffixed slug. The three assertions
@@ -1361,10 +1407,21 @@ describe("WorkflowsPage — LIB-01 / SC#1: search finds a row among 200 (D-07 sc
     await waitFor(() => expect(renderedCards()).toHaveLength(1))
     const card = renderedCards()[0]
     expect(within(card).getByText(bulkName(PURPOSE_ONLY_INDEX))).toBeInTheDocument()
-    // THE HALF SC#1'S WORDING DOES NOT REACH: the word is absent from the name and present in
-    // the purpose the reader can already see on the card (`soul-purpose`, the hero atom).
+    // THE HALF SC#1'S WORDING DOES NOT REACH: the word is absent from the name, and the search
+    // found the row anyway — so the filter really does read wider than the title.
     expect(bulkName(PURPOSE_ONLY_INDEX)).not.toContain(PURPOSE_ONLY_WORD)
-    expect(within(card).getByTestId("soul-purpose").textContent).toContain(PURPOSE_ONLY_WORD)
+
+    // ⚠ 192.2-05 (D-03) — AND HERE IS THE CONSEQUENCE, ASSERTED RATHER THAN LEFT IMPLICIT.
+    // This line read `getByTestId("soul-purpose").textContent).toContain(PURPOSE_ONLY_WORD)`:
+    // the reader could see WHY the row matched, because the purpose hero was on the card.
+    // D-03 cut that atom, so the match is now made on a field the resting card does not show.
+    // The search is unchanged and still correct; what changed is that the hit is no longer
+    // self-explaining. Pinned in this direction so the trade is a recorded decision — the
+    // phase accepted it knowingly (`business_requirement` is populated on 14% of rows and
+    // CONTEXT D-03 rules it cannot lead) — and so a later wave restoring a why-it-matched
+    // affordance reds here and reads this note rather than rediscovering the reason.
+    expect(within(card).queryByTestId("soul-purpose")).not.toBeInTheDocument()
+    expect(card).not.toHaveTextContent(PURPOSE_ONLY_WORD)
   })
 
   it("⚠ MEASURED, NOT ASSUMED: the search hit is NOT highlighted today — D-07's second half is unshipped", async () => {

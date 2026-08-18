@@ -138,12 +138,51 @@
  * taste: sheet (server preview + victim naming + terminal lifecycle) versus arm (one click).
  *
  * ── WHAT THIS CARD DOES NOT OWN ──────────────────────────────────────────────────────────
- * `WorkflowSoul scale="card"` renders the five atoms and is CONSUMED UNCHANGED — purpose hero,
- * needs, glyph-dot spine, tier chip, deliverable. This card adds chrome and one sentence AROUND
- * the soul; it does not rebuild the card's content and must not lose an atom. It also owns
- * neither fork's slug/version mechanics (they stay in the page's two shipped handlers) nor the
- * heaviest delete guard (that is `WorkflowDeleteSheet`, moved in 192-08, mounted here as a
- * black box).
+ * ⚠ **THE PARAGRAPH THAT STOOD HERE ASSERTED THE OPPOSITE OF WHAT THIS FILE NOW DOES, AND IT
+ * IS AMENDED IN THE SAME DIFF AS THE SUBTRACTION RATHER THAN LEFT TO CONTRADICT ITS OWN CODE.**
+ * `192.2-01-SUMMARY.md` flagged it for exactly this wave so it could not be read as a fence.
+ * It said, verbatim:
+ *
+ *     "`WorkflowSoul scale="card"` renders the five atoms and is CONSUMED UNCHANGED — purpose
+ *      hero, needs, glyph-dot spine, tier chip, deliverable. This card adds chrome and one
+ *      sentence AROUND the soul; it does not rebuild the card's content and must not lose an
+ *      atom."
+ *
+ * That was true of 192, and 192.2's D-03 reverses it deliberately: **the subtraction IS the
+ * feature.** Rendering the real component (sketch 179 variant A, the dev route `/sketch-card`)
+ * measured the shipped card at NINE information rows deep, and the operator picked variant C,
+ * which spends four slots and cuts the rest. So the card-scale soul mount is GONE and five
+ * atoms leave with it — purpose hero, needs, glyph-dot spine, tier chip, deliverable — plus the
+ * fork-consequence paragraph, which is RELOCATED rather than deleted (see the `⋯` menu below).
+ *
+ * ⚠ **`WorkflowSoul` ITSELF IS UNTOUCHED, AND THAT IS A HARD BOUNDARY.** It is CONSUMED, not
+ * owned: it still renders at `scale="run"` and `scale="pub"` on two surfaces outside this
+ * phase's scope. What left is this card's MOUNT of it. Deleting or narrowing the component
+ * would break both of those surfaces silently.
+ *
+ * This card also owns neither fork's slug/version mechanics (they stay in the page's two
+ * shipped handlers) nor the heaviest delete guard (that is `WorkflowDeleteSheet`, moved in
+ * 192-08, mounted here as a black box).
+ *
+ * ── 192.2-05 (LIB-06 / D-01 / D-02 / D-03) — THE FOUR SLOTS, AND NOTHING ELSE ────────────
+ *
+ *   | slot        | carries                                                                  |
+ *   | gutter, 3px | the last-run outcome. Colour, AND NEVER COLOUR ALONE                     |
+ *   | line 1      | the NAME, with the dim mono version deferred to its right                |
+ *   | line 2      | the run truth in words, then the state in BUSINESS words                 |
+ *   | everything  | CUT from the resting card                                                |
+ *
+ * ⚠ **D-02 IS THE INSTRUCTION MOST LIKELY TO BE MISREAD, SO IT IS STATED AT THE RENDER.**
+ * Sketches 177 and 178 both argued *lead with the state; the name cannot be the differentiator*.
+ * **The operator chose C, which KEEPS THE NAME AS THE LEAD.** What moved is the ENCODING —
+ * the outcome went to a 3px gutter and arrives peripherally. A later edit that demotes the name
+ * to line two has rebuilt variant B, which was not chosen.
+ *
+ * ⚠ **THE GUTTER IS NEVER THE ONLY CARRIER.** Its colour repeats a fact that line 2 states in
+ * words, and it is `aria-hidden` for that reason: a colour-blind reader and a screen-reader user
+ * both get the whole answer from the sentence. `runFacts` returns three structurally distinct
+ * arms and every one of them has a word, so there is no arm this card can render as a mark
+ * alone even by accident.
  *
  * ⚠ FIVE STRINGS ARE DECLARED HERE RATHER THAN IN `libraryVocabulary.ts`, and it is a scope
  * boundary rather than an oversight — this plan's `files_modified` names exactly two files and
@@ -220,12 +259,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { templateAdmission } from "@/components/workflows/soulData"
-import { WorkflowSoul } from "@/components/workflows/WorkflowSoul"
 import { deleteWorkflowDraft } from "@/lib/api"
 
-import { cardFace, type CardMark } from "./cardFace"
+import { cardFace, type CardFace, type CardMark } from "./cardFace"
 import { CHIP_PREDICATES } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
+import type { RunOutcome } from "./runFacts"
 import {
   CARD_TEMPLATE_MARK,
   FORK_CONSEQUENCE,
@@ -275,11 +314,37 @@ const DELETE_DRAFT_FAILED = "Couldn't delete this draft — try again."
 
 // ── Shared class strings (the shipped card chrome, unchanged) ────────────────────────
 
-const CARD_CLASSES = "flex flex-col gap-3 rounded-lg border bg-card p-4"
+/**
+ * Phase 192.2-05 (D-01) — THE CARD IS NOW A ROW: gutter, then everything else.
+ *
+ * ⚠ IT WAS `flex flex-col gap-3` AND THE AXIS FLIP IS THE STRUCTURAL CHANGE, not a class tweak.
+ * The 3px outcome mark has to run the FULL HEIGHT of the card to be legible peripherally down a
+ * column of 107 rows, which a mark nested inside the stacked content cannot do. Everything the
+ * card stacked before now stacks inside `CARD_BODY_CLASSES`.
+ */
+const CARD_CLASSES = "flex gap-3 rounded-lg border bg-card p-4"
+
+/** The stack that used to be the card root — same axis, same gap, one level in. */
+const CARD_BODY_CLASSES = "flex min-w-0 flex-1 flex-col gap-3"
+
+/**
+ * D-01 slot 1 — the gutter. `3px` verbatim from the approved sketch (179-C), `flex-none` so it
+ * never shrinks under a long name, and full height by virtue of the row's default `stretch`.
+ */
+const GUTTER_CLASSES = "w-[3px] flex-none rounded-full"
+
 const NAME_CLASSES = "truncate text-[14px] font-medium text-foreground"
 const VERSION_CLASSES = "font-mono text-[11px] text-muted-foreground"
 const PILL_BASE = "shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase "
-const NOTE_CLASSES = "text-[11.5px] leading-snug text-muted-foreground"
+/**
+ * Phase 192.2-05 — the consequence sentence's classes, IN ITS NEW HOME.
+ *
+ * ⚠ IT WAS `NOTE_CLASSES` (`text-[11.5px] leading-snug text-muted-foreground`) on a card-level
+ * paragraph. The size and leading are carried over verbatim — the sentence did not change, only
+ * where it is spent — and the padding is the menu's own item padding, so the note sits on the
+ * same left edge as the verb it describes rather than floating in the popover.
+ */
+const MENU_NOTE_CLASSES = "px-2 py-1.5 text-[11.5px] leading-snug text-muted-foreground"
 const FOOTER_CLASSES = "mt-auto flex items-center gap-2 border-t border-border/60 pt-2"
 
 /**
@@ -366,12 +431,79 @@ const LEGACY_STATE_PILL = {
   building: "draft",
 } as const satisfies Record<CardMark, string>
 
-/** The pill's colour, carried over verbatim. Chrome, so it stays with the card, not the face. */
-const STATE_PILL_CLASS = {
-  ready: "border-primary/40 text-primary",
-  starter: "border-primary/50 bg-primary/15 text-primary",
-  building: "border-border text-muted-foreground",
+/**
+ * Phase 192.2-05 (D-01 line 2) — THE STATE'S TONE, NOW THAT IT IS A WORD RATHER THAN A PILL.
+ *
+ * ⚠ IT WAS `STATE_PILL_CLASS`, A BORDERED MONO UPPERCASE CHIP IN THE CARD'S RIGHT-HAND FLEX
+ * CHILD. D-01 puts the state on line 2 beside the run truth, so the chip's border, background
+ * and `uppercase` all leave with the slot — `READY TO RUN` shouted in 9px mono is a system
+ * token wearing a business word's clothes, which is the defect D-06 exists to end rather than
+ * to relocate. CONTEXT D-05 flagged this move as STRUCTURAL and not a CSS change, because the
+ * pill lived in a different flex child from the name; it was, and this is that move.
+ *
+ * ⚠ THE THREE TONES ARE THE SHIPPED ONES, RE-USED RATHER THAN RE-PICKED — no new hex, and no
+ * new decision. The sketch spends a third colour (green) on `Ready to run`; that is deliberately
+ * NOT copied, because `Worked` one span to its left is already the success tone and two greens
+ * on one line would conflate *this row is runnable* with *this row's last run succeeded* —
+ * the exact conflation the gutter exists to keep apart.
+ */
+const STATE_TONE = {
+  ready: "text-primary",
+  starter: "text-primary",
+  building: "text-muted-foreground",
 } as const satisfies Record<CardMark, string>
+
+/**
+ * The run arm as ONE key — the outcome when there was a run, the arm's own name when there was
+ * not. It keys the gutter's colour and the run word's tone together, so the two cannot drift.
+ */
+type RunGutter = RunOutcome | "never" | "unknown"
+
+/**
+ * D-01 slot 1 — the gutter's colour. Deep Midnight semantic tokens only; every one of these is
+ * already in `index.css` and none is a new hex.
+ *
+ * ⚠ `unknown` IS DELIBERATELY UNPAINTED, AND THAT IS T-22's MITIGATION IN THE COLOUR AXIS.
+ * D-08's whole point is that *the wire did not say* is not *this never ran*: a bar that merely
+ * looked quiet would make the two read alike at a glance down a column. No mark for no
+ * information; `never` keeps a real, quiet bar. Neither can be mistaken for a tick, and the
+ * WORD on line 2 is what actually distinguishes them for the reader (T-20).
+ */
+const GUTTER_TONE = {
+  worked: "bg-success",
+  failed: "bg-destructive",
+  stopped: "bg-warning",
+  never: "bg-border",
+  unknown: "bg-transparent",
+} as const satisfies Record<RunGutter, string>
+
+/** The run word's tone. Same five keys, so a new arm cannot get a colour and lose a word. */
+const RUN_TONE = {
+  worked: "text-success",
+  failed: "text-destructive",
+  stopped: "text-warning",
+  never: "text-muted-foreground",
+  unknown: "text-muted-foreground",
+} as const satisfies Record<RunGutter, string>
+
+/**
+ * D-01 line 2's classes. `text-[12px]` is the sketch's size; it sits between the name's 14px
+ * and the identity line's 11px, which is what makes the run truth read as the SECOND thing on
+ * the card rather than as more metadata.
+ */
+const ANSWER_CLASSES = "mt-1.5 flex flex-wrap items-center gap-2 text-[12px]"
+
+/** The separator between the two halves of line 2 — decorative, exactly like the identity line's. */
+const ANSWER_SEPARATOR = "|"
+
+/**
+ * Resolve the gutter key from the face's run arm. TOTAL by construction: `RunFact` has three
+ * arms, `ran` contributes its outcome and the other two contribute their own `kind`, so a
+ * fourth arm becomes a typecheck error here rather than an unpainted gutter.
+ */
+function runGutterOf(run: CardFace["run"]): RunGutter {
+  return run.kind === "ran" ? run.outcome : run.kind
+}
 
 // ── Props ────────────────────────────────────────────────────────────────────────────
 
@@ -450,6 +582,23 @@ export interface WorkflowCardProps {
    * exist — silently, and on every row it owns. Required makes `tsc` enumerate the call sites.
    */
   identity: RowIdentity
+  /**
+   * Phase 192.2-05 (LIB-06 / P-1) — THE ONE INSTANT THIS CARD'S RECENCY IS MEASURED AGAINST.
+   *
+   * ⚠ HOIST IT ONCE PER RENDER PASS, AT THE LIST. `cardFace` and `runFacts` both default to the
+   * real clock, and a card that took that default would have 107 rows each reading their own —
+   * two cards in ONE pass could then straddle a band boundary and disagree about what time it
+   * is. The page already hoists exactly this instant for `resolveIdentity` (`WorkflowsPage.tsx`
+   * :520, with its own note on why it is NOT captured inside the `[rows]` memo, which would
+   * freeze it), so this prop hands the SAME `now` to the second consumer instead of minting a
+   * second clock beside the first.
+   *
+   * Optional with a real-clock default, following `hasExistingFork`'s precedent above rather
+   * than `identity`'s: a call site that omits it renders a correct card, merely one that reads
+   * its own clock — unlike an omitted identity line, which would render a card D-06 says
+   * cannot exist.
+   */
+  now?: number
   /** Re-fetch after a CONFIRMED delete. Forwarded to the Sheet; also called by D-18's guard. */
   onDeleted: () => void
 }
@@ -465,6 +614,7 @@ export function WorkflowCard({
   onForkStarter,
   hasExistingFork = false,
   identity,
+  now = Date.now(),
   onDeleted,
 }: WorkflowCardProps) {
   const deleteSheetRef = useRef<WorkflowDeleteSheetHandle>(null)
@@ -485,9 +635,15 @@ export function WorkflowCard({
    * the lead, the version, the state word, the mark and whether the row can be run. The card
    * decides none of it and re-derives none of it — the same discipline it already holds when it
    * refuses to compute slugs, versions or the identity line.
+   *
+   * ⚠ 192.2-05: `now` IS PASSED, NOT DEFAULTED — see the prop's own docblock (P-1). The face
+   * now carries the run truth as well, so this call is where D-01's line 2 and its gutter both
+   * come from, and there is still exactly one of it.
    */
-  const face = cardFace(row)
+  const face = cardFace(row, now)
   const runnable = face.runnable
+  /** D-01 slot 1's key, and line 2's tone. One derivation, two paints — never two switches. */
+  const gutter = runGutterOf(face.run)
 
   /**
    * D-13 / D-14 — the id of the one consequence sentence, derived from the ROW id. That
@@ -628,13 +784,51 @@ export function WorkflowCard({
         CARD_CLASSES + (row.provenance === "draft" ? " border-dashed border-border" : " border-border")
       }
     >
-      {/* ── Card chrome (NOT a soul atom): name/version header, folder chip, ⋯ + pill ── */}
+      {/* ── D-01 SLOT 1 — THE GUTTER ─────────────────────────────────────────────────
+          The last-run outcome, as a 3px mark running the card's full height. It is
+          `aria-hidden` BY DESIGN, not by omission: it repeats, in colour, a fact line 2
+          states in words, so a reader who cannot see the colour loses nothing at all.
+          `data-run` carries the arm so a test can prove the colour tracks the sentence
+          without asserting a class (T-20). */}
+      <div
+        data-testid="run-gutter"
+        data-run={gutter}
+        aria-hidden="true"
+        className={GUTTER_CLASSES + " " + GUTTER_TONE[gutter]}
+      />
+
+      <div className={CARD_BODY_CLASSES}>
+      {/* ── Card chrome (NOT a soul atom): name/version header, folder chip, ⋯ ─────── */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span aria-hidden="true">{MARK_GLYPH[face.mark]}</span>
             <span className={NAME_CLASSES}>{face.lead}</span>
             {face.version !== null && <span className={VERSION_CLASSES}>{face.version}</span>}
+          </div>
+
+          {/* ── D-01 LINE 2 — THE ANSWER TO *"DOES THIS ONE WORK?"* ─────────────────────
+              The run truth in words, then the state in business words. This is the whole
+              of LIB-06 on the resting card, and it is why the five soul atoms could go.
+
+              ⚠ IT SITS AT DOM POSITION 2, DISPLACING THE IDENTITY LINE TO POSITION 3, and
+              that is a decision rather than a drift. 179-C is SILENT on the question — the
+              sketch rendered no identity line at all — so what governs is D-01, which
+              numbers this slot as line 2. Burying the run truth under a five-part identity
+              line would make the answer this phase exists to give the card's FOURTH line.
+              `WorkflowCard.test.tsx`'s child-order assertions moved in the same wave, which
+              is exactly what asserting placement by child order was for.
+
+              ⚠ NEITHER HALF IS EVER BLANK. `runWord` is total over `RunFact`'s three arms
+              (`cardFace.ts` states that at the field), and `state` is total over the three
+              provenances — so this line always says two things, on every row, including a
+              row whose feed carried no run keys at all. */}
+          <div data-testid="row-answer" className={ANSWER_CLASSES}>
+            <span className={RUN_TONE[gutter]}>{face.runWord}</span>
+            <span aria-hidden="true" className="text-border">
+              {ANSWER_SEPARATOR}
+            </span>
+            <span className={STATE_TONE[face.mark]}>{LEGACY_STATE_PILL[face.mark]}</span>
           </div>
 
           {/* ── THE 14TH ATOM — THE IDENTITY LINE (D-06 / D-08 / D-09 / D-10) ───────────
@@ -751,40 +945,45 @@ export function WorkflowCard({
                     {DELETE_DRAFT_LABEL}
                   </DropdownMenuItem>
                 )}
+
+                {/* ── THE ONE SENTENCE THIS SURFACE SPENDS (D-13 / D-14) ────────────
+                    Real DOM text, wired to the fork control by `aria-describedby` — so
+                    the explanation reaches a touch user and a screen reader alike, which
+                    the hover-only tooltip it replaces never did. It names BOTH halves:
+                    what you get, and what stays true. Naming only the first half
+                    reproduces the exact surprise LIB-03 exists to end, which is why the
+                    sentence is imported rather than typed.
+
+                    ⚠ 192.2-05 (D-03, threat T-21): IT MOVED HERE FROM THE RESTING CARD,
+                    AND MOVING IS NOT DELETING. D-03 cuts it from the resting card — it was
+                    a two-line paragraph on every runnable row, i.e. most of the shelf — but
+                    it warns about a real consequence before a real act, so it is spent at
+                    the MOMENT IT IS NEEDED instead: in the menu, directly under the verb it
+                    describes, where the person is when the warning is worth anything. The
+                    `aria-describedby` round trip is unchanged and still asserted.
+
+                    ⚠ IT IS NOT A MENU ITEM. A plain `<p>` inside the content carries no
+                    role, takes no focus and is skipped by Radix's roving focus and
+                    typeahead, so the menu still offers exactly the actions it offered.
+
+                    ⚠ 192-13: WHICH sentence depends on the row's real state. On a row the
+                    person has already forked, the verb opens their EXISTING draft and
+                    creates nothing, so promising "a new private copy" there would be a quiet
+                    lie. STILL EXACTLY ONE NODE: the sentence is selected, never appended. */}
+                {runnable && (
+                  <p
+                    id={consequenceId}
+                    data-testid="fork-consequence"
+                    className={MENU_NOTE_CLASSES}
+                  >
+                    {hasExistingFork ? FORK_CONSEQUENCE_EXISTING : FORK_CONSEQUENCE}
+                  </p>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           )}
-          {/* ⚠ `LEGACY_STATE_PILL`, not `face.state` — see that constant's docblock. Wave 4's
-              one-line edit is right here, and it is the only place D-06's vocabulary fix lands. */}
-          <span className={PILL_BASE + STATE_PILL_CLASS[face.mark]}>
-            {LEGACY_STATE_PILL[face.mark]}
-          </span>
         </div>
       </div>
-
-      {/* LIB-02: the shared card-scale soul, CONSUMED UNCHANGED — all five atoms. */}
-      <WorkflowSoul def={row.def} scale="card" />
-
-      {/* ── THE ONE SENTENCE THIS SURFACE SPENDS (D-13 / D-14) ───────────────────────
-          Real DOM text, always visible, wired to the fork control by `aria-describedby`
-          — so the explanation reaches a touch user and a screen reader alike, which the
-          hover-only tooltip it replaces never did. It names BOTH halves: what you get,
-          and what stays true. Naming only the first half reproduces the exact surprise
-          LIB-03 exists to end, which is why the sentence is imported rather than typed.
-
-          It is spent ONCE, here. `Run` runs and `Open` opens; neither earns a sentence,
-          and repeating one on all 200 cards is the clutter LIB-02 exists to cure.
-
-          ⚠ 192-13: WHICH sentence depends on the row's real state. On a row the person has
-          already forked the verb opens their EXISTING draft and creates nothing, so promising
-          "a new private copy" there would be a quiet lie — and trading the U5 silent failure
-          for a quiet lie is not closing that gap. STILL EXACTLY ONE NODE: the sentence is
-          selected, never appended, so the card gains no atom (U5-b is out of this round). */}
-      {runnable && (
-        <p id={consequenceId} data-testid="fork-consequence" className={NOTE_CLASSES}>
-          {hasExistingFork ? FORK_CONSEQUENCE_EXISTING : FORK_CONSEQUENCE}
-        </p>
-      )}
 
       {/* ── The ONE primary verb (D-09) ──────────────────────────────────────────────
           Exactly one per row state, chosen by provenance. A draft reaches no Run
@@ -861,6 +1060,7 @@ export function WorkflowCard({
           onDeleted={onDeleted}
         />
       )}
+      </div>
     </div>
   )
 }

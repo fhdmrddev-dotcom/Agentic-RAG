@@ -1079,6 +1079,13 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                    the current search, and `now` is the ONE clock every card in this pass
                    shares — see both docblocks above for why neither can live in the other. */
                 identity={resolveIdentity(identityIndex, row, now)}
+                /* 192.2-05 (LIB-06 / P-1) — THE SAME `now`, HANDED TO THE SECOND CONSUMER.
+                   D-01's line 2 carries a relative band (`Worked 2 days ago`), so the card
+                   reads a clock too. It reads THIS one: a card left to `cardFace`'s own
+                   default would give each of the 107 rows its own instant, and two rows in
+                   one pass could then straddle a band boundary. One clock per render pass,
+                   two consumers — never two clocks. */
+                now={now}
                 onDeleted={handleDeleted}
               />
             ))}
