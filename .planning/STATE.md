@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T01:57:00.000Z"
+last_updated: "2026-08-19T03:35:00.000Z"
 last_activity: 2026-08-19
 progress:
   total_phases: 21
   completed_phases: 10
   total_plans: 117
-  completed_plans: 108
-  percent: 48
+  completed_plans: 109
+  percent: 49
 ---
 
 # Project State
@@ -36,14 +36,60 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 192.2 (does-this-one-work) — EXECUTING
-Plan: **4 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
-(`192.2-02` the G-5 discharge + `192.2-03` the run-facts join) and Wave 3 (`192.2-04`, the run
-truth's wire→words path) COMPLETE. Wave 2 ran its two plans in PARALLEL worktrees and they merged
-clean at `00b81f63` / `7bd88426` — zero `files_modified` overlap (frontend vs backend), and only
-`192.2-03` touched Postgres, so CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied
-without serialising the wave. Wave 3 ran SEQUENTIALLY on the main working tree.
-Next action: `/gsd:execute-phase 192.2` — run **Wave 4** (`192.2-05`, the subtraction + the
-language: the card finally changes what it draws).
+Plan: **5 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
+(`192.2-02` the G-5 discharge + `192.2-03` the run-facts join), Wave 3 (`192.2-04`, the run
+truth's wire→words path) and **Wave 4 (`192.2-05`, THE SUBTRACTION + THE LANGUAGE)** COMPLETE.
+Wave 2 ran its two plans in PARALLEL worktrees and they merged clean at `00b81f63` / `7bd88426`
+— zero `files_modified` overlap (frontend vs backend), and only `192.2-03` touched Postgres, so
+CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied without serialising the wave.
+Waves 3 and 4 ran SEQUENTIALLY on the main working tree.
+Next action: `/gsd:execute-phase 192.2` — run **Wave 5** (`192.2-06`, the dev-route teardown +
+the same-commit ledger / CLAUDE.md sync).
+
+⚠ **Carried OUT of Wave 4 into Wave 5, measured not assumed:**
+- ✅ **LIB-06 IS SATISFIED ON SCREEN.** The card renders sketch 179 variant C: a 3px run gutter,
+  the name leading line 1 with the version deferred, and **line 2 saying the run truth then the
+  state in business words**. Three rows sharing ONE name and differing only by their last run
+  now say **three different things**, asserted as a mutual-distinctness property and re-asserted
+  after every `class` attribute is stripped off the DOM (colour is never the only carrier).
+- ⚠ **THE SUBTRACTION LANDED AS EXACTLY SIX ATOMS, AND THE DELTA IS PROVED RATHER THAN CLAIMED.**
+  The characterization pin was RE-BASELINED by INVERSION — the six flip from *asserted present*
+  to *asserted ABSENT*, none was deleted — and a new sweep asserts all six absent on all three
+  provenance faces. Case count `24 → 29`, so the pin got STRICTER while growing.
+- ⚠ **THREE SURVIVING ATOMS CHANGED THEIR LITERAL AND NONE DEPARTED** (D-06): the provenance mark,
+  the folder chip and the state word. An auditor counting "exactly six left" must count
+  DEPARTURES, not edits.
+- ⚠ **`lib/phaseGlyph.tsx` WAS NOT TOUCHED — the plan's `files_modified` was DECLINED, not obeyed,
+  and this is the FOURTH wrong path in this phase's plans** (after `models/harness.py` and
+  `libraryRow.ts`). That map is TOTAL OVER PHASE TYPES and `icon-convention.md` §4 forbids a
+  phase-type glyph as a category icon BY NAME; its exported key set is additionally guarded to
+  equal `soulData.PHASE_GLYPHS`. The card stopped consuming it entirely when the spine left.
+  The three marks became **`lucide-react`** icons — the house chrome set this file already drew
+  `MoreHorizontal` / `Trash2` / `Loader2` from, so no fourth icon path was introduced.
+- ⚠ **THE IDENTITY LINE MOVED FROM DOM POSITION 2 TO POSITION 3**, deliberately. D-01 numbers the
+  run truth as LINE 2 and sketch 179-C is SILENT on the order (it rendered no identity line at
+  all). Five child-order assertions moved with it in the same wave — which is exactly what
+  asserting placement by child order was for. **LIB-05 was NOT re-opened**: no field, word or
+  resolver of `rowIdentity.ts` changed.
+- ⚠ **A NEW DUPLICATION IS OBSERVABLE AND IS RECORDED RATHER THAN FIXED.** On a row that collides
+  on its name, `resolveIdentity` picks the STATE AXIS as the discriminator, so `Ready to run`
+  now renders TWICE — once on line 2 and once as a seg of the identity line. Found by a
+  card-wide `getByText` throwing *"Found multiple elements"*, not by reasoning. **Not fixed
+  here**: D-04 says LIB-05 stays complete and must not be re-opened, `rowIdentity.ts` is outside
+  `files_modified` with 72 pinned cases, and the card's own discipline is that it *invents no
+  part and drops none*. **Re-open trigger: an operator reads the stutter on the real shelf.**
+- ⚠ **A SEARCH HIT IS NO LONGER SELF-EXPLAINING.** The library filter still matches on `purpose`,
+  but D-03 cut the purpose hero, so a row found by a word only in its purpose shows no reason
+  why. Pinned in that direction in `WorkflowsPage.test.tsx` with the trade written beside it.
+  Accepted knowingly (`business_requirement` is populated on 14% of rows). Re-open trigger: a
+  wave restoring a why-it-matched affordance.
+- ⚠ **THE FORK CONSEQUENCE MOVED INTO THE `⋯` MENU, IT DID NOT DIE** (T-21). `aria-describedby`
+  round trip intact; it is a plain `<p>`, so Radix roving focus and typeahead skip it.
+- ⚠ **`WorkflowCard.tsx` RE-DERIVES TO `11 / 4 / 1104`** (ledger row says `8 / 3 / 818`) — a
+  **fifth** ledger row Wave 5 owes, alongside `libraryVocabulary.ts` (`8 / 4 / 584`, no row at
+  all) and the count-gate constants. **Its G-5 obligation stays DISCHARGED** (Wave 2), and this
+  wave was honoured by construction: the decision stayed in `cardFace.ts` and only the DRAWING
+  changed here.
 
 ⚠ **Carried OUT of Wave 3 into Wave 4, measured not assumed:**
 - **`face.run` (the arm) and `face.runWord` (the sentence) already reach the card** — `cardFace.ts`
