@@ -200,6 +200,11 @@ import {
   type PersistState,
 } from "@/hooks/useDraftPersistence"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
+// 196-08 (AUTH-04): the ONE author-registry read on this surface. Sited here for the same
+// reason the two leaf hooks above are — the panel mounts the picker FOUR times, so a fetch
+// inside the component would be four requests per step click.
+import { useModelRegistry } from "@/hooks/useModelRegistry"
+import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import { DEGRADED_SENTENCE, groupVerdicts } from "@/components/workflows/verdictModel"
 import { isCheckOutstanding } from "@/components/workflows/verdictModel" // 187-27 (GAP B)
 import { clearNudges, readNudges, writeNudge } from "@/components/workflows/canvasNudge"
@@ -1141,6 +1146,23 @@ export function WorkflowBuilderPage({
    */
   const bundle = useGroundingBundle(canvasEnabled)
   const toolOptions: string[] | "degraded" = bundle.kind === "ready" ? bundle.tools : "degraded"
+
+  /**
+   * 196-08 (AUTH-04) — the live model registry, read ONCE for the whole panel.
+   *
+   * ⚠ IT IS NOT GATED ON `canvasEnabled`, unlike `bundle` directly above, and the difference
+   * is deliberate. The palette IS the canvas contract (D-14 promises a flag-off surface
+   * byte-identical to the shipped one). A model is not a canvas idea: the four `AI model`
+   * fields have been on the Spine form since Phase 103, and gating the picker on the flag
+   * would leave the surface most authors are actually on with the free-text box AUTH-04
+   * exists to remove. Same reasoning `template` already carries at the mount below.
+   *
+   * `showTechnical` is the app-wide ⌥ reveal, read through the NON-throwing accessor: this
+   * page renders in suites that mount no provider, and a leaf that still renders outside one
+   * is the shipped contract (`ProblemsTray`, `StepTypePicker`, `WorkflowCanvas` all do this).
+   */
+  const modelRegistry = useModelRegistry()
+  const showTechnical = useTechnicalNamesOptional()?.showTechnical ?? false
 
   /**
    * The server's KB-reading tool names (Phase 185 / D-185-09), read on BOTH honest
@@ -2336,6 +2358,34 @@ export function WorkflowBuilderPage({
           // "ABSENT ⇒ NOTHING RENDERS" contract is honoured literally rather than by a falsy
           // value that happens to render the same.
           {...(nameCheck ? { nameCheck } : {})}
+          // 196-08 (AUTH-04) — SPREAD-CONDITIONAL on a COMPLETE read, the `nameCheck` shape
+          // above rather than the `template` shape, and the choice is the load-bearing one on
+          // this plan.
+          //
+          // ⚠ THE REJECTED ALTERNATIVE, NAMED: passing `models: []` on a `loading` or
+          // `unavailable` read. It renders a calm, correct-looking control that offers nothing
+          // but its inherit option — and worse, `ModelField` would then retain every stored
+          // model as `(current) — not in the registry`, telling an author that a perfectly
+          // registered model is unknown and inviting them to change it. That is precisely the
+          // substitution the registry hook's own docblock exists to make unconstructable, and
+          // this is the caller that would have re-created it. (⚠ The hook is named by role, not
+          // by token: this plan's acceptance grep counts its identifier over this file, so a
+          // mention in prose inflates the count — the 187-24 trap.)
+          //
+          // ⚠ THE COST OF THE CHOICE, STATED RATHER THAN LEFT TO BE FOUND: while the read is in
+          // flight, and for as long as it is failing, the `AI model` field is ABSENT from the
+          // step form. An absent field writes nothing and says nothing false; a lying one does
+          // both. `ModelField` cannot express "I could not read the registry" — it takes rows,
+          // not a reading — and widening it is 196-05's file, not this plan's.
+          {...(modelRegistry.kind === "ready"
+            ? {
+                modelPicker: {
+                  models: modelRegistry.models,
+                  runDefaultModel: modelRegistry.runDefaultModel,
+                  showTechnical,
+                },
+              }
+            : {})}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
         />
       </div>

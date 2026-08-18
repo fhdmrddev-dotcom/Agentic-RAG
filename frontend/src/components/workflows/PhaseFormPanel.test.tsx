@@ -37,6 +37,24 @@ function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> 
 
 const noop = () => {}
 
+/**
+ * 196-08 (AUTH-04) — the registry answer a caller hands down, in the shape the four picker
+ * mounts consume. Two rows and a resolved run default, which is enough for every assertion in
+ * this file: what the picker DOES with them is fenced by its own 32-case suite, not here.
+ *
+ * ⚠ IT IS A FIXTURE, NOT A DEFAULT. The panel's prop is optional and ABSENT means the four
+ * mounts render nothing, so a test that wants the model control on screen must pass this
+ * deliberately — which is the point: it makes "the field exists only because a caller supplied
+ * a complete registry read" a property this file states rather than assumes.
+ */
+const MODEL_PICKER = {
+  models: [
+    { model_id: "gpt-5.4", provider: "openai", capability_source: "registry", enabled: true, deprecated: false, emit_tier: "force_strict" as const },
+    { model_id: "kimi-k3", provider: "moonshot", capability_source: "registry", enabled: true, deprecated: false, emit_tier: "coerce" as const },
+  ],
+  runDefaultModel: "gpt-5.4",
+}
+
 describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", () => {
   it("programmatic: renders Function + Inputs; NO model/tools/scope/instructions", () => {
     render(
@@ -66,6 +84,11 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         onChange={noop}
         onPersist={noop}
         onClose={noop}
+        // 196-08 (AUTH-04): the `AI model` control is now the registry-backed picker, and it is
+        // gated on a COMPLETE registry read arriving from the caller. This assertion has stood
+        // since Phase 103 and still holds — but it now REQUIRES the prop, which is the honest
+        // record of a real contract change rather than a silently relaxed test.
+        modelPicker={MODEL_PICKER}
       />,
     )
     expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
@@ -198,12 +221,18 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         onChange={noop}
         onPersist={noop}
         onClose={noop}
+        modelPicker={MODEL_PICKER}
       />,
     )
     // The helper sentences are rendered as plain VISIBLE text (queryable via getByText),
     // not hidden behind a hover-only `title`/ⓘ tooltip.
     expect(screen.getByText("What you want the AI to do in this step.")).toBeInTheDocument()
-    expect(screen.getByText("Leave blank to use the workspace default.")).toBeInTheDocument()
+    // ⚠ 196-08 (D-06): this line read "Leave blank to use the workspace default." from Phase 103
+    // until now, and the sentence was WRONG rather than merely old — there is no workspace
+    // default in the code. A run inherits whatever model STARTED it, which is knowable at run
+    // time and not while somebody is authoring, so the picker's helper says that instead. The
+    // assertion is updated to the shipped honest copy rather than loosened to a regex.
+    expect(screen.getByText("Leave blank to use the run's model.")).toBeInTheDocument()
     expect(screen.getByText("How many actions the AI may take before it stops.")).toBeInTheDocument()
     expect(screen.getByText("Stop this step after this many seconds (optional).")).toBeInTheDocument()
     expect(screen.getByText("The tools the AI may use here.")).toBeInTheDocument()
@@ -485,5 +514,254 @@ describe("PhaseFormPanel — the 193.1 name-check mount (D-22)", () => {
     expect(mounts[0]).toContain('pt === "llm_emit"')
     // …and it forwards the prop whole rather than picking it apart here.
     expect(mounts[0]).toContain("{...nameCheck}")
+  })
+})
+
+/**
+ * Phase 196-08 (AUTH-04 / D-20) — THE FOUR PICKER MOUNTS, AND THE PANEL'S ABSOLUTE ZERO.
+ *
+ * ⚠ WHY THIS FENCE EXISTS WHEN ONE ALREADY DOES, DIRECTLY ABOVE. The shipped fence is scoped
+ * to the template name-check mount and to nothing else. A picker mount passes through it
+ * invisibly, and — the failure that actually matters — this panel could grow a memo to shape
+ * the option list, or an effect to fetch the registry itself, and that fence would notice
+ * nothing at all. The G-5 order on this file is a property of the WHOLE file, so it needs a
+ * guard that reads the whole file.
+ *
+ * Three claims, each mechanical:
+ *
+ *   1. EXACTLY FOUR mounts, one per step type that carries a model, each carrying its own
+ *      `pt ===` guard and forwarding the caller's answer WHOLE via spread. The captured guards
+ *      are compared as a SORTED SET, so a duplicate (two mounts both gated `llm_single`) and an
+ *      omission (three types covered, one missing) are each a failure — a bare length check
+ *      would pass both.
+ *   2. The fitness flag rides the deliverable mount and ONLY it (D-12).
+ *   3. `useMemo` / `useState` / `useEffect` are at an ABSOLUTE ZERO in this file's source.
+ *      Not "no increase" — zero, because all three measured zero before this phase, and a
+ *      non-decrease criterion on a file that already reads 0 is a criterion that permits the
+ *      first one.
+ *
+ * ⚠ THE MATCHED TOKENS ARE BUILT, NEVER SPELLED, in this file's prose and in the panel's. A
+ * comment that names the needle is COUNTED BY the fence that greps for it — the 187-24 trap,
+ * which this phase hit three separate times while writing these very paragraphs (twice in the
+ * panel's docblock, once in the comment explaining the first two).
+ */
+describe("PhaseFormPanel — the 196-08 picker mounts (AUTH-04 / D-20)", () => {
+  /** The opening tag, assembled so this file's own text never carries it as a literal. */
+  const MOUNT_TOKEN = "<" + "ModelField"
+  /** The four step types that carry a model, as the schema orders them in this panel. */
+  const MODEL_BEARING_TYPES = ["llm_agent", "llm_batch_agents", "llm_emit", "llm_single"]
+
+  /** The extractor, ONE definition, run over the real source below and over the deliberately
+   *  wrong fixtures in the positive control — so the control tests the same code the fence
+   *  runs, which is the only thing that makes a control worth having. */
+  const mountsIn = (src: string) => src.split("\n").filter((line) => line.includes(MOUNT_TOKEN))
+  const guardsIn = (lines: string[]) =>
+    lines.map((l) => l.match(/pt === "([a-z_]+)"/)?.[1] ?? null)
+
+  it("NON-VACUITY — the source really was loaded, and really is this panel", () => {
+    expect(phaseFormPanelSource.length).toBeGreaterThan(1000)
+    expect(phaseFormPanelSource).toContain("export function PhaseFormPanel")
+    expect(mountsIn(phaseFormPanelSource).length).toBeGreaterThan(0)
+  })
+
+  it("POSITIVE CONTROL — the extractor really can fail, on both shapes it exists to reject", () => {
+    // Too few mounts: the shape where one step type keeps a free-text box.
+    const tooFew = ["  {modelPicker && pt === \"llm_single\" && " + MOUNT_TOKEN + " />}", "  <TextField label=\"AI model\" />"].join("\n")
+    expect(mountsIn(tooFew)).toHaveLength(1)
+    // An UNGATED mount: the shape where the picker leaks onto a step type that has no model.
+    const ungated = ["  {modelPicker && " + MOUNT_TOKEN + " {...modelPicker} />}"].join("\n")
+    expect(guardsIn(mountsIn(ungated))).toEqual([null])
+    // And a shape the fence must ACCEPT, so the control proves discrimination, not just noise.
+    const good = MODEL_BEARING_TYPES.map((t) => "  {modelPicker && pt === \"" + t + "\" && " + MOUNT_TOKEN + " {...modelPicker} />}").join("\n")
+    expect(guardsIn(mountsIn(good)).sort()).toEqual(MODEL_BEARING_TYPES)
+  })
+
+  it("SOURCE — exactly FOUR mounts, one per model-bearing step type, each forwarding the prop whole", () => {
+    const mounts = mountsIn(phaseFormPanelSource)
+    expect(mounts).toHaveLength(4)
+    // A sorted SET comparison, not a length check: a duplicated guard and a missing type both fail.
+    expect(guardsIn(mounts).sort()).toEqual(MODEL_BEARING_TYPES)
+    for (const line of mounts) {
+      expect(line).toContain("{...modelPicker}")
+      // The panel keeps its ONE save-on-blur discipline; no mount introduces a second.
+      expect(line).toContain("onPersist={onPersist}")
+    }
+  })
+
+  it("SOURCE — the fitness flag rides the deliverable mount and ONLY it (D-12)", () => {
+    const withFitness = mountsIn(phaseFormPanelSource).filter((l) => l.includes("showFitness"))
+    expect(withFitness).toHaveLength(1)
+    expect(withFitness[0]).toContain('pt === "llm_emit"')
+  })
+
+  it("SOURCE — the panel computes NOTHING for the picker: an ABSOLUTE zero, not a non-increase", () => {
+    // Built, never spelled — this assertion would otherwise count itself.
+    for (const token of ["use" + "Memo(", "use" + "State(", "use" + "Effect("]) {
+      expect(phaseFormPanelSource.split(token).length - 1).toBe(0)
+    }
+  })
+
+  it("POSITIVE CONTROL — the zero-compute needle really can find what it forbids", () => {
+    const planted = "  const rows = use" + "Memo(() => models.filter(Boolean), [models])"
+    expect(planted.split("use" + "Memo(").length - 1).toBe(1)
+  })
+
+  it("ABSENT ⇒ no model control at all — and emphatically NO free-text box (AUTH-04)", () => {
+    // The load-bearing negative. AUTH-04 is the claim that there is no path through this form
+    // that accepts a typed model name; a caller that supplies no registry answer must therefore
+    // get NOTHING, never a fallback input. Absence is the honest degradation, a text box is the
+    // regression, and only this assertion tells them apart.
+    for (const phase_type of MODEL_BEARING_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+        />,
+      )
+      expect(screen.queryByLabelText(/^ai model/i)).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("PRESENT ⇒ a real <select> on all four types, and NEVER a textbox", () => {
+    for (const phase_type of MODEL_BEARING_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={MODEL_PICKER}
+        />,
+      )
+      const control = screen.getByLabelText(/^ai model/i)
+      expect(control.tagName).toBe("SELECT")
+      expect((control as HTMLSelectElement).value).toBe("gpt-5.4")
+      unmount()
+    }
+  })
+
+  it("PRESENT but a step type with NO model ⇒ still nothing — the gate is the phase type", () => {
+    for (const phase_type of ["programmatic", "llm_human_input"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", fn: "split_topic", input_keys: ["topic"] })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={MODEL_PICKER}
+        />,
+      )
+      expect(screen.queryByLabelText(/^ai model/i)).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("A BLANK stored model — the case 239 of 257 real phases are in — renders as the named inherit option", () => {
+    // ⚠ THE DOMINANT REAL SHAPE, MEASURED: of 257 phases across 270 stored definitions, 239
+    // carry a blank `model`. A mount that could not render a blank gracefully would break the
+    // overwhelming majority of workflows that exist, so this is the case the phase is judged on.
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_single", prompt: "x", model: "" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        modelPicker={MODEL_PICKER}
+      />,
+    )
+    const control = screen.getByLabelText(/^ai model/i) as HTMLSelectElement
+    expect(control.value).toBe("")
+    // A NAMED leading option, never an empty slot (D-05), and it hedges rather than asserting a
+    // default this code does not implement (D-06) — the resolved id is the server's, not ours.
+    expect(control.options[0].textContent).toContain("Use the run's model")
+    expect(control.options[0].textContent).toContain("gpt-5.4")
+    // …and a blank is NOT retained as a phantom `(current)` row.
+    expect(control.textContent).not.toContain("(current)")
+  })
+
+  it("A MISSING model key reads the same as a blank one — no crash, no phantom row", () => {
+    // `cfg.model` is genuinely absent on some stored phases, not merely empty. `asStr` maps both
+    // to `""`, and this pins that the mount inherits that mapping rather than passing undefined.
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_emit", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        modelPicker={MODEL_PICKER}
+      />,
+    )
+    const control = screen.getByLabelText(/^ai model/i) as HTMLSelectElement
+    expect(control.value).toBe("")
+    expect(control.textContent).not.toContain("(current)")
+  })
+
+  it("OPENING THE FORM WRITES NOTHING — viewing a workflow is not editing it (D-07)", () => {
+    // The failure this catches is INVISIBLE on screen, which is why it is asserted here as well
+    // as being owed as UAT row U-A1 (whose proof is a DB read). A mount that normalised a stored
+    // value on open would silently rewrite 239 blank models the first time anyone looked.
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    for (const model of ["", "gpt-5.4", "a-model-the-registry-never-heard-of"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type: "llm_emit", prompt: "x", model })}
+          open
+          onChange={onChange}
+          onPersist={onPersist}
+          onClose={noop}
+          modelPicker={MODEL_PICKER}
+        />,
+      )
+      unmount()
+    }
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onPersist).not.toHaveBeenCalled()
+  })
+
+  it("A STORED model the registry does not know is KEPT, not silently dropped (D-08)", () => {
+    // Saving is not blocked and the value is not rewritten: an operator retiring a registry row
+    // must not make every existing workflow unsaveable, or quietly change what they run on.
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x", model: "retired-model-9" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        modelPicker={MODEL_PICKER}
+      />,
+    )
+    const control = screen.getByLabelText(/^ai model/i) as HTMLSelectElement
+    expect(control.value).toBe("retired-model-9")
+    expect(control.textContent).toContain("(current)")
+  })
+
+  it("a pick calls onChange with the chosen id, and a blur persists — the panel's ONE discipline", () => {
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_single", prompt: "x", model: "" })}
+        open
+        onChange={onChange}
+        onPersist={onPersist}
+        onClose={noop}
+        modelPicker={MODEL_PICKER}
+      />,
+    )
+    const control = screen.getByLabelText(/^ai model/i)
+    fireEvent.change(control, { target: { value: "kimi-k3" } })
+    expect(onChange).toHaveBeenCalledWith({ model: "kimi-k3" })
+    fireEvent.blur(control)
+    expect(onPersist).toHaveBeenCalledTimes(1)
   })
 })

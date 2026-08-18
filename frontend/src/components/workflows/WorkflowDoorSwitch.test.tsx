@@ -66,6 +66,9 @@ vi.mock("@/lib/api", () => ({
   listSkills: mockListSkills,
   readTemplatePlaceholdersFromFile: mockReadPlaceholders,
   uploadWorkflowTemplate: mockUploadTemplate,
+  // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the hosted
+  // Builder reads the author model registry at mount and this factory must declare it.
+  getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
 }))
 
 import { WorkflowDoorSwitch } from "./WorkflowDoorSwitch"

@@ -411,7 +411,41 @@ const BASELINE = {
   // and a SOURCE fence asserting the mount is exactly one line carrying both the type gate and
   // the whole-prop spread. Without that last one the "one gated line" claim is prose.
   // Read from THIS SCRIPT'S OWN `actual` column (`PhaseFormPanel.test.tsx 19 24 +5`).
-  "PhaseFormPanel.test.tsx": 24,
+  //
+  // 196-08 (AUTH-04 / D-20): 24 → 38. AN EXTENSION, and the SAME kind as 193.1's above —
+  // nothing was deleted, renamed or lowered; all 24 shipped cases are still here and still
+  // counted, and the shipped one-gated-line fence is byte-unchanged. The +14 exist because
+  // this phase REPLACED the four free-text `AI model` boxes with four registry-backed picker
+  // mounts, and the shipped fence could not see any of it: it is scoped to the template
+  // name-check mount, so a picker mount passes through it invisibly AND the panel could have
+  // grown a memo to build the option list with that fence noticing nothing at all.
+  //
+  // ⚠ WHAT WOULD BE UNGUARDED WITHOUT THEM, since an unpinned case is an unguarded one:
+  //
+  //   • THE MOUNT SHAPE — exactly four mounts, guards compared as a SORTED SET against the
+  //     four model-bearing step types, each forwarding the caller's answer whole. A bare
+  //     length check passes a duplicate guard and a missing type alike; the set comparison
+  //     fails both. Driven RED against a real ungated-mount plant in production source
+  //     (`expected [ Array(4) ] to deeply equal [ 'llm_agent', …(3) ]`), then restored
+  //     md5-identical — a fence never observed red is not evidence.
+  //   • THE ABSOLUTE ZERO — `useMemo` / `useState` / `useEffect` counted on the panel's own
+  //     `?raw` source and required to be 0, not merely non-increasing. All three measured 0
+  //     before this phase, so a non-decrease criterion would have permitted the first one.
+  //     Also driven RED against a real planted memo (`expected 1 to be +0`).
+  //   • THE BLANK — 239 of 257 phases across the 270 stored definitions carry a blank
+  //     `model`. That case renders the NAMED inherit option carrying the server-resolved id,
+  //     and no phantom `(current)` row. It is the shape the overwhelming majority of real
+  //     workflows are in, and nothing else in this tree asserts it end-to-end through the
+  //     panel.
+  //   • NO-WRITE-ON-OPEN across three stored values including an unknown one (D-07). The
+  //     failure it catches is INVISIBLE on screen — a mount that normalised a stored value on
+  //     open would silently rewrite those 239 blanks the first time anybody looked at them.
+  //   • ABSENT ⇒ NO CONTROL AT ALL, and emphatically no free-text fallback. AUTH-04 is the
+  //     claim that no path through this form accepts a typed model name; without this case a
+  //     future "graceful degradation" that restores a text input reads as a fix.
+  //
+  // Read from THIS SCRIPT'S OWN `actual` column (`PhaseFormPanel.test.tsx 24 38 +14`).
+  "PhaseFormPanel.test.tsx": 38,
   // 193.1-09 (AUTH-03 / SC#3) — TWO NEW FILES, pinned in the SAME COMMIT that creates them,
   // because a `BASELINE` key naming a path that does not yet exist makes this gate ERROR
   // (exit 2) rather than fail.

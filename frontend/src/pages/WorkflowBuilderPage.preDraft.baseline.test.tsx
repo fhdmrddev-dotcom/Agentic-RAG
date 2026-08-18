@@ -141,6 +141,9 @@ const WIRE = vi.hoisted(() => {
     updateWorkflowDraft: () => Promise.reject(new Error("no row is updated before a draft exists")),
     validateWorkflow: () => Promise.resolve({ ok: true, verdicts: [] }),
     getGroundingBundle: () => Promise.resolve({ tools: [], folders: [], skills: [], degraded: [] }),
+    // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
+    // reads the author model registry at mount and this factory must declare it.
+    getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
     publishWorkflow: () => Promise.reject(new Error("nothing is published from the describe screen")),
     listPublishedWorkflows: () => Promise.resolve([]),
     listStarterWorkflows: () => Promise.resolve([]),

@@ -119,6 +119,9 @@ vi.mock("@/lib/api", () => ({
   // distinct here rather than merely described as distinct.
   getWorkflowDeletePreview: mockDeletePreview,
   deleteWorkflowCascade: mockDeleteCascade,
+  // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: this page's
+  // rows reach the Builder, which reads the author model registry at mount.
+  getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
 }))
 
 import { WorkflowsPage } from "./WorkflowsPage"

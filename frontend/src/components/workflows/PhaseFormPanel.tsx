@@ -58,6 +58,42 @@ import { ExternalActionSection } from "./ExternalActionSection"
 import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
+// 196-08 (AUTH-04) — the registry-backed picker. ONE import, and the arrow points ONE WAY:
+// this panel imports the picker, the picker imports nothing from here.
+//
+// ── THE `FieldLabel` EXTRACTION: CONSIDERED, AND DEFERRED ON A REASON ──────────────────────
+//
+// `FieldLabel` and `InfoHint` are private functions in THIS file, so the picker renders the
+// same two-audience structure locally rather than importing them. Plan 196-05 discovered that
+// (its `<interfaces>` assumed the primitive was importable; it is not) and recommended that
+// THIS plan extract both into their own module, because this is the file that owed the edit.
+//
+// ⚠ IT IS DELIBERATELY NOT TAKEN HERE, and the reason is the shape of this plan rather than
+// disagreement with the recommendation. The extraction is the right architecture: it removes a
+// real duplication and permanently forecloses the ESM cycle that exporting `FieldLabel` would
+// otherwise invite once the import above exists. But it is a refactor of a G-5 hot file that
+// would also rewrite the picker's rendered markup — a component whose 32-case suite pins that
+// markup — inside the one plan whose whole discipline is a capped diff under this file's
+// standing ONE GATED LINE order. Smuggling a refactor into the mount that makes AUTH-04 real
+// is how a narrow change stops being reviewable as one.
+//
+// NO CYCLE EXISTS TODAY: the arrow points one way, and nothing here exports a label primitive.
+//
+// ⚠ RE-OPEN TRIGGER, concrete so this is a deferral and not a drop — take the extraction in
+// the FIRST of these to happen: (a) any change to `FieldLabel`'s or `InfoHint`'s markup or
+// a11y contract, which would silently desynchronise the picker's local copy; (b) a THIRD
+// consumer needing the same two-audience label; or (c) any future need to import a primitive
+// from this file back into the picker, which is the move that would create the real cycle.
+//
+// ⚠ THE TYPE IS ALIASED ON IMPORT, AND THE ALIAS IS LOAD-BEARING RATHER THAN COSMETIC. A
+// generic written over the child's own props type — `Pick< the-props-type , … >` — puts the
+// component's opening-tag token on a line that is NOT a mount, because the props type's name
+// starts with the component's name. This phase's fence counts lines carrying that token, so an
+// unaliased reference reads as a FIFTH mount with no phase-type guard, which is precisely the
+// shape the fence exists to reject. Aliasing keeps "a line carrying the tag" and "a mount" the
+// same set. ⚠ The token is not spelled anywhere in this file's prose for the same reason — a
+// comment that describes a fence is counted BY it (the 187-24 trap; this very comment hit it).
+import { ModelField, type ModelFieldProps as PickerProps } from "./ModelField"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 // TYPE-ONLY, and erased at build. The child declares its OWN props; this panel exports no
 // props type for it, exactly as it exports none for the two sections above.
@@ -202,6 +238,47 @@ export interface PhaseFormPanelProps {
   nameCheck?: {
     classification: TemplateNameClassification
   }
+  /**
+   * Phase 196-08 (AUTH-04 / D-20) — the live model registry answer, already finished.
+   *
+   * Caller-owned for the FIFTH time in this file's history and for the identical reason the
+   * four props above are: the answer is derived ABOVE this panel — one `GET /models/registry`
+   * read plus the app-wide ⌥ reveal — while this panel's only write seam (`onChange`) patches
+   * `config`. The picker mounts FOUR times in one open, so a component-level fetch would be
+   * four requests per step click; owning the read at `WorkflowBuilderPage` is what makes the
+   * one-gated-line shape below satisfiable at all.
+   *
+   * THE PANEL COMPUTES NOTHING FOR IT — no memo to shape the rows, no predicate to drop the
+   * disabled ones, no projection to build the options. Every one of those lives in the picker
+   * component and its vocabulary module. This panel receives a finished answer and forwards it
+   * whole. (⚠ The hook names are deliberately not spelled: the fence below counts them over
+   * this file's own source, so naming them in prose is how a guardrail fails by description.)
+   *
+   * ABSENT ⇒ THE FOUR MOUNTS RENDER NOTHING, which is what keeps every other mount of this
+   * panel byte-identical by construction rather than by review. ⚠ Unlike the four props above,
+   * absence here REMOVES a field that has been on this form since Phase 103 rather than
+   * withholding a new section — a deliberate trade the caller documents at its own mount: an
+   * absent field writes nothing and says nothing false, while a picker fed an empty array
+   * would label every stored model "not in the registry". Absence must never resurrect the
+   * free-text box; that is fenced in `PhaseFormPanel.test.tsx`.
+   *
+   * ⚠ ONE GATED LINE, BY STANDING ORDER (G-5 / D-22 / D-20). This file's hot-file ledger row
+   * closes with an instruction rather than a status: *"the next surface that needs the panel
+   * gets its own component and one gated line."* Phase 185 honoured it, Phase 193 honoured it
+   * again, Phase 193.1 made it MECHANICAL with a `?raw` source fence — and this phase is the
+   * FOURTH honouring. It writes its OWN fence, because the shipped one is scoped to the
+   * template name-check mount and a picker mount passes through it invisibly.
+   *
+   * ⚠ THE TOKEN THAT MOUNT IS MATCHED BY IS DELIBERATELY NOT SPELLED IN THIS DOCBLOCK. The
+   * shipped fence splits this file's own source and counts the lines carrying it, so writing
+   * it in prose makes the count 2 and fails a guardrail by describing it — the 187-24 trap,
+   * which this paragraph hit on its first draft. The same rule binds the picker's fence below.
+   *
+   * The shape is `Pick` off `ModelFieldProps` rather than a re-typed object literal, so the
+   * spread at each mount matches the component's contract by construction: a prop renamed in
+   * `ModelField` becomes a typecheck error here instead of a silently dropped attribute.
+   */
+  modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical">
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -758,6 +835,7 @@ export function PhaseFormPanel({
   onGovernanceChange,
   template,
   nameCheck,
+  modelPicker,
 }: PhaseFormPanelProps) {
   // RESTING rail — the parent grid collapses this column to 44px; show a thin hint.
   if (!open || !phase) {
@@ -873,15 +951,7 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {modelPicker && pt === "llm_single" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <TextField
                 label="Creativity"
                 hint="temperature — 0 is focused and repeatable, higher is more varied."
@@ -909,15 +979,7 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {modelPicker && pt === "llm_agent" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions the AI may take before it must stop."
@@ -961,15 +1023,7 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {modelPicker && pt === "llm_batch_agents" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions each worker may take before it must stop."
@@ -1063,15 +1117,10 @@ export function PhaseFormPanel({
                 value={asStr(cfg.emitter, "render_template")}
                 full
               />
-              <TextField
-                label="AI model"
-                qualifier="(optional — uses the default if blank)"
-                hint="model — pick a specific model, or leave blank to use the workspace default."
-                help="Leave blank to use the workspace default."
-                value={asStr(cfg.model)}
-                onChange={set("model")}
-                onPersist={onPersist}
-              />
+              {/* D-12 — the fitness flag rides THIS mount and no other: on the three step
+                  types above the emission tier predicts nothing about the outcome, and a
+                  warning that predicts nothing trains people to ignore the ones that do. */}
+              {modelPicker && pt === "llm_emit" && <ModelField {...modelPicker} showFitness value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
               <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
               <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
               <SelectField

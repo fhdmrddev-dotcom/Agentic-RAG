@@ -145,6 +145,11 @@ vi.mock("@/lib/api", () => {
     listSkills: mockListSkills,
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
+    // 196-08 (AUTH-04): the Builder now reads the author model registry on mount, so this
+    // factory owes the export or the page throws before rendering anything — the same shape
+    // `getGroundingBundle` had to be added for, one phase earlier. An empty registry is the
+    // right stub here: these rows are about the draft flow, not the picker.
+    getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
     publishWorkflow: mockPublish,
     listPublishedWorkflows: mockListPublished,
     listStarterWorkflows: mockListStarters,
