@@ -1025,3 +1025,518 @@ async def test_a_retry_emit_is_stamped_identically_to_a_first_emit(monkeypatch):
     assert len(calls) == 2  # the shipped budget: 1 then 2, never 3
     assert result["ok"] is True
     assert _wd(result["definition"]).business_requirement_seeded_by_ai is True
+
+
+# ══ Phase 197 (AUTH-02 / D-13) — the SERVER'S OWN READINESS VERDICT ══════════════════════
+#
+# The arrival card RENDERS a verdict; it never DECIDES one (187-24). These cases pin the
+# three properties that make that posture checkable:
+#
+#   1. the success payload carries the verdict, derived from the ONE shipped predicate;
+#   2. the `missing` arm's sentence IS the shipped constant — asserted by identity against
+#      the imported name, never against a string re-typed here (which would be the second
+#      copy the whole D-12 arrangement exists to prevent);
+#   3. the four honest-failure arms carry NOTHING (T-197-07).
+#
+# ⚠ NOTHING HERE IS A FREQUENCY CLAIM (D-08, this module's header binds this section too).
+# Each case STUBS what the model emitted and asserts what the SERVER derives from it.
+
+# The two-token status vocabulary, closed on purpose: a third token would be a state the
+# publish gauntlet cannot produce.
+READINESS_STATUSES = frozenset({"present", "missing"})
+
+
+def _readiness_message_constant() -> str:
+    """The shipped sentence, fetched from its ONE home at call time.
+
+    Imported rather than re-typed for the reason the constant's own docblock gives: it
+    reaches the author VERBATIM (`blockedReason` relays it and D-182-06 forbids a
+    client-side message map), so a copy spelled in this file would be a second source free
+    to drift from the gate's actual words while every assertion stayed green.
+    """
+    from app.services.harness.grounding import BUSINESS_REQUIREMENT_MISSING_MESSAGE
+
+    return BUSINESS_REQUIREMENT_MISSING_MESSAGE
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("requirement", "expected_status"),
+    [
+        pytest.param(
+            "Produce a client-ready renewal brief for a named account from our own records.",
+            "present",
+            id="a-stated-requirement-reads-present",
+        ),
+        pytest.param(_ABSENT, "missing", id="an-absent-key-reads-missing"),
+        pytest.param("", "missing", id="an-empty-string-reads-missing"),
+        pytest.param("   \n\t ", "missing", id="whitespace-only-reads-missing"),
+    ],
+)
+async def test_the_success_payload_carries_the_servers_own_readiness_verdict(
+    monkeypatch, requirement, expected_status
+):
+    """**D-13** — a freshly generated draft arrives carrying the server's verdict on
+    whether it can be published, in the server's own words.
+
+    The verdict is not a new rule. It is the ONE shipped publish predicate
+    (`grounding.business_requirement_missing`, publish stage 1's own) read a second time
+    at authoring time, so the client can render a truth the server already owns instead of
+    re-deriving one of its own in TypeScript.
+
+    ⚠ Both verdicts are exercised, so the case cannot pass over a derivation that is
+    unconditionally one value.
+    """
+    result = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(requirement)
+    )
+
+    assert result["ok"] is True
+    verdict = result["readiness"]["business_requirement"]
+    assert verdict["status"] in READINESS_STATUSES
+    assert verdict["status"] == expected_status
+
+
+@pytest.mark.asyncio
+async def test_the_missing_arm_relays_the_gates_own_sentence_and_the_present_arm_is_silent(
+    monkeypatch,
+):
+    """D-12 — the author sees the GATE'S words, and only when there is something to say.
+
+    Two halves of one contract:
+
+      * on `missing`, the message is the shipped constant **by identity** — the same
+        object publish stage 1 would show. Compared against the imported name, never
+        against a sentence spelled in this file.
+      * on `present`, the key is **ABSENT**, not `None`. A nullable field is a two-arm
+        read waiting to happen and the client's union depends on absence meaning absence.
+    """
+    constant = _readiness_message_constant()
+
+    missing = await _generate_emitting(
+        monkeypatch, _definition_dict_with_requirement(_ABSENT)
+    )
+    missing_verdict = missing["readiness"]["business_requirement"]
+    assert missing_verdict["message"] == constant
+    assert missing_verdict["message"] is constant  # the object, not a lookalike
+
+    present = await _generate_emitting(
+        monkeypatch,
+        _definition_dict_with_requirement(
+            "Produce a client-ready renewal brief for a named account from our own records."
+        ),
+    )
+    present_verdict = present["readiness"]["business_requirement"]
+    assert "message" not in present_verdict
+    assert set(present_verdict) == {"status"}
+
+
+@pytest.mark.asyncio
+async def test_the_readiness_payload_carries_exactly_one_entry_and_no_row_data(monkeypatch):
+    """**D-20 / T-197-04** — ONE verdict, and nothing else rides along.
+
+    D-20 is a MEASUREMENT, not an omission: every gauntlet stage was enumerated from
+    source and exactly one is a definition-level predicate. A payload carrying extra
+    greens for things nothing refuses a publish for would be claims the server cannot
+    make — strictly worse than no field at all.
+
+    The information-disclosure half is the same assertion read the other way: a verdict
+    that is exactly one status token plus one fixed server constant cannot carry a folder
+    name, a folder id, a user id or any other row's data. The sweep drives BOTH arms so a
+    payload that widened on only one of them still fails.
+    """
+    for requirement in (
+        _ABSENT,
+        "Produce a client-ready renewal brief for a named account from our own records.",
+    ):
+        result = await _generate_emitting(
+            monkeypatch, _definition_dict_with_requirement(requirement)
+        )
+        readiness = result["readiness"]
+        assert set(readiness) == {"business_requirement"}
+
+        verdict = readiness["business_requirement"]
+        assert set(verdict) <= {"status", "message"}
+        # Every leaf is a token or the shipped constant — nothing derived from a row.
+        for value in verdict.values():
+            assert isinstance(value, str)
+        # The stub user id the driver passes must not appear anywhere in the payload.
+        assert "u1" not in json.dumps(readiness)
+
+
+@pytest.mark.asyncio
+async def test_a_could_not_generate_failure_carries_no_readiness_verdict(monkeypatch):
+    """**T-197-07** — a failed generation makes NO claim about publishability.
+
+    The honest-failure arms return `{ok: False, error, detail}` and gain nothing here. A
+    verdict on a draft that does not exist would be the `SEED-159` shape — a value that
+    reads as an answer where there is none — and the arrival card's union would have to
+    defend against a state that means nothing.
+
+    This drives the retry-exhausted arm: two failed emits, the shipped 1-then-2 budget.
+    """
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+    _patch_user_settings(monkeypatch)
+    calls = _patch_emit(monkeypatch, [{"emitted": None, "failure": "validation_failed"}])
+
+    result = await _generate()
+
+    assert len(calls) == 2  # non-vacuity: the failure arm was really reached
+    assert result["ok"] is False
+    assert result["error"] == "could_not_generate"
+    assert "readiness" not in result
+    assert "definition" not in result  # the shipped rule: a failure carries no draft
+
+
+@pytest.mark.asyncio
+async def test_a_grounding_failure_carries_no_readiness_verdict(monkeypatch):
+    """T-197-07, a SECOND arm — because "no verdict on failure" is a property of the
+    control flow, not of one branch.
+
+    Grounding fidelity returns its own `ok: False` dict and returns it DIRECTLY, from a
+    point earlier than the success path's derivation. A verdict attached by a future edit
+    at the top of the function rather than at the bottom would pass the case above (whose
+    return is later still) and fail here.
+    """
+    import app.services.workflow_authoring as wa
+
+    _patch_grounding(monkeypatch)
+    _patch_provider(monkeypatch)
+    _patch_user_settings(monkeypatch)
+    _patch_emit(monkeypatch, [{"emitted": _wd(_named_definition_dict()), "failure": None}])
+
+    async def _fake_fidelity(*_args, **_kwargs):
+        return {"ok": False, "error": "grounding_failed", "detail": "planted violation"}
+
+    monkeypatch.setattr(wa, "_check_grounding_fidelity", _fake_fidelity)
+
+    result = await _generate()
+
+    assert result["ok"] is False
+    assert result["error"] == "grounding_failed"  # non-vacuity: the arm was reached
+    assert "readiness" not in result
+
+
+def test_the_generate_path_declares_no_predicate_and_no_message_of_its_own():
+    """**T-197-03 / 187-24** — the authoring path is a CONSUMER, never a second home.
+
+    `grounding.py`'s own section header states the rule: *the shared publish invariant —
+    one source, even trivial*. This case makes the posture mechanical rather than a claim
+    in a comment: the service module must contain NO assignment of the message constant
+    and NO definition of the predicate, and must import both from the one home.
+
+    Read off the SOURCE rather than off the module object, because a re-implementation
+    that happened to produce equal values would be invisible to a behavioural assertion —
+    and that silent second copy is exactly what this fences.
+    """
+    import inspect
+
+    import app.services.workflow_authoring as wa
+
+    source = inspect.getsource(wa)
+
+    assert not re.search(r"BUSINESS_REQUIREMENT_MISSING_MESSAGE\s*[:=]", source), (
+        "the authoring path declares its own copy of the gate's sentence"
+    )
+    assert "def business_requirement_missing" not in source, (
+        "the authoring path re-implements the shipped publish predicate"
+    )
+    assert "from app.services.harness.grounding import" in source, (
+        "the authoring path must consume the ONE home by import"
+    )
+
+
+# ══ Phase 197 (AUTH-02 / D-14) — HALF A: THE EMIT CONTRACT FENCE ═════════════════════════
+#
+# THE SHAPE THIS CATCHES, stated as a pattern rather than as one field: an authoring
+# contract that ADVERTISES something the authoring path never asks for. That is the shape
+# behind `SEED-157`, `SEED-163` and the AI-chosen name — three independently-recorded
+# instances of one structural defect — so the fence is over the PATTERN, not over any
+# particular field.
+#
+# ⚠ A NAIVE FENCE IS WRONG HERE, and that is the whole reason this file gets an allowlist
+# rather than a one-line assertion. Measured: the emit tool advertises 15 top-level
+# properties and the prompt names 7. Eight are advertised-and-not-asked TODAY and most of
+# them are CORRECTLY so. A fence reading "every advertised field must be asked for" would
+# be red on arrival and would be deleted within a week.
+#
+# ⚠ THIS IS TWO-DIRECTIONAL. A field ADDED to the model and not consciously routed reds on
+# the commit that adds it; an entry REMOVED from the allowlist without the field being
+# asked for also reds. The allowlist therefore cannot be grown to silence the test without
+# a reason being written down — which is the only property that makes an allowlist worth
+# anything.
+
+#: Advertised by the emit tool, deliberately NOT asked for in the prompt — one entry per
+#: field, each carrying its reason IN THE LITERAL (the shipped `ADMISSION_CASES` idiom:
+#: a reason in a comment is not readable by the person who later wants to delete the row).
+ADVERTISED_BUT_NOT_ASKED: dict[str, str] = {
+    "output_target_folder": (
+        "098 additive-optional SHAPE ONLY (D-08, `models/harness.py:528`) — the column "
+        "exists so old JSONB rows validate; no shipped path reads it, so asking a model "
+        "to fill it would manufacture a value nothing consumes"
+    ),
+    "reingest_output": (
+        "098 additive-optional SHAPE ONLY (D-08, `models/harness.py:529`) — same reason "
+        "as the field above; a defaulted bool nothing acts on"
+    ),
+    "version_policy": (
+        "098 additive-optional SHAPE ONLY (D-08, `models/harness.py:530`) — a Literal "
+        "with a shipped default; a model choosing between two tokens nothing reads is "
+        "noise in the emit"
+    ),
+    "provenance": (
+        "098 net-new FLAG with a shipped default (D-08, `models/harness.py:531`) — a "
+        "provenance claim is a thing the SERVER decides, never a thing the model asserts "
+        "about itself; cf. the stamp this file already fences in both directions"
+    ),
+    "inputs": (
+        "the launch-form spec, authored on the visual canvas rather than at birth "
+        "(`models/harness.py:532`) — a generated draft that invented launch inputs would "
+        "hand the author a form nobody asked for"
+    ),
+    "assets": (
+        "template/reference refs, PRODUCED by the author-time binding door and consumed "
+        "by `template_asset_service.resolve_template_source` (`models/harness.py:533`) — "
+        "an asset ref names a real Storage path, so a model inventing one names a file "
+        "that does not exist"
+    ),
+    "business_requirement_seeded_by_ai": (
+        "the PROVENANCE stamp for the field above it — deliberately ignored from the "
+        "model in BOTH directions and written server-side after validation "
+        "(`workflow_authoring.py`, the 193.2 stamp block). Asking for it would invite "
+        "exactly the laundering T-193.2-03b exists to refuse"
+    ),
+    "category": (
+        "the Starters-shelf curation marker (`models/harness.py:575-581`) — it is in the "
+        "schema so the fresh-copy STARTER FORK can round-trip it through create_draft "
+        "without `extra='forbid'` raising; it is a curation fact, not an authoring choice"
+    ),
+}
+
+
+def _fields_named_in_prompt(properties) -> set[str]:
+    """The ASKED set: advertised property names that occur in the authoring prompt.
+
+    Deliberately crude — a membership test, not a parser — for the same reason
+    `_sentences_naming` above is crude: it is a PROPERTY EXTRACTOR. A field the prompt
+    mentions anywhere has been consciously routed; a field it never mentions has not.
+    """
+    prompt = _prompt()
+    return {name for name in properties if name in prompt}
+
+
+def _advertised_but_not_asked(schema: dict) -> set[str]:
+    """THE CHECKER, taking its schema as an argument so the positive control can hand it a
+    modified copy. A checker that could only ever read the real schema could never be
+    shown to fire.
+    """
+    properties = schema["properties"]
+    return set(properties) - _fields_named_in_prompt(properties)
+
+
+def test_every_advertised_but_not_asked_entry_carries_a_reason():
+    """The allowlist's ONLY defence is that a row costs an explanation to add.
+
+    An entry with an empty reason is a silenced test wearing the costume of a documented
+    decision, so emptiness is refused mechanically rather than by review.
+    """
+    assert ADVERTISED_BUT_NOT_ASKED, "an empty allowlist would make the fence below vacuous"
+    assert all(isinstance(v, str) and v.strip() for v in ADVERTISED_BUT_NOT_ASKED.values())
+
+
+def test_the_advertised_but_not_asked_set_is_exactly_the_reasoned_allowlist():
+    """**D-14 half A** — the emit contract advertises nothing unrouted.
+
+    SET EQUALITY, in both directions and on purpose:
+
+      * a property ADDED to `WorkflowDefinition` (and therefore to `WF_SCHEMA`, which is
+        the model's own `model_json_schema()`) that the prompt never mentions turns this
+        red **on the commit that adds it** — the D-22 shape, caught at authoring time
+        rather than discovered as a live gap months later;
+      * an entry REMOVED from the allowlist while the field is still unasked ALSO reds, so
+        the allowlist cannot be quietly emptied.
+
+    ⚠ It asserts nothing about which side any field SHOULD be on. That is a judgement, and
+    the allowlist is where the judgement is written down.
+    """
+    from app.services.workflow_authoring import WF_SCHEMA
+
+    properties = WF_SCHEMA["properties"]
+    asked = _fields_named_in_prompt(properties)
+
+    # non-vacuity, both ways — a corpus that collapsed to empty, or a prompt that
+    # mentioned nothing, would make the equality trivially satisfiable.
+    assert len(properties) >= 15, "the advertised contract looks truncated"
+    assert asked, "no advertised property is named in the prompt — the checker is blind"
+
+    assert _advertised_but_not_asked(WF_SCHEMA) == set(ADVERTISED_BUT_NOT_ASKED)
+
+
+def test_positive_control_the_checker_reports_a_synthetic_advertised_field():
+    """THE SYNTHETIC PLANT — proof the checker KEEPS firing once every real instance is
+    allowlisted.
+
+    Without it, the case above could pass forever because the checker had gone blind, and
+    an absence assertion over a blind checker is indistinguishable from a clean tree. This
+    is the standing rule from 192.1 and SC#3 in 196: every fence carries a control.
+
+    ⚠ The fabricated name is ASSEMBLED AT RUNTIME from fragments and appears nowhere in
+    this file as a contiguous literal. These fences read raw sources by membership, so a
+    needle spelled out in prose becomes a needle the fence then finds — the trap that hit
+    four times in `196-08`, once inside the comment written to explain the first three.
+    """
+    from app.services.workflow_authoring import WF_SCHEMA
+
+    planted = "_".join(("plant", "ed", "unrouted", "prop"))
+    assert planted not in _prompt(), "the plant must be genuinely unasked-for"
+    assert planted not in ADVERTISED_BUT_NOT_ASKED, "the plant must be genuinely unrouted"
+
+    modified = copy.deepcopy(WF_SCHEMA)
+    modified["properties"][planted] = {"type": "string"}
+
+    reported = _advertised_but_not_asked(modified)
+
+    assert planted in reported, "the checker cannot see a newly advertised, unasked field"
+    assert reported != set(ADVERTISED_BUT_NOT_ASKED), (
+        "the fence above would not have gone red on this plant"
+    )
+    # The real schema object is untouched — the control must not contaminate the fence.
+    assert planted not in WF_SCHEMA["properties"]
+
+
+# ══ Phase 197 (AUTH-02 / D-14) — HALF B: THE REQUEST CONTRACT FENCE ══════════════════════
+#
+# The same pattern from the other side of the wire. Half A asks *"does the authoring path
+# ASK for everything its contract advertises?"*; half B asks *"does the client SEND
+# everything the server ACCEPTS?"* Both failures look identical from a user's seat — a
+# capability that exists in a type and nowhere in the product.
+#
+# ⚠ THIS FENCE'S POSITIVE CONTROL IS REAL, NOT PLANTED. It was landed with an EMPTY
+# allowlist and observed RED against a live, independently-recorded, currently-unclosed
+# instance in the tree — so it has been exercised against the wild rather than against
+# something its author invented. The RED output is quoted in this plan's SUMMARY. The
+# synthetic control in half A covers the complementary property (that it keeps firing once
+# every real instance is allowlisted).
+#
+# ⚠ THE NEEDLE TRAP, stated by ROLE because stating it by name would spring it: this fence
+# reads a FRONTEND SOURCE FILE and decides "sent" by membership. A comment added to that
+# file naming one of the request fields would therefore be read as evidence that the field
+# is sent, and the fence would go quietly green on an unwired channel. Comments are
+# stripped before the membership test for exactly this reason, and no plan may rely on
+# that stripping as a licence to name a field in prose over there.
+
+#: The ONE production call site of the generation route, as repo-relative path SEGMENTS —
+#: joined against a root derived from `__file__`, never an absolute path (a hard-coded one
+#: is wrong in every worktree, and this suite runs in worktrees routinely).
+_GENERATE_CALL_SITE = (
+    "frontend",
+    "src",
+    "components",
+    "workflows",
+    "useTemplateFirstDraft.ts",
+)
+
+#: Accepted by the request model, never sent by the call site above — with the measured
+#: reason, in the literal.
+#:
+#: ⚠ THE ONE ENTRY HERE IS A CONFESSION OF A LIVE DEFECT, NOT A DISMISSAL OF ONE. The fence
+#: was landed with this mapping EMPTY and observed RED against it (the output is quoted in
+#: `197-02-SUMMARY.md`), which is why this file's half-B control is real rather than
+#: planted. It is allowlisted rather than fixed because wiring the channel means either
+#: widening the server's type or changing what the upload door mints — a change to the
+#: template-binding contract, which is `AUTH-03`'s surface and not `AUTH-02`'s.
+#:
+#: RE-OPEN TRIGGER: the next phase that takes up template binding. Deleting this entry
+#: without wiring the field reds the fence, which is the point.
+ACCEPTED_BUT_NEVER_SENT: dict[str, str] = {
+    "template_asset_id": (
+        "`SEED-157` instance 1, half-closed: 193.1-07 wired the placeholders arm and left "
+        "this one. MEASURED — the field is typed `UUID | None` while the Phase-193 upload "
+        "door mints a STORAGE PATH, so passing a real asset id is a 422 before the handler "
+        "runs (the identical defect found the same day on the grounding-bundle route, "
+        "`260814-q5r-SUMMARY.md`). The channel is UNWIRABLE AS TYPED, so the client cannot "
+        "send it and no amount of frontend work would change that. Wiring it is a "
+        "template-binding contract change — AUTH-03's surface, not AUTH-02's. RE-OPEN: the "
+        "next phase that takes up template binding"
+    ),
+}
+
+
+def _repo_root():
+    from pathlib import Path
+
+    # <root>/backend/tests/unit/<this file>
+    return Path(__file__).resolve().parents[3]
+
+
+def _generate_call_site_source() -> str:
+    """The call site's source with comments stripped — see the needle-trap note above."""
+    raw = _repo_root().joinpath(*_GENERATE_CALL_SITE).read_text(encoding="utf-8")
+    without_blocks = re.sub(r"/\*.*?\*/", " ", raw, flags=re.DOTALL)
+    return re.sub(r"//[^\n]*", " ", without_blocks)
+
+
+def _request_fields() -> set[str]:
+    from app.api.workflows import GenerateRequest
+
+    return set(GenerateRequest.model_fields)
+
+
+def _accepted_but_never_sent() -> set[str]:
+    source = _generate_call_site_source()
+    return {name for name in _request_fields() if name not in source}
+
+
+def test_the_generation_call_site_is_readable_and_really_is_the_call_site():
+    """NON-VACUITY for the fence below, and it needs three separate proofs.
+
+    A fence that reads a file by path can fail silently in three ways — the path stops
+    resolving, the file stops being the call site, or the comment stripping eats the code.
+    Each is checked rather than assumed:
+
+      * the file resolves and is non-empty;
+      * it really is a caller of the generation route (it names the client function);
+      * stripping removed something and left the CODE — a stripper that ate the file would
+        report every field as never-sent, and a stripper that did nothing would report
+        every field as sent.
+
+    ⚠ THE SURVIVAL CHECK IS OVER TOKENS, NEVER OVER A CHARACTER RATIO, and that is a
+    measurement rather than a preference. This call site is **32,762 raw characters and
+    8,048 stripped — 75% comment by character**, because the module documents every wire
+    decision it makes at length. A plausible-looking `len(stripped) > len(raw) // 2` guard
+    is therefore FALSE on the very file it is guarding, and would have to be re-tuned every
+    time someone documents something. A token that must survive cannot rot that way.
+    """
+    raw = _repo_root().joinpath(*_GENERATE_CALL_SITE).read_text(encoding="utf-8")
+    stripped = _generate_call_site_source()
+
+    assert raw.strip(), "the call site is empty or unreadable"
+    assert "generateWorkflow" in stripped, "this file is not the generation call site"
+    assert len(stripped) < len(raw), "comment stripping removed nothing"
+    for token in ("import", "export", "await", "function"):
+        assert token in stripped, f"comment stripping ate the code — {token!r} is gone"
+
+    fields = _request_fields()
+    assert len(fields) >= 4, "the request contract looks truncated"
+    # The checker must see BOTH verdicts on the real tree, or it proves nothing.
+    assert _accepted_but_never_sent() != fields, "no field reads as sent — the fence is blind"
+
+
+def test_every_accepted_request_field_is_either_sent_or_allowlisted_with_a_reason():
+    """**D-14 half B** — the request contract promises nothing the product never uses.
+
+    SET EQUALITY, for the same two-directional reason half A is: a field ADDED to the
+    request model and never wired reds on the commit that adds it, and an entry REMOVED
+    from the allowlist without the field being wired also reds.
+
+    ⚠ An entry here is a CONFESSION, not a fix. It records that the server accepts
+    something no user action can produce, with the measurement that explains why, and it
+    is the correct state only while wiring the channel would be a different phase's
+    contract change.
+    """
+    assert all(
+        isinstance(v, str) and v.strip() for v in ACCEPTED_BUT_NEVER_SENT.values()
+    ), "an allowlist entry without a reason is a silenced test in costume"
+
+    assert _accepted_but_never_sent() == set(ACCEPTED_BUT_NEVER_SENT)

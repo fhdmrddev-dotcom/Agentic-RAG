@@ -333,8 +333,12 @@ async def generate_workflow_definition(
 ) -> dict:
     """Generate ONE grounded ``WorkflowDefinition`` draft from an NL description.
 
-    Returns on success ``{"ok": True, "definition": <model_dump json>}`` (NOT persisted —
-    persistence is REQ-1's explicit ``POST /workflows`` create). On failure returns an
+    Returns on success ``{"ok": True, "definition": <model_dump json>, "readiness": …}``
+    (NOT persisted — persistence is REQ-1's explicit ``POST /workflows`` create). The
+    ``readiness`` key is Phase 197 / D-13: the server's own verdict on whether the draft
+    can be published, in the gate's own words, sourced by IMPORT from
+    ``app.services.harness.grounding``. It is present ONLY here, on the success path — see
+    the block that builds it. On failure returns an
     honest structured error: ``{"ok": False, "error": <code>, "detail": ...}`` where code
     is one of ``no_authoring_model`` / ``could_not_generate`` / ``grounding_failed``. A
     failure NEVER carries a runnable/partial draft (REQ-2 c).
@@ -569,4 +573,53 @@ async def generate_workflow_definition(
 
     wd = wd.model_copy(update={"slug": f"{wd.slug}-{uuid.uuid4().hex[:8]}"})
 
-    return {"ok": True, "definition": wd.model_dump(mode="json")}
+    # ── Phase 197 (AUTH-02 / D-13) — the SERVER'S OWN READINESS VERDICT ──────────────
+    #
+    # The arrival card must RENDER a verdict, never DECIDE one (187-24). So the generate
+    # path becomes a SECOND CONSUMER of the one home that already owns this rule —
+    # exactly as `publish_service` stage 1 is — and declares neither the predicate nor
+    # the sentence of its own. A local copy of either is the drift D-klo-DEF-01 predicted
+    # and `grounding.py`'s own section header names ("one source, even trivial").
+    #
+    # ⚠ THE MESSAGE TRAVELS RATHER THAN BEING RE-TYPED IN TYPESCRIPT. D-182-06 forbids a
+    # client-side message map, so the author sees the gate's words VERBATIM — this IS the
+    # UI copy, and it is the same object the publish gauntlet would show.
+    #
+    # ⚠ D-20 — THE PAYLOAD CARRIES EXACTLY ONE ENTRY, AND THAT IS A MEASUREMENT, NOT AN
+    # OMISSION. Every gauntlet stage was enumerated from source: stage 1's
+    # `business_requirement_missing` is the ONLY definition-level predicate. Nothing
+    # anywhere refuses a publish for a missing KB binding, a missing template, a missing
+    # name or a missing deliverable — so a `readiness` that carried four extra greens
+    # would be four claims the server cannot make, which is strictly worse than no field
+    # at all. Adding a key here is a behaviour change to justify against the gauntlet.
+    #
+    # ⚠ THE `message` KEY EXISTS ONLY ON THE `missing` ARM. `"message": None` on the
+    # present arm would be a nullable field and therefore a two-arm read waiting to
+    # happen; the client's union depends on ABSENCE MEANING ABSENCE.
+    #
+    # ⚠ T-197-04 — it is a function of the definition just generated and carries no folder
+    # name, no folder id, no user id and no other row's data: one status token, plus one
+    # fixed server constant on one arm.
+    #
+    # ⚠ IT SITS ON THE SINGLE SUCCESS PATH, AFTER the provenance stamp and AFTER the slug
+    # mint, so the verdict describes the definition actually returned. The four
+    # `{"ok": False, …}` returns above gain NOTHING (T-197-07): a failed generation makes
+    # no claim about publishability.
+    from app.services.harness.grounding import (  # function-local (Pitfall 4 discipline)
+        BUSINESS_REQUIREMENT_MISSING_MESSAGE,
+        business_requirement_missing,
+    )
+
+    readiness: dict = {
+        "business_requirement": (
+            {"status": "missing", "message": BUSINESS_REQUIREMENT_MISSING_MESSAGE}
+            if business_requirement_missing(wd)
+            else {"status": "present"}
+        )
+    }
+
+    return {
+        "ok": True,
+        "definition": wd.model_dump(mode="json"),
+        "readiness": readiness,
+    }
