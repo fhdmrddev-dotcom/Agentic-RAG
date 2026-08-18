@@ -681,7 +681,39 @@ Plans:
   2. The fast door stays fast — guidance must not turn "Describe & run" into the strict door (D-05).
   3. A user can still get a one-shot draft if they want one.
 
-**Plans**: TBD — `/gsd:plan-phase 197`
+**Plans**: 11 plans in 7 waves
+
+**Wave 1**
+
+- [ ] 197-01-PLAN.md — Wave 1: the D-05 red line as a MECHANICAL criterion, before any source edit — the shipped pre-draft baseline (it predates by four phases) run green at the base SHA, the four gate baselines re-derived, and the four numstat deletion criteria declared with their two exclusions
+
+**Wave 2** *(five plans in parallel — zero `files_modified` overlap, no plan mutates the DB)*
+
+- [ ] 197-02-PLAN.md — Wave 2: the backend — D-13's ONE server-derived readiness verdict on `/generate`'s single success return (imported from `grounding.py`, never re-declared; the four failure arms carry none), plus D-14's two-half fence whose positive control is a REAL live fourth D-22 instance
+- [ ] 197-03-PLAN.md — Wave 2: `decisionsVocabulary.ts` — D-09/D-10's one copy home as a true zero-import leaf, with D-07's five-row order exported as DATA and a D-20 fence proving no row falsely claims a publish requirement
+- [ ] 197-04-PLAN.md — Wave 2: `terminalEmitSlug` beside `soulDeliverable` — WHICH step produces the deliverable, deterministic tie-break, without re-answering the question `soulDeliverable` already owns (D-18)
+- [ ] 197-05-PLAN.md — Wave 2: `setName` — the phase's ONLY new store action (D-15), one key, untracked, no trim, no provenance flag (C-1 declined), with the slug fence asserted over the PATCH body
+- [ ] 197-06-PLAN.md — Wave 2: the wire — a TYPE-only arm on `api.ts` (the repo's hottest file: 170/99/6154) and the `onDrafted` widening that stops the verdict being dropped at the hook boundary; absence travels as absence
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 197-07-PLAN.md — Wave 3: `DecisionsList` — five rows, always, in the exported order; each answer read LIVE off the definition; the three-arm readiness read where an absent verdict renders exactly what a green one does (nothing); rows 2+5 as ONE jump; row 4 an inline field (D-17)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 197-08-PLAN.md — Wave 4: `DraftArrivalCard` — sketch 174's ONE card (149 px chrome, 65% to the graph), composing `SeedReceipt` **byte-unchanged** behind a fold. A COMPOSITION change, not a charter change; D-02 survives intact
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 197-09-PLAN.md — Wave 5: the page — the card mounted IN PLACE of the receipt (`graphColumn` stays at exactly THREE children or the graph strands at 0 px), the readiness captured as a SNAPSHOT beside `receiptPhases`, and two focus seams onto the controls that already exist
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 197-10-PLAN.md — Wave 6: D-19 — the drafted header renders the NAME when there is one (it is displayed nowhere today), with the `FLAG_OFF_HEADER_MARKUP` band-3 disposition declared in its own plan: a dated third re-capture following the file's own four-part procedure, or the recorded proof that none was forced
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 197-11-PLAN.md — Wave 7: the records — three gate pins taken from the gate's own counts, nine hot-file ledger rows RE-DERIVED in one batch pass with `docs/HOT-FILE-LEDGER.md` synced in the same commit, every declared criterion run once more, and every declined decision given a written re-open trigger
 
 #### Phase 198: Node Vocabulary (research-first)
 
