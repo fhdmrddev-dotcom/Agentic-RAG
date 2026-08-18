@@ -2041,3 +2041,127 @@ not record is worse than no claim at all.
 breath.** Different renderer, different source of truth (`runs` vs `workflow_runs` +
 `workflow_phases`) — a fix to one does **not** automatically fix the other. If 194.1 closes only
 the workflow half, the other's frontmatter must say so.
+
+---
+
+## Session: Phase 197 — Guided Authoring (2026-08-18)
+
+G-2 sketch, **AFTER discuss-phase and BEFORE plan-phase**. `ROADMAP.md:677` flags G-2 on this
+phase; `197-CONTEXT.md` records the guardrail as surfaced and **not overridden**, and the
+discussion deliberately ran first so the sketch had a shape to draw — the project's own precedent
+(*"G-2 sketch, BEFORE plan-phase"*, this file at the 193.1 session).
+
+**The phase's own framing:** a freshly AI-generated draft arrives with the decisions the AI made
+**visible and answerable in place**. D-07 fixes five rows — KB scope, template, business
+requirement, name, deliverable — always all five, always the same order. D-02 says a **new sibling**
+card beside `SeedReceipt`, never a widened receipt, and names the composition problem it expects
+the sketch to solve: *"Two receipts stacked on one screen is a composition problem, and it is the
+sketch's problem."*
+
+### ⚠ RENDERING THE REAL SCREEN SHOWED THE PROBLEM IS A DIFFERENT AND LARGER ONE
+
+**Three of D-07's five rows already have a control on the drafted view.** Measured by rendering
+`WorkflowBuilderPage` with `visual_workflow_canvas` ON — not read about:
+
+| D-07 row | Home on the drafted view **today** | Scale |
+|---|---|---|
+| 1 · KB scope | `project-folder-picker` select in the header identity strip (D-186-15) | **11 px chip** |
+| 2 · Template | `TemplateAttachSection`, inside `PhaseFormPanel` (the per-step side panel) | rail scale |
+| 3 · Requirement | `business-requirement-input` + the shipped `AI-proposed` mark (193.2-09) | **11 px chip** |
+| 4 · Name | **nothing — and no display either** | — |
+| 5 · Deliverable | **derived, not stored** — `soulDeliverable()` reads a terminal `llm_emit` | — |
+
+So the real problem is **a second home for two shipped controls**, on a page whose own source
+states the rule verbatim — `kbAffordance`'s docblock: *"A second, different answer to one question
+is drift."*
+
+⚠ **Row 4 is sharper than "static text".** The emitter handed the page a definition whose `name` is
+`Vendor-risk review` and whose `slug` is `vendor-risk-review`. **The header renders the slug**, so
+the workflow's *name* appears nowhere on the drafted view at all (asserted in `172/build.cjs`).
+D-15 keeps the slug untouched — so after this phase the header would still show the slug while a
+row edits the name: **two strings, one of them invisible.**
+
+⚠ **Row 5 has no field at all.** "Answering" it means editing a step, which D-03's write path
+(`builderStore`, one `set()`) does not express as a row edit. **Price this before planning rather
+than discovering it inside planning.**
+
+### ⚠ THE MEASUREMENT THAT PRICES D-02's LITERAL READING
+
+The graph column ships as `grid-rows-[auto_auto_minmax(0,1fr)]` with the graph pinned by
+`[&>*:last-child]:row-start-3`. Two findings, and the second is the one that decides:
+
+1. **A fourth child STRANDS the graph.** The card auto-places into an implicit fourth row, the
+   `minmax(0,1fr)` row has nothing left to distribute, and the graph — nailed to row 3 —
+   **collapses to 0 px**. `requirementAffordance`'s own docblock predicted *"a control in
+   `graphColumn` would … permanently shorten the flow."* Measured, it does not shorten it: it
+   removes it.
+2. **Adding the fourth row fixes the stranding and NOT the height.** Chrome above the graph
+   measures **662 px** (48 toggle + 243 receipt + 370 card). Swept live on the page:
+
+   | column height | graph gets | |
+   |---|---|---|
+   | 620 px | 25 px | unusable |
+   | 700 px | 25 px | unusable |
+   | 760 px | 46 px | a sliver |
+   | 820 px | 106 px | a sliver |
+   | 900 px | 186 px | workable |
+
+   **At laptop size a stacked second card does not shrink the canvas — it removes it until you
+   scroll**, on the screen whose whole job is showing the workflow that was just built.
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 172 | where-the-five-decisions-live | Should the decisions surface OWN controls for the five decisions, or POINT at the ones that already ship — given that three of the five already have a control on the drafted view? | *(open)* | phase-197, auth-02, guided-authoring, decisions-surface, seed-163, generated-from-build, g2-sketch-gate, d-02, d-07 |
+| 173 | one-row-five-ways | What does ONE row look like — ask-first, quiet-when-answered, or answer-first — across all five D-07 rows and every state each can actually be in? | *(open)* | phase-197, auth-02, row-anatomy, d-07, d-09, d-16, g2-sketch-gate, drawing-not-render |
+
+### Sketch 174 was PROPOSED and FOLDED, deliberately
+
+*"What dismissal costs"* — D-04 makes the card dismissible; if it is the only home for a row,
+dismissal deletes the control. It is a real question and it is **downstream of 172**: on variant C
+the card owns no control, so dismissal costs nothing and the question dissolves. It survives as a
+**named cost of variants A and B** on 172's page rather than as its own sketch. **Re-open trigger:**
+172 lands on A or B.
+
+### Method note — 172 RENDERS, 173 DRAWS, and the difference is stated on both pages
+
+172 keeps the 164–167 inverted arrow (`SEED-155`: *if it depicts a surface consuming an existing
+component, it must RENDER it, not redraw it*). Its header, receipt and grid classes are the **real
+rendered DOM**; only the decisions card is hand-composed, and every one of its nodes carries
+`data-s172="NEW"`. **173 is a drawing** — the card exists in no component — and says so at the top;
+what keeps it honest is that every sentence the product owns is parsed out of 172's dump and row 3
+wears the **shipped** `AI-proposed` markup lifted whole.
+
+Builds assert **41** (172) and **25** (173) structural properties and exit non-zero otherwise.
+
+⚠ **Two silent build bugs were caught by those assertions rather than shipping**, both recorded
+because both were the invisible kind: a regex extractor stopped one nesting level early on
+`builder-business-requirement` (three nested spans) and matched the wrong close tag on
+`builder-view-toggle` (which closes on a button, not a div). A splice into a missing anchor fails
+silently and yields a variant that quietly equals the baseline — the exact green-looking-nothing
+failure the audit exists to prevent.
+
+⚠ **And a THIRD: 172's emitter first wrote its dump OUTSIDE the repository.** It lives in
+`frontend/src/pages/`, three levels below the root; 165's lived one directory deeper, and its
+`../../../../` was copied verbatim. The vitest run passed and reported success either way — a
+green test that wrote nothing where anyone would look for it.
+
+### ⚠ A CORRECTION THIS SESSION CARRIES UPSTREAM
+
+`197-CONTEXT.md`'s deferred section lists **BUG-260809-02** as *"(blocking) — a canvas-built
+workflow can never be published … NOT closed by this phase."* Its frontmatter reads
+`status: closed`, `folded_into: quick-260809-klo`,
+`verified_closed_by: live-uat-2026-08-10-local-chrome-devtools-mcp`. **That quick task is what
+shipped the very requirement input these sketches render** — so D-06's recorded consequence does
+not exist, and the control it shipped is half of why variant A installs a second home. Absorbed
+here at the operator's direction rather than re-opening discuss-phase.
+
+### ⚠ What these two pages deliberately do NOT settle
+
+1. **The server-derived readiness verdict (D-13).** No row shows a per-row verdict, because the
+   field does not exist yet and inventing its rendering would be the client-side derivation D-13
+   explicitly refuses.
+2. **Whether row 4 gets a home.** 172-C is only complete if this phase also gives the name one.
+   That is a scope decision, not something a chosen variant may smuggle in.
+3. **Whether row 5 becomes answerable at all.** Larger than the other four; all three 173 variants
+   give it a stated fact instead of a control.
+4. **Hover, focus rings, pixel spacing** — a human comparison at UAT, driven by looking.
