@@ -386,6 +386,72 @@ export const RUN_TEMPLATE_LABEL = "Template to fill"
  */
 export const CHANGED_PREFIX = "changed "
 
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 192.2-04 (LIB-06) — THE RUN WORDS (D-01 line 2 / D-08's three arms)
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// The answer to *"does this one work?"*, in the five words a person can read. They live HERE
+// and not in `runFacts.ts` for the reason 192.2-02 recorded when it declined to re-spell
+// `Ready to run`: this module is the library subtree's ONE home for a string, and a second
+// home is the drift D-14 forbids. `runFacts.ts` owns the DECISION — which arm a row is in —
+// and imports the WORDS from here, exactly as `cardFace.ts` does for the state axis.
+//
+// ⚠ THEY ARE NOT `runVocabulary.ts`'s WORDS, AND THE DIFFERENCE IS AUDIENCE, NOT OVERSIGHT.
+// That module (`components/workflows/runVocabulary.ts`) is the CANVAS's vocabulary, keyed by
+// `CanvasReading` — it names what ONE STEP of a run being watched is doing right now
+// (`Complete` · `Running` · `Paused for your answer` · `Stopped by you`). These name what a
+// WHOLE PAST RUN of a workflow DID, read months later off a library shelf, and they are past
+// tense because that is the only tense honest here. Its own docblock states the governing
+// rule for exactly this case: *"one derivation, two vocabularies … Req 8's acceptance is a
+// grep proving zero re-derivations — NOT that the two views print identical strings."* No
+// derivation is duplicated: this file holds no status mapping at all.
+//
+// ⚠ AND NONE OF THEM IS A COLOUR. D-01 gives the outcome a 3px gutter mark, and the
+// constraint on it is *"colour, and never colour alone"* — so every arm carries a word, and
+// these are those words. A card that renders the mark without one has broken the constraint.
+
+/**
+ * The run WORKED — `workflow_runs.status = 'completed'`.
+ *
+ * ⚠ THE PLAIN PAST-TENSE VERB, NOT THE SYSTEM SPELLING. `Completed` is what the database says
+ * and it reads as a bureaucratic state; `Worked` is the answer to the question the operator
+ * actually asked of this shelf, and it is the word the approved sketch (179-C) uses.
+ * Composed with a band into `Worked 2 days ago` — see `runFacts.ts`, which owns the join.
+ */
+export const RUN_WORKED = "Worked"
+
+/** The run FAILED — `status = 'failed'`. Same tense, same shape: `Failed last month`. */
+export const RUN_FAILED = "Failed"
+
+/**
+ * A person STOPPED the run — `status = 'cancelled'`.
+ *
+ * ⚠ NEITHER SUCCESS NOR FAILURE, and it must not be readable as either. A stopped run is a
+ * decision somebody took, not a fault the system raised — the same distinction
+ * `runVocabulary.ts`'s ninth word carries for a step, made independently here for a whole run.
+ */
+export const RUN_STOPPED = "Stopped"
+
+/**
+ * D-08 arm 2 — THE BACKEND LOOKED AND THERE IS NO RUN. An affirmative statement about the
+ * row, and on a shelf that is 69% drafts it is the most common thing a card will say.
+ *
+ * ⚠ NOT A BLANK. A blank renders like an absence and reads like a tick: the whole reason D-08
+ * has three arms is that *silence is not success*.
+ */
+export const RUN_NEVER = "Never run"
+
+/**
+ * D-08 arm 3 — THE WIRE DID NOT SAY. A frontend deployed ahead of its backend receives rows
+ * with no run keys at all, and a status this build does not recognise lands here too.
+ *
+ * ⚠ THIS IS THE WORD THE WHOLE PLAN TURNS ON. It must never be confusable with `RUN_NEVER`
+ * above: claiming *"never run"* about a workflow that has run a hundred times is the product
+ * asserting something false, which is worse than admitting a gap. It says what is true — no
+ * outcome is on record here — and claims nothing about whether the workflow ran.
+ */
+export const RUN_UNKNOWN = "Not recorded"
+
 /**
  * Lineage state 2b — a version fork: `v3 of v2` (D-12).
  *

@@ -76,11 +76,39 @@ export function relativeChanged(
   updatedAt: string | null | undefined,
   now: number = Date.now(),
 ): string | null {
-  if (!updatedAt) return null
-  const t = Date.parse(updatedAt)
+  const phrase = relativeBand(updatedAt, now)
+  return phrase === null ? null : CHANGED_PREFIX + phrase
+}
+
+/**
+ * Phase 192.2-04 (LIB-06 / T-16) — THE SAME NINE BANDS, WITHOUT THE `changed ` PREFIX.
+ *
+ * ⚠ WHY THIS EXISTS, STATED HERE RATHER THAN DISCOVERED LATER. LIB-06 renders a SECOND
+ * relative time on the same card — *"Worked 2 days ago"* — and the prefix above is not part of
+ * that sentence. The three ways to get there were: re-implement the bands in `runFacts.ts`
+ * (T-16 by name, and this file's own ⚠ paragraph about being the THIRD spelling in the
+ * repository is the argument against it); make the prefix a parameter (which puts a caller's
+ * vocabulary into this module's signature); or split the ENGINE from the SENTENCE, which is
+ * this. `relativeChanged` is now literally `CHANGED_PREFIX + relativeBand(…)` and its own
+ * suite passes UNEDITED, which is what proves the split moved no band boundary.
+ *
+ * ⚠ IT RETURNS `null` RATHER THAN INVENTING A PHRASE, and that is the load-bearing half for
+ * D-08: a run whose status is known but whose timestamp is absent renders the outcome WITHOUT
+ * a time, never `just now` and never `new Date()`. Same rule as the ⚠ SILENCE IS A BAND TOO
+ * paragraph above; the caller is `runFacts.ts`.
+ *
+ * @param at an ISO-8601 instant, or `null` / `undefined` for "the wire did not say".
+ * @param now the instant to measure against — one hoisted value per render (P-1).
+ */
+export function relativeBand(
+  at: string | null | undefined,
+  now: number = Date.now(),
+): string | null {
+  if (!at) return null
+  const t = Date.parse(at)
   if (!Number.isFinite(t)) return null
 
-  return CHANGED_PREFIX + band(now - t)
+  return band(now - t)
 }
 
 /**

@@ -113,6 +113,11 @@ const LIBRARY_SUBTREE_PATHS = [
   // green — the *"a guardrail cannot see what is absent from its list"* failure this array's own
   // docblock records. That is a correctness requirement, not a scope question.
   "./cardFace.ts",
+  // ── 192.2-04 (LIB-06 / D-08): the run truth's wire→words resolver ──
+  // ⚠ LISTED IN THE COMMIT THAT CREATES IT, for the third time in this subtree and for the same
+  // measured reason: an unlisted module is swept by NOTHING while all six fences stay green.
+  // Its plan's `files_modified` did not name this file either.
+  "./runFacts.ts",
 ] as const
 
 /** The house `?raw` / `import.meta.glob` idiom (`PhaseFormPanel.rails.test.tsx:422`). */
@@ -156,7 +161,12 @@ describe("the sweep is looking at something (non-vacuity)", () => {
     // …(12) ] to have a length of 12 but got 13` was OBSERVED before the 13 was written, and the
     // FIVE forecast three paragraphs up held — five `it.each(LIBRARY_SUBTREE_PATHS)` sweeps ×
     // one new module (`./cardFace.ts`, the G-5 discharge's face leaf) = +5 cases.
-    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(13)
+    // ⚠ 192.2-04 read it the same way, one plan later again: `expected [ './libraryRow.ts',
+    // …(13) ] to have a length of 13 but got 14` was OBSERVED before the 14 was written, and the
+    // FIVE held for the SECOND consecutive addition — the suite printed `1 failed | 127 passed
+    // (128)` against 123 at the previous commit. The module is `./runFacts.ts`, the run truth's
+    // wire→words resolver.
+    expect(LIBRARY_SUBTREE_PATHS).toHaveLength(14)
     for (const later of [
       "./RunModal.tsx",
       "./WorkflowDeleteSheet.tsx",
