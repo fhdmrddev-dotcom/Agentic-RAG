@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T01:30:00.000Z"
+last_updated: "2026-08-19T01:57:00.000Z"
 last_activity: 2026-08-19
 progress:
-  total_phases: 19
-  completed_phases: 9
-  total_plans: 105
-  completed_plans: 100
-  percent: 47
+  total_phases: 21
+  completed_phases: 10
+  total_plans: 117
+  completed_plans: 108
+  percent: 48
 ---
 
 # Project State
@@ -31,14 +31,62 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 197 — guided-authoring
+**Current focus:** Phase 192.2 — does-this-one-work
 
 ## Current Position
 
-Phase: **192.2 (does-this-one-work) — PLANNED 2026-08-19, 6 plans / 5 waves, not yet executed**
-Next action: `/gsd:execute-phase 192.2` — ⚠ **Wave 2 plan `192.2-03` is `autonomous: false`**
-(its tests touch the local Postgres; CLAUDE.md rule 4 forbids running it concurrently with another
-DB-touching plan). Wave 2's other plan, `192.2-02`, is the G-5 discharge and may run in parallel.
+Phase: 192.2 (does-this-one-work) — EXECUTING
+Plan: **1 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline) COMPLETE.
+Next action: `/gsd:execute-phase 192.2` — run **Wave 2**. ⚠ **Wave 2 plan `192.2-03` is
+`autonomous: false`** (its tests touch the local Postgres; CLAUDE.md rule 4 forbids running it
+concurrently with another DB-touching plan). Wave 2's other plan, `192.2-02`, is the G-5 discharge
+and may run in parallel.
+
+⚠ **The frontmatter plan/phase counts were CORRECTED here, and the correction is recorded rather
+than silently applied.** `82dd2efd` ("Phase 192.2 planned — 6 plans / 5 waves") added the phase and
+its six plans but changed **no** count field, so `total_phases: 20` / `total_plans: 111` were already
+stale before this plan ran. They now read `21` / `117`, with `completed_plans` `107 → 108`.
+
+**Wave 1 baseline recorded at `82dd2efd13459e419d8e6036cdae19fae9ee574b`** — the phase base SHA every
+later wave's numstat criterion is expressed against (`192.2-01-SUMMARY.md`). Measured, not asserted:
+
+| Gate | Verdict at base |
+|---|---|
+| `tsc --noEmit -p tsconfig.app.json` | **33 errors / 19 files**, pre-existing — **zero under `library/`** |
+| count gate (cap 2, **from REPO ROOT**) | `total 4455 · failed 0 · pinned total 4328` — `OK — 92/92` |
+| library suites + `WorkflowsPage` | **9 files / 501 tests passed / 0 failed** |
+| backend `tests/unit` | **62 failed / 2289 passed** — the SEED-056 rot set; **all six workflow suites green** |
+
+⚠ **The card's resting atom inventory is written down BEFORE any source byte changes (188.1's
+lesson): 17 atoms across the nine information rows.** The load-bearing finding for Wave 4: **D-03's
+six CUT atoms live in exactly TWO JSX nodes** — `<WorkflowSoul scale="card" />` (five of them) and
+`<p data-testid="fork-consequence">` (the sixth). The subtraction is a two-line deletion in
+`WorkflowCard.tsx`, **not** a rewrite of five renderers, and it **must not touch `WorkflowSoul.tsx`**,
+whose `run`/`pub` consumers are out of scope.
+
+⚠ **D-04 CONFIRMED IN SOURCE: `43 share this name · changed 2 days ago` ALREADY RENDERS TODAY**
+(`resolveIdentity`'s `ofN` + `when`, pinned by 72 + 37 green cases). **LIB-05 stays COMPLETE** — a
+later wave that "adds" it is re-shipping shipped code.
+
+⚠ **TWO PLAN-TEXT DEFECTS FOUND AND CORRECTED (Rule 3), both recorded so a later wave does not
+repeat them:** (1) the plan's count-gate command `cd frontend && node scripts/vitest-count-gate.cjs`
+points at a path that **does not exist** — the script's one home is the **repo root** — and the
+plan's `| tail` form made the module-not-found **exit 0**; (2) the plan and CONTEXT both name
+`ROW_FACE`, but the identifier in the file is **`FACE`** (`WorkflowCard.tsx:334`) — a grep for
+`ROW_FACE` finds nothing.
+
+⚠ **CLAUDE.md's count-gate constants have ROTTED A FOURTH TIME, in two days** — it carries
+`4170 / 4096 / 83`; measured here `4455 / 4328 / 92`. **A growing total is the gate WORKING.**
+Recorded only; **Wave 5 (`192.2-05`) owns the same-commit ledger sync.**
+
+✅ **The three hot-file ledger triples this phase touches were re-derived and ALL THREE MATCH** —
+`WorkflowCard.tsx` **8 / 3 / 818**, `api.ts` **171 / 98 / 6174**, `backend/app/api/workflows.py`
+**36 / 18 / 1984**. Wave 5 inherits no stale cell for these three (it must still re-derive, since
+this phase changes two of them). **G-5 on `WorkflowCard.tsx` confirmed FIRING with the obligation
+UNDISCHARGED** — Wave 2 is the discharge.
+
+⚠ **LIB-06 was deliberately NOT marked complete.** `192.2-01`'s frontmatter carries it, but a
+baseline ships a measurement, not a capability; LIB-06 is satisfied by Waves 3-4.
 
 **Inserted from sketch 179**, which is the first sketch in this project to RENDER the shipped
 component rather than redraw it — and rendering it **overturned the phase's own premise**: the
@@ -62,8 +110,8 @@ published rows (89%)**, and `workflow_runs` already holds **228 rows**. The back
 UAT rows are still owed)
 
 Phase: 197 (guided-authoring) — **EXECUTED 11/11, NOT COMPLETE**
-Plan: 11 of 11 — every wave merged
-Status: **Verification returned `human_needed`. The phase is DELIBERATELY NOT MARKED COMPLETE.**
+Plan: 1 of 6
+Status: Executing Phase 192.2
 Next action: drive `197-HUMAN-UAT.md` — **11 rows, row U5 first**. Rows 10 and 11 confirm the two
 review fixes on screen.
 
@@ -94,6 +142,7 @@ with its accepted limitation written down rather than left implicit:
   `missing` verdict against a fixture whose requirement was NON-EMPTY and **pinned the incoherent
   state as correct**. The incoherence PROPAGATED from the component fixture to the page fixture,
   which is how one blind spot came to exist at both levels. Nothing any case proved was dropped.
+
 - **WR-01 (Warning) — an empty name rendered a blank library title.** `f0cc6bb4` (RED) → `4e7326c7`
   (fix). One rule, `libraryDisplayName`, consumed by BOTH row constructors and the builder's edit
   label; **two different routes reached the same blank** (`fromDraft` used `??`, which answers only
@@ -1353,7 +1402,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Executing Phase 197
+**Status:** Executing Phase 192.2
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
