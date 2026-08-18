@@ -182,6 +182,103 @@ export function soulDeliverable(def: DefShape | null | undefined): SoulDeliverab
 }
 
 /**
+ * Phase 197-04 (AUTH-02 / D-18) — WHICH STEP PRODUCES THE DELIVERABLE.
+ *
+ * The arrival card's rows 2 and 5 both hand a slug to the page's SHIPPED
+ * `jumpToStep(slug)` seam (`WorkflowBuilderPage.tsx:1570`, `:1637`) — row 2 because
+ * `TemplateAttachSection` is already mounted on that step (`PhaseFormPanel.tsx:1166`) and
+ * owns its own server read, row 5 because that step's *Instructions* field is what
+ * actually decides what gets produced. D-18 routes both to the terminal `llm_emit` step,
+ * which makes rows 2 and 5 ONE mechanism rather than two.
+ *
+ * ⚠ **THIS DOES NOT RE-ANSWER "DOES THIS MAKE A FILE?"** — `templateAdmission`'s docblock
+ * below states the module's standing rule and it binds here verbatim
+ * (`soulData.ts:236-240`):
+ *
+ *   > *"WHY NOT THE SIMPLER 'has an emit phase' (P1′): it is byte-for-byte
+ *   > `soulDeliverable(def).kind === "file"`, which ALREADY drives the shipped* Makes a
+ *   > file *chip (`library/libraryFilter.ts`). Under P1′ the new mark would be a second
+ *   > word for a fact this exact surface already states — and a second answer to one
+ *   > question is the drift this module exists to forbid. Nothing here re-implements a
+ *   > derivation `soulDeliverable` or `tierForDefinition` already owns."*
+ *
+ * `soulDeliverable` remains the ONE owner of *whether* a file is produced, and its
+ * order-independent `phases.some(...)` is CORRECT for that question — it is deliberately
+ * not refactored to route through this function. The question here is *WHICH step*, which
+ * `.some()` structurally cannot answer and which matters because drafts carry more than
+ * one emit phase. A caller wanting both facts asks both functions.
+ *
+ * ⚠ **ROWS 4 AND 5 ARE COUPLED TODAY, AND THE COUPLING LIVES IN THE OTHER FUNCTION.**
+ * `soulDeliverable`'s label interpolates the workflow NAME (`${name} · file`), so the
+ * deliverable row's *label* changes the moment the name row is edited. `terminalEmitSlug`
+ * is name-independent BY CONSTRUCTION — it reads `slug` / `phase_index` / `phase_type` and
+ * never touches `def.name`. That is exactly why the card reads the two separately: the
+ * jump target must not move when the author renames the workflow. A later reader must not
+ * "simplify" this by deriving the target from the label.
+ *
+ * THE TIE-BREAK IS DECLARED, NEVER LEFT TO `sort` STABILITY. Among `llm_emit` phases
+ * carrying a usable slug: the greatest `phase_index` wins; on a tie, or when ANY candidate
+ * lacks a usable numeric `phase_index`, the LAST candidate in ARRAY ORDER wins. The
+ * mixed case resolves to array order deliberately — a numeric comparison in which one
+ * operand does not exist is not a comparison, and the array is the definition's own
+ * serialised order. ⚠ No shipped derivation in this module orders phases by `phase_index`
+ * for a PICK (`tierForDefinition` folds over all of them; `soulDeliverable` uses
+ * `.some()`), so this is net-new logic and is driven RED-first by
+ * `soulData.test.ts`'s descending-order case.
+ *
+ * The defensive-shape ladder copies `templateAdmission`'s arm-per-reason shape below.
+ *
+ * @returns the slug of the step that produces the deliverable, or `null` when no step
+ *          does — `null` is an HONEST absence and is never a slug that selects nothing.
+ */
+export function terminalEmitSlug(def: DefShape | null | undefined): string | null {
+  // (1) The wire did not say. Nullish, or a `phases` the server never sent as an array —
+  //     which includes the jsonb STRING SCALAR shape 194 of 223 live rows carry
+  //     (`CLAUDE.md` § jsonb string-scalar trap): a string is truthy, `("…").phases` is
+  //     `undefined`, and `Array.isArray` is false, so it is caught here.
+  if (!def || !Array.isArray(def.phases)) return null
+
+  // (2) The candidate set. A phase qualifies only if it is an `llm_emit` AND carries a
+  //     slug that could actually select a step. ⚠ A candidate whose `slug` is absent,
+  //     non-string, or empty after trim is NOT a candidate (threat T-197-13): this value's
+  //     ONLY purpose is to be handed to `jumpToStep`, and a slug that selects nothing is
+  //     strictly worse than an honest `null` — the caller can render nothing for `null`,
+  //     but a dead jump target looks like a working control that silently does nothing.
+  //     A phase list declaring no `config` at all yields no candidates and falls to (3),
+  //     which is the same silence `templateAdmission`'s arm (2b) refuses to read as a "no".
+  const candidates: Array<{ slug: string; index: number | null }> = []
+  for (const p of def.phases) {
+    if (p?.config?.phase_type !== "llm_emit") continue
+    const rawSlug = p?.slug
+    const slug = typeof rawSlug === "string" ? rawSlug.trim() : ""
+    if (slug.length === 0) continue
+    const rawIndex = p?.phase_index
+    const index =
+      typeof rawIndex === "number" && Number.isFinite(rawIndex) ? rawIndex : null
+    candidates.push({ slug, index })
+  }
+
+  // (3) Nothing produces a deliverable that this card could point at → `null`.
+  //     ⚠ This is NOT the negation of `soulDeliverable(def).kind === "file"` and must not
+  //     be read as one: a definition WITH an emit phase whose slug is unusable DOES make a
+  //     file and still answers `null` here. The two functions answer different questions,
+  //     and the case where they disagree is the proof of it.
+  if (candidates.length === 0) return null
+
+  // (4) The declared tie-break. `>=` in the fold is load-bearing: it makes an index tie
+  //     resolve to the LAST candidate in array order, matching the no-usable-index arm
+  //     directly above it, so both fallbacks point the same way.
+  const allIndexed = candidates.every((c) => c.index !== null)
+  if (!allIndexed) return candidates[candidates.length - 1].slug
+
+  let best = candidates[0]
+  for (const c of candidates) {
+    if ((c.index as number) >= (best.index as number)) best = c
+  }
+  return best.slug
+}
+
+/**
  * Phase 193-02 (AUTH-03 / D-21 / D-25) — CAN THIS WORKFLOW BE HANDED A TEMPLATE?
  *
  * ⚠ THE CONTRACT'S SIGNAL DOES NOT EXIST IN THE DATA, and that correction is stated
