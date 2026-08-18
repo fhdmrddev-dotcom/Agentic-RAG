@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-18T08:30:00.000Z"
+last_updated: "2026-08-18T12:00:00.000Z"
 last_activity: 2026-08-18
 progress:
   total_phases: 19
   completed_phases: 9
-  total_plans: 94
+  total_plans: 105
   completed_plans: 87
   percent: 42
 ---
@@ -31,17 +31,100 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 196 — registry-backed-model-picker-canvas
+**Current focus:** Phase 197 — guided-authoring (PLANNED, 11 plans, awaiting execution)
 
 ## Current Position
 
-Phase: **197 (guided-authoring) — SKETCHED 2026-08-18** (`ca9bdc06` · `fe5c955f` · `df27a372`).
-Resume file: `.planning/phases/197-guided-authoring/197-CONTEXT.md`
-Status: ✅ **G-2 DISCHARGED — sketches 172 + 173 built and committed. ⏸ AWAITING THE OPERATOR'S PICK
-before `/gsd:plan-phase 197`.** `ROADMAP.md:677` flags **G-2**; the guardrail was surfaced before any
-question was asked and was **not overridden**. The discussion deliberately ran first so the sketch had
-a shape to draw, on the project's own precedent (`sketches/MANIFEST.md` — *"G-2 sketch, BEFORE
-plan-phase"*).
+Phase: **197 (guided-authoring) — ✅ PLANNED 2026-08-18** (`75a89240` · `8cae3b7a` · `060792bd` ·
+`7b6d55bd` · `0f487877` · `f59daa4c`).
+Resume file: `.planning/phases/197-guided-authoring/197-01-PLAN.md`
+Status: ✅ **11 PLANS IN 7 WAVES · `gsd-plan-checker` VERDICT: VERIFICATION PASSED, NO BLOCKERS.**
+Four non-blocking findings; **two applied**, two recorded as accepted. **Next: `/gsd:execute-phase 197`.**
+
+### What plan-phase produced, and the three things it CORRECTED
+
+**Artifacts:** `197-RESEARCH.md` (1629 ln) · `197-VALIDATION.md` (`status: approved`,
+`nyquist_compliant: true`, ⚠ `wave_0_complete: false` — Wave 0 runs at EXECUTION) ·
+`197-PATTERNS.md` (18 files, 17 analogs) · `197-01`…`197-11-PLAN.md`.
+
+**Wave shape:** `01` alone (⚠ `files_modified: []` **by design**) → **`02`-`06` FIVE IN PARALLEL**
+(zero `files_modified` overlap, no DB mutation — checker verified both) → `07` → `08` → `09` → `10`
+→ `11`. Waves 5-7 are serial only because they share `WorkflowBuilderPage.tsx` or must read final
+counts.
+
+**⚠ THREE CLAIMS IN THE UPSTREAM FILES WERE MEASURED FALSE. All are recorded beside their originals,
+never overwritten.**
+
+1. ⚠ **Sketch 173's pricing of row 5 is REFUTED.** It states `builderStore`'s write path *"does not
+   express a step edit as a row edit"*; **`patchConfig` (`builderStore.ts:281`, impl `:548-557`)
+   expresses it exactly.** **Row 5 is the CHEAPEST of the five rows, not the dearest** — 3 files,
+   zero new store actions, zero new fields, zero backend, because `jumpToStep` is already wired
+   (`WorkflowBuilderPage.tsx:1570`, `:1637`). **Row 4 is the expensive one** — `setName` does not
+   exist (`:262-306`) and is the phase's ONLY new store action.
+2. ⚠ **`governanceVocabulary.ts` DOES NOT EXIST.** CONTEXT.md D-09 and RESEARCH.md both cite it as
+   one of four shipped vocabulary-module precedents; only its *test* file is there — a cross-cutting
+   sweep with no module behind it. **A phantom precedent was being reasoned from.**
+3. ⚠ **D-15's *"187 shipped `name_seeded_by_ai`, the provenance shape is already there"* is FALSE.**
+   That is a **`PhaseSpec`** field (`harness.py:435`) — a *step*-name flag. `WorkflowDefinition` has
+   no equivalent (15 fields, none of them it). So the mark was never a checkbox; it is a full new
+   stored field. **DECLINED (C-1) with a re-open trigger**, taken as the discretion CONTEXT.md grants.
+
+### ⚠ D-20 — D-11's REACH IS NARROWER THAN IT READS. Not reversed; scoped.
+
+D-11 claims *"the rows ARE the publish requirements."* Research enumerated **every** gauntlet stage
+from source: **exactly ONE of five rows has a server predicate** — `business_requirement_missing`
+(`grounding.py:1007`). Stage 2 `lint_workflow` is purely structural; 2.5 is interactive phases; 2.6
+is folder ⊆ + unregistered tools/skills. **Nothing anywhere refuses a publish for a missing KB
+binding, a missing template, an AI-chosen name, or the deliverable.**
+
+**Two consequences bind the build:** D-13's payload carries **ONE** verdict, never four invented
+greens (absent ≠ green — the three-arm `TemplateAdmission` precedent, `soulData.ts:243-247`); and
+**rows 1/2/4/5 must NOT say *"before publishing"*** — that would be four false claims about the gate.
+
+### The operator's two picks (2026-08-18), from costed choices
+
+- **D-18 — row 5 JUMPS to the terminal `llm_emit` step's *Instructions*.** Rejected: inline-editing
+  the emit prompt, which puts *Instructions* in two places against the page's own rule
+  (`WorkflowBuilderPage.tsx:2085`: *"A second, different answer to one question is drift."*).
+- **D-19 — the drafted header renders `meta.name ?? meta.slug`.** ⚠ **Priced, not discovered:** that
+  line is inside **`FLAG_OFF_HEADER_MARKUP` band 3**, a literal that stood **nine phases**, was
+  re-captured twice in 193, and whose own note expects **no third**. Plan `197-10` carries it as a
+  **decision RULE, not an assumption** — the re-capture is only forced if the header fixture's
+  definition carries a `name`, which nobody has measured. **Branch A (no re-capture) is the better
+  outcome and is recorded, not silently skipped.** ⚠ 193.2-09's escape hatch does **not** apply:
+  band 3's captured literal contains the rendered slug itself.
+
+### ⚠ Two things execution must not get wrong
+
+1. **`WorkflowBuilderPage.canvas.test.tsx` is BOTH a SEED-171 flaky suite AND a suite `197-09`
+   extends.** A red run there is **genuinely ambiguous**. Filenames from the gate's own persisted
+   JSON **before any re-run**; each checked against `git diff --numstat`; **cap untouched**. Say
+   *"provably unmodified"*, never *"fine"*.
+2. **`197-02` task 3 lands its fence RED ON PURPOSE.** `template_asset_id` is accepted by
+   `GenerateRequest` (`workflows.py:1586`) and has **never once been sent** by any production call
+   site — a **live, unclosed fourth D-22 instance**. The plan records the failure verbatim before
+   allowlisting and **forbids an executor from "fixing" it**, because that silently takes on
+   AUTH-03's surface.
+
+### Guardrails at plan-phase
+
+**G-2 discharged** (sketches 172/173/174, operator-corrected twice). **G-5 fires on all six predicted
+files** — triples RE-DERIVED 2026-08-18 and **five of six were already stale in CONTEXT.md; every one
+GREW**: `api.ts` **170/99/6154** (was 97) · `WorkflowBuilderPage.tsx` 42/15/2398 (was 13) ·
+`workflows.py` 36/19/1984 (was 18) · `grounding.py` 18/6/1252 (was 5) · `builderStore.ts` 11/6/837
+(was 5) · `workflow_authoring.py` 12/6/572. **The refactor recommendation was produced FIRST as G-5
+requires and is honoured by construction** (new files — the 193.1 precedent); `api.ts` gains a
+**type only**, not a runtime export. **G-7 N/A** (no `--gaps`). **NO GUARDRAIL OVERRIDE RECORDED.**
+⚠ **`backend/app/api/workflows.py` likely needs ZERO change** — the `/generate` route declares no
+`response_model` and returns the service dict untouched (`:1594-1630`). Verify before editing it.
+
+### The prior status line, preserved
+
+> ✅ **G-2 DISCHARGED — sketches 172 + 173 built and committed. ⏸ AWAITING THE OPERATOR'S PICK
+> before `/gsd:plan-phase 197`.** `ROADMAP.md:677` flags **G-2**; the guardrail was surfaced before any
+> question was asked and was **not overridden**. The discussion deliberately ran first so the sketch had
+> a shape to draw, on the project's own precedent (`sketches/MANIFEST.md` — *"G-2 sketch, BEFORE
+> plan-phase"*).
 
 - `.planning/sketches/172-where-the-five-decisions-live/` — does the card OWN controls or POINT at
   the shipped ones? Generated FROM the build; 41 assertions, 0 failing.
@@ -129,7 +212,8 @@ sketch over.
 2. **Row 5 (deliverable)** — no field; derived from a terminal `llm_emit`. It reads as a fact with
    no control, and making it editable is larger than the other four.
 
-**Next: `/gsd:plan-phase 197`, building 174's one-card shape.**
+**Next: `/gsd:execute-phase 197`.** (This line read *"Next: `/gsd:plan-phase 197`"* until
+plan-phase ran on 2026-08-18 — see Current Position above for the 11 plans it produced.)
 
 ⚠ **Phase 196 is CLOSED** — see the phase-close ledger below (every phase-scoped item discharged,
 G-4 rows driven, `BUG-260718-04` closed by split). The line that previously stood here read
