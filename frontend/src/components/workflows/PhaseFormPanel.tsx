@@ -58,6 +58,8 @@ import { ExternalActionSection } from "./ExternalActionSection"
 import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
+// 196-08 (AUTH-04) — TYPE ONLY in this task; the value import arrives with the mounts.
+import type { ModelFieldProps } from "./ModelField"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 // TYPE-ONLY, and erased at build. The child declares its OWN props; this panel exports no
 // props type for it, exactly as it exports none for the two sections above.
@@ -202,6 +204,47 @@ export interface PhaseFormPanelProps {
   nameCheck?: {
     classification: TemplateNameClassification
   }
+  /**
+   * Phase 196-08 (AUTH-04 / D-20) — the live model registry answer, already finished.
+   *
+   * Caller-owned for the FIFTH time in this file's history and for the identical reason the
+   * four props above are: the answer is derived ABOVE this panel — one `GET /models/registry`
+   * read plus the app-wide ⌥ reveal — while this panel's only write seam (`onChange`) patches
+   * `config`. The picker mounts FOUR times in one open, so a component-level fetch would be
+   * four requests per step click; owning the read at `WorkflowBuilderPage` is what makes the
+   * one-gated-line shape below satisfiable at all.
+   *
+   * THE PANEL COMPUTES NOTHING FOR IT — no memo to shape the rows, no predicate to drop the
+   * disabled ones, no projection to build the options. Every one of those lives in the picker
+   * component and its vocabulary module. This panel receives a finished answer and forwards it
+   * whole. (⚠ The hook names are deliberately not spelled: the fence below counts them over
+   * this file's own source, so naming them in prose is how a guardrail fails by description.)
+   *
+   * ABSENT ⇒ THE FOUR MOUNTS RENDER NOTHING, which is what keeps every other mount of this
+   * panel byte-identical by construction rather than by review. ⚠ Unlike the four props above,
+   * absence here REMOVES a field that has been on this form since Phase 103 rather than
+   * withholding a new section — a deliberate trade the caller documents at its own mount: an
+   * absent field writes nothing and says nothing false, while a picker fed an empty array
+   * would label every stored model "not in the registry". Absence must never resurrect the
+   * free-text box; that is fenced in `PhaseFormPanel.test.tsx`.
+   *
+   * ⚠ ONE GATED LINE, BY STANDING ORDER (G-5 / D-22 / D-20). This file's hot-file ledger row
+   * closes with an instruction rather than a status: *"the next surface that needs the panel
+   * gets its own component and one gated line."* Phase 185 honoured it, Phase 193 honoured it
+   * again, Phase 193.1 made it MECHANICAL with a `?raw` source fence — and this phase is the
+   * FOURTH honouring. It writes its OWN fence, because the shipped one is scoped to the
+   * template name-check mount and a picker mount passes through it invisibly.
+   *
+   * ⚠ THE TOKEN THAT MOUNT IS MATCHED BY IS DELIBERATELY NOT SPELLED IN THIS DOCBLOCK. The
+   * shipped fence splits this file's own source and counts the lines carrying it, so writing
+   * it in prose makes the count 2 and fails a guardrail by describing it — the 187-24 trap,
+   * which this paragraph hit on its first draft. The same rule binds the picker's fence below.
+   *
+   * The shape is `Pick` off `ModelFieldProps` rather than a re-typed object literal, so the
+   * spread at each mount matches the component's contract by construction: a prop renamed in
+   * `ModelField` becomes a typecheck error here instead of a silently dropped attribute.
+   */
+  modelPicker?: Pick<ModelFieldProps, "models" | "runDefaultModel" | "showTechnical">
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
