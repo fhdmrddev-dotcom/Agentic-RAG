@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T03:35:00.000Z"
+last_updated: "2026-08-19T03:52:00.000Z"
 last_activity: 2026-08-19
 progress:
   total_phases: 21
   completed_phases: 10
   total_plans: 117
-  completed_plans: 109
+  completed_plans: 110
   percent: 49
 ---
 
@@ -35,17 +35,73 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 192.2 (does-this-one-work) — EXECUTING
-Plan: **5 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
+Phase: 192.2 (does-this-one-work) — **ALL 6 PLANS EXECUTED · VERIFICATION OWED**
+Plan: **6 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
 (`192.2-02` the G-5 discharge + `192.2-03` the run-facts join), Wave 3 (`192.2-04`, the run
 truth's wire→words path) and **Wave 4 (`192.2-05`, THE SUBTRACTION + THE LANGUAGE)** COMPLETE.
 Wave 2 ran its two plans in PARALLEL worktrees and they merged clean at `00b81f63` / `7bd88426`
 — zero `files_modified` overlap (frontend vs backend), and only `192.2-03` touched Postgres, so
 CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied without serialising the wave.
-Waves 3 and 4 ran SEQUENTIALLY on the main working tree.
-Next action: `/gsd:execute-phase 192.2` — run **Wave 5** (`192.2-06`, the dev-route teardown +
-the same-commit ledger / CLAUDE.md sync).
+Waves 3, 4 and 5 ran SEQUENTIALLY on the main working tree.
+Next action: **`/gsd:verify-work 192.2`.** Execution is complete; the phase is NOT closed.
+⛔ **NINE G-4 lived-experience rows are OWED to the operator** (`192.2-VALIDATION.md`, every
+`result:` empty). **Run U4 FIRST** — the deploy-skew *unknown* arm. It is the row most likely to be
+skipped and it guards the phase's central honesty claim: a frontend deployed ahead of its backend
+must never say *"Never run"* about a workflow that has run. **Then U1**, the phase's thesis — pick
+the one that last worked off a 43-member same-name shelf, **by reading the screen, never by**
+**`getElementById`** (D-27). ⚠ **LIB-06 is NOT ticked in `REQUIREMENTS.md`** — the capability ships,
+but that table's own rule is *"marked here only after verification, never per-plan"*, and
+verification has not run. **That is a decision, not an oversight.**
 
+⚠ **Wave 5 (`192.2-06`) COMPLETE — the phase's closing plan. 4 task commits `b38764ca` /
+`23334f0d` / `079cca07` / `eb279c08`. What it MEASURED, not what it assumed:**
+- ✅ **THE SKETCH SURFACE IS GONE AND IT IS PROVED, NOT ASSERTED.** `grep -rn
+  "sketch-card|SketchLibraryCard" frontend/src` → **no match, exit 1**; `frontend/src/dev/` no
+  longer exists; `main.tsx` is **byte-identical to its pre-sketch shape** (`git diff 17a508d7`
+  → empty). Component + route branch deleted **in one commit**, as the sketch required.
+- ⚠ **TWO DOCBLOCKS STILL POINTED AT THE DELETED PATH** (`library/runFacts.ts`,
+  `library/WorkflowCard.tsx`) and were amended in the same commit. **Nothing here typechecks
+  prose**, so a dangling pointer survives every gate. The sketch README records the teardown as
+  DISCHARGED with its original wording preserved beside it — and records that **the sketch's own
+  two-armed `runWords` T-13 bug did NOT ship: the three-armed resolution lives in `runFacts.ts`.**
+- ⚠ **THE LEDGER DEBT WAS LARGER THAN ANY PLAN THOUGHT.** The plan named SEVEN files; the phase's
+  real diff names **TWELVE** non-test source files. **FIVE existing rows were stale** (corrected
+  beside their originals) and **THREE were ADDED BECAUSE THEY WERE ABSENT**, not because they were
+  new: `libraryVocabulary.ts` **8/4/584**, and — found by nobody until this pass —
+  **`libraryFilter.ts` 4/4/341** and **`libraryRow.ts` 3/3/162, EXACTLY at the threshold.** All
+  three were at/over G-5 with no row, so the guardrail could never have fired on them at any count.
+  ⚠ **`libraryFilter.ts`'s shape is worth remembering: 4 commits across 4 DIFFERENT phases** — a
+  file touched once per phase never looks hot in any one plan's diff.
+- ✅ **`WorkflowCard.tsx`'s cell read *obligation UNDISCHARGED* for four phases and is now
+  DISCHARGED (Wave 2), with the NEXT SEAM NAMED** — the `⋯` overflow menu + its armed-delete state
+  machine — rather than marked `satisfied` with no successor, which is the exact state three of the
+  five rows found stale on 2026-08-17 were in. It re-derives to **12 / 4 / 1105** (Wave 4 predicted
+  `11 / 4 / 1104`; this plan's own commit moved it — the self-staling this ledger documents).
+- ✅ **`api.ts`'s 197 seam-DECLINE HOLDS and its re-open trigger did NOT fire**, stated explicitly
+  rather than left as a silent cell: `+53 / −0`, **zero** new runtime exports, measured by grep over
+  the diff, so `196-08`'s mock-factory failure mode measurably could not fire.
+- ⚠ **CLAUDE.md's count-gate constants rotted a FOURTH time and are corrected BESIDE the originals:**
+  `4170 / 4096 / 83` (2026-08-17) → **`4594 / 4328 / 92`** — **`+424` cases in TWO DAYS.** 192.2's
+  own arc is published with every increment attributed and no residual (`4455 → 4506 → 4574 →
+  4594`). ⚠ **A deliberate deletion is the ONE thing that can legitimately DECREASE the total, and
+  it did not here — because no gated suite ever covered `src/dev/`. The gate could never have told
+  anyone the dev surface had outlived its sketch; that obligation was carried by a README note and
+  nothing executable.** The cap held at `2` on every run of every plan and was never adjusted.
+- ⚠ **A FIFTH WRONG PATH, in this plan's own prompt: `relativeBand` is an EXPORT at
+  `relativeChanged.ts:103`, NOT a module.** All five are now collected in one table in
+  `docs/HOT-FILE-LEDGER.md` — `ROW_FACE` · `models/harness.py` · `libraryRow.ts` · `phaseGlyph.tsx`
+  · `relativeBand`. **`files_modified` was wrong in five of six plans**, and the rate is the finding:
+  a plan's file list is a CLAIM, not a fact, and it is itself a scan list that can be incomplete.
+- ⚠ **`BUG-260819-01` FILED** — the state-word duplication on a name-colliding row, `status: open`,
+  `surface: Agentic-RAG`. **A record living only in a phase summary is invisible to every touchpoint
+  that scans for open bugs**, which is how a live bug hid for two months in this project.
+- ⚠ **`gsd-sdk query roadmap.update-plan-progress 192.2` RETURNED `updated: true` AND WROTE ZERO
+  BYTES AGAIN** — second confirmation this phase, verified with `git diff --numstat`. It also
+  reported `summary_count: 5`. ROADMAP.md and STATE.md were hand-edited. **Do not trust that verb.**
+- ⚠ **A MISFILED RECORD WAS FOUND AND MOVED (Rule 1):** Wave 4's entire ROADMAP block had been
+  appended to **Phase 198's** bullet instead of Phase 192.2's — 4,267 characters of 192.2's record
+  filed under an unrelated future phase, where it was both invisible and wrong. Phase 198's bullet is
+  restored to its original 165 characters.
 ⚠ **Carried OUT of Wave 4 into Wave 5, measured not assumed:**
 - ✅ **LIB-06 IS SATISFIED ON SCREEN.** The card renders sketch 179 variant C: a 3px run gutter,
   the name leading line 1 with the version deferred, and **line 2 saying the run truth then the
