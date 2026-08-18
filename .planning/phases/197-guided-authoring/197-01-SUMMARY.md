@@ -249,3 +249,95 @@ type it reads. Per Phase 196's measured lesson: **D-13 adds a TYPE, not a runtim
 should not trigger the `196-08` failure mode (249 real failures from `@/lib/api` mock factories
 missing a newly-added runtime export) — but any plan that adds a **runtime** export to `api.ts`
 must budget one mock line per mounting suite.
+
+---
+
+## Task 3 — THE FOUR STANDING NUMSTAT CRITERIA
+
+⚠ **These are the phase's red line. They are RUNNABLE COMMANDS, not judgements anyone has to
+make.** The rule they encode is lifted verbatim from the fence file itself
+(`WorkflowBuilderPage.preDraft.baseline.test.tsx:60-67`):
+
+> *"a diff against these strings is a BEHAVIOUR CHANGE TO EXPLAIN, never a test to update.
+> Re-capturing them to make a red run green deletes the only evidence anybody has that the pre-draft
+> screen still renders what it rendered. `git diff --numstat` on this file must show ZERO DELETIONS
+> through the extraction wave; the first wave that intentionally changes a rendered node re-captures
+> ONCE, DECLARED in its own plan with a date and a reason, never quietly absorbed."*
+
+### The four commands — copy these, the base SHA is already substituted
+
+```bash
+# ── D-05 / ROADMAP SC#2 / SC#3 — THE FAST DOOR STAYS FAST ────────────────────────────
+# The GOVERN door's pre-draft describe screen. Six whole-container captures.
+git diff --numstat 52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07 HEAD \
+  -- frontend/src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx
+# REQUIRED: deletions column == 0
+
+# The LOOSE / fast door's half of the same fence.
+git diff --numstat 52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07 HEAD \
+  -- frontend/src/components/workflows/WorkflowDoorSwitch.baseline.test.tsx
+# REQUIRED: deletions column == 0
+
+# ── D-02 — A NEW SIBLING SURFACE, NOT A WIDENED SeedReceipt ──────────────────────────
+git diff --numstat 52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07 HEAD \
+  -- frontend/src/components/workflows/SeedReceipt.tsx
+# REQUIRED: 0 insertions AND 0 deletions — the file must not appear in the output at all
+
+# ── D-11 / D-20 — THE PUBLISH GAUNTLET LEARNS NOTHING NEW ────────────────────────────
+git diff --numstat 52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07 HEAD \
+  -- backend/app/services/harness/publish_service.py
+# REQUIRED: 0 insertions AND 0 deletions — the file must not appear in the output at all
+```
+
+### The criteria table — what each defends, and its disposition
+
+| # | Path | Decision defended | Required | Why |
+|---|---|---|---|---|
+| 1 | `frontend/src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx` | **D-05** · SC#2 · SC#3 | **deletions = 0** (insertions allowed) | D-05's falsifiable form: *the pre-draft describe screen is byte-unchanged — zero new controls, zero new required input, zero new gates.* Guidance must not turn "Describe & run" into the strict door. Insertions are fine (a wave may ADD a row to the capture table); a deletion means a captured string was rewritten to make a red run green |
+| 2 | `frontend/src/components/workflows/WorkflowDoorSwitch.baseline.test.tsx` | **D-05** · SC#2 · SC#3 | **deletions = 0** (insertions allowed) | The LOOSE door is the door SC#3 is actually about (*a user can still get a one-shot draft*). ⚠ Both screens carry the same splice anchor `<div className="flex flex-col items-center gap-3">`, so a plan that splices "at the CTA group" can land on the wrong door — this fence is what catches it |
+| 3 | `frontend/src/components/workflows/SeedReceipt.tsx` | **D-02** | **`0 0`** — must not appear in the diff at all | `SeedReceipt` is a **governance** receipt, not a general "here is what I decided" receipt. Its docblock binds it hard and each clause is enforced by a source fence with a positive control (*"authors no sentence of its own"*, *"declares no predicate of its own"*, *"imports nothing from the API client, names no route and opens no request"*). This phase **composes** it beside a new sibling; widening its charter would cost exactly the guarantees that make it checkable |
+| 4 | `backend/app/services/harness/publish_service.py` | **D-11** · **D-20** | **`0 0`** — must not appear in the diff at all | D-11: answering the rows **IS** how you become publish-ready, *with the gate learning nothing new*. D-20 narrows D-11's reach to **row 3 only** — measured from source, stage 1 `business_requirement_missing` (`grounding.py:1007`) is the ONLY definition-level predicate; nothing anywhere refuses a publish for a missing KB binding, template, name or deliverable. The rows READ this source (D-12); they never teach it |
+
+### Starting state — all four, run now at the base SHA
+
+```bash
+$ git diff --numstat 52e6bcdb8a28b2cda1e3fa06a1bc95b733dbee07 HEAD \
+    -- frontend/src/pages/WorkflowBuilderPage.preDraft.baseline.test.tsx \
+       frontend/src/components/workflows/WorkflowDoorSwitch.baseline.test.tsx \
+       frontend/src/components/workflows/SeedReceipt.tsx \
+       backend/app/services/harness/publish_service.py
+                                                                   [no output — exit 0]
+```
+
+**Empty output on all four rows: 0 deletions, 0 insertions.** Trivially true — nothing has been
+edited — and recorded precisely *because* it is trivially true now. A later wave comparing against
+this line knows the starting point was clean rather than assuming it.
+
+### ⚠ THE TWO EXCLUSIONS — name them, so a later executor cannot mistake one for the other
+
+**These are two different literals with two different dispositions in this phase, and a plan that
+conflates them will either block itself or waive the wrong one.**
+
+**EXCLUSION 1 — `frontend/src/pages/WorkflowBuilderPage.header.test.tsx` is NOT under a
+zero-deletion criterion.** It holds `FLAG_OFF_HEADER_MARKUP`, whose **band 3** is the `<header>`
+hosting `identityGroup`. D-19 makes the drafted header render `meta.name ?? meta.slug` — one
+expression at `WorkflowBuilderPage.tsx:2203`, which sits *inside* band 3 and forces a re-capture.
+Plan **`197-10`** performs that re-capture as a **declared, dated, one-time act with its own task**,
+never a silent edit folded into another. ⚠ **Band 3's own note (`:2181-2184`) says the phase that
+wrote it expects NO THIRD re-capture — this phase is the third, and it says so out loud.** The
+D-05 fence above pins the **pre-draft** screen and is structurally blind to the **drafted** header;
+they are not the same literal and the exclusion is not a loophole in D-05.
+
+**EXCLUSION 2 — `scripts/vitest-count-gate.cjs` is NOT under a zero-deletion criterion.** Raising a
+per-file pin **necessarily deletes the line carrying the old number**. A check of the form
+`grep -c '^-[^-]'` expecting `0` on that file is therefore **wrong by construction** and will fire
+on correct work. The gate's contract is *no per-file DECREASE in the count* and *zero failing* — it
+is not a contract about the deletions in the gate script's own diff.
+
+### The standing instruction
+
+**Run all four commands at EVERY WAVE MERGE and again at PHASE CLOSE** — not once. A non-zero
+deletion on any of the four rows is a **behaviour change to explain**, never a test to update. The
+correct response is to open the wave's plan and either (a) explain the behaviour change and declare
+the re-capture there with a date and a reason, or (b) revert the source change. Silently absorbing
+the deletion destroys the only evidence that the fast door is still fast.
