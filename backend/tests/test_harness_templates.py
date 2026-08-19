@@ -13,6 +13,13 @@ from pathlib import Path
 
 import pytest
 
+# D-13 (Phase 200): ``_exec_llm_human_input`` moved to
+# ``app.services.harness.human_input``, and its module-global
+# ``subscribe_for_response`` moved WITH it — so the patch target is the new
+# home, not ``phase_types``. Patching the old module now patches a name the
+# executor no longer reads (measured: 5 failures + one HANG).
+from app.services.harness import human_input as _human_input_home
+
 from app.models.harness import WorkflowDefinition
 
 # The migration 061 file (repo root) whose `definition` JSONB blobs MUST be
@@ -234,7 +241,7 @@ async def test_each_seed_runs_end_to_end_mocked_llm(
 
     with patch.object(phase_types, "_stream_one_iteration", _fake_stream), \
             patch.object(phase_types, "run_task_sub_agent", _fake_sub_agent), \
-            patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+            patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
         await harness_engine.run_workflow(
             run_id, wf, ctx, pool=mock_asyncpg_pool, redis=fake_redis
         )

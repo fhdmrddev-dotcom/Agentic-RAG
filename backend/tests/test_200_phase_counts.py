@@ -61,6 +61,13 @@ from unittest.mock import patch
 
 import pytest
 
+# D-13 (Phase 200): ``_exec_llm_human_input`` moved to
+# ``app.services.harness.human_input``, and its module-global
+# ``subscribe_for_response`` moved WITH it — so the patch target is the new
+# home, not ``phase_types``. Patching the old module now patches a name the
+# executor no longer reads (measured: 5 failures + one HANG).
+from app.services.harness import human_input as _human_input_home
+
 
 MEASURE = "_measure"
 
@@ -311,7 +318,13 @@ async def test_llm_human_input_emits_no_measure_key():
         return None
 
     async def _fake_subscribe(redis, run_id, tool_call_id, timeout):
-        return None  # timeout -> no answer; the output shape is what this case reads
+        # ⚠ THIS RETURNED ``None`` (a TIMEOUT) UNTIL PHASE 200 / D-10, and the change is
+        # recorded rather than made quietly: a timeout no longer PRODUCES an output at
+        # all — the executor raises ``HumanInputTimeout`` and the engine pauses the run
+        # (``BUG-260816-06``: the empty answer used to advance the workflow as though the
+        # person had approved). This case is about the count key, not about the timeout,
+        # so it now takes the ANSWERED path — the one that really does return a dict.
+        return {"kind": "response", "response_text": "yes", "choice_index": None}
 
     phase = _spec(
         {"phase_type": "llm_human_input", "prompt": "Confirm?", "timeout_seconds": 1},
@@ -319,7 +332,7 @@ async def test_llm_human_input_emits_no_measure_key():
     )
     ctx = _ctx(emit=_fake_emit, redis=object(), supabase=None)
 
-    with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+    with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
         out = await phase_types._exec_llm_human_input(phase, {}, ctx)
 
     assert MEASURE not in out, (

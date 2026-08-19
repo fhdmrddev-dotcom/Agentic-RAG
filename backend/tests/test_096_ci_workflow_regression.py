@@ -18,7 +18,7 @@ execute. The ONLY faked seams are infrastructure boundaries:
   - ``task_service.get_pg_pool``        → the asyncpg pool (conftest mock recorder)
   - ``app.config.get_model_capability_async`` → the registry DB tier (offline,
                                           the test_085 precedent)
-  - ``phase_types.subscribe_for_response``    → the ask_user block (Pitfall-5
+  - ``human_input.subscribe_for_response``    → the ask_user block (Pitfall-5
                                           determinism — pre-published answer; the
                                           REAL pub/sub path is covered by the
                                           operator restart smoke)
@@ -39,6 +39,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+
+# D-13 (Phase 200): ``_exec_llm_human_input`` moved to
+# ``app.services.harness.human_input``, and its module-global
+# ``subscribe_for_response`` moved WITH it — so the patch target is the new
+# home, not ``phase_types``. Patching the old module now patches a name the
+# executor no longer reads (measured: 5 failures + one HANG).
+from app.services.harness import human_input as _human_input_home
 
 from app.services.tool_dispatcher import _TOOL_REGISTRY, ToolResult
 
@@ -395,7 +402,7 @@ async def test_096_ci_workflow_regression_happy_path(
     with patch.object(task_service, "open_stream", gw.open_stream), \
          patch.object(task_service, "get_pg_pool", _make_get_pool(pool)), \
          patch("app.config.get_model_capability_async", _fake_capability), \
-         patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+         patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
         await asyncio.wait_for(
             harness_engine.run_workflow(
                 run_id, wf, ctx, pool=pool, redis=fake_redis

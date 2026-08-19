@@ -500,6 +500,135 @@ class AskUserResponseBody(BaseModel):
     choice_index: "int | None" = None
 
 
+async def _redrive_paused_workflow_run(run_id: UUID, tool_call_id: str, redis) -> bool:
+    """Wake a `paused` workflow run in-process after its human gate has been answered.
+
+    ⚠ **WITHOUT THIS, D-10's OWN SENTENCE IS FALSE.** *"Answering later still resumes;
+    nothing is discarded"* is not a property of the shipped architecture: once
+    `subscribe_for_response` has timed out, **nothing is subscribed**, so Step 4's Redis
+    PUBLISH reaches no listener, and the ONLY re-drive in the entire product is
+    `main.py:406`'s **boot-time sweep**. Pausing without this helper would mean a run
+    resumes *only when the server next restarts* — and the UI would have to SAY so, which
+    is a wording nobody should ship. RESEARCH's option (b), taken.
+
+    Returns True if a re-drive was spawned. Every other path returns False, and **no path
+    raises**: the caller's persist has already succeeded and the answer is durable, so a
+    failure here must never turn a recorded answer into a non-200 (the same posture
+    Step 4's PUBLISH already takes, for the same reason).
+
+    ⚠ THE ROW SELECT IS `find_resumable_runs`' PREDICATE, NARROWED TO ONE RUN — copied
+    rather than improvised, because three of its clauses are load-bearing and one of them
+    is a SECURITY property:
+      * `wr.status = 'paused'` — only a paused run is woken here (an `active` run already
+        has a producer; a terminal run must stay terminal).
+      * `t.active_workflow_run_id = wr.id` — the thread anchor, which `pause_run`
+        deliberately left intact and which is what makes the run findable at all.
+      * `wr.is_golden_run = false` — ⚠ **A GOLDEN RUN IS NEVER RESUMABLE, AND THAT IS A
+        SECURITY PROPERTY, NOT HOUSEKEEPING** (Phase 190 / A4): re-driving a publish
+        validation would PERFORM its external action with nobody asked. Dropping this
+        clause would reopen that door through a route the boot sweep's own guard does not
+        watch.
+
+    ⚠ `claim_run` IS THE ANTI-DOUBLE-DRIVE, and it is a real CAS rather than a check:
+    it stamps the migration-062 `claimed_at` lease and matches only when the lease is
+    unset or expired, so two answers racing on two workers — or this route racing the
+    boot sweep — produce exactly ONE producer. A crash mid-re-drive becomes re-claimable
+    once the lease expires, so nothing strands.
+
+    ⚠ THE MINTED PRODUCER SHELL IS TERMINALIZED ON EVERY EXIT PATH (Facet C, 092-07).
+    `_build_resume_context` INSERTs a `status='streaming'` `runs` row so the re-driven
+    sub-agents' `parent_run_id` FK resolves; a stranded one becomes the thread's latest
+    runs row and defeats the F2 self-heal, re-wedging the thread.
+
+    ⚠ `ctx.resume_answered_tool_call_id` IS WHY THIS DOES NOT SIMPLY RE-ASK. The executor
+    mints a fresh `tool_call_id` on every entry, so a plain re-run would insert a SECOND
+    prompt row and block again — the person would watch their answer vanish and the
+    question return. The flag carries the id THIS request just persisted, is single-use,
+    and is read only by `_exec_llm_human_input`.
+    """
+    from app.db.workflows import claim_run, resume_run  # noqa: PLC0415
+    from app.dependencies import get_pg_pool  # noqa: PLC0415
+    from app.services.harness_engine import (  # noqa: PLC0415
+        _build_resume_context,
+        _load_run_definition,
+        _resume_run,
+    )
+
+    pool = await get_pg_pool()
+    row = await pool.fetchrow(
+        """
+        SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
+               wr.org_id, wr.is_golden_run, t.user_id
+        FROM workflow_runs wr
+        JOIN threads t ON t.id = wr.thread_id
+        WHERE wr.id = $1
+          AND wr.status = 'paused'
+          AND t.active_workflow_run_id = wr.id
+          AND wr.is_golden_run = false
+        """,
+        run_id,
+    )
+    if row is None:
+        return False
+    if not await claim_run(pool, run_id, settings.harness_resume_lease_seconds):
+        # Somebody else (the boot sweep, or a racing second answer) owns this run.
+        logger.info("ask_user_response: re-drive skipped, run %s already claimed", run_id)
+        return False
+
+    definition = await _load_run_definition(pool, run_id)
+    if definition is None:
+        # Mirrors the sweep's WR-02 posture: skip THIS run rather than raise; it
+        # re-becomes claimable after the lease expires.
+        logger.warning(
+            "ask_user_response: run %s has no loadable definition — not re-driven", run_id
+        )
+        return False
+
+    # The run is about to RUN, so it must stop reporting `paused` — a run that reads
+    # paused while a producer drives it is the same class of user-visible lie D-10 exists
+    # to remove. Narrower than `pause_run`: `AND status = 'paused'` only.
+    await resume_run(pool, run_id)
+
+    ctx = await _build_resume_context(dict(row), redis, pool)
+    ctx.resume_answered_tool_call_id = tool_call_id
+
+    async def _wake():
+        _failed = False
+        try:
+            await _resume_run(run_id, definition, ctx, pool=pool, redis=redis)
+        except Exception:
+            _failed = True
+            logger.exception("ask_user_response: re-drive failed for run %s", run_id)
+        finally:
+            _pid = getattr(ctx, "producer_run_id", None)
+            if _pid is not None:
+                try:
+                    from app.db.runs import finalize_run  # noqa: PLC0415
+                    from datetime import datetime as _dt, timezone as _tz  # noqa: PLC0415
+
+                    await finalize_run(
+                        pool,
+                        run_id=_pid,
+                        status="failed" if _failed else "completed",
+                        error="ask_user re-drive failed" if _failed else None,
+                        completed_at=_dt.now(_tz.utc),
+                        message_id=None,
+                        input_tokens=None,
+                        output_tokens=None,
+                    )
+                except Exception:
+                    logger.exception(
+                        "ask_user_response: producer-shell finalize failed for %s", _pid
+                    )
+            RUN_TASKS.pop(run_id, None)
+
+    _t = asyncio.create_task(_wake())
+    RUN_TASKS[run_id] = _t
+    _t.add_done_callback(lambda _x, _r=run_id: RUN_TASKS.pop(_r, None))
+    logger.info("ask_user_response: re-drove paused run %s on tcid %s", run_id, tool_call_id)
+    return True
+
+
 @router.post("/{run_id}/ask_user_response", status_code=200)
 async def submit_ask_user_response(
     run_id: UUID,
@@ -652,6 +781,32 @@ async def submit_ask_user_response(
             "ask_user_response: publish failed for run %s tcid %s",
             run_id, body.tool_call_id,
         )
+
+    # ── Step 5 (Phase 200 / D-10): wake a run the human gate PAUSED ──────────
+    #
+    # ⚠ BRANCH, NEVER REPLACE — the same discipline the F10 fallback above keeps.
+    # Step 1's `runs` SELECT is byte-identical and still FIRST, so Deep's runs-keyed
+    # ask_user path is untouched and still returns 200; Steps 2-4 are untouched. This
+    # engages ONLY on `_origin == "harness"`, i.e. the branch that already resolved the
+    # id as a `workflow_runs` row UNDER THE CALLER'S OWNERSHIP with the thread-anchor
+    # confirmed (404 never 403 — no existence leak). A Deep answer never reaches here.
+    #
+    # ⚠ PERSIST FIRST, THEN WAKE. The response is durable before anything is re-driven,
+    # so a re-drive failure can never cost the answer.
+    #
+    # ⚠ SPAWNING MUST NOT BLOCK THE 200, AND A FAILURE IS LOGGED, NEVER RAISED — exactly
+    # the posture Step 4 takes, and for the same reason: the persist already succeeded,
+    # and returning non-200 would tell the person their answer was not recorded when it
+    # was. The helper itself already swallows its own failures; this belt is here because
+    # a NEW failure mode added inside it must not become a new way to lose an answer.
+    if _origin == "harness":
+        try:
+            await _redrive_paused_workflow_run(run_id, body.tool_call_id, redis)
+        except Exception:
+            logger.exception(
+                "ask_user_response: paused re-drive raised for run %s tcid %s",
+                run_id, body.tool_call_id,
+            )
 
     return {"status": "ok"}
 

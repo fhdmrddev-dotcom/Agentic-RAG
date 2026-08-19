@@ -114,6 +114,9 @@ from app.services.template_render_service import (
 )
 from app.services.tool_dispatcher import ToolContext
 
+# ── llm_human_input — MOVED to app.services.harness.human_input (G-5 / D-13, 2026-08-19) ──
+from app.services.harness.human_input import _exec_llm_human_input, _latest_phase_text  # noqa: F401
+
 # Imported lazily-at-call (NOT at module top) to avoid a harness import cycle
 # (harness_engine imports the harness package which imports phase_types): the
 # honest-fail surface lives in harness_engine and is fetched inside the executor.
@@ -817,137 +820,6 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         # question. The noun is AUTHORED COPY (§5.1) and this is its ONE home.
         **_measure(len(sub_run_ids), "agents"),
     }
-
-
-async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
-    """Pause for human input via the ask_user pub/sub flow, block on the answer.
-
-    Reuses the ask_user substrate ordering (SUBSCRIBE → advertise → durable prompt
-    row → emit → block) so Plan 04's resume can re-subscribe against the same
-    ``tool_call_id``. The per-call timeout is clamped to the 1800s hard cap
-    (``settings.ask_user_max_timeout_seconds``). The durable prompt row + tool_call_id
-    are stored in the output so resume can find the pending prompt.
-    """
-    run_id: UUID = getattr(ctx, "run_id", None)
-    redis = getattr(ctx, "redis", None)
-    tool_call_id = uuid4().hex
-    prompt = phase.config.prompt
-    options = list(phase.config.options)
-    timeout_seconds = min(
-        phase.config.timeout_seconds, settings.ask_user_max_timeout_seconds
-    )
-    # D-12: the prior phase's text is the DRAFT the user is being asked to confirm
-    # (the doc_qa_human flow's `draft` phase produces {"text": <answer>}). Carry it
-    # through the durable prompt row + the SSE event + the /pending replay so the
-    # Phase 094 frame can render "here's what I'd answer — confirm?" without
-    # re-deriving it. Empty string when there is no upstream text (harmless).
-    draft = _latest_phase_text(accumulated_outputs)
-
-    # Durable prompt row (D-085-05) — Plan 04 resume re-subscribes against this
-    # tool_call_id. Best-effort: a failed insert only affects the /pending replay
-    # surface, not the live block-on-answer flow.
-    supabase = getattr(ctx, "supabase", None)
-    current_user = getattr(ctx, "current_user", None) or {}
-    thread_id = getattr(ctx, "thread_id", None)
-    if supabase is not None and thread_id:
-        try:
-            from app.utils.db import aexec
-
-            await aexec(
-                supabase.table("messages").insert(
-                    {
-                        "thread_id": thread_id,
-                        "user_id": current_user.get("id"),
-                        "role": "system",
-                        "content": prompt,
-                        # CTX-01 (T-120-04): llm_human_input ask_user prompt — workflow row.
-                        "origin": "harness",
-                        "tool_calls": [
-                            {
-                                "kind": "ask_user_prompt",
-                                "tool_call_id": tool_call_id,
-                                "prompt": prompt,
-                                "options": options,
-                                "timeout_seconds": timeout_seconds,
-                                "run_id": str(run_id),
-                                # D-12: the prior phase's draft (the thing being
-                                # confirmed) — additive; older rows have no draft.
-                                "draft": draft,
-                            }
-                        ],
-                    }
-                )
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception(
-                "llm_human_input: prompt row insert failed run=%s tcid=%s",
-                run_id, tool_call_id,
-            )
-
-    # Emit the ask_user prompt so the frontend renders the question.
-    # Facet B / edit #4 (092-07): this is a DIRECT executor emit (NOT an engine
-    # _emit site reached by run_workflow's stream_run_id threading), so route it on
-    # the PRODUCER stream transport (run:{producer}) the frontend watches — while
-    # the durable prompt-row run_id VALUE (above), the subscribe_for_response
-    # channel (below), and the get_pending_ask_user resume matcher all stay on
-    # ctx.run_id (the workflow_run id) for live↔resume answer-channel consistency.
-    _stream_id = getattr(ctx, "producer_run_id", None) or run_id
-    emit = getattr(ctx, "emit", None)
-    if emit is not None and redis is not None:
-        try:
-            await emit(
-                redis, _stream_id, "ask_user_prompt",
-                tool_call_id=tool_call_id,
-                prompt=prompt,
-                options=options,
-                timeout_seconds=timeout_seconds,
-                # D-12: carry the prior-phase draft on the live SSE event too, so the
-                # frontend PendingAsk shape gets it without a /pending round-trip.
-                draft=draft,
-            )
-        except Exception:  # noqa: BLE001
-            logger.exception("llm_human_input: ask_user_prompt emit failed")
-
-    # Block on the answer via the shipped subscribe helper (SUBSCRIBE → SADD →
-    # block; cleanup in finally). Returns the parsed payload or None on timeout.
-    payload = await subscribe_for_response(
-        redis, run_id, tool_call_id, float(timeout_seconds)
-    )
-
-    # 096-09 (UAT Test 2 restart-resumability fix): a {"kind":"shutdown"} payload
-    # comes ONLY from main.py's broadcast_shutdown_sentinel_to_all (graceful app
-    # shutdown). For a HARNESS llm_human_input phase we must NOT complete with an
-    # empty answer — that would advance/finish the workflow and lose the pending
-    # question. Instead escape via CancelledError so this phase stays 'active' and
-    # the durable prompt row stays pending; the boot-time resume sweep then
-    # re-subscribes + re-emits the SAME prompt and blocks on the answer
-    # (BUG-260605-01). The engine's cancel/escape handler skips prompt-expiry on
-    # shutdown (is_app_shutting_down gate), so the prompt survives the restart.
-    # Deep-mode ask_user (the dispatcher tool) is unaffected — it keeps returning
-    # a normal "interrupted by server shutdown" ToolResult and finalizes.
-    if payload and payload.get("kind") == "shutdown":
-        raise asyncio.CancelledError(
-            "llm_human_input interrupted by server shutdown — phase left active "
-            "for the boot-time resume sweep (096-09)"
-        )
-
-    answer = ""
-    if payload and payload.get("kind") == "response":
-        # BUG-260607-01 (same defense as the Deep dispatcher ask_user handler):
-        # a choice-click answer arrives as {response_text: "", choice_index: N}
-        # — resolve the chosen option text so the workflow never advances on a
-        # silently-empty answer when the user actually chose.
-        answer = (payload.get("response_text") or "").strip()
-        if not answer and options:
-            _ci = payload.get("choice_index")
-            try:
-                _ci = int(_ci)
-                if 0 <= _ci < len(options):
-                    answer = str(options[_ci])
-            except (TypeError, ValueError):
-                pass
-
-    return {"text": prompt, "answer": answer, "tool_call_id": tool_call_id}
 
 
 # ── 101.1 (D-01/D-04/D-08/D-10/D-12) — the 6th executor: a SEALED FORCED EMIT ──
@@ -1783,19 +1655,6 @@ def _collect_sub_questions(accumulated_outputs: dict) -> list[str]:
         if isinstance(out, dict) and isinstance(out.get("sub_questions"), list):
             return list(out["sub_questions"])
     return []
-
-
-def _latest_phase_text(accumulated_outputs: dict) -> str:
-    """The most-recent upstream phase's answer text — the draft an llm_human_input
-    phase asks the user to confirm (D-12). Mirrors ``_collect_sub_questions``'
-    reverse scan: every phase executor returns ``{"text": <answer>}``, so the
-    latest non-empty ``text`` is the prior phase's output (the doc_qa_human flow's
-    ``draft`` phase produces ``{"text": <answer>}`` — that is the thing being
-    confirmed). Returns ``""`` when there is no upstream text (harmless)."""
-    for out in reversed(list(accumulated_outputs.values())):
-        if isinstance(out, dict) and isinstance(out.get("text"), str) and out["text"].strip():
-            return out["text"]
-    return ""
 
 
 # ── Phase 189 (CONN-01) — the 7th executor: the governed EXTERNAL ACTION ─────

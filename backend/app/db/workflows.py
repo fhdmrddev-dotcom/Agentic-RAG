@@ -1720,6 +1720,138 @@ async def advance_current_phase(
     )
 
 
+async def pause_run(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
+    """Flip a run to ``paused`` — the D-10 human gate, and the FIRST writer of this status.
+
+    ⚠ ``workflow_runs.status = 'paused'`` HAD **ZERO WRITERS IN THE ENTIRE BACKEND**
+    before Phase 200. ``grep -rn "'paused'" backend/app --include=*.py`` returned seven
+    hits and **all seven were READS** — the delete-cascade in-flight sweep
+    (``api/workflows.py``), the lock banner (``:1180``), ``find_resumable_runs``
+    (``:1296``) and the claim/lease writes. The literal has been admitted by
+    ``workflow_runs_status_check`` since migration 057 and nothing has ever written it.
+    So there is no pause semantics to copy here, only a SHAPE: ``cancel_active_phases``'
+    single keyed ``pool.execute`` with ``$N`` placeholders and a docstring naming the key
+    axis and the ownership division.
+
+    ⚠ **THIS MUST NOT BE ``finish_run``, AND THE REASON IS MEASURED RATHER THAN
+    STYLISTIC.** ``finish_run``'s guard (``status NOT IN ('completed','failed',
+    'cancelled')``) would happily ACCEPT a ``'paused'`` write — but it clears
+    ``threads.active_workflow_run_id`` in the SAME transaction (092 SC#2), and
+    ``find_resumable_runs`` (``:1251``) requires ``t.active_workflow_run_id = wr.id``.
+    Reusing it would make every paused run **permanently unresumable**: the boot sweep
+    would find nothing, forever. That is Pitfall 4, and it is why this is a separate
+    writer rather than a second argument to an existing one.
+
+    ⚠ RUN-KEYED write → ``WHERE id = $1``. The guard is
+    ``status NOT IN ('completed','failed','cancelled')`` so this can never RESURRECT a
+    terminal run — a Stop that landed on another worker while the gate was waiting keeps
+    its terminal status, and this write finds 0 rows. It is deliberately NOT narrowed to
+    ``status = 'active'``: a re-entered pause (the same gate timing out twice across a
+    re-drive) must stay idempotent rather than silently no-op, and ``cap_paused`` is a
+    non-terminal state a run can legitimately be in when a later phase's gate elapses.
+
+    ⚠ THE THREAD ANCHOR IS NOT TOUCHED HERE, AND ITS ABSENCE IS THE POINT. A paused run
+    is still the thread's CURRENT run; the anchor is what makes it findable again.
+
+    NO OWNERSHIP CHECK IS PERFORMED HERE. The workflow cluster reads through a
+    service-role pool that BYPASSES RLS, so a WHERE clause is the access boundary — but
+    this writer takes no user-supplied filter, only a key. Ownership is enforced by the
+    CALLER (the engine reached this run through an owner-scoped kickoff or an
+    owner-scoped, anchor-confirmed answer), the same division ``cancel_active_phases``
+    keeps.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs SET status = 'paused' WHERE id = $1 AND status NOT IN ('completed', 'failed', 'cancelled')",
+        workflow_run_id,
+    )
+
+
+async def resume_run(pool: asyncpg.Pool, workflow_run_id: UUID) -> None:
+    """Flip a ``paused`` run back to ``active`` — the answer-triggered re-drive (D-10).
+
+    The exact inverse of ``pause_run`` above and narrower than it on purpose:
+    ``AND status = 'paused'`` means this can only ever move a run OUT of the one state
+    ``pause_run`` put it in. It cannot resurrect a terminal run, cannot disturb a
+    ``cap_paused`` run (whose Continue path owns its own transition), and no-ops on a run
+    somebody else already resumed — so two answers racing on two workers produce one
+    transition, not two.
+
+    ⚠ WITHOUT THIS, A RE-DRIVEN RUN WOULD REPORT ``paused`` WHILE IT IS RUNNING, which is
+    the same class of user-visible lie D-10 exists to remove. The status is the only
+    column written; the thread anchor is untouched (it was never cleared — see
+    ``pause_run``).
+
+    ⚠ RUN-KEYED write → ``WHERE id = $1``. Ownership is the CALLER's, exactly as above:
+    the answer route resolves the run owner-scoped and anchor-confirmed before it ever
+    reaches here.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs SET status = 'active' WHERE id = $1 AND status = 'paused'",
+        workflow_run_id,
+    )
+
+
+async def get_ask_user_response(
+    pool: asyncpg.Pool, run_id: UUID, tool_call_id: str
+) -> dict | None:
+    """The durable ask_user RESPONSE payload for ``tool_call_id`` — or ``None``.
+
+    ⚠ THIS EXISTS BECAUSE THE RESUME CONTRACT WAS ONLY HALF TRUE, AND THE HALF THAT WAS
+    MISSING IS THE ONE A PERSON NOTICES. ``resume_stranded_workflows``' docstring says of
+    an already-answered ask_user phase: *"the answer is durable → do NOT re-ask; let
+    ``run_workflow`` re-run the phase, which re-reads the durable answer and proceeds."*
+    **Nothing re-read it.** ``_exec_llm_human_input`` mints a fresh ``uuid4().hex``
+    ``tool_call_id`` on every entry and blocks on a brand-new channel, so a re-driven
+    phase asked the question AGAIN. ``ask_user_response_exists`` (:1342) could answer
+    *whether* an answer exists but never hand it back.
+
+    It is the EXISTS query above, kept structurally identical and SELECTing the payload
+    instead of a boolean — same ``role='system'`` scan (the /pending way, never the
+    filtered /snapshot path), same ``ask_user_response`` kind discriminator, same
+    per-call id match, and the same RUN-SCOPING correlation (WR-06): the response row
+    carries no ``run_id``, so a matching PROMPT row for the SAME ``tool_call_id`` must
+    belong to THIS run. A thread with several workflow runs cannot cross-feed answers.
+
+    ⚠ ``expired`` rows are EXCLUDED. The terminal-site cleanup (096-09) writes a row
+    shaped exactly like a response but carrying ``expired: true``; consuming one as an
+    answer would resurrect precisely the silent-empty-approval this phase removes.
+
+    Returns ``{"response_text": str, "choice_index": int | None}`` for the LATEST
+    matching row, or ``None``. Owner-scoping is the caller's, as everywhere in this
+    module: the pool bypasses RLS and the ``WHERE`` clause is the boundary.
+    """
+    row = await pool.fetchrow(
+        """
+        SELECT r.tool_calls
+        FROM messages r
+        JOIN workflow_runs wr ON wr.thread_id = r.thread_id
+        JOIN messages p
+          ON p.thread_id = wr.thread_id
+         AND p.role = 'system'
+         AND p.tool_calls @> '[{"kind": "ask_user_prompt"}]'::jsonb
+         AND p.tool_calls->0->>'tool_call_id' = $2
+         AND p.tool_calls->0->>'run_id' = $1::text
+        WHERE wr.id = $1
+          AND r.role = 'system'
+          AND r.tool_calls @> '[{"kind": "ask_user_response"}]'::jsonb
+          AND r.tool_calls->0->>'tool_call_id' = $2
+          AND COALESCE((r.tool_calls->0->>'expired')::boolean, false) = false
+        ORDER BY r.created_at DESC
+        LIMIT 1
+        """,
+        run_id,
+        tool_call_id,
+    )
+    if row is None:
+        return None
+    tcs = row["tool_calls"] or []
+    payload = tcs[0] if tcs else {}
+    return {
+        "response_text": payload.get("response_text"),
+        "choice_index": payload.get("choice_index"),
+    }
+
+
 async def finish_run(pool: asyncpg.Pool, run_id: UUID, status: str) -> None:
     """Terminal run status write (``completed`` / ``failed`` / ``cancelled``) + lock-clear (SC#2).
 
