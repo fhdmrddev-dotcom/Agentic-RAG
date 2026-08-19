@@ -50,6 +50,10 @@ import publishGauntletSource from "./PublishGauntlet?raw"
 // `blockedReason` is composed here and handed to the component verbatim.
 import builderPageSource from "@/pages/WorkflowBuilderPage?raw"
 import { PublishGauntlet } from "./PublishGauntlet"
+// 199-03 Task 1 (DES-01): the refusal sentences are read from the module that OWNS them,
+// so the assertion compares the surface against the vocabulary rather than against a second
+// spelling of it. A test that re-typed the sentence would go green on a re-spelled component.
+import { blockedSentence } from "./verdictModel"
 import type { PublishOutcome } from "@/lib/api"
 import { publishWorkflow } from "@/lib/api"
 
@@ -1063,5 +1067,303 @@ the refusal's vocabulary, and D-12 gives the server the only one`).not.toContain
     // …and the stripper does NOT rescue a comment-shaped plant into invisibility by accident:
     // a plant inside a comment is correctly ignored, which is the whole point of stripping.
     expect(strip("// llm_human_input in a comment")).not.toContain("llm_human_input")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 199-03 Task 1 (DES-01 · sheet 178 `c7-gauntlet-soul`) — THE PRE-CHANGE
+// INVENTORY, and the three sheet claims that had no RENDERED guard.
+//
+// Sheet 178 renders ZERO shipped components — every sheet is drawn from scratch — so each
+// row below is a claim about OUR surface that had to be MEASURED before anything moved.
+// The resting atoms are pinned PRESENT (the `192.2-05` method): a later removal is proved
+// by INVERTING an assertion here to absent, never by deleting one. A deleted assertion
+// proves nothing at all about what a re-presentation subtracted.
+//
+// Three of the sheet's claims had no rendered guard on this surface before this plan:
+//  · "indeterminate while running" — the shipped spine IS honest, but nothing asserted it
+//    over the RUNNING render. The F7 describe above asserts a related property over a
+//    RESOLVED unknown block, which is a different moment and cannot stand in for it.
+//  · "no override control anywhere" — guarded by a `?raw` regex over the source, and by one
+//    button scan needled on two words. A LINK, a MENU ITEM, or a control worded any other
+//    way was invisible to both, and a source regex cannot see a control whose label is
+//    composed from a variable at all.
+//  · "raw detail on demand" — asserted to EXIST; never asserted to be the ONLY one, so a
+//    second disclosure could have been built beside it with the suite green.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Every way a "go forward anyway" control could actually ARRIVE on this surface —
+ * deliberately wider than the two words the shipped scan needled, and matched over a ROLE
+ * set rather than over `<button>` alone.
+ *
+ * The `no override · <s>publish anyway</s>` strip the wall renders ON PURPOSE is not a
+ * member of any of these selectors, and neither is the sentence saying there is no
+ * override — both are plain text nodes. That is what lets this scan be strict about
+ * controls while the deliberate ABSENCE keeps rendering.
+ */
+const FORWARD_CONTROL_SELECTOR = [
+  "button",
+  "a[href]",
+  '[role="button"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  'input[type="submit"]',
+  'input[type="button"]',
+].join(", ")
+
+/** The words a control offering a way past the wall would plausibly wear. */
+const OVERRIDE_NEEDLE =
+  /publish anyway|override|proceed|force[-\s]?publish|bypass|ignore the (?:grader|judge)|skip the (?:grader|judge)|publish regardless|ship it/i
+
+/** Controls inside `root` whose label, aria-label or title offers a way past. */
+function forwardControlsIn(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FORWARD_CONTROL_SELECTOR)).filter((el) => {
+    const surfaces = [
+      el.textContent ?? "",
+      el.getAttribute("aria-label") ?? "",
+      el.getAttribute("title") ?? "",
+    ]
+    return surfaces.some((s) => OVERRIDE_NEEDLE.test(s))
+  })
+}
+
+/** The judge block the whole hard-wall contract is measured against. */
+const JUDGE_BLOCK: PublishOutcome = {
+  kind: "verdict",
+  verdict: {
+    published: false,
+    version: null,
+    golden_run_id: "a7f3c1d2-run",
+    blocked_stage: "judge",
+    named_failures: [
+      { criterion: "grounded_in_evidence", score: 0.42, evidence: "3 of 12 figures are uncited." },
+      { summary: "a quarter of its quantitative claims are not grounded in a cited source" },
+    ],
+  },
+}
+
+/** A MECHANICAL block — recoverable, and pre-run, so it carries no golden run. */
+const MECHANICAL_BLOCK: PublishOutcome = {
+  kind: "verdict",
+  verdict: {
+    published: false,
+    version: null,
+    golden_run_id: null,
+    blocked_stage: "lint",
+    named_failures: [
+      { code: "unreachable_phase", phase: "summarise", message: "nothing routes to this step" },
+    ],
+  },
+}
+
+describe("PublishGauntlet 199-03 — the pre-change RESTING inventory (sheet c7)", () => {
+  it("(rest) the closed gauntlet is ONE control and nothing else, and its label is this literal", () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    expect(screen.getByTestId("publish-trigger")).toHaveTextContent("◆ Publish…")
+    // The sheet's at-rest row draws an eight-segment strip inside a card. Ours draws a
+    // single button — already LESS, so there is nothing here to subtract.
+    expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("gauntlet-spine")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("publish-soul")).not.toBeInTheDocument()
+  })
+
+  it("(rest) the opened modal's atoms, as LITERALS — pinned present so a removal is proved by INVERSION", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    const modal = screen.getByTestId("publish-modal")
+
+    // The three regions the resting modal is made of.
+    expect(screen.getByTestId("publish-soul")).toBeInTheDocument()
+    expect(screen.getByTestId("gauntlet-spine")).toBeInTheDocument()
+    expect(screen.getByLabelText(/golden_input/i)).toBeInTheDocument()
+
+    // The form's own words, verbatim. These say what publishing COSTS, which is the
+    // purpose that has to survive any cut.
+    expect(modal).toHaveTextContent("golden_input — a representative kickoff prompt")
+    expect(modal).toHaveTextContent(/Publishing runs the full gauntlet above/)
+    expect(modal).toHaveTextContent(/It can honestly block\./)
+    expect(screen.getByRole("button", { name: /run the gauntlet/i })).toHaveTextContent(
+      "Publish ▸ run the gauntlet",
+    )
+    expect(screen.getByPlaceholderText(/Choose something typical, not a corner case/)).toBeInTheDocument()
+
+    // ⚠ THE DUPLICATION, MEASURED. The dialog's title bar and the form's section heading
+    // say the SAME four words about two lines apart. Task 2 INVERTS these two counts
+    // rather than deleting this case — "text is noise, cut it; the purpose must survive
+    // the cut", and here the purpose survives untouched in the title bar.
+    expect(screen.getAllByText("Publish this workflow")).toHaveLength(1)
+    expect(screen.getAllByText("◆ Publish this workflow")).toHaveLength(1)
+  })
+
+  it("(rest) the spine names its ten server stages as literals, in the server's own order", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    const spine = screen.getByTestId("gauntlet-spine")
+    const rendered = Array.from(spine.querySelectorAll("div")).map((d) => d.textContent ?? "")
+    for (const stage of [
+      "Owner",
+      "Valid",
+      "Goal",
+      "Structure",
+      "Pause",
+      "Grounding",
+      "Golden run",
+      "Citations",
+      "Judge",
+      "Commit",
+    ]) {
+      expect(rendered).toContain(stage)
+    }
+    // The node COUNT follows the STAGES table; it is read off the render, never written
+    // twice. `rounded-xl` is the node box's own shape class and nothing else in the spine
+    // carries it — the connectors are `rounded-full`, the ✓ badge is a circle.
+    expect(spine.querySelectorAll('[class*="rounded-xl"]')).toHaveLength(10)
+  })
+})
+
+describe("PublishGauntlet 199-03 — IN PROGRESS is INDETERMINATE (sheet c7 row 2)", () => {
+  /** Put the gauntlet into the in-flight state and hand back the modal element. */
+  async function startNeverResolvingPublish(): Promise<HTMLElement> {
+    const user = userEvent.setup()
+    mockedPublish.mockReturnValue(new Promise<PublishOutcome>(() => {}))
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
+    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toBeInTheDocument())
+    return screen.getByTestId("publish-modal")
+  }
+
+  it("claims NO stage has passed while the run is in flight — no green node, no ✓ badge, no reached connector", async () => {
+    await startNeverResolvingPublish()
+    const spine = screen.getByTestId("gauntlet-spine")
+    // The wire carries no per-stage progress during a publish: the request is ONE
+    // synchronous call whose only answer is the final verdict. Painting any node passed
+    // here would be the fabricated precision this project forbids — and it is exactly
+    // what the SHEET draws (three filled segments of eight, before anything has resolved).
+    expect(spine.querySelectorAll('[class*="border-success"]')).toHaveLength(0)
+    expect(spine.querySelectorAll('[class*="bg-success"]')).toHaveLength(0)
+    expect(spine.textContent ?? "").not.toContain("✓")
+  })
+
+  it("renders no determinate progress anywhere while running — no percentage, no 'n of 10', no aria-valuenow", async () => {
+    const modal = await startNeverResolvingPublish()
+    const text = modal.textContent ?? ""
+    expect(text).not.toMatch(/\d+\s*%/)
+    expect(text).not.toMatch(/\b\d+\s*(?:of|\/)\s*10\b/i)
+    expect(text).not.toMatch(/\bstage\s*\d+\b/i)
+    // An indeterminate progressbar would be legitimate; a VALUED one is the claim we
+    // cannot make, so the guard is on the value and not on the role.
+    for (const bar of Array.from(modal.querySelectorAll('[role="progressbar"]'))) {
+      expect(bar.getAttribute("aria-valuenow")).toBeNull()
+    }
+    // Exactly one node is alive, and it is the only stage a user actually waits on.
+    expect(screen.getByTestId("gauntlet-spine").querySelectorAll(".gauntlet-node-run")).toHaveLength(1)
+  })
+
+  it("the only number it shows while running is a MEASURED one — the elapsed clock", async () => {
+    const modal = await startNeverResolvingPublish()
+    expect(screen.getByTestId("publish-elapsed")).toHaveTextContent(/elapsed/i)
+    // Elapsed time is observed. An estimate, a remaining, or an ETA would all be predicted.
+    expect(modal.textContent ?? "").not.toMatch(
+      /remaining|estimated|\beta\b|about \d+ (?:more )?(?:second|minute)/i,
+    )
+  })
+})
+
+describe("PublishGauntlet 199-03 — the judge wall carries NO override, over the WHOLE rendered state", () => {
+  it("(non-vacuity) the scan FIRES on a planted button, a planted link and a planted menu item", () => {
+    // Three plants, three arms. The shipped guard scanned `<button>` only, so a link or a
+    // menu item offering the same thing was invisible to it. Driving the predicate RED
+    // here — permanently — is what keeps the absence assertion below falsifiable rather
+    // than vacuous: a selector typo matching nothing fails THIS case first.
+    const { container } = render(
+      <div>
+        <button type="button">Publish anyway</button>
+        <a href="/x">Override the grader</a>
+        <div role="menuitem">Proceed to publish</div>
+      </div>,
+    )
+    const hits = forwardControlsIn(container)
+    expect(hits).toHaveLength(3)
+    expect(hits.map((h) => h.textContent)).toEqual([
+      "Publish anyway",
+      "Override the grader",
+      "Proceed to publish",
+    ])
+  })
+
+  it("(non-vacuity) the scan does NOT fire on the deliberate absence the hard wall renders", () => {
+    // `no override · <s>publish anyway</s>` is TEXT, not a control. A scan that flagged it
+    // would force the honest absence to be deleted to go green — the opposite of the point.
+    const { container } = render(
+      <p>
+        no override · <s>publish anyway</s>
+      </p>,
+    )
+    expect(forwardControlsIn(container)).toHaveLength(0)
+  })
+
+  it("finds no forward control ANYWHERE in the judge-failure state — buttons, links, menu items", async () => {
+    mockedPublish.mockResolvedValue(JUDGE_BLOCK)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    // The WHOLE rendered state, not just the verdict card: a control smuggled into the
+    // modal header, the spine or the soul block would be just as much of a way past.
+    const modal = screen.getByTestId("publish-modal")
+    expect(forwardControlsIn(modal)).toHaveLength(0)
+
+    // …and again with the disclosure OPEN, because a closed <details> still has its
+    // children in the DOM but a future collapsed region might not.
+    const raw = screen.getByTestId("raw-verdict") as HTMLDetailsElement
+    raw.open = true
+    expect(forwardControlsIn(modal)).toHaveLength(0)
+
+    // The one forward affordance is the honest one, and it is not a way past the wall.
+    expect(screen.getByRole("button", { name: /fix & re-publish/i })).toBeEnabled()
+  })
+
+  it("the two failure kinds are separated in WORDS — and the words are IMPORTED, never re-spelled here", async () => {
+    // The sheet writes its own sentences ("The workflow quality does not meet production
+    // standards." / "Two phases have no knowledge source."). Ours come from the pure
+    // verdict module, the ONE home for every word a surface says about a check.
+    mockedPublish.mockResolvedValue(JUDGE_BLOCK)
+    const { unmount } = render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("verdict-headline")).toBeInTheDocument())
+    expect(screen.getByTestId("verdict-headline")).toHaveTextContent(blockedSentence("judge"))
+    // FATAL, in words — the wall is stated, not merely coloured.
+    expect(screen.getByTestId("publish-block")).toHaveTextContent(/hard wall/i)
+    unmount()
+
+    mockedPublish.mockResolvedValue(MECHANICAL_BLOCK)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("verdict-headline")).toBeInTheDocument())
+    expect(screen.getByTestId("verdict-headline")).toHaveTextContent(blockedSentence("lint"))
+    // RECOVERABLE, in words — a route forward is named, and no wall is claimed.
+    expect(screen.getByTestId("publish-block")).toHaveTextContent(/Fix the cause and re-publish/i)
+    expect(screen.getByTestId("publish-block")).not.toHaveTextContent(/hard wall/i)
+
+    // Two genuinely different strings — not one sentence tinted twice.
+    expect(blockedSentence("judge")).not.toEqual(blockedSentence("lint"))
+  })
+
+  it("the raw detail is ALREADY on demand, and there is exactly ONE of it (do not build a second)", async () => {
+    mockedPublish.mockResolvedValue(JUDGE_BLOCK)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+
+    // The sheet's "View Details" affordance. Ours is a real <details> disclosure, closed by
+    // default — the sheet draws an <a href="#">, which is a dead affordance.
+    expect(screen.getByTestId("publish-modal").querySelectorAll("details")).toHaveLength(1)
+    const raw = screen.getByTestId("raw-verdict") as HTMLDetailsElement
+    expect(raw.tagName).toBe("DETAILS")
+    expect(raw.open).toBe(false)
+    expect(within(raw).getByText(/Show raw verdict/i)).toBeInTheDocument()
   })
 })
