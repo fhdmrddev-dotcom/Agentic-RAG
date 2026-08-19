@@ -30,6 +30,9 @@ import { SAVED_STILL_A_DRAFT } from "./builderStore"
 import {
   HOLD_PUBLISHING_MANUAL,
   RELOAD_FAILED_NOTE,
+  // 199-09: the loop's REAL refusal sentence. The failure arm's distinctness is only worth
+  // asserting against the words a person actually receives, not against a placeholder.
+  SAVE_FAILED_SENTENCE,
   type PersistState,
 } from "@/hooks/useDraftPersistence"
 
@@ -257,5 +260,96 @@ describe("BuilderSaveRegion — the quiet line is flag-gated, but the HOLD is no
 
     const controls = [...view.container.querySelectorAll("button")]
     expect(controls).toEqual([screen.getByTestId("builder-save-draft")])
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 199-09 (DES-01 · sheet `c10-builder-chrome` §2) — THE ARMS READ APART WITH EVERY
+// `class` ATTRIBUTE STRIPPED OFF.
+//
+// ⚠ WHY CLASS-FREE, AND WHY IT IS THE ONLY HONEST FORM OF THIS CLAIM. Sheet c10 draws the
+// failure arm in `error` tone and the saved arm in the default one, and colour is where a
+// save-state surface is most tempting to stop. A person who cannot see that colour — or a
+// theme where the token happens not to compile, which `192.2`'s `bg-warning` no-op proves
+// is a real thing in this repo — must still be able to tell "your draft is saved" from
+// "your draft is NOT saved". So the comparison discards every class and reads the WORDS.
+// That is the strongest form of the T-199-09-02 spoofing claim: an unsaved draft can never
+// read as a saved one, on any theme, with no colour at all.
+//
+// ⚠ AND THE COMPARATOR IS DRIVEN IN BOTH DIRECTIONS. Non-vacuity is asserted before any
+// inequality, and a deliberately identical pair proves the comparator can still detect
+// sameness — otherwise `not.toEqual` would pass for a comparator that compared nothing.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * What a person READS: every non-empty text node, in document order, taken from a clone
+ * with every `class` attribute physically removed. The removal is ASSERTED, not assumed —
+ * a selector typo would leave the classes on and quietly weaken every case below.
+ */
+function classFreeReading(container: HTMLElement): string[] {
+  const clone = container.cloneNode(true) as HTMLElement
+  for (const el of clone.querySelectorAll("[class]")) el.removeAttribute("class")
+  expect(clone.querySelectorAll("[class]")).toHaveLength(0)
+
+  const out: string[] = []
+  const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT)
+  let node = walker.nextNode()
+  while (node !== null) {
+    const text = (node.textContent ?? "").replace(/\s+/g, " ").trim()
+    if (text !== "") out.push(text)
+    node = walker.nextNode()
+  }
+  return out
+}
+
+/** One arm's class-free reading, taken from its own mount and torn down after. */
+function readingFor(patch: Parameters<typeof renderRegion>[0]): string[] {
+  const { view } = renderRegion(patch)
+  const reading = classFreeReading(view.container)
+  view.unmount()
+  return reading
+}
+
+describe("BuilderSaveRegion — sheet c10 §2: the arms are told apart by WORDS, never by colour", () => {
+  it("the FAILURE arm and the SAVED arm cannot be confused with every class stripped", () => {
+    const failed = readingFor({ state: { kind: "error", sentence: SAVE_FAILED_SENTENCE } })
+    const saved = readingFor({ state: { kind: "saved", at: Date.now() }, dirty: false })
+
+    // NON-VACUITY FIRST. Two empty readings would compare EQUAL and the inequality below
+    // would then be measuring the absence of a component rather than a distinction.
+    expect(failed.length).toBeGreaterThan(1)
+    expect(saved.length).toBeGreaterThan(1)
+
+    expect(failed).not.toEqual(saved)
+    // …and stated in the direction that actually matters: the failure arm carries the
+    // refusal and carries NO receipt, so nothing on screen can be read as "it saved".
+    expect(failed).toContain(SAVE_FAILED_SENTENCE)
+    expect(failed).not.toContain(SAVED_STILL_A_DRAFT)
+    expect(saved).toContain(SAVED_STILL_A_DRAFT)
+    expect(saved).not.toContain(SAVE_FAILED_SENTENCE)
+  })
+
+  it("POSITIVE CONTROL — the comparator still detects two readings that ARE the same", () => {
+    const once = readingFor({ state: { kind: "saved", at: 1 }, dirty: false })
+    const twice = readingFor({ state: { kind: "saved", at: 2 }, dirty: false })
+    expect(once).toEqual(twice)
+  })
+
+  it("all four reachable arms are pairwise distinct, class-free", () => {
+    // Sheet §2 draws four cards. This component reaches four readings — and they are NOT
+    // the sheet's four: `saving`, `saved`, `error` and `conflict`, with the sheet's
+    // `unsaved changes` absent (see this plan's CE-2) and `conflict` present in its place,
+    // carrying two exits the sheet never drew.
+    const arms: Array<readonly [string, string[]]> = [
+      ["saving", readingFor({ state: { kind: "saving" } })],
+      ["saved", readingFor({ state: { kind: "saved", at: Date.now() }, dirty: false })],
+      ["error", readingFor({ state: { kind: "error", sentence: SAVE_FAILED_SENTENCE } })],
+      ["conflict", readingFor({ state: CONFLICTED })],
+    ]
+    for (const [name, reading] of arms) {
+      expect(`${name}:${reading.length > 0}`).toBe(`${name}:true`)
+    }
+    const seen = arms.map(([, reading]) => reading.join(" ⏎ "))
+    expect(new Set(seen).size).toBe(arms.length)
   })
 })

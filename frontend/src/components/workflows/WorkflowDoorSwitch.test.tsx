@@ -1198,10 +1198,25 @@ describe("199-08 Task 1 — the 199-09 SEAM, recorded rather than assumed", () =
     expect(builderPageSource).not.toContain('data-testid="describe-box"')
   })
 
-  it("the Builder's box is UNGATED BY ANY SENTENCE today — 199-09's inheritance, pinned", () => {
-    // Wave 3 imports the SAME refusal constant this plan lands, rather than spelling a second
-    // one. The proof that it has not already done so is here, in wave 2.
-    expect(builderPageSource).not.toContain("DESCRIBE_REFUSAL")
+  it("✅ INVERTED BY 199-09 — the Builder's box now takes THE SAME constant, by import", () => {
+    // ⚠ POLARITY FLIPPED, QUERY UNCHANGED — this case was authored by `199-08` in wave 2
+    // precisely so that wave 3 would flip it rather than delete it, and its original words
+    // are preserved directly below. Wave 2 read: *"the Builder's box is UNGATED BY ANY
+    // SENTENCE today — 199-09's inheritance, pinned … Wave 3 imports the SAME refusal
+    // constant this plan lands, rather than spelling a second one. The proof that it has
+    // not already done so is here, in wave 2."*
+    //
+    // It did. `199-09` measured that the Builder's pre-draft CTA carries the identical
+    // `describe.trim().length > 0` term this door's gate carries — the question `199-08`
+    // deliberately left open — so saying the refusal out loud there is presentation, and it
+    // was built rather than reported.
+    expect(builderPageSource).toContain("DESCRIBE_REFUSAL")
+    // ⚠ AND THE HALF THAT ACTUALLY MATTERS: it arrives by IMPORT, never as a second
+    // spelling. `WorkflowBuilderPage.tsx` is a swept source of the D-24(a) copy fence, so a
+    // literal there would turn that fence red — but this states it directly rather than
+    // relying on another suite to notice.
+    expect(builderPageSource).toContain('} from "@/components/workflows/doorVocabulary"')
+    expect(builderPageSource).not.toContain(doorVocabulary.DESCRIBE_REFUSAL)
   })
 })
 

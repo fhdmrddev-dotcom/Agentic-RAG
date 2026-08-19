@@ -227,9 +227,15 @@ import {
 // loose door read one CTA while this screen still read the pre-D one. Named ids, not literals.
 // ⚠ FOUR literals were expected here and FIVE were found: `DESCRIBE_H1` was duplicated too,
 // and is only in this list because the check was run rather than eyeballed.
+// ⚠ 199-09 adds `DESCRIBE_REFUSAL` to this list, and IMPORTING IT IS THE POINT. It is the
+// 23rd governed door id, created by `199-08` for the door's copy of this same box; this file
+// is already a SWEPT SOURCE of the D-24(a) copy fence, so spelling the sentence here instead
+// of importing it turns that fence red — which is the fence working. A second spelling of a
+// governed string is how a governed string stops being governed.
 import {
   DESCRIBE_CTA,
   DESCRIBE_H1,
+  DESCRIBE_REFUSAL,
   HINT_FRAG1,
   HINT_FRAG2,
   HINT_FRAG3,
@@ -1896,6 +1902,31 @@ export function WorkflowBuilderPage({
   const preDraftHeaderHosted =
     canvasEnabled && (headerLead !== undefined || headerTrail !== undefined)
 
+  /**
+   * 199-09 (DES-01 · sheet `c9-doors-describe` §3, finished on `c10`'s screen) — THE SECOND
+   * DESCRIBE BOX SAYS OUT LOUD WHAT IT HAS SILENTLY REFUSED SINCE PHASE 124.
+   *
+   * ⚠ IT ADDS NO RULE AND CHANGES NO ENABLEMENT, and that was MEASURED before it was
+   * written rather than assumed — `199-08` explicitly left the question open. The CTA below
+   * is `disabled={!canDraft}`, and `useTemplateFirstDraft`'s `canDraft` opens on
+   * `describe.trim().length > 0` — the identical first term the door's own gate carries. So
+   * this expression reads a decision that was already made; it is never consulted by
+   * `canDraft`, and `canDraft` is untouched. Had the predicate NOT existed, inventing one
+   * would have been behaviour and this row would have been a report instead.
+   *
+   * ⚠ THE `length > 0` TERM IS LOAD-BEARING AND IS NOT A DUPLICATE OF THE TRIM. An untouched
+   * empty box is refused by the same rule, and captioning it would put a refusal on the first
+   * screen an author meets — the wrong reading, and a byte-for-byte change to a resting DOM
+   * that `WorkflowDoorSwitch.baseline.test.tsx`'s `GOVERN_INLINE` capture pins whole.
+   *
+   * ⚠ AND IT COVERS ONLY THE FIRST TERM, DELIBERATELY — the same fence `199-08` drew on the
+   * door. The second (`templateRead.kind !== "loading"`) already speaks for itself through
+   * `DescribeTemplateRow`'s own in-flight line, and the third (`builderPhase !== "composing"`)
+   * is spoken by the CTA's own "Composing…" label. A second sentence for either would be a
+   * second home for one fact.
+   */
+  const refusingDescribe = describe.length > 0 && describe.trim().length === 0
+
   // ── EMPTY: just the describe box — a 3-second read, nothing else. ──
   if (builderPhase === "empty" || builderPhase === "composing" || builderPhase === "error") {
     const describeScreen = (
@@ -1917,8 +1948,36 @@ export function WorkflowBuilderPage({
             placeholder="Describe the goal in plain language…"
             rows={5}
             disabled={builderPhase === "composing"}
-            className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            // SPREAD-CONDITIONAL, the door's shipped idiom: with nothing refused the
+            // attribute is genuinely ABSENT rather than present-and-false, so the resting
+            // markup is the markup `GOVERN_INLINE` pins. `aria-invalid="false"` would not be.
+            {...(refusingDescribe ? { "aria-invalid": true } : {})}
+            // THE CONDITIONAL IS SPELLED AS A CONCATENATION so the unconditional arm is
+            // CHARACTER-IDENTICAL to what shipped — three slots move and the token count
+            // does not. Written as a whole-string ternary it would be a second literal that
+            // could drift from the first (the `ml-auto` idiom, `199-08` §3).
+            className={`w-full resize-none rounded-lg border ${refusingDescribe ? "border-destructive" : "border-border"} bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground ${refusingDescribe ? "focus:border-destructive" : "focus:border-primary"} focus:outline-none focus:ring-1 ${refusingDescribe ? "focus:ring-destructive" : "focus:ring-primary"}`}
           />
+          {/* ⚠ THE REFUSAL, SAID OUT LOUD — the sheet's whole finding for this surface, and
+              the one thing a disabled button cannot do. `role="status"` rather than `alert`:
+              the author is mid-typing and this is a standing condition, not an interruption.
+              Rendered only while there is an input to refuse, so it never greets anyone and
+              the resting DOM is byte-identical.
+              ⚠ IT SITS ABOVE THE CTA GROUP, and the placement is load-bearing: two byte-exact
+              pins are scoped to that group alone by walking UP from `describe-hint`
+              (`FLAG_OFF_DESCRIBE_MARKUP` and the `/template|starter/i` word guard), so a
+              sibling above it is outside both — 193.1-08's measured reasoning, reused.
+              The sentence is IMPORTED (`DESCRIBE_REFUSAL`), never spelled: this file is a
+              swept source of the D-24(a) copy fence. */}
+          {refusingDescribe && (
+            <p
+              data-testid="describe-refusal"
+              role="status"
+              className="-mt-2 text-[12.5px] leading-snug text-destructive"
+            >
+              {DESCRIBE_REFUSAL}
+            </p>
+          )}
 
           {/* Phase 103-ux: ONE calm project picker — binds the generated workflow to
               a knowledge base. Only shown once folders have loaded (keeps the empty
@@ -2452,12 +2511,37 @@ export function WorkflowBuilderPage({
    * The `typeof` narrowing is the idiom forty-five lines above: `name` is not declared on
    * `BuilderDefinition` and lands under its index signature as `unknown`.
    */
-  const identityLabel =
-    typeof meta.name === "string" && meta.name.length > 0 ? meta.name : (meta.slug ?? "Untitled workflow")
+  /**
+   * 199-09 (DES-01 · sheet `c10-builder-chrome` §1 case 4) — THE FALLBACK NOW READS AS A
+   * FALLBACK, and this is the one expression that decides both.
+   *
+   * ⚠ THE PREDICATE IS HOISTED, NOT DUPLICATED. `authoredName` is D-19's own non-empty
+   * check with its result carried instead of re-spelled: `identityLabel` is byte-for-byte
+   * the same three-arm chain it was (`name → slug → "Untitled workflow"`), and the tone
+   * below reads the SAME answer rather than asking the question a second time. Two
+   * spellings of one predicate is how a label and its styling come to disagree.
+   *
+   * ⚠ WHY IT IS A PRESENTATION CHANGE AND NOT A NEW RULE. Nothing reads `authoredName`
+   * except this label and its tone. No store action, no request and no predicate learns
+   * anything from it — D-19's "display fallback, not a validation rule" is preserved
+   * exactly, and is now the thing the surface is honest about: `vendor-brief` painted like
+   * an authored name asserts *"this workflow is called vendor-brief"* about a workflow
+   * nobody has named. Muting the stand-in says *"this is what we call it until you do"*.
+   */
+  const authoredName =
+    typeof meta.name === "string" && meta.name.length > 0 ? meta.name : null
+  const identityLabel = authoredName ?? meta.slug ?? "Untitled workflow"
 
   const identityGroup = (
     <>
-      <span className="min-w-0 truncate text-[14px] font-semibold text-foreground">
+      {/* THE CONDITIONAL IS A CONCATENATION so the AUTHORED arm is character-identical to
+          the class list that shipped — one slot moves and the token count does not. The
+          FALLBACK arm is the deliberate, stated change; it moves band 3 of
+          `FLAG_OFF_HEADER_MARKUP`, whose fixture binds no name, and that re-capture is
+          scoped, diffed and justified in this suite's own note. */}
+      <span
+        className={`min-w-0 truncate text-[14px] font-semibold ${authoredName === null ? "text-muted-foreground" : "text-foreground"}`}
+      >
         {identityLabel}
       </span>
       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
