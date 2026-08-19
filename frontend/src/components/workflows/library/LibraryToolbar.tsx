@@ -72,6 +72,10 @@
  */
 import { useId } from "react"
 
+// 200-PORT — the sheet's inset `search` glyph. The house chrome set this file's sibling card
+// already draws from; no second icon path, and it carries no meaning (`aria-hidden`).
+import { Search } from "lucide-react"
+
 import { Input } from "@/components/ui/input"
 import type { Folder } from "@/types"
 
@@ -134,11 +138,40 @@ const UPDATING_LABEL = "updating…"
 
 // ── Shared class strings ─────────────────────────────────────────────────────────────
 
-/** `FilterItem`'s shipped toggle skin (`WorkflowsPage.tsx:675-691`), as a pill. */
+/**
+ * `FilterItem`'s shipped toggle skin (`WorkflowsPage.tsx:675-691`).
+ *
+ * ⚠ 200-PORT — IT WAS A `rounded-full` PILL AND IS NOW THE SHEET'S 32px RECTANGLE. Sketch 200
+ * draws the six chips as `h-[32px] px-sm` boxes at the toolbar's own corner radius, sharing a
+ * baseline with the 36px create control and the 36px search field. A `rounded-full` pill with
+ * `py-1` had neither the height nor the geometry of anything else on the row, which is what
+ * made the toolbar read as three unrelated clusters rather than one instrument.
+ *
+ * ⚠ THE `bg-[#151B24]` REST FILL IS ADOPTED TOO. Every chip in the sheet carries a fill; only
+ * the ACTIVE one changes tone. The shipped chip was transparent at rest and gained a fill when
+ * pressed, so `pressed` was carried by fill AND border AND text colour at once — three signals
+ * where the sheet spends two, and the un-filled rest state made the row look unpopulated.
+ * `bg-muted/40` is the utility that lands where the sheet's raised chip surface does.
+ *
+ * ⚠ THE OBVIOUS SYNONYM FOR "utility" IS AVOIDED HERE, AND ITS FIRST DRAFT USED IT AND WENT
+ * RED — the sixth recorded hit of the 187-24 trap in this subtree, and the fifth in this file
+ * alone. `librarySubtree.fences.test.ts`'s F6 scoping control is a RAW `source.includes` over
+ * every swept module and its subject word is that synonym, so a sentence about PAINT reds a
+ * fence about a DRAFT's opaque field: `expected [ './LibraryToolbar.tsx', …(4) ] to deeply
+ * equal [ './WorkflowCard.tsx', …(3) ]`. The right fix is the PROSE, never the fence — widening
+ * F6's measured list to admit a false positive would put a paint comment into a record about
+ * data handling, which is what this file's create-control block already says one screen up.
+ *
+ * ⚠ NO COLOUR NAME HERE IS NEW: `primary`, `border`, `muted` and `muted-foreground` are all
+ * already declared and already used by the create control this file's own suite verifies the
+ * chain for. A utility naming an undeclared key compiles to NOTHING and renders identically to
+ * a deliberately unpainted control — the `bg-warning` defect 192.2 shipped unguarded.
+ */
 const CHIP_BASE =
-  "flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] transition-colors "
+  "flex h-8 items-center gap-1.5 rounded border px-2.5 text-[11.5px] whitespace-nowrap transition-colors "
 const CHIP_ON = "border-primary/40 bg-primary/10 text-primary"
-const CHIP_OFF = "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
+const CHIP_OFF =
+  "border-border bg-muted/40 text-muted-foreground hover:border-primary/40 hover:text-foreground"
 
 const NOTE_CLASSES = "text-[11.5px] leading-snug text-muted-foreground"
 
@@ -211,9 +244,29 @@ export function LibraryToolbar({
   const anythingActive = query.length > 0 || activeChips.length > 0 || projectSelected
 
   return (
+    // ⚠ 200-PORT — ONE ROW, ON ONE BASELINE, WITH THE PROJECT CONTROL PUSHED RIGHT.
+    //
+    // It read `flex flex-wrap items-start gap-x-4 gap-y-3 … py-3`: a wrapping, TOP-aligned bag
+    // in which a 36px button, a two-line search column, a row of pills and a two-line select
+    // column all began at the same y and ended at four different ones. Sketch 200 draws a
+    // single `h-[68px]` band, `items-center`, `justify-between`, on a RAISED surface
+    // (`bg-[#0D1117]` against the canvas's `#060A0F`) — so the instruments read as one strip
+    // and the canvas below reads as content.
+    //
+    // ⚠ `min-h-[68px]` RATHER THAN THE SHEET'S FIXED `h-[68px]`, AND THE DIFFERENCE IS OWED TO
+    // TWO SENTENCES THE SHEET DOES NOT DRAW AND THIS SURFACE MAY NOT DROP: the search field's
+    // D-08 hint and the project select's D-17 starters note. Both are honesty contracts — the
+    // note exists because `?project_folder_id=` narrows only the published feed, a fact that
+    // reads as a BROKEN FILTER if left unsaid (UAT row U6) — and both are REAL DOM TEXT wired
+    // by `aria-describedby`, never a tooltip, because touch has no hover. Fixing the height
+    // would have meant hiding one of them; the band gives instead.
+    //
+    // ⚠ `flex-wrap` SURVIVES for the same reason it was there: below ~1100px the six chips and
+    // the select cannot share a line with the create control at any height, and a `nowrap` row
+    // would put the project filter off-screen rather than under the chips.
     <div
       data-testid="library-toolbar"
-      className="flex flex-wrap items-start gap-x-4 gap-y-3 border-b border-border px-6 py-3"
+      className="flex min-h-[68px] flex-wrap items-center gap-x-4 gap-y-3 border-b border-border bg-card px-6 py-3"
     >
       {/* ── 1 · CREATE LEADS (D-02 / LIB-04 / SC#4) ──────────────────────────────────
           FIRST in DOM order, before search and before the chips. Asserted by
@@ -266,17 +319,30 @@ export function LibraryToolbar({
           "a control you always open should always be open." The hint below is real DOM
           text wired by `aria-describedby` — the D-08 promise ships where a screen reader
           reaches it, not in a tooltip. */}
-      <div className="flex min-w-[220px] flex-1 flex-col gap-1">
-        <Input
-          type="search"
-          data-testid="library-search"
-          aria-label={SEARCH_LABEL}
-          aria-describedby={searchHintId}
-          placeholder={SEARCH_PLACEHOLDER}
-          value={query}
-          onChange={(event) => onQueryChange(event.target.value)}
-          className="h-9"
-        />
+      {/* ⚠ 200-PORT — A FIXED 280px FIELD WITH THE SHEET'S INSET MAGNIFIER.
+          The sheet gives search a `w-[280px]` box and parks a `search` glyph inside it at
+          `left-3`. It read `min-w-[220px] flex-1`, which let the field swallow every pixel the
+          chips did not want — at 1600px it ran to ~700px, wider than the toolbar's other five
+          controls combined, for a field that holds a few words. The glyph is `aria-hidden` and
+          `pointer-events-none`: the field's accessible name is still `SEARCH_LABEL`, and the
+          D-08 hint below is still real DOM text wired by `aria-describedby`. */}
+      <div className="flex w-[280px] min-w-[200px] flex-col gap-1">
+        <div className="relative">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            data-testid="library-search"
+            aria-label={SEARCH_LABEL}
+            aria-describedby={searchHintId}
+            placeholder={SEARCH_PLACEHOLDER}
+            value={query}
+            onChange={(event) => onQueryChange(event.target.value)}
+            className="h-9 pl-9"
+          />
+        </div>
         <span id={searchHintId} data-testid="library-search-hint" className={NOTE_CLASSES}>
           {SEARCH_HINT}
         </span>
@@ -305,7 +371,16 @@ export function LibraryToolbar({
               <span className="truncate">{word.label}</span>
               <span
                 data-testid={`library-chip-count-${chip}`}
-                className="font-mono text-[9.5px] opacity-70"
+                /* ⚠ 200-PORT — the sheet's `font-data-sm` count: mono, 11px, and DIM rather
+                   than merely faded. `text-[9.5px] opacity-70` rendered the number smaller
+                   than any other text in the product and, at 70% of an already-muted
+                   foreground, close to unreadable — on the one atom whose entire job is to be
+                   a legible quantity. The tone now comes from the chip's own text colour on
+                   the active arm and `text-muted-foreground` at rest, so it is a colour
+                   decision rather than a transparency accident. */
+                className={
+                  "font-mono text-[11px] " + (active ? "opacity-80" : "text-muted-foreground")
+                }
               >
                 {counts[chip]}
               </span>
@@ -350,7 +425,16 @@ export function LibraryToolbar({
           ⚠ The forbidden package is not NAMED here for the same reason the tooltip attribute
           is not spelled above: T-192-SC's check is a raw count of its name in this file, and
           prose explaining why it is absent would satisfy the grep that proves it absent. */}
-      <label className="flex flex-col gap-1">
+      {/* ⚠ 200-PORT — RIGHT-ALIGNED, AT THE SHEET'S 160px FLOOR, ON THE SHARED BASELINE.
+          Sketch 200 sets the project control apart from the create/search/chips cluster by
+          pushing it to the far end of the band (`justify-between`, `min-w-[160px] shrink-0`) —
+          it narrows the WHOLE list rather than acting on it, so it does not belong in the
+          instrument cluster. `ml-auto` does that WITHOUT touching DOM order, which matters:
+          create is asserted to be index 0 of every focusable node in this toolbar, and a
+          visual re-order achieved with `order-*` would be a keyboard regression this file's
+          own suite is written to catch. The select itself takes `h-9` so it lands on the same
+          baseline as the create control and the search field. */}
+      <label className="ml-auto flex min-w-[160px] shrink-0 flex-col gap-1">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
           {PROJECT_LABEL}
         </span>
@@ -360,7 +444,7 @@ export function LibraryToolbar({
           value={projectId ?? ""}
           onChange={(event) => onProjectChange(event.target.value === "" ? null : event.target.value)}
           {...(projectSelected ? { "aria-describedby": projectNoteId } : {})}
-          className="rounded-md border border-border bg-card px-2 py-1.5 text-[12.5px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="h-9 rounded-md border border-border bg-card px-2 text-[12.5px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <option value="">{PROJECT_ALL_LABEL}</option>
           {folders.map((folder) => (
