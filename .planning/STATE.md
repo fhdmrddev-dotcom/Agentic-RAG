@@ -35,7 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 192.2 (does-this-one-work) — **6 EXECUTED · `gaps_found` 4/6 · GAP ROUND 1 PLANNED (5 plans / 3 waves) · NOT CLOSED**
+Phase: 192.2 (does-this-one-work) — **11 EXECUTED · GAP ROUND 1 COMPLETE (all 3 waves) · AWAITING VERIFY + 10 OWED UAT ROWS**
 Plan: **6 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
 (`192.2-02` the G-5 discharge + `192.2-03` the run-facts join), Wave 3 (`192.2-04`, the run
 truth's wire→words path) and **Wave 4 (`192.2-05`, THE SUBTRACTION + THE LANGUAGE)** COMPLETE.
@@ -44,8 +44,9 @@ Wave 2 ran its two plans in PARALLEL worktrees and they merged clean at `00b81f6
 CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied without serialising the wave.
 Waves 3, 4 and 5 ran SEQUENTIALLY on the main working tree.
 **GAP-CLOSURE ROUND 1 — WAVE 2 OF 3 COMPLETE.** Wave 1 (`07` + `08` + `09`) merged; **Wave 2 (`192.2-10`) executed SEQUENTIALLY on the main working tree** — 3 task commits `ff351da1` / `75952617` / `d568f434`. `has_any_run` reaches `LibraryRow.hasAnyRun` three-valued, `RUN_NOT_BY_YOU` is authored in ONE home, WR-02's three lookalike fields cross-reference each other behind a marker-bound fence, and **`api.ts`'s 197 seam-decline is PROVED to hold three ways** (the complete non-comment added content is two field declarations; the only removed line is a docblock terminator; a token scan over every added line for `export`/`function`/`const`/`=>` returns nothing). ⚠ **`RUN_NOT_BY_YOU` is exported and UNCONSUMED by design** — the union member is what makes `runGutterOf` non-total, so **CR-01 is not closed on screen until `192.2-11` ships**.
-Next action: **`/gsd:execute-phase 192.2 --gaps-only`** — WAVE 3 (`192.2-11`) remains. Round 1 was:
-`192.2-07` .. `192.2-11`, five plans across three waves, committed `504c538f` + `185693ae`.
+**GAP-CLOSURE ROUND 1 — COMPLETE. WAVE 3 (`192.2-11`) EXECUTED SEQUENTIALLY on the main working tree** — 3 task commits `9206f62c` / `b9fceff9` / `aa2b0029`. ✅ **CR-01 IS CLOSED IN CODE**: `RunFact` gained a fourth arm `not-by-you`, `never` gained the precondition `has_any_run === false`, and both tone maps are total over six arms. ⚠ **The old behaviour was MEASURED**: four pre-existing card cases went RED the instant the precondition landed (*expected 'Not recorded|…' to contain 'Never run'* on a `status: null` row). ⚠ **DEC-11-B held exactly** — an ABSENT bit → `unknown`, `=== true` / `=== false`, proved by a four-value matrix reaching THREE arms. ✅ **07's fence RE-DERIVED, not bumped**: `{10, 9, 5}` → **`{12, 10, 6}`** — `entries` +2, `unique` **+1** (only `bg-muted-foreground` is new; `text-muted-foreground` is a THIRD occurrence), `perMap` +1; **a uniform `+2` would have given `unique: 11`, wrong while plausible.** Still EXACT; its **FIVE** synthetic controls (not the two the plan named) all re-run and all fire. ⚠ **WR-03's fix is `DropdownMenuGroup`, NOT `DropdownMenuLabel`** — Radix's `Menu.Label` carries **no role** (so the sweep stayed red, `div[role=none]`) **and** injects `font-semibold` (so it would have changed pixels): both halves of the review's own fix block refuted by measurement. ⚠ **AXE DID NOT CATCH IT** — green against the unedited `<p>` under jsdom; the fence that holds WR-03 is the explicit five-role sweep, driven RED twice, and the axe case ships labelled a backstop. ⚠ **A DEFAULT PARAMETER FIRES ON AN EXPLICIT `undefined`** — the same absence-destroying shape `192.2-10` measured for `?? false`, met through a different door. ✅ `WorkflowCard.baseline.test.tsx` **byte-unchanged, 29/29 unedited**. Gates: count gate **`OK — total 4690 · failed 0 · pinned 4340 · 93/93`** · `tsc` **33, ZERO under `library/`** · library subtree **12 / 665 / 0** · with `WorkflowsPage` **13 / 724 / 0** · **`G-7 clear`** · `check-claude-md-size` **exit 0** · zero `backend/` or `supabase/` files, zero deletions.
+⏸ **`WorkflowCard.tsx` re-derives to `15 / 4 / 1262` against a ledger row reading `8 / 3 / 818` — FLAGGED, NOT EDITED** (CLAUDE.md + HOT-FILE-LEDGER.md are outside this plan's `files_modified` and the same-commit sync rule binds them; the `197-10` precedent). **Owed to the next phase that touches this file.**
+Next action: **`/gsd:verify-work 192.2`**. Round 1 was: `192.2-07` .. `192.2-11`, five plans across three waves, committed `504c538f` + `185693ae`.
 **G-7 was clear** (`6 total · 0 gap-closure`) and **ROADMAP SC#1 is genuinely UNMET**, which is
 the one thing that justifies a round.
 
@@ -151,12 +152,16 @@ phase's FIRST verification; it would be a stop signal only inside a closure roun
 - **`BUG-260819-01`** (`status: open`) — the state word renders twice on a name-colliding row.
   The fix is one decision in `rowIdentity.ts`, not in the card.
 
-⛔ **NINE G-4 lived-experience rows remain OWED** (`192.2-VALIDATION.md`, every `result:` empty).
+⛔ **~~NINE~~ TEN G-4 lived-experience rows remain OWED** (`192.2-VALIDATION.md`, every `result:` empty). ⚠ `192.2-11` added **U10** for the fourth run arm and corrected **U4**'s override key list, which named two keys where the payload now carries three — **U4 would have PASSED WHILE BLIND**, because rule 1 short-circuits before `has_any_run` is read. **Run U10 and U4 first.**
 Both of the phase's central claims — *"can tell what works"* and *"quieter, not louder"* — are
 felt claims **no person has verified by eye**. The verifier scored this UNCERTAIN rather than
 failed, which is the honest reading. Execution is complete; **the phase is NOT closed.**
-⛔ **NINE G-4 lived-experience rows are OWED to the operator** (`192.2-VALIDATION.md`, every
-`result:` empty). **Run U4 FIRST** — the deploy-skew *unknown* arm. It is the row most likely to be
+⛔ **~~NINE~~ TEN G-4 lived-experience rows are OWED to the operator** (`192.2-VALIDATION.md`, every
+`result:` empty — amended by `192.2-11`, which added **U10** and drove nothing). **Run U10 and U4
+FIRST**, and they guard the same claim from opposite sides: U10 is the *not-by-you* arm (CR-01's own
+row — null the two run fields, LEAVE `has_any_run: true`), U4 the deploy-skew *unknown* arm
+(DELETE all three keys, `has_any_run` included — the original two-key list would have passed while
+blind, because rule 1 short-circuits before the bit is read). It is the row most likely to be
 skipped and it guards the phase's central honesty claim: a frontend deployed ahead of its backend
 must never say *"Never run"* about a workflow that has run. **Then U1**, the phase's thesis — pick
 the one that last worked off a 43-member same-name shelf, **by reading the screen, never by**
