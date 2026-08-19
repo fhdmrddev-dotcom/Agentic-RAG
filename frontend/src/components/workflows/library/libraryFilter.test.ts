@@ -1244,3 +1244,128 @@ describe("192.2-09 (WR-04) — the words are READ from the chip table, never re-
     expect(libraryFilterSource).not.toContain(MATCH_REASON_PREFIX)
   })
 })
+
+// ── 192.2-10 (LIB-06 / CR-01 / DEC-10-A): the ROW-LEVEL run bit crosses the normalizers ──
+
+// `has_any_run` is the fix for the defect where a world-readable row that HAS been run was
+// rendered with an explicit, painted "Never run" — because the two fields beside it are joined
+// OWNER-SCOPED and answer a different question. The normalizers are the one place its three
+// states could be silently flattened into two, and the flattening would look like a tidy-up.
+//
+// ⚠ EVERY ASSERTION BELOW USES `toBe`, NEVER A TRUTHINESS CHECK. `false` and `undefined` are
+// both falsy and the ENTIRE point of this block is that they are DIFFERENT FACTS: `false` is the
+// backend affirming *nobody has run this*, `undefined` is the wire declining to say. A
+// `expect(...).toBeFalsy()` here would pass on a normalizer that had collapsed them.
+
+describe("192.2-10 — has_any_run reaches LibraryRow.hasAnyRun with all three states intact", () => {
+  it("fromPublished — `true` survives as true (somebody ran it, maybe not you)", () => {
+    const row = fromPublished({ ...publishedVendor, has_any_run: true }, "published")
+    expect(row.hasAnyRun).toBe(true)
+  })
+
+  it("fromPublished — `false` survives as false, and is NOT coerced to undefined", () => {
+    const row = fromPublished({ ...publishedVendor, has_any_run: false }, "published")
+    expect(row.hasAnyRun).toBe(false)
+    // The discriminating half: a `|| undefined` or a `?? undefined` would pass the line above
+    // only if it also passed this one, and it cannot.
+    expect(row.hasAnyRun).not.toBe(undefined)
+  })
+
+  it("fromPublished — an explicit `null` survives as null, NOT as false", () => {
+    const row = fromPublished({ ...publishedVendor, has_any_run: null }, "published")
+    expect(row.hasAnyRun).toBe(null)
+    expect(row.hasAnyRun).not.toBe(false)
+  })
+
+  it("fromPublished — an ABSENT key arrives as undefined, NOT as false", () => {
+    // `publishedVendor` predates the field entirely — the stale-deploy shape. A `?? false`
+    // here is CR-01 one layer down: it manufactures *nobody has run this* out of an absence.
+    const row = fromPublished(publishedVendor, "published")
+    expect(row.hasAnyRun).toBe(undefined)
+    expect(row.hasAnyRun).not.toBe(false)
+  })
+
+  it("fromDraft — `true` survives as true", () => {
+    expect(fromDraft({ ...draftVendorFork, has_any_run: true }).hasAnyRun).toBe(true)
+  })
+
+  it("fromDraft — `false` survives as false, and is NOT coerced to undefined", () => {
+    const row = fromDraft({ ...draftVendorFork, has_any_run: false })
+    expect(row.hasAnyRun).toBe(false)
+    expect(row.hasAnyRun).not.toBe(undefined)
+  })
+
+  it("fromDraft — an explicit `null` survives as null, NOT as false", () => {
+    const row = fromDraft({ ...draftVendorFork, has_any_run: null })
+    expect(row.hasAnyRun).toBe(null)
+    expect(row.hasAnyRun).not.toBe(false)
+  })
+
+  it("fromDraft — an ABSENT key arrives as undefined, NOT as false", () => {
+    const row = fromDraft(draftVendorFork)
+    expect(row.hasAnyRun).toBe(undefined)
+    expect(row.hasAnyRun).not.toBe(false)
+  })
+
+  it("the four states are FOUR distinct readings on one normalizer, not two", () => {
+    // The property the eight cases above imply but none states on its own. Written as a set so
+    // a future collapse of ANY pair reds here even if the individual cases were edited to match.
+    const readings = [true, false, null, undefined].map((v) =>
+      v === undefined
+        ? fromPublished(publishedVendor, "published").hasAnyRun
+        : fromPublished({ ...publishedVendor, has_any_run: v }, "published").hasAnyRun,
+    )
+    expect(readings).toEqual([true, false, null, undefined])
+    expect(new Set(readings).size).toBe(4)
+  })
+
+  it("⚠ THE CR-01 PAIR — hasAnyRun true WITH lastRunAt null is carried, not reconciled", () => {
+    // The shape measured on 5 of 92 live `/published` rows and 1 of 3 `/starters` rows for a
+    // caller who is not the runner. The two facts DISAGREE on purpose; a normalizer that
+    // "fixed" the disagreement would delete the only evidence the card needs.
+    const row = fromPublished(
+      { ...publishedVendor, has_any_run: true, last_run_at: null, last_run_status: null },
+      "starter",
+    )
+    expect(row.hasAnyRun).toBe(true)
+    expect(row.lastRunAt).toBe(null)
+    expect(row.lastRunStatus).toBe(null)
+  })
+
+  it("SOURCE FENCE — neither normalizer coalesces the bit, in CODE rather than in prose", () => {
+    // ⚠ A BARE GREP CANNOT ASSERT THIS AND THE ATTEMPT IS RECORDED RATHER THAN HIDDEN. Both
+    // normalizers carry a comment that NAMES `?? false` in order to forbid it, so a raw source
+    // grep for that spelling matches the guard that forbids it — the 187-24 trap, and the
+    // 195-07 "unsatisfiable absence criterion" one. So comments are STRIPPED first and the
+    // assertion is made over code only.
+    const code = libraryFilterSource
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "")
+
+    // Non-vacuity FIRST: the stripper must not have eaten the lines under test.
+    const assignments = code.match(/hasAnyRun: row\.has_any_run,/g) ?? []
+    expect(assignments).toHaveLength(2)
+
+    expect(code).not.toMatch(/\?\? false/)
+    expect(code).not.toMatch(/Boolean\(\s*row\.has_any_run/)
+    expect(code).not.toMatch(/has_any_run\s*\?\?/)
+    expect(code).not.toMatch(/!!\s*row\.has_any_run/)
+  })
+
+  it("POSITIVE CONTROL — the stripped-source detector CATCHES a planted coalesce", () => {
+    // Without this, the four negatives above pass on a broken regex exactly as they pass on a
+    // clean module. The detector is the same one, run over a synthetic source that violates.
+    const planted = [
+      "/** hasAnyRun: row.has_any_run, // this mention is a COMMENT and must not count */",
+      "    hasAnyRun: row.has_any_run ?? false,",
+      "    hasAnyRun: row.has_any_run,",
+    ].join(String.fromCharCode(10))
+    const code = planted
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/[^\n]*/g, "")
+
+    expect(code).toMatch(/\?\? false/)
+    // and the comment-only mention was correctly excluded — 2 real assignments, not 3.
+    expect(code.match(/hasAnyRun: row\.has_any_run/g) ?? []).toHaveLength(2)
+  })
+})

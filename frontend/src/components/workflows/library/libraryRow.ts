@@ -140,6 +140,18 @@ export interface LibraryRow {
    * ⚠ AND IT IS NOT `updatedAt`. On a published row that field is the PUBLISH time and is
    * frozen there by design (`api.ts`, D-17). They disagree on real data. Do not read one for
    * the other and do not "fix" either.
+   *
+   * ⚠ AMENDED BY 192.2-10 (CR-01) — THE PARAGRAPHS ABOVE ARE PRESERVED VERBATIM AND ARE
+   * SUPERSEDED WHERE THEY CALL THE `null` A FACT ABOUT *THE ROW*. It is not. The wire field
+   * behind this one is joined OWNER-SCOPED (`r.user_id = $1`), so `null` means **the backend
+   * looked and YOU have no run of this row** — a fact about the CALLER, not about the row.
+   * On a world-readable `is_system_global` shelf that difference is the whole defect: five
+   * published rows carry 20/15/11/7/1 runs belonging to ONE user, and every other caller was
+   * told, in an explicit painted word, that nobody ever ran them.
+   *
+   * The three states below are UNCHANGED and still exactly right — what changed is the SCOPE
+   * of the middle one. The ROW-LEVEL answer now arrives separately, on `hasAnyRun` below, and
+   * `runFacts.ts` reads the PAIR.
    */
   lastRunAt: string | null | undefined
   /**
@@ -153,6 +165,33 @@ export interface LibraryRow {
    * the way in. Same three states as `lastRunAt` above, for the same reason.
    */
   lastRunStatus: string | null | undefined
+  /**
+   * Phase 192.2 (LIB-06 / CR-01) — DID ANYBODY EVER RUN THIS ROW? The wire's `has_any_run`,
+   * VERBATIM. A ROW-LEVEL fact, and the reason it exists is that the two fields above are NOT
+   * one: they are OWNER-SCOPED and answer *did MY last run of this work?*.
+   *
+   * ⚠ `hasAnyRun === true` WITH `lastRunAt === null` IS THE ARM THIS FIELD WAS ADDED FOR —
+   * *somebody ran it, and it was not you*. Without it, `runFacts.ts` took the `never` arm on
+   * those rows and the card printed an affirmative **"Never run"** about a workflow that had
+   * run twenty times. That is CR-01, and it was reproducible on the live `/starters` shelf.
+   *
+   * ⚠ THREE STATES, THE SAME THREE ITS NEIGHBOURS CARRY AND FOR THE SAME REASON (DEC-10-A):
+   *   · `true`      — somebody has run it.
+   *   · `false`     — the backend looked and NOBODY has. The ONLY state that honestly earns
+   *                   the words *"Never run"*.
+   *   · `undefined` — the key was absent from the payload: THE WIRE DID NOT SAY. `null` from
+   *                   the wire is carried through as `null` and means the same *"cannot say"*
+   *                   here — a SQL `EXISTS` is never null, so today it can only arrive from a
+   *                   read path that omitted the column.
+   * A `?? false` on the way in would manufacture the affirmative claim *nobody has run this*
+   * out of an absence, which is CR-01's own shape one layer down. The normalizers in
+   * `libraryFilter.ts` pass it through untouched, and that absence of a coalesce is the point.
+   *
+   * ⚠ EXISTENCE ONLY, BY DECISION (`192.2-08` DEC-08-A). It never carries who, when, how many
+   * or with what outcome, and a future edit that grows it toward any of those is a cross-tenant
+   * disclosure rather than a richer field.
+   */
+  hasAnyRun: boolean | null | undefined
   /**
    * THE ORIGINAL WIRE OBJECT, KEPT WHOLE. See the ⚠ paragraph in this file's header —
    * `token` and the real `PublishedWorkflow` reach their handlers through here, and a

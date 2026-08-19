@@ -123,6 +123,12 @@ export function fromPublished(
     // it. Both fields pass through untouched — no default, no coalesce, no normalization.
     lastRunAt: row.last_run_at,
     lastRunStatus: row.last_run_status,
+    // 192.2-10 (LIB-06 / CR-01 / DEC-10-A) — the ROW-LEVEL run bit, on the SAME verbatim rule
+    // as the two lines above; the paragraph there is the argument and is deliberately not
+    // written a third time. ⚠ NO `??`, NO `Boolean(...)`, NO DEFAULT: a `?? false` here would
+    // manufacture the affirmative claim *nobody has run this* out of an absence, which is the
+    // CR-01 defect this field exists to FIX, reproduced one layer down.
+    hasAnyRun: row.has_any_run,
     source: row,
   }
 }
@@ -157,6 +163,11 @@ export function fromDraft(row: WorkflowDraftRow): LibraryRow {
     // is 69% drafts is the most useful thing the row can say.
     lastRunAt: row.last_run_at,
     lastRunStatus: row.last_run_status,
+    // 192.2-10 (LIB-06 / CR-01 / DEC-10-A) — verbatim, for the reason spelled out in
+    // `fromPublished` above. ⚠ The drafts feed is `created_by = $1`, so this bit and the two
+    // scoped fields normally AGREE here — which is exactly why it must not be defaulted:
+    // agreement is a property of this feed, not of the pair.
+    hasAnyRun: row.has_any_run,
     source: row,
   }
 }

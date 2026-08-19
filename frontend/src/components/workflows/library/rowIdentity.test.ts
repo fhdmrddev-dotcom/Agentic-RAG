@@ -72,6 +72,9 @@ const rowOf = (over: Partial<LibraryRow> = {}): LibraryRow => {
     // recency there is `updatedAt`, and the run truth is `cardFace`'s, one module over.
     lastRunAt: undefined,
     lastRunStatus: undefined,
+    // 192.2-10 (LIB-06 / CR-01) — the ROW-LEVEL run bit, `undefined` on the same rule as the
+    // two lines above: *the wire did not say*, never the affirmative *nobody has run this*.
+    hasAnyRun: undefined,
     source: { id: `r-${seq}` } as unknown as LibraryRow["source"],
   }
   return { ...base, ...over }

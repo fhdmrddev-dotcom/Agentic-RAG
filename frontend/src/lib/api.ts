@@ -1417,6 +1417,21 @@ export interface PublishedWorkflow {
    * and the honest rendering of `undefined` is an explicit *unknown* — never a fabricated
    * time, never `new Date()`, never a blank, and never a green tick. This is the same rule
    * `updated_at` states one field up, with one extra arm because absence here has two causes.
+   *
+   * ⚠ CORRECTED BY 192.2-10 (CR-01) — THE PARAGRAPH ABOVE IS PRESERVED VERBATIM AND IS
+   * SUPERSEDED, NEVER OVERWRITTEN. Its sentence *"`null` means the backend looked and there is
+   * NO RUN"* is FALSE AS A ROW-LEVEL CLAIM. The lateral behind this field is OWNER-SCOPED
+   * (`r.user_id = $1`, `backend/app/db/workflows.py`), which is the correct security posture and
+   * stands — but it makes the fact CALLER-SCOPED. So `null` means *the backend looked and **YOU**
+   * have no run of this row*. It says nothing whatever about whether anybody else has.
+   *
+   * Measured on the live feeds 2026-08-19 as a caller who is not the runner: **5 of 92**
+   * `/workflows/published` rows and **1 of 3** `/workflows/starters` rows come back with
+   * `last_run_at: null` on a definition that HAS been run. Rendering that as an affirmative
+   * *"Never run"* is precisely the false claim CR-01 names.
+   *
+   * ⚠ THE ROW-LEVEL ANSWER LIVES ONE FIELD DOWN — `has_any_run`, added by `192.2-08`. When the
+   * question is *"has this ever run?"* read THE PAIR, never this field alone.
    */
   last_run_at?: string | null
   /**
@@ -1436,6 +1451,34 @@ export interface PublishedWorkflow {
    * `undefined` / `null` carry the same two meanings as on `last_run_at` above.
    */
   last_run_status?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / CR-01) — WHETHER ANY RUN OF THIS DEFINITION EXISTS, BY ANYBODY.
+   * A ROW-LEVEL fact, and the only deliberately UNSCOPED field on this model. Landed by
+   * `192.2-08` as one projection-only SQL `EXISTS` at four sites.
+   *
+   * ⚠ IT ANSWERS A DIFFERENT QUESTION FROM ITS TWO NEIGHBOURS DIRECTLY ABOVE, AND THE TWO ARE
+   * MEANT TO DISAGREE. `last_run_at` / `last_run_status` come off an OWNER-SCOPED lateral
+   * (`r.user_id = $1`) and answer *did MY last run of this work?*. This one answers *has
+   * ANYBODY run it?*. **`has_any_run: true` WITH `last_run_at: null` is the meaningful pair —
+   * somebody ran it, and it was not you.** That shape is real on 5 `/published` rows and 1
+   * `/starters` row today for any caller who is not the runner (measured 2026-08-19).
+   *
+   * ⚠ THREE STATES, AND A CONSUMER MAY NOT COLLAPSE THEM (192.2-10 DEC-10-A):
+   *   · `true`           — somebody has run it.
+   *   · `false`          — the backend looked and NOBODY has. **The only state that honestly
+   *                        earns the words "Never run".**
+   *   · absent or `null` — THE WIRE DID NOT SAY: a frontend deployed ahead of its backend, or a
+   *                        read path that omits the column. NOT a synonym for `false`.
+   * A `?? false` anywhere downstream manufactures the affirmative claim *nobody has run this*
+   * out of an absence — CR-01's exact shape, one layer down.
+   *
+   * ⚠ THE DISCLOSURE BUDGET IS EXISTENCE-ONLY, AND IT IS A DECISION RATHER THAN AN OMISSION
+   * (`192.2-08` DEC-08-A). A bare SQL `EXISTS`: never WHO, never WHEN, never HOW MANY, never
+   * WITH WHAT OUTCOME. Widening this key toward any of those is a cross-tenant disclosure, not
+   * a richer field. Re-open trigger: the first workflow row visible to a caller who is not
+   * entitled to know it has been exercised at all.
+   */
+  has_any_run?: boolean | null
 }
 
 /** Phase 092 (SC#5 / D-v2.5-03) — GET /threads/{id}/workflow pure-read reconcile.
@@ -3458,6 +3501,18 @@ export interface WorkflowDraftRow {
    */
   last_run_at?: string | null
   last_run_status?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / CR-01) — the mirror of `PublishedWorkflow.has_any_run`; read THAT
+   * docblock for the three states and the disclosure budget, which are identical here and are
+   * the load-bearing part.
+   *
+   * ⚠ MIRRORED FOR CONSISTENCY, AND SAYING SO IS THE POINT. `/workflows/drafts` is already
+   * scoped to `created_by = $1`, so on this feed the caller is normally the only person with
+   * runs and the row-level bit AGREES with the two owner-scoped fields above. That agreement is
+   * a property of THIS FEED, not an invariant of the pair — leaving the field off here would
+   * have made *"the two facts agree"* an unstated assumption that the next feed quietly breaks.
+   */
+  has_any_run?: boolean | null
 }
 
 /**

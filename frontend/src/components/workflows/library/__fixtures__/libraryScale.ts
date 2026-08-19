@@ -770,6 +770,11 @@ function toLibraryRow(seed: Seed): LibraryRow {
     // have made 107 rows CLAIM they had never run, which is a fact this fixture does not hold.
     lastRunAt: undefined,
     lastRunStatus: undefined,
+    // 192.2-10 (LIB-06 / CR-01) — `undefined`, THE *WIRE DID NOT SAY* ARM, matching the two
+    // lines above. `false` would be the affirmative row-level claim *nobody has ever run this*,
+    // which is a fact this corpus does not hold; `true` would be the opposite one. A suite that
+    // wants either arm asks for it through the override seam.
+    hasAnyRun: undefined,
     // The original wire object, kept whole (`libraryRow.ts:115-120`). The fixture cannot build
     // a real `PublishedWorkflow` without importing the API client, so it carries the fields the
     // handlers actually reach for and casts, exactly as the house builder at

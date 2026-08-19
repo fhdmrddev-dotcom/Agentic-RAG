@@ -166,6 +166,11 @@ const rowOf = (provenance: Provenance, over: Partial<LibraryRow> = {}): LibraryR
   // yet (Wave 4 does); `...over` lets a case pass any of the three states.
   lastRunAt: undefined,
   lastRunStatus: undefined,
+  // 192.2-10 (LIB-06 / CR-01). REQUIRED for the same reason the three fields above are, and this
+  // builder is a THIRD time the site `tsc` found. ⚠ `undefined` is the *wire did not say* arm;
+  // `false` is the affirmative *nobody has run this* and `true` is *somebody has, and it may not
+  // be you*. `...over` lets a case pass any of the three.
+  hasAnyRun: undefined,
   source: { id: `row-${provenance}`, slug: "vendor-risk", name: "Vendor-risk review" } as unknown as LibraryRow["source"],
   ...over,
 })
