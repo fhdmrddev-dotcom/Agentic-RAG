@@ -2024,3 +2024,115 @@ down**, and the cheapest moment to write a row is before the guardrail needs it.
   component in one commit. ⚠ **The row exists so the next person who needs a throwaway surface finds the
   precedent AND its teardown together** — a dev route that outlives its sketch becomes production surface
   by accident, and this file is where that happens.
+
+
+## Phase 192.2 gap-closure round 1 — the triples RE-DERIVED, and the one cell whose CONTENT was wrong
+
+⚠ **Written at the round's close on 2026-08-19, and deliberately NOT written per-plan.** Five plans
+(`192.2-07` … `192.2-11`) touched these files across three waves; three separate plans each reported
+owed cells at three different moments, **and their figures disagreed with each other**. Copying any
+one of them forward would have published a number that was already stale. **Every triple below was
+re-derived at the round's HEAD with the CLAUDE.md recipe**, six-digit dated-quick-task buckets
+subtracted. Table row and this section land in the SAME commit, per the sync rule.
+
+| File | row read | **measured at round close** |
+|---|---|---|
+| `frontend/src/components/workflows/library/WorkflowCard.tsx` | 12 / 4 / 1105 | **15 / 4 / 1262** |
+| `frontend/src/pages/WorkflowsPage.tsx` | 36 / 14 / 1186 | **37 / 14 / 1211** |
+| `frontend/src/components/workflows/library/libraryVocabulary.ts` | 8 / 4 / 584 | **10 / 4 / 727** |
+| `frontend/src/components/workflows/library/libraryFilter.ts` | 4 / 4 / 341 | **6 / 4 / 435** |
+| `frontend/src/components/workflows/library/libraryRow.ts` | 3 / 3 / 162 | **4 / 3 / 201** |
+| `backend/app/api/workflows.py` | 37 / 19 / 2073 | **38 / 19 / 2143** |
+| `backend/app/db/workflows.py` | 37 / 19 / 1811 | **38 / 19 / 1889** |
+| `frontend/src/lib/api.ts` | 172 / 99 / 6227 | **174 / 99 / 6357** |
+| `scripts/vitest-count-gate.cjs` | 101 / 17 / 3259 | **102 / 18 / 3301** |
+| `frontend/src/components/workflows/library/cardFace.ts` | 2 / 1 / 200 | **3 / 1 / 207** |
+| `frontend/src/components/workflows/library/runFacts.ts` | 2 / 1 / 176 | **3 / 1 / 243** |
+
+**No phase count moved on any row, so no NEW G-5 obligation was created by this round.** Line counts
+moved on all eleven.
+
+### ⚠ The cell that was wrong in its WORDS, not its numbers — `runFacts.ts`
+
+Its cell read **"THREE arms, and folding two together IS the defect."** That was true when written and
+is now false, and the correction is the point of this round rather than a tidy-up.
+
+`_LAST_RUN_LATERAL_SQL` is scoped `r.user_id = $1` — the correct security posture, which **stands
+untouched**. But that made the run fact **caller-scoped** while every downstream artifact still rendered
+it as a **row-level** one, so a caller who was not the runner saw a painted, explicit "Never run" about
+a workflow that had really run. **Measured, not inferred: 1 of 3 starter rows and 5 of 92 published
+rows** (the plans said "2 of 3"; `192.2-08` corrected it DOWN, toward `192.2-03`'s existing
+`rows: 3 populated: 1`). `runFacts.ts`'s own header had already named this defect class *"the single
+most likely place to ship a lie."*
+
+The repair, operator-chosen against a presented alternative: a non-identifying
+`EXISTS(SELECT 1 FROM workflow_runs WHERE definition_id = wd.id) AS has_any_run` and a **fourth arm**.
+`never` now requires `has_any_run === false`; `not-by-you` carries the affirmed-but-not-yours case.
+⚠ **The disclosure trade was accepted explicitly:** the bit reveals that SOMEBODY ran a workflow the
+caller can already see, and must NEVER reveal who, when, how many, or with what outcome — `EXISTS` only.
+
+⚠ **An ABSENT `has_any_run` is a THIRD state and routes to `unknown`, never to `never`** (DEC-11-B).
+This REFINED an operator decision that named `true` and `false` but not absent; it was flagged as an
+interpretation rather than executed silently, and upheld on three tests — it resolves an ambiguity
+rather than contradicting what was specified, the resolver stays total, and in a stale-backend window
+every row reads *"Not recorded"* rather than a false *"Never run"*. Compare with `=== true` / `=== false`:
+**a truthiness test folds `false`, `null` and `undefined` into ONE answer**, and this turns on their
+being three. The neighbouring measured hazard: both `true` and `false` SURVIVE a `?? false` — only
+`null` and `undefined` are destroyed.
+
+### Three method findings this round produced, each of which would otherwise be rediscovered
+
+1. ⚠ **`?raw` CANNOT READ CSS UNDER VITEST — it returns the EMPTY STRING, silently.** Four forms
+   measured, all length 0 (`@/index.css?raw`, a relative `?raw`, `import.meta.glob` with `query`, and
+   `?inline`); `test.css` defaults to `false`, so the query is swallowed with no throw and no warning.
+   **Any fence reading CSS that way defends nothing while staying green.** `gutterTokens.fences.test.ts`
+   caught it ONLY because its non-vacuity block asserts each source is non-empty BEFORE asserting
+   anything about contents. Worked around with `vi.importActual("node:fs")`. Swept repo-wide at the
+   round's close: **no other `?raw` CSS reader exists**, so this is a latent trap for the next fence,
+   not an active silent-green one.
+2. ⚠ **A miscorrelated `EXISTS` returns TRUE FOR EVERY ROW — the OPPOSITE lie, and green everywhere.**
+   Proved with a real plant (`r2.definition_id = r2.definition_id`), which flipped all four projections
+   to `28/28`, `120/120`, `3/3`, `80/80` true with zero false and reddened three fences. Per-site
+   correlation is proved with a no-run row returning `false` at each projection, checked against
+   `workflow_runs` directly rather than inferred from the projection under test.
+3. ⚠ **Axe did NOT catch the ARIA violation (WR-03).** Driven through the real trigger against the
+   unedited node, vitest-axe / axe-core 4.11.4 passed **green** under jsdom. The fence that actually
+   holds WR-03 is an explicit five-permitted-roles sweep, driven red twice; the axe case ships labelled
+   a broad backstop **with its silence written into its own comment**, rather than as evidence it is not.
+   Related: `DropdownMenuLabel` was the wrong primitive on BOTH counts — Radix's `Menu.Label` is a bare
+   `Primitive.div` with **no role**, so swapping to it renamed the defect rather than fixing it, and it
+   merges `text-sm font-semibold`. Shipped `DropdownMenuGroup`.
+
+### Two structural findings about the GUARDRAILS themselves
+
+- ⚠ **A cross-plan fence collision was caught by the plan-checker BEFORE execution, and a second,
+  intra-wave instance of the same shape was caught at dispatch.** `192.2-07` pins an EXACT literal count
+  over `WorkflowCard.tsx`'s `GUTTER_TONE` / `RUN_TONE` bodies; `192.2-11` adds a sixth arm to both and
+  named that fence NOWHERE while running the whole subtree in its own verification. The fix was to give
+  `11` ownership plus a **mandatory re-derive**. The re-derive is why it matters: `{10, 9, 5}` →
+  **`{12, 10, 6}`** — `entries` +2, `unique` **+1**, `perMap` +1, because one map gained a NEW literal
+  and the other a THIRD occurrence of an existing one. **A uniform `+2` yields `unique: 11`: wrong while
+  looking plausible, and it would still have failed — for the wrong reason.**
+- ⚠ **Two more fences that could not fire were found and closed.** `src/lib/` had **no bare-directory
+  `TARGETS` entry**, so a new `api.ts` fence would never have run; it got a `TARGETS` line AND a
+  `BASELINE` pin in its creating commit (`+42 / −0` — **adding a pin is not raising one**, so the usual
+  "a raise deletes a line" caveat does not apply). A side effect worth recording: **`192.2` was absent
+  from the count gate's own phase-bucket list at base**, which is why that row moves 17 → 18 phases.
+  Separately, a plan's acceptance grep was **unsatisfiable** — `grep "?? false"` hits the very comment
+  forbidding `?? false` (the 195-07 trap) — and the executor made it comment-stripping with a synthetic
+  control **instead of deleting the comment to go green**.
+
+### The scorecard this round is honest about
+
+- **A plan's `files_modified` was wrong or incomplete in EIGHT of this phase's ELEVEN plans.** Known
+  specifics, all measured: `ROW_FACE` (the identifier is `FACE`), `models/harness.py` (contains neither
+  wire model), `libraryRow.ts` (a types-only leaf emitting zero runtime code, so naming it as the
+  normalizers' home was structurally impossible), `phaseGlyph.tsx` (correctly DECLINED by its executor),
+  `relativeBand` (an export, not a module), and `gutterTokens.fences.test.ts` (added by revision).
+- ⚠ **An ORCHESTRATOR-SUPPLIED baseline was wrong and an executor caught it.** "library subtree
+  12 files / 640 tests" was inherited from an earlier plan's report rather than re-derived at the
+  round's base; measured it is **11 files / 585 tests**. A plan trusting it would have read a 44-test
+  DECREASE that never happened. **The lesson is the ledger's own: re-derive, never inherit — and that
+  applies to the orchestrator too, not only to the plans.**
+- **`gsd-sdk query roadmap.update-plan-progress` returned `updated: true` and wrote ZERO bytes**, twice
+  more this round. Both tracking files were hand-edited. Do not trust that verb's return value.
