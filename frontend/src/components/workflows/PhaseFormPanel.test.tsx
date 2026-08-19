@@ -25,11 +25,14 @@ import phaseFormPanelSource from "./PhaseFormPanel?raw"
 // (`ARM_PINNED_TYPES`), rather than to a second copy of that list living in this phase.
 import governanceSectionSource from "./GovernanceSection?raw"
 import {
+  STEP_CARD_DELIVERS_TITLE,
   STEP_CARD_MODEL_TITLE,
   STEP_CARD_NEEDS_ARMING,
+  STEP_CARD_NO_SOURCE_ADD,
   STEP_CARD_OUTSIDE_SENTENCE,
   STEP_CARD_OUTSIDE_TITLE,
   STEP_CARD_REACH_TITLE,
+  STEP_CARD_WHAT_IT_DOES_TITLE,
 } from "./stepCardSectionContext"
 // 200-04 — the ONE tool-phrase home, so the fence asserts what a person reads against the
 // same reader the panel uses rather than against a second copy of the phrases.
@@ -1246,8 +1249,43 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     open: { helpLines: 5, helpChars: 234, proseChars: 1618 },
   } as const
 
-  /** The two card titles this phase added, and their exact cost in rendered characters. */
+  /** The two card titles 200-04 added, and their exact cost in rendered characters. */
   const CARD_TITLE_CHARS = "Model".length + "What it can reach".length
+
+  /**
+   * ⚠ 200 (THE STEP-PANEL PORT) — THE THIRD READING, AND THE 200-04 FIGURES ARE PRESERVED
+   * ABOVE RATHER THAN OVERWRITTEN, exactly as 200-04 preserved 199-06's.
+   *
+   * ⚠ READ WHY THIS MOVED BEFORE READING THE NUMBERS, because "the pin went up again" is the
+   * shape of a pin being relaxed and this one is not. 200-04 reported `13/14` atoms on this
+   * screen and the operator's verdict on the shipped result was that **it is not what was
+   * designed**: measured against `screens/step-panel.html`, the sheet composes SEVEN titled
+   * cards and the panel had THREE. The rework ports the sheet's structure directly, so it
+   * ADDS the four titles that were missing plus one refusal the sheet draws as a control this
+   * product has no seam for. A port that added four named sections and then reported its
+   * prose volume unchanged would have either not built them or silently deleted something
+   * else to pay for them.
+   *
+   * ⚠ WHAT THE PIN ACTUALLY GUARDS IS UNTOUCHED, AND THAT IS THE LOAD-BEARING HALF.
+   * `helpLines` and `helpChars` still read an EXACT `0` at the collapsed reading and an exact
+   * `5 / 234` at the open one — byte-identical to 199-06's and 200-04's readings. 199-06's
+   * SUBTRACTION is therefore proven un-reversed: this port re-opened no helper, and the
+   * arithmetic below is what separates that claim from a hope.
+   *
+   * ⚠ THE DELTA ACCOUNTS FOR ITSELF WITH NO RESIDUAL, per type:
+   *
+   *     llm_agent  1403 → 1508   (+105)  =  "What it does" (12) + the no-add refusal (93)
+   *     llm_emit   1385 → 1506   (+121)  =  the same 105, plus "What it delivers" (16)
+   *     open       1640 → 1745   (+105)  =  the agent reading, identical
+   *
+   * Every character is attributed to a NAMED constant below, so a future drift of one
+   * character fails with a computable cause rather than with a bigger number.
+   */
+  const PORT_WHAT_IT_DOES_CHARS = STEP_CARD_WHAT_IT_DOES_TITLE.length
+  const PORT_NO_SOURCE_ADD_CHARS = STEP_CARD_NO_SOURCE_ADD.length
+  const PORT_DELIVERS_CHARS = STEP_CARD_DELIVERS_TITLE.length
+  /** What EVERY step type gained: the first card's title, and the folders' honest refusal. */
+  const PORT_SHARED_CHARS = PORT_WHAT_IT_DOES_CHARS + PORT_NO_SOURCE_ADD_CHARS
 
   it("DENSITY AFTER — the collapsed reading, measured against the recorded BEFORE", () => {
     const agent = densityOf(renderAtFullDensity("llm_agent", FULL_RAILS).container)
@@ -1255,15 +1293,21 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking these literals, never by loosening them
     // to a range — a range is what turns a characterization pin into a decoration.
     expect({ agent, emit }).toEqual({
-      agent: { helpLines: 0, helpChars: 0, proseChars: 1403 },
-      emit: { helpLines: 0, helpChars: 0, proseChars: 1385 },
+      agent: { helpLines: 0, helpChars: 0, proseChars: 1508 },
+      emit: { helpLines: 0, helpChars: 0, proseChars: 1506 },
     })
     // ⚠ 200-04 — THE SUBTRACTION 199-06 PROVED IS UNTOUCHED, asserted rather than asserted-about.
     expect(agent.helpLines).toBe(0)
     expect(emit.helpLines).toBe(0)
-    // …and the ENTIRE prose delta is the two card titles. No residual, on either type.
-    expect(agent.proseChars - DENSITY_AT_199_06.agent.proseChars).toBe(CARD_TITLE_CHARS)
-    expect(emit.proseChars - DENSITY_AT_199_06.emit.proseChars).toBe(CARD_TITLE_CHARS)
+    // …and the ENTIRE prose delta is the four card titles this screen owed plus the folders'
+    // one honest refusal. No residual, on either type — the 200-04 accounting, carried
+    // forward and extended rather than replaced.
+    expect(agent.proseChars - DENSITY_AT_199_06.agent.proseChars).toBe(
+      CARD_TITLE_CHARS + PORT_SHARED_CHARS,
+    )
+    expect(emit.proseChars - DENSITY_AT_199_06.emit.proseChars).toBe(
+      CARD_TITLE_CHARS + PORT_SHARED_CHARS + PORT_DELIVERS_CHARS,
+    )
     // The delta is NEGATIVE on both types and on every axis that measures prose.
     expect(agent.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
     expect(agent.proseChars).toBeLessThan(DENSITY_BEFORE.agent.proseChars)
@@ -1317,13 +1361,18 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     const { container } = renderAtFullDensity("llm_agent", FULL_RAILS)
     fireEvent.click(screen.getByTestId("field-guidance-toggle"))
     const open = densityOf(container)
-    // ⚠ 200-04 — `1618` → `1640`, and the `+22` is the same two card titles, to the character.
-    // `helpLines` and `helpChars` are UNMOVED, which is what proves this phase added sections
-    // and did not quietly re-open a helper 199-06 folded.
-    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1640 })
+    // ⚠ 200-04 read `1618` → `1640` (`+22`, its two card titles). ⚠ THE STEP-PANEL PORT
+    // MOVES IT AGAIN, to `1745`, and the `+105` is `What it does` plus the folders' honest
+    // no-add refusal — the identical accounting as the agent's collapsed reading, because the
+    // port added no GUIDANCE and the two readings therefore diverge by exactly the helpers.
+    // `helpLines` and `helpChars` are UNMOVED at `5 / 234` across all three phases, which is
+    // what proves each of them added SECTIONS and none quietly re-opened a helper 199-06 folded.
+    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1745 })
     expect(open.helpLines).toBe(DENSITY_AT_199_06.open.helpLines)
     expect(open.helpChars).toBe(DENSITY_AT_199_06.open.helpChars)
-    expect(open.proseChars - DENSITY_AT_199_06.open.proseChars).toBe(CARD_TITLE_CHARS)
+    expect(open.proseChars - DENSITY_AT_199_06.open.proseChars).toBe(
+      CARD_TITLE_CHARS + PORT_SHARED_CHARS,
+    )
     // Fully open is the DENSEST this panel can now be, and it is still quieter than the
     // panel that shipped — the model helper is gone outright and the whitelist refusal
     // stopped being a helper. Both are subtractions the switch cannot undo.

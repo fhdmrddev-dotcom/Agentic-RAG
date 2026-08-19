@@ -76,6 +76,9 @@ import { ExternalActionSection } from "./ExternalActionSection"
 import { FieldGuidance } from "./FieldGuidance"
 import { useFieldGuidance } from "./fieldGuidanceContext"
 import { GovernanceSection } from "./GovernanceSection"
+// 200 (the step-panel port) — the own-property reader, imported to close the ONE remaining
+// live WR-04 prototype-key sink in this file (`CITATION_CAPTIONS`). See its use site.
+import { own } from "./ownProperty"
 // 200-04 (DES-02, §1 `SP-MR-02`/`SP-MR-03`/`SP-MR-04`) — sheet c4's card shell and the words
 // it wears, split across a component and a leaf for the reason `FieldGuidance` is: a component
 // file may not export shared non-component values (`react-refresh/only-export-components`;
@@ -86,11 +89,15 @@ import { GovernanceSection } from "./GovernanceSection"
 import { StepCardSection } from "./StepCardSection"
 import {
   outsideChangeSentence,
+  STEP_CARD_CHECKS_TITLE,
+  STEP_CARD_DELIVERS_TITLE,
   STEP_CARD_MODEL_TITLE,
   STEP_CARD_NEEDS_ARMING,
+  STEP_CARD_NO_SOURCE_ADD,
   STEP_CARD_OUTSIDE_SENTENCE,
   STEP_CARD_OUTSIDE_TITLE,
   STEP_CARD_REACH_TITLE,
+  STEP_CARD_WHAT_IT_DOES_TITLE,
 } from "./stepCardSectionContext"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
@@ -137,6 +144,22 @@ import type { PhaseSpecJSON } from "./phaseVocabulary"
 // WR-04 prototype-key sink in this tree, and it was observed RED against this very file (a
 // chip whose label rendered as nothing at all, because React refuses a function child).
 import { toolName } from "./toolNames"
+// 200 (the step-panel port) — the tool CHOICE set and its one reveal, its own leaf because a
+// reveal is state and this file's hook count is pinned at an ABSOLUTE ZERO. The reference
+// sheet draws TWELVE pills; the server offers TWENTY-EIGHT, and the shipped set printed every
+// one of them. Nothing is dropped — the unchosen remainder is one click away, and every
+// CHOSEN or UNREGISTERED tool is pinned open (a decision and a finding are never folded).
+import { ToolChoiceSet } from "./ToolChoiceSet"
+// 200 (the step-panel port) — the sheet's CLOSING card, pinned to the bottom of the panel.
+// The CLAIM about what is still missing lives in the leaf beside it, where it can be tested
+// without a DOM; two rows the sketch itself draws are refused there, with reasons.
+import { StepReadiness } from "./StepReadiness"
+import {
+  stepGaps,
+  STEP_ANCHOR_FILES,
+  STEP_ANCHOR_OUTSIDE,
+  STEP_ANCHOR_WHAT_IT_DOES,
+} from "./stepReadinessContext"
 // TYPE-ONLY, and erased at build. The child declares its OWN props; this panel exports no
 // props type for it, exactly as it exports none for the two sections above.
 import type { TemplateNameClassification } from "./templateNameBuckets"
@@ -574,7 +597,30 @@ function StaticField(props: {
 
 /** Render the folder_scope as real folder NAME(s) (📁 Name), with the bound id
  *  reachable via the per-chip ⓘ/title — never a path. `folder_scope` can hold
- *  MULTIPLE ids; each renders as its own name chip. */
+ *  MULTIPLE ids; each renders as its own name chip.
+ *
+ *  ── ⚠ 200 (the step-panel port): ROWS, NOT INLINE CHIPS — AND TWO THINGS THE SHEET DRAWS
+ *  THAT ARE NOT ON THE WIRE ──────────────────────────────────────────────────────────────
+ *
+ *  The reference sheet gives each folder its OWN full-width row (`p-3 rounded border
+ *  bg-raised`, an icon, the name), which is what makes a step's reach legible at a glance
+ *  instead of a run-on chip line. That is ported. Two atoms beside it are not, and refusing
+ *  them is the honest direction rather than the tidy one:
+ *
+ *   1. **A per-folder LOCK STATE** (`Locked — only the person who locked it can release it`).
+ *      `folder_scope` is a bare `string[]`. There is no lock bit, no holder, no wire field of
+ *      any kind — so a lock badge here would be a fabricated fact on a governance surface,
+ *      which is the highest-consequence defect this panel can ship. NOTHING renders for it.
+ *   2. **An `Add a source` BUTTON.** `folder_scope` is a READ-ONLY display in this panel and
+ *      no authoring control writes it — pinned by a source assertion in
+ *      `WorkflowBuilderPage.header.test.tsx`, and for a recorded reason: a phase declaring
+ *      `folder_scope` on a workflow with no `project_folder_id` raises a raw 422
+ *      (`_folder_scope_requires_project`), which under D-186-04's hold-the-write rule would
+ *      leave a permanently unsaveable draft. So the slot is ported as the STATEMENT it
+ *      actually is (`STEP_CARD_NO_SOURCE_ADD`) rather than as a control that writes nothing.
+ *      A dashed box that looks pressable and does nothing is the dead control SPEC Req 5
+ *      forbids; a dashed box that says where sources come from keeps the information.
+ */
 function FolderScopeField({
   ids,
   folderNames,
@@ -595,17 +641,17 @@ function FolderScopeField({
       {ids.length === 0 ? (
         <span className="text-muted-foreground">📁 {fallbackName ?? "(none)"}</span>
       ) : (
-        <span className="flex flex-wrap items-center gap-1.5">
+        <span className="flex w-full flex-col gap-1.5">
           {ids.map((id) => {
             const name = folderNames?.[id] ?? fallbackName
             return (
               <span
                 key={id}
                 title={id}
-                className="inline-flex items-center gap-1 rounded bg-card px-1.5 py-0.5 text-foreground"
+                className="flex items-center gap-2 rounded border border-border bg-card px-2 py-1.5 text-foreground"
               >
-                📁 {name ?? id}
-                <span className="ml-0.5 font-mono text-[8px] text-muted-foreground" title={id}>
+                <span className="min-w-0 flex-1 truncate">📁 {name ?? id}</span>
+                <span className="shrink-0 font-mono text-[8px] text-muted-foreground" title={id}>
                   ⓘ
                 </span>
               </span>
@@ -614,6 +660,42 @@ function FolderScopeField({
         </span>
       )}
     </StaticField>
+  )
+}
+
+/**
+ * 200 (the step-panel port) — the sheet's `Add a source` slot, as the refusal it really is.
+ *
+ * ⚠ NOT A `<button>`, NOT A `[role=button]`, NOT AN `<a>`. It carries the sheet's dashed
+ * treatment because that is what the sheet draws in this position, and it carries no control
+ * because this panel has no write seam for `folder_scope` and one is pinned closed upstream —
+ * the full argument is in `FolderScopeField`'s docblock and in `STEP_CARD_NO_SOURCE_ADD`.
+ *
+ * ⚠ IT IS A REFUSAL, SO IT IS NEVER FOLDED (SEED-184 rule 3) — a person meets it at rest,
+ * exactly as the tool whitelist's `you cannot add one by typing` does two rows down. It does
+ * NOT travel through the guidance channel; the two were sorted apart at 199-06 and this is
+ * the same sort, one atom later.
+ */
+/**
+ * 200 (the step-panel port) — the sheet's own `<hr class="border-t border-line w-full">`.
+ *
+ * It sits INSIDE the `What it can reach` card, between the folders and the tools, because the
+ * sheet composes those two as ONE card with two halves rather than as two cards. What a step
+ * can READ and what a step can DO are the same question asked twice, and the divider is what
+ * says so without a second heading.
+ */
+function CardDivider() {
+  return <hr aria-hidden="true" className="col-span-2 border-t border-border" />
+}
+
+function NoSourceAddLine() {
+  return (
+    <p
+      data-testid="no-source-add"
+      className="col-span-2 rounded border border-dashed border-border px-2 py-1.5 text-[10.5px] leading-snug text-muted-foreground"
+    >
+      {STEP_CARD_NO_SOURCE_ADD}
+    </p>
   )
 }
 
@@ -704,9 +786,6 @@ function ToolsField({
   )
 }
 
-const TOOL_CHIP_BASE =
-  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] focus:outline-none focus:ring-1 focus:ring-primary"
-
 /**
  * 199-06 (DES-01) — the whitelist's REFUSAL, hoisted to module scope so the sentence has one
  * home rather than being an attribute value. It is deliberately NOT in `definitionOps`: that
@@ -785,63 +864,12 @@ function ToolWhitelistRail({
           )}
         </div>
       ) : (
-        <ToolOptionSet tools={tools} options={options} commit={commit} />
-      )}
-    </div>
-  )
-}
-
-/** The chip set itself — split out so the degraded branch above reads as one sentence. */
-function ToolOptionSet({
-  tools,
-  options,
-  commit,
-}: {
-  tools: string[]
-  options: string[]
-  commit: (next: string[]) => void
-}) {
-  const selected = new Set(tools)
-  // Registry order first (the server's own ordering), then anything the definition names
-  // that the registry lacks — appended rather than hidden.
-  const offered = [...options, ...tools.filter((t) => !options.includes(t))]
-
-  return (
-    <div
-      data-rail="tools"
-      data-testid="tools-rail"
-      role="group"
-      aria-label="What this step can do"
-      className="flex flex-wrap gap-1.5"
-    >
-      {offered.length === 0 ? (
-        <p data-testid="tools-empty" className="text-[11px] leading-snug text-muted-foreground">
-          This workspace offers no tools for this step.
-        </p>
-      ) : (
-        offered.map((t) => {
-          const on = selected.has(t)
-          const unregistered = !options.includes(t)
-          return (
-            <button
-              key={t}
-              type="button"
-              data-testid="tool-option"
-              data-tool={t}
-              data-unregistered={unregistered ? "true" : "false"}
-              aria-pressed={on}
-              title={unregistered ? `${t} — not in this workspace's tool registry` : t}
-              onClick={() => commit(on ? tools.filter((x) => x !== t) : [...tools, t])}
-              className={[
-                TOOL_CHIP_BASE,
-                on ? "border-primary bg-primary/10 text-foreground" : "border-border bg-card text-muted-foreground",
-                unregistered ? "line-through" : "",
-              ].join(" ")}
-            >
-              {toolName(t)}
-            </button>
-          )
-        })
+        // 200 (the step-panel port) — the chip set moved to `ToolChoiceSet.tsx`, and the move
+        // is what the reveal cost. The set itself is unchanged: same ids, same order, same
+        // `data-tool` / `data-unregistered` attributes, same comma seam. What it gained is a
+        // readable first reading, because twenty-eight pills is the "dense form" half of the
+        // operator's verdict on this panel and the two CHOSEN tools were lost inside it.
+        <ToolChoiceSet tools={tools} options={options} commit={commit} />
       )}
     </div>
   )
@@ -857,9 +885,12 @@ function ToolOptionSet({
  */
 function OrderRail({ index, total }: { index: number; total: number }) {
   return (
-    <section data-rail="order" data-testid="rail-order" className="mb-3 rounded border border-border bg-muted/40 px-2.5 py-2">
-      <h3 className="text-[11px] font-medium text-foreground">Order is locked</h3>
-      <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+    // 200 (the step-panel port) — the sheet's card shape: a small-caps outside label over an
+    // inset panel DARKER than the aside around it. The shipped `bg-muted/40` strip read as a
+    // heading with a tint, which is the "three headings and a dense form" the operator saw.
+    <section data-rail="order" data-testid="rail-order" className="mb-3 flex flex-col gap-1.5">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Order is locked</h3>
+      <p className="rounded border border-border bg-background p-3 text-[11px] leading-snug text-muted-foreground">
         Runs as step {index} of {total} — steps run in order, one after another.
       </p>
     </section>
@@ -880,14 +911,19 @@ function OrderRail({ index, total }: { index: number; total: number }) {
  */
 function GatesRail({ gates }: { gates: PhaseGateRow[] }) {
   return (
-    <section data-rail="gates" data-testid="rail-gates" className="mt-3 rounded border border-border bg-muted/40 px-2.5 py-2">
-      <h3 className="text-[11px] font-medium text-foreground">Checks that run on this step</h3>
+    // 200 (the step-panel port) — the sheet's card shape, as the two rails beside it now wear.
+    // ⚠ THE HEADING LITERAL MOVED TO `stepCardSectionContext.ts` AND DID NOT CHANGE. It is a
+    // `RAIL_MARKERS` entry in `PhaseFormPanel.rails.test.tsx`, asserted ABSENT from every
+    // rails-absent render — and it still is, because the constant renders only from here.
+    <section data-rail="gates" data-testid="rail-gates" className="mt-3 flex flex-col gap-1.5">
+      <h3 className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{STEP_CARD_CHECKS_TITLE}</h3>
+      <div className="rounded border border-border bg-background p-3">
       {gates.length === 0 ? (
-        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+        <p className="text-[11px] leading-snug text-muted-foreground">
           No checks apply to this step yet.
         </p>
       ) : (
-        <ul className="mt-1 flex flex-col gap-1">
+        <ul className="flex flex-col gap-1">
           {gates.map((gate) => (
             <li
               key={gate.label}
@@ -916,6 +952,7 @@ function GatesRail({ gates }: { gates: PhaseGateRow[] }) {
         A locked check came with a choice above it — change what made it apply and it goes.
         There is no switch.
       </p>
+      </div>
     </section>
   )
 }
@@ -974,16 +1011,23 @@ export function PhaseFormPanel({
       aria-label={`Refine step: ${phase.name ?? phase.slug}`}
       className="flex h-full min-w-0 flex-col overflow-hidden border-l border-border bg-card"
     >
-      <header className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="min-w-0 truncate text-[13px] font-semibold text-foreground">
-          {phase.name?.trim() || phase.slug}
-        </span>
-        <span
-          title={pt}
-          className="ml-2 shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-        >
-          {friendlyType}
-        </span>
+      {/* ⚠ PORTED FROM THE SHEET'S MARKUP (`screens/step-panel.html`), not from a checklist.
+          It draws the header as a COLUMN — a bordered small-caps type badge on its own line,
+          then the step's name as the heading under it — and the shipped header was a single
+          row with the badge crammed between the name and the ✕. The badge-above-title order
+          is what lets the name be read as a title rather than as one more chip in a strip. */}
+      <header className="flex items-start justify-between gap-2 border-b border-border px-3 py-2.5">
+        <div className="flex min-w-0 flex-col gap-1">
+          <span
+            title={pt}
+            className="w-fit rounded border border-border bg-muted px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wide text-muted-foreground"
+          >
+            {friendlyType}
+          </span>
+          <h2 className="min-w-0 break-words text-[13px] font-semibold leading-snug text-foreground">
+            {phase.name?.trim() || phase.slug}
+          </h2>
+        </div>
         {/* The discoverable exit — a normal flex child of the header, never an
             absolutely-positioned overlay (the panel is a grid track). The glyph is
             hidden from the a11y tree so the announcement is the label, not "✕". */}
@@ -1003,7 +1047,7 @@ export function PhaseFormPanel({
           // keystroke, and the page flushes the coalescing undo entry as it releases.
           // Keyboard activation never fires `mousedown`, so Enter/Space are untouched.
           onMouseDown={(event) => event.preventDefault()}
-          className="ml-1.5 inline-grid h-5 w-5 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          className="inline-grid h-6 w-6 shrink-0 place-items-center rounded text-[11px] text-muted-foreground hover:bg-accent/40 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
         >
           <span aria-hidden="true">✕</span>
         </button>
@@ -1023,10 +1067,18 @@ export function PhaseFormPanel({
         {/* The rails render ONLY when the caller supplies them. Absent ⇒ today's panel. */}
         {rails && <OrderRail index={rails.order.index} total={rails.order.total} />}
 
-        <div className="grid grid-cols-2 gap-3">
+        {/* 200 (the step-panel port) — `gap-4` rather than `gap-3`: the sheet spaces its
+            groups at `gap-8` against a `gap-3` inside each card, and that ratio is what makes
+            seven cards read as seven things. The grid itself is unchanged, because the fields
+            INSIDE each card still use its two columns. */}
+        <div className="grid grid-cols-2 gap-4">
           {/* ── programmatic: fn + input_keys (a deterministic server step — no LLM fields) ── */}
           {pt === "programmatic" && (
-            <>
+            <StepCardSection
+              title={STEP_CARD_WHAT_IT_DOES_TITLE}
+              testId="card-what-it-does"
+              anchorId={STEP_ANCHOR_WHAT_IT_DOES}
+            >
               <TextField
                 label="Function"
                 hint="fn — a key into the server-side function registry. This step runs deterministic code, not an AI."
@@ -1046,22 +1098,42 @@ export function PhaseFormPanel({
                 onPersist={onPersist}
                 full
               />
-            </>
+            </StepCardSection>
           )}
 
           {/* ── llm_single: prompt + model + temperature + folder_scope + skill_ref ── */}
           {pt === "llm_single" && (
             <>
-              <TextField
-                label="Instructions"
-                hint="prompt — what you're telling the AI to do in this step."
-                help="What you want the AI to do in this step."
-                value={asStr(cfg.prompt)}
-                onChange={set("prompt")}
-                onPersist={onPersist}
-                textarea
-                full
-              />
+              {/* 200 (the step-panel port) — the sheet's FIRST card. The shipped panel opened
+                  straight onto a bare labelled textarea; the sheet titles it, and the title
+                  is what turns a form into a reading. The step's own dials ride here too —
+                  the sheet draws none of them and they are shipped fields, so they are KEPT
+                  and GROUPED rather than dropped or left loose. */}
+              <StepCardSection
+                title={STEP_CARD_WHAT_IT_DOES_TITLE}
+                testId="card-what-it-does"
+                anchorId={STEP_ANCHOR_WHAT_IT_DOES}
+              >
+                <TextField
+                  label="Instructions"
+                  hint="prompt — what you're telling the AI to do in this step."
+                  help="What you want the AI to do in this step."
+                  value={asStr(cfg.prompt)}
+                  onChange={set("prompt")}
+                  onPersist={onPersist}
+                  textarea
+                  full
+                />
+                <TextField
+                  label="Creativity"
+                  hint="temperature — 0 is focused and repeatable, higher is more varied."
+                  help="Higher = more varied wording; lower = more focused."
+                  value={asStr(cfg.temperature)}
+                  onChange={set("temperature")}
+                  onPersist={onPersist}
+                  type="number"
+                />
+              </StepCardSection>
               {/* 200-04 (§1 `SP-MR-02`) — sheet c4's MODEL card. The gate is `modelPicker`
                   so an absent registry answer renders no empty card, and the mount line
                   inside is byte-identical to the shipped one: this file's own fence reads
@@ -1072,132 +1144,151 @@ export function PhaseFormPanel({
               {modelPicker && pt === "llm_single" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
                 </StepCardSection>
               )}
-              <TextField
-                label="Creativity"
-                hint="temperature — 0 is focused and repeatable, higher is more varied."
-                help="Higher = more varied wording; lower = more focused."
-                value={asStr(cfg.temperature)}
-                onChange={set("temperature")}
-                onPersist={onPersist}
-                type="number"
-              />
               <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
                 <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+                <NoSourceAddLine />
+                <CardDivider />
+                <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
               </StepCardSection>
-              <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
             </>
           )}
 
           {/* ── llm_agent: + available_tools + max_steps (12) + wall_clock_seconds ── */}
           {pt === "llm_agent" && (
             <>
-              <TextField
-                label="Instructions"
-                hint="prompt — what you're telling the AI to do in this step."
-                help="What you want the AI to do in this step."
-                value={asStr(cfg.prompt)}
-                onChange={set("prompt")}
-                onPersist={onPersist}
-                textarea
-                full
-              />
+              <StepCardSection
+                title={STEP_CARD_WHAT_IT_DOES_TITLE}
+                testId="card-what-it-does"
+                anchorId={STEP_ANCHOR_WHAT_IT_DOES}
+              >
+                <TextField
+                  label="Instructions"
+                  hint="prompt — what you're telling the AI to do in this step."
+                  help="What you want the AI to do in this step."
+                  value={asStr(cfg.prompt)}
+                  onChange={set("prompt")}
+                  onPersist={onPersist}
+                  textarea
+                  full
+                />
+                <TextField
+                  label="Max steps"
+                  hint="max_steps — how many actions the AI may take before it must stop."
+                  help="How many actions the AI may take before it stops."
+                  value={asStr(cfg.max_steps, "12")}
+                  onChange={set("max_steps")}
+                  onPersist={onPersist}
+                  type="number"
+                />
+                <TextField
+                  label="Time limit"
+                  qualifier="(seconds, optional)"
+                  hint="wall_clock_seconds — stop this step after this many seconds, even if it isn't finished."
+                  help="Stop this step after this many seconds (optional)."
+                  value={asStr(cfg.wall_clock_seconds)}
+                  onChange={set("wall_clock_seconds")}
+                  onPersist={onPersist}
+                  type="number"
+                />
+              </StepCardSection>
               {modelPicker && (
                 <StepCardSection title={STEP_CARD_MODEL_TITLE} testId="card-model">
               {modelPicker && pt === "llm_agent" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
                 </StepCardSection>
               )}
-              <TextField
-                label="Max steps"
-                hint="max_steps — how many actions the AI may take before it must stop."
-                help="How many actions the AI may take before it stops."
-                value={asStr(cfg.max_steps, "12")}
-                onChange={set("max_steps")}
-                onPersist={onPersist}
-                type="number"
-              />
-              <ToolsField
-                tools={asList(cfg.available_tools)}
-                options={rails?.toolOptions}
-                onChange={(v) => onChange({ available_tools: v.split(",").map((s) => s.trim()).filter(Boolean) })}
-                onPersist={onPersist}
-              />
-              <TextField
-                label="Time limit"
-                qualifier="(seconds, optional)"
-                hint="wall_clock_seconds — stop this step after this many seconds, even if it isn't finished."
-                help="Stop this step after this many seconds (optional)."
-                value={asStr(cfg.wall_clock_seconds)}
-                onChange={set("wall_clock_seconds")}
-                onPersist={onPersist}
-                type="number"
-              />
+              {/* ⚠ 200 (the step-panel port) — THE TOOLS MOVED INSIDE THIS CARD, under the
+                  sheet's own `<hr>`. The reference composes folders and tools as ONE card in
+                  two halves; the shipped panel had the tool list floating between two
+                  unrelated number fields, which is why the card titled *what it can reach*
+                  read as though it were only about folders. */}
               <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
                 <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+                <NoSourceAddLine />
+                <CardDivider />
+                <ToolsField
+                  tools={asList(cfg.available_tools)}
+                  options={rails?.toolOptions}
+                  onChange={(v) => onChange({ available_tools: v.split(",").map((s) => s.trim()).filter(Boolean) })}
+                  onPersist={onPersist}
+                />
+                <CardDivider />
+                <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
               </StepCardSection>
-              <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
             </>
           )}
 
           {/* ── llm_batch_agents: + max_parallel_agents (5) + merge_strategy ── */}
           {pt === "llm_batch_agents" && (
             <>
-              <TextField
-                label="Instructions"
-                hint="prompt — what you're telling the AI to do for each item it works on."
-                help="What you want the AI to do in this step."
-                value={asStr(cfg.prompt)}
-                onChange={set("prompt")}
-                onPersist={onPersist}
-                textarea
-                full
-              />
+              <StepCardSection
+                title={STEP_CARD_WHAT_IT_DOES_TITLE}
+                testId="card-what-it-does"
+                anchorId={STEP_ANCHOR_WHAT_IT_DOES}
+              >
+                <TextField
+                  label="Instructions"
+                  hint="prompt — what you're telling the AI to do for each item it works on."
+                  help="What you want the AI to do in this step."
+                  value={asStr(cfg.prompt)}
+                  onChange={set("prompt")}
+                  onPersist={onPersist}
+                  textarea
+                  full
+                />
+                <TextField
+                  label="Max steps"
+                  hint="max_steps — how many actions each worker may take before it must stop."
+                  help="How many actions the AI may take before it stops."
+                  value={asStr(cfg.max_steps, "12")}
+                  onChange={set("max_steps")}
+                  onPersist={onPersist}
+                  type="number"
+                />
+                <TextField
+                  label="Parallel workers"
+                  hint="max_parallel_agents — how many copies run at once (one per item, up to this many)."
+                  help="How many copies run at once."
+                  value={asStr(cfg.max_parallel_agents, "5")}
+                  onChange={set("max_parallel_agents")}
+                  onPersist={onPersist}
+                  type="number"
+                />
+                <SelectField
+                  label="How to combine results"
+                  hint="merge_strategy — how each worker's output is stitched into one result."
+                  help="How the parallel results are merged."
+                  value={asStr(cfg.merge_strategy, "concat")}
+                  options={MERGE_STRATEGIES}
+                  onChange={set("merge_strategy")}
+                  onPersist={onPersist}
+                />
+              </StepCardSection>
               {modelPicker && (
                 <StepCardSection title={STEP_CARD_MODEL_TITLE} testId="card-model">
               {modelPicker && pt === "llm_batch_agents" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
                 </StepCardSection>
               )}
-              <TextField
-                label="Max steps"
-                hint="max_steps — how many actions each worker may take before it must stop."
-                help="How many actions the AI may take before it stops."
-                value={asStr(cfg.max_steps, "12")}
-                onChange={set("max_steps")}
-                onPersist={onPersist}
-                type="number"
-              />
-              <ToolsField
-                tools={asList(cfg.available_tools)}
-                options={rails?.toolOptions}
-                onChange={(v) => onChange({ available_tools: v.split(",").map((s) => s.trim()).filter(Boolean) })}
-                onPersist={onPersist}
-              />
-              <TextField
-                label="Parallel workers"
-                hint="max_parallel_agents — how many copies run at once (one per item, up to this many)."
-                help="How many copies run at once."
-                value={asStr(cfg.max_parallel_agents, "5")}
-                onChange={set("max_parallel_agents")}
-                onPersist={onPersist}
-                type="number"
-              />
-              <SelectField
-                label="How to combine results"
-                hint="merge_strategy — how each worker's output is stitched into one result."
-                help="How the parallel results are merged."
-                value={asStr(cfg.merge_strategy, "concat")}
-                options={MERGE_STRATEGIES}
-                onChange={set("merge_strategy")}
-                onPersist={onPersist}
-              />
               <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
                 <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+                <NoSourceAddLine />
+                <CardDivider />
+                <ToolsField
+                  tools={asList(cfg.available_tools)}
+                  options={rails?.toolOptions}
+                  onChange={(v) => onChange({ available_tools: v.split(",").map((s) => s.trim()).filter(Boolean) })}
+                  onPersist={onPersist}
+                />
               </StepCardSection>
             </>
           )}
 
           {/* ── llm_human_input: prompt + options + timeout_seconds (300) — a human pause ── */}
           {pt === "llm_human_input" && (
-            <>
+            <StepCardSection
+              title={STEP_CARD_WHAT_IT_DOES_TITLE}
+              testId="card-what-it-does"
+              anchorId={STEP_ANCHOR_WHAT_IT_DOES}
+            >
               <TextField
                 label="Instructions"
                 hint="prompt — what the person is asked to review or decide at this pause."
@@ -1228,29 +1319,28 @@ export function PhaseFormPanel({
                 onPersist={onPersist}
                 type="number"
               />
-            </>
+            </StepCardSection>
           )}
 
           {/* ── llm_emit: the ONLY type with citation_policy + integrity_policy (greyed) ── */}
           {pt === "llm_emit" && (
             <>
-              <TextField
-                label="Instructions"
-                hint="prompt — what the AI should produce for the deliverable."
-                help="What you want the AI to do in this step."
-                value={asStr(cfg.prompt)}
-                onChange={set("prompt")}
-                onPersist={onPersist}
-                textarea
-                full
-              />
-              <ReadOnlyField
-                label="Output type"
-                hint="emitter — how the deliverable is produced (e.g. fill a template). Read-only."
-                help="How the deliverable is produced (read-only)."
-                value={asStr(cfg.emitter, "render_template")}
-                full
-              />
+              <StepCardSection
+                title={STEP_CARD_WHAT_IT_DOES_TITLE}
+                testId="card-what-it-does"
+                anchorId={STEP_ANCHOR_WHAT_IT_DOES}
+              >
+                <TextField
+                  label="Instructions"
+                  hint="prompt — what the AI should produce for the deliverable."
+                  help="What you want the AI to do in this step."
+                  value={asStr(cfg.prompt)}
+                  onChange={set("prompt")}
+                  onPersist={onPersist}
+                  textarea
+                  full
+                />
+              </StepCardSection>
               {/* D-12 — the fitness flag rides THIS mount and no other: on the three step
                   types above the emission tier predicts nothing about the outcome, and a
                   warning that predicts nothing trains people to ignore the ones that do. */}
@@ -1259,34 +1349,59 @@ export function PhaseFormPanel({
               {modelPicker && pt === "llm_emit" && <ModelField {...modelPicker} showFitness value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
                 </StepCardSection>
               )}
-              <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
               <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
                 <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+                <NoSourceAddLine />
+                <CardDivider />
+                <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
               </StepCardSection>
-              <SelectField
-                label="Sourcing strictness"
-                hint="citation_policy — how strictly claims in the deliverable must be backed by sources."
-                help="How strictly the deliverable must cite its sources."
-                value={asStr(cfg.citation_policy, "strict")}
-                options={CITATION_POLICIES}
-                onChange={set("citation_policy")}
-                onPersist={onPersist}
-                full
-                caption={CITATION_CAPTIONS[asStr(cfg.citation_policy, "strict")]}
-              />
-              {/* integrity_policy: GREYED / read-only (disabled) — schema-declared, Phase 106 wiring. */}
-              <SelectField
-                label="File check"
-                qualifier="(coming in Phase 106)"
-                hint="integrity_policy — re-opens the produced file to confirm it's complete. Not wired yet."
-                help="Re-opens the produced file to confirm it's complete (coming in Phase 106)."
-                value={asStr(cfg.integrity_policy, "strict")}
-                options={INTEGRITY_POLICIES}
-                onChange={() => {}}
-                onPersist={() => {}}
-                disabled
-                full
-              />
+              {/* 200 (the step-panel port) — the deliverable's own three fields, grouped. The
+                  sheet draws no card for them and they are shipped fields on the one type
+                  that produces a document, so they are KEPT and titled rather than left as
+                  the loose column the operator's verdict named. ⚠ NOT titled `How strictly it
+                  is held` — that is the card BELOW, whose heading `GovernanceSection.tsx`
+                  owns; two adjacent cards under one title is how a reader concludes a control
+                  has two copies (the L-14 reading its `already-set` arm exists to prevent). */}
+              <StepCardSection title={STEP_CARD_DELIVERS_TITLE} testId="card-delivers">
+                <ReadOnlyField
+                  label="Output type"
+                  hint="emitter — how the deliverable is produced (e.g. fill a template). Read-only."
+                  help="How the deliverable is produced (read-only)."
+                  value={asStr(cfg.emitter, "render_template")}
+                  full
+                />
+                <SelectField
+                  label="Sourcing strictness"
+                  hint="citation_policy — how strictly claims in the deliverable must be backed by sources."
+                  help="How strictly the deliverable must cite its sources."
+                  value={asStr(cfg.citation_policy, "strict")}
+                  options={CITATION_POLICIES}
+                  onChange={set("citation_policy")}
+                  onPersist={onPersist}
+                  full
+                  // ⚠ `own()`, NOT a bracket read — a live WR-04 prototype-key sink, fixed in
+                  // passing (Rule 1). `citation_policy` is arbitrary wire data, so a stored
+                  // `constructor` resolved `Object.prototype.constructor` off this plain
+                  // literal and handed a FUNCTION to a React child — which React does not
+                  // render as text, it REFUSES outright, so the caption vanished. Measured
+                  // three files away in this same phase, on a chip whose label rendered as
+                  // nothing at all. `own()` returns `undefined` and nothing renders, honestly.
+                  caption={own(CITATION_CAPTIONS, asStr(cfg.citation_policy, "strict"))}
+                />
+                {/* integrity_policy: GREYED / read-only (disabled) — schema-declared, Phase 106 wiring. */}
+                <SelectField
+                  label="File check"
+                  qualifier="(coming in Phase 106)"
+                  hint="integrity_policy — re-opens the produced file to confirm it's complete. Not wired yet."
+                  help="Re-opens the produced file to confirm it's complete (coming in Phase 106)."
+                  value={asStr(cfg.integrity_policy, "strict")}
+                  options={INTEGRITY_POLICIES}
+                  onChange={() => {}}
+                  onPersist={() => {}}
+                  disabled
+                  full
+                />
+              </StepCardSection>
             </>
           )}
 
@@ -1305,8 +1420,13 @@ export function PhaseFormPanel({
             <StepCardSection
               title={STEP_CARD_OUTSIDE_TITLE}
               testId="card-outside"
+              anchorId={STEP_ANCHOR_OUTSIDE}
               mark={STEP_CARD_NEEDS_ARMING}
               note={STEP_CARD_OUTSIDE_SENTENCE}
+              // 200 (the step-panel port) — the sheet's amber left edge, which it spends on
+              // exactly two cards: this one and the closing checklist. Both are places a
+              // person is being told something happens OUTSIDE the run.
+              accent="consequence"
             >
               <OutsideChangeLine capability={asStr(cfg.capability)} />
               <ExternalActionSection capability={asStr(cfg.capability)} onChange={set("capability")} onPersist={onPersist} />
@@ -1321,11 +1441,35 @@ export function PhaseFormPanel({
             line, ABOVE the attach section as sketch 167 places it. Same `llm_emit` gate for
             the same reason, and the same absent-renders-nothing rule. */}
         {nameCheck && pt === "llm_emit" && <TemplateNameCheck {...nameCheck} />}
-        {template && pt === "llm_emit" && <TemplateAttachSection {...template} />}
+        {/* 200 (the step-panel port) — the sheet's `Files it starts from`, in the sheet's
+            POSITION. Its own words stay `The file this step fills in` (one home, in
+            `TemplateAttachSection.tsx`): that sentence says what the file is FOR, which the
+            sheet's does not, and re-spelling it to match a drawing would trade a truer
+            sentence for a matching one. The anchor is on a wrapper so the readiness
+            checklist's jump row can reach a section this file does not own. */}
+        <div id={STEP_ANCHOR_FILES} className="scroll-mt-3">
+          {template && pt === "llm_emit" && <TemplateAttachSection {...template} />}
+        </div>
         {rails && <GovernanceSection phaseType={pt} availableTools={asList(cfg.available_tools)} kbTools={rails.kbTools ?? []}
           citationPolicy={asStr(cfg.citation_policy)} groundingEscalated={phase.grounding_escalated === true}
           actionRiskArmed={phase.action_risk_armed === true} onGovernanceChange={onGovernanceChange} />}
         {rails && <GatesRail gates={rails.gates} />}
+        {/* 200 (the step-panel port) — THE SHEET'S CLOSING CARD, and the last thing on the
+            panel exactly as the sheet places it (`mt-auto pt-4 border-t`). ⚠ It renders
+            NOTHING when nothing is missing — never `0 things still missing`, never an "all
+            set", because a zero-state congratulation claims the step is COMPLETE and the
+            publish gauntlet is the surface allowed to make that claim. Which conditions may
+            be called missing — and which two of the sketch's own rows are refused — is
+            argued in `stepReadinessContext.ts`, where it can be tested without a DOM. */}
+        <StepReadiness
+          gaps={stepGaps({
+            phaseType: pt,
+            prompt: asStr(cfg.prompt),
+            fn: asStr(cfg.fn),
+            outsideSentence: outsideChangeSentence(asStr(cfg.capability)),
+            template,
+          })}
+        />
         </FieldGuidance>
       </div>
     </aside>
