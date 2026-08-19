@@ -265,6 +265,40 @@
       animation: ringspin 1.5s linear infinite;
     }
   }
+
+  /* ─── Phase 200 (canvas port) — THE REORDER REFUSAL NUDGE.
+     Operator finding, in their words: *"nodes cannot move to the left or to the right —
+     the first node to the left cannot move beyond a certain boundary, same as to the
+     right."* Refusing to move the first step further left is CORRECT — order is derived
+     from run order and there is no position −1. What was wrong is that the refusal was
+     TOTALLY SILENT: the handler's early `return` said nothing to anyone, and its comment's
+     reasoning ("a live region that repeats itself on a no-op teaches the user to ignore
+     it") is sound for a screen reader but produced silence for sighted users too.
+
+     THIS IS THE VISUAL HALF ONLY, and that split is the point. The live region stays quiet
+     on a no-op exactly as it was; this says "that direction is the end" to the eye, once,
+     on the node the person is already looking at. It is a lateral nudge that RETURNS to
+     where it started — the shape of a thing that will not go further, never a wobble that
+     could be read as movement having happened.
+
+     BOUNDED BY CONSTRUCTION: no `infinite`, no `alternate` beyond the keyframe's own
+     return, and the class is removed by a timer, so it cannot become ambient motion on a
+     canvas whose standing rule is that looping motion belongs to the run channel alone.
+
+     REDUCED MOTION IS HONEST HERE, NOT MERELY SAFE. With motion suppressed the nudge does
+     not run — so the border tint below carries the whole reading on its own, which is why
+     it is a separate declaration outside the query rather than part of the keyframe. ─── */
+  .canvas-reorder-refused .react-flow__node,
+  .canvas-reorder-refused > div {
+    outline: 1px solid hsl(var(--muted-foreground) / 0.55);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .canvas-reorder-refused {
+      animation: canvasReorderRefused 220ms ease-in-out;
+    }
+  }
 }
 
 /* ─── Phase 117: relationship remove ✕ reachability (the fidelity audit's #1 a11y
@@ -286,6 +320,29 @@
 @keyframes ringspin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Phase 200 (canvas port) — the reorder-refusal nudge's ONE keyframe. Sited with its
+   siblings; the `.canvas-reorder-refused` utility that consumes it, the outline that
+   carries the reading when motion is suppressed, and the reduced-motion guard around the
+   animation, are all in the `@layer utilities` block above.
+
+   ⚠ IT RETURNS TO 0 AT BOTH ENDS AND IN THE MIDDLE. A nudge that ended anywhere else would
+   leave the card visibly displaced from the position the model says it holds — on a canvas
+   whose entire premise is that position IS run order, that would be a lie told in motion.
+   The travel is deliberately small (3px) and lateral only: it reads as "this edge is the
+   end", never as "something moved". */
+@keyframes canvasReorderRefused {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  30% {
+    transform: translateX(-3px);
+  }
+  65% {
+    transform: translateX(3px);
   }
 }
 

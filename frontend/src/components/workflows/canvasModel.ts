@@ -70,19 +70,32 @@ import {
 export const CANVAS_LAYOUT = {
   /** Uniform node width — every card is the same width; content wraps, never widens. */
   NODE_WIDTH: 260,
-  /** The floor a card may not shrink below; it grows DOWNWARD from here. Raised
-   *  96 → 104 by D-185-17: 104 is the 137-B floor, the height at which the mark
-   *  floating above the card's top edge clears the title line by 11px rather than
-   *  the 3px the sketch theme's own `padding-top: 34` left. */
-  NODE_MIN_HEIGHT: 104,
+  /** The floor a card may not shrink below; it grows DOWNWARD from here.
+   *
+   *  ⚠ 104 → 72 AT THE PHASE 200 CANVAS PORT, and the prior reason is kept rather than
+   *  overwritten: 104 was D-185-17's 137-B floor — "the height at which the mark floating
+   *  above the card's top edge clears the title line by 11px rather than the 3px the
+   *  sketch theme's own `padding-top: 34` left". That mark no longer floats above the
+   *  card; sketch 200 puts it INSIDE, on the left, so the clearance the 104 bought is not
+   *  a constraint any more. 72 is `screens/builder-canvas.html`'s own node height, on ten
+   *  of its ten nodes. The floor is still a FLOOR — the sheet's own three-line nodes are
+   *  84px, and this card still grows downward to meet a run line or a condition. */
+  NODE_MIN_HEIGHT: 72,
   /** Horizontal distance between two adjacent phase columns. */
   PITCH_X: 320,
   /** The single spine lane every phase node sits on. */
   LANE_Y: 0,
   /** The lane below the spine where an unresolved-skip stub is parked. */
   SKIP_LANE_Y: 200,
-  /** Handle offset from the node TOP (never 50%) — a taller card keeps its baseline. */
-  EDGE_ANCHOR_Y: 28,
+  /** Handle offset from the node TOP (never 50%) — a taller card keeps its baseline.
+   *
+   *  ⚠ 28 → 36 AT THE PHASE 200 CANVAS PORT. It is still a FIXED offset from the top and
+   *  D-183-12 is untouched — what changed is which fixed offset the sheet draws. Measured
+   *  off `screens/builder-canvas.html` rather than chosen: its nodes sit at `top: 64px`
+   *  with a height of 72, and every connector into and out of them is drawn at `y = 100`.
+   *  `100 − 64 = 36`, i.e. the vertical centre of the sheet's 72px card. At the old 28 the
+   *  lines would enter a 72px card a third of the way down its left edge. */
+  EDGE_ANCHOR_Y: 36,
   /** The ○ end cap's square size. */
   END_CAP_SIZE: 40,
 } as const satisfies Record<string, number>

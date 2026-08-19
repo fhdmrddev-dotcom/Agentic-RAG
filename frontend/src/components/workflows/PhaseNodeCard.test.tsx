@@ -107,13 +107,21 @@ import { renderPhaseMark } from "./nodePresentation"
 // XSS ban. Neither the count gate nor `tsc` can see that loss, and a reviewer reading a green
 // suite cannot tell a guard that guards from one that quietly stopped asking. Naming the five
 // destinations BEFORE they exist is what stops the extraction narrowing a fence.
+// ⚠ `./NodeIconWell.tsx` WAS THE SIXTH ENTRY AND WAS REMOVED BY THE PHASE 200 CANVAS PORT,
+// which deleted that module — sketch 200 renders the mark INSIDE the card, so the module
+// that rendered it floating above the top edge lost its only consumer. It is removed from
+// this list rather than left in it: `CARD_MODULES[path] ?? ""` swallows a missing path
+// SILENTLY, so a stale entry here would contribute the empty string to the swept source and
+// every fence below would keep passing while covering one file less. That is the exact
+// narrowing this list's own header warns about, arriving from the opposite direction —
+// a path that no longer resolves rather than a file that does not exist yet.
+// The new inline well lives in `PhaseNodeCard.tsx`, which is already swept as entry one.
 const CARD_SUBTREE_PATHS = [
   "./PhaseNodeCard.tsx",
   "./phaseNodeCardContract.ts",
   "./ownProperty.ts",
   "./NodeCornerMarks.tsx",
   "./NodeRunOverlay.tsx",
-  "./NodeIconWell.tsx",
 ] as const
 const CARD_MODULES = import.meta.glob("./*.{ts,tsx}", {
   query: "?raw",
@@ -122,14 +130,19 @@ const CARD_MODULES = import.meta.glob("./*.{ts,tsx}", {
 }) as Record<string, string>
 const cardSubtreeSource = CARD_SUBTREE_PATHS.map((path) => CARD_MODULES[path] ?? "").join("\n")
 
-/** The five destinations, named once here and looped over below — a length pin catches a
- *  TRUNCATION but never a SUBSTITUTION, so each one is asserted individually. */
+/** The destinations, named once here and looped over below — a length pin catches a
+ *  TRUNCATION but never a SUBSTITUTION, so each one is asserted individually.
+ *
+ *  ⚠ FIVE → FOUR AT THE PHASE 200 CANVAS PORT, for the same reason as the list above:
+ *  `NodeIconWell.tsx` was deleted with the floating mark it rendered. The loop's own
+ *  `expect(CARD_DESTINATION_PATHS).toHaveLength(5)` is re-pinned to 4 in the same commit —
+ *  the length pin exists so a silent truncation fails, so it has to move DELIBERATELY when
+ *  the set really changes, which is exactly what is happening here. */
 const CARD_DESTINATION_PATHS = [
   "./phaseNodeCardContract.ts",
   "./ownProperty.ts",
   "./NodeCornerMarks.tsx",
   "./NodeRunOverlay.tsx",
-  "./NodeIconWell.tsx",
 ] as const
 
 /** The minimal slot set — everything else on the contract is optional by design. */
@@ -542,7 +555,16 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     //   "canvas-node-seal"                    → NodeCornerMarks.tsx
     //   "const RING_RADIUS"                   → NodeRunOverlay.tsx
     //   "canvas-node-pause-chip"              → NodeRunOverlay.tsx
-    //   "h-[62px]"                            → NodeIconWell.tsx
+    //   "canvas-icon-well"                    → PhaseNodeCard.tsx  (see below)
+    //
+    // ⚠ THE SIXTH MARKER WAS `"h-[62px]" → NodeIconWell.tsx`, AND IT IS REPLACED RATHER
+    // THAN DROPPED. The Phase 200 canvas port deleted that module: sketch 200 draws the
+    // mark INSIDE the card at 24px, not floating above it at 62px, so the literal it
+    // anchored on no longer exists anywhere in the subtree and a marker asserting it would
+    // be red for the right reason but for a file nobody can restore. The replacement
+    // anchors on the INLINE well's own test id, which is where that responsibility went —
+    // so the fence still proves the swept source reaches the icon-well code at both ends of
+    // the port, which is the property this control exists to hold.
     //
     // So this proves the fenced source really REACHES the moved code at BOTH ends of the
     // refactor, and it goes red the moment a later edit narrows `CARD_SUBTREE_PATHS` past one
@@ -554,12 +576,13 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     expect(cardSubtreeSource).toContain("canvas-node-seal")
     expect(cardSubtreeSource).toContain("const RING_RADIUS")
     expect(cardSubtreeSource).toContain("canvas-node-pause-chip")
-    expect(cardSubtreeSource).toContain("h-[62px]")
+    expect(cardSubtreeSource).toContain("canvas-icon-well")
     // NON-VACUITY: a truncated list, or a glob that resolved to nothing, cannot satisfy the six
     // lines above by accident, because both the list's length and the record's non-emptiness are
     // pinned here (the `PhaseFormPanel.rails.test.tsx:440` control shape). The workflows
     // directory holds 66 `.ts`/`.tsx` files, so `> 5` is a safe, non-brittle floor.
-    expect(CARD_SUBTREE_PATHS).toHaveLength(6)
+    // 6 → 5 at the Phase 200 canvas port (`NodeIconWell.tsx` deleted); see the list's note.
+    expect(CARD_SUBTREE_PATHS).toHaveLength(5)
     expect(Object.keys(CARD_MODULES).length).toBeGreaterThan(5)
     // …and the five DESTINATIONS are named individually, because a length pin catches a
     // TRUNCATION but not a SUBSTITUTION: swapping `./NodeRunOverlay.tsx` for any other real file
@@ -668,7 +691,8 @@ describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3
     // a fence that holds. `188.2-05` is where it was observed RED (C-5) against a deliberately
     // planted back-import — in BOTH the value form and the type-only form, since
     // `verbatimModuleSyntax: true` makes the cheap mistake the likely one.
-    expect(CARD_DESTINATION_PATHS).toHaveLength(5)
+    // 5 → 4 at the Phase 200 canvas port; see `CARD_DESTINATION_PATHS`' own note.
+    expect(CARD_DESTINATION_PATHS).toHaveLength(4)
     for (const path of CARD_DESTINATION_PATHS) {
       expect(Object.keys(CARD_MODULES)).toContain(path)
       expect(CARD_MODULES[path]).not.toMatch(IMPORT_FROM_CARD)
@@ -685,11 +709,16 @@ describe("PhaseNodeCard 188.2 — the extracted modules cannot import back (SC#3
     // fence above proves nothing points back, and these four assertions prove something
     // points forward. Same shape as `WorkflowCanvas.test.tsx`'s one-direction half, which is
     // where 188.1 proved it.
+    // ⚠ THE PHASE 200 PORT DELETED ONE OF THE THREE DESTINATIONS, and this fence is
+    // NARROWED rather than loosened. `NodeIconWell.tsx` held the 62px 3D mark that floated
+    // ABOVE the card's top edge; sketch 200 puts a 24px mark INSIDE the card on the left,
+    // so that module lost its only consumer and was deleted rather than left as dead code
+    // asserting a shape nothing renders. The cut still has ONE direction — there are now
+    // TWO forward edges instead of three, and the fence checks two rather than quietly
+    // continuing to check three against a file that no longer exists (which would throw,
+    // and is why this is an edit and not an omission).
     expect(phaseNodeCardSource).toMatch(
       /import \{ NodeCornerMarks \} from ["']@\/components\/workflows\/NodeCornerMarks["']/,
-    )
-    expect(phaseNodeCardSource).toMatch(
-      /import \{ NodeIconWell \} from ["']@\/components\/workflows\/NodeIconWell["']/,
     )
     expect(phaseNodeCardSource).toMatch(
       /import \{ NodeRunOverlay \} from ["']@\/components\/workflows\/NodeRunOverlay["']/,
@@ -1183,6 +1212,32 @@ const STEP_NUMBER_BOX: MarkBox = { x0: 12, y0: 12, x1: 34, y1: 34 }
  * 185-01 built. The one corner it may NOT use is top-right: SPEC Req 6 claims it for
  * governance, and the seal's own docblock in `PhaseNodeCard.tsx` says so.
  */
+/**
+ * The sketch-200 card's own box, inside the node box — the three numbers every geometry
+ * claim in this block is now derived from rather than typed.
+ *
+ * ⚠ THE ICON WELL IS NO LONGER ABSOLUTELY POSITIONED, which is why these exist. Before the
+ * Phase 200 port the well floated above the card at `left-1/2 top-[-26px]`, so `boxOf`
+ * could read its whole box off its class list like every other mark. Sketch 200 puts it IN
+ * FLOW, in the card's left gutter, so its position is a consequence of the card's padding
+ * and flex order and there is no placement class to read. Its box is therefore DERIVED
+ * here, from the card's constants plus the size class the element really carries — the size
+ * still comes off the DOM, so a well that changed size still moves this table.
+ */
+const CARD_WIDTH = 240
+const CARD_INSET = (CANVAS_LAYOUT.NODE_WIDTH - CARD_WIDTH) / 2
+const CARD_PADDING = 16
+
+/** An IN-FLOW mark's box: the size is read off the class list (so it cannot drift silently),
+ *  the origin is the card's content-box origin. Only the icon well uses this today. */
+function inFlowBoxOf(className: string): MarkBox {
+  const width = sizeOf(className, "w")
+  const height = sizeOf(className, "h")
+  const x0 = CARD_INSET + CARD_PADDING
+  const y0 = CARD_PADDING
+  return { x0, y0, x1: x0 + width, y1: y0 + height }
+}
+
 function markTable(): MarkZone[] {
   const { icon, verdict, seal, ring } = renderedMarkClasses()
   const w = CANVAS_LAYOUT.NODE_WIDTH
@@ -1192,7 +1247,9 @@ function markTable(): MarkZone[] {
   // 188-06 block below rather than assumed here.
   const h = CANVAS_LAYOUT.NODE_MIN_HEIGHT
   return [
-    { name: "icon well", rendered: true, box: boxOf(icon, w, h) },
+    // IN FLOW since the Phase 200 port — see `inFlowBoxOf`. Every other row still reads
+    // its whole box off an absolute placement class.
+    { name: "icon well", rendered: true, box: inFlowBoxOf(icon) },
     { name: "verdict", rendered: true, box: boxOf(verdict, w, h) },
     { name: "governance seal", rendered: true, box: boxOf(seal, w, h) },
     // 188-06 adds the row the block above predicted, from the classes of the element the
@@ -1221,27 +1278,42 @@ const CONCENTRIC_BY_DESIGN = "icon well × run state"
 describe("PhaseNodeCard — 137-B mark occupancy (SPEC criterion 23)", () => {
   it("the verdict mark is on the card's LEFT — top-right is CLAIMED for governance", () => {
     const { verdict } = renderedMarkClasses()
-    expect(verdict).toContain("-left-2")
+    // `-left-2` → `left-[-1px]` at the Phase 200 port: the card narrowed 248 → 240, so the
+    // border this mark straddles moved 6 → 10 and the exact centring became reachable.
+    // The CLAIM is unchanged and is what this test is named for — left, never right.
+    expect(verdict).toContain("left-[-1px]")
     expect(verdict).not.toContain("-right-2")
+    expect(verdict).not.toContain("right-[")
   })
 
-  it("the icon well FLOATS above the card's top edge, centred on the 260px node box", () => {
+  it("the icon well sits IN the card's left gutter — sketch 200 put the mark inside", () => {
+    // ⚠ THIS TEST'S SUBJECT WAS INVERTED BY THE PORT, and its previous name is recorded
+    // rather than merely replaced: it was "the icon well FLOATS above the card's top edge,
+    // centred on the 260px node box", and it asserted `{ x0: 99, y0: -26, x1: 161, y1: 36 }`
+    // — 62px wide, centred, overhanging upward — with both numbers quoted verbatim from
+    // 137-B's own theme rule. Sketch 200 draws the mark INSIDE the card, 24px, in a
+    // 16px-padded left gutter, so the float is gone by design and not by regression.
     const table = markTable()
     const icon = table.find((z) => z.name === "icon well")?.box
-    // 62px wide, centred in the 260px node box ⇒ 99…161; 26px above the top edge ⇒
-    // −26…36. Both numbers are `body.card-b .node .icowrap`, verbatim.
-    expect(icon).toEqual({ x0: 99, y0: -26, x1: 161, y1: 36 })
+    // 10px of node-box inset + 16px of card padding ⇒ x 26…50; the same padding down the
+    // top edge ⇒ y 16…40. Derived from the card's constants, never typed.
+    expect(icon).toEqual({ x0: 26, y0: 16, x1: 50, y1: 40 })
+    // …and it no longer overhangs the node box on any side, which is the property that
+    // actually changed. (The verdict mark still does — see the no-clipping block.)
+    expect(icon!.x0).toBeGreaterThanOrEqual(0)
+    expect(icon!.y0).toBeGreaterThanOrEqual(0)
   })
 
-  it("the verdict mark straddles the 248px card's left border", () => {
+  it("the verdict mark straddles the 240px card's left border", () => {
     const table = markTable()
     const verdict = table.find((z) => z.name === "verdict")?.box
-    expect(verdict).toEqual({ x0: -8, y0: 6, x1: 14, y1: 28 })
-    // The card is 248px centred in the 260px box, so its left border sits at x = 6 —
-    // strictly INSIDE the mark's span. On 137-D the border was at x = 24 and the mark
-    // floated 10px clear of it, which is half of why D-185-17 exists.
-    const cardLeftBorder = (CANVAS_LAYOUT.NODE_WIDTH - 248) / 2
-    expect(cardLeftBorder).toBe(6)
+    expect(verdict).toEqual({ x0: -1, y0: 50, x1: 21, y1: 72 })
+    // The card is 240px centred in the 260px box, so its left border sits at x = 10 —
+    // strictly INSIDE the mark's span, which is the whole meaning of "straddles". The
+    // composite is derived from the card's own width rather than typed, so a card that
+    // changes width fails HERE rather than silently un-straddling.
+    const cardLeftBorder = CARD_INSET
+    expect(cardLeftBorder).toBe(10)
     expect(verdict!.x0).toBeLessThan(cardLeftBorder)
     expect(verdict!.x1).toBeGreaterThan(cardLeftBorder)
   })
@@ -1276,25 +1348,43 @@ describe("PhaseNodeCard — 137-B mark occupancy (SPEC criterion 23)", () => {
     expect(collisions).toEqual([])
   })
 
-  it("records the residual: the verdict grazes the UNRENDERED stepNumber slot by 2×16px", () => {
-    // Not a tolerance and not a bug — a written residual (sketch 147 §RESOLVED item 2).
-    // The slot paints nothing today, so criterion 23's "between rendered marks" is met;
-    // this pins the exact number so bringing `phase_index` to the face cannot land the
-    // two on top of each other unnoticed.
+  it("records the residual: the UNRENDERED stepNumber slot now sits under the run ring", () => {
+    // ⚠ THE RESIDUAL MOVED AT THE PHASE 200 PORT, and the previous one is recorded rather
+    // than deleted: it was "the verdict grazes the UNRENDERED stepNumber slot by 2×16px"
+    // (32px², sketch 147 §RESOLVED item 2), with the written remedy that moving the slot to
+    // `left: 16` clears it. The verdict has since moved down into the card's left gutter
+    // (50…72) and no longer reaches the slot's band (12…34) at all — so that graze is GONE,
+    // which is an improvement and is asserted below rather than assumed.
+    //
+    // WHAT REPLACED IT IS LARGER AND IS THE HONEST NEW FACT: the 137-B `.stepn` slot sits
+    // exactly where sketch 200 now puts the step's mark and its run ring, so a slot that
+    // ever starts painting would land ON them, not beside them. That is recorded here with
+    // its real number so bringing `phase_index` to the face cannot do it unnoticed. It is
+    // not a collision today, because criterion 23 is about RENDERED marks and this one
+    // renders nothing — a fact about the component, asserted below, not an assumption.
     const table = markTable()
     const verdict = table.find((z) => z.name === "verdict")!
+    const ring = table.find((z) => z.name === "run state")!
     const stepNumber = table.find((z) => z.name === "stepNumber")!
     expect(stepNumber.rendered).toBe(false)
-    expect(overlapArea(verdict.box, stepNumber.box)).toBe(32) // 2px × 16px
 
-    // The slot really does render nothing — the `rendered: false` flag is a fact about
-    // the component, not an assumption this table makes about it.
+    // The old graze is gone outright.
+    expect(overlapArea(verdict.box, stepNumber.box)).toBe(0)
+    // The new one, pinned exactly: the slot (12…34 square) against the ring (21…55 × 11…45).
+    // 13px of x and the slot's whole 22px of y — a PARTIAL cover, not a nesting, because the
+    // ring sits 21px in from the node box's left edge while the slot starts at 12.
+    expect(overlapArea(ring.box, stepNumber.box)).toBe(286) // 13px × 22px
+
+    // The slot really does render nothing.
     const { container } = renderCard({ verdict: "error", stepNumber: 3 })
     expect(container.textContent).not.toContain("3")
 
-    // The written remedy, asserted rather than promised: at `left: 16` the graze clears.
+    // ⚠ AND THE OLD REMEDY NO LONGER WORKS, which is why it is retired here instead of
+    // being carried forward as reassurance. `left: 16` cleared the verdict; against the
+    // ring it clears nothing, because the ring spans the whole gutter. Whoever brings the
+    // step number to this face needs a NEW home for it, not this one shifted 4px.
     const movedToLeft16: MarkBox = { x0: 16, y0: 12, x1: 38, y1: 34 }
-    expect(overlapArea(verdict.box, movedToLeft16)).toBe(0)
+    expect(overlapArea(ring.box, movedToLeft16)).toBeGreaterThan(0)
   })
 })
 
@@ -1641,10 +1731,17 @@ describe("PhaseNodeCard — the seal is made of SHAPE, and the edge only reinfor
   it("the sealed EDGE lifts an unselected grounded card's border", () => {
     const open = frostedCardClasses()
     const grounded = frostedCardClasses({ grounded: true })
-    expect(open).toContain("border-border/50")
+    // ⚠ `border-border/50` → `border-border` at the Phase 200 port: sketch 200 draws the
+    // resting card's border at full strength. The RELATION this test is named for is
+    // untouched — a grounded card swaps the default token for the sealed edge, and an
+    // ungrounded one does not carry the sealed edge at all.
+    expect(open).toContain("border-border")
     expect(open).not.toContain(SEALED_EDGE_TOKEN)
     expect(grounded).toContain(SEALED_EDGE_TOKEN)
-    expect(grounded).not.toContain("border-border/50")
+    // `not.toContain("border-border")` would be satisfied by the sealed edge's own
+    // `border-[…]` token never matching it, so the negative is anchored on the WHOLE token
+    // via a word boundary rather than on a prefix.
+    expect(grounded).not.toMatch(/(?:^|\s)border-border(?:\s|$)/)
   })
 
   it("the edge is REINFORCEMENT: a selected grounded card keeps its primary border", () => {
@@ -1666,20 +1763,29 @@ describe("PhaseNodeCard — the seal is made of SHAPE, and the edge only reinfor
 })
 
 describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four marks)", () => {
-  it("sits at the card's top-right, 21×21, exactly 11px inside the CARD's right border", () => {
+  it("sits at the card's top-right, 21×21, exactly 4px inside the CARD's right border", () => {
     const seal = markTable().find((z) => z.name === "governance seal")?.box
-    expect(seal).toEqual({ x0: 222, y0: 11, x1: 243, y1: 32 })
+    expect(seal).toEqual({ x0: 225, y0: 4, x1: 246, y1: 25 })
 
-    // THE NUMBER THE SKETCH LOCKED IS THE CLEARANCE A READER SEES, not the Tailwind
-    // token. 143-A places the seal `top: 11px; right: 11px` inside the 248px CARD; the
-    // element is a sibling of the verdict mark, so its containing block is the 260px NODE
-    // BOX, whose right edge sits 6px outside the card's border. `right-[17px]` is that
-    // composite. Asserting the CLEARANCE is what stops the 17 drifting from the 11 it is
-    // derived from — if either number is edited alone, this goes red.
-    const cardRightBorder = (CANVAS_LAYOUT.NODE_WIDTH + 248) / 2
-    expect(cardRightBorder).toBe(254)
-    expect(cardRightBorder - seal!.x1).toBe(11)
-    expect(seal!.y0).toBe(11)
+    // ⚠ THE CLEARANCE MOVED 11 → 4 AT THE PHASE 200 PORT, and the METHOD did not — which
+    // is the reason this test still exists in this shape. The previous reasoning is kept
+    // because every word of it is still how the composite is built: "THE NUMBER THE SKETCH
+    // LOCKED IS THE CLEARANCE A READER SEES, not the Tailwind token. 143-A places the seal
+    // `top: 11px; right: 11px` inside the 248px CARD; the element is a sibling of the
+    // verdict mark, so its containing block is the 260px NODE BOX, whose right edge sits
+    // 6px outside the card's border … Asserting the CLEARANCE is what stops the composite
+    // drifting from the number it is derived from — if either is edited alone, this goes
+    // red."
+    //
+    // BOTH INPUTS CHANGED: the card is 240 not 248, so the node box overhangs by 10 not 6;
+    // and sketch 200 insets its own corner mark by 4px (`top-xs right-xs`), not 143-A's 11.
+    // 4 + 10 = 14, which is the `right-[14px]` the element carries. The clearance asserted
+    // is still the one a reader sees, and it is still derived from the card's own width
+    // rather than typed.
+    const cardRightBorder = (CANVAS_LAYOUT.NODE_WIDTH + CARD_WIDTH) / 2
+    expect(cardRightBorder).toBe(250)
+    expect(cardRightBorder - seal!.x1).toBe(4)
+    expect(seal!.y0).toBe(4)
     expect(seal!.x1 - seal!.x0).toBe(21)
     expect(seal!.y1 - seal!.y0).toBe(21)
 
@@ -1708,21 +1814,34 @@ describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four mark
       }
     }
 
-    // TWO nonzero pairs, and neither is a collision a person could see:
+    // TWO nonzero pairs, and neither is a collision a person could see. ⚠ BOTH NUMBERS
+    // MOVED AT THE PHASE 200 PORT AND ONE PAIR WAS REPLACED — the previous list was
+    // `icon well × run state = 3844px²` (62×62) and `verdict × stepNumber = 32px²`, and
+    // the change in each is accounted for rather than re-captured wholesale:
     //
-    //  • `icon well × run state` = 62 × 62 — the ring is an ANNULUS and the well sits in
-    //    its hole. Their rectangles nest by construction; the real measure is the RADIAL
-    //    clearance, asserted at 3px in the 188-06 block. Listed rather than filtered,
-    //    with its exact area pinned, so the ring moving off-centre changes this number.
-    //  • `verdict × stepNumber` = 2 × 16 — 185-01's WRITTEN residual against a slot that
-    //    paints nothing (D-183-07 keeps the step's index off the face), pinned above
-    //    with its remedy.
+    //  • `icon well × run state` = 24 × 24 = 576 — the ring is still an ANNULUS and the
+    //    well still sits in its hole, so their rectangles still nest by construction and
+    //    the real measure is still the RADIAL clearance asserted in the 188-06 block. What
+    //    changed is only the scale: a 24px well inside a 34px ring rather than a 62px well
+    //    inside a 72px one. Listed rather than filtered, with its exact area pinned, so the
+    //    ring moving off-centre still changes this number.
+    //  • `icon well × stepNumber` = 8 × 18 = 144 — NEW, and the plainest consequence of the
+    //    port: sketch 200 puts the mark exactly where 137-B reserved the step's index.
+    //  • `run state × stepNumber` = 13 × 22 = 286 — NEW, the same fact one ring wider.
+    //
+    // ⚠ THE TWO NEW PAIRS REPLACE `verdict × stepNumber = 32px²`, which is now ZERO because
+    // the verdict moved down into the card's gutter. So the count went 2 → 3 and every one
+    // of the three involves the UNRENDERED slot or the concentric pair. Against a slot that
+    // paints nothing (D-183-07 keeps the step's index off the face) these are residuals and
+    // not collisions; both are pinned in the occupancy block above, with the note that the
+    // old `left: 16` remedy no longer clears either of them.
     //
     // Every other pair — and therefore every pair of marks a person can actually SEE —
     // is zero, which is what criterion 23 asks for.
     expect(collisions).toEqual([
-      "icon well × run state = 3844px²",
-      "verdict × stepNumber = 32px²",
+      "icon well × run state = 576px²",
+      "icon well × stepNumber = 144px²",
+      "run state × stepNumber = 286px²",
     ])
   })
 
@@ -1733,8 +1852,11 @@ describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four mark
     expect(stepNumber.rendered).toBe(false)
     expect(overlapArea(seal.box, stepNumber.box)).toBe(0)
     // Bringing `phase_index` to the face therefore cannot collide with governance: the
-    // step number is top-LEFT and the seal is top-RIGHT, 188px of card between them.
-    expect(seal.box.x0 - stepNumber.box.x1).toBe(188)
+    // step number is top-LEFT and the seal is top-RIGHT, with most of the card between
+    // them. ⚠ 188 → 191 at the Phase 200 port: the card narrowed 248 → 240 (−8) but the
+    // seal's inset tightened 11 → 4 (+7) and the node-box overhang grew 6 → 10 (+4), so
+    // the gap widened by 3 rather than narrowing by 8. Re-derived, not adjusted.
+    expect(seal.box.x0 - stepNumber.box.x1).toBe(191)
   })
 })
 
@@ -1754,8 +1876,14 @@ describe("PhaseNodeCard — the seal's zone (criterion 23, extended to four mark
  * temporarily moved to `-left-2 top-1.5` and the suite run. Its verbatim output is quoted
  * in `185-09-SUMMARY.md`, and the seal was then restored.
  */
+// ⚠ FOLLOWS THE VERDICT. This literal exists to plant the seal on THE VERDICT'S CURRENT
+// CORNER, so it has to move whenever the verdict does or the control silently stops being
+// a control. It read `-left-2 top-1.5` until the Phase 200 port moved the verdict down into
+// the card's left gutter; left at the old spelling it would have planted the seal on an
+// EMPTY corner and reported a zero collision — a falsification control that cannot falsify,
+// which is the precise failure the block below already documents once.
 const SEAL_ON_THE_VERDICTS_CORNER =
-  "pointer-events-none absolute -left-2 top-1.5 z-[6] grid h-[21px] w-[21px] place-items-center"
+  "pointer-events-none absolute left-[-1px] top-[50px] z-[6] grid h-[21px] w-[21px] place-items-center"
 const SEAL_ON_THE_VERDICTS_OLD_CORNER =
   "pointer-events-none absolute -right-2 top-1.5 z-[6] grid h-[21px] w-[21px] place-items-center"
 
@@ -1767,7 +1895,7 @@ describe("PhaseNodeCard — the seal's zone check CAN go red (falsification cont
     const verdict = boxOf(verdictClasses, w, h)
     const planted = boxOf(SEAL_ON_THE_VERDICTS_CORNER, w, h)
 
-    expect(planted).toEqual({ x0: -8, y0: 6, x1: 13, y1: 27 })
+    expect(planted).toEqual({ x0: -1, y0: 50, x1: 20, y1: 71 })
     expect(overlapArea(planted, verdict)).toBe(441) // 21px × 21px — the whole seal
 
     // …and it is REALLY zero where the seal actually ships, measured by the same
@@ -2218,11 +2346,19 @@ describe("188-06 — no clipping anywhere in the node subtree (the mark overhang
     // the count at one rather than adding a second. Pinning the number is what stops the
     // rule being deleted as easily as it stops the utility being added.
     // D-08 — RE-ANCHORED TO THE SUBTREE IN 188.2-01, and this is the landmine the phase was
-    // scoped around. The tree's ONE mention sits at `PhaseNodeCard.tsx:772`, inside the 3D-mark
-    // JSX comment that D-04 moves to `NodeIconWell.tsx`; a naive cut takes this count to 0 and
+    // scoped around. The tree's ONE mention sat at `PhaseNodeCard.tsx:772`, inside the 3D-mark
+    // JSX comment that D-04 moved to `NodeIconWell.tsx`; a naive cut takes this count to 0 and
     // RED. Counted over the SUBTREE it stays exactly 1 wherever the rule lives, and it still
     // cannot be satisfied by shuffling the prose between files — which is precisely the failure
     // mode a per-file count invites during a refactor.
+    //
+    // ⚠ AND IT FIRED, EXACTLY AS DESIGNED, AT THE PHASE 200 CANVAS PORT. That port deleted
+    // `NodeIconWell.tsx` — sketch 200 renders the mark inside the card, so the module had no
+    // consumer left — and the deletion took this count to 0 and turned this test RED. It did
+    // NOT mean the rule had stopped applying: the verdict mark still overhangs the node box
+    // at `left-[-1px]`. The rule was re-homed into the card's own inline icon-well comment
+    // and the count is 1 again. Recorded because a pin that has actually gone red once, for
+    // the right reason, is worth more than the argument that it would.
     const occurrences = cardSubtreeSource.split(CLIP_UTILITY).length - 1
     expect(occurrences).toBe(1)
   })
@@ -2369,7 +2505,7 @@ describe("188-06 — the run line renders at EVERY reading, so nothing reflows m
     expect(container.querySelector(`[data-testid="${RING_TEST_ID}"]`)).toBeNull()
   })
 
-  it("the card's min-height is CONSTANT across all seven readings (104 → 120 once)", () => {
+  it("the card's min-height is CONSTANT across all seven readings (72 → 84 once)", () => {
     const heights = ALL_READINGS.map((reading) => {
       const { container, unmount } = renderCard({ status: reading })
       const height = container.querySelector(`[data-testid="canvas-node-summarize"]`)!
@@ -2378,14 +2514,17 @@ describe("188-06 — the run line renders at EVERY reading, so nothing reflows m
       return height ?? ""
     })
     for (const height of heights) expect(height).toBe(heights[0])
-    expect(heights[0]).toContain("min-height: 120px")
+    // ⚠ 120 → 84 at the Phase 200 port. The RULE is unchanged — one floor for the whole
+    // run view, so no card changes height as its step progresses — and only the number the
+    // sheet draws has moved. See RUN_MODE_NODE_MIN_HEIGHT for the arithmetic.
+    expect(heights[0]).toContain("min-height: 84px")
 
     // The floor really did move, and it moved for RUN MODE rather than for a reading —
     // which is the whole reason a card cannot change height as its step progresses.
     const { container } = renderCard()
     expect(container.querySelector(`[data-testid="canvas-node-summarize"]`)!.getAttribute("style"))
       .toContain(`min-height: ${CANVAS_LAYOUT.NODE_MIN_HEIGHT}px`)
-    expect(CANVAS_LAYOUT.NODE_MIN_HEIGHT).toBe(104)
+    expect(CANVAS_LAYOUT.NODE_MIN_HEIGHT).toBe(72)
   })
 
   it("says exactly what the vocabulary says — one function, two consumers", () => {
@@ -2455,17 +2594,25 @@ describe("188-06 — the ring and the icon well are CONCENTRIC, not colliding", 
     const table = markTable()
     const ring = table.find((z) => z.name === "run state")!
     const well = table.find((z) => z.name === "icon well")!
-    expect(ring.box).toEqual({ x0: 94, y0: -31, x1: 166, y1: 41 })
-    expect(well.box).toEqual({ x0: 99, y0: -26, x1: 161, y1: 36 })
+    // ⚠ RE-DERIVED AT THE PHASE 200 PORT. Both boxes moved into the card's left gutter and
+    // both shrank — ring 72 → 34, well 62 → 24 — but the RELATION this test is named for is
+    // unchanged and is still asserted the same way. Previous values, for the record:
+    // ring `{ 94, −31, 166, 41 }`, well `{ 99, −26, 161, 36 }`, inset 5 on all four sides.
+    expect(ring.box).toEqual({ x0: 21, y0: 11, x1: 55, y1: 45 })
+    expect(well.box).toEqual({ x0: 26, y0: 16, x1: 50, y1: 40 })
 
-    // Nested, and concentric: the same 5px inset on all four sides ⇒ (72 − 62) / 2.
+    // Still nested, and still concentric on BOTH axes: the same 5px inset on all four sides
+    // ⇒ (34 − 24) / 2. ⚠ THE X AND Y OFFSETS OF THE RING ARE DIFFERENT NUMBERS (21 and 11)
+    // precisely so that this stays true — the ring's containing block is the 260px node box
+    // while the well is positioned inside the 240px card, which is inset 10px within it.
+    // The first draft used 11 on both axes and this assertion is what caught it.
     expect(well.box.x0 - ring.box.x0).toBe(5)
     expect(ring.box.x1 - well.box.x1).toBe(5)
     expect(well.box.y0 - ring.box.y0).toBe(5)
     expect(ring.box.y1 - well.box.y1).toBe(5)
-    // The rectangle intersection the zone check reports is the whole well — which is
-    // what a bounding box says about an annulus, and why the real check is radial.
-    expect(overlapArea(ring.box, well.box)).toBe(62 * 62)
+    // The rectangle intersection the zone check reports is the whole overlap of the two —
+    // which is what a bounding box says about an annulus, and why the real check is radial.
+    expect(overlapArea(ring.box, well.box)).toBe(24 * 24)
   })
 
   it("the STROKE clears the well by 3px on every side — the check a rectangle can't make", () => {
@@ -2475,18 +2622,35 @@ describe("188-06 — the ring and the icon well are CONCENTRIC, not colliding", 
     )
     const { icon } = renderedMarkClasses()
     const wellDiameter = sizeOf(icon, "w")
-    expect(wellDiameter).toBe(62)
-    // d = 68 on a 72px box ⇒ 3px of air between the arc and the 3D mark's tint disc.
-    expect((radius * 2 - wellDiameter) / 2).toBe(3)
+    // ⚠ 62 → 24 AT THE PHASE 200 PORT: sketch 200's mark is a 24px glyph inside the card,
+    // not a 62px disc floating above it.
+    expect(wellDiameter).toBe(24)
+    // ⚠ THE CLEARANCE IS NOW MEASURED IN THE RING'S OWN 72-UNIT VIEWBOX AND THEN SCALED,
+    // because the ring's BOX shrank to 34px while `RING_RADIUS` and the `viewBox` were
+    // deliberately left untouched — that is what keeps all nine arc shapes byte-identical
+    // (sketch 153-A's colour-free acceptance test). So `r` is still 34 of 72, and the
+    // rendered diameter is `68 × (34 / 72)`. Against a 24px well that leaves 4px of air on
+    // every side, against the previous geometry's 3px. Derived, never typed.
+    const renderedRingDiameter = radius * 2 * (34 / 72)
+    expect(Math.round((renderedRingDiameter - wellDiameter) / 2)).toBe(4)
   })
 
-  it("the ring clears the seal, the verdict and the step-number slot outright", () => {
+  it("the ring clears the seal and the verdict outright — and now covers the step slot", () => {
     const table = markTable()
     const ring = table.find((z) => z.name === "run state")!
-    for (const name of ["governance seal", "verdict", "stepNumber"]) {
+    // ⚠ `stepNumber` LEFT THIS LIST AT THE PHASE 200 PORT, and it is called out rather than
+    // silently dropped: the 137-B `.stepn` slot (12…34 square) is exactly where sketch 200
+    // now puts the mark and its ring, so the ring covers it rather than clearing it. It is
+    // still not a collision — the slot paints nothing (D-183-07) — and the exact area is
+    // pinned as a RESIDUAL in the occupancy block above, together with the note that the
+    // old `left: 16` remedy no longer clears it.
+    for (const name of ["governance seal", "verdict"]) {
       const other = table.find((z) => z.name === name)!
       expect(overlapArea(ring.box, other.box), `${name} overlaps the ring`).toBe(0)
     }
+    const stepNumber = table.find((z) => z.name === "stepNumber")!
+    expect(stepNumber.rendered).toBe(false)
+    expect(overlapArea(ring.box, stepNumber.box)).toBeGreaterThan(0)
     // …and it does NOT take the corner governance claims. Top-right is spoken for.
     const seal = table.find((z) => z.name === "governance seal")!
     expect(ring.box.x1).toBeLessThan(seal.box.x0)
@@ -2672,6 +2836,42 @@ function cardHtml(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>>
  * re-capturing it to make it green would delete the only evidence anybody has that the card
  * still renders what it rendered.
  *
+ * ══════════════════════════════════════════════════════════════════════════════════════
+ * ⚠ RE-CAPTURED AT THE PHASE 200 CANVAS PORT — DELIBERATELY, ONCE, AND FOR A REASON THAT
+ * IS WRITTEN HERE RATHER THAN LEFT IN A COMMIT MESSAGE.
+ * ══════════════════════════════════════════════════════════════════════════════════════
+ *
+ * The paragraph directly above is the strongest anti-re-baseline rule in this file, and it
+ * is being invoked-and-overridden rather than quietly ignored. Read it literally: its
+ * subject is *"AFTER PLANS 188.2-05 AND 188.2-06"* — an EXTRACTION, whose entire promise
+ * was that it moved code and not pixels. Against that promise a red capture proved the
+ * promise broken, and re-capturing would have destroyed the proof.
+ *
+ * THE PHASE 200 PORT MAKES THE OPPOSITE PROMISE. It is a deliberate, operator-directed
+ * change to what the card LOOKS LIKE: `screens/builder-canvas.html` draws a 240×72
+ * horizontal row with a 24px mark inside it on the left, and the shipped card was a 248px
+ * centre-aligned frosted block with a 62px mark floating above its top edge. Those captures
+ * were SUPPOSED to go red. A capture that stayed green through this port would have meant
+ * the port did not happen.
+ *
+ * ⚠ THE THING THE RULE PROTECTS IS STILL PROTECTED, and that is the test of whether this
+ * override is honest. The rule exists so that a capture is never re-taken to HIDE an
+ * unexplained change. So:
+ *   · the three literals below were re-captured MECHANICALLY, by rendering the new card and
+ *     writing its `innerHTML` to a file, exactly as the originals were — not one character
+ *     was hand-typed or hand-edited, which is the property the header above opens with;
+ *   · the change they record is NAMED, in `PhaseNodeCard.tsx`'s own docblock and in the
+ *     card div's JSX comment, both of which quote the sheet they were ported from;
+ *   · the MARKER ROWS below are unchanged and still assert what each capture must CONTAIN,
+ *     so a re-capture taken from a card that had silently stopped painting its verdict
+ *     mark, its seal, its ring or its run line still fails.
+ * The marker rows are the load-bearing half of that list: byte-identity alone is satisfied
+ * by an empty render, and re-capturing is exactly when that matters most.
+ *
+ * ⚠ AND THE RULE ITSELF IS NOT RETIRED. It binds the NEXT change to this card as hard as
+ * it bound 188.2. A future red here is a behaviour change to explain, not a literal to
+ * refresh, unless that change is itself a deliberate re-design with the sheet to point at.
+ *
  * ── WHAT IS AND IS NOT CLAIMED TO BE BYTE-IDENTICAL ────────────────────────────────────
  *
  * THE RENDERED DOM must be byte-identical. THE MOVED SOURCE WILL NOT BE, and stating that
@@ -2706,7 +2906,16 @@ function cardHtml(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>>
 // first run after the source change (measured — the only red rows were the three
 // Builder-mode ones). A hover lift that had leaked onto the run surface would have reddened
 // them, so their silence is evidence and not an absence of coverage.
+// ⚠ THE 199-01 TERM AND THE PHASE 200 TERM ARE BOTH KEPT, and the older one is NOT
+// deleted — the paragraph above is an argument about not erasing evidence, and erasing the
+// term it argues over would make that argument unreadable. `HOVER_TERM_199` is what 199-01
+// shipped (a FILL, no border, no motion); `HOVER_TERM_200` is what the canvas port ships
+// after the operator named sketch 200 the absolute reference and the sheet turned out to
+// draw a border change AND a lift. Only the 200 term is asserted against live renders; the
+// 199 term survives as the record of what the captures below used to be spliced with.
 const HOVER_TERM_199 = "transition-colors duration-150 hover:bg-card/45"
+const HOVER_TERM_200 =
+  "transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground"
 
 /**
  * The captured class list as it reads AFTER 199-01, computed from the verbatim capture
@@ -2750,25 +2959,31 @@ function withHoverLift199(capturedHtml: string): string {
   return capturedHtml.replace(match[1], classWithHoverLift199(match[1]))
 }
 
-/** The same delta applied to a captured SHAPE array: only the card div's `class` carries it,
- *  because only the card div holds the className the term was added to. */
-function shapeWithHoverLift199<T extends { key: string; class: string | null }>(
-  captured: readonly T[],
-): T[] {
-  return captured.map((entry) =>
-    entry.key === CARD_DIV_KEY && entry.class !== null
-      ? { ...entry, class: classWithHoverLift199(entry.class) }
-      : entry,
-  )
-}
+/*
+ * ⚠ `shapeWithHoverLift199` WAS DELETED HERE BY THE PHASE 200 CANVAS PORT, and it is
+ * recorded rather than silently removed. It read:
+ *
+ *   "The same delta applied to a captured SHAPE array: only the card div's `class` carries
+ *    it, because only the card div holds the className the term was added to."
+ *
+ * Its two call sites (the verdict matrix and the border-branch matrix) now compare against
+ * the captures DIRECTLY, because the port re-captured and the hover delta is inside those
+ * arrays — splicing it again would have applied it twice. With no caller left it became an
+ * unused declaration and `tsc` said so (TS6133), which is the right outcome: a splice helper
+ * kept "just in case" is a helper nobody can tell is still correct.
+ *
+ * ITS TWO SIBLINGS SURVIVE and are still exercised — `withHoverLift199` and
+ * `classWithHoverLift199` are the subjects of their own throw-on-miss control cases further
+ * down, which are the record of how 199-01 kept faith with a pin it was forbidden to move.
+ */
 
 const CARD_HTML_BASELINE: Record<string, string> = {
   MAXIMAL_RUNNING:
-    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 120px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 120px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 84px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 84px;\"><span aria-hidden=\"true\" data-testid=\"canvas-icon-well\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground truncate\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span></div>",
   MAXIMAL_WAITING:
-    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 120px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]\" style=\"min-height: 120px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"waiting-for-you\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Paused for your answer — it needs your reply before it can continue</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"waiting-for-you\" class=\"pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--warning))\" stroke-dasharray=\"158.085 55.543\" stroke-dashoffset=\"25.635\"></circle></svg></span><span aria-hidden=\"true\" data-testid=\"canvas-node-pause-chip\" class=\"pointer-events-none absolute left-1/2 top-[-37px] z-[9] flex -translate-x-1/2 gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]\"><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span></span><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 84px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]\" style=\"min-height: 84px;\"><span aria-hidden=\"true\" data-testid=\"canvas-icon-well\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground truncate\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"waiting-for-you\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Paused for your answer — it needs your reply before it can continue</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"waiting-for-you\" class=\"pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--warning))\" stroke-dasharray=\"158.085 55.543\" stroke-dashoffset=\"25.635\"></circle></svg></span><span aria-hidden=\"true\" data-testid=\"canvas-node-pause-chip\" class=\"pointer-events-none absolute left-[31px] top-[46px] z-[9] flex gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]\"><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span></span></div>",
   MINIMAL_BUILDER:
-    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"false\" class=\"relative\" style=\"width: 260px; min-height: 104px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50\" style=\"min-height: 104px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p></div><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"false\" class=\"relative\" style=\"width: 260px; min-height: 72px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border\" style=\"min-height: 72px;\"><span aria-hidden=\"true\" data-testid=\"canvas-icon-well\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p></div></div></div>",
 }
 
 describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", () => {
@@ -2777,15 +2992,16 @@ describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", 
       // NON-VACUITY, first: a `toBe` against an empty string would pass forever if the row
       // ever stopped rendering and the baseline were ever re-captured from that silence.
       expect(CARD_HTML_BASELINE[row].length).toBeGreaterThan(0)
-      // 199-01: the Builder-mode rows carry the ONE declared delta; the run-mode rows are
-      // compared against the verbatim capture, unchanged, because the hover lift is
-      // suppressed the moment a reading is supplied. The predicate reads the ROW's own
-      // props rather than a hand-kept list of row names.
-      const builderMode = CARD_HTML_ROWS[row].status === undefined
-      const expected = builderMode
-        ? withHoverLift199(CARD_HTML_BASELINE[row])
-        : CARD_HTML_BASELINE[row]
-      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(expected)
+      // ⚠ THE 199-01 SPLICE IS GONE FROM THIS COMPARISON, and it is worth saying why rather
+      // than leaving a simplification to look like a loosening. 199-01 could not re-capture
+      // (the pin above forbade it), so it declared its hover delta as a NAMED, MACHINE-
+      // CHECKED transformation of the untouched capture — `withHoverLift199`, spliced in at
+      // one anchor on Builder-mode rows only. The Phase 200 port re-captures for the reasons
+      // written into the pin's own header, so the delta is now INSIDE the capture and
+      // splicing it a second time would apply it twice. The helpers survive, exercised by
+      // their own control cases below, because they are the record of how 199-01 kept faith
+      // with a pin it could not move.
+      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(CARD_HTML_BASELINE[row])
     })
   }
 
@@ -2848,7 +3064,11 @@ describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", 
  *  and it is the element that holds the four-branch border ternary — so it may not be left
  *  out of the capture merely because it has no hook. The leading parenthesis keeps it in a
  *  stable sort position and makes it unmistakable for a real test id. */
-const CARD_DIV_KEY = "(card-div — the 137-B card, no data-testid)"
+// ⚠ "137-B" → "sketch-200" at the canvas port. The key is a LABEL for a structurally-reached
+// element, not a selector, so renaming it changes no lookup — but leaving it would have every
+// re-captured array below assert, in its own text, that it is pinning a card shape that no
+// longer exists. It still sorts first (the leading `(`), so no capture's order moves.
+const CARD_DIV_KEY = "(card-div — the sketch-200 card, no data-testid)"
 
 /**
  * The captured shape of one element under the node root.
@@ -2967,9 +3187,9 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
   {
   "not-started": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -2980,8 +3200,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3008,7 +3241,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3032,11 +3265,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  running: [
+  "running": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3047,8 +3280,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3088,7 +3334,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3112,11 +3358,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  done: [
+  "done": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3127,8 +3373,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3168,7 +3427,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3192,11 +3451,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  failed: [
+  "failed": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-destructive",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-destructive",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3207,8 +3466,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3248,7 +3520,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3272,11 +3544,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  skipped: [
+  "skipped": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3287,8 +3559,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3328,7 +3613,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3354,9 +3639,9 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
   ],
   "waiting-for-you": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3367,8 +3652,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-pause-chip",
-      class: "pointer-events-none absolute left-1/2 top-[-37px] z-[9] flex -translate-x-1/2 gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]",
+      class: "pointer-events-none absolute left-[31px] top-[46px] z-[9] flex gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3381,7 +3679,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     },
     {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3421,7 +3719,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3445,11 +3743,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  unknown: [
+  "unknown": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3460,8 +3758,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3501,7 +3812,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3525,34 +3836,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  /**
-   * 189-10 — THE EIGHTH ROW, CAPTURED. Every value below was READ OUT of the rendered
-   * DOM by running `CARD_SHAPE` and substituting what it printed; not one number was
-   * typed from the source, computed by hand or reasoned about. The capture was OBSERVED
-   * TWICE and the two dumps compared byte for byte (md5 134b86c8…, identical) BEFORE
-   * either was written here. The capture rule stated above applies to it in full.
-   *
-   * The dasharray names FOUR dash/gap pairs and the offset is positive — the whole
-   * eighth shape, reaching the DOM. Both numbers are falsified independently against
-   * the formula by the `EXPECTED_RING` block above; this row is the element-for-element
-   * record. The two instruments fail differently, on purpose.
-   *
-   * ⚠ THREE THINGS THIS ROW PINS THAT NOTHING ELSE REACHES, each an ABSENCE — the kind
-   * neither the compiler nor a presence-only fence can see:
-   *   • the card div ends `border-border/50`, the DEFAULT branch. That is
-   *     `RUN_READING_BORDER` declining to claim the border, RENDERED. The omission is
-   *     an editorial decision recorded in that table's docblock; here it is measured.
-   *   • the arc carries NO class at all, so it carries no spin utility. `spinning:
-   *     false` reaches the DOM as the ABSENCE of an attribute — precisely what a fence
-   *     that only checked for presence would miss.
-   *   • there is no `canvas-node-pause-chip` entry: the chip stays the waiting
-   *     reading's alone, and this reading does not borrow it.
-   */
   "recorded-not-sent": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3563,8 +3851,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3604,7 +3905,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3628,28 +3929,11 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
   ],
-  // ── 194-04 (RUN-01 / D-04 / D-13) — THE NINTH READING'S CAPTURE ────────────────────
-  //
-  // ⚠ THE CAPTURE RULE ABOVE APPLIED IN FULL, AND THIS IS A **NEW** CAPTURE RATHER THAN A
-  // RE-CAPTURE. Not one existing key was re-read, re-run or re-written — `git diff` on this
-  // literal is a pure addition, which is what keeps the eight 188.2-03 baselines exactly as
-  // load-bearing as they were. Every value below was READ OUT of the rendered DOM by running
-  // `cardShapeOf({ status: "cancelled" })` and substituting what it printed; not one number
-  // was typed from the source, computed by hand or reasoned about; and the capture was
-  // OBSERVED TWICE, the two dumps compared and found md5-identical
-  // (`d235a365378bc540b2a6ab88c5e94f64`) BEFORE either was written here.
-  //
-  // ⚠ AND A DIFF AGAINST THIS ARRAY IS A BEHAVIOUR CHANGE, NOT A TEST TO UPDATE — the same
-  // standing rule the eight rows above carry.
-  //
-  // The arc row is the whole point of the entry: `106.814 106.814` is the ring cut exactly in
-  // half, at an offset of `53.407`, on the muted stroke. It is the only capture in this matrix
-  // whose two dash numbers are equal.
-  cancelled: [
+  "cancelled": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3660,8 +3944,21 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3701,7 +3998,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3731,12 +4028,25 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
  *  over `VerdictMarkKind` for the same compiler-forced reason. */
 const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>> =
   {
-  error: [
+  "error": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 104px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border",
+      style: "min-height: 72px;",
       ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
       ariaLabel: null,
       r: null,
       stroke: null,
@@ -3748,7 +4058,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 104px;",
+      style: "width: 260px; min-height: 72px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3760,7 +4070,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
     },
     {
       key: "canvas-node-verdict",
-      class: "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive",
+      class: "pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive",
       style: null,
       ariaHidden: null,
       ariaLabel: null,
@@ -3785,12 +4095,25 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
       strokeDashoffset: null,
     },
   ],
-  incomplete: [
+  "incomplete": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 104px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border",
+      style: "min-height: 72px;",
       ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
       ariaLabel: null,
       r: null,
       stroke: null,
@@ -3802,7 +4125,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 104px;",
+      style: "width: 260px; min-height: 72px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3814,7 +4137,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
     },
     {
       key: "canvas-node-verdict",
-      class: "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-dashed border-border bg-muted text-muted-foreground",
+      class: "pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-dashed border-border bg-muted text-muted-foreground",
       style: null,
       ariaHidden: null,
       ariaLabel: null,
@@ -3839,12 +4162,25 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
       strokeDashoffset: null,
     },
   ],
-  unknown: [
+  "unknown": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 104px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border",
+      style: "min-height: 72px;",
       ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
       ariaLabel: null,
       r: null,
       stroke: null,
@@ -3856,7 +4192,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 104px;",
+      style: "width: 260px; min-height: 72px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3868,7 +4204,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
     },
     {
       key: "canvas-node-verdict",
-      class: "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-dashed border-border bg-muted text-muted-foreground",
+      class: "pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-dashed border-border bg-muted text-muted-foreground",
       style: null,
       ariaHidden: null,
       ariaLabel: null,
@@ -3899,11 +4235,11 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
  *  precedence. See `CARD_BORDER_ROWS` above for why this third literal exists. */
 const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
   {
-  run: [
+  "run": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-destructive",
-      style: "min-height: 120px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-destructive",
+      style: "min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3914,8 +4250,21 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
     {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
       key: "canvas-node-ring",
-      class: "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2",
+      class: "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]",
       style: null,
       ariaHidden: "true",
       ariaLabel: null,
@@ -3954,7 +4303,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     },
     {
       key: "canvas-node-seal",
-      class: "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+      class: "pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
       style: null,
       ariaHidden: null,
       ariaLabel: null,
@@ -3968,7 +4317,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 120px;",
+      style: "width: 260px; min-height: 84px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -3992,12 +4341,25 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
   ],
-  selected: [
+  "selected": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm border-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]",
-      style: "min-height: 104px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]",
+      style: "min-height: 72px;",
       ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
       ariaLabel: null,
       r: null,
       stroke: null,
@@ -4008,7 +4370,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     },
     {
       key: "canvas-node-seal",
-      class: "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+      class: "pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
       style: null,
       ariaHidden: null,
       ariaLabel: null,
@@ -4022,7 +4384,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 104px;",
+      style: "width: 260px; min-height: 72px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -4046,12 +4408,25 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
   ],
-  grounded: [
+  "grounded": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(220_30%_100%/0.34)]",
-      style: "min-height: 104px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-[hsl(220_30%_100%/0.34)]",
+      style: "min-height: 72px;",
       ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
       ariaLabel: null,
       r: null,
       stroke: null,
@@ -4062,7 +4437,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     },
     {
       key: "canvas-node-seal",
-      class: "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
+      class: "pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
       style: null,
       ariaHidden: null,
       ariaLabel: null,
@@ -4076,7 +4451,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 104px;",
+      style: "width: 260px; min-height: 72px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -4100,12 +4475,25 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
   ],
-  default: [
+  "default": [
     {
-      key: "(card-div — the 137-B card, no data-testid)",
-      class: "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-border/50",
-      style: "min-height: 104px;",
+      key: "(card-div — the sketch-200 card, no data-testid)",
+      class: "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border",
+      style: "min-height: 72px;",
       ariaHidden: null,
+      ariaLabel: null,
+      r: null,
+      stroke: null,
+      strokeWidth: null,
+      strokeLinecap: null,
+      strokeDasharray: null,
+      strokeDashoffset: null,
+    },
+    {
+      key: "canvas-icon-well",
+      class: "relative grid h-6 w-6 shrink-0 place-items-center",
+      style: null,
+      ariaHidden: "true",
       ariaLabel: null,
       r: null,
       stroke: null,
@@ -4117,7 +4505,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
     {
       key: "canvas-node-summarize",
       class: "relative",
-      style: "width: 260px; min-height: 104px;",
+      style: "width: 260px; min-height: 72px;",
       ariaHidden: null,
       ariaLabel: null,
       r: null,
@@ -4159,9 +4547,11 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     for (const verdict of ALL_VERDICTS) {
       const captured = cardShapeOf({ verdict })
       expect(captured.some((e) => e.key === VERDICT_TEST_ID)).toBe(true)
-      // 199-01: every verdict row is Builder-mode (no `status` is passed), so every one
-      // carries the declared hover delta — see `withHoverLift199`.
-      expect(captured).toEqual(shapeWithHoverLift199(CARD_VERDICT_SHAPES[verdict]))
+      // ⚠ THE 199-01 SPLICE IS GONE HERE FOR THE SAME REASON AS ON THE HTML ROWS: the
+      // Phase 200 port re-captured, so the hover delta is inside the capture and applying
+      // it again would double it. See `CARD_HTML_BASELINE`'s header for why re-capturing
+      // was the honest move here and was not at 188.2.
+      expect(captured).toEqual(CARD_VERDICT_SHAPES[verdict])
     }
   })
 
@@ -4172,12 +4562,11 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
       // 199-01: three of the four branches are Builder-mode and carry the declared hover
       // delta; the `run` branch passes a `status`, so it is compared against the verbatim
       // 188.2-03 capture. That asymmetry is the suppression rule, read off the row's props.
-      const builderMode = CARD_BORDER_ROWS[branch].status === undefined
-      expect(captured).toEqual(
-        builderMode
-          ? shapeWithHoverLift199(CARD_BORDER_SHAPES[branch])
-          : CARD_BORDER_SHAPES[branch],
-      )
+      // ⚠ THE 199-01 SPLICE IS GONE (see the verdict row directly above). The Builder-mode
+      // asymmetry it encoded is now carried BY THE CAPTURES THEMSELVES — the `run` row's
+      // capture has no hover term and the other three do, which is the suppression rule
+      // recorded as data rather than re-derived at assert time.
+      expect(captured).toEqual(CARD_BORDER_SHAPES[branch])
     }
   })
 
@@ -4594,8 +4983,13 @@ describe("199-01 — the hover lift (sheet c2 section 3, HOVERED)", () => {
     // `not.toContain` forever.
     const classes = card?.getAttribute("class") ?? ""
     expect(classes.length).toBeGreaterThan(0)
-    expect(classes).toContain("hover:bg-card/45")
-    expect(classes).toContain(HOVER_TERM_199)
+    // ⚠ RE-BASELINED BY THE PHASE 200 CANVAS PORT, and the previous expectation is recorded
+    // here rather than merely replaced: this read `toContain("hover:bg-card/45")`, the FILL
+    // 199-01 shipped after deliberately declining the sheet's border change. Sketch 200 (and
+    // `node-identity.html` §"Interaction States", the sheet 199-01 was itself reading) draws
+    // HOVERED as a BORDER change plus a `-translate-y-1` LIFT. The operator has named the
+    // sketch the absolute reference, so the decline is overruled and both halves now ship.
+    expect(classes).toContain(HOVER_TERM_200)
   })
 
   it("is SUPPRESSED at every one of the nine run readings — no false affordance", () => {
@@ -4612,13 +5006,30 @@ describe("199-01 — the hover lift (sheet c2 section 3, HOVERED)", () => {
     }
   })
 
-  it("the ONE hover utility in the whole subtree is a FILL — never a border", () => {
-    // The sheet's own hover rule changes `border-color`. Taking it would put a fifth
-    // colour utility into a four-branch ternary whose entire argument is that exactly one
-    // border-colour utility is emitted per state. This is that decision, as a fence.
+  it("the hover treatment is the SHEET's two atoms, and they are the only two in the subtree", () => {
+    // ⚠ THIS FENCE RECORDED A REFUSAL AND THE REFUSAL IS NOW RETIRED. Its previous title was
+    // "the ONE hover utility in the whole subtree is a FILL — never a border", and its body
+    // read, verbatim: "The sheet's own hover rule changes `border-color`. Taking it would put
+    // a fifth colour utility into a four-branch ternary whose entire argument is that exactly
+    // one border-colour utility is emitted per state. This is that decision, as a fence."
+    //
+    // The operator has named sketch 200 the absolute reference, so the decision that fence
+    // encoded is overruled and the fence is re-pointed rather than deleted — a deleted fence
+    // would leave the hover treatment completely unguarded, which is strictly worse than a
+    // fence guarding the new answer.
+    //
+    // ⚠ THE ARGUMENT IT MADE IS ALSO MEASURABLY NOT VIOLATED, which is why re-pointing is
+    // honest rather than merely obedient. `hover:border-muted-foreground` is a VARIANT
+    // utility; the four-branch ternary emits UNPREFIXED border-colour utilities. They never
+    // occupy the same tailwind-merge slot, so "exactly one border-colour utility per resting
+    // state" still holds — and the re-baselined captures below are where that is checked,
+    // rather than here in prose.
+    //
+    // THE SET IS PINNED EXACTLY, still: two atoms, no more. A third `hover:` utility
+    // anywhere in the subtree fails this, which is the property worth keeping.
     expect(HOVER_SUBTREE_SOURCE.length).toBeGreaterThan(0)
     const hoverUtilities = HOVER_SUBTREE_SOURCE.match(/hover:[a-z0-9:[\]/._-]+/gi) ?? []
-    expect(hoverUtilities).toEqual(["hover:bg-card/45"])
+    expect(hoverUtilities).toEqual(["hover:-translate-y-1", "hover:border-muted-foreground"])
   })
 
   it("the four border branches still emit exactly ONE border-colour utility each", () => {
@@ -4639,9 +5050,21 @@ describe("199-01 — the hover lift (sheet c2 section 3, HOVERED)", () => {
     }
   })
 
-  it("MOTION still keys off RUN STATE — the card emits no animation and no transform", () => {
-    // The run channel's motion is the ring's infinite `canvas-ring-spin`. A colour ease is
-    // not that, and this asserts the distinction rather than arguing it.
+  it("LOOPING motion still keys off RUN STATE — the card's only transform is the hover lift", () => {
+    // ⚠ THIS TEST WAS PASSING BY ACCIDENT AND IS CORRECTED HERE RATHER THAN LEFT GREEN.
+    // Its previous name was "MOTION still keys off RUN STATE — the card emits no animation
+    // and no transform", and it asserted `not.toMatch(/hover:(?:scale|rotate|translate|
+    // skew)-/)`. The Phase 200 port adds the sheet's hover LIFT, whose utility is
+    // `hover:-translate-y-1` — with a MINUS between the colon and the word — so that regex
+    // did not match it and the fence reported success over a card that had just gained the
+    // exact thing the fence existed to forbid. A guard that cannot see the change it is
+    // guarding against is the failure mode this file has now recorded several times.
+    //
+    // WHAT IS ACTUALLY TRUE, and what is asserted below instead: the card carries EXACTLY
+    // ONE transform, it is the hover lift, and it is a discrete state change rather than a
+    // loop. The rule the old name was reaching for survives intact and is now stated
+    // precisely — LOOPING motion belongs to the run channel and to nothing else, so no
+    // `animate-` utility and no spin class may appear on this card, at rest or on hover.
     renderRestingCard()
     const card = screen
       .getByTestId(`canvas-node-${RESTING_SLUG}`)
@@ -4650,8 +5073,22 @@ describe("199-01 — the hover lift (sheet c2 section 3, HOVERED)", () => {
     expect(classes.length).toBeGreaterThan(0)
     expect(classes).not.toContain("animate-")
     expect(classes).not.toContain("canvas-ring-spin")
-    expect(classes).not.toMatch(/(?:^|\s)(?:scale|rotate|translate|skew)-/)
-    expect(classes).not.toMatch(/hover:(?:scale|rotate|translate|skew)-/)
+    // No transform AT REST — the lift is a hover state, never the card's resting shape.
+    expect(classes).not.toMatch(/(?:^|\s)-?(?:scale|rotate|translate|skew)-/)
+    // Exactly ONE hover transform, and it is the sheet's lift. The `-?` is the whole point:
+    // it is what the previous spelling was missing.
+    const hoverTransforms = classes.match(/hover:-?(?:scale|rotate|translate|skew)-\S+/g) ?? []
+    expect(hoverTransforms).toEqual(["hover:-translate-y-1"])
+    // …and it is SUPPRESSED in run mode, so the run channel keeps motion to itself.
+    const { unmount } = renderRestingCard({ status: "running" })
+    const running = screen
+      .getAllByTestId(`canvas-node-${RESTING_SLUG}`)
+      .at(-1)!
+      .querySelector(":scope > div")
+      ?.getAttribute("class") ?? ""
+    expect(running.length).toBeGreaterThan(0)
+    expect(running).not.toMatch(/hover:-?(?:scale|rotate|translate|skew)-/)
+    unmount()
 
     // POSITIVE CONTROL: the spin utility really is the shipped motion carrier, so the
     // negative above is a statement about the CARD and not about a token that never

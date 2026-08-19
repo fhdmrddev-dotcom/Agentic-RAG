@@ -92,6 +92,9 @@ import { PhaseNodeCard } from "@/components/workflows/PhaseNodeCard"
 // convention 188.1 set for exactly this situation), so the whole change reads as added
 // lines under `git diff` and no shipped line had to be edited to accommodate it.
 import type { BadgeSlot, BadgeSlots } from "@/components/workflows/phaseNodeCardContract"
+// Phase 200 (canvas port) — the plane's own words. A true leaf; see its docblock for why
+// the end cap's sentence does not live in `phaseVocabulary.ts`.
+import { END_CAP_MEANING } from "@/components/workflows/planeVocabulary"
 import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { cn } from "@/lib/utils"
 
@@ -317,6 +320,12 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       icon={renderPhaseMark(data.phaseType)}
       title={data.title}
       subtitle={technical ? data.technicalTitle : data.subtitle}
+      // Phase 200 (canvas port) — the reveal's form is `${label} · ${slug}`, a MACHINE
+      // IDENTIFIER, so the card must not truncate it. This adapter is the one place that
+      // knows the reveal is on (D-183-08 — exactly ONE technical-names state in the app),
+      // which is why the answer is resolved here and passed as data rather than re-derived
+      // inside a card that has to render provider-less. See `subtitleIsIdentifier`.
+      subtitleIsIdentifier={technical}
       // 200-06 (BC-MR-03) — the branch condition, resolved to the target step's NAME at
       // projection time by `canvasModel.buildPhaseData` via `phaseVocabulary
       // .branchConditionOf`. This adapter derives nothing and resolves nothing: the value
@@ -396,6 +405,17 @@ export function EndCapNode() {
   return (
     <div
       data-testid="canvas-end-cap"
+      // ⚠ THE HOVER SENTENCE (Phase 200 — operator finding, in their words: *"at the very
+      // end of the workflow there is a circle, I don't know what this is."*). The cap was
+      // already telling screen-reader users what it means, through the `sr-only` span
+      // below, and telling sighted users nothing at all. `title` closes that gap with the
+      // SAME string from the SAME home, so the two audiences cannot be told two things.
+      //
+      // IT DOES NOT MAKE THIS FOCUSABLE, deliberately: the model sets `selectable: false`
+      // and `focusable: false` on this node, and a `title` needs no tab stop to work under
+      // the pointer. The canvas-level "one tab stop per node" invariant is untouched, and
+      // so is the cap's inertness.
+      title={END_CAP_MEANING}
       className="grid place-items-center rounded-full border border-border/60 bg-card/20 text-muted-foreground"
       style={{ width: CANVAS_LAYOUT.END_CAP_SIZE, height: CANVAS_LAYOUT.END_CAP_SIZE }}
     >
@@ -403,7 +423,10 @@ export function EndCapNode() {
       <span aria-hidden="true" className="text-[13px] leading-none">
         ○
       </span>
-      <span className="sr-only">End of the workflow</span>
+      {/* The accessible name. Unchanged in ROLE, but no longer spelled inline — it now comes
+          from the plane's one string home, which is what makes the `title` above provably
+          the same sentence rather than a second one that merely agrees today. */}
+      <span className="sr-only">{END_CAP_MEANING}</span>
     </div>
   )
 }

@@ -1372,13 +1372,47 @@ function AFFORDANCE_SHAPE(container: HTMLElement) {
  * AND THE RULE IS RE-ARMED, UNCHANGED, FOR EVERY FUTURE DIFF. This authorisation covers
  * this one re-capture in this one phase and nothing else. The next diff against this array
  * is a behaviour change and not a test to update.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════════
+ * ⚠ THE PHASE 200 CANVAS PORT MOVED IT, AND THE MOVE IS A SINGLE DERIVED TERM.
+ * ═══════════════════════════════════════════════════════════════════════════════════
+ *
+ * The paragraph above says the next diff is a behaviour change and not a test to update.
+ * This IS that behaviour change, declared rather than absorbed: sketch 200's card is 72px
+ * tall and the sheet draws every connector entering at its vertical centre, so
+ * `CANVAS_LAYOUT.EDGE_ANCHOR_Y` moved 28 → 36. These affordances are positioned from that
+ * anchor, so all twelve of them moved down by exactly 8px.
+ *
+ * ⚠ THE DELTA IS NOT UNIFORM, AND THE FIRST ATTEMPT AT THIS RE-BASELINE GOT IT WRONG.
+ * That is recorded rather than tidied away, because it is the whole argument for why a
+ * capture is re-derived and then RE-RUN instead of being reasoned about:
+ *
+ *   · the seven `＋` INSERT affordances sit ON the connector, so their Y is
+ *     `LANE_Y + EDGE_ANCHOR_Y` — they moved **+8** (28 → 36).
+ *   · the five `✕` REMOVE affordances hang off the CARD'S BOTTOM, so their Y is
+ *     `heightAt(position) - REMOVE_SIZE/2`, and under jsdom `heightAt` falls back to
+ *     `NODE_MIN_HEIGHT` — they moved **−32** (104 → 72).
+ *
+ * A blanket `+8` was applied to all twelve first. It made the insert rows right and the
+ * remove rows wrong by 40, and the suite said so immediately. TWO terms, two derivations,
+ * both traceable to `CANVAS_LAYOUT`; neither is a number anyone typed.
+ *
+ * ⚠ THE EDIT WAS MECHANICAL AND ITS SCOPE WAS ENFORCED BY THE TOOL, not by care: a script
+ * matched `translate(Xpx, Ypx)` and rewrote ONLY the Y, per group, by exactly one derived
+ * constant each. Nothing else in this array — not one class, aria attribute, testid,
+ * width, height, z-index or X coordinate — could drift under cover of the edit, which is
+ * the property that makes re-baselining a capture safe when it is safe at all.
+ *
+ * THE ARITHMETIC CLOSES WITH NO RESIDUAL: 7 rows × +8 and 5 rows × −32, one axis, two
+ * constants, twelve rows accounted for. A row moving by anything else would have been
+ * evidence of a SECOND change hiding inside this one, and would not have been re-baselined.
  */
 const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
   {
     testid: "canvas-insert-0",
     class:
       "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(-43px, 15px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(-43px, 23px); z-index: 1002;",
     ariaLabel: "Add a step before step 1",
     ariaExpanded: "false",
     ariaHaspopup: "menu",
@@ -1387,7 +1421,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-insert-1",
     class:
       "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(277px, 39px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(277px, 47px); z-index: 1002;",
     ariaLabel: "Add a step before step 2",
     ariaExpanded: "false",
     ariaHaspopup: "menu",
@@ -1396,7 +1430,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-insert-2",
     class:
       "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(597px, 39px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(597px, 47px); z-index: 1002;",
     ariaLabel: "Add a step before step 3",
     ariaExpanded: "true",
     ariaHaspopup: "menu",
@@ -1405,7 +1439,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-insert-3",
     class:
       "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(917px, 15px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(917px, 23px); z-index: 1002;",
     ariaLabel: "Add a step before step 4",
     ariaExpanded: "false",
     ariaHaspopup: "menu",
@@ -1414,7 +1448,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-insert-4",
     class:
       "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(1237px, 15px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(1237px, 23px); z-index: 1002;",
     ariaLabel: "Add a step before step 5",
     ariaExpanded: "false",
     ariaHaspopup: "menu",
@@ -1423,7 +1457,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-insert-5",
     class:
       "absolute grid place-items-center rounded-full border border-dashed border-border bg-card text-[15px] leading-none text-muted-foreground transition-opacity hover:border-solid hover:border-primary hover:text-primary motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(1557px, 15px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 26px; height: 26px; transform: translate(1557px, 23px); z-index: 1002;",
     ariaLabel: "Add a step at the end",
     ariaExpanded: "false",
     ariaHaspopup: "menu",
@@ -1432,7 +1466,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-insert-picker",
     class: "pointer-events-auto absolute",
     style:
-      "left: 0px; top: 0px; transform-origin: top left; transform: translate(460px, 74px) scale(1); z-index: 1002;",
+      "left: 0px; top: 0px; transform-origin: top left; transform: translate(460px, 82px) scale(1); z-index: 1002;",
     ariaLabel: null,
     ariaExpanded: null,
     ariaHaspopup: null,
@@ -1441,7 +1475,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-remove-confirm",
     class:
       "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(1078px, 92px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(1078px, 60px); z-index: 1002;",
     ariaLabel: "Remove step 4",
     ariaExpanded: null,
     ariaHaspopup: null,
@@ -1450,7 +1484,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-remove-deep_dive",
     class:
       "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(758px, 92px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(758px, 60px); z-index: 1002;",
     ariaLabel: "Remove step 3",
     ariaExpanded: null,
     ariaHaspopup: null,
@@ -1459,7 +1493,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-remove-fanout",
     class:
       "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(438px, 140px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(438px, 108px); z-index: 1002;",
     ariaLabel: "Remove step 2",
     ariaExpanded: null,
     ariaHaspopup: null,
@@ -1468,7 +1502,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-remove-split",
     class:
       "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(118px, 92px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(118px, 60px); z-index: 1002;",
     ariaLabel: "Remove step 1",
     ariaExpanded: null,
     ariaHaspopup: null,
@@ -1477,7 +1511,7 @@ const AFFORDANCE_SHAPE_BASELINE: ReturnType<typeof AFFORDANCE_SHAPE> = [
     testid: "canvas-remove-summarize",
     class:
       "absolute grid place-items-center rounded-[7px] border border-border bg-card text-[11px] leading-none text-muted-foreground transition-opacity hover:border-[hsl(0_72%_51%/0.6)] hover:text-[hsl(0_85%_74%)] motion-reduce:transition-none pointer-events-auto opacity-100 lg:opacity-0 lg:group-hover/canvas:opacity-100 lg:focus-visible:opacity-100 [@media(hover:none)]:opacity-100",
-    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(1398px, 92px); z-index: 1002;",
+    style: "left: 0px; top: 0px; width: 24px; height: 24px; transform: translate(1398px, 60px); z-index: 1002;",
     ariaLabel: "Remove step 5",
     ariaExpanded: null,
     ariaHaspopup: null,

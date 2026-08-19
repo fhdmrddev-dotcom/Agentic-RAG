@@ -108,15 +108,23 @@ describe("canvasModel.CANVAS_LAYOUT — the ONE frozen constants table", () => {
   it("carries the locked layout values (183-06's CSS reads these, not literals)", () => {
     expect(CANVAS_LAYOUT).toEqual({
       NODE_WIDTH: 260,
-      // 185-01 (D-185-17): raised 96 → 104 with the 137-B card rebuild. 104 is the
+      // ⚠ 104 → 72 AT THE PHASE 200 CANVAS PORT, and the prior reason is preserved:
+      // "185-01 (D-185-17): raised 96 → 104 with the 137-B card rebuild. 104 is the
       // floor at which the mark floating above the card's top edge clears the title
-      // by 11px. `NODE_WIDTH` is unchanged and is the NODE BOX — the 137-B card is
-      // 248px INSIDE it.
-      NODE_MIN_HEIGHT: 104,
+      // by 11px." That mark no longer floats — sketch 200 renders it inside the card —
+      // so the clearance the 104 bought is not a constraint any more. 72 is
+      // `screens/builder-canvas.html`'s own node height, on ten of its ten nodes.
+      // `NODE_WIDTH` is unchanged and is still the NODE BOX; the card inside it is now
+      // 240px rather than 248.
+      NODE_MIN_HEIGHT: 72,
       PITCH_X: 320,
       LANE_Y: 0,
       SKIP_LANE_Y: 200,
-      EDGE_ANCHOR_Y: 28,
+      // ⚠ 28 → 36 AT THE SAME PORT. Still a FIXED offset from the node TOP (D-183-12 is
+      // untouched); only which offset changed. Measured off the sheet rather than chosen:
+      // its nodes sit at `top: 64` with height 72 and every connector is drawn at `y = 100`,
+      // so `100 − 64 = 36` — the vertical centre of the sheet's card.
+      EDGE_ANCHOR_Y: 36,
       END_CAP_SIZE: 40,
     })
   })
