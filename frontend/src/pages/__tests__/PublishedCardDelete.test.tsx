@@ -837,3 +837,204 @@ describe("WorkflowDeleteSheet 192-08 — the guard refuses on its OWN, with no p
     rendered.unmount()
   })
 })
+
+// ── 199-10 Task 3 — THE GRADED ACTION-GUARD LADDER, ASSERTED RATHER THAN ARGUED ──────
+
+/**
+ * Phase 199-10 Task 3 (DES-01) — sheet `c6-library-dialogs`'s delete sheet, and the thing a
+ * presentation pass most easily breaks without noticing.
+ *
+ * ── THE PROBLEM THIS BLOCK EXISTS FOR ───────────────────────────────────────────────────
+ * `WorkflowDeleteSheet.tsx`'s docblock states that TWO other live decisions are arguments
+ * made BY REFERENCE to this guard — D-15 (the fork ships no confirm sheet, because a heavy
+ * guard on a harmless action spends the vocabulary THIS one relies on) and D-18 (the draft
+ * delete must be demonstrably LIGHTER) — and that both *"become false the moment this one
+ * quietly weakens."*
+ *
+ * ⚠ UNTIL THIS BLOCK, THAT RELATIONSHIP LIVED ONLY IN PROSE. Each surface's own suite
+ * asserted its own properties in isolation: the delete sheet's counts here, the fork's
+ * confirm-freedom in `ForkNameDialog.test.tsx`. **Nothing in the repository compared them**,
+ * so a re-presentation could have lightened the delete and left every suite green — which is
+ * precisely the risk a phase whose PREMISE IS REMOVAL introduces. Removing text is this
+ * phase's job. Removing a safety GRADE is not, and the difference is now machine-checkable.
+ *
+ * ⚠ THE COMPARISON IS ONE-DIRECTIONAL AND STRICT. It is not enough that the delete sheet is
+ * heavy; it must be heavier THAN THE FORK, on every atom, with the fork scoring zero. A
+ * "both are heavy" reading would be satisfied by exactly the drift D-15 forbids.
+ */
+
+import { ForkNameDialog } from "@/components/workflows/library/ForkNameDialog"
+
+/**
+ * The four atoms that MAKE a guard heavy, as detectors run over rendered markup. Each is a
+ * property the 146-148 graded-action-guards rule assigns to the victim-naming grade and to no
+ * lighter one. They are functions rather than inline regexes so the positive controls below
+ * exercise the REAL detector rather than a copy of it.
+ */
+const GUARD_ATOMS = {
+  /** EXACT server counts, stated before the destructive action is offered (D-LOCK-03). */
+  statesExactCounts: (html: string) => /\d+ versions/.test(html) && /\d+ run records/.test(html),
+  /** The victim named inside the removal claim, not merely mentioned somewhere. */
+  namesItsVictim: (html: string) =>
+    /Permanently removed/.test(html) && /Vendor-risk review/.test(html),
+  /**
+   * Destructive weight on the single irreversible control, AT REST.
+   *
+   * ⚠ THE VARIANT-PREFIX EXCLUSION IS LOAD-BEARING AND WAS MEASURED, NOT ANTICIPATED. The
+   * first draft of this detector was a bare `/bg-destructive/` and it PASSED against a
+   * deliberate plant that stripped the resting `bg-destructive` from the Delete-forever
+   * control — because `hover:bg-destructive/90` survived on the same element and satisfied
+   * the substring. A guard whose danger colour exists only on HOVER is no guard at all on
+   * a touch device (D-14: touch has no hover), so the detector now requires the utility to
+   * stand at a class boundary with no variant prefix in front of it. Re-driven against the
+   * same plant afterwards, it went red.
+   */
+  wearsDestructiveWeight: (html: string) =>
+    /(?:^|[\s"])bg-destructive(?=[\s"\/]|$)/.test(html),
+  /** The audit receipt — the ✎ convention, consequence ≠ receipt (146-148). */
+  carriesAnAuditReceipt: (html: string) => /✎/.test(html),
+} as const
+
+const gradeOf = (html: string): number =>
+  Object.values(GUARD_ATOMS).filter((detect) => detect(html)).length
+
+/** Render the fork prompt in isolation and read its markup. */
+function forkHtml(): string {
+  const rendered = render(
+    <ForkNameDialog
+      open
+      sourceName="Vendor-risk review"
+      onCancel={vi.fn()}
+      onCreate={vi.fn()}
+      isClash={() => false}
+    />,
+  )
+  const html = screen.getByTestId("fork-name-dialog").outerHTML
+  rendered.unmount()
+  return html
+}
+
+describe("199-10 — the delete sheet is DEMONSTRABLY the heaviest grade, and the fork the lightest", () => {
+  it("POSITIVE CONTROL — every detector fires on markup that carries its atom", () => {
+    // Without this, a fork scoring 0 proves nothing: four broken detectors score 0 too.
+    expect(GUARD_ATOMS.statesExactCounts("x · 3 versions · 12 run records")).toBe(true)
+    expect(GUARD_ATOMS.namesItsVictim("<p>Permanently removed</p><b>Vendor-risk review</b>")).toBe(
+      true,
+    )
+    expect(GUARD_ATOMS.wearsDestructiveWeight('<button class="bg-destructive">x</button>')).toBe(
+      true,
+    )
+    // ⚠ THE CONTROL THAT MATTERS — a hover-only danger colour must NOT count as weight.
+    expect(
+      GUARD_ATOMS.wearsDestructiveWeight('<button class="bg-muted hover:bg-destructive/90">x</button>'),
+    ).toBe(false)
+    // …and the shipped shape, which carries BOTH, still does.
+    expect(
+      GUARD_ATOMS.wearsDestructiveWeight('<button class="bg-destructive hover:bg-destructive/90">x</button>'),
+    ).toBe(true)
+    expect(GUARD_ATOMS.carriesAnAuditReceipt("<p>✎ Recorded with your name</p>")).toBe(true)
+    // NEGATIVE CONTROL — and none of them fires on markup that carries none of it.
+    expect(gradeOf("<div>Name your copy</div>")).toBe(0)
+  })
+
+  it("the delete sheet scores FOUR of four — all four guard properties, re-asserted after the phase", async () => {
+    const html = await sheetHtml("loadedZeroThreads")
+    expect(html.length).toBeGreaterThan(500) // non-vacuity before any grade is read
+    // Named individually rather than only as a total, so a failure says WHICH property went.
+    expect(GUARD_ATOMS.statesExactCounts(html), "exact server counts").toBe(true)
+    expect(GUARD_ATOMS.namesItsVictim(html), "names its victim").toBe(true)
+    expect(GUARD_ATOMS.wearsDestructiveWeight(html), "destructive weight").toBe(true)
+    expect(GUARD_ATOMS.carriesAnAuditReceipt(html), "audit receipt").toBe(true)
+    expect(gradeOf(html)).toBe(4)
+  })
+
+  it("the counts are FETCHED BEFORE the destructive action is offered — never rendered alongside a guess", async () => {
+    // The fourth property's ordering half, which a static read of the loaded state cannot see.
+    // While the preview is in flight the sheet offers NO destructive control at all, and shows
+    // no number: a placeholder count beside an armed Delete is the failure D-LOCK-03 prevents.
+    const loading = await sheetHtml("loading")
+    expect(loading.length).toBeGreaterThan(300)
+    expect(loading).not.toContain("delete-forever")
+    expect(loading).not.toMatch(/\d+ versions/)
+    expect(loading).not.toMatch(/\d+ run records/)
+    // …and the loaded state DOES offer it, so the absence above is ordering, not a dead control.
+    expect(await sheetHtml("loadedZeroThreads")).toContain("delete-forever")
+  })
+
+  it("the amber cancel-first banner is raised ONLY when a run is live, and it is amber not red", async () => {
+    const quiet = await sheetHtml("loadedZeroThreads")
+    const live = await sheetHtml("loadedInFlight")
+    expect(quiet).not.toContain("delete-inflight-banner")
+    expect(live).toContain("delete-inflight-banner")
+    // Amber, never red — the graded rule spends danger colour on the ACTION, not on the notice.
+    expect(live).toMatch(/delete-inflight-banner[\s\S]{0,200}amber-/)
+  })
+
+  it("the fork prompt scores ZERO of four — it is not a lighter guard, it is outside the ladder", () => {
+    const html = forkHtml()
+    expect(html.length).toBeGreaterThan(300) // non-vacuity: it really rendered
+    expect(html).toContain("Name your copy") // …and it really is the fork prompt
+    expect(GUARD_ATOMS.statesExactCounts(html), "fork states counts").toBe(false)
+    expect(GUARD_ATOMS.namesItsVictim(html), "fork names a victim").toBe(false)
+    expect(GUARD_ATOMS.wearsDestructiveWeight(html), "fork wears destructive weight").toBe(false)
+    expect(GUARD_ATOMS.carriesAnAuditReceipt(html), "fork carries a receipt").toBe(false)
+    expect(gradeOf(html)).toBe(0)
+  })
+
+  it("THE ORDERING ITSELF — delete > fork, strictly, on the same scale", async () => {
+    // The assertion D-15 and D-18 have been leaning on in prose since Phase 192.
+    const heavy = gradeOf(await sheetHtml("loadedZeroThreads"))
+    const light = gradeOf(forkHtml())
+    expect(heavy).toBeGreaterThan(light)
+    expect(heavy - light).toBe(4)
+  })
+
+  it("no optimistic vanish and no undo — re-asserted as a PROPERTY OF THE MARKUP after the phase", async () => {
+    // The behavioural halves are driven elsewhere in this file (the cascade + re-fetch cases).
+    // What is added here is the negative a re-presentation could introduce without touching
+    // behaviour at all: an "Undo" affordance on the terminal state.
+    const done = await sheetHtml("deleted")
+    expect(done.length).toBeGreaterThan(300)
+    expect(done).toContain("Deleted · recorded")
+    expect(done).not.toMatch(/\bundo\b/i)
+    expect(done).not.toMatch(/\brestore\b/i)
+    // POSITIVE CONTROL — the matcher does find those words when they are there.
+    expect("<button>Undo</button>").toMatch(/\bundo\b/i)
+  })
+})
+
+/**
+ * ── SHEET c6's DELETE DRAWING, RECONCILED ───────────────────────────────────────────────
+ *
+ * The sheet's whole consequence line is *"This will permanently remove 12 historical runs and
+ * 5 configured phases."* — ALREADY-SHIPPED, and the shipped one is HEAVIER: it splits Removed
+ * from KEPT, states the exact server counts for both, and adds the audit receipt the drawing
+ * has no concept of.
+ *
+ * ⚠ ITS ONE GENUINELY DIFFERENT MOVE — naming the victim in the TITLE (*"Delete Daily Summary
+ * Extraction?"* against the shipped *"Delete this workflow?"*) — IS REFUSED, and the reason is
+ * mechanical rather than aesthetic. The title renders BEFORE the preview resolves, so it could
+ * only be fed from `wf.name`: the LIST FEED's cached copy. The victim in the consequence line
+ * is fed from `preview.name`, which is fetched at open time. Adopting the sheet would put TWO
+ * sources for one victim's name on one surface, and the earlier, larger, more prominent one
+ * would be the STALE one — a guard whose headline can name a different workflow than its
+ * consequence is weaker than one that names it once, from the server, at the moment of asking.
+ * Asserted below rather than left as a claim in a summary.
+ */
+describe("199-10 — the victim is named ONCE, from the server, at the moment of asking", () => {
+  it("the headline makes no claim about WHICH workflow; the consequence line does, from the preview", async () => {
+    const html = await sheetHtml("loadedZeroThreads")
+    // The generic headline is deliberate: it cannot go stale because it names nothing.
+    expect(html).toContain("Delete this workflow?")
+    // And the name appears exactly once, inside the Removed group.
+    const occurrences = html.split("Vendor-risk review").length - 1
+    expect(occurrences).toBe(1)
+    expect(html).toMatch(/Permanently removed[\s\S]{0,300}Vendor-risk review/)
+  })
+
+  it("while the preview is in flight the sheet names NO victim at all — it has not been told one yet", async () => {
+    const loading = await sheetHtml("loading")
+    expect(loading).toContain("Delete this workflow?")
+    expect(loading).not.toContain("Vendor-risk review")
+  })
+})
