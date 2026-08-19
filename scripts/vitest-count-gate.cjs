@@ -288,7 +288,17 @@ const BASELINE = {
   // retired 185 chip stays retired. The +1 is the real 189 guard beside it: the
   // `[data-not-connected]` attribute present on an `external_action` node and absent on all
   // six other types, over a roster derived from `PHASE_TYPE_ORDER`.
-  "WorkflowCanvas.test.tsx": 53,
+  // ⚠ 200-06: 53 → 89, and the +36 is DECOMPOSED rather than quoted as one number, because
+  // only twelve of it is this plan's. The gate printed `53 89 +36` on the run that first
+  // executed this plan's cases; the suite ran **77** immediately before them (measured by
+  // running it alone on this same tree), so **+24 was PRE-EXISTING DRIFT** — 24 cases that
+  // were deletable with the gate green — and **+12 is this plan's** (the payload seam, the
+  // pass-through proof, the `constructor`-slug pair, the four states with hover/selection
+  // driven for real, and the legend). The drift is ABSORBED DELIBERATELY here rather than
+  // carried forward as another paragraph about it: an unpinned case is an unguarded one, and
+  // this file's own eleven-times-stale marker is the standing evidence that a drift left in a
+  // comment outlives every plan that noticed it. Read from the `actual` column, never counted.
+  "WorkflowCanvas.test.tsx": 89,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:
@@ -1665,10 +1675,28 @@ const BASELINE = {
   // Source restored md5-identical at `37181e61…`. The number below is the gate's OWN reported
   // actual, read off its output, never a predicted one.
   "TemplateAttachSection.test.tsx": 43,
-  "FlowEdge.test.tsx": 22,
+  // 200-06 (BC-MR-01 / BC-MR-02): 22 → 34, and the +12 is ENTIRELY this plan's — the gate's
+  // own drift column read `22 34 +12` on the run that first executed the new cases, with no
+  // pre-existing gap on this file to decompose. Read from the `actual` column, never counted
+  // from `it(` literals. The twelve are the payload label (declared count, DECLARED ZERO, a
+  // DOM absence where nothing was declared, the verbatim noun, survival on an armed
+  // connector, the typeof-arm source fence) and the four connection states with their
+  // absence case and positive control.
+  "FlowEdge.test.tsx": 34,
   // 188.1-01: 19 → 20. EXTENDED — the same move-invariant subtree-fence control, carried
   // here as well because this suite re-scopes its own five negatives and a control living in
   // another file protects another file. Twice-measured from the `actual` column.
+  // ── 200-06 — a NEW suite, pinned in the SAME COMMIT that creates it ────────────────
+  //
+  // ONE knob, and which one is CHECKED rather than assumed: `connectionState.test.ts` lives
+  // under `src/components/workflows`, already a DIRECTORY entry in the `TARGETS` array
+  // below, so it RAN the moment it existed and this script printed it as `— 13 new` before
+  // this line was written. A `TARGETS` edit would have been redundant; a `BASELINE` entry
+  // would not, because TARGETS decides what RUNS and BASELINE decides what is GUARDED, and
+  // an unpinned file is not a lightly-guarded one — it is an unguarded one.
+  //
+  // The number is the gate's OWN `actual` column on that first run, never hand-counted.
+  "connectionState.test.ts": 13,
   "WorkflowCanvas.composition.test.tsx": 20,
   "CanvasToolbar.test.tsx": 14,
   "BuilderSaveRegion.test.tsx": 11,

@@ -37,6 +37,11 @@
  */
 import type { Edge, Node } from "@xyflow/react"
 
+// Type-only, and that is required rather than stylistic: this module is the PURE
+// projection (D-183-12) and must stay free of any runtime dependency that could make the
+// committed snapshot depend on view state. `connectionState.ts` is a true leaf anyway,
+// but the type-only form is what makes the independence structural.
+import type { ConnectionState } from "@/components/workflows/connectionState"
 import {
   actionRiskArmed,
   groundingCauseOf,
@@ -240,6 +245,43 @@ export interface CanvasEdgeData extends Record<string, unknown> {
    * `FlowEdge.tsx` is empty, deliberately.
    */
   armed?: boolean
+  /**
+   * Phase 200-06 (`BC-MR-01` / D-08) — the UPSTREAM step's own declared count, ready to
+   * render, or ABSENT when that step declared nothing.
+   *
+   * ⚠ **`toCanvas` NEVER SETS THIS, AND THAT IS STRUCTURAL RATHER THAN AN OVERSIGHT.**
+   * This projection is a PURE function of the definition alone (D-183-12) — same phases
+   * in, byte-identical nodes and edges out — and a run's declared count is not in the
+   * definition. The key is declared HERE because this is where the edge's data shape has
+   * its one home; it is FILLED by `WorkflowCanvas`, from the `runState` seam the PAGE
+   * supplies, in the same memo that resolves the stroke. So the projection's committed
+   * snapshot stays byte-identical to what it was before this plan, and there is still
+   * exactly one place a reader looks to learn what an edge can carry.
+   */
+  payload?: EdgePayload
+  /**
+   * Phase 200-06 (`BC-MR-02`) — which of the four connection states this line is in.
+   *
+   * Resolved by `connectionState.connectionStateOf` in `WorkflowCanvas` (which owns the
+   * pointer and the selection), never here: it is a VIEW state, not a projection fact,
+   * and putting it in the pure projection would make the committed snapshot depend on
+   * where the mouse is. Absent ⇒ `FlowEdge` renders exactly as it did before this plan.
+   */
+  connection?: ConnectionState
+}
+
+/**
+ * ONE connection's payload — the fact it carries, kept in the two halves the wire carries
+ * them in so that neither can be synthesised from the other.
+ *
+ * ⚠ `count` is a REAL integer INCLUDING `0`; ABSENCE is the DIFFERENT fact and is
+ * expressed by omitting the whole object, never by a `0` and never by a dash
+ * (`BC-MNR-01`). `noun` is the STEP'S OWN word, authored at one executor site per phase
+ * type and carried on the wire — the client spells none of its own (`BC-MNR-02`).
+ */
+export interface EdgePayload {
+  count: number
+  noun: string
 }
 
 /**

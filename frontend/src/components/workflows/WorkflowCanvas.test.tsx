@@ -68,6 +68,9 @@ import { CANVAS_LAYOUT } from "./canvasModel"
 // 199-05: the ONE shared 3D phase-mark map, read so the §4 audit below checks the real
 // slugs rather than a hand-kept copy of them.
 import { PHASE_GLYPHS } from "./soulData"
+// 200-06: the phase shape, so the `constructor`-slug fixture is built against the real
+// type rather than cast. Added as a SEPARATE statement, same auditability rule as above.
+import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 // ── 188.1-01 — THE SUBTREE SOURCE, and why it names files that do not exist yet ──────
 //
@@ -1560,5 +1563,214 @@ describe("WorkflowCanvas 199-05 — the sheet's RIGHT-OVERFLOW flaw is not inher
     expect(screen.getByTestId("canvas-node-escalate")).toBeInTheDocument()
     expect(screen.getByTestId("canvas-end-cap")).toBeInTheDocument()
     expect(container.querySelectorAll(".react-flow__node")).toHaveLength(branching.length + 1)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 200-06 — THE CONNECTION CARRIES THE UPSTREAM'S DECLARED COUNT
+//
+// `200-CHECKLIST.md` §3 `BC-MR-01` / `BC-MNR-01` / `BC-MNR-05`, and D-08's ONE-mechanism
+// rule. `FlowEdge.test.tsx` drives the RENDER of a payload; this block drives the SEAM —
+// that the number the page declared for a step is the number that reaches the connection
+// LEAVING that step, that a step which declared nothing produces no label anywhere on the
+// plane, and that the canvas is a pass-through which computes none of it.
+// ════════════════════════════════════════════════════════════════════════════════
+
+const EDGE_PAYLOAD = '[data-testid="canvas-edge-payload"]'
+
+/** A run state carrying a declared count — the shape the PAGE builds one in once
+ *  `200-07` wires the two wire fields through. `mkRun` above is deliberately left
+ *  untouched, so every shipped RUNVIZ-01 assertion keeps calling exactly what it called. */
+function mkCountedRun(reading: CanvasReading, count: number, noun: string): NodeRunState {
+  return { reading, label: runReadingLabel(reading), count, noun }
+}
+
+/** Render the plane with a page-supplied lookup and wait for the edges to draw. */
+async function renderCounted(
+  phases: Parameters<typeof toCanvas>[0],
+  runState: (slug: string) => NodeRunState | undefined,
+) {
+  const view = renderCanvas(phases, { runState })
+  await waitFor(() => {
+    expect(view.container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+  })
+  return view
+}
+
+describe("WorkflowCanvas 200-06 — BC-MR-01, the edge label IS the upstream's declared count", () => {
+  it("labels the connection LEAVING the step that declared the count", async () => {
+    const { container } = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug
+        ? mkCountedRun("done", 312, "sources")
+        : mkCountedRun("done", 0, "zzqx"),
+    )
+    const marks = [...container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent)
+    // The first step declared 312 sources, so the one connection leaving it says so.
+    expect(marks).toContain("312 sources")
+  })
+
+  it("a step that declared NOTHING puts no label anywhere on the plane (BC-MNR-01)", async () => {
+    const { container } = await renderCounted(researchSummarize, () => mkRun("done"))
+    // NON-VACUITY FIRST — the plane really drew connections, so "no label" is a statement
+    // about drawn edges rather than about an empty canvas. This project has now measured
+    // three fences that were reached and still defended nothing.
+    expect(container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+    expect(container.querySelectorAll(EDGE_PAYLOAD)).toHaveLength(0)
+  })
+
+  it("a DECLARED ZERO reaches the plane — `0` is a fact, absence is the other one", async () => {
+    const { container } = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 0, "zzqx") : undefined,
+    )
+    const marks = [...container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent)
+    expect(marks).toContain("0 zzqx")
+  })
+
+  it("HALF a declaration is no declaration — a count with no noun renders nothing", async () => {
+    const { container } = await renderCounted(researchSummarize, () => ({
+      reading: "done",
+      label: runReadingLabel("done"),
+      count: 9,
+    }))
+    expect(container.querySelectorAll(EDGE_PAYLOAD)).toHaveLength(0)
+  })
+
+  it("the canvas is a PASS-THROUGH — change the seam and the plane changes with it (BC-MNR-05)", async () => {
+    // D-08: ONE mechanism. If the canvas ever grew a counting path of its own, the label
+    // would stop tracking the seam — which is exactly how the edge label and the live
+    // per-step column would drift apart. Driven rather than grepped.
+    const first = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 312, "zzqx") : undefined,
+    )
+    expect(
+      [...first.container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent),
+    ).toContain("312 zzqx")
+    first.unmount()
+
+    const second = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 7, "zzqx") : undefined,
+    )
+    expect([...second.container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent)).toContain(
+      "7 zzqx",
+    )
+  })
+
+  it("a `constructor`-slugged step cannot poison the payload map (WR-04 · own())", async () => {
+    // `workflow_phases.slug` is unconstrained `text` and the UI cannot author this slug
+    // (D-184-11), so only a seeded definition reaches it — which is why the fixture is
+    // built here. A bare index would resolve `Object.prototype.constructor`, a FUNCTION,
+    // which is never nullish and therefore passes every downstream guard.
+    const poisoned: PhaseSpecJSON[] = [
+      { slug: "first", phase_index: 0, config: { phase_type: "llm_agent" } },
+      { slug: "constructor", phase_index: 1, config: { phase_type: "llm_single" } },
+      { slug: "last", phase_index: 2, config: { phase_type: "llm_emit" } },
+    ]
+    const { container } = await renderCounted(poisoned, () => undefined)
+    // Nothing declared anything, so NO label may appear — and in particular no label whose
+    // text is a stringified function.
+    expect(container.querySelectorAll(EDGE_PAYLOAD)).toHaveLength(0)
+    expect(container.textContent ?? "").not.toContain("function")
+    expect(container.textContent ?? "").not.toContain("[object")
+    // NON-VACUITY — the poisoned node really is on the plane.
+    expect(screen.getByTestId("canvas-node-constructor")).toBeInTheDocument()
+  })
+
+  it("the poisoned slug still renders a real, finite position (BUG-260808-01's floor)", async () => {
+    // The automated floor beneath `200-VALIDATION.md`'s driven row. 808's defect was a
+    // node whose `position` became a Function with no `.x`/`.y`, after which the library
+    // wrote NO transform at all and painted the card at the origin on top of phase 1.
+    const poisoned: PhaseSpecJSON[] = [
+      { slug: "first", phase_index: 0, config: { phase_type: "llm_agent" } },
+      { slug: "constructor", phase_index: 1, config: { phase_type: "llm_single" } },
+    ]
+    const { container } = await renderCounted(poisoned, () => undefined)
+    const wrapper = container.querySelector<HTMLElement>('.react-flow__node[data-id="constructor"]')
+    expect(wrapper).not.toBeNull()
+    const transform = wrapper!.style.transform
+    // A REAL transform with FINITE numbers — not the empty string 808 measured, and not a
+    // `NaN` that would render as `translate(NaN px, NaN px)`.
+    expect(transform).not.toBe("")
+    expect(transform).not.toContain("NaN")
+    const numbers = [...transform.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]))
+    expect(numbers.length).toBeGreaterThan(0)
+    for (const n of numbers) expect(Number.isFinite(n)).toBe(true)
+    // …and it is NOT at the origin, which is where the defect parked it.
+    expect(numbers.some((n) => n !== 0)).toBe(true)
+  })
+})
+
+describe("WorkflowCanvas 200-06 — BC-MR-02, the four connection states", () => {
+  it("an ordinary connector rests, and says so", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const path = container.querySelector(".react-flow__edge-path")
+    expect(path?.getAttribute("data-connection-state")).toBe("at-rest")
+  })
+
+  it("HOVER is reachable and changes the state the connector reports", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const edge = container.querySelector<SVGGElement>(".react-flow__edge")
+    expect(edge).not.toBeNull()
+    fireEvent.mouseEnter(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("hovered")
+    })
+    // …and it RELEASES. A state that never clears is a stuck highlight, not a hover.
+    fireEvent.mouseLeave(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("at-rest")
+    })
+  })
+
+  it("SELECTION is reachable, outranks hover, and a pane click clears it", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const edge = container.querySelector<SVGGElement>(".react-flow__edge")
+    fireEvent.click(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("selected")
+    })
+    // Precedence, driven rather than asserted at the leaf alone: the pointer is over the
+    // line it just picked, and the reading stays `selected`.
+    fireEvent.mouseEnter(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("selected")
+    })
+    const pane = container.querySelector<HTMLElement>(".react-flow__pane")
+    expect(pane).not.toBeNull()
+    fireEvent.click(pane!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).not.toBe("selected")
+    })
+  })
+
+  it("the CONDITIONAL BRANCH reads as `not taken` — the dash it has carried since 183", async () => {
+    const { container } = await renderPlane(branching)
+    const dashed = [...container.querySelectorAll<SVGPathElement>(".react-flow__edge-path")].filter(
+      (p) => (p.getAttribute("style") ?? "").includes("dasharray"),
+    )
+    // Exactly one conditional branch in this fixture, and it is drawn distinctly from
+    // every run-order connector WITHOUT relying on a hue.
+    expect(dashed.length).toBe(1)
+  })
+
+  it("the LEGEND names all four, and is inert", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const legend = container.querySelector<HTMLElement>('[data-testid="canvas-connection-legend"]')
+    expect(legend).not.toBeNull()
+    for (const word of ["at rest", "selected", "hovered", "not taken"]) {
+      expect(legend!.textContent).toContain(word)
+    }
+    // One tab stop per node is a canvas-level invariant, and a legend is not an exception.
+    expect(legend!.querySelectorAll("[role], [tabindex], button, a")).toHaveLength(0)
+    expect(legend!.getAttribute("aria-hidden")).toBe("true")
   })
 })
