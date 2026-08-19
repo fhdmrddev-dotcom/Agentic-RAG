@@ -20,7 +20,7 @@ import libraryFilterSource from "./libraryFilter?raw"
 import workflowsPageSource from "@/pages/WorkflowsPage?raw"
 import type { PublishedWorkflow, WorkflowDraftRow } from "@/lib/api"
 import type { ChipId } from "./libraryRow"
-import type { LibrarySelection } from "./libraryFilter"
+import type { LibrarySelection, MatchReason } from "./libraryFilter"
 import {
   CHIP_PREDICATES,
   UNBOUND,
@@ -28,10 +28,20 @@ import {
   filterLibrary,
   fromDraft,
   fromPublished,
+  matchReasons,
   matchesProject,
   matchesQuery,
   mergeLibrary,
 } from "./libraryFilter"
+// 192.2-09 (WR-04) — the reason WORDS, imported so the cases compare two EXPORTS rather than
+// a rendered string against a literal typed here. A re-spelling in either home then reds.
+import {
+  CHIP_WORDS,
+  MATCH_REASON_PREFIX,
+  MATCH_REASON_PURPOSE,
+  MATCH_REASON_SEPARATOR,
+  MATCH_REASON_WORDS,
+} from "./libraryVocabulary"
 
 // ── fixtures ─────────────────────────────────────────────────────────────────────────
 //
@@ -1014,5 +1024,213 @@ describe("F-7 extended — no client sort on the merged list (D-17)", () => {
     }
     // POSITIVE CONTROL — the needle catches the state hook such a control would need.
     expect("const [sortOrder, setSortOrder] = useState('recent')").toMatch(/\bsortOrder\b/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 192.2-09 (LIB-06 — gap-closure round 1, WR-04) — `matchReasons`
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// D-03 cut six atoms from the resting card; three ways into the list still select on facts
+// that left with them. These cases prove the repair is DERIVED — the same predicates, the
+// same needle — and, more importantly, that it emits NOTHING when nothing was asked, which
+// is the property the resting card's byte-identity depends on.
+
+/** Build a selection without re-typing the three fields at every call site. */
+const sel = (over: Partial<LibrarySelection> = {}): LibrarySelection => ({
+  query: "",
+  chips: [],
+  projectId: null,
+  ...over,
+})
+
+const rowById = (id: string) => merged().find((r) => r.id === id)!
+
+describe("192.2-09 (WR-04) — matchReasons emits nothing unless something was asked", () => {
+  it("an EMPTY selection returns an EMPTY array — the property the resting card rests on", () => {
+    // Asserted directly, on every row in the corpus, because "the card renders nothing at
+    // rest" is a claim about this function before it is a claim about any DOM.
+    for (const row of merged()) {
+      expect(matchReasons(row, sel()), row.id).toEqual([])
+    }
+  })
+
+  it("a BLANK or WHITESPACE-ONLY query emits nothing, on a row whose purpose would match", () => {
+    const vendor = rowById(publishedVendor.id)
+    expect(matchReasons(vendor, sel({ query: "" }))).toEqual([])
+    expect(matchReasons(vendor, sel({ query: "   " }))).toEqual([])
+    // POSITIVE CONTROL — the same row DOES answer once a real needle is typed, so the two
+    // assertions above are not passing because the fixture can never match.
+    expect(matchReasons(vendor, sel({ query: "supplier" }))).toEqual(["purpose"])
+  })
+
+  it("the four chips that already have a visible carrier emit NOTHING while pressed", () => {
+    // Each is pressed on a row it genuinely selects — proved by the predicate, so the empty
+    // result cannot be an artifact of a row the chip would not have returned anyway.
+    const silent: [ChipId, string][] = [
+      ["ready-to-run", publishedVendor.id],
+      ["yours", publishedVendor.id],
+      ["still-building", draftSignoff.id],
+      ["starters", starterClause.id],
+    ]
+    for (const [chip, id] of silent) {
+      const row = rowById(id)
+      expect(CHIP_PREDICATES[chip](row), `${chip} must really select ${id}`).toBe(true)
+      expect(matchReasons(row, sel({ chips: [chip] })), chip).toEqual([])
+    }
+  })
+})
+
+describe("192.2-09 (WR-04) — the two chips whose atoms D-03 cut", () => {
+  it("Makes a file: pressed AND true yields the reason; pressed AND false yields nothing", () => {
+    const makesFile = rowById(publishedVendor.id)
+    const chatOnly = rowById(publishedRecap.id)
+    expect(CHIP_PREDICATES["makes-a-file"](makesFile)).toBe(true)
+    expect(CHIP_PREDICATES["makes-a-file"](chatOnly)).toBe(false)
+    expect(matchReasons(makesFile, sel({ chips: ["makes-a-file"] }))).toEqual(["makes-a-file"])
+    // The RIGHT reason for the empty answer: the chip is pressed, the row simply is not one.
+    expect(matchReasons(chatOnly, sel({ chips: ["makes-a-file"] }))).toEqual([])
+  })
+
+  it("Makes a file: TRUE but NOT pressed yields nothing — a card never volunteers it", () => {
+    const makesFile = rowById(publishedVendor.id)
+    expect(CHIP_PREDICATES["makes-a-file"](makesFile)).toBe(true)
+    expect(matchReasons(makesFile, sel({ chips: ["yours"] }))).toEqual([])
+  })
+
+  it("Strict: pressed AND true yields the reason; pressed AND false yields nothing", () => {
+    const strictRow = rowById(starterClause.id)
+    const looseRow = rowById(draftSignoff.id)
+    expect(CHIP_PREDICATES.strict(strictRow)).toBe(true)
+    expect(CHIP_PREDICATES.strict(looseRow)).toBe(false)
+    expect(matchReasons(strictRow, sel({ chips: ["strict"] }))).toEqual(["strict"])
+    expect(matchReasons(looseRow, sel({ chips: ["strict"] }))).toEqual([])
+  })
+
+  it("Strict: TRUE but NOT pressed yields nothing", () => {
+    const strictRow = rowById(starterClause.id)
+    expect(CHIP_PREDICATES.strict(strictRow)).toBe(true)
+    expect(matchReasons(strictRow, sel({ chips: ["starters"] }))).toEqual([])
+  })
+
+  it("both chips pressed on a row that is both — both reasons, in ONE stable order", () => {
+    const both = rowById(publishedVendor.id)
+    expect(matchReasons(both, sel({ chips: ["makes-a-file", "strict"] }))).toEqual([
+      "makes-a-file",
+      "strict",
+    ])
+    // …and the order is the FUNCTION's, not the caller's array order — otherwise two people
+    // who pressed the same two chips in a different sequence would read two different lines.
+    expect(matchReasons(both, sel({ chips: ["strict", "makes-a-file"] }))).toEqual([
+      "makes-a-file",
+      "strict",
+    ])
+  })
+
+  it("DERIVED, NOT RE-IMPLEMENTED — the reason agrees with the predicate on every row", () => {
+    // T-192.2-41: a second copy of a predicate would let the card claim a reason the filter
+    // did not act on. Swept over the whole corpus rather than spot-checked.
+    for (const row of merged()) {
+      const reasons = matchReasons(row, sel({ chips: ["makes-a-file", "strict"] }))
+      expect(reasons.includes("makes-a-file"), row.id).toBe(CHIP_PREDICATES["makes-a-file"](row))
+      expect(reasons.includes("strict"), row.id).toBe(CHIP_PREDICATES.strict(row))
+    }
+  })
+
+  it("every row a chip RETURNS carries that chip's reason — the WR-04 gap, closed", () => {
+    // The defect in its own terms: `filterLibrary` hands back a set, and before this plan
+    // some members of that set carried no visible evidence of the property that selected
+    // them. Now every member can say it.
+    for (const chip of ["makes-a-file", "strict"] as const) {
+      const selection = sel({ chips: [chip] })
+      const returned = filterLibrary(merged(), selection)
+      expect(returned.length).toBeGreaterThan(0) // non-vacuity
+      for (const row of returned) {
+        expect(matchReasons(row, selection), `${chip} ${row.id}`).toContain(chip)
+      }
+    }
+  })
+})
+
+describe("192.2-09 (WR-04) — the purpose reason, and the name clause that guards it", () => {
+  it("a needle that lives ONLY in the purpose yields the purpose reason", () => {
+    const vendor = rowById(publishedVendor.id)
+    expect(vendor.name.toLowerCase()).not.toContain("supplier")
+    expect(matchReasons(vendor, sel({ query: "supplier" }))).toEqual(["purpose"])
+  })
+
+  it("a needle in the NAME yields NO purpose reason, even when the purpose carries it too", () => {
+    // ⚠ THE CASE RULE 3's NAME CLAUSE EXISTS FOR. `HighlightTitle` already marks a name hit,
+    // so repeating it underneath is precisely the duplication D-03 removed. Without this
+    // case the clause is unguarded and could be deleted with every other test still green.
+    const both = fromPublished(
+      {
+        id: "id-both",
+        slug: "recap-both",
+        name: "Quarterly recap",
+        definition: chatOnlyDef("Recap the quarter for the board.", null, 1),
+      },
+      "published",
+    )
+    expect(both.name.toLowerCase()).toContain("recap")
+    expect(String(both.def?.business_requirement).toLowerCase()).toContain("recap")
+    expect(matchesQuery(both, "recap")).toBe(true) // it IS in the filtered set…
+    expect(matchReasons(both, sel({ query: "recap" }))).toEqual([]) // …and says nothing extra
+  })
+
+  it("a needle in NEITHER field yields nothing — the row is not in the set at all", () => {
+    const vendor = rowById(publishedVendor.id)
+    expect(matchesQuery(vendor, "zzz-no-such-word")).toBe(false)
+    expect(matchReasons(vendor, sel({ query: "zzz-no-such-word" }))).toEqual([])
+  })
+
+  it("the needle is normalized ONCE — the same trim and case-fold matchesQuery uses", () => {
+    const vendor = rowById(publishedVendor.id)
+    for (const query of ["supplier", "SUPPLIER", "  Supplier  ", "SuPpLiEr"]) {
+      expect(matchesQuery(vendor, query), query).toBe(true)
+      expect(matchReasons(vendor, sel({ query })), query).toEqual(["purpose"])
+    }
+    // Substring, mid-word, exactly as D-08 says — no second matching rule crept in here.
+    expect(matchReasons(vendor, sel({ query: "uppli" }))).toEqual(["purpose"])
+  })
+
+  it("chip reasons come FIRST and the purpose reason LAST", () => {
+    const vendor = rowById(publishedVendor.id)
+    expect(
+      matchReasons(vendor, sel({ query: "supplier", chips: ["strict", "makes-a-file"] })),
+    ).toEqual(["makes-a-file", "strict", "purpose"])
+  })
+})
+
+describe("192.2-09 (WR-04) — the words are READ from the chip table, never re-spelled", () => {
+  it("the two chip reasons ARE the chip labels — the same value, not a matching literal", () => {
+    // D-14 / DEC-09-D: the chip a person pressed and the reason the row gives back must be
+    // one word. Comparing the two EXPORTS is what makes a re-spelling in either place red.
+    expect(MATCH_REASON_WORDS["makes-a-file"]).toBe(CHIP_WORDS["makes-a-file"].label)
+    expect(MATCH_REASON_WORDS.strict).toBe(CHIP_WORDS.strict.label)
+  })
+
+  it("the purpose word is this module's own, and is the exported one", () => {
+    expect(MATCH_REASON_WORDS.purpose).toBe(MATCH_REASON_PURPOSE)
+  })
+
+  it("every MatchReason has a word, and the table has no member the union does not", () => {
+    const ids: MatchReason[] = ["makes-a-file", "strict", "purpose"]
+    expect(Object.keys(MATCH_REASON_WORDS).sort()).toEqual([...ids].sort())
+    for (const id of ids) expect(MATCH_REASON_WORDS[id].length).toBeGreaterThan(0)
+  })
+
+  it("the prefix and separator exist and are non-empty — the line's fixed parts", () => {
+    // The prefix is what stops a bare `Strict` beside a card from reading as the tier atom
+    // D-03 cut; a blank one would silently re-create exactly that.
+    expect(MATCH_REASON_PREFIX.length).toBeGreaterThan(0)
+    expect(MATCH_REASON_SEPARATOR.length).toBeGreaterThan(0)
+  })
+
+  it("the module still holds NO user-facing string of its own", () => {
+    // `libraryFilter.ts` has never spelled a word a person reads, and `matchReasons` returns
+    // IDS precisely so it never starts. The words live one module over.
+    expect(libraryFilterSource).not.toContain(MATCH_REASON_PURPOSE)
+    expect(libraryFilterSource).not.toContain(MATCH_REASON_PREFIX)
   })
 })

@@ -29,6 +29,10 @@
  */
 import { TIERS } from "@/components/workflows/deriveTier"
 import type { ChipId, Provenance } from "./libraryRow"
+// 192.2-09 (WR-04) — TYPE ONLY, and erased at build. `libraryFilter.ts` owns the closed
+// `MatchReason` union because it owns the matching; this module owns the words. The import
+// is `import type` so the runtime module graph stays one-directional (filter → nothing here).
+import type { MatchReason } from "./libraryFilter"
 
 // ── The six chips ───────────────────────────────────────────────────────────────────
 
@@ -582,3 +586,92 @@ export function forkDialogSub(sourceName: string): string {
     `you can change it in the Builder.`
   )
 }
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 192.2-09 (LIB-06 — gap-closure round 1, WR-04) — WHY THIS ROW IS HERE
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// D-03 cut six atoms from the RESTING card, and three of the ways a person reaches a row
+// still select on facts that left with them: the *Makes a file* chip selects on the
+// deliverable atom, the *Strict* chip on the tier chip, and the search matches inside the
+// `business_requirement` purpose sentence whose hero is gone. So a filtered list could
+// return rows carrying no visible evidence of the property that selected them, and
+// `chipCounts` published a number for a fact the surface would not show.
+//
+// ⚠ THESE WORDS ARE NOT A BACK DOOR FOR THE SIX CUT ATOMS, AND THE ARGUMENT IS MECHANICAL
+// RATHER THAN RHETORICAL. D-03 governs the RESTING card — its own words are *"six atoms
+// leave the **resting** card"* — and the line these words compose is structurally unable to
+// appear there: `matchReasons` returns an EMPTY array whenever no chip is pressed and no
+// search is typed, and the card renders nothing at all for an empty array. The proof is
+// `WorkflowCard.baseline.test.tsx`, which renders with no selection and comes through this
+// wave BYTE-UNCHANGED. A re-baseline would have been the tell that the line leaked.
+//
+// ⚠ ONLY THREE REASONS EXIST, AND THE OTHER FOUR CHIPS ARE SILENT ON PURPOSE.
+// *Ready to run*, *Yours*, *Still building* and *Starters* each already have a visible
+// carrier on line 2 or in the identity line, and echoing them would be exactly the noise
+// D-03 removed. A fourth reason is a DECISION, not a tidy-up.
+//
+// The precedent for explaining a match on this surface is already shipped: `HighlightTitle`
+// marks *why this row matched* on the NAME. These are the same idea for the facts the name
+// cannot carry.
+
+/**
+ * The lead-in that makes the line read as an explanation of the SEARCH the person just ran,
+ * rather than as a claim about the row.
+ *
+ * ⚠ WITHOUT IT THE LINE IS AMBIGUOUS, and ambiguous in the one direction this phase cannot
+ * afford: a bare `Strict` sitting beside a card IS the tier atom D-03 cut. Prefixed, the
+ * same word is an answer to *why is this row in my filtered list*, which is a different
+ * statement made at a different moment.
+ *
+ * It carries no trailing space — the card renders it as its own span inside a `gap`-spaced
+ * flex row, exactly as the identity line renders its own parts.
+ */
+export const MATCH_REASON_PREFIX = "Matched:"
+
+/**
+ * The word for *the letters you typed appear in this workflow's purpose sentence*.
+ *
+ * ⚠ IT NAMES THE FIELD AND NEVER QUOTES IT (T-192.2-40). Rendering the matched SNIPPET
+ * would put user-authored text on a new rendering path and would re-add, one row at a time,
+ * the purpose hero D-03 deliberately cut. The reason says WHERE the hit was; the text stays
+ * off the card.
+ *
+ * ⚠ THE TENSE LIVES IN THE PREFIX, NOT IN EACH WORD, and that is a deliberate departure
+ * from the plan's suggested literal (`Matched in its purpose`). Composed with
+ * `MATCH_REASON_PREFIX` above, that literal renders `Matched: Matched in its purpose` — a
+ * stutter — and it would also have been the only reason word phrased as a verb while the
+ * two chip reasons are noun phrases read straight out of `CHIP_WORDS`. One lead-in, three
+ * things it leads into: `Matched: Makes a file · Your words in its purpose`.
+ */
+export const MATCH_REASON_PURPOSE = "Your words in its purpose"
+
+/**
+ * The three reason words.
+ *
+ * ⚠ TWO OF THE THREE ARE READ FROM `CHIP_WORDS`, NEVER TYPED. The chip a person pressed and
+ * the reason the row gives back must be the SAME WORD — if they were two literals they would
+ * agree today and drift the first time either is reworded, which is the whole failure D-14's
+ * one-home rule exists to prevent. Reading them makes the agreement a property of the
+ * program rather than of somebody's care.
+ *
+ * `as const satisfies Record<MatchReason, string>` is this file's table idiom
+ * (`CHIP_WORDS`, `LIBRARY_STATES`, `PROVENANCE_WORDS`): a fourth `MatchReason` added in
+ * `libraryFilter.ts` without a word here is a TYPECHECK ERROR, not a reason that renders
+ * blank.
+ *
+ * ⚠ THE `import type` ABOVE IS TYPE-ONLY AND THAT IS LOAD-BEARING. `libraryFilter.ts`
+ * imports this module at RUNTIME for nothing (it holds no words), and this module imports
+ * only the TYPE back — erased at build, so the runtime module graph stays acyclic.
+ */
+export const MATCH_REASON_WORDS = {
+  "makes-a-file": CHIP_WORDS["makes-a-file"].label,
+  strict: CHIP_WORDS.strict.label,
+  purpose: MATCH_REASON_PURPOSE,
+} as const satisfies Record<MatchReason, string>
+
+/**
+ * The separator when two reasons apply at once — decorative, and the SAME glyph the identity
+ * line spends, so the card carries one separator vocabulary rather than two.
+ */
+export const MATCH_REASON_SEPARATOR = "·"
