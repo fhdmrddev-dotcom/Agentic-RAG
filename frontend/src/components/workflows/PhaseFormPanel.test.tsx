@@ -1214,6 +1214,48 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     expect(emit.proseChars).toBeLessThan(DENSITY_BEFORE.emit.proseChars)
   })
 
+  it("199-06 — a FAILED registry read reaches all four model-bearing types, and says so", () => {
+    // The widened `Pick` carries the reading through the SAME four mounts — no fifth line,
+    // and the source fence below still reads four. This drives the panel, not the picker:
+    // what is asserted here is that the panel forwards the caller's answer WHOLE on every
+    // type that has a model, which is the only claim the panel owes for this feature.
+    for (const phase_type of ["llm_single", "llm_agent", "llm_batch_agents", "llm_emit"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={{ models: [], runDefaultModel: null, noAnswer: "unavailable" }}
+        />,
+      )
+      expect(screen.getByTestId("model-no-answer").getAttribute("data-reading"), phase_type).toBe("unavailable")
+      // ⚠ AUTH-04's core claim survives the new arm on every type: still no typed path.
+      expect(screen.queryByRole("textbox", { name: /^ai model/i }), phase_type).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("199-06 — a step type with NO model stays untouched by the failed read", () => {
+    for (const phase_type of ["programmatic", "llm_human_input"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", fn: "f", input_keys: ["x"] })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={{ models: [], runDefaultModel: null, noAnswer: "unavailable" }}
+        />,
+      )
+      // The gate is still the PHASE TYPE. A failed read must not conjure a model field onto
+      // a deterministic step or a human pause just because it has something to report.
+      expect(screen.queryByTestId("model-no-answer"), phase_type).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
   it("DENSITY AT THE OPEN READING — still below BEFORE, because one helper was CUT", () => {
     const { container } = renderAtFullDensity("llm_agent", FULL_RAILS)
     fireEvent.click(screen.getByTestId("field-guidance-toggle"))

@@ -2635,6 +2635,20 @@ export function WorkflowBuilderPage({
           // step form. An absent field writes nothing and says nothing false; a lying one does
           // both. `ModelField` cannot express "I could not read the registry" — it takes rows,
           // not a reading — and widening it is 196-05's file, not this plan's.
+          //
+          // ⚠ CORRECTED at Phase 199-06 (DES-01, sheet `c4-phase-form-panel`), in the commit
+          // that closed it, and the paragraph above is kept rather than overwritten because
+          // it was an accurate statement of a real cost for one phase. THE WIDENING HAPPENED:
+          // the picker now takes the READING as well as the rows, so the field no longer
+          // disappears — it says which of the two things is true. `196-08` named the file
+          // that owed this and the hot-file ledger row carried the same line; this is it.
+          //
+          // ⚠ THE REJECTED ALTERNATIVE IS STILL REJECTED, and nothing here re-creates it. The
+          // two non-ready arms pass NO rows to consult: the picker returns above the first
+          // line that reads them, so `models: []` cannot be mistaken for an answer. What
+          // makes that safe is the EXPLICIT discriminator, never the emptiness of an array —
+          // and a registry that genuinely answers with nothing takes the third arm, inside
+          // the normal path, with its own sentence.
           {...(modelRegistry.kind === "ready"
             ? {
                 modelPicker: {
@@ -2643,7 +2657,15 @@ export function WorkflowBuilderPage({
                   showTechnical,
                 },
               }
-            : {})}
+            : {
+                modelPicker: {
+                  // Not consulted — see above. Present only because the shape requires them.
+                  models: [],
+                  runDefaultModel: null,
+                  showTechnical,
+                  noAnswer: modelRegistry.kind === "loading" ? ("loading" as const) : ("unavailable" as const),
+                },
+              })}
           {...(canvasEnabled ? { rails, onGovernanceChange } : {})}
         />
       </div>

@@ -297,7 +297,19 @@ export interface PhaseFormPanelProps {
    * spread at each mount matches the component's contract by construction: a prop renamed in
    * `ModelField` becomes a typecheck error here instead of a silently dropped attribute.
    */
-  modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical">
+  /**
+   * ⚠ 199-06 (DES-01) — `noAnswer` IS NOW IN THE PICK, AND WITH IT THE PARAGRAPH ABOVE THAT
+   * READS *"ABSENT ⇒ THE FOUR MOUNTS RENDER NOTHING"* HAS A SECOND HALF. It stays true and
+   * is kept verbatim, because a caller may still withhold the prop entirely. What changed is
+   * that withholding it is no longer the caller's ONLY move on a failed read: the picker can
+   * now be handed the reading instead of the rows, and it says so on screen. `196-08`'s own
+   * mount comment named this as a cost it was paying and named the file that owed the fix.
+   *
+   * The mounts are untouched — each still spreads the caller's answer WHOLE, so a widened
+   * `Pick` reaches all four without a fifth line, and the source fence that counts them
+   * still reads four.
+   */
+  modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical" | "noAnswer">
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
