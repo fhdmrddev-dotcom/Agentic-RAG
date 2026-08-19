@@ -63,6 +63,7 @@ import {
   CHOOSER_SUB,
   DESCRIBE_CTA,
   DESCRIBE_H1,
+  DESCRIBE_REFUSAL,
   DOOR_A_DESC,
   DOOR_A_NAME,
   DOOR_A_NOTE,
@@ -215,6 +216,26 @@ export function WorkflowDoorSwitch({
    * a suite drives.
    */
   const canDraft = describe.trim().length > 0 && templateRead.kind !== "loading"
+  /**
+   * 199-08 (DES-01 · sheet `c9-doors-describe` §3) — WHEN THE BOX IS REFUSING SOMETHING THE
+   * AUTHOR ACTUALLY TYPED.
+   *
+   * ⚠ IT ADDS NO RULE AND CHANGES NO ENABLEMENT. It is the FIRST term of `canDraft` above,
+   * read back so the surface can say what that term already decided — the sheet's finding is
+   * that a disabled button with no sentence is the failure state, not the fix. `canDraft` is
+   * untouched, and this expression is never consulted by it.
+   *
+   * ⚠ THE `length > 0` TERM IS LOAD-BEARING AND IS NOT A DUPLICATE OF THE TRIM. An untouched
+   * empty box is refused by the same rule, and captioning it would put a refusal on the first
+   * screen an author meets, before they had done anything — which is both the wrong reading and
+   * a byte-for-byte change to a resting DOM three suites pin. So the sentence appears only once
+   * there is an input to refuse.
+   *
+   * ⚠ AND IT COVERS ONLY THE FIRST TERM, DELIBERATELY. The second (`templateRead.kind`) already
+   * speaks for itself: the attach row renders its own in-flight line, so a second sentence here
+   * would be a second home for one fact.
+   */
+  const refusingDescribe = describe.length > 0 && describe.trim().length === 0
 
   // Return to the "both" chooser AND clear the one-shot draft hand-off (so re-entering
   // the govern door later doesn't re-trigger a generate).
@@ -356,6 +377,21 @@ export function WorkflowDoorSwitch({
               </span>
               <h1 className="text-[1.4rem] font-semibold text-foreground">{DESCRIBE_H1}</h1>
             </div>
+            {/* ── 199-08 (sheet c9 §3) — THE BOX, AND ITS ONE TONED STATE ──
+                ⚠ THE CLASS LIST IS A CONCATENATION, NEVER TWO `className` BRANCHES, and the
+                shape is `DoorHeaderStrip.tsx`'s `ml-auto` conditional copied in kind for the
+                same mechanical reason: with nothing refused the three slots below resolve to
+                the class list that shipped, CHARACTER FOR CHARACTER, which is exactly what
+                `WorkflowDoorSwitch.baseline.test.tsx` holds byte for byte across six states.
+                A rewrite that grouped the tokens differently would red that pin while changing
+                no pixel — and re-baselining a characterization pin to make a red go green is
+                forbidden in terms.
+
+                ⚠ TONE IS THE SECOND CARRIER, NEVER THE ONLY ONE (WCAG 1.4.1): the refusal is
+                a SENTENCE first, and this border is a reinforcement of it. `destructive` is a
+                shipped token that resolves in `tailwind.config.js` — verified rather than
+                assumed, because fifteen of this sheet's seventeen colour tokens compile to
+                nothing here and would render identically to an arm nobody painted. */}
             <textarea
               aria-label="business requirement"
               data-testid="describe-box"
@@ -363,8 +399,25 @@ export function WorkflowDoorSwitch({
               onChange={(e) => setDescribe(e.target.value)}
               placeholder="Describe the goal in plain language…"
               rows={5}
-              className="w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              // SPREAD-CONDITIONAL, this file's shipped idiom: with nothing refused the
+              // attribute is genuinely ABSENT rather than present-and-false, so the resting
+              // markup is the markup that shipped. `aria-invalid="false"` would not be.
+              {...(refusingDescribe ? { "aria-invalid": true } : {})}
+              className={`w-full resize-none rounded-lg border ${refusingDescribe ? "border-destructive" : "border-border"} bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground ${refusingDescribe ? "focus:border-destructive" : "focus:border-primary"} focus:outline-none focus:ring-1 ${refusingDescribe ? "focus:ring-destructive" : "focus:ring-primary"}`}
             />
+            {/* ⚠ THE REFUSAL, SAID OUT LOUD — the sheet's whole finding for this surface, and
+                the one thing a disabled button cannot do. `role="status"` rather than `alert`:
+                the author is mid-typing and this is a standing condition, not an interruption.
+                Rendered only while there is an input to refuse, so it never greets anyone. */}
+            {refusingDescribe && (
+              <p
+                data-testid="describe-refusal"
+                role="status"
+                className="-mt-2 text-[12.5px] leading-snug text-destructive"
+              >
+                {DESCRIBE_REFUSAL}
+              </p>
+            )}
             {/* Phase 187-26 (GAP A): somewhere to say what this work is ABOUT, before the
                 AI drafts. OPTIONAL by construction — it renders nothing when there are no
                 folders to offer, it touches no enablement rule, and ignoring it gives

@@ -229,6 +229,43 @@ export const DESCRIBE_H1 = "What recurring work should this automate?"
 export const DESCRIBE_CTA = "Write the first draft"
 
 /**
+ * `describe.refusal` — what the describe box SAYS when it has an input it cannot act on.
+ *
+ * ⚠ THE 23rd GOVERNED ID, AND THE SECOND THAT POSTDATES THE GENERATED CONTRACT (199-08, sheet
+ * `c9-doors-describe` §3). Like `DESCRIBE_ATTACH_PROMPT` above it belongs to a DIFFERENT
+ * acceptance bar and cannot reach `__contracts__/doors-copy.generated.md`; `doorVocabulary.test.ts`
+ * therefore carries it in the post-contract set and asserts it is ABSENT from the parsed contract,
+ * rather than widening the contract parse to a row the contract does not have.
+ *
+ * ── ⚠ IT DESCRIBES A SHIPPED RULE. IT DOES NOT CREATE ONE ────────────────────────────────
+ * The CTA has been gated on a trimmed-length test since Phase 124 and on an in-flight document
+ * read since 193.1. Nothing about either changes here: this string only says out loud what the
+ * FIRST of those two already decides in silence. A refusal SENTENCE is presentation; a refusal
+ * RULE would be behaviour, and behaviour is outside this phase's fence. `199-08`'s Task-1 pin
+ * measures the predicate in source AND drives it, so the claim is checked rather than asserted.
+ *
+ * ── ⚠ WHY NOT THE SHEET'S OWN WORDS ──────────────────────────────────────────────────────
+ * Sheet c9 draws this state captioned with a VAGUENESS verdict over a real sentence
+ * (*"Automate my emails."*) and names two things it claims are missing. We can make no such
+ * judgement: no predicate in this product reads an input for vagueness, so shipping that caption
+ * would be printing a verdict nothing computes — the `UNDETERMINED` refusal `199-03` made one
+ * sheet earlier, pointed the other way. What our rule actually refuses is an input that is blank
+ * once its whitespace is taken off, so that is what this says.
+ *
+ * ── ⚠ IT MUST NEVER RENDER AT REST ───────────────────────────────────────────────────────
+ * An untouched empty box is refused by the same rule, and captioning THAT would put a red
+ * sentence on the first screen an author meets before they had done anything at all. The
+ * component gates this on a non-empty input, so the resting DOM is unchanged — which is
+ * additionally a MECHANICAL requirement here, not merely a taste one:
+ * `WorkflowDoorSwitch.baseline.test.tsx` pins all six resting states byte for byte.
+ *
+ * No severity word, no exclamation, no mechanism: it names what is missing and what to do.
+ * The dash is an EM DASH (U+2014); the suite asserts the codepoint over the whole table.
+ */
+export const DESCRIBE_REFUSAL =
+  "There is nothing here to draft from yet — describe the work in a sentence."
+
+/**
  * `ctrl.label` — the pre-draft attach control's prompt, directly below the KB picker's label.
  *
  * ⚠ THE 22nd GOVERNED ID, AND THE FIRST ONE THIS TABLE HAS GAINED SINCE THE CONTRACT WAS

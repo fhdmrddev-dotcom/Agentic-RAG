@@ -601,7 +601,10 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
     // cannot shrink the sweep silently. 193.1-06 (D-21 / D-28): 21 → 22, moved in the SAME
     // COMMIT as `GOVERNED_ID_COUNT` in `doorVocabulary.test.ts`, since the two numbers are the
     // same fact read from two files.
-    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(22)
+    // 199-08 (DES-01): 22 → 23, again in the SAME COMMIT as `GOVERNED_ID_COUNT` in
+    // `doorVocabulary.test.ts` — the two numbers are one fact read from two files, and a count
+    // that moved on its own is a table nobody checked.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(23)
     for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
     // …and the SECOND spelling is not a no-op: at least one id really differs between the
     // two, which is the only thing that makes sweeping twice worth the line.
@@ -626,7 +629,7 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
 
 describe("D-24(a) — no governed door word survives as a literal in any swept module", () => {
   it.each(SWEPT_SOURCES.map((f) => [f.path, f.source] as const))(
-    "%s carries none of the 22 governed words, in either spelling",
+    "%s carries none of the 23 governed words, in either spelling",
     (_path, source) => {
       expect(hitsIn(source)).toEqual([])
     },
@@ -1071,15 +1074,17 @@ describe("199-08 Task 1 — THE REFUSAL ROW: does a gating predicate already exi
     expect(cta).toBeEnabled()
   })
 
-  it("⚠ TODAY IT REFUSES IN SILENCE — a disabled button and no sentence (INVERTED by Task 2)", async () => {
+  it("⚠ IT NO LONGER REFUSES IN SILENCE — the sentence is THERE (INVERTED by Task 2, not deleted)", async () => {
     render(<WorkflowDoorSwitch />)
     fireEvent.click(screen.getByTestId("door-card-describe"))
     await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
     fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "   " } })
     // NON-VACUITY: the refusing state really is on screen and really is refusing.
     expect(screen.getByTestId("describe-draft")).toBeDisabled()
-    // The absence Task 2 turns into a presence. This assertion is INVERTED, never deleted.
-    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    // ⚠ THE INVERSION. Task 1 committed this same query asserting `toBeNull()` one commit
+    // earlier; the POLARITY moved and the query did not. That is what makes this a proof of
+    // the change rather than a description of it.
+    expect(screen.getByTestId("describe-refusal")).toBeInTheDocument()
   })
 
   it("the SECOND gating term already speaks for itself — an in-flight read says so out loud", () => {
@@ -1197,5 +1202,115 @@ describe("199-08 Task 1 — the 199-09 SEAM, recorded rather than assumed", () =
     // Wave 3 imports the SAME refusal constant this plan lands, rather than spelling a second
     // one. The proof that it has not already done so is here, in wave 2.
     expect(builderPageSource).not.toContain("DESCRIBE_REFUSAL")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 2 (DES-01 · sheet `c9-doors-describe` §3) — THE REFUSAL, SAID OUT LOUD.
+//
+// APPENDED, never interleaved. The ONE assertion this plan moves is the polarity of the
+// absence Task 1 committed a commit earlier; nothing is deleted anywhere.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("199-08 Task 2 — the describe box refuses OUT LOUD, and adds no rule doing it", () => {
+  /** The describe door, open, with the picker's request settled. */
+  async function openDescribeDoor() {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    return screen.getByTestId("describe-box") as HTMLTextAreaElement
+  }
+
+  it("the sentence is the GOVERNED one, reached by import — never a literal in the component", async () => {
+    const box = await openDescribeDoor()
+    fireEvent.change(box, { target: { value: "  \t " } })
+    // The words come from the module. The D-24(a) fence above independently proves the
+    // component does not spell them; this proves the module's value is what renders.
+    expect(screen.getByTestId("describe-refusal")).toHaveTextContent(
+      doorVocabulary.DESCRIBE_REFUSAL,
+    )
+    // …and it announces itself as a standing condition rather than an interruption.
+    expect(screen.getByTestId("describe-refusal").getAttribute("role")).toBe("status")
+  })
+
+  it("⚠ IT NEVER GREETS ANYONE — an untouched box is refused in silence, exactly as it ships", async () => {
+    await openDescribeDoor()
+    // The SAME rule refuses an empty box, and captioning that would put a refusal on the first
+    // screen an author meets. This is the reason the trigger carries a `length > 0` term.
+    expect(screen.getByTestId("describe-draft")).toBeDisabled()
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(screen.getByTestId("describe-box")).not.toHaveAttribute("aria-invalid")
+  })
+
+  it("it CLEARS the moment there is something to draft from, and on the way back to empty", async () => {
+    const box = await openDescribeDoor()
+
+    fireEvent.change(box, { target: { value: "   " } })
+    expect(screen.getByTestId("describe-refusal")).toBeInTheDocument()
+
+    fireEvent.change(box, { target: { value: "Summarise weekly vendor risk" } })
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(screen.getByTestId("describe-draft")).toBeEnabled()
+
+    // …and clearing the box RIGHT back to empty returns it to the resting silence rather than
+    // leaving a refusal standing over a screen nobody has touched.
+    fireEvent.change(box, { target: { value: "" } })
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+  })
+
+  it("NO RULE MOVED — enablement is byte-for-byte the shipped predicate on every arm", async () => {
+    const box = await openDescribeDoor()
+    const cta = screen.getByTestId("describe-draft")
+    for (const [value, enabled] of [
+      ["", false],
+      ["   ", false],
+      ["\n\t", false],
+      ["a", true],
+      [" a ", true],
+    ] as const) {
+      fireEvent.change(box, { target: { value } })
+      expect(cta.hasAttribute("disabled"), `enablement moved for ${JSON.stringify(value)}`).toBe(
+        !enabled,
+      )
+    }
+  })
+
+  it("the box is marked invalid ONLY while refusing — an attribute, never a colour alone", async () => {
+    const box = await openDescribeDoor()
+    fireEvent.change(box, { target: { value: " " } })
+    expect(box).toHaveAttribute("aria-invalid", "true")
+    fireEvent.change(box, { target: { value: "Summarise weekly vendor risk" } })
+    // ⚠ ABSENT, not `"false"`. A spread-conditional rather than a default is what keeps the
+    // resting markup identical to the markup three suites pin byte for byte.
+    expect(box).not.toHaveAttribute("aria-invalid")
+  })
+
+  it("⚠ THE RESTING CLASS LIST IS CHARACTER-FOR-CHARACTER THE SHIPPED ONE", async () => {
+    const box = await openDescribeDoor()
+    const RESTING =
+      "w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] " +
+      "leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 " +
+      "focus:ring-primary"
+    expect(box.getAttribute("class")).toBe(RESTING)
+
+    // …and the refusing arm really does differ, so the concatenation is not a no-op dressed up
+    // as a conditional. Three slots move and NOTHING else does.
+    fireEvent.change(box, { target: { value: " " } })
+    const refusing = (box.getAttribute("class") ?? "").split(" ")
+    expect(refusing).toContain("border-destructive")
+    expect(refusing).toContain("focus:border-destructive")
+    expect(refusing).toContain("focus:ring-destructive")
+    expect(refusing).not.toContain("border-border")
+    expect(refusing.length).toBe(RESTING.split(" ").length)
+  })
+
+  it("the sentence claims NOTHING the product cannot compute — no vagueness verdict", () => {
+    // Sheet c9 captions this state with a vagueness judgement over a real sentence. No
+    // predicate in this product reads an input for vagueness, so that caption would print a
+    // verdict nothing computes. Swept over the shipped string rather than promised in prose.
+    const words = /vague|too short|too long|invalid|unclear|error|quality|specific enough/i
+    expect(words.test(doorVocabulary.DESCRIBE_REFUSAL)).toBe(false)
+    // POSITIVE CONTROL — the sweep really fires on the sheet's own caption.
+    expect(words.test("Request too vague - Needs a goal and a source.")).toBe(true)
   })
 })

@@ -70,6 +70,10 @@ import workflowDoorSwitchSource from "./WorkflowDoorSwitch?raw"
 import headerSuiteSource from "@/pages/WorkflowBuilderPage.header.test?raw"
 
 import { DoorHeaderStrip } from "./DoorHeaderStrip"
+// 199-08: the words this strip renders, read off their ONE home rather than re-typed — this
+// suite may legitimately spell them, but deriving them is what keeps a reword from needing an
+// edit here too.
+import * as doorVocabulary from "./doorVocabulary"
 
 /**
  * The judge badge's class attribute AS CAPTURED in `WorkflowBuilderPage.header.test.tsx`'s
@@ -363,5 +367,67 @@ describe("DoorHeaderStrip 193-03 — the extracted module cannot import back (D-
     // …and no re-export shim was left behind, which is what would quietly preserve the coupling
     // this extraction exists to remove while every other assertion here stayed green.
     expect(workflowDoorSwitchSource).not.toMatch(/export \{[^}]*DoorHeaderStrip[^}]*\} from/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 2 (DES-01 · sheet `c9-doors-describe` §2) — THE STRIP IS **ALREADY
+// SHIPPED**, AND THIS RECORDS THE VERDICT RATHER THAN REBUILDING IT.
+//
+// APPENDED, never interleaved. Not one assertion above this line moves, and this plan
+// changes NO byte of `DoorHeaderStrip.tsx` — the shipped shape (D-04's restack, Phase 193)
+// already IS the sheet's §2: a return control, then the name of the door you are standing
+// in. Re-drawing it would spend change budget on the one element that needed none, and it
+// would move a DOM that `WorkflowDoorSwitch.baseline.test.tsx` pins byte for byte.
+//
+// ⚠ THE SHEET AND THE SHIPPED LANGUAGE DISAGREE ON THREE POINTS AND THE SHIPPED ONE WINS,
+// which is what these cases pin so the disagreement is a decision rather than a diff:
+//   1. the sheet's label is a PROGRESS word ("…ing", trailing ellipsis) — a claim that work
+//      is under way, on a strip that renders while nothing is running at all;
+//   2. its glyphs are Material Symbols, which are not in this project's icon convention
+//      (`199-03` refused the same substitution one sheet earlier);
+//   3. its return control is an ICON-ONLY button whose only name is a `title` — the shipped
+//      one is a worded control, and a `title` is not an accessible name a keyboard user can
+//      read without hovering.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("199-08 — sheet c9 §2: the header strip, ALREADY SHIPPED (verified, not rebuilt)", () => {
+  it("both of the sheet's §2 elements are present, in the sheet's own order", () => {
+    render(<DoorHeaderStrip onBack={() => {}} />)
+    const back = screen.getByTestId("both-doors")
+    const label = screen.getByText(doorVocabulary.STRIP_LABEL_GOVERN)
+    // NON-VACUITY: two distinct real nodes, not one node matched twice.
+    expect(back).not.toBe(label)
+    // The sheet's order — escape first, then the door you are in. `compareDocumentPosition`
+    // reads the real DOM order rather than trusting the source to have kept it.
+    expect(back.compareDocumentPosition(label) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("⚠ the return control is WORDED, not an icon with a tooltip for a name", () => {
+    render(<DoorHeaderStrip onBack={() => {}} />)
+    const back = screen.getByTestId("both-doors")
+    // The accessible name is real text, present without hovering anything.
+    expect((back.textContent ?? "").trim().length).toBeGreaterThan(0)
+    expect(back).toHaveTextContent(doorVocabulary.STRIP_BACK)
+  })
+
+  it("⚠ the label names the DOOR, and claims no progress the strip cannot observe", () => {
+    // The sheet's caption asserts an activity in flight. This strip renders on a screen where
+    // nothing is running, so that word would be a claim about state it never reads — the same
+    // class of refusal `199-03` recorded for the sheet's determinate progress strip.
+    const label = doorVocabulary.STRIP_LABEL_GOVERN
+    expect(label.endsWith("...")).toBe(false)
+    expect(label.endsWith("…")).toBe(false)
+    expect(/ing\b/i.test(label)).toBe(false)
+    // POSITIVE CONTROL — the sweep really fires on the sheet's own two captions.
+    expect(/ing\b/i.test("Describing workflow...")).toBe(true)
+    expect("Manual composition...".endsWith("...")).toBe(true)
+  })
+
+  it("199-08 modified NO byte of this component — the strip carries no marker from this phase", () => {
+    // A verdict of ALREADY-SHIPPED is only honest if the file really was left alone. Cheapest
+    // mechanical form of that claim: this phase's own tag appears nowhere in the component.
+    expect(doorHeaderStripSource).not.toContain("199-08")
+    expect(doorHeaderStripSource.length).toBeGreaterThan(1000)
   })
 })
