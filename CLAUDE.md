@@ -337,6 +337,19 @@ User-observed bugs from manual testing live in `.planning/reported-bugs/`. Each 
 
 **Status lifecycle:** `open` → `folded` (when a phase claims it) → `closed` (when the shipped phase verifiably closes it). Reports can also be `deferred` (with `re_open_trigger`) or `external-noted` (won't ever fold).
 
+## Seeds register cross-check (MANDATORY)
+
+⚠ **MEASURED 2026-08-19: the seeds register is swept by NOTHING, and neither are the carry-forward files.** `.planning/seeds/` holds **188** deferred ideas, each with a `trigger_when` written precisely so it could be revived at the right moment — and `grep -rln "SEED" .claude/commands/gsd/` returns **`capture.md` only**, the command that *writes* seeds. `/gsd:new-milestone` greps for neither `SEED` nor `carry.?forward`. So `.planning/v3.6-STRETCH-CARRYFORWARD.md`'s own claim — *"At `/gsd:new-milestone` the STRETCH sweep surfaces this file"* — **is backed by nothing executable.** This is the `reported-bugs` failure mode one register over: a `trigger_when` nobody reads is a deferral with no re-open, which is a deletion that looks like a decision.
+
+**Sweep the register at two touchpoints, the same way reported-bugs are swept:**
+
+| Touchpoint | What to do |
+|---|---|
+| `/gsd:new-milestone` | List `.planning/seeds/*.md` with `status: planted` (or `dormant`) AND `surface: Agentic-RAG`. Read each `trigger_when`; surface the ones whose trigger is ALREADY TRUE or fires within the proposed milestone as candidate REQ-IDs. Seeds explicitly gated on another seed must be sequenced, never listed flat. |
+| `/gsd:discuss-phase NNN` | Grep the register for seeds whose `relates_to` names a file in the phase's blast radius or whose `trigger_when` names this phase's surface. Fold / defer / leave — and write the routing back into the seed's frontmatter, exactly as reported-bugs require. |
+
+**A seed is answered by editing the seed.** Flip `status` and record where it went; a seed that shipped but still reads `planted` will be re-proposed forever, and one that was consciously rejected must say so rather than staying silent. ⚠ **`status:` frontmatter IS the index — prose inside the body saying "still open" is invisible to the scan.**
+
 ## UAT scoreboard recipe (MANDATORY)
 
 Phase 075.4 Plan 05 (D-075.4-H1 Wave 0) — closes the assumption-driven-UAT gap that cost insert-phases 067.5, 075.1, 075.2, 075.3, 075.4. ROADMAP SC#10 verbatim:
