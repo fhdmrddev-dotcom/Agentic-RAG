@@ -360,6 +360,25 @@ const DEFAULT_EDGE_OPTIONS: DefaultEdgeOptions = {
   },
 }
 
+/**
+ * Phase 200 (canvas port) — how long the reorder-refusal acknowledgement stays on the node.
+ *
+ * 320ms against a 220ms animation: long enough that the nudge completes and the outline is
+ * seen to rest for a moment, short enough that it cannot read as a persistent STATE of the
+ * step. A refusal is an answer to one keypress, not a property of the first card.
+ *
+ * MODULE SCOPE, never a literal at the use site — the frozen-table rule this file already
+ * applies to `CANVAS_LAYOUT`, `EDGE_STYLE` and `BACKGROUND_GROUND`.
+ */
+const REFUSAL_NUDGE_MS = 320
+
+/**
+ * The class the refusing node's WRAPPER wears for `REFUSAL_NUDGE_MS`. Spelled once here and
+ * consumed by the `nodes` memo; its keyframe, its reduced-motion guard and the outline that
+ * carries the reading when motion is suppressed all live in `index.css` beside the ring's.
+ */
+const REFUSAL_NUDGE_CLASS = "canvas-reorder-refused"
+
 /** Solid for run order and for the terminal cap; dashed for a conditional branch. */
 const EDGE_STYLE: Record<string, CSSProperties> = {
   [CANVAS_EDGE_KINDS.flow]: { stroke: "hsl(var(--border))", strokeWidth: 2 },
@@ -679,6 +698,40 @@ export function WorkflowCanvas({
    */
   const [dragOverlay, setDragOverlay] = useState<Record<string, XYPosition>>({})
 
+  // ⚠ DECLARED HERE, ABOVE THE `nodes` MEMO THAT READS IT, AND NOT BESIDE THE KEY
+  // HANDLER THAT WRITES IT. A `const` is in its temporal dead zone until its own line
+  // runs, so declaring it next to the handler further down threw
+  // `ReferenceError: Cannot access 'refusedSlug' before initialization` from inside the
+  // memo — 83 tests red on one hoisting mistake, which is what this note is here to
+  // stop the next reader repeating.
+  /**
+   * Phase 200 (canvas port) — WHICH STEP JUST REFUSED TO MOVE, if any.
+   *
+   * ⚠ IT EXISTS BECAUSE THE REFUSAL WAS SILENT. Operator finding, in their words: *"nodes
+   * cannot move to the left or to the right — the first node to the left cannot move beyond
+   * a certain boundary, same as to the right."* The REFUSAL is correct — order is derived
+   * from run order and there is no position −1 — but the handler's early `return` told
+   * nobody, so a person pressed a key, nothing happened, and nothing said why. That is the
+   * same defect class as a control that declines without saying so.
+   *
+   * A SLUG AND NOT A BOOLEAN, so the acknowledgement lands on the node the person actually
+   * selected rather than on the plane. It is transient by design and clears itself on a
+   * timer; nothing downstream persists it, and it never reaches the definition.
+   */
+  const [refusedSlug, setRefusedSlug] = useState<string | null>(null)
+  const refusalTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // The timer is cleared on unmount so a refusal fired just before navigation cannot call
+  // `setState` on a dead component. `useEffect` with an empty dep list is the right shape:
+  // the ref survives every render, so there is nothing to re-subscribe.
+  useEffect(
+    () => () => {
+      if (refusalTimer.current !== null) clearTimeout(refusalTimer.current)
+    },
+    [],
+  )
+
+
   /**
    * The library's own measurement, echoed back so it survives our node rebuilds.
    * See `handleNodesChange` for why dropping it makes a dragged card blink.
@@ -806,12 +859,27 @@ export function WorkflowCanvas({
       // node's `position` became a Function with no `.x`/`.y` — and the library then
       // wrote NO transform at all, painting the card at the origin on top of phase 1.
       const overlay = own(dragOverlay, node.id)
-      if (overlay === undefined) return node
+      // Phase 200 — the reorder-refusal acknowledgement rides HERE rather than in
+      // `settledNodes`, and the placement is load-bearing. This memo copies the node but
+      // hands `data` straight through BY REFERENCE, so `PhaseNode`'s memo still
+      // short-circuits and the card is not re-rendered to show a wrapper class. Adding it
+      // one memo up would have rebuilt every node's `data` object — the exact identity the
+      // drag-flicker fix depends on.
+      const refused = refusedSlug !== null && node.id === refusedSlug
+      if (overlay === undefined && !refused) return node
       touched = true
-      return { ...node, position: overlay }
+      return {
+        ...node,
+        ...(overlay === undefined ? {} : { position: overlay }),
+        // Composed, never replaced: the projection may already have given this node a
+        // class, and a refusal must not silently drop it.
+        ...(refused
+          ? { className: [node.className, REFUSAL_NUDGE_CLASS].filter(Boolean).join(" ") }
+          : {}),
+      }
     })
     return touched ? next : settledNodes
-  }, [settledNodes, dragOverlay])
+  }, [settledNodes, dragOverlay, refusedSlug])
 
   /**
    * The lane centres, in render order — the x-coordinate of every phase column, read
@@ -1087,9 +1155,37 @@ export function WorkflowCanvas({
       if (from === -1) return
 
       const to = from + (event.key === "ArrowLeft" ? -1 : 1)
-      // At either end there is nowhere to go. Nothing is committed and nothing new is
-      // said — a live region that repeats itself on a no-op teaches the user to ignore it.
-      if (to < 0 || to >= phaseOrder.length) return
+      // At either end there is nowhere to go. Nothing is committed, and NOTHING NEW IS SAID
+      // — a live region that repeats itself on a no-op teaches the user to ignore it. That
+      // sentence is unchanged and still governs the ANNOUNCEMENT.
+      //
+      // ⚠ WHAT CHANGED IS THAT SILENCE IS NO LONGER THE WHOLE ANSWER (Phase 200 — operator
+      // finding). The reasoning above is correct about the screen reader and was being
+      // applied to the eye as well, so a sighted person pressed a key and got nothing at
+      // all. The visual acknowledgement below is the other half: it fires on the selected
+      // node, it is bounded, and it says "this direction is the end" without claiming
+      // anything moved.
+      //
+      // IT DOES NOT SPAM, and the mechanism is not a string comparison. `event.repeat` is
+      // already discarded above, so a HELD key nudges once. A repeatedly TAPPED key is a
+      // repeated deliberate act and gets a repeated answer — which is the honest behaviour;
+      // what the comment above forbids is re-announcing the same words into a live region,
+      // and the live region is untouched here. `setAnnouncement` is deliberately NOT called.
+      //
+      // The state is re-set before the timer so a second tap restarts the acknowledgement
+      // rather than being swallowed by the tail of the first.
+      if (to < 0 || to >= phaseOrder.length) {
+        event.preventDefault()
+        if (refusalTimer.current !== null) clearTimeout(refusalTimer.current)
+        setRefusedSlug(null)
+        // A frame's gap, so React really removes and re-adds the class and the animation
+        // restarts. Setting the same value twice in one tick would be a no-op render.
+        refusalTimer.current = setTimeout(() => {
+          setRefusedSlug(selectedSlug)
+          refusalTimer.current = setTimeout(() => setRefusedSlug(null), REFUSAL_NUDGE_MS)
+        }, 0)
+        return
+      }
 
       event.preventDefault()
       onCommitNodes?.(nodesWithMove(selectedSlug, to))
