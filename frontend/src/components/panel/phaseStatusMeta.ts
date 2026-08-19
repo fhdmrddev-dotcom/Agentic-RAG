@@ -27,6 +27,36 @@
  * DOM is unmoved (`panel/__tests__/PhaseTimeline.test.tsx`, 21 cases, green across the
  * move).
  *
+ * ── Phase 200-07 (DES-02 · `200-CHECKLIST.md` §4) — THIS MODULE FINALLY HAS ITS OWN SUITE ──
+ *
+ * ⚠ IT WAS UNPINNED FOR ITS ENTIRE LIFE, while being D-06's natural home. Every guarantee
+ * below was exercised only TRANSITIVELY, through `PhaseCard` / `PhaseTimeline` renders —
+ * and the count gate's own §187-29 correction says exactly why that is not enough:
+ * *"a pinned TOTAL rising proves nothing about the NEW cases, because slack inside an
+ * already-listed file absorbs them."* `phaseStatusMeta.test.ts` is the direct guard, pinned
+ * in the commit that created it (the 196-05 / 196-07 rule: *"an unpinned file is not a
+ * lightly-guarded one, it is an UNGUARDED one"*).
+ *
+ * ⚠ THE TWO INVARIANTS THAT SUITE EXISTS TO HOLD, stated once here so a later editor meets
+ * them before the diff rather than after it:
+ *
+ *  1. **`statusMeta()` MUST STAY TOTAL over the nine declared members, and must NEVER become
+ *     a coalesced bracket read.** `Record<Phase["status"], StatusMeta>` makes the compiler
+ *     the parity guarantee for every DECLARED member and says nothing whatever about an
+ *     INHERITED one — so an own-property guard with an explicit `unknown` row is the shape,
+ *     and the tempting one-liner returns a FUNCTION for a prototype key rather than firing
+ *     its fallback. (The forbidden expression is deliberately not spelled anywhere in this
+ *     file: this plan's acceptance greps this source for it and a docblock quoting the
+ *     needle would make its own guard read `1` instead of `0` — the 187-24 trap, which has
+ *     now fired on five separate files in this phase.)
+ *  2. **No word a person reads may be interpolated from a raw status member** (WR-05). The
+ *     table holds the words; `statusWord` is the only door to them.
+ *
+ * ⚠ THIS MODULE HOLDS WORDS AND NO DERIVATION, and that split is deliberate rather than
+ * incidental. D-06's nine timing arms live in `components/workflows/phaseDuration.ts` —
+ * shared with the run page, so the panel half and the page half provably cannot disagree
+ * about a duration. A second arm added here would be that disagreement's first day.
+ *
  * ⚠ THE GLYPH-COUNT EVIDENCE MOVED WITH THE TABLE. `STATUS_META["recorded-not-sent"]`'s
  * comment argues its mark was chosen because a rejected alternative already means CANCELLED
  * elsewhere, and rests that claim on the rejected mark's occurrence COUNT *in the file the

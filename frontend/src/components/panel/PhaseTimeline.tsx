@@ -25,7 +25,7 @@
  * the {n}-agents tally (sub_agent_start), and the run-level end-of-run sources.
  * NO per-phase tool/search/source chip (those fire on the invisible sub stream).
  */
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePhases, useTasks } from "@/providers/StreamsProvider"
 import { getThreadWorkflow, type ThreadWorkflowState } from "@/lib/api"
 import type { Phase } from "@/types"
@@ -36,11 +36,28 @@ import { TERMINAL_RUN_STATUSES } from "@/lib/phaseState"
 import { PhaseCard } from "./PhaseCard"
 // WR-05 — the panel's status vocabulary, read from its ONE home rather than re-derived.
 import { statusWord } from "./phaseStatusMeta"
+// ── Phase 200-07 (DES-02 / D-06 / D-07) — the ONE resolver, imported rather than mirrored.
+//
+// `runFactsBySlug` is `200-05`'s slug → facts lookup, and it is the reason this file
+// subtracts no timestamps of its own. It also reads its map through `own()`, which matters
+// live rather than theoretically here: `workflow_phases.slug` is unconstrained `text`
+// (migration 121 declined `SEED-143`'s CHECK with a recorded trigger), so a phase slugged
+// `constructor` really can reach this layer — and a bare index would hand back a FUNCTION
+// typed as a facts object, which React refuses to render, blanking the row with nothing on
+// screen to say anything went wrong.
+import { runFactsBySlug } from "@/components/workflows/phaseDuration"
 
-/** The run-level reconcile frame this timeline needs (subset of ThreadWorkflowState). */
+/** The run-level reconcile frame this timeline needs (subset of ThreadWorkflowState).
+ *
+ *  ⚠ Phase 200-07 — `phases` JOINED THE PICK, and it is what makes the durable per-step
+ *  timings reachable at all. `GET /threads/{id}/workflow` has carried them since `200-02`
+ *  widened the Python model; the client mirror declared them only from `200-07`. **FETCH IS
+ *  AUTHORITATIVE** (D-v2.5-03): these rows come from the read, never from an SSE frame, and
+ *  a terminal run has no stream at all — which is the same reason this component's
+ *  reconcile floor exists. */
 type RunFrame = Pick<
   ThreadWorkflowState,
-  "mode" | "definition_name" | "run_status" | "current_phase_index" | "total_phases"
+  "mode" | "definition_name" | "run_status" | "current_phase_index" | "total_phases" | "phases"
 >
 
 
@@ -120,26 +137,79 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
   // so the COUNTER derives from the slice (forward-only by construction); this
   // frame only supplies the header name + the terminal run_status for aria-busy.
   const [frame, setFrame] = useState<RunFrame | null>(null)
+  /**
+   * ⚠ Phase 200-07 — THE RE-READ TRIGGER, and it is the D-v2.5-03 rule rather than an
+   * optimisation. The durable timestamps live on the FETCHED rows, and this component
+   * fetched exactly once, at mount. A step that starts after mount would therefore have had
+   * its `started_at` arrive on the SSE frame (which drives the slice) and never on the rows
+   * the readings are computed from — so the reading would sit frozen while a person watched.
+   *
+   * The signature is (index, status) per row: the live stream MOVES it, and the fetch then
+   * settles what actually happened. That is the shipped division of labour on this surface —
+   * *"Realtime is a hint, not a source of truth; always reconcile via fetch"* — and it is the
+   * same failure `196` measured one surface over, where a gate with no fetch reconcile HID a
+   * shipped control. It is bounded by construction: one read per status transition, not a
+   * poll.
+   */
+  const phaseSignature = phases.map((p) => `${p.phaseIndex}:${p.status}`).join(",")
+
+  /**
+   * ⚠ LATEST-WINS BY SEQUENCE, NOT CANCEL-ON-EVERY-TRIGGER — and this shape was arrived at
+   * by MEASUREMENT rather than chosen for elegance.
+   *
+   * The obvious form is one effect keyed on `[threadId, phaseSignature]` with a per-effect
+   * `cancelled` flag. It was written that way first, and it DROPPED ITS OWN RE-READ: the
+   * slice this component renders is itself fetch-derived (`usePhases` mounts
+   * `usePanelReconcile`, whose fetcher REPLACES the whole slice), so a settling reconcile
+   * changes `phaseSignature`, which tears down the effect that is at that moment waiting for
+   * the answer. Observed: four reads issued, and the frame still holding the first one's
+   * payload. In a churny moment that starves the read indefinitely — and a starved read here
+   * is not a blank, it is a STALE READING, which is the one failure mode this whole screen
+   * exists to remove.
+   *
+   * So: the ABORT is scoped to the THREAD (where cancelling really is right — a previous
+   * thread's answer must never land), and staleness is settled by a monotonic sequence.
+   * A later request always wins; an earlier one that arrives late is discarded rather than
+   * cancelling anybody.
+   */
+  const frameSeq = useRef(0)
+  const frameAbort = useRef<AbortController | null>(null)
+
+  // Effect 1 — the THREAD-scoped controller. Declared FIRST on purpose: React runs effects
+  // in declaration order, so the controller exists before the read below is issued, and on
+  // a thread change every in-flight read is aborted before the new one starts.
   useEffect(() => {
+    const ctrl = new AbortController()
+    frameAbort.current = ctrl
+    return () => {
+      ctrl.abort()
+      frameAbort.current = null
+    }
+  }, [threadId])
+
+  const readFrame = useCallback(() => {
     if (!threadId) {
       setFrame(null)
       return
     }
-    let cancelled = false
-    const ctrl = new AbortController()
-    getThreadWorkflow(threadId, ctrl.signal)
+    const seq = ++frameSeq.current
+    getThreadWorkflow(threadId, frameAbort.current?.signal)
       .then((wf) => {
-        if (!cancelled) setFrame(wf)
+        if (seq === frameSeq.current) setFrame(wf)
       })
       .catch(() => {
-        // A reconcile miss is non-fatal — the slice still drives the timeline.
-        if (!cancelled) setFrame(null)
+        // A reconcile miss is non-fatal — the slice still drives the timeline. Guarded by
+        // the same sequence so a late failure cannot blank a fresher success.
+        if (seq === frameSeq.current) setFrame(null)
       })
-    return () => {
-      cancelled = true
-      ctrl.abort()
-    }
   }, [threadId])
+
+  // Effect 2 — the read itself: at mount, on a thread change, and on every phase-status
+  // transition. NO cleanup, which is the whole point: a trigger issues a read and never
+  // revokes one.
+  useEffect(() => {
+    readFrame()
+  }, [readFrame, phaseSignature])
 
   // ── Honest "Phase i / N" — total = the skeleton length (= reconcile
   //    total_phases); i = the active row's index + 1 (forward-only). ──
@@ -165,6 +235,39 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
   const runTerminal = frame?.run_status != null && TERMINAL_RUN_STATUSES.has(frame.run_status)
   const anyRunning = phases.some((p) => p.status === "running" || p.status === "retrying")
   const isBusy = !runTerminal && anyRunning
+
+  // ── Phase 200-07 (DES-02 / RS-MR-02 / RS-MR-04 / RS-MNR-02) — the per-step readings ──
+  //
+  // ⚠ ONE `now` PER RENDER, HOISTED, and it is `runFacts.ts`'s exact signature for
+  // `relativeChanged.ts`'s exact reason: several rows resolved against separate
+  // `Date.now()` defaults can straddle a boundary mid-render and print two readings of one
+  // instant. The whole list ticks against a single value or it does not tick honestly.
+  const [nowMs, setNowMs] = useState(() => Date.now())
+  // ⚠ THE TICK IS GATED ON THE RUN BEING LIVE, WHICH IS `RS-MNR-02` MADE STRUCTURAL RATHER
+  // THAN ASSERTED. A terminal run re-renders nothing here, so no clock can keep moving on a
+  // run that ended. The second half of that guarantee is `phaseDuration.ts`'s `unfinished`
+  // arm: an `active` row under a terminal run reads *did not finish* rather than a duration,
+  // because `harness_engine.py:1698-1706` records that such a row is left behind by a crash.
+  // Without BOTH halves this surface would re-create `BUG-260610-01`'s symptom on the very
+  // screen built to remove it.
+  useEffect(() => {
+    if (!isBusy) return
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [isBusy])
+
+  // The slug → facts lookup. The DECISION is `phaseDuration.ts`'s, the WORDS are
+  // `receiptVocabulary.ts`'s, and this component supplies only the three things it alone
+  // holds: the durable rows, the RUN's status, and the one instant above.
+  //
+  // ⚠ `frame?.phases` — THE FETCHED ROWS, never the live slice. The slice's `Phase` carries
+  // no timestamps at all (`types/index.ts:1018-1082`), so there is no second source here
+  // that could disagree; a row the fetch has not seen yet simply resolves `undefined`, and
+  // `PhaseCard` renders nothing for it. An absent answer is not `time not recorded`.
+  const factsOf = useMemo(
+    () => runFactsBySlug(frame?.phases ?? [], frame?.run_status, nowMs),
+    [frame?.phases, frame?.run_status, nowMs],
+  )
 
   // ── The {n}-agents tally (client tally of sub_agent_start — the ONLY count
   //    derivable; per-phase tool/search/source counts are suppressed, D-03). ──
@@ -255,7 +358,7 @@ export function PhaseTimeline({ threadId }: PhaseTimelineProps) {
         <ol aria-label="Phases" aria-busy={isBusy || undefined} className="flex flex-col gap-1.5">
           {phases.map((phase, i) => (
             <li key={`${phase.phaseIndex}-${phase.slug}`}>
-              <PhaseCard phase={phase} position={i} />
+              <PhaseCard phase={phase} position={i} timing={factsOf(phase.slug)} />
             </li>
           ))}
         </ol>

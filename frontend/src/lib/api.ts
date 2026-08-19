@@ -1377,6 +1377,34 @@ export interface WorkflowPhaseState {
   phase_index: number
   status: string
   phase_type?: string
+  /**
+   * ── Phase 200-07 (DES-02 / D-05 / D-07) — THE CLIENT MIRROR OF TRANSPORT 3, CAUGHT
+   *    MISSING AND ADDED HERE ────────────────────────────────────────────────────────
+   *
+   * ⚠ `200-02` widened the BACKEND `WorkflowPhaseState` (`models/thread.py:122-125`) with
+   * these four fields and did NOT widen this client mirror, so `GET /threads/{id}/workflow`
+   * has been sending them and the panel has been unable to declare them. `200-02`'s own
+   * SUMMARY states the reason the two models must move together, verbatim: *"widening only
+   * the other model would ship a run page with durations and a chat panel without them."*
+   * That is exactly the state this restores — measured against the Python model rather than
+   * inferred from the plan's prose, which asserts both transports already carried them.
+   *
+   * ⚠ **A TYPE, NOT A RUNTIME EXPORT.** These four lines are fully erased at build, so
+   * `197`'s decline on this file still holds and `196-08`'s mock-factory failure mode
+   * (a `vi.mock("@/lib/api")` factory missing a newly-added export) measurably cannot fire.
+   * Proved by grep over this plan's real diff (D-15), never by quoting this paragraph.
+   *
+   * Semantics are stated ONCE, on `WorkflowRunPhase` — the run page's mirror of the same
+   * `workflow_phases` rows. The two that bind hardest, repeated because getting either
+   * wrong is a rendered lie rather than a crash: a NULL timestamp means **the time was not
+   * recorded** (there is no backfill), and `step_count` distinguishes `0` (a real
+   * measurement of nothing) from `null` (this phase type declares no count) — so the arm is
+   * `typeof === "number"` and never `?? 0`.
+   */
+  started_at?: string | null
+  completed_at?: string | null
+  step_count?: number | null
+  step_noun?: string | null
 }
 
 /** A picker row from GET /workflows/published (backend/app/api/workflows.py

@@ -76,6 +76,19 @@ import {
 } from "@/lib/phaseState"
 import { runReadingLabel, type NodeRunState } from "@/components/workflows/runVocabulary"
 import { nodeTitle, waitsForYou, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
+// ── Phase 200-07 (DES-02 / D-09 · `RS-MR-05`) — THE RECEIPT'S FIRST AND ONLY MOUNT ────────
+//
+// `200-05` created `RunReceipt` and mounted it NOWHERE, deliberately and load-bearingly: it
+// keeps `199-02`'s refusal intact BY CONSTRUCTION, because a component the builder cannot
+// reach cannot fabricate a run-tense claim about a draft that has no run. Until this line it
+// had never rendered in the product. It is mounted HERE and must never be mounted on
+// `WorkflowBuilderPage.tsx`; that absence is asserted by grep, on both files.
+import { RunReceipt } from "@/components/workflows/RunReceipt"
+// The ONE resolver's read shape. ⚠ A TYPE ONLY, and that absence is the point: the page
+// derives NO duration and NO span of its own. `min(started_at) → max(completed_at)` has
+// exactly one home (`phaseDuration.runSpan`) and exactly one call site (the receipt), so
+// there is no second place for the product's first honest total runtime to drift.
+import { type PhaseTimingRow } from "@/components/workflows/phaseDuration"
 import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
 // Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
@@ -169,6 +182,18 @@ const COPY_DELIVERABLE_HEADING = "Files in this run's workspace"
 const COPY_NO_FILES_LIVE = "No files yet — this run hasn't written anything."
 const COPY_NO_FILES_TERMINAL = "This run produced no files."
 const COPY_DOWNLOAD_FAILED = "Download failed — try again."
+/**
+ * Phase 200-07 (D-09 · `RS-MR-05`) — the receipt region's heading.
+ *
+ * ⚠ PAST TENSE, and it is the receipt's whole premise rather than a stylistic choice: the
+ * canvas above says what the run IS DOING, and this region says what it DID. `200-05`'s
+ * `receiptVocabulary.ts` owns every string INSIDE the receipt; this one names the region on
+ * the page and therefore belongs to the page, beside the three copy constants above it.
+ *
+ * ⚠ It deliberately does not repeat the word `run` twice in one line with the deliverable
+ * heading below, and it names no mechanism — no *phases*, no *timeline*, no *spine*.
+ */
+const COPY_RECEIPT_HEADING = "What this run did, step by step"
 
 // ── The deliverable list (SPEC Req 7) ──────────────────────────────────────────
 //
@@ -650,6 +675,31 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * There is no second derivation and no second vocabulary — Req 8's grep returns zero
    * either way, and a re-opened finished run cannot disagree with the run it was.
    */
+  /**
+   * ── Phase 200-07 (DES-02 · `RS-MR-01` / `RS-MR-02` / `RS-MR-03` / `RS-MR-05`) — THE
+   *    DURABLE PHASE ROWS, WHICH ARE THE ONLY PLACE THE TIMINGS AND THE COUNTS LIVE ──────
+   *
+   * ⚠ THE LIVE SLICE CANNOT SUPPLY THESE AND NEVER COULD. `Phase` (`types/index.ts`) has no
+   * timestamps and no counts on it at all, so every figure this page prints about a step
+   * comes from `run.phases` — i.e. from the FETCH, which `refreshRun` already polls while
+   * the run is live and re-reads on the terminal edge. That is the project rule rather than
+   * a convenience: *"Realtime is a best-effort hint, not a source of truth — always
+   * reconcile via fetch"* (D-v2.5-03), and a terminal run has no stream to read at all.
+   *
+   * ⚠ AND THIS IS WHY THE PANEL AND THE PAGE CANNOT DISAGREE. `200-02` widened BOTH wire
+   * models for these same `workflow_phases` rows — `WorkflowRunPhaseRead` here and
+   * `WorkflowPhaseState` on the chat panel's transport — and both halves resolve their arms
+   * through the ONE `phaseDuration.ts`. Two surfaces, one derivation, one vocabulary.
+   */
+  const wireRows = useMemo<PhaseTimingRow[]>(() => run?.phases ?? [], [run])
+
+  /** slug → the durable row. The join for the count the canvas paints on a connection. */
+  const wireBySlug = useMemo(() => {
+    const m = new Map<string, PhaseTimingRow>()
+    for (const row of wireRows) m.set(row.slug, row)
+    return m
+  }, [wireRows])
+
   const byIndex = useMemo(() => {
     const m = new Map<number, Phase>()
     if (livePhases.length > 0) {
@@ -718,10 +768,33 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         waiting && phase ? { ...phase, pendingAsk: askToken } : phase,
       )
       const emitFailure = phase?.emitFailure ?? null
-      m.set(spec.slug, { reading, label: runReadingLabel(reading, emitFailure), emitFailure })
+      // ── Phase 200-07 · `BC-MR-01`'s SUPPLY LINE, which `200-06` built the seam for and
+      //    deliberately left unwired because this file was not its to edit ────────────────
+      //
+      // The canvas renders a connection's payload label from the UPSTREAM step's DECLARED
+      // count, through the `runState` seam that already exists. `200-06` shipped the seam,
+      // the relay and the render, and recorded the hand-off in its SUMMARY verbatim: *"one
+      // line — forwarding the phase row's `step_count` / `step_noun` into the object it
+      // already builds — makes the label appear on the live run canvas."* This is that line.
+      //
+      // ⚠ THE PAGE DECLARES; NOTHING DOWNSTREAM COUNTS. There is no second counting path and
+      // no second fetch — the number is the executor's own, carried on the wire since
+      // `200-02`, and it passes through here untouched (`BC-MNR-05`).
+      //
+      // ⚠ ABSENT IS NOT ZERO. `wireBySlug` misses for a step the durable read has not
+      // mentioned, and `payloadLabel` renders NOTHING for a non-number — never `0`, never a
+      // dash, never an empty pill. A declared `0` is a real measurement and DOES render.
+      const wire = wireBySlug.get(spec.slug)
+      m.set(spec.slug, {
+        reading,
+        label: runReadingLabel(reading, emitFailure),
+        emitFailure,
+        count: wire?.step_count,
+        noun: wire?.step_noun,
+      })
     }
     return m
-  }, [specs, byIndex, asks, isTerminal])
+  }, [specs, byIndex, asks, isTerminal, wireBySlug])
 
   /**
    * ⚠ `useCallback`, NOT an inline arrow at the call site. An inline arrow is a NEW
@@ -731,6 +804,30 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * with a test; defeating it from here would go red there rather than silently.
    */
   const runState = useCallback((slug: string) => runStateBySlug.get(slug), [runStateBySlug])
+
+  /**
+   * ── Phase 200-07 · the receipt's step names ────────────────────────────────────────────
+   *
+   * ⚠ THE TITLE IS THE PAGE'S, RE-DERIVED NOWHERE. `nodeTitle`'s ladder needs a page-owned
+   * name context, and the receipt's own docblock refuses to re-derive it for exactly that
+   * reason: a second derivation would give the SAME step a different face on the receipt
+   * than on the canvas above it — the two-views-two-languages defect, one surface along.
+   * This is the same `nodeTitle` the canvas paints, so the two provably agree.
+   *
+   * A slug with no spec falls back to the slug itself rather than to a placeholder: an
+   * unrecognised step is still a step that ran, and inventing a friendly name for it would
+   * be the fabrication this whole screen is built to avoid.
+   */
+  const titleBySlug = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const spec of specs) m.set(spec.slug, nodeTitle(spec))
+    return m
+  }, [specs])
+  const titleOf = useCallback(
+    (slug: string) => titleBySlug.get(slug) ?? slug,
+    [titleBySlug],
+  )
+
 
   // ── The elapsed figure (D-188-18) ────────────────────────────────────────────
   // (`runStatus` / `isTerminal` are hoisted above the run-state memo — F5 needs the live/
@@ -1099,7 +1196,42 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         />
       </section>
 
-      {/* 4. DELIVERABLE REGION — the thing the run made, listed and downloadable. The
+      {/* 4. RUN RECEIPT — the same spine above, re-read in the PAST TENSE (D-09 ·
+             `RS-MR-02` / `RS-MR-03` / `RS-MR-04` / `RS-MR-05`).
+             ────────────────────────────────────────────────────────────────────────────
+             ⚠ THIS IS `RunReceipt`'s FIRST AND ONLY MOUNT IN THE PRODUCT. `200-05` built it
+             and deliberately mounted it nowhere; until this line it had never rendered
+             outside a suite. Siting it HERE and only here is what keeps `199-02`'s refusal
+             intact BY CONSTRUCTION — the builder's spine reads a DRAFT and has no run, so a
+             component it cannot reach cannot fabricate a run-tense claim there. That absence
+             is asserted by grep over `WorkflowBuilderPage.tsx`, not left to care.
+
+             ⚠ THE TOTAL RUNTIME AT ITS TOP IS THE PRODUCT'S FIRST HONEST ONE, and it is
+             DELIBERATELY NOT ALSO PRINTED IN THE PAGE HEADER. The header's figure measures
+             `created_at → updated_at` and says so in words (*from when it was queued*); this
+             one measures the steps that really ran. Two labelled measurements of two
+             different things are honest; two unlabelled clocks one under the other are the
+             duplicate-status defect an operator reported on this exact surface on
+             2026-08-06, which is why the band above is `sr-only` today. So the phase-derived
+             total is rendered ONCE, at the top of the region it belongs to.
+
+             ⚠ NO `deliverableOf` IS PASSED, and the omission is a decision. Nothing on
+             `workflow_phases` says which file a step produced — the run's file list is
+             thread-scoped, not step-scoped — so joining one here would be a fabricated
+             claim about WHICH step made WHAT. The deliverables region below lists them
+             honestly, as the run's output rather than any step's.
+
+             `now` is the page's ONE hoisted instant, so a still-running row on the receipt
+             and the header's clock cannot straddle a second boundary and disagree. */}
+      <section
+        data-testid="run-receipt-region"
+        className="shrink-0 border-t border-border/10 px-6 py-4"
+      >
+        <h2 className="mb-2 text-xs font-semibold text-foreground">{COPY_RECEIPT_HEADING}</h2>
+        <RunReceipt phases={wireRows} titleOf={titleOf} runStatus={runStatus} now={nowMs} />
+      </section>
+
+      {/* 5. DELIVERABLE REGION — the thing the run made, listed and downloadable. The
              region caps its height on desktop and flows on mobile (<768px), where a
              fixed cap would hide the very rows the surface exists to hand over. It is
              the only new focus-stop GROUP on this page (§ Focus order): one stop per
