@@ -11,8 +11,16 @@
  *  • that the total runtime is derived from the PHASE TIMESTAMPS and not from a client clock;
  *  • that this component spells NO user-visible string of its own — every displayed word
  *    traces to a `receiptVocabulary.ts` import;
- *  • ⚠ that it is MOUNTED NOWHERE at this commit, which is what keeps `199-02`'s refusal
- *    intact by construction rather than by care.
+ *  • ⚠ that it is mounted on EXACTLY ONE surface — the run page — which is what keeps
+ *    `199-02`'s refusal intact by construction rather than by care.
+ *
+ * ⚠ THAT LAST LINE READ *"MOUNTED NOWHERE at this commit"* UNTIL PHASE 200-07, and the
+ * original is corrected here rather than quietly overwritten: `200-05` created this
+ * component and deliberately mounted it nowhere, saying so in its own docblock and
+ * predicting this edit; `200-07` mounted it on `WorkflowRunPage.tsx`, and the sweep below
+ * went RED on that commit. It is INVERTED, not deleted — it now pins the importer list at
+ * exactly one named file, so a SECOND mount (most of all on the builder, which has no run
+ * and where a past-tense claim would be fabricated) reddens it again.
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, within } from "@testing-library/react"
@@ -237,10 +245,23 @@ describe("RunReceipt — the one-string-home rule, and the deliberate non-mount"
     expect(planted.match(/>\s*[A-Z][a-z][^<>{}]{3,}</g)).not.toEqual([])
   })
 
-  it("⚠ is MOUNTED NOWHERE — 200-07 mounts it, which keeps 199-02's refusal by construction", () => {
-    // Asserted here rather than left to the SUMMARY's prose. A receipt that never reaches the
-    // builder cannot fabricate a run-tense claim on a draft definition, and that is a property
-    // of the import graph rather than of anyone's care.
+  it("⚠ is mounted on the RUN PAGE and NOWHERE ELSE — 199-02's refusal, by construction", () => {
+    // ─────────────────────────────────────────────────────────────────────────────────────
+    // ⚠ THIS CASE WAS `is MOUNTED NOWHERE` UNTIL PHASE 200-07, AND IT WENT RED THE MOMENT
+    // THAT PLAN MOUNTED THE COMPONENT — which is the fence doing its job at exactly the
+    // moment its invariant was deliberately superseded, not a fence that rotted.
+    //
+    // It is INVERTED here rather than deleted (the `192.2-05` method, and `200-05`'s own
+    // `BS-MNR-01` precedent one file over): a removed assertion proves nothing afterwards,
+    // whereas a live one that now names the ONE permitted importer reddens again if a
+    // SECOND mount ever appears. `200-05`'s own docblock predicted this edit in as many
+    // words — *"created here and mounted in `200-07`. That is deliberate."*
+    //
+    // WHAT STILL MATTERS, and is the whole reason the assertion survives in any form: the
+    // builder's spine reads a DRAFT definition and has NO RUN, so a past-tense receipt there
+    // would be a fabricated claim — precisely what `199-02` refused. Keeping that a property
+    // of the IMPORT GRAPH rather than of anyone's care is what the sweep buys.
+    // ─────────────────────────────────────────────────────────────────────────────────────
     const modules = import.meta.glob("/src/**/*.{ts,tsx}", { query: "?raw", import: "default", eager: true }) as Record<string, string>
     // NON-VACUITY: the sweep really read the tree, and it really can see this component's own
     // two files (its source and this suite).
@@ -249,7 +270,13 @@ describe("RunReceipt — the one-string-home rule, and the deliberate non-mount"
       .filter(([path]) => !path.endsWith("RunReceipt.tsx") && !path.endsWith("RunReceipt.test.tsx"))
       .filter(([, src]) => /from\s+["'][^"']*RunReceipt["']/.test(src) || /<RunReceipt[\s/>]/.test(src))
       .map(([path]) => path)
-    expect(importers).toEqual([])
+    // EXACTLY ONE importer, and it is named. A `toContain` would pass with a second mount
+    // sitting silently beside it; the equality is what makes this a budget rather than a hope.
+    expect(importers.map((p) => p.split("/").pop())).toStrictEqual(["WorkflowRunPage.tsx"])
+    // …and the surface with no run is named explicitly too, so the refusal is stated rather
+    // than inferred from the list above.
+    expect(importers.some((p) => p.endsWith("WorkflowBuilderPage.tsx"))).toBe(false)
+    expect(importers.some((p) => p.endsWith("PhaseSpineGraph.tsx"))).toBe(false)
   })
 
   it("POSITIVE CONTROL — the importer sweep really can find a mount", () => {

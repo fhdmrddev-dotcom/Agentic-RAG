@@ -12,7 +12,10 @@
  * Authored fresh (MEMORY project_frontend_vitest_rot) — no import from a rotted sibling.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, cleanup, fireEvent, waitFor, act } from "@testing-library/react"
+// Phase 200-07 widened this line with `within`: the D-17 green row is DRIVEN inside the
+// deliverable region rather than against the whole document, so "exactly one control per
+// row" is a statement about that region and not about the page.
+import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testing-library/react"
 import type { Phase, WorkspaceFile } from "@/types"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 
@@ -134,7 +137,13 @@ vi.mock("@/components/workflows/WorkflowCanvas", () => ({
     kbTools,
   }: {
     phases: PhaseSpecJSON[]
-    runState?: (slug: string) => { reading: string; label: string } | undefined
+    // Phase 200-07: `count` / `noun` joined the shape `200-06` added to `NodeRunState`. The
+    // stub renders them so a test reads the value THE PAGE HANDED DOWN — the supply line
+    // `200-06` built the seam for and left to this plan. Without them here the hand-off
+    // would be untestable from the page side, which is where the join actually happens.
+    runState?: (
+      slug: string,
+    ) => { reading: string; label: string; count?: number | null; noun?: string | null } | undefined
     editable?: boolean
     selectedSlug: string | null
     kbTools?: readonly string[]
@@ -151,6 +160,12 @@ vi.mock("@/components/workflows/WorkflowCanvas", () => ({
         <div key={p.slug} data-testid={`node-${p.slug}`}>
           <span data-testid={`reading-${p.slug}`}>{runState?.(p.slug)?.reading ?? "NONE"}</span>
           <span data-testid={`label-${p.slug}`}>{runState?.(p.slug)?.label ?? "NONE"}</span>
+          {/* ⚠ `String(...)` rather than a rendered child, deliberately: a declared `0` and
+                 an ABSENT count are two different facts, and a bare child would render both
+                 as nothing at all — which is exactly the fold `RS-MNR-03` forbids and the
+                 one this stub has to be able to TELL APART. */}
+          <span data-testid={`count-${p.slug}`}>{String(runState?.(p.slug)?.count)}</span>
+          <span data-testid={`noun-${p.slug}`}>{String(runState?.(p.slug)?.noun)}</span>
         </div>
       ))}
     </div>
@@ -165,6 +180,12 @@ import pageSource from "./WorkflowRunPage?raw"
 // vanished". Each is length- AND identity-guarded at its use site.
 import utilsSource from "@/components/files/fileRowUtils?raw"
 import iconSource from "@/lib/fileIcon?raw"
+// Phase 200-07: the builder page's source, read ONLY to assert an ABSENCE — the receipt must
+// never be reachable from the surface that has no run (`199-02`'s refusal, kept by
+// construction). And the receipt's own source, as the positive control for the deliverable
+// slot it CAN render and this page deliberately does not supply.
+import builderSource from "./WorkflowBuilderPage?raw"
+import receiptSource from "@/components/workflows/RunReceipt?raw"
 import { ApiError } from "@/lib/api"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
 
@@ -207,7 +228,20 @@ interface RunLike {
   claimed_at: string | null
   updated_at: string | null
   definition: { phases: PhaseSpecJSON[] } | null
-  phases: { slug: string; phase_index: number; status: string; phase_type: string | null }[]
+  // Phase 200-07: the four fields `200-02` put on this transport. OPTIONAL here for the
+  // same reason they are optional on the wire — a pre-migration-121 row carries none of
+  // them, and every case in this file that predates this plan omits all four, which is
+  // itself the historic-row shape.
+  phases: {
+    slug: string
+    phase_index: number
+    status: string
+    phase_type: string | null
+    started_at?: string | null
+    completed_at?: string | null
+    step_count?: number | null
+    step_noun?: string | null
+  }[]
 }
 
 const CLAIMED = "2026-08-05T14:03:11Z"
@@ -2554,5 +2588,505 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
     )
     expect(screen.getByText(/^v\d+$/)).toHaveTextContent("v4")
     expect(screen.queryByText("We couldn't read this workflow's details")).toBeNull()
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-07 Task 2 (DES-02 · `200-CHECKLIST.md` §4) — THE PAGE HALF.
+//
+// `RS-MR-01` (the count's SUPPLY LINE into the canvas) · `RS-MR-02` (per-step start/finish)
+// · `RS-MR-03` (a real TOTAL RUNTIME, the product's first honest one) · `RS-MR-04` (D-06's
+// distinct renders, read through the receipt) · `RS-MR-05` (the receipt MOUNTED) ·
+// `RS-MR-06` + `RS-MNR-07` (D-17: the shipped deliverable listing VERIFIED, the no-previewer
+// fence untouched) · `RS-MNR-02` / `RS-MNR-03`.
+//
+// ⚠ `BUG-260610-01`'s TIMER HALF, AND A CORRECTION THIS PLAN OWES OUT LOUD. The plan text
+// says the shipped elapsed is *"anchored at component MOUNT … which is exactly why
+// navigating away and back restarts it."* **Measured, that is not what the code does:** F3
+// and F6 already moved the anchor to `claimed_at ?? created_at`, both SERVER timestamps, so
+// the header figure was remount-stable before this plan touched anything. What this plan
+// adds is a SECOND figure — the phase-derived span — and the honest claim is that BOTH are
+// server-anchored and neither can reset on navigation. Asserted here for both rather than
+// asserted for one and assumed for the other.
+//
+// ⚠ AND THE REPORT'S `status: open` IS NOT FLIPPED. Its duplicate-avatar half is live, has
+// survived two folds (174, 194.1), and a `folded` status would hide it from the routing
+// scan — which this exact report has already suffered twice. `git diff` over the report file
+// is empty across this plan.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+
+/** Two instants 12s apart, and a second pair, so a span is provably not one row's duration. */
+const P0_START = "2026-08-05T14:03:10Z"
+const P0_END = "2026-08-05T14:03:22Z"
+const P1_START = "2026-08-05T14:03:22Z"
+const P1_END = "2026-08-05T14:04:10Z"
+
+/** A run whose phase rows carry the four fields `200-02` put on the wire. */
+function mkTimedRun(over: Partial<RunLike> = {}): RunLike {
+  return mkRun({
+    status: "completed",
+    phases: [
+      {
+        slug: "gather-contracts",
+        phase_index: 0,
+        status: "completed",
+        phase_type: "llm_agent",
+        started_at: P0_START,
+        completed_at: P0_END,
+        step_count: 312,
+        step_noun: "sources",
+      },
+      {
+        slug: "draft-letter",
+        phase_index: 1,
+        status: "completed",
+        phase_type: "llm_agent",
+        started_at: P1_START,
+        completed_at: P1_END,
+      },
+      {
+        slug: "final-check",
+        phase_index: 2,
+        status: "skipped",
+        phase_type: "llm_human_input",
+      },
+    ],
+    ...over,
+  })
+}
+
+function receiptHeaderAtoms(): string[] {
+  return Array.from(document.querySelectorAll('[data-testid^="receipt-header-atom-"]')).map(
+    (el) => el.textContent ?? "",
+  )
+}
+
+describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    setAsks([])
+  })
+
+  it("renders the receipt on THIS page — its first and only mount in the product", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // ⚠ NON-VACUITY FIRST: the region exists AND the receipt inside it does. `200-05`
+    // shipped `RunReceipt` exported and mounted NOWHERE — an `import.meta.glob` sweep in its
+    // own suite asserted zero importers — so until this line it had never rendered outside a
+    // test. This is the case that makes `BS-MR-03`/`RS-MR-05` a product fact.
+    expect(screen.getByTestId("run-receipt-region")).toBeInTheDocument()
+    expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
+    // One row per phase row, in the SERVER's order — never re-sorted client-side.
+    // ⚠ Scoped to the receipt's own list rather than a `data-testid` PREFIX match: the
+    // prefix `receipt-row-` also matches every atom INSIDE a row (`-title`, `-outcome`,
+    // `-time`), so a prefix count reads 12 for a three-step run and would have passed a
+    // wrong number for a plausible-looking reason.
+    const rows = screen.getByTestId("run-receipt").querySelectorAll("ol > li")
+    expect(rows).toHaveLength(3)
+  })
+
+  it("names each step with the SAME `nodeTitle` the canvas paints — never the slug", async () => {
+    // Two derivations would give one step two faces on one screen. The receipt refuses to
+    // re-derive; the page supplies the name it already computed for the node.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const titles = Array.from(
+      document.querySelectorAll('[data-testid="receipt-row-title"]'),
+    ).map((el) => el.textContent ?? "")
+    expect(titles).toStrictEqual([
+      "Find the supplier contracts",
+      "Draft the renewal letter",
+      "Check it over",
+    ])
+    // NON-VACUITY: those are the author names, not the slugs.
+    for (const slug of SLUGS) expect(titles).not.toContain(slug)
+  })
+
+  it("is mounted on the RUN page and NOWHERE on the builder — 199-02's refusal, by construction", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
+
+    // The builder's spine reads a DRAFT definition and has no run, so a run-tense receipt
+    // there would be a fabricated claim — which is precisely what `199-02` refused. The
+    // absence is STRUCTURAL: the component is not reachable from that page at all.
+    const NEEDLE = ["Run", "Receipt"].join("")
+    expect(builderSource).not.toMatch(new RegExp(NEEDLE))
+    // POSITIVE CONTROL — the assembled needle finds the shape it forbids, and finds it in
+    // THIS page's source, so the two arms are the same measurement pointed two ways.
+    expect(pageSource).toMatch(new RegExp(NEEDLE))
+  })
+})
+
+describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    setAsks([])
+  })
+
+  it("computes the span from the PHASE timestamps — min(started_at) → max(completed_at)", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const atoms = receiptHeaderAtoms()
+    expect(atoms).toHaveLength(3)
+    // 14:03:10 → 14:04:10 is 60s ACROSS the two timed rows. ⚠ It is deliberately NOT any
+    // single row's duration (12s and 48s), so a span computed from one row would read
+    // differently and be caught.
+    expect(atoms[0]).toBe("Ran 1m 00s")
+    expect(atoms[1]).toBe("3 steps")
+    expect(atoms[2]).toMatch(/^finished \d{2}:\d{2}$/)
+  })
+
+  it("`claimed_at` being null does NOT stop it — the measured reason it exists", async () => {
+    // `claimed_at` is null on 0 of 149 completed runs, so a span anchored on it is absent
+    // exactly when a span is wanted. The phase rows carry their own instants.
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ claimed_at: null }))
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(receiptHeaderAtoms()[0]).toBe("Ran 1m 00s")
+  })
+
+  it("says so IN WORDS when no row carries a readable pair — never `0s`, never omitted", async () => {
+    // Every pre-migration-121 run, and any run whose steps were all routed around. An
+    // omitted total reads as "instant"; a `0s` claims a measurement nobody took.
+    getWorkflowRun.mockResolvedValue(
+      mkTimedRun({
+        phases: [
+          { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+        ],
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const atoms = receiptHeaderAtoms()
+    expect(atoms[0]).toBe("Runtime not recorded")
+    expect(atoms[0]).not.toMatch(/\b0s\b/)
+    // ⚠ The finish atom is a SEPARATE sentence: one says we do not know how long it took,
+    // the other says it has no finish instant to name. Folding them would be a smaller
+    // version of the very fold D-06 exists to prevent.
+    expect(atoms[2]).toBe("no finish time recorded")
+    expect(atoms[0]).not.toBe(atoms[2])
+  })
+
+  it("`BUG-260610-01`'s TIMER HALF: BOTH figures survive a remount unchanged", async () => {
+    // ⚠ STRUCTURAL, NOT PATCHED. Every anchor on this surface is a SERVER timestamp — the
+    // header's `claimed_at ?? created_at` and the receipt's `min(started_at)` — so there is
+    // no client instant for a remount to re-take. Driven as a real unmount + re-render with
+    // identical props, which is what navigating away and back does.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    const first = renderPage()
+    await screen.findByTestId("canvas-stub")
+    const spanBefore = receiptHeaderAtoms()[0]
+    const elapsedBefore = screen.getByTestId("run-elapsed").textContent
+    first.unmount()
+
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(receiptHeaderAtoms()[0]).toBe(spanBefore)
+    expect(screen.getByTestId("run-elapsed").textContent).toBe(elapsedBefore)
+    // NON-VACUITY: both really do carry a figure, so "unchanged" is not "empty twice".
+    expect(spanBefore).toMatch(/\d/)
+    expect(elapsedBefore ?? "").toMatch(/\d/)
+  })
+
+  it("the two figures MEASURE DIFFERENT THINGS and each says which", async () => {
+    // ⚠ THE REASON A SECOND FIGURE IS NOT A DUPLICATE. An operator reported this exact
+    // surface showing its status twice, one line under the other, on 2026-08-06 — which is
+    // why the band is `sr-only` today. Two figures are honest only while each is labelled
+    // with the field it came from.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const header = screen.getByTestId("run-elapsed").textContent ?? ""
+    // The header names its own anchor in plain words…
+    expect(header).toMatch(/from when it (was queued|started processing)/)
+    // …and the receipt's total is a different reading of a different pair.
+    expect(receiptHeaderAtoms()[0]).toBe("Ran 1m 00s")
+    expect(header).not.toContain("Ran 1m 00s")
+  })
+})
+
+describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-MR-04)", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    setAsks([])
+  })
+
+  it("renders a real per-step duration, and `never ran` for the routed-around step", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
+      (el) => el.textContent ?? "",
+    )
+    expect(times[0]).toBe("12s")
+    expect(times[1]).toBe("48s")
+    // ⚠ The skipped row is an AFFIRMATIVE fact, not a blank — and it is a DIFFERENT string
+    // from the historic row's, which is `RS-MNR-04`.
+    expect(times[2]).toBe("never ran (skipped)")
+  })
+
+  it("RS-MNR-04: a historic row reads `time not recorded`, never the skipped sentence", async () => {
+    getWorkflowRun.mockResolvedValue(
+      mkTimedRun({
+        phases: [
+          // Terminal with BOTH timestamps absent — written before migration 121 existed.
+          { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+          { slug: "draft-letter", phase_index: 1, status: "skipped", phase_type: "llm_agent" },
+        ],
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
+      (el) => el.textContent ?? "",
+    )
+    expect(times[0]).toBe("time not recorded")
+    expect(times[1]).toBe("never ran (skipped)")
+    expect(times[0]).not.toBe(times[1])
+  })
+
+  it("RS-MNR-02: an `active` row under a TERMINAL run reads `did not finish` — no clock", async () => {
+    // The residual is INHERITED (`harness_engine.py:1698-1706`): the engine only terminalizes
+    // the interrupted phase on a cancellation, so a crash leaves this row behind. Ticking it
+    // would re-create `BUG-260610-01`'s symptom on the screen built to remove it.
+    getWorkflowRun.mockResolvedValue(
+      mkTimedRun({
+        status: "failed",
+        phases: [
+          {
+            slug: "gather-contracts",
+            phase_index: 0,
+            status: "active",
+            phase_type: "llm_agent",
+            started_at: P0_START,
+          },
+        ],
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const time = document.querySelector('[data-testid="receipt-row-time"]')?.textContent ?? ""
+    expect(time).toBe("did not finish")
+    expect(time).not.toMatch(/\d/)
+    // …and the row's OUTCOME agrees with its reading rather than contradicting it. A row
+    // still marked active reading *still running* beside *did not finish* is how a receipt
+    // stops being a receipt.
+    const outcome =
+      document.querySelector('[data-testid="receipt-row-outcome"]')?.textContent ?? ""
+    expect(outcome).toBe("did not finish")
+  })
+})
+
+describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => {
+  beforeEach(() => {
+    setFiles([])
+    setAsks([])
+  })
+
+  it("a STALE live-slice row does not override the durable rows the receipt reads", async () => {
+    // ⚠ THE PROJECT RULE, MADE STRUCTURAL RATHER THAN ASSERTED: *"Realtime is a best-effort
+    // hint, not a source of truth — always reconcile via fetch."* The live slice carries NO
+    // timestamps and NO counts at all (`types/index.ts`), so every figure the receipt prints
+    // is fetch-derived by construction. This case drives the disagreement anyway: the slice
+    // says the first step is still RUNNING; the durable read says it finished, with both
+    // instants. The receipt must report what the server recorded.
+    //
+    // `196` measured what the opposite costs one surface over — a gate whose only input was
+    // a live SSE lock, with no fetch reconcile, HID a shipped control from the operator.
+    setLiveSlice([
+      mkPhase(0, "running", "gather-contracts"),
+      mkPhase(1, "pending", "draft-letter"),
+      mkPhase(2, "pending", "final-check"),
+    ])
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
+      (el) => el.textContent ?? "",
+    )
+    // The FETCH's answer, not the slice's: a finished duration, never a live tick.
+    expect(times[0]).toBe("12s")
+    expect(times[0]).not.toMatch(/so far/)
+    // NON-VACUITY: the slice really is disagreeing — its reading reaches the canvas, which
+    // is the surface that reads the slice. So this is two sources measured against each
+    // other, not one source read twice.
+    expect(screen.getByTestId("reading-gather-contracts").textContent).toBe("running")
+  })
+
+  it("the receipt survives a run with NO durable rows at all — nothing claimed, nothing crashed", async () => {
+    // A run read that came back with an empty `phases` array. The honest render is an empty
+    // list and a worded absence, never a fabricated span and never a throw.
+    setLiveSlice([])
+    getWorkflowRun.mockResolvedValue(mkTimedRun({ phases: [] }))
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
+    expect(screen.getByTestId("run-receipt").querySelectorAll("ol > li")).toHaveLength(0)
+    const atoms = receiptHeaderAtoms()
+    expect(atoms[0]).toBe("Runtime not recorded")
+    expect(atoms[1]).toBe("0 steps")
+  })
+})
+
+describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-03)", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    setAsks([])
+  })
+
+  it("forwards the DECLARED count and noun into the canvas run state — `200-06`'s hand-off", async () => {
+    // ⚠ THE ONE LINE `200-06` RECORDED AND DELIBERATELY DID NOT WRITE, because this file was
+    // not its to edit. Its SUMMARY names it exactly: the seam, the relay and the render all
+    // shipped there; the PRODUCTION SUPPLY LINE is here. Read off the stub, so this asserts
+    // the value the PAGE handed down rather than anything the canvas invented.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(screen.getByTestId("count-gather-contracts").textContent).toBe("312")
+    expect(screen.getByTestId("noun-gather-contracts").textContent).toBe("sources")
+  })
+
+  it("RS-MNR-03: a step that declared NO count forwards an absence, never a `0`", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // `undefined`/`null` — an absence. ⚠ Emphatically NOT `"0"`: four of the seven phase
+    // types declare no count at all, and printing `0 sources` under one of them is a claim
+    // about a measurement that was never taken.
+    expect(screen.getByTestId("count-draft-letter").textContent).not.toBe("0")
+    expect(screen.getByTestId("count-final-check").textContent).not.toBe("0")
+    expect(["undefined", "null"]).toContain(screen.getByTestId("count-draft-letter").textContent)
+  })
+
+  it("a DECLARED `0` is forwarded as the fact it is", async () => {
+    getWorkflowRun.mockResolvedValue(
+      mkTimedRun({
+        phases: [
+          {
+            slug: "gather-contracts",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+            started_at: P0_START,
+            completed_at: P0_END,
+            step_count: 0,
+            step_noun: "sources",
+          },
+        ],
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(screen.getByTestId("count-gather-contracts").textContent).toBe("0")
+    expect(screen.getByTestId("noun-gather-contracts").textContent).toBe("sources")
+    // …and it reaches the receipt too, as the pair the wire sent, VERBATIM.
+    expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe(
+      "0 sources",
+    )
+  })
+
+  it("the NOUN passes VERBATIM — this page substitutes no word of its own", async () => {
+    // `312 docs matched` is a DOMAIN sentence (`SEED-168`); `312 sources` is not. The noun is
+    // AUTHORED COPY owned by the one executor that declares it, and the client renders what
+    // the wire sent. Driven with a token no vocabulary in this tree contains, so a
+    // substitution anywhere on the path is visible rather than plausible.
+    getWorkflowRun.mockResolvedValue(
+      mkTimedRun({
+        phases: [
+          {
+            slug: "gather-contracts",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+            started_at: P0_START,
+            completed_at: P0_END,
+            step_count: 7,
+            step_noun: "zzqx",
+          },
+        ],
+      }),
+    )
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(screen.getByTestId("noun-gather-contracts").textContent).toBe("zzqx")
+    expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe("7 zzqx")
+  })
+})
+
+describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-MNR-07)", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setAsks([])
+  })
+
+  it("the shipped deliverable listing still renders — a GREEN row DRIVEN, not read", async () => {
+    // ⚠ `ALREADY-SHIPPED` IS NOT A PASS IN THIS PHASE (`200-CHECKLIST.md`, `How to use this
+    // file`): a `VERIFY` verdict means *drive it and show it renders*. Phase 195 shipped this
+    // region; this case is the driving.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    setFiles([
+      {
+        id: "file-1",
+        path: "out/renewal-letter.docx",
+        size_bytes: 20480,
+        mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      } as WorkspaceFile,
+    ])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const region = screen.getByTestId("run-deliverables")
+    expect(region).toBeInTheDocument()
+    expect(region.textContent).toContain("renewal-letter.docx")
+    // Exactly one control per row, and it is a download.
+    expect(within(region).getAllByRole("button")).toHaveLength(1)
+    expect(
+      within(region).getByRole("button", { name: /Download renewal-letter\.docx/ }),
+    ).toBeInTheDocument()
+  })
+
+  it("the receipt did NOT open a file-content path — the no-previewer fence still stands", async () => {
+    // ⚠ D-17 IS A TESTED DECISION, NOT A GAP: DOCX/PPTX/XLSX/PDF are download-only, and the
+    // template engine emits `.docx`, so the flagship deliverable is exactly the artefact that
+    // cannot be shown in place. The shipped previewer fence higher up this file is UNEDITED
+    // by this plan — its acceptance is a diff grep for its own title, so that title is
+    // deliberately not re-typed here (the 187-24 rule, which has now fired three times in
+    // this plan alone). This case is the independent statement that the receipt, which is
+    // NEW surface, did not smuggle a file-content path in beside it.
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    setFiles([])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const receipt = screen.getByTestId("run-receipt-region")
+    // No file names, no preview affordance, and NO deliverable slot at all — nothing on
+    // `workflow_phases` says which file a step produced, so the page passes no
+    // `deliverableOf` and the receipt renders none.
+    expect(receipt.querySelectorAll('[data-testid="receipt-row-deliverable"]')).toHaveLength(0)
+    // POSITIVE CONTROL — the receipt CAN render that slot, so the absence is a decision
+    // rather than a component that never had the feature.
+    expect(receiptSource).toContain("receipt-row-deliverable")
   })
 })
