@@ -10,7 +10,7 @@ folded_into: 200
 verified_closed_by: null
 related_seeds: []
 re_open_trigger: >
-  Folded at /gsd:discuss-phase 200 (2026-08-19). The canvas is one of Phase 200 four in-scope screens (plan 200-05 rebuilds it to sketch 200). Re-open if 200 ships without exercising light mode on the rebuilt canvas.
+  Folded at /gsd:discuss-phase 200 (2026-08-19). The canvas is one of Phase 200 four in-scope screens (plan 200-06 rebuilds it to sketch 200 — corrected from 200-05, the plan numbers shifted by one when the backend slice split in two). Re-open if 200 ships without exercising light mode on the rebuilt canvas, OR if the plane follows the theme while a node card does not (see the 2026-08-19 addendum — those two are coupled by coincidence, not by design).
 reproduces_on:
   branch: develop
   commit: 031396dc
@@ -136,3 +136,62 @@ the root class).
 **Routed to phase 196 (AUTH-04, the registry-backed model picker on the canvas)** — that phase opens
 canvas files anyway, and either option above is a considered change rather than a polish sweep.
 ⚠ **Do NOT re-estimate this as a one-liner.** The one-liner is available and it is wrong.
+
+---
+
+## ⚠ ADDENDUM 2026-08-19 — measured during Phase 200 execution, from an operator screenshot
+
+The operator re-reported this from the Builder canvas (`Customer Quarterly Business Review v1`,
+Canvas tab). The capture shows the sidebar, header, tab strip and editing toolbar all correctly
+**light**, and the canvas region below them a single black rectangle — plane, dot grid, zoom
+controls, the React Flow attribution, **and the five step cards**, whose titles render in white.
+
+**The step cards are the part this report did not explain, and the explanation matters.**
+
+`PhaseNodeCard.tsx` does NOT hardcode anything. Measured — it uses theme tokens throughout:
+`bg-card/30` (`:183`), `text-foreground` (`:239`), `text-muted-foreground` (`:244`, `:280`),
+`border-border/50` (`:235`). On its own it would follow the theme correctly.
+
+**Why it renders dark anyway — the mechanism, verified in the installed library:**
+
+`@xyflow/react/dist/esm/index.js:3736` builds the wrapper's class list as
+
+```js
+className: cc(['react-flow', className, colorModeClassName])
+```
+
+where `colorModeClassName` comes from `useColorModeClass(colorMode)` (`:334-349`) and is the
+**literal string `"dark"` or `"light"`**. Meanwhile `tailwind.config.js` is `darkMode: ["class"]`,
+and Tailwind's class strategy is **scoped by the nearest ancestor carrying the class** — not by
+`<html>` alone.
+
+⇒ `colorMode="dark"` wraps the whole canvas subtree in a `.dark` ancestor, so **every `dark:`
+variant inside it activates**, including our own components'. One prop explains the plane, the
+dots, the `<Controls />` chrome, the attribution and the cards simultaneously.
+
+**Consequence for the fix — GOOD:** the one-prop change is genuinely complete. No per-component
+work is owed on the cards, and no card needs a token audit.
+
+⚠ **Consequence for the FENCE — and this is the part worth guarding.** That completeness is a
+**coincidence of two independent mechanisms happening to agree on the spelling `dark`**. React
+Flow's color-mode class and Tailwind's dark-mode class are unrelated systems; nothing in this
+repository documents, tests or enforces their agreement. If `darkMode` ever moves to a
+`[data-theme]` selector, or React Flow renames the class, the canvas **half-fixes**: the plane
+follows the theme and the cards stay dark. That reads as a fresh bug rather than a regression of
+this one.
+
+**So `200-06`'s acceptance criterion must assert BOTH halves in light mode — the plane AND at
+least one node card's computed background — never the plane alone.** A fence that checks only
+`colorMode={theme}` in source passes green in exactly the scenario above.
+
+**Line-number drift corrected:** this report cites `WorkflowCanvas.tsx:1250`; at HEAD the prop is
+at **`:1317`** (67 lines of drift). Re-derive rather than trust either number.
+
+**Scope note — one further hardcoded-dark site found while measuring, deliberately NOT folded
+here:** `frontend/src/components/chat/tool-bodies/ExecuteCodeBody.tsx:42` and `:119` carry
+`bg-[#0d1117]` with no `dark:` variant, so code-output blocks in chat stay GitHub-dark in light
+mode. That may well be intentional (a code block reading as a terminal), but nothing records the
+intent — no comment, no token, no report. It is a **chat** surface, not the canvas, and Phase
+200's scope is the four workflow screens, so it is reported rather than absorbed. Re-open
+trigger: the next phase touching chat tool bodies, or an operator confirming it should follow the
+theme.
