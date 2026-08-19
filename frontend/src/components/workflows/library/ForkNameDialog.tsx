@@ -179,9 +179,36 @@ export function ForkNameDialog({
         if (!next) onCancel()
       }}
     >
+      {/* ── PORTED FROM SKETCH 200 `fork-delete.html` §1 (2026-08-20) ───────────────────
+          The sheet titles itself *"Two dialogs, deliberately unequal"* and its §3 table
+          states the ladder as four rules. This dialog is the LIGHT end of that ladder and
+          the port keeps it there — every delta below either matches the sheet or is a
+          refusal recorded in writing:
+
+            names what it affects   no  ·  states exact numbers first  no
+            spends danger colour    no  ·  leaves a receipt            no
+
+          What actually changed: the card widens to the sheet's 480px, the consequence
+          sentence moves into the sheet's RAISED BOX (it was a bordered-top paragraph, which
+          read as a footnote rather than as the promise being made), a clashing name tints
+          the FIELD amber as well as the hint, and the free-name hint drops its emerald for
+          the sheet's muted tone.
+
+          ⚠ THE EMERALD IS A DELIBERATE SUBTRACTION, NOT AN OVERSIGHT. 199-10 already
+          refused the earlier sheet's green-tick "Name available" because colour was
+          carrying the meaning; the words were always the signal and the paint was
+          redundant beside them. Sheet 200 draws the free state muted and agrees. The
+          199-10 assertion that proves the three states differ with EVERY class attribute
+          stripped is untouched and still passes — which is exactly why removing the paint
+          is safe rather than merely tidy.
+
+          ⚠ AMBER IS NOT DANGER COLOUR. The delete sheet already spends amber for its
+          cancel-first banner and red for nothing but its one destructive button; a warning
+          tint on a field that still submits is the same register, and §3's "spends danger
+          colour: no" is about RED. */}
       <DialogContent
         data-testid="fork-name-dialog"
-        className="max-w-[460px]"
+        className="max-w-[480px]"
         onOpenAutoFocus={(event) => {
           // Focus the FIELD, not the content wrapper: the first thing to do here is type.
           event.preventDefault()
@@ -223,7 +250,12 @@ export function ForkNameDialog({
             // Real DOM text, reachable by a screen reader — the `LibraryToolbar.tsx:223-224`
             // wiring, which is the same rule as the card's `aria-describedby` round trip.
             aria-describedby={`${HINT_ID} ${CONSEQUENCE_ID}`}
-            className="mt-4 w-full rounded-md border border-border bg-background px-3 py-2 text-[13.5px] text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            className={cn(
+              "mt-4 h-10 w-full rounded-md border bg-background px-3 text-[13.5px] text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary",
+              // The sheet's state 2 tints the FIELD as well as the line beneath it, so the
+              // warning is attached to the thing it is about. It still submits (D-20).
+              clash ? "border-amber-500" : "border-border",
+            )}
           />
           {/* ⚠ NOT `role="alert"` (D-20). `InviteMemberDialog.tsx:255` is right to announce
               its 422 as an interruption, because a 422 IS a refusal. This is not one — it is
@@ -235,7 +267,9 @@ export function ForkNameDialog({
             data-testid="fork-name-hint"
             className={cn(
               "mt-1.5 min-h-[16px] text-[11px] leading-snug",
-              empty ? "text-muted-foreground" : clash ? "text-amber-400" : "text-emerald-400",
+              // ⚠ THE FREE ARM IS MUTED, NOT EMERALD — see the DialogContent docblock. The
+              // sentence is the signal; the paint was a second, weaker copy of it.
+              clash ? "text-amber-400" : "text-muted-foreground",
             )}
           >
             {hint}
@@ -246,7 +280,7 @@ export function ForkNameDialog({
           <p
             id={CONSEQUENCE_ID}
             data-testid="fork-name-consequence"
-            className="mt-4 border-t border-border/60 pt-3 text-[11.5px] leading-snug text-muted-foreground"
+            className="mt-4 rounded-md border border-border bg-muted/40 p-4 text-[11.5px] leading-snug text-muted-foreground"
           >
             {FORK_CONSEQUENCE}
           </p>
@@ -256,7 +290,7 @@ export function ForkNameDialog({
               type="button"
               data-testid="fork-name-cancel"
               onClick={onCancel}
-              className="rounded-md border border-border px-3 py-1.5 text-[12.5px] text-muted-foreground hover:text-foreground"
+              className="h-10 rounded-md border border-border px-4 text-[12.5px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               {FORK_DIALOG_CANCEL}
             </button>
@@ -267,7 +301,7 @@ export function ForkNameDialog({
               type="submit"
               data-testid="fork-name-create"
               disabled={empty}
-              className="rounded-md bg-primary px-4 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
+              className="h-10 rounded-md bg-primary px-4 text-[13px] font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {FORK_DIALOG_OK}
             </button>

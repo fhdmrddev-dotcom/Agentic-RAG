@@ -54,7 +54,7 @@
  * to make it green deletes the only evidence the modal still renders what it rendered.
  */
 import { useState, useEffect, useMemo, useRef } from "react"
-import { Upload, Check, X } from "lucide-react"
+import { Upload, Check, X, ChevronDown, Info } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { entryInputKeys, templateAdmission, type DefShape } from "@/components/workflows/soulData"
@@ -291,22 +291,60 @@ export function RunModal({
 
             ⚠ The sheet's own header WORD is refused separately: it reads *"Execute {name}"*,
             and this product's verb for this action is Run. */}
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <span className="text-[15px] font-semibold text-foreground">{wf.name}</span>
+        {/* ── PORTED FROM SKETCH 200 `run-dialog.html` (2026-08-20) ────────────────────
+            The sheet's header is `px-lg py-md · justify-between`, a 17px truncating title
+            and a dismiss control on the right. Two deltas from the shipped header, both
+            deliberate:
+
+            · THE TITLE IS 17px AND TRUNCATES. A workflow name is author-typed and long
+              ("Quarterly Business Review — Northwind Logistics" is the sheet's own); at
+              15px with no truncate it wrapped the header to two lines.
+            · THE ✕ IS NEW, AND IT MOVES THE FOCUS CYCLE. Escape and Cancel were the only
+              two ways out; the sheet draws a third and a dialog with no visible dismiss is
+              a real gap on touch, where there is no Escape key. ⚠ It becomes the FIRST
+              focusable in the trap, so `RunModal.a11y.test.tsx`'s two cycle pins move from
+              `run-scope-select` to `run-modal-close` — re-baselined there with this reason
+              written beside them, never silently.
+
+            ⚠ The 199-10 rule still stands and is NOT reopened: the header spends no
+            CATEGORY glyph. A dismiss control is an affordance, not a category mark. */}
+        <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-3">
+          <span className="min-w-0 truncate text-[17px] font-semibold text-foreground">{wf.name}</span>
+          <button
+            type="button"
+            data-testid="run-modal-close"
+            aria-label="Close"
+            disabled={submitting}
+            onClick={onCancel}
+            className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
         </div>
-        <div className="flex flex-col gap-3 px-4 py-4">
+        {/* The sheet's body: `p-lg` with a `gap-lg` stack of field groups, each group a
+            `gap-xs` label/control pair. The shipped body was `gap-3 px-4 py-4` with
+            `gap-1.5` groups — the same composition drawn tighter than the sheet draws it. */}
+        <div className="flex flex-col gap-6 px-6 py-6">
           {/* WFIN-02 (D-LOCK-01): the KB-scope <select> — native, byte-matching the
               ChatArea scope selector ("All documents / {folder}"). The author default
               is tagged "workflow default"; picking another = a per-run override. Hidden
               when there are no folders (matches ChatArea's folders.length guard). */}
           {folders.length > 0 && (
-            <label data-testid="run-scope" className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium text-foreground">Knowledge base:</span>
+            <label data-testid="run-scope" className="flex flex-col gap-1">
+              {/* The sheet labels this field `Knowledge base` with no colon — its two field
+                  labels are sentences, not form-builder keys. The accessible name still
+                  matches `/knowledge base/i`, which is what the a11y suite needles. */}
+              <span className="text-[13px] font-medium text-foreground">Knowledge base</span>
+              {/* The sheet draws a FULL-WIDTH `h-10` control with its own chevron rather
+                  than the platform's — `appearance-none` plus an absolutely-positioned,
+                  pointer-events-none glyph. It is still a native `<select>`, so role,
+                  keyboard behaviour and the option list are untouched. */}
+              <div className="relative w-full">
               <select
                 data-testid="run-scope-select"
                 value={selectedFolderId}
                 onChange={(e) => setSelectedFolderId(e.target.value)}
-                className="rounded-md border border-border bg-card px-2.5 py-1.5 text-[14px] text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="h-10 w-full appearance-none rounded-md border border-border bg-card pl-3 pr-9 text-[14px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               >
                 {/* WR-05: the "" option truthfully labels the server-applied scope.
                     Bound → "Workflow default" (with the folder name when the author
@@ -325,9 +363,14 @@ export function RunModal({
                   </option>
                 ))}
               </select>
+              <ChevronDown
+                className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              </div>
             </label>
           )}
-          <label className="flex flex-col gap-1.5">
+          <label className="flex flex-col gap-1">
             <span className="text-[13px] font-medium text-foreground">What should this run work on?</span>
             <textarea
               ref={textareaRef}
@@ -455,56 +498,88 @@ export function RunModal({
             )}
           </div>
           )}
-          {/* Declared input_keys → a HINT line only (never fake structured fields). */}
-          <p data-testid="run-hint" className="text-[12px] text-muted-foreground">
-            This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
-          </p>
-        </div>
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
-          {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
-              going to. 188-09 retargeted `doRun` to the run surface, and the modal still
-              said "Run opens a new chat thread and streams there" right above the button.
-              It is the LAST thing a person reads before committing, so it is the one place
-              the surface cannot be vague about where they are about to land.
+          {/* ── THE SHEET'S INFO GROUP — TWO ⓘ LINES, AT THE FOOT OF THE BODY ──────────
+              The sheet gathers everything the dialog says ABOUT the run (as opposed to
+              everything it ASKS) into one `gap-sm` stack of `info`-glyph lines, below the
+              fields and ABOVE the footer. The shipped surface had one of them here and the
+              other stranded inside the footer bar beside the buttons, which is why the
+              footer read as two unrelated things sharing a row.
 
-              It is NOT a flat string swap, because there are genuinely two destinations:
-              CR-05 gated the retarget on the canvas flag, and with the flag OFF `doRun`
-              still falls through to the shipped `selectThread` + chat path. So the copy
-              reads the SAME gate the launch reads — one source, and it cannot drift from
-              the behaviour by construction. */}
-          <span className="text-[12px] text-muted-foreground" data-testid="run-destination">
-            {canvasEnabled ? (
-              <>
-                Run opens this workflow&apos;s <b className="text-foreground">run surface</b>. The
-                chat thread is still created, and stays reachable from there.
-              </>
-            ) : (
-              <>
-                Run opens a <b className="text-foreground">new chat thread</b> and streams there.
-              </>
-            )}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={submitting}
-              className="rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            {/* D-103-1: Run stays ENABLED even on empty input; WR-05: disabled only
-                while a launch is in flight (one click = one thread). */}
-            <button
-              type="button"
-              data-testid="run-confirm"
-              disabled={submitting}
-              onClick={() => void handleRun()}
-              className="rounded-md bg-primary px-4 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {submitting ? "Running…" : "▶ Run workflow"}
-            </button>
+              ⚠ THE DESTINATION SENTENCE MOVED HOUSE AND NOTHING ELSE. Its `data-testid`,
+              its gate (`canvasEnabled` — the SAME gate `doRun` reads, F4) and both of its
+              two verbatim arms travel unchanged; `RUN_DESTINATION_BASELINE` in
+              `RunModal.test.tsx` reads its `innerHTML` and is untouched by this port,
+              which is the mechanical proof that only the container changed.
+
+              ⚠ AND THE SHEET'S OWN WORDING FOR THE FIRST LINE IS REFUSED, ON PURPOSE.
+              It draws *"This workflow needs a starting instruction."* — a humanised
+              reading of the declared entry keys. There is no authored per-key label
+              anywhere on the wire (`entryInputKeys` returns the raw JSONB key strings), so
+              rendering that sentence would mean INVENTING the label for every key that is
+              not `kickoff_prompt`. The keys render as the facts they are. */}
+          <div className="flex flex-col gap-2">
+            {/* Declared input_keys → a HINT line only (never fake structured fields). */}
+            <p data-testid="run-hint" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
+              <Info className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+              <span>
+                This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
+              </span>
+            </p>
+            {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
+                going to. 188-09 retargeted `doRun` to the run surface, and the modal still
+                said "Run opens a new chat thread and streams there" right above the button.
+                It is the LAST thing a person reads before committing, so it is the one place
+                the surface cannot be vague about where they are about to land.
+
+                It is NOT a flat string swap, because there are genuinely two destinations:
+                CR-05 gated the retarget on the canvas flag, and with the flag OFF `doRun`
+                still falls through to the shipped `selectThread` + chat path. So the copy
+                reads the SAME gate the launch reads — one source, and it cannot drift from
+                the behaviour by construction. */}
+            <p className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
+              <Info className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+              <span data-testid="run-destination">
+                {canvasEnabled ? (
+                  <>
+                    Run opens this workflow&apos;s <b className="text-foreground">run surface</b>. The
+                    chat thread is still created, and stays reachable from there.
+                  </>
+                ) : (
+                  <>
+                    Run opens a <b className="text-foreground">new chat thread</b> and streams there.
+                  </>
+                )}
+              </span>
+            </p>
           </div>
+        </div>
+        {/* The sheet's footer: a raised bar, `justify-end`, `gap-md`, two `h-10` controls
+            and nothing else on the row. */}
+        <div className="flex items-center justify-end gap-3 border-t border-border bg-muted/30 px-6 py-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            className="h-10 rounded-md border border-border px-4 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          {/* D-103-1: Run stays ENABLED even on empty input; WR-05: disabled only
+              while a launch is in flight (one click = one thread).
+
+              ⚠ THE ▶ STAYS, THOUGH THE SHEET DRAWS THE LABEL BARE. It is the run VERB's
+              mark, not a category glyph — the distinction 199-10 drew when it removed the
+              header's `document` mark from this same file — and dropping it would be a
+              subtraction the sheet does not ask for anywhere else in the journey. */}
+          <button
+            type="button"
+            data-testid="run-confirm"
+            disabled={submitting}
+            onClick={() => void handleRun()}
+            className="h-10 rounded-md bg-primary px-4 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {submitting ? "Running…" : "▶ Run workflow"}
+          </button>
         </div>
       </div>
     </div>

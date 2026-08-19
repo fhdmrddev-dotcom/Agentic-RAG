@@ -2179,7 +2179,13 @@ describe("193.2 / D-19 — the post-publish Run CTA, its first automated coverag
     // `canPublish` requires a non-empty golden_input, so the gauntlet cannot run without it.
     const golden = await screen.findByLabelText(/golden_input/i)
     fireEvent.change(golden, { target: { value: "a representative kickoff prompt" } })
-    fireEvent.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    // ⚠ NEEDLE MOVED BY THE SKETCH-200 PORT (2026-08-20); the previous one is kept here
+    // rather than overwritten: it read `/run the gauntlet/i`. Sketch 200's `publish.html`
+    // labels this control *"Publish — run the checks"*, dropping the mechanism's name from
+    // the sentence a person reads. ⚠ THE `findByLabelText(/golden_input/i)` ABOVE IS
+    // DELIBERATELY UNCHANGED and still resolves: the wire key was DEMOTED to a quiet token
+    // inside the same <label>, not removed — which is exactly the property this line proves.
+    fireEvent.click(screen.getByRole("button", { name: /run the checks/i }))
 
     // The publish call is what `onPublished` — and therefore `onGauntletPublished` — hangs off.
     await waitFor(() => expect(mockPublish).toHaveBeenCalledTimes(1))

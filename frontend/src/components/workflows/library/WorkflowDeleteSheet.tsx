@@ -187,31 +187,66 @@ export function WorkflowDeleteSheet({ wf, onDeleted, ref }: WorkflowDeleteSheetP
                   <button
                     type="button"
                     onClick={() => setSheetOpen(false)}
-                    className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className="h-10 rounded-md border border-border px-4 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     Keep it
                   </button>
                 </div>
               </div>
             ) : preview === null ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                Loading the exact counts…
+              // ── PORTED FROM SKETCH 200 `fork-delete.html` §2, LOADING SPECIMEN ─────────
+              // The sheet draws this moment as a SPINNER beside the title with the line
+              // *"Checking what this will remove…"*, and the whole card at `opacity-70`.
+              // Two things it gets right that the shipped line did not: a spinner says the
+              // wait is alive rather than stuck, and "checking what this will remove" says
+              // WHY there is a wait — the guard is fetching the exact victim before it will
+              // offer the button (D-LOCK-03). "Loading the exact counts…" named the
+              // mechanism, which is the thing this design language does not print.
+              // ⚠ `role="status"` and the never-guess rule are untouched: this arm still
+              // renders NO count, no placeholder and no destructive control.
+              <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 flex-none animate-spin" aria-hidden="true" />
+                Checking what this will remove…
               </p>
             ) : (
               <>
-                {/* Removed group — danger-tinted heading + EXACT server counts (never guessed). */}
+                {/* ── PORTED FROM SKETCH 200 `fork-delete.html` §2, LOADED SPECIMEN ───────
+                    The victim group becomes a quiet uppercase caption over a RAISED BOX
+                    holding the name on its own line and the counts beneath it. Two lines,
+                    not one run-on sentence — the name is what a person checks, and it was
+                    competing with two numbers on the same baseline.
+
+                    ⚠ THE CAPTION LOSES ITS RED, AND THAT IS THE SHEET'S OWN RULE RATHER
+                    THAN A SOFTENING. §3's table reads *"spends danger colour: yes, ON THE
+                    BUTTON ONLY"*. Red on the caption spent the strongest signal this
+                    surface has on a label, so the one control that is actually irreversible
+                    had to shout over it. `Delete forever` keeps `bg-destructive` and is now
+                    the only red thing in the dialog.
+
+                    ⚠ EVERY OTHER LADDER RULE IS UNCHANGED AND STILL ASSERTED: the victim is
+                    named, the EXACT server counts are stated before the button exists, and
+                    the audit receipt is rendered. This is a re-presentation of the heaviest
+                    guard, never a de-grading of it. */}
                 <div>
-                  <p className="text-[13px] font-semibold text-destructive">Permanently removed</p>
-                  <p className="mt-1 text-sm text-foreground">
-                    <span className="font-medium">{preview.name}</span> · {preview.versions} versions ·{" "}
-                    {preview.runs} run records
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Permanently removed
+                  </p>
+                  <p className="mt-1.5 flex flex-col gap-0.5 rounded-md border border-border bg-muted/40 p-4">
+                    <span className="text-sm font-medium text-foreground">{preview.name}</span>
+                    <span className="text-[12px] text-muted-foreground">
+                      {preview.versions} versions · {preview.runs} run records
+                    </span>
                   </p>
                 </div>
-                {/* Kept group — neutral heading + the reassurance that closes "no orphaned
-                    threads"; it ALWAYS renders (incl. the 0-threads variant). */}
+                {/* Kept group — neutral caption + the reassurance that closes "no orphaned
+                    threads"; it ALWAYS renders (incl. the 0-threads variant). The sheet
+                    boxes it too, transparently rather than raised, so the two groups read as
+                    a pair and the weight difference between them is legible. */}
                 <div className="mt-6">
-                  <p className="text-[13px] font-semibold text-foreground">Kept — not touched</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Kept — not touched
+                  </p>
+                  <p className="mt-1.5 rounded-md border border-border bg-transparent p-4 text-[12px] text-muted-foreground">
                     {preview.threads > 0
                       ? `${preview.threads} chat threads become normal chats — transcripts & files stay. Your knowledge base is untouched.`
                       : "No chat threads to keep."}
@@ -240,15 +275,18 @@ export function WorkflowDeleteSheet({ wf, onDeleted, ref }: WorkflowDeleteSheetP
                       <button
                         type="button"
                         onClick={() => setSheetOpen(false)}
-                        className="rounded-md border border-border px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        className="h-10 rounded-md border border-border px-4 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
                         Keep it
                       </button>
+                      {/* THE ONLY RED THING IN THIS DIALOG (sketch 200 §3 — *"spends danger
+                          colour: yes, on the button only"*). Unchanged apart from the
+                          sheet's `h-10` sizing. */}
                       <button
                         type="button"
                         data-testid="delete-forever"
                         onClick={() => void handleDelete()}
-                        className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
+                        className="h-10 rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90"
                       >
                         Delete forever
                       </button>
@@ -282,8 +320,14 @@ export function WorkflowDeleteSheet({ wf, onDeleted, ref }: WorkflowDeleteSheetP
                     </div>
                   )}
                 </div>
-                {/* Recorded footer — the audit receipt honesty (D-LOCK-03). */}
-                <p className="mt-4 text-[12px] text-muted-foreground">
+                {/* Recorded footer — the audit receipt honesty (D-LOCK-03). The sheet sets
+                    it right-aligned and italic, under the action row: a receipt, read after
+                    the decision rather than argued before it.
+                    ⚠ THE ✎ STAYS THOUGH THE SHEET DROPS IT. It is the shipped audit-receipt
+                    mark (146-148 — *"✎ writes"*), it is the same glyph the Control Room's
+                    ledger spends, and dropping it here would fork that vocabulary for one
+                    dialog. Nothing in the reference is REMOVED by keeping it. */}
+                <p className="mt-4 text-right text-[12px] italic text-muted-foreground">
                   ✎ Recorded with your name in the audit log.
                 </p>
               </>
