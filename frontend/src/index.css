@@ -34,6 +34,18 @@
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
+    /* Phase 192.2 WR-01 — the amber needs-you / stopped token, promoted OUT OF `.dark`-only.
+       It has existed at `.dark` since Phase 087 (PANEL-04, ask_user) and was never declared
+       here, so `bg-warning` / `text-warning` resolved in NEITHER theme — the Tailwind key
+       was missing too, and a key that maps to an undefined variable paints nothing.
+       ⚠ THE VALUES ARE `.dark`'s, BYTE-FOR-BYTE, AND THAT IS A PRECEDENT RATHER THAN A GUESS:
+       `--success` two lines up is identical in both blocks of this file. Inventing a second,
+       light-specific amber would be a design decision this gap-closure round has no mandate
+       for, and the product ships in Deep Midnight. `.dark`'s own Phase-087 contrast rationale
+       (`--warning-foreground` DARKENED to ≥4.5:1 against the amber, not lightened) is
+       untouched — this block only stops the token being dark-only. */
+    --warning: 38 92% 60%;
+    --warning-foreground: 240 60% 8%;
     --border: 220 13% 89%;
     --input: 220 13% 89%;
     --ring: 239 84% 67%;

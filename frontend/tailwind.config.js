@@ -74,6 +74,17 @@ export default {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
         },
+        // Phase 192.2 WR-01 — a MISSING DECLARATION, not a new colour. `--warning` /
+        // `--warning-foreground` have existed in index.css since Phase 087 (the amber
+        // ask_user treatment) but this key never did, so `bg-warning` / `text-warning`
+        // compiled to NOTHING everywhere they were used — the WorkflowCard `stopped` run
+        // gutter, plus ModelDiscoveryPanel, ModelRegistryTab and ConnectionFormPanel.
+        // Same two-member shape as `success` directly above. Guarded by
+        // components/workflows/library/gutterTokens.fences.test.ts.
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
