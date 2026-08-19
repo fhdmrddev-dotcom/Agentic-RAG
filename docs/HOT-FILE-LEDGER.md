@@ -2136,3 +2136,174 @@ being three. The neighbouring measured hazard: both `true` and `false` SURVIVE a
   applies to the orchestrator too, not only to the plans.**
 - **`gsd-sdk query roadmap.update-plan-progress` returned `updated: true` and wrote ZERO bytes**, twice
   more this round. Both tracking files were hand-edited. Do not trust that verb's return value.
+
+## Phase 199 — SIX files found ABSENT at or over the G-5 threshold, nine stale rows, and one cell whose CONTENT was refuted
+
+Phase 199 re-presented ten shipped surfaces against sketch 178's component map (`DES-01`). It
+modified **19 non-test source files**. **Nine had a row that was stale, six had no row at all**, and
+one row's *narrative claim* — not its triple — was measured false. That is the same failure this
+ledger keeps recording: `WorkflowsPage.tsx` escaped G-5 for ten phases, `config.py` for forty-two,
+and `api.ts` — still the hottest file in the repository — had never been listed at all.
+
+⚠ **Every executor in this phase declined to edit this file mid-wave** (the `197-10` precedent:
+never edit a shared artifact while a sibling agent is live) and published exact re-derived values in
+its SUMMARY instead, so the edit here was pure transcription rather than re-measurement. That
+convention worked and should be kept.
+
+Triples re-derived on **2026-08-19** with the `CLAUDE.md` recipe, six-digit dated quick-task buckets
+subtracted:
+
+| File | row read | **measured** |
+|---|---|---|
+| `PublishGauntlet.tsx` | *(absent)* | **14 / 7 / 1025** |
+| `PhaseSpineGraph.tsx` | *(absent)* | **4 / 4 / 278** |
+| `doorVocabulary.ts` | *(absent)* | **4 / 3 / 341** |
+| `StepTypePicker.tsx` | *(absent)* | **7 / 3 / 522** |
+| `library/RunModal.tsx` | *(absent)* | **4 / 3 / 526** |
+| `panel/PanelEmpty.tsx` | *(absent)* | **4 / 4 / 52** |
+| `WorkflowCanvas.tsx` | 23 / 6 / 1301 | **25 / 7 / 1405** |
+| `PhaseFormPanel.tsx` | 19 / 9 / 1216 | **21 / 10 / 1289** |
+| `WorkflowBuilderPage.tsx` | 47 / 14 / 2656 | **49 / 15 / 2762** |
+| `WorkflowDoorSwitch.tsx` | 12 / 8 / 522 | **13 / 9 / 575** |
+| `WorkflowRunPage.tsx` | 14 / 4 / 1156 | **15 / 5 / 1197** |
+| `panel/PhaseCard.tsx` | 11 / 7 / 522 | **12 / 8 / 543** |
+| `panel/FilesSection.tsx` | 7 / 4 / 298 | **8 / 5 / 334** |
+| `PhaseNodeCard.tsx` | 11 / 6 / 280 | **12 / 7 / 313** |
+| `ModelField.tsx` | 1 / 1 / 236 | **3 / 2 / 370** |
+
+### frontend/src/components/workflows/PublishGauntlet.tsx
+
+The 8-stage publish gauntlet and the judge hard-wall. **Absent from the scan list for seven phases.**
+
+⚠ **BOTH shipped "no override" guards were measured BLIND.** `199-03` planted a live
+`<a href="/publish?force=1">Proceed to publish anyway</a>` inside `HardWall`. The `?raw` source
+regex passed **green** — it cannot see a control composed from a variable. The
+`queryAllByRole("button")` filter passed **green** — it cannot see a link, a menu item, or any other
+wording. **Only a role-SET scan went red.** This is the project's third recorded "fence that could
+not fire", and the first on a *safety* wall rather than a cosmetic one.
+
+Two DOM hooks now exist on the shipped spine: `data-testid="spine-stage"` (×10) and
+`data-testid="spine-conn"` (×9). **Next seam:** the stage strip and the verdict are two concerns in
+one file; the strip is the extractable one.
+
+### frontend/src/components/workflows/PhaseSpineGraph.tsx
+
+The **authoring** spine — the read-only vertical phase graph in the Builder. Absent for four phases.
+
+⚠ **It reads a DRAFT definition and has no run.** Any run-time word drawn on it — `TRAVERSED`,
+`SKIPPED`, a duration, an elapsed — is a **fabricated claim**, not a presentation choice. Sheet c3
+column 1 drew exactly that and `199-02` refused it rather than building it. This is the same family
+of defect as the sketch README's own `(4/12)`.
+
+`NET-NEW · no graph lib` was an implementation note printed to the person authoring a workflow.
+Removed — and a repo-wide grep measured **zero** assertions on it *before* it was spent, so the
+removal could be proved rather than hoped.
+
+### frontend/src/components/workflows/doorVocabulary.ts
+
+The two authoring doors' ONE string home. **Absent, and exactly at the G-5 threshold** — the
+`libraryRow.ts` state where a missing row costs most, because the audit cannot even ask the question.
+
+`DESCRIBE_REFUSAL` (added by `199-08`) is its **23rd governed id**. ⚠ It is imported by
+`WorkflowBuilderPage.tsx`, and **that page is a SWEPT SOURCE of the D-24(a) copy fence — spelling
+the sentence there instead of importing the constant turns that fence RED.** A second copy of a word
+is the defect, not the fix.
+
+⚠ The refusal it carries is **presentation of an existing gate, not a new one**: `199-08` measured
+`describe.trim().length > 0` in source *and* drove it before writing a word. `199-09` then measured
+the Builder's pre-draft CTA and found the **same first term** (`useTemplateFirstDraft.ts:463`, spent
+as `disabled={!canDraft}`), which is the only reason saying it out loud there was in scope.
+
+### frontend/src/components/workflows/StepTypePicker.tsx
+
+The ONE step-type chooser. **Absent, exactly at threshold.** Honoured by construction in 199.
+
+### frontend/src/components/workflows/library/RunModal.tsx
+
+The run launch dialog — the **lightest** of the three library guard grades. **Absent, exactly at
+threshold.**
+
+⚠ **No fabricated estimate may reach it.** The graded action-guard ladder is a **safety** structure,
+not a stylistic one: delete = victim-naming (heaviest, with exact server counts fetched *before* the
+destructive action is offered), fork = lightest. **Removing text is Phase 199's premise; removing a
+grade is not**, and the two must never be confused during a presentation pass.
+
+⚠ `199-10`'s own new fence `wearsDestructiveWeight` **passed against the exact plant it was written
+to catch**: stripping the resting `bg-destructive` off `Delete forever` left `hover:bg-destructive/90`
+satisfying a bare substring. **A danger colour that exists only on hover is no guard on touch.**
+Hardened, re-driven red, restored by md5.
+
+### frontend/src/components/panel/PanelEmpty.tsx
+
+The panel's ONE resting state. **Absent at four phases — invisible to G-5 for its entire life.**
+
+The decorative `Inbox` glyph is gone; the heading and hint stay, the hint being the atom the sheet
+agrees with. ⚠ **It reaches the viewer through `ChatLayout.tsx:673`, the ONLY mount** (measured by
+`199-07`; every other occurrence in the tree is prose). A change here **lands in CHAT first**, so
+UAT on a workflow surface alone will miss it.
+
+### The cell whose CONTENT was refuted — `ModelField.tsx`
+
+Its cell read: *"⚠ it cannot express 'I could not read the registry'"*. **That is now false.**
+`199-06` gave it a `noAnswer` arm. The original is preserved beside the correction in `CLAUDE.md`
+rather than overwritten, per this ledger's own habit.
+
+⚠ **The deviation that made it real, recorded rather than absorbed:** reaching the new arm required
+editing `frontend/src/pages/WorkflowBuilderPage.tsx` (`+24/−6`), a file `199-06`'s `files_modified`
+did not name and which the ROADMAP assigned to **exactly one plan, `199-09`**. Without the caller
+change the arm is a capability nothing in the application can reach — green in its own suite,
+invisible in the product. The call was right; the fence crossing is logged so the phase's
+one-owner-per-file guarantee is not silently believed to have held.
+
+### What Phase 199 measured about the SKETCH itself — read this before building to sheet 178
+
+⚠ **The sheets are direction, not a contract, and three separate plans proved it:**
+
+- **15 of sheet 178's 18 colour tokens COMPILE TO NOTHING** against `frontend/tailwind.config.js`
+  (`primary-container`, `primary-fixed`, `tertiary`, `on-surface` … — absent from both the config
+  and `index.css`; on sheet c9 only `background` and `primary` resolve). **A class that compiles to
+  nothing renders identically to the arm that is deliberately unpainted** — the `bg-warning` silent
+  no-op that shipped unguarded in 192.2. ⚠ Fence it by reading the config through
+  `vi.importActual("node:fs")`: **`?raw` CANNOT read CSS under vitest and returns the EMPTY STRING,
+  silently.**
+- **The README's claim that sheet c5 "reproduces our shipped `decisionsVocabulary` contract" is
+  false on three counts** (`199-04`): its arms are `Satisfied` / `Needs You` / `Unknown`, so a
+  *present* readiness paints an affirmative badge and re-introduces the "unknown reads as satisfied"
+  failure the third arm exists to prevent; its explicit *Not reported* caption **is** that breach;
+  and its one publish sentence sits on the **Knowledge-Grounding** row when D-20 is explicit that
+  nothing refuses a publish for a missing KB binding.
+- **Sheet c2 is drawn in the SUPERSEDED 137-D language** (`199-01`), and **sheet c2 draws six run
+  states where the card ships nine** — missing `unknown`, `recorded-not-sent`, `cancelled`. ⚠ A
+  sheet that draws six teaches that there are six, and `unknown` is precisely the reading a
+  fail-open hides behind.
+
+**Where the sheet and the shipped locked language disagree, the shipped language wins and the
+disagreement is REPORTED.** Re-present; never redraw (`SEED-155`).
+
+### Phase 199 — the guardrail record
+
+- **G-5:** fires on **fifteen** rows above. Six were invisible to it entirely. Honoured by
+  construction throughout — the phase is a presentation pass, and its scope fence (no backend, no
+  endpoint, no migration, no new capability) is what kept every touched file from growing a second
+  concern. `FieldGuidance.tsx` is the one extraction, and a **fence forced it**: `PhaseFormPanel`'s
+  hook count is pinned at an absolute zero, so the disclosure switch's state had to leave the panel.
+  The pin then passed untouched.
+- **G-2:** discharged before planning — sketch 178 is the operator-approved mockup.
+- **G-4:** **owed, and named rather than waved through.** jsdom runs no layout
+  (`clientHeight`/`getBoundingClientRect` return 0, so a height "measurement" reads `0 − 0` as a
+  pass), so every rendered-geometry claim in this phase ships as a **stated surrogate** with an owed
+  human row: the node's readability at 50% micro zoom (`199-01`), the draft-arrival declared box
+  (`199-04`), the form panel's rendered height (`199-06`), four panel/run rows of which three are on
+  the **chat** surface (`199-07`), and the library toolbar's create-leads-visually at a narrow
+  viewport (`199-10`).
+- **G-7:** not entered — no gap-closure round ran.
+
+### ⚠ Three shipped marks have NO row in the icon convention — OWED, and deliberately not closed here
+
+`199-05` measured three marks in live use with no entry in
+`.claude/skills/sketch-findings-agentic-rag/references/icon-convention.md` §4: **`○`** (the end
+cap), **`✎`** (the writes receipt, on **four** surfaces) and **`👁`** (the View-only chip).
+
+They are **pinned in the consumer suite**, so closing the gap *inverts* an assertion rather than
+merely adding prose — which is the only reason this can be left owed without rotting. Not closed in
+this commit because the inversion is a coupled test edit, not a documentation edit.
