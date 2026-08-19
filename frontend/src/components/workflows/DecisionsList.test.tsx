@@ -1144,3 +1144,114 @@ describe("DecisionsList — the label column and the verdict indent may not drif
     expect(140).not.toBe(128 + gapScaleToPx(2))
   })
 })
+
+// ── 10. THE 199-04 ROW WASH — the one BUILT row of sheet c5 ──────────────────────────
+//
+// ⚠ THE DELTA IS DECLARED, NOT RE-CAPTURED. Section 9's inventory pins are UNTOUCHED by
+// this change and still pass, which is what proves the wash added no atom and moved no
+// word. What is new here is a class and one state attribute; nothing an author READS
+// changed, and the pins are the evidence for that rather than the assertion.
+
+/** The tailwind config, read as text. A colour utility naming a key that is not in here
+ *  compiles to NOTHING and ships as a silent no-op — the `bg-warning` failure `192.2`
+ *  measured, on a card whose suite asserted a `data-` attribute and never a class. */
+import tailwindConfigSource from "../../../tailwind.config.js?raw"
+
+describe("DecisionsList — the row wash lands only where there is something to reach", () => {
+  function washed(key: string): boolean {
+    const row = screen.getByTestId(`decision-row-${key}`)
+    return (row.getAttribute("class") ?? "").includes("hover:bg-accent")
+  }
+  function claimsInteractive(key: string): string | null {
+    return screen.getByTestId(`decision-row-${key}`).getAttribute("data-row-interactive")
+  }
+
+  it("WITH a producing step every row is reachable, and every row is washed", () => {
+    renderList()
+    for (const key of DECISION_ROW_ORDER) {
+      expect(claimsInteractive(key), `row "${key}"`).toBe("true")
+      expect(washed(key), `row "${key}" claims to be reachable but carries no wash`).toBe(true)
+    }
+  })
+
+  it("WITHOUT a producing step rows 2 and 5 lose BOTH their jump and their wash", () => {
+    // ⚠ THIS IS THE WHOLE POINT OF THE DERIVATION. A row that lights up under the cursor
+    // while rendering no control at all promises an interaction that does not exist — the
+    // `199-01` run-mode argument, applied to a row instead of to a canvas node.
+    renderList({ deliverableStepSlug: null })
+    for (const key of DECISION_ROW_ORDER) {
+      const reachable = key !== "template" && key !== "deliverable"
+      expect(claimsInteractive(key), `row "${key}"`).toBe(String(reachable))
+      expect(washed(key), `row "${key}"`).toBe(reachable)
+    }
+    // …and the two unwashed rows really do render no control, so the claim is about the
+    // component and not about this test's own opinion of which rows are which.
+    expect(screen.queryByTestId("decision-action-template")).toBeNull()
+    expect(screen.queryByTestId("decision-action-deliverable")).toBeNull()
+  })
+
+  it("row 4 is washed because its FIELD is its action (D-17), not because it has a button", () => {
+    renderList({ deliverableStepSlug: null })
+    expect(screen.getByTestId("decision-name-input")).toBeTruthy()
+    // There is no `decision-action-name` handle anywhere — asserted from the source, so
+    // this cannot pass merely because a query name was mistyped.
+    expect(decisionsListSource).not.toContain("decision-action-name")
+    expect(washed("name")).toBe(true)
+  })
+
+  it("the wash is FILL ONLY — it declares no padding, margin, radius or transform", () => {
+    // A wash that also moved the row would change the surface's declared vertical box and
+    // make the sibling card's box pins fail for a reason nobody intended. Read off the
+    // source so the claim is about what SHIPS, not about what one rendered row happens to
+    // carry.
+    const decl = /const ROW_HOVER_CLASS =\s*"([^"]*)"/.exec(decisionsListSource)
+    expect(decl, "ROW_HOVER_CLASS is no longer where this fence looks").not.toBeNull()
+    const utilities = (decl?.[1] ?? "").split(/\s+/).filter(Boolean)
+    expect(utilities.length).toBeGreaterThan(0)
+    for (const u of utilities) {
+      expect(u, `"${u}" moves geometry`).not.toMatch(
+        /^(?:hover:|focus:)?(?:-?[mp][xytblr]?-|rounded|translate-|scale-|rotate-|w-|h-|gap-|space-)/,
+      )
+    }
+    // POSITIVE CONTROL — the detector really fires on a geometry utility.
+    expect("hover:px-2").toMatch(
+      /^(?:hover:|focus:)?(?:-?[mp][xytblr]?-|rounded|translate-|scale-|rotate-|w-|h-|gap-|space-)/,
+    )
+  })
+
+  it("the wash's COLOUR TOKEN resolves in tailwind.config.js — it is not a silent no-op", () => {
+    // Non-vacuity FIRST: `?raw` has been measured to hand back the EMPTY STRING for some
+    // asset kinds under vitest, silently, and an empty config would make the lookup below
+    // pass for the wrong reason.
+    expect(tailwindConfigSource.length).toBeGreaterThan(0)
+    expect(tailwindConfigSource).toContain("colors:")
+    const decl = /const ROW_HOVER_CLASS =\s*"([^"]*)"/.exec(decisionsListSource)
+    const colour = /hover:bg-([a-z-]+)\//.exec(decl?.[1] ?? "")
+    expect(colour, "the wash no longer names a colour this fence can extract").not.toBeNull()
+    expect(tailwindConfigSource).toContain(`${colour?.[1]}: {`)
+  })
+
+  it("POSITIVE CONTROL — the config lookup would MISS one of sheet c5's own tokens", () => {
+    // ⚠ THE FINDING THIS CASE EXISTS TO PIN. Sheet `c5-draft-arrival` draws this wash in a
+    // Material-3 palette. Taking its token verbatim would have compiled to nothing and
+    // shipped a hover that does nothing at all, which no `data-` assertion would have
+    // caught. Both spellings the config could plausibly carry are checked.
+    for (const absent of ["surface-variant", "on-surface-variant", "tertiary"]) {
+      expect(tailwindConfigSource).not.toContain(`${absent}: {`)
+      expect(tailwindConfigSource).not.toContain(`"${absent}":`)
+    }
+  })
+
+  it("the wash changes NOTHING an author reads — the section 9 inventory is re-asserted", () => {
+    // A guard against the one way a presentation change can go wrong invisibly: a class
+    // edit that also nudged a string. Same expectation as section 9, deliberately stated
+    // again HERE so that this section fails on its own if the wash ever grows a caption.
+    renderList()
+    expect(rowAtoms("knowledge-base")).toEqual([
+      decisionRowLabel("knowledge-base"),
+      FOLDER_NAME,
+      DECISION_CHANGE_ACTION,
+    ])
+    expect(rowAtoms("name")).toEqual([decisionRowLabel("name"), WORKFLOW_NAME])
+  })
+})
