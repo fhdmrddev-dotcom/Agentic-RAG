@@ -2111,6 +2111,27 @@ const BASELINE = {
   "decisionsVocabulary.test.ts": 22,
   "DecisionsList.test.tsx": 54,
   "DraftArrivalCard.test.tsx": 35,
+  // ── Added in 192.2-10 (WR-02), in the SAME COMMIT that creates the file ──────────────
+  //
+  // ⚠ THE TWO-KNOB TRAP, AND `src/lib/` IS WHERE THIS SCRIPT ALREADY RECORDS IT FOUR TIMES.
+  // TARGETS decides what RUNS; BASELINE decides what is GUARDED, and a file can land outside
+  // BOTH by default. `src/lib/` has NO bare-directory entry — it is reached only by the two
+  // FILE-LEVEL lines `src/lib/phaseState.test.ts` and `src/lib/__tests__/fileIcon.test.tsx` —
+  // so without the matching `TARGETS` line below this suite would never have EXECUTED, and a
+  // falsification that does not run has falsified nothing.
+  //
+  // WHAT IS UNGUARDED WITHOUT IT: `frontend/src/lib/api.ts` declares THREE fields spelled
+  // `last_run_status?: string | null` (on `ThreadWorkflowState`, `PublishedWorkflow` and
+  // `WorkflowDraftRow`) and a swap between any two of them TYPECHECKS — the collision the
+  // file's own warning predicted twelve lines above it. WR-02's fix is a cross-reference
+  // docblock on each, bound by one marker token. This suite is the ONLY mechanical thing
+  // standing between that and a silent FOURTH declaration, or a marker deleted in a tidy-up.
+  // Neither `tsc` nor any rendering test can see either event.
+  //
+  // PINNED AT 12 — read from this gate's own printed `actual` column, and driven RED twice
+  // against REAL plants in `api.ts` first (a fourth declaration: 3 failed; one marker
+  // deleted: 4 failed), each with an md5-verified restore.
+  "apiRunFields.fences.test.ts": 12,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
@@ -3026,6 +3047,27 @@ const TARGETS = [
   // Phase 196 the owner of their future rot in a gate that requires 0 failing forever.
   "src/hooks/__tests__/useComposerModel.test.ts",
   "src/components/chat/__tests__/ChatArea.model.test.tsx",
+  // ── Added in 192.2-10 (WR-02), in the SAME COMMIT as its BASELINE pin above ─────────
+  //
+  // The ELEVENTH occurrence of the two-knob trap this script documents. `src/lib/` is reached
+  // above by TWO NAMED FILES ONLY (`phaseState.test.ts`, `__tests__/fileIcon.test.tsx`), so
+  // nothing here reached a new suite sitting directly in that directory. MEASURED, not
+  // assumed: absent from this gate's printed file list on the unmodified tree.
+  //
+  // WHAT IS UNGUARDED WITHOUT IT — the full reason is recorded ONCE at the matching `BASELINE`
+  // entry above (search `192.2-10`); it is not duplicated here, because two copies of a reason
+  // drift.
+  //
+  // ⚠ FILE-LEVEL, deliberately NOT the bare directory `src/lib` — verbatim the reasoning this
+  // script already records for `phaseState.test.ts`: that directory holds a dozen suites this
+  // plan does not read, and adopting them would make Phase 192.2 the owner of their future rot
+  // in a gate that requires 0 failing forever.
+  //
+  // ⚠ TIMING: a `TARGETS` path that does not yet exist makes this gate ERROR at exit 2 — not
+  // fail — for every later plan, so this lands in its creating commit and nowhere else. The
+  // path was `ls`-confirmed and the bare filename confirmed unique tree-wide (the BASELINE key
+  // space is global) before this line was written.
+  "src/lib/apiRunFields.fences.test.ts",
 ]
 
 const REPO_ROOT = path.resolve(__dirname, "..")

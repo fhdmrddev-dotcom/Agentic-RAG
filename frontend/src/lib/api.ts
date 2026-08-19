@@ -1333,7 +1333,31 @@ export interface ThreadWorkflowState {
    *  UPDATE — NOT a wall-clock run duration, because queue time is inside it. `claimed_at` is
    *  deliberately not offered (0 of 149 completed rows carry it — the in-process producer
    *  never takes `claim_run`'s CAS lease). Any surface printing the interval owes that
-   *  disclosure. Timestamps are ISO strings on the wire. */
+   *  disclosure. Timestamps are ISO strings on the wire.
+   *
+   * ⚠ WR-02-LOOKALIKE-LAST-RUN-STATUS — THREE IDENTICALLY-TYPED `last_run_status?: string | null`
+   * FIELDS EXIST IN THIS FILE, AND A SWAP BETWEEN ANY TWO OF THEM TYPECHECKS. They live on
+   * `ThreadWorkflowState`, on `PublishedWorkflow` and on `WorkflowDraftRow`. Named by TYPE and
+   * never by line number, because a line number rots on the next edit to this 6,000-line file.
+   *
+   *   · `ThreadWorkflowState.last_run_status` — THE LIVE THREAD's last `workflow_runs` row,
+   *     keyed to `last_workflow_run_id`. Paired with `last_run_created_at`.
+   *   · `PublishedWorkflow.last_run_status` and `WorkflowDraftRow.last_run_status` — THE
+   *     LIBRARY ROW's last run, OWNER-SCOPED (`r.user_id = $1`). Both paired with `last_run_at`.
+   *
+   * ⚠ AND THE TWO TIMESTAMP NAMES ARE THE SAME COLUMN. `last_run_created_at` (on
+   * `ThreadWorkflowState`) and `last_run_at` (on the two library rows) BOTH render
+   * `workflow_runs.created_at`. That divergence is KNOWN AND DECIDED (192.2-10 DEC-10-B), not an
+   * oversight: renaming either one is a wire change across the backend, three serializers, two
+   * interfaces here and both library normalizers — a large blast radius to make two names agree
+   * about a readability defect, taken inside a gap-closure round, on the hottest file in this
+   * repository. `last_run_at` is also the better name for the question the LIBRARY asks (*when
+   * did it last run*), where `last_run_created_at` names the column's provenance for a surface
+   * that also shows `last_run_updated_at`. The rename is DECLINED; the cross-reference is the fix.
+   *
+   * The marker token above is bound by `apiRunFields.fences.test.ts`, which counts THREE
+   * declarations and THREE markers. Deleting one of these paragraphs reds it.
+   */
   last_run_status?: string | null
   last_run_created_at?: string | null
   last_run_updated_at?: string | null
@@ -1449,6 +1473,29 @@ export interface PublishedWorkflow {
    * arm, and that arm must never be success.
    *
    * `undefined` / `null` carry the same two meanings as on `last_run_at` above.
+   *
+   * ⚠ WR-02-LOOKALIKE-LAST-RUN-STATUS — THREE IDENTICALLY-TYPED `last_run_status?: string | null`
+   * FIELDS EXIST IN THIS FILE, AND A SWAP BETWEEN ANY TWO OF THEM TYPECHECKS. They live on
+   * `ThreadWorkflowState`, on `PublishedWorkflow` and on `WorkflowDraftRow`. Named by TYPE and
+   * never by line number, because a line number rots on the next edit to this 6,000-line file.
+   *
+   *   · `ThreadWorkflowState.last_run_status` — THE LIVE THREAD's last `workflow_runs` row,
+   *     keyed to `last_workflow_run_id`. Paired with `last_run_created_at`.
+   *   · `PublishedWorkflow.last_run_status` and `WorkflowDraftRow.last_run_status` — THE
+   *     LIBRARY ROW's last run, OWNER-SCOPED (`r.user_id = $1`). Both paired with `last_run_at`.
+   *
+   * ⚠ AND THE TWO TIMESTAMP NAMES ARE THE SAME COLUMN. `last_run_created_at` (on
+   * `ThreadWorkflowState`) and `last_run_at` (on the two library rows) BOTH render
+   * `workflow_runs.created_at`. That divergence is KNOWN AND DECIDED (192.2-10 DEC-10-B), not an
+   * oversight: renaming either one is a wire change across the backend, three serializers, two
+   * interfaces here and both library normalizers — a large blast radius to make two names agree
+   * about a readability defect, taken inside a gap-closure round, on the hottest file in this
+   * repository. `last_run_at` is also the better name for the question the LIBRARY asks (*when
+   * did it last run*), where `last_run_created_at` names the column's provenance for a surface
+   * that also shows `last_run_updated_at`. The rename is DECLINED; the cross-reference is the fix.
+   *
+   * The marker token above is bound by `apiRunFields.fences.test.ts`, which counts THREE
+   * declarations and THREE markers. Deleting one of these paragraphs reds it.
    */
   last_run_status?: string | null
   /**
@@ -3500,6 +3547,34 @@ export interface WorkflowDraftRow {
    * fields off a different table entirely.
    */
   last_run_at?: string | null
+  /**
+   * Phase 192.2 (LIB-06 / D-08) — the RAW `workflow_runs.status` of the run `last_run_at`
+   * describes. The mirror of `PublishedWorkflow.last_run_status`; read that docblock for the
+   * three-state rule and for why it is `string` rather than a union.
+   *
+   * ⚠ WR-02-LOOKALIKE-LAST-RUN-STATUS — THREE IDENTICALLY-TYPED `last_run_status?: string | null`
+   * FIELDS EXIST IN THIS FILE, AND A SWAP BETWEEN ANY TWO OF THEM TYPECHECKS. They live on
+   * `ThreadWorkflowState`, on `PublishedWorkflow` and on `WorkflowDraftRow`. Named by TYPE and
+   * never by line number, because a line number rots on the next edit to this 6,000-line file.
+   *
+   *   · `ThreadWorkflowState.last_run_status` — THE LIVE THREAD's last `workflow_runs` row,
+   *     keyed to `last_workflow_run_id`. Paired with `last_run_created_at`.
+   *   · `PublishedWorkflow.last_run_status` and `WorkflowDraftRow.last_run_status` — THE
+   *     LIBRARY ROW's last run, OWNER-SCOPED (`r.user_id = $1`). Both paired with `last_run_at`.
+   *
+   * ⚠ AND THE TWO TIMESTAMP NAMES ARE THE SAME COLUMN. `last_run_created_at` (on
+   * `ThreadWorkflowState`) and `last_run_at` (on the two library rows) BOTH render
+   * `workflow_runs.created_at`. That divergence is KNOWN AND DECIDED (192.2-10 DEC-10-B), not an
+   * oversight: renaming either one is a wire change across the backend, three serializers, two
+   * interfaces here and both library normalizers — a large blast radius to make two names agree
+   * about a readability defect, taken inside a gap-closure round, on the hottest file in this
+   * repository. `last_run_at` is also the better name for the question the LIBRARY asks (*when
+   * did it last run*), where `last_run_created_at` names the column's provenance for a surface
+   * that also shows `last_run_updated_at`. The rename is DECLINED; the cross-reference is the fix.
+   *
+   * The marker token above is bound by `apiRunFields.fences.test.ts`, which counts THREE
+   * declarations and THREE markers. Deleting one of these paragraphs reds it.
+   */
   last_run_status?: string | null
   /**
    * Phase 192.2 (LIB-06 / CR-01) — the mirror of `PublishedWorkflow.has_any_run`; read THAT
