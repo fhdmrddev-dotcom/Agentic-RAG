@@ -73,7 +73,8 @@ import { ExternalActionSection } from "./ExternalActionSection"
 // asserts an ABSOLUTE ZERO of the three state/effect/memo tokens over its own source, and a
 // pin relaxed to make red go green is a pin that never fails again. This file reads the
 // answer; it does not hold it.
-import { FieldGuidance, useFieldGuidance } from "./FieldGuidance"
+import { FieldGuidance } from "./FieldGuidance"
+import { useFieldGuidance } from "./fieldGuidanceContext"
 import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"

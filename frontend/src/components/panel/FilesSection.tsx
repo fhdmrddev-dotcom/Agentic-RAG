@@ -120,7 +120,15 @@ const EXPIRY_UNKNOWN = "expiry unknown"
 //    trailing slot at all, so it is byte-identical either way (D-11). ──
 function expiryCaption(expiresAt?: string): string {
   if (!expiresAt) return EXPIRY_UNKNOWN  // the wire did not say — say THAT
-  const ms = new Date(expiresAt).getTime() - Date.now()
+  const at = new Date(expiresAt).getTime()
+  // 199 CR WR-02 — an UNPARSEABLE date is a third case, and totality over `string` did not
+  // make it go away. `NaN <= 0` is FALSE, so it fell past the expired arm, `Math.floor(NaN)`
+  // stayed NaN, and the caption rendered "expires in NaNm" — painted calm-muted, because
+  // isNearExpiry's comparison is false for NaN too. That is a WORSE lie than the blank this
+  // function replaced: a blank says nothing, NaN asserts a countdown that does not exist.
+  // An unreadable value is not-known, which is exactly what EXPIRY_UNKNOWN already says.
+  if (Number.isNaN(at)) return EXPIRY_UNKNOWN
+  const ms = at - Date.now()
   if (ms <= 0) return "expired"
   const h = Math.floor(ms / 3_600_000)
   if (h >= 1) return `expires in ${h}h`

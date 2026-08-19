@@ -21,7 +21,7 @@ import { describe, it, expect, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
-import { FIELD_GUIDANCE_HIDE, FIELD_GUIDANCE_SHOW } from "./FieldGuidance"
+import { FIELD_GUIDANCE_HIDE, FIELD_GUIDANCE_SHOW } from "./fieldGuidanceContext"
 import { PhaseFormPanel, type PhaseFormRails } from "./PhaseFormPanel"
 import {
   ACTION_RISK_ARM_LABEL,

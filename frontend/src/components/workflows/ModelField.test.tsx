@@ -580,6 +580,34 @@ describe("ModelField 199-06 — three readings, three different things on screen
     expect(screen.queryByTestId("model-no-answer")).not.toBeInTheDocument()
   })
 
+  it("⚠ 199 CR WR-01 — an empty read that STILL HOLDS a stored model does NOT claim emptiness", () => {
+    // THE DEFECT THIS PINS, which shipped in 199-06 and was caught by review rather than by
+    // any test here: the sentence was gated on `offered.length === 0` alone, and the retained
+    // `(current)` option is rendered from that SAME emptiness. The two were mutually IMPLIED,
+    // never exclusive — so the select held a choosable model while the line beneath it said
+    // the workspace offers none. Both resolved in ONE render; that is the contradiction.
+    render(
+      <ModelField
+        value={DISABLED_ID}
+        onChange={vi.fn()}
+        onPersist={vi.fn()}
+        models={[]}
+        runDefaultModel={null}
+      />,
+    )
+    const select = screen.getByRole("combobox", { name: /ai model/i }) as HTMLSelectElement
+    // NON-VACUITY FIRST — the retained option really is on screen, so the negative below is a
+    // claim about a populated control rather than about an empty one. Without this line the
+    // assertion would also pass on a component that rendered nothing at all.
+    const retained = within(select).getByRole("option", { name: new RegExp(DISABLED_ID) })
+    expect(retained).toBeInTheDocument()
+    expect(select.value).toBe(DISABLED_ID)
+    // …and therefore the emptiness sentence must NOT be there. A model you can pick and a
+    // sentence saying there are none cannot both be true of the same screen.
+    expect(screen.queryByText(REGISTRY_EMPTY_SENTENCE)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("model-registry-empty")).not.toBeInTheDocument()
+  })
+
   it("the three renders are pairwise DISTINCT — asserted, not assumed", () => {
     const html = (props: Partial<Parameters<typeof ModelField>[0]>) => {
       const { container, unmount } = render(

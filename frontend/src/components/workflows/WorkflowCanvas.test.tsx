@@ -35,7 +35,12 @@ import workflowCanvasSource from "./WorkflowCanvas?raw"
 // can show and neither `tsc` nor eslint can fail on.
 import planeEditingLayerSource from "./PlaneEditingLayer?raw"
 import editAffordanceSource from "./editAffordance?raw"
-import { WorkflowCanvas, BRANCH_CONNECTOR_WORD, BACKGROUND_GROUND } from "./WorkflowCanvas"
+import { WorkflowCanvas, BRANCH_CONNECTOR_WORD } from "./WorkflowCanvas"
+// 199 CR WR-03 — the ground table moved to its own leaf so the component file stops
+// exporting a shared object (`react-refresh/only-export-components`). The source-pattern
+// assertions below still read `WorkflowCanvas.tsx`, and still pass: the USE SITE is what
+// they pin, and it is unchanged.
+import { BACKGROUND_GROUND } from "./canvasGround"
 import { toCanvas } from "./canvasModel"
 // 189-15: the badge-slot-1 guard builds its own seven-type roster from the shipped type
 // order rather than adding an eighth entry to the shared fixture corpus — which would move

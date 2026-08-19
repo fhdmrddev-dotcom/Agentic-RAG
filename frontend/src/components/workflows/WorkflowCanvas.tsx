@@ -195,9 +195,6 @@ import {
 } from "react"
 import {
   Background,
-  // 199-05 — the ENUM, never the string `"dots"`. A typo in a string literal falls back
-  // to the library's own default and draws a ground that merely looks committed.
-  BackgroundVariant,
   Controls,
   MarkerType,
   ReactFlow,
@@ -207,6 +204,10 @@ import {
   type XYPosition,
 } from "@xyflow/react"
 
+// 199 CR WR-03 — the ground table lives in its own leaf: a component file may not export a
+// shared OBJECT constant (`react-refresh/only-export-components`). The bare-string
+// `BRANCH_CONNECTOR_WORD` below is exempt under the same rule and deliberately stays here.
+import { BACKGROUND_GROUND } from "./canvasGround"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import {
   CANVAS_EDGE_KINDS,
@@ -390,22 +391,6 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
  * same fact twice, three centimetres apart.
  */
 export const BRANCH_CONNECTOR_WORD = "on fail"
-
-/**
- * 199-05 — the plane's ground, stated rather than inherited. See the `<Background>` use
- * site for why the colour is deliberately absent from this table.
- *
- * Every number was MEASURED off the shipped rendering before it was written down: the
- * library was drawing a 20px dot lattice with a 1px dot, and it still is.
- */
-export const BACKGROUND_GROUND = {
-  /** Dots, never lines or crosses — the sheet's commitment and already the shipped one. */
-  variant: BackgroundVariant.Dots,
-  /** The lattice pitch, in canvas pixels. */
-  gap: 20,
-  /** One dot, one pixel. The quietest mark this plane draws. */
-  size: 1,
-} as const
 
 /**
  * The label's own presentation, in the SAME raw hsl the branch stroke above already

@@ -356,8 +356,16 @@ export function ModelField({
           the failed-read arm above would be distinguishable only by its own absence of a
           control. Two different facts must read differently on screen, not just in the
           props. Gated on the OFFERED set being empty, which is a fact about the answer that
-          did arrive — never about whether one arrived at all. */}
-      {offered.length === 0 && (
+          did arrive — never about whether one arrived at all.
+
+          199 CR WR-01 — `retained === null` is LOAD-BEARING and was missing. A retained
+          `(current)` option is rendered from the SAME emptiness this sentence claims: when the
+          registry offers nothing but the step already stores a model, the select held a
+          choosable option while the line beneath it said there were none. Driven, not reasoned:
+          `getByRole("option", {name: /gpt-5 \(current\)/})` and
+          `getByTestId("model-registry-empty")` both resolved in one render. The two conditions
+          were mutually IMPLIED, never exclusive. */}
+      {offered.length === 0 && retained === null && (
         <p
           data-testid="model-registry-empty"
           className="mt-1 text-[10.5px] leading-snug text-muted-foreground"

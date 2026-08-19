@@ -54,31 +54,19 @@
  * The distinction in one line: a sentence that restates its own label is guidance; a
  * sentence that states what the product will or will not do is not.
  */
-import { createContext, useContext, useState } from "react"
+import { useState } from "react"
 import type { ReactNode } from "react"
 
-/**
- * ⚠ DEFAULT `true` — see the docblock. Outside a provider every consumer renders its
- * guidance, which is the pre-199-06 surface exactly.
- */
-const FieldGuidanceContext = createContext<boolean>(true)
-
-/** The control's word while the explanations are hidden — an offer, not a mechanism. */
-export const FIELD_GUIDANCE_SHOW = "Explain each field"
-
-/** The control's word while they are shown. */
-export const FIELD_GUIDANCE_HIDE = "Hide the explanations"
-
-/**
- * Is the fully-open reading in effect?
- *
- * NON-THROWING, the `useSelectedPhaseSlug` idiom: there is no "no provider" error state to
- * report, because the absence of a provider has a correct answer (`true`) rather than an
- * undefined one.
- */
-export function useFieldGuidance(): boolean {
-  return useContext(FieldGuidanceContext)
-}
+// 199 CR WR-03 — the context, the hook and the two control words live in `fieldGuidance.ts`.
+// A component file may not export a shared HOOK (`react-refresh/only-export-components`), and
+// this project answers that rule with a leaf module rather than a suppression — 27 files do,
+// zero disables exist. ⚠ The `useState` below deliberately did NOT move: it is the entire
+// reason this file exists, because `PhaseFormPanel`'s hook count is pinned at an absolute zero.
+import {
+  FieldGuidanceContext,
+  FIELD_GUIDANCE_HIDE,
+  FIELD_GUIDANCE_SHOW,
+} from "./fieldGuidanceContext"
 
 export interface FieldGuidanceProps {
   children: ReactNode

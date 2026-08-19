@@ -266,6 +266,48 @@ describe("FilesSection (TMPL-01 / D-02) — ephemeral template badge + countdown
     expect(blanks).toHaveLength(0)
   })
 
+  /** A template whose `expires_at` the wire carried but which is NOT a parseable date —
+   *  the third case, which totality over `string` did not make go away. */
+  const templateBadExpiry = {
+    ...templateFile,
+    id: "file-tmpl-unparseable",
+    path: "garbage-timestamp.docx",
+    expires_at: "not-a-date",
+  }
+
+  it("⚠ 199 CR WR-01/WR-02 — an UNPARSEABLE expires_at reads unknown, never `NaN`", () => {
+    // THE DEFECT THIS PINS, introduced by the very fix above and caught by review: making the
+    // function TOTAL over `string` removed the blank but not the third case. `new Date("x")`
+    // is NaN, `NaN <= 0` is FALSE so it fell straight past the expired arm, `Math.floor(NaN)`
+    // stayed NaN, and the caption rendered "expires in NaNm" — painted CALM, because
+    // isNearExpiry's comparison is false for NaN too. That is a worse lie than the blank it
+    // replaced: a blank says nothing; NaN asserts a countdown that does not exist.
+    useWorkspaceFiles.mockReturnValue({
+      data: [templateBadExpiry],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+    const { container } = render(<FilesSection />)
+
+    // Non-vacuity FIRST — this really is a template row, so the caption slot exists at all.
+    expect(screen.getByText("Template")).toBeInTheDocument()
+
+    expect(screen.getByText("expiry unknown")).toBeInTheDocument()
+    // ⚠ THE LOAD-BEARING NEGATIVE, and it is asserted over the WHOLE rendered subtree rather
+    // than over one queried node — a stray NaN anywhere on this row is the bug.
+    expect(container.textContent ?? "").not.toMatch(/NaN/)
+    expect(screen.queryByText(/expires in/i)).toBeNull()
+    expect(screen.queryByText(/expired/i)).toBeNull()
+  })
+
+  it("POSITIVE CONTROL — the NaN needle really can fire", () => {
+    // ⚠ Without this, the negative above would also pass on a component that rendered nothing.
+    // Two fences in this phase passed green while defending nothing, and one of them was a
+    // safety guard, so a bare `not.toMatch` is not accepted here as evidence.
+    expect(`expires in ${Math.floor(Number.NaN)}m`).toMatch(/NaN/)
+  })
+
   it("ABSENT is NOT urgent — the unknown reading is muted, never the amber cue", () => {
     useWorkspaceFiles.mockReturnValue({
       data: [templateNoExpiry],
