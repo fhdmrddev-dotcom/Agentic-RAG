@@ -18,6 +18,9 @@ import { fireEvent, render, screen, within } from "@testing-library/react"
 // The SOURCES via Vite's `?raw` loader — two independent source fences live below.
 import nameCheckSource from "./TemplateNameCheck?raw"
 import bucketsSource from "./templateNameBuckets?raw"
+// 199-08: the api client's own SOURCE. The sheet's §6 needs a name-availability answer, and
+// the strongest form of "we cannot express that" is that there is nothing anywhere to ask.
+import apiClientSource199 from "@/lib/api?raw"
 
 import { TemplateNameCheck, NAME_CHECK_CAP } from "./TemplateNameCheck"
 import { classifyTemplateNames } from "./templateNameBuckets"
@@ -354,5 +357,109 @@ describe("D-14 fence scope — the two excluded modules really are non-consumers
     // STRONGER than the regexes above and cheap: this is the property a plain `grep` would
     // report, so the exclusion stays checkable by the bluntest available tool.
     expect(source).not.toContain(VOCAB_MODULE)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 3 (DES-01 · sheet `c9-doors-describe` §6) — THE NAME CHECK.
+//
+// APPENDED, never interleaved. Not one assertion above this line moves, and NO byte of
+// `TemplateNameCheck.tsx` is modified by this plan.
+//
+// ⚠ **THE PLAN'S OWN CLAIM ABOUT THIS FILE IS MEASURED FALSE, AND THAT IS THE FINDING.**
+// `199-08-PLAN.md` says: *"`TemplateNameCheck.tsx` already ships all three states; verify
+// rather than rebuild."* Verified — and it is false of the tree. The plan matched on the
+// component's NAME. The sheet's §6 and this file are two different checks that share a word:
+//
+//   | | sheet c9 §6 | `TemplateNameCheck.tsx` |
+//   |---|---|---|
+//   | subject | the WORKFLOW's own name / slug | the TEMPLATE DOCUMENT's field names |
+//   | states | available · already taken · still checking | produced · run-input · named nowhere |
+//   | nature | a UNIQUENESS VERDICT from the server | a local HEURISTIC over names |
+//   | control | an editable text input | no input at all — it is read-only output |
+//
+// ⚠ **CANNOT-EXPRESS, in three parts:**
+//   • **What the sheet asks for.** A name field that says, live, whether the name is free,
+//     already taken, or still being checked.
+//   • **What the component can do.** Nothing adjacent to it. And the shortfall is not this
+//     component's: NO name-availability check exists anywhere in the client — no api symbol,
+//     no route, no caller — which is asserted below rather than asserted in prose.
+//   • **The gap.** Closing it needs a server endpoint that answers "is this name taken?",
+//     which is a BACKEND CAPABILITY and outside a presentation-only phase's fence. The
+//     honest third state ("still checking") is additionally unbuildable without it: a
+//     spinner over a request nobody makes would be theatre.
+//
+// What IS pinned below is the property sheet c9 legitimately asks of any multi-state block,
+// and which this component genuinely can satisfy: its three states are told apart by WORDS,
+// not by colour.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("199-08 — sheet c9 §6: the THREE states are told apart WITHOUT colour", () => {
+  it("each bucket is named in words, and the three names are mutually distinct", () => {
+    render(<TemplateNameCheck classification={THREE_BUCKET} />)
+    const labels = [BUCKET_PRODUCED, BUCKET_RUN_INPUT, BUCKET_NAMED_NOWHERE]
+    // NON-VACUITY: all three buckets really rendered in this fixture, so the distinctness
+    // claim below is about three surfaces rather than about one and two absences.
+    for (const id of ["produced", "run-input", "nowhere"] as const) {
+      expect(readBucket(id).present, `${id} did not render`).toBe(true)
+    }
+    for (const label of labels) expect(screen.getByText(label)).toBeInTheDocument()
+    expect(new Set(labels).size).toBe(3)
+  })
+
+  it("⚠ NO STATE IS CARRIED BY COLOUR — strip every class and the three still read apart", () => {
+    const { container } = render(<TemplateNameCheck classification={THREE_BUCKET} />)
+    const texts = (["produced", "run-input", "nowhere"] as const).map((id) => {
+      const node = screen.getByTestId(`name-check-bucket-${id}`)
+      return (node.textContent ?? "").replace(/\s+/g, " ").trim()
+    })
+    for (const text of texts) expect(text.length).toBeGreaterThan(0)
+    expect(new Set(texts).size).toBe(3)
+    // …and no state word is spent on a colour utility anywhere in the rendered tree: the
+    // classes present are layout and muted text, never a status tone. A `bg-warning`-style
+    // silent no-op could not carry a meaning here even if someone added one.
+    const classes = Array.from(container.querySelectorAll("*"))
+      .flatMap((n) => (n.getAttribute("class") ?? "").split(" "))
+      .filter(Boolean)
+    expect(classes.length).toBeGreaterThan(0)
+    expect(classes.filter((c) => /(destructive|success|warning|green|red|amber)/.test(c))).toEqual(
+      [],
+    )
+  })
+
+  it("⚠ THE PLAN'S CLAIM, REFUTED MECHANICALLY: these are BUCKETS, not availability verdicts", () => {
+    render(<TemplateNameCheck classification={THREE_BUCKET} />)
+    const rendered = (document.body.textContent ?? "").toLowerCase()
+    // The sheet's three §6 verdicts appear NOWHERE on this surface, because this surface
+    // makes no such judgement — it says where a name is mentioned, never whether it is free.
+    for (const verdict of ["available", "already taken", "checking", "unavailable"]) {
+      expect(rendered.includes(verdict), `this surface claims "${verdict}"`).toBe(false)
+    }
+    // POSITIVE CONTROL — the sweep really fires on the sheet's own captions.
+    expect("State: Already taken".toLowerCase()).toContain("already taken")
+  })
+
+  it("⚠ NO NAME-AVAILABILITY SEAM EXISTS IN THE CLIENT AT ALL — the gap is a backend one", () => {
+    // The strongest form of the CANNOT-EXPRESS above: this component is not merely missing
+    // the states, there is nothing anywhere for it to ask. Swept over the api client itself.
+    for (const needle of [
+      "checkWorkflowName",
+      "isNameAvailable",
+      "nameAvailable",
+      "checkSlugAvailable",
+    ]) {
+      expect(apiClientSource199.includes(needle), `${needle} exists after all`).toBe(false)
+    }
+    // NON-VACUITY: the api client really loaded, so the four negatives are not `"".includes`.
+    expect(apiClientSource199.length).toBeGreaterThan(10000)
+    expect(apiClientSource199).toContain("export async function")
+  })
+
+  it("199-08 modified NO byte of this component — the verdict is a report, not a rebuild", () => {
+    expect(nameCheckSource).not.toContain("199-08")
+    expect(nameCheckSource.length).toBeGreaterThan(1000)
+    // …and it stays a leaf fed entirely from props: no api client, no fetch.
+    expect(nameCheckSource).not.toContain("@/lib/api")
+    expect(/\bfetch\s*\(/.test(nameCheckSource)).toBe(false)
   })
 })
