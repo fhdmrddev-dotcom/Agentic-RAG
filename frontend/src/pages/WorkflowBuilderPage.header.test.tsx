@@ -126,11 +126,33 @@ import type { EffectiveFeatures } from "@/lib/api"
 import builderSource from "./WorkflowBuilderPage?raw"
 import workflowsPageSource from "./WorkflowsPage?raw"
 import doorSwitchSource from "@/components/workflows/WorkflowDoorSwitch?raw"
+// 199-09 (DES-01 · sheet `c10-builder-chrome`) — the six chrome sources this plan reconciles,
+// read through the same `?raw` loader the three above use. Every sheet element this plan
+// REFUSES is refused against one of these, with NON-VACUITY asserted first and a positive
+// control beside it: a sweep over an empty string passes silently and proves nothing (the
+// `?raw`-returns-"" trap that `gutterTokens.fences.test.ts` records for CSS).
+import saveRegionSource from "@/components/workflows/BuilderSaveRegion?raw"
+import headerBarSource from "@/components/workflows/BuilderHeaderBar?raw"
+import publishGauntletSource from "@/components/workflows/PublishGauntlet?raw"
+import problemsTraySource from "@/components/workflows/ProblemsTray?raw"
+import stepPickerSource from "@/components/workflows/StepTypePicker?raw"
+import templateFirstDraftSource from "@/components/workflows/useTemplateFirstDraft?raw"
 // Phase 193-08: the two governed words this suite names, READ off their one home rather than
 // re-typed. A page suite that spells a governed door string is a second home (D-11) and goes
 // stale silently at the next reword — which is precisely what happened to every literal this
 // plan had to re-capture.
-import { STRIP_BACK, STRIP_LABEL_GOVERN } from "@/components/workflows/doorVocabulary"
+// 199-09: two more governed ids, on the same terms. `DESCRIBE_REFUSAL` is `199-08`'s new
+// 23rd id and is asserted through its IMPORTED value, never re-typed — a suite that spells
+// it would be the fourth home for a string with one owner, and would go green against a
+// re-worded constant.
+import {
+  DESCRIBE_CTA,
+  DESCRIBE_REFUSAL,
+  STRIP_BACK,
+  STRIP_LABEL_GOVERN,
+} from "@/components/workflows/doorVocabulary"
+import { WorkflowBuilderPage } from "./WorkflowBuilderPage"
+import { BuilderHeaderBar } from "@/components/workflows/BuilderHeaderBar"
 
 /** Two steps, hand-authored so `__fixtures__/canvasFixtures.ts` stays untouched
  *  (D-184-17 — that corpus belongs to the snapshot + round-trip suites). */
@@ -427,11 +449,48 @@ describe("Builder header, canvas flag OFF — three separate bands (D-181-01)", 
  *    text node. Whoever gives this suite's fixture a `name` owes the re-capture, and owes it
  *    under the four-part procedure above (encoder validated first, capture driven twice, ONE
  *    changed line, per-band delta table), not as a paste.
+ *
+ * ── ⚠ RE-CAPTURE **THREE**, TAKEN DELIBERATELY BY `199-09` (DES-01 · sheet c10 §1 case 4) ──
+ *
+ * The `TWO OF TWO` note above is NOT overwritten and its force is NOT waived. It says a further
+ * re-capture is *"a behaviour change to explain in its own plan, not a test to update"* — so this
+ * is the explanation, and `199-09` is that plan. It is also NOT the trigger that note predicted:
+ * the fixture still binds no `name`, and nobody gave it one. What moved is the TONE the fallback
+ * arm is painted in.
+ *
+ *  • WHAT CHANGED, AND WHY IT IS A CHANGE AT ALL. `identityLabel` resolves `name → slug →
+ *    "Untitled workflow"`, and until now painted all three arms identically. So a header
+ *    reading `vendor-brief` in the same weight and colour as an authored name ASSERTED that the
+ *    workflow was called `vendor-brief`, about a workflow nobody had named. Sheet c10 §1 case 4
+ *    draws the empty-name case as a DIMMED stand-in; that is the finding, and this is it applied
+ *    where it is true. The AUTHORED arm is untouched — measured, both arms, in one case.
+ *
+ *  • ⚠ IT IS **ONE CHANGED LINE AND ONE CHANGED TOKEN**, which is the whole reason it is
+ *    auditable. `text-foreground` → `text-muted-foreground` inside band 3's identity span. The
+ *    source side is spelled as a CONCATENATION precisely so the authored arm stays
+ *    character-identical to what shipped, and so this diff could not be anything larger.
+ *
+ *      | band            | tag deltas | attribute deltas | non-empty text nodes |
+ *      |-----------------|------------|------------------|----------------------|
+ *      | 1 (breadcrumb)  | NONE       | NONE             | 3 → 3, identical     |
+ *      | 2 (door band)   | NONE       | NONE             | 4 → 4, identical     |
+ *      | 3 (save cluster)| NONE       | ONE class token  | 4 → 4, identical     |
+ *
+ *  • ⚠ THE PROOF THAT NO WORD MOVED IS NOT THIS TABLE — IT IS A SEPARATE, CLASS-FREE PIN.
+ *    `199-09`'s `sheet c10 §1 — the header's RESTING atoms` captures both surfaces as text-node
+ *    literals with every class discarded, was committed BEFORE this change, and passed UNEDITED
+ *    after it. A byte pin cannot tell a colour change from a content change; that atom list can,
+ *    and it is why this re-capture can be asserted to be presentation rather than merely claimed.
+ *
+ *  • THE PREDICTION THE `TWO OF TWO` NOTE MADE IS STILL LIVE FOR THE NEXT AUTHOR. Giving this
+ *    fixture a `name` still owes a re-capture, and it would move the same span BACK to
+ *    `text-foreground` while also moving its text node. That is a DIFFERENT re-capture from this
+ *    one and still owes the four-part procedure.
  */
 const FLAG_OFF_HEADER_MARKUP = [
   `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="builder-back" class="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground hover:text-foreground">← Workflows</button><span class="text-[13px] font-medium text-foreground">Edit · Vendor brief v1</span><span data-testid="net-new-flag" title="Net-new surface — only GET /workflows/published + POST /workflows/{id}/publish are live today" class="rounded-full border border-accent-violet/40 bg-accent-violet/15 px-1.5 py-0.5 font-mono text-[8px] font-semibold uppercase text-accent-violet">net-new</span></div>`,
   `<div class="flex items-center gap-3 border-b border-border px-4 py-2"><button type="button" data-testid="both-doors" class="px-1 py-1 text-[13px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus-visible:text-foreground focus-visible:underline focus-visible:outline-none">‹ Change how I start</button><span aria-hidden="true" class="mx-0.5 h-4 w-px bg-border"></span><span class="text-[13px] font-medium text-foreground">Build it myself</span><span data-testid="judge-locked" title="The llm_judge_rubric output-quality judge is the publish gauntlet's hard wall — it runs on EVERY tier and cannot be switched off (TIERS.judgeAlwaysOn)." class="ml-auto inline-flex items-center gap-1 rounded-full border border-accent-violet/40 bg-accent-violet/10 px-2 py-0.5 font-mono text-[9px] font-semibold uppercase text-accent-violet"><span aria-hidden="true">🔒</span> judge always-on</span></div>`,
-  `<header class="flex items-center justify-between border-b border-border px-4 py-2.5"><div class="flex min-w-0 items-center gap-2"><span class="min-w-0 truncate text-[14px] font-semibold text-foreground">vendor-brief</span><span class="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">draft</span></div><div class="flex shrink-0 items-center gap-2"><div data-testid="builder-save-state" class="flex items-center gap-2"><button type="button" data-testid="builder-save-draft" class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60">Save draft</button></div><div><button type="button" data-testid="publish-trigger" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90">◆ Publish…</button></div></div></header>`,
+  `<header class="flex items-center justify-between border-b border-border px-4 py-2.5"><div class="flex min-w-0 items-center gap-2"><span class="min-w-0 truncate text-[14px] font-semibold text-muted-foreground">vendor-brief</span><span class="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">draft</span></div><div class="flex shrink-0 items-center gap-2"><div data-testid="builder-save-state" class="flex items-center gap-2"><button type="button" data-testid="builder-save-draft" class="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-[13px] font-medium text-foreground transition-opacity hover:bg-accent/40 disabled:cursor-not-allowed disabled:opacity-60">Save draft</button></div><div><button type="button" data-testid="publish-trigger" class="rounded-md bg-primary px-3 py-1.5 text-[13px] font-semibold text-primary-foreground hover:opacity-90">◆ Publish…</button></div></div></header>`,
 ].join("\n")
 
 describe("Builder header, canvas flag OFF — the markup itself is pinned", () => {
@@ -1103,5 +1162,541 @@ describe("197-10 / D-19 — the drafted header's identity slot", () => {
     // And the name rode along unchanged — the display reads the store, it does not
     // rewrite it.
     expect(body.name).toBe("Northwind QBR")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 199-09 Task 1 (DES-01 · sheet `c10-builder-chrome`) — THE PRE-CHANGE RESTING
+// INVENTORY OF THE BUILDER CHROME, AND THE SHEET RECONCILIATION.
+//
+// ⚠ WHY AN ATOM LIST BESIDE A BYTE PIN THAT ALREADY EXISTS. `FLAG_OFF_HEADER_MARKUP`
+// above proves the BYTES; it cannot tell a class change apart from a word change, so it
+// answers "did anything move?" and never "did what a PERSON reads move?". Task 2 makes a
+// deliberate, stated presentation change to band 3's identity span — and the only thing
+// that can prove that change is PRESENTATION rather than content is a class-free reading
+// of the same surface, captured BEFORE it. That is what these atom lists are for, and it
+// is why they are the control the re-baseline is judged against rather than a duplicate
+// of the pin.
+//
+// ⚠ EVERYTHING HERE IS PINNED **PRESENT**, INCLUDING THE THINGS THIS PLAN CHANGES. Where
+// the sheet takes an atom away, Task 2/3 INVERTS the assertion (present → absent) rather
+// than deleting the query. Zero assertion deletions is the target; a deleted query proves
+// nothing and leaves no evidence that the surface ever carried the atom.
+//
+// ⚠ jsdom RUNS NO LAYOUT. `clientHeight` and `getBoundingClientRect()` return 0, so a
+// "the controls did not get pushed off the row" measurement here would read `0 − 0` and
+// pass on any markup at all. Sheet §1 case 5 is therefore measured through a STATED
+// STRUCTURAL SURROGATE (the shrink/wrap/min-w contract), and the real check is an owed
+// G-4 row named in this plan's SUMMARY.
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Every non-empty text node under `root`, whitespace-collapsed, in document order — what a
+ * person READS, with every class, testid and attribute discarded. The 199-08 "class-free
+ * reading" idiom: a comparison that cannot be satisfied by a colour and cannot be broken
+ * by one.
+ */
+function restingAtoms(root: Element): string[] {
+  const out: string[] = []
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let node = walker.nextNode()
+  while (node !== null) {
+    const text = (node.textContent ?? "").replace(/\s+/g, " ").trim()
+    if (text !== "") out.push(text)
+    node = walker.nextNode()
+  }
+  return out
+}
+
+/** The atoms of every band stacked above the flow, outermost band first. */
+function headerAtoms(grid: Element, root: Element): string[] {
+  return headerBandsAbove(grid, root)
+    .reverse()
+    .flatMap((band) => restingAtoms(band))
+}
+
+/**
+ * Every source this reconciliation sweeps, with the NON-VACUITY floor asserted before any
+ * absence claim is made against it. A `?raw` import that silently resolved to `""` would
+ * make every absence assertion below pass while measuring nothing.
+ */
+const C10_SOURCES: ReadonlyArray<readonly [string, string]> = [
+  ["WorkflowBuilderPage.tsx", builderSource],
+  ["BuilderHeaderBar.tsx", headerBarSource],
+  ["BuilderSaveRegion.tsx", saveRegionSource],
+  ["PublishGauntlet.tsx", publishGauntletSource],
+  ["ProblemsTray.tsx", problemsTraySource],
+  ["StepTypePicker.tsx", stepPickerSource],
+  ["useTemplateFirstDraft.ts", templateFirstDraftSource],
+]
+
+/** The detector every sweep below uses, so the positive controls exercise the REAL one. */
+const carries = (source: string, needle: string) => source.includes(needle)
+
+describe("199-09 / sheet c10 — the sources are readable before anything is claimed absent", () => {
+  it.each(C10_SOURCES)("%s loaded with real content through ?raw", (_name, source) => {
+    expect(source.length).toBeGreaterThan(500)
+    // Shape, not just length: a stub that happened to be long would still be wrong.
+    expect(source).toMatch(/\/\*\*/)
+  })
+
+  it("POSITIVE CONTROL — the detector actually fires on a needle that IS present", () => {
+    // Driven against a string this test owns, so the control cannot be broken by an edit
+    // to a shipped file and cannot be satisfied by one either.
+    expect(carries("nothing here but a Save failed — Check connection line", "Save failed")).toBe(true)
+    expect(carries("nothing here at all", "Save failed")).toBe(false)
+  })
+})
+
+// ── §1 THE HEADER BAR — the five sheet cases ──────────────────────────────────────
+
+describe("199-09 / sheet c10 §1 — the header's RESTING atoms, pinned as literals", () => {
+  it("flag OFF: the three bands read exactly these words, in this order", async () => {
+    const { container } = await openDraftBuilder(OFF_VARIANTS[0].value)
+    expect(headerAtoms(screen.getByTestId("builder-grid"), container)).toEqual([
+      "← Workflows",
+      "Edit · Vendor brief v1",
+      "net-new",
+      STRIP_BACK,
+      STRIP_LABEL_GOVERN,
+      "🔒",
+      "judge always-on",
+      // ⚠ THE IDENTITY SLOT, AND IT IS A FALLBACK: this fixture's definition binds no
+      // `name`, so what a person reads here is the SLUG. Task 2 changes how that reads,
+      // not what it says — this line is what proves the second half of that sentence.
+      "vendor-brief",
+      "draft",
+      "Save draft",
+      "◆ Publish…",
+    ])
+  })
+
+  it("flag ON: the merged row reads exactly these words, in this order", async () => {
+    const { container } = await openDraftBuilder(FLAG_ON)
+    // ⚠ SETTLE THE FIRST VALIDATION BEFORE CAPTURING, and the reason is a real finding
+    // rather than test hygiene: on the flag-ON surface the publish refusal is LIVE in the
+    // merged row, and before the first check answers `blockedReason` is the never-ran
+    // sentence — so an unsettled capture pins a transient. `publish-blocked-reason` going
+    // absent is the check having answered `ok`. §3's refusal reading is driven
+    // DELIBERATELY in its own case below rather than caught in a race here.
+    await waitFor(() => expect(screen.queryByTestId("publish-blocked-reason")).toBeNull(), {
+      timeout: 4000,
+    })
+    expect(headerAtoms(screen.getByTestId("builder-grid"), container)).toEqual([
+      "← Workflows",
+      "Edit · Vendor brief v1",
+      "net-new",
+      "vendor-brief",
+      "draft",
+      // ⚠ The merged row says MORE than the flag-off one, and the two extra readings are
+      // both INSIDE `identityGroup` (D-186-15's KB chip and 197's requirement field), not
+      // extra bands — `headerBandsAbove` still returns exactly one. That distinction is
+      // the whole of D-184.1-01 and is asserted separately above.
+      "📁",
+      "No knowledge base · searches everything",
+      "✎",
+      STRIP_BACK,
+      STRIP_LABEL_GOVERN,
+      "🔒",
+      "judge always-on",
+      "Save draft",
+      "◆ Publish…",
+    ])
+  })
+})
+
+describe("199-09 / sheet c10 §1 — the identity slot's three arms (197-10 / D-19 is ALREADY-SHIPPED)", () => {
+  // The NAME arm and the SLUG arm are covered by `197-10 / D-19` above and are NOT
+  // rebuilt here. What this block adds is the THIRD arm — no name AND no slug — which
+  // nothing covered, and which is the arm sheet §1 case 4 is actually about.
+  it("no name AND no slug reaches the shipped terminal fallback", async () => {
+    const { container } = await openDraftWithDefinition({ slug: undefined })
+    expect(identitySlot(screen.getByTestId("builder-grid"), container).textContent).toBe(
+      "Untitled workflow",
+    )
+  })
+
+  it("✅ INVERTED BY TASK 2 — a fallback now READS as a fallback, and an authored name does not", async () => {
+    // ⚠ THE POLARITY OF THESE TWO LINES IS FLIPPED, NOT DELETED. Task 1 captured this
+    // surface asserting `text-foreground` PRESENT and `text-muted-foreground` ABSENT; the
+    // queries are the same queries. That is what makes the removal provable — a deleted
+    // assertion would leave no evidence the surface ever painted a stand-in like a name.
+    //
+    // Sheet §1 case 4's finding: the empty-name case must degrade to a DIMMED fallback,
+    // never to blank. Ours already degraded to a fallback rather than to blank; what it
+    // did NOT do was let a person tell the two apart, so the header asserted "this
+    // workflow is called vendor-brief" about a workflow nobody had named.
+    const fallback = await openDraftWithDefinition({})
+    const fallbackSlot = identitySlot(screen.getByTestId("builder-grid"), fallback.container)
+    expect(fallbackSlot.textContent).toBe("vendor-brief")
+    expect(fallbackSlot.className).toContain("text-muted-foreground")
+    expect(fallbackSlot.className).not.toContain(" text-foreground")
+    cleanup()
+
+    // …and the AUTHORED arm is untouched, which is the half that makes the change mean
+    // anything. Both arms in one case: a dimmed-everything header would satisfy the first
+    // assertion alone and would say strictly less than the one that shipped.
+    const named = await openDraftWithDefinition({ name: "Northwind QBR" })
+    const namedSlot = identitySlot(screen.getByTestId("builder-grid"), named.container)
+    expect(namedSlot.textContent).toBe("Northwind QBR")
+    expect(namedSlot.className).toContain("text-foreground")
+    expect(namedSlot.className).not.toContain("text-muted-foreground")
+  })
+
+  it("the terminal fallback is dimmed too — it names the workflow least of all three", async () => {
+    const { container } = await openDraftWithDefinition({ slug: undefined })
+    const slot = identitySlot(screen.getByTestId("builder-grid"), container)
+    expect(slot.textContent).toBe("Untitled workflow")
+    expect(slot.className).toContain("text-muted-foreground")
+  })
+
+  it("⚠ THE TONE IS NOT THE CARRIER — the fallback is still legible as TEXT (WCAG 1.4.1)", async () => {
+    // Colour may never be the only thing that distinguishes two readings. Here it is the
+    // SECOND carrier: the first is that a fallback is a slug or the literal words
+    // "Untitled workflow", neither of which is a name anybody typed. Asserted class-free
+    // so a person reading with no colour at all still receives the whole distinction.
+    const { container } = await openDraftWithDefinition({})
+    expect(restingAtoms(identitySlot(screen.getByTestId("builder-grid"), container))).toEqual([
+      "vendor-brief",
+    ])
+  })
+
+  it("the tone reads a DISPLAY answer and no rule learns anything from it (D-19 preserved)", () => {
+    // 197-10's binding constraint: the non-empty check is a display fallback, not a
+    // validation rule. This plan hoists that check into `authoredName` and spends it in a
+    // second render position — so the thing to guard is that it is still spent NOWHERE
+    // else. No store action, no request and no predicate may consult it.
+    // ⚠ COMMENT LINES ARE EXCLUDED, AND THAT IS DELIBERATE. The docblock above the
+    // expression names `authoredName` twice while explaining why it may not spread; a
+    // counter that included prose would go red against the very paragraph that states the
+    // rule, and `199-08`'s lesson is that a fence which forbids explaining itself is a
+    // fence somebody deletes.
+    const codeUses = builderSource
+      .split("\n")
+      .filter((line) => !/^\s*(\*|\/\/)/.test(line))
+      .filter((line) => line.includes("authoredName"))
+    // The declaration, the label chain, and the tone. Three, and no fourth.
+    expect(codeUses).toHaveLength(3)
+    expect(carries(builderSource, 'authoredName ?? meta.slug ?? "Untitled workflow"')).toBe(true)
+    expect(carries(builderSource, "authoredName === null ?")).toBe(true)
+    // POSITIVE CONTROL — the line filter really does drop prose and really does keep code.
+    const control = ["  * authoredName is a display answer", "  const x = authoredName"]
+      .filter((line) => !/^\s*(\*|\/\/)/.test(line))
+      .filter((line) => line.includes("authoredName"))
+    expect(control).toHaveLength(1)
+  })
+})
+
+describe("199-09 / sheet c10 §1 case 5 — the long-name contract (STRUCTURAL SURROGATE)", () => {
+  it("the identity may shrink and elide while the trailing group may not shrink at all", async () => {
+    // ⚠ THIS IS NOT A LAYOUT MEASUREMENT AND MUST NOT BE READ AS ONE. jsdom performs no
+    // layout, so every box here is 0×0 and a width comparison would read `0 > 0` — false
+    // for the right reason and true for none. What IS honestly checkable is the contract
+    // that produces the behaviour: the identity may shrink (`min-w-0`) and elides
+    // (`truncate`), the trailing group refuses to shrink (`shrink-0`), and the bar WRAPS
+    // rather than eliding a control (`flex-wrap`, `BuilderHeaderBar`'s own stated answer
+    // to the operator's ~900 px complaint). The real check is an owed G-4 row.
+    const LONG = "Enterprise Q3 Comprehensive Compliance and Vendor Risk Assessment 2026"
+    const { container } = await openDraftWithDefinition({ name: LONG })
+
+    // ⚠ MEASURED FLAG-OFF, and that is not a shortcut. `identitySlot` resolves the FIRST
+    // `<span>` of the `<header>` band, which is the identity only on the flag-off surface
+    // — with the flag ON the merged bar is itself a `<header>` whose first span belongs to
+    // the breadcrumb LEAD. Reusing the helper there silently measured the wrong element
+    // (it read "Edit · Vendor brief v1"), which is exactly the class of false green this
+    // file's own docblock warns about. The bar's contract is measured on its own terms in
+    // the case below.
+    const slot = identitySlot(screen.getByTestId("builder-grid"), container)
+    expect(slot.textContent).toBe(LONG)
+    expect(slot.className).toContain("min-w-0")
+    expect(slot.className).toContain("truncate")
+
+    // NOTHING WAS LOST TO THE LONG NAME: every control is still mounted.
+    expect(screen.getByTestId("builder-save-draft")).toBeInTheDocument()
+    expect(screen.getByTestId("publish-trigger")).toBeInTheDocument()
+  })
+
+  it("the merged row WRAPS rather than eliding a control, and its trailing group never shrinks", async () => {
+    await openDraftWithDefinition(
+      { name: "Enterprise Q3 Comprehensive Compliance and Vendor Risk Assessment 2026" },
+      FLAG_ON,
+    )
+    const bar = screen.getByTestId("builder-header-bar")
+    expect(bar.className).toContain("flex-wrap")
+    // The bar's SECOND child is the trailing group — `trail` + `actions`. It is the one
+    // that must never give up width, because that is where every control lives. The
+    // two-child shape is `WorkflowBuilderPage.canvas.test.tsx`'s 184-13 pin, re-measured
+    // here because this plan edits the bar.
+    expect(bar.children).toHaveLength(2)
+    expect(bar.children[1].className).toContain("shrink-0")
+    expect(bar.textContent ?? "").toContain("Assessment 2026")
+  })
+})
+
+describe("199-09 / sheet c10 §1 — the hairline between WHERE-YOU-ARE and WHAT-THIS-IS", () => {
+  it("the merged row marks the seam, and the mark adds NO band and NO word", async () => {
+    const { container } = await openDraftBuilder(FLAG_ON)
+    const bar = screen.getByTestId("builder-header-bar")
+    const seam = screen.getByTestId("builder-header-seam")
+
+    // It is a child of the EXISTING lead/identity group, never a third child of the bar —
+    // `canvas.test.tsx`'s 184-13 pin says the bar has exactly two children and it still does.
+    expect(bar.children).toHaveLength(2)
+    expect(bar.children[0].contains(seam)).toBe(true)
+
+    // POSITIONAL, not by class: it sits AFTER the breadcrumb and BEFORE the identity.
+    const lead = screen.getByTestId("builder-back")
+    // Resolved BY ITS WORDS rather than by a testid or a position, because the identity
+    // slot deliberately carries neither (the byte pin sees that span).
+    const identity = screen.getByText("vendor-brief")
+    expect(lead.compareDocumentPosition(seam) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(seam.compareDocumentPosition(identity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    // It spends no words and no accessible name — decoration, and the class-free atom pin
+    // above is the mechanical proof that the merged row still READS exactly as it did.
+    expect(seam.getAttribute("aria-hidden")).toBe("true")
+    expect(restingAtoms(seam)).toEqual([])
+    expect(headerBandsAbove(screen.getByTestId("builder-grid"), container)).toHaveLength(1)
+  })
+
+  it("with no identity to separate, there is no seam — so the pre-draft capture cannot see it", () => {
+    // ⚠ THE GUARD IS THE POINT. `WorkflowDoorSwitch.baseline.test.tsx`'s `GOVERN_INLINE`
+    // pins the PRE-DRAFT mount of this bar byte for byte, and that mount passes `lead` and
+    // `trail` only. Asserted here on the component's own terms so the claim is a property
+    // of the guard rather than a fact about one capture that happens to still pass.
+    const { container } = render(<BuilderHeaderBar lead={<nav>‹ Workflows</nav>} trail={<span>t</span>} />)
+    expect(container.querySelector('[data-testid="builder-header-seam"]')).toBeNull()
+    cleanup()
+
+    // …and the seam appears the moment there IS a seam — the positive control, so the
+    // absence above is a decision and not a component that never draws one.
+    render(<BuilderHeaderBar lead={<nav>‹ Workflows</nav>} identity={<span>Northwind QBR</span>} />)
+    expect(screen.getByTestId("builder-header-seam")).toBeInTheDocument()
+  })
+})
+
+describe("199-09 / sheet c10 §1 — the sheet's ICON and MOTION language is REFUSED", () => {
+  it("no chrome source names a Material Symbol, and none carries the sheet's activity underline", () => {
+    for (const [name, source] of C10_SOURCES) {
+      expect(`${name}:${carries(source, "material-symbols")}`).toBe(`${name}:false`)
+      expect(`${name}:${carries(source, "shaping-indicator")}`).toBe(`${name}:false`)
+    }
+    // POSITIVE CONTROL — both needles are real and the detector finds them.
+    expect(carries('<span class="material-symbols-outlined">lock</span>', "material-symbols")).toBe(true)
+    expect(carries('<div class="shaping-indicator pb-1">', "shaping-indicator")).toBe(true)
+  })
+})
+
+// ── §2 THE SAVE REGION — four arms in the sheet, and the one we do not have ────────
+
+describe("199-09 / sheet c10 §2 — the save region's shipped vocabulary, and the sheet's REFUSED one", () => {
+  it("the sheet's own failure sentence is authored NOWHERE — the loop owns that sentence", () => {
+    // D-186-03 / D-186-08: the refusal sentence is the write loop's, verbatim. A component
+    // that authored "Save failed — Check connection" would be re-wording a refusal it did
+    // not make, and would say "check connection" about a 409 that has nothing to do with
+    // the network.
+    expect(carries(saveRegionSource, "Save failed")).toBe(false)
+    expect(carries(saveRegionSource, "Check connection")).toBe(false)
+    expect(carries(saveRegionSource, "cloud_off")).toBe(false)
+    expect(carries("Save failed — Check connection", "Check connection")).toBe(true)
+  })
+
+  it("⚠ THE COST OF THE REFUSED FOURTH ARM, PINNED RATHER THAN DESCRIBED", () => {
+    // Sheet §2 has FOUR arms and this component reaches three of them: `saving`, `saved`
+    // and `error`. There is no `unsaved changes` reading anywhere, on either surface —
+    // asserted here so that a later plan which closes the gap FLIPS this line instead of
+    // rediscovering it. See the SUMMARY's CE-2 for why this plan does not close it: the
+    // only element that could carry it is `builder-autosave-status`, and
+    // `WorkflowBuilderPage.canvas.test.tsx` asserts that element ABSENT after an edit made
+    // on the flag-off surface — the mechanical form of D-181-01's promise.
+    expect(carries(saveRegionSource, "Unsaved")).toBe(false)
+    expect(carries(saveRegionSource, "unsaved changes")).toBe(false)
+    expect(carries("nothing but Unsaved changes here", "Unsaved")).toBe(true)
+  })
+})
+
+// ── §3 THE PUBLISH GATE — the refusal is RENDERED, not merely disabling ────────────
+
+describe("199-09 / sheet c10 §3 — publish states its refusal in words (ALREADY-SHIPPED)", () => {
+  it("the trigger renders the reason as a DOM node, not only as a `disabled` attribute", () => {
+    // The plan's question for §3 was: does the shipped `blockedReason` seam RENDER the
+    // refusal, or only grey the control? It renders it — `publish-blocked-reason` is a
+    // real element wired to the trigger through `aria-describedby`, which is the whole
+    // difference between a refusal and a dead button.
+    expect(carries(publishGauntletSource, 'data-testid="publish-blocked-reason"')).toBe(true)
+    expect(carries(publishGauntletSource, "aria-describedby")).toBe(true)
+    expect(carries(publishGauntletSource, "{blockedReason}")).toBe(true)
+  })
+
+  it("no client-side refusal SENTENCE is authored in the publish surface", () => {
+    // The sheet's `Needs 2 grounded phases` is a lint code wearing a sentence, and it
+    // names a threshold nothing in this product computes. Every reason that reaches the
+    // trigger comes from the Builder's `blockedReason`, whose five branches are either the
+    // server's verbatim message or one of two locally-authored NON-verdicts.
+    expect(carries(publishGauntletSource, "grounded phases")).toBe(false)
+    expect(carries("Needs 2 grounded phases", "grounded phases")).toBe(true)
+  })
+
+  it("DRIVEN: a real server refusal reaches the header as WORDS, and the words are the server's", async () => {
+    // The source sweep above proves the seam exists; this proves it is LIVE, end to end,
+    // and that the sentence a person reads is the one the server sent rather than anything
+    // this client composed. Driven deliberately rather than caught in the first-load race
+    // the atom pin above waits out.
+    const SERVER_SENTENCE = "Give the second step something to work from."
+    mockValidate.mockResolvedValue({
+      ok: false,
+      verdicts: [{ code: "phase_missing_input", severity: "error", phase: "summarize", message: SERVER_SENTENCE }],
+    })
+    await openDraftBuilder(FLAG_ON)
+
+    // ⚠ WAIT ON THE SENTENCE, NEVER ON THE ELEMENT. `publish-blocked-reason` is already
+    // mounted before the first check answers — carrying the never-ran sentence — so a
+    // `findByTestId` resolves instantly against the WRONG reading and the case would
+    // have measured the fail-closed default while claiming to measure a server verdict.
+    await waitFor(
+      () => expect(screen.getByTestId("publish-blocked-reason").textContent).toBe(SERVER_SENTENCE),
+      { timeout: 4000 },
+    )
+    const reason = screen.getByTestId("publish-blocked-reason")
+    // A refusal, not a dead control: the trigger is disabled AND it points at the reason.
+    const trigger = screen.getByTestId("publish-trigger")
+    expect(trigger).toBeDisabled()
+    expect(trigger.getAttribute("aria-describedby")).toBe(reason.getAttribute("id"))
+  })
+})
+
+// ── §4 THE PROBLEMS TRAY — business-plain BY DEFAULT, and the sheet's rows REFUSED ─
+
+describe("199-09 / sheet c10 §4 — the tray carries none of the sheet's engineer language", () => {
+  it("not one of the sheet's four row sentences appears in the shipped tray", () => {
+    for (const needle of [
+      "Output schema invalid",
+      "JSON schema definition contains syntax errors",
+      "Retrieve step requires at least one connected datastore",
+      "A generation model must be selected",
+    ]) {
+      expect(`${needle}:${carries(problemsTraySource, needle)}`).toBe(`${needle}:false`)
+    }
+    expect(carries("Phase 5: Output schema invalid", "Output schema invalid")).toBe(true)
+  })
+
+  it("and it carries no friendly-message map to rewrite them with either (D-182-06)", () => {
+    // The obvious fix for the sheet's language is the one thing this component may not
+    // grow. Phase 185 ships new findings as new identifiers in the module that owns them;
+    // a client-side rewrite table is exactly what D-182-06 removed, and re-introducing one
+    // would put a SECOND home under every finding identifier.
+    for (const needle of [
+      "FRIENDLY",
+      "MESSAGE_FOR",
+      "CODE_TO_MESSAGE",
+      "MESSAGES[",
+      "messageFor",
+    ]) {
+      expect(`${needle}:${carries(problemsTraySource, needle)}`).toBe(`${needle}:false`)
+    }
+    // …and the server's own message is what reaches the row, unedited.
+    expect(carries(problemsTraySource, "{verdict.message}")).toBe(true)
+    expect(carries("const FRIENDLY = {}", "FRIENDLY")).toBe(true)
+  })
+})
+
+// ── §5 THE STEP PICKER — one title resolver, and the sheet's verbs REFUSED ─────────
+
+describe("199-09 / sheet c10 §5 — the picker's rows resolve through THE one resolver", () => {
+  it("not one of the sheet's six verbs is spelled in this file", () => {
+    // WR-03: the row title asks `nodeTitle` over the very phase the click will build. The
+    // sheet's verbs are a DRAWING of that vocabulary, not a source for it — transcribing
+    // them would re-create the exact defect WR-03 fixed ("Check with you" in the menu,
+    // "Wait for your approval" on the card, one click apart), and it would survive every
+    // lexical fence because the drift is SEMANTIC.
+    for (const verb of [
+      "Find documents",
+      "Pull out specific details",
+      "Weigh against policy",
+      "Decide which way to go",
+      "Write a document",
+      "Send or file result",
+    ]) {
+      expect(`${verb}:${carries(stepPickerSource, verb)}`).toBe(`${verb}:false`)
+    }
+    expect(carries(stepPickerSource, "nodeTitle(minimalPhaseFor(")).toBe(true)
+    expect(carries("<p>Find documents</p>", "Find documents")).toBe(true)
+  })
+
+  it("the sheet's search field is REFUSED — it is a filter, not a presentation", () => {
+    // A search box over six rows is a behaviour (it decides which rows exist), and this
+    // phase's fence is presentation only. Recorded as an absence so the refusal is
+    // mechanical rather than a paragraph.
+    expect(carries(stepPickerSource, "Search actions")).toBe(false)
+    expect(carries(stepPickerSource, 'type="search"')).toBe(false)
+    expect(carries('<input placeholder="Search actions..." />', "Search actions")).toBe(true)
+  })
+})
+
+// ── THE MEASUREMENT THE WAVE-2 HAND-OFF ASKED FOR ─────────────────────────────────
+
+describe("199-09 — the Builder's pre-draft CTA predicate, MEASURED not assumed", () => {
+  it("carries the SAME trimmed-length term the door's gate carries", () => {
+    // ⚠ THE QUESTION `199-08` DELIBERATELY LEFT OPEN, and the answer decides whether
+    // saying the refusal out loud on this screen is PRESENTATION (in scope) or BEHAVIOUR
+    // (a report). The door's `canDraft` reads `describe.trim().length > 0`; the Builder's
+    // pre-draft CTA is `disabled={!canDraft}`, and ITS `canDraft` lives in
+    // `useTemplateFirstDraft`. They are the same predicate, so the sentence is
+    // presentation on both screens and NO new rule is added by rendering it.
+    expect(carries(templateFirstDraftSource, "describe.trim().length > 0")).toBe(true)
+    expect(carries(doorSwitchSource, "describe.trim().length > 0")).toBe(true)
+    // ⚠ THE PAGE AUTHORS NO GATE OF ITS OWN — it spends the hook's. Stated as the absence
+    // of a `canDraft` DECLARATION rather than of the substring `describe.trim()`, because
+    // Task 2 legitimately adds a trimmed READ here (the refusal expression) and a fence
+    // that cannot tell a read from a rule would have to be deleted the moment one landed.
+    expect(carries(builderSource, "const canDraft")).toBe(false)
+    expect(carries(builderSource, "disabled={!canDraft}")).toBe(true)
+    expect(carries("const canDraft = describe.trim().length > 0", "const canDraft")).toBe(true)
+  })
+
+  it("✅ INVERTED BY TASK 2 — the pre-draft box now refuses OUT LOUD, in the door's own words", async () => {
+    // ⚠ POLARITY FLIPPED, QUERY UNCHANGED. Task 1 asserted `DESCRIBE_REFUSAL` ABSENT from
+    // this file; the same needle is now asserted PRESENT, and the sentence is asserted to
+    // arrive by IMPORT rather than by spelling — `WorkflowBuilderPage.tsx` is a swept
+    // source of the D-24(a) copy fence, so a re-spelling would turn that fence red.
+    expect(carries(builderSource, "DESCRIBE_REFUSAL")).toBe(true)
+    expect(carries(builderSource, '} from "@/components/workflows/doorVocabulary"')).toBe(true)
+    expect(carries(builderSource, DESCRIBE_REFUSAL)).toBe(false)
+
+    // DRIVEN, not merely swept: the real pre-draft screen, refusing real whitespace.
+    const { container } = render(<WorkflowBuilderPage />)
+    const box = await screen.findByLabelText("business requirement")
+
+    // It never greets anyone — an untouched empty box is refused by the SAME rule and says
+    // nothing, which is what keeps the resting DOM the one `GOVERN_INLINE` pins.
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(box.getAttribute("aria-invalid")).toBeNull()
+
+    fireEvent.change(box, { target: { value: "   \n\t  " } })
+    expect(screen.getByTestId("describe-refusal").textContent).toBe(DESCRIBE_REFUSAL)
+    expect(box.getAttribute("aria-invalid")).toBe("true")
+
+    // Real text retires it, and the CTA agrees — the sentence reads the gate, it is not a
+    // second gate. Both readings taken off ONE render.
+    fireEvent.change(box, { target: { value: "summarise every vendor contract each quarter" } })
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(container.querySelector("button[disabled]")).toBeNull()
+  })
+
+  it("the refusal changes NO enablement — the CTA refuses exactly what it refused before", async () => {
+    // The whole of the "presentation, not behaviour" claim, driven rather than argued. The
+    // CTA's disabled state is read across all three inputs; only the SENTENCE is new.
+    render(<WorkflowBuilderPage />)
+    const box = await screen.findByLabelText("business requirement")
+    const cta = screen.getByRole("button", { name: DESCRIBE_CTA })
+
+    expect(cta).toBeDisabled()
+    fireEvent.change(box, { target: { value: "   \n\t  " } })
+    expect(cta).toBeDisabled()
+    fireEvent.change(box, { target: { value: "a real sentence" } })
+    expect(cta).not.toBeDisabled()
+    // …and back, so the case cannot pass on a control that simply never re-disables.
+    fireEvent.change(box, { target: { value: "  " } })
+    expect(cta).toBeDisabled()
   })
 })

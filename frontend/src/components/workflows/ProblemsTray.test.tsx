@@ -33,6 +33,11 @@ import { toCanvas } from "./canvasModel"
 // IMPORTED so the 187-27 positive control asserts character-identity against the page's
 // own constant rather than against a second copy of it.
 import { NOTHING_OUTSTANDING } from "./verdictModel"
+// 199-09, its own lines so this file's diff stays added-lines-only. The `?raw` source is
+// what the CANNOT-EXPRESS report's mechanical half sweeps; the provider + its REAL accessor
+// are what drive the ⌥ reveal, so no storage key is ever re-spelled here.
+import problemsTraySource from "./ProblemsTray?raw"
+import { TechnicalNamesProvider, useTechnicalNames } from "@/providers/TechnicalNamesProvider"
 import type { Verdict } from "@/lib/api"
 
 const PHASES: PhaseSpecJSON[] = [
@@ -525,5 +530,139 @@ describe("ProblemsTray — 187-27: a check that never RAN says so, and claims no
     )
     expect(screen.getByTestId("problems-tray-row-draft-0")).toBeInTheDocument()
     expect(screen.getByTestId("problems-tray-counts").textContent).toBe("1 problem")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 199-09 (DES-01 · sheet `c10-builder-chrome` §4) — THE TRAY IS VERIFIED, NOT REBUILT.
+//
+// ⚠ `ProblemsTray.tsx` IS UNMODIFIED BY THIS PLAN, AND THAT IS THE FINDING RATHER THAN AN
+// OMISSION. Sheet c10 draws this surface in engineer language — *"Phase 5: Output schema
+// invalid / JSON schema definition contains syntax errors"*, *"Retrieve step requires at
+// least one connected datastore"* — and sketch 178's own README names it: error codes
+// wearing a sentence. The business-language rule holds on our labels and titles and fails
+// on the SERVER'S error text, which this component renders VERBATIM by decision (D-182-06).
+// So the fix is authored server-side, in the module that owns the finding identifiers, and
+// is a BACKEND change this phase's fence forbids. The full three-part report and its
+// routing live in `199-09-SUMMARY.md` (CE-1); what lives here is the mechanical half —
+// proof that the properties the report DEPENDS ON are true, so the report is a measurement
+// rather than a claim.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/** Flips the app-wide reveal through its REAL accessor, so no storage key is re-spelled. */
+function RevealToggle() {
+  const { toggle } = useTechnicalNames()
+  return (
+    <button type="button" data-testid="reveal-toggle" onClick={toggle}>
+      technical names
+    </button>
+  )
+}
+
+describe("ProblemsTray — sheet c10 §4: business-plain BY DEFAULT (199-09, verified not rebuilt)", () => {
+  it("the two-count summary is readable with the tray CLOSED — the surface says how it is doing at rest", () => {
+    // Sheet c10 draws ONE number (*"3 Issues preventing publish"*) and calls everything an
+    // issue. Both severities block a publish, so merging them tells a person they have done
+    // something wrong every time they pause halfway — and half-finished is the state a
+    // canvas spends most of its life in. Ours separates them IN WORDS, closed.
+    renderTray({ open: false }, [
+      verdict({ phase: "draft", severity: "error", message: "the deliverable step has no input" }),
+      verdict({ phase: "gather", severity: "incomplete", message: "this step still needs a source" }),
+      verdict({ phase: "emit", severity: "incomplete", message: "this step still needs a model" }),
+    ])
+    expect(screen.getByTestId("problems-tray-summary")).toHaveAttribute("aria-expanded", "false")
+    expect(screen.getByTestId("problems-tray-counts").textContent).toBe(
+      "1 problem · 2 things to finish",
+    )
+    // …and neither word is the sheet's undifferentiated one.
+    expect(screen.getByTestId("problems-tray-counts").textContent).not.toMatch(/issues?/i)
+  })
+
+  it("a finding that belongs to NO step still has a home, even when it is the only thing there", () => {
+    // Sketch 139 variant B rendered verdicts inside the step they belonged to and therefore
+    // lost these findings from the surface entirely. Driven with an EMPTY per-phase set so
+    // the section is proved to render on its own rather than as a tail on a populated list.
+    renderTray({ open: true }, [
+      verdict({ phase: null, severity: "incomplete", message: "this still needs a one-line description" }),
+    ])
+    const section = screen.getByTestId("problems-tray-workflow-wide")
+    expect(within(section).getByTestId("problems-tray-message").textContent).toBe(
+      "this still needs a one-line description",
+    )
+    // Nothing else is in the list: the section is standing alone.
+    expect(screen.queryByTestId("problems-tray-empty")).toBeNull()
+    expect(screen.getByTestId("problems-tray-list").querySelectorAll("button")).toHaveLength(0)
+  })
+
+  it("the raw identifier is ABSENT by default and appears ONLY under the ⌥ reveal", async () => {
+    // The tray's whole claim to being a business surface: the server's `code` is a technical
+    // name and lives behind the app-wide reveal, never beside the sentence. Driven through
+    // the REAL provider and the REAL accessor — a test that set the storage key by hand
+    // would be a second home for that key and would pass against a broken accessor.
+    const CODE = "phase_output_schema_unreadable"
+    render(
+      <TechnicalNamesProvider>
+        <RevealToggle />
+        <ProblemsTray
+          groups={groupVerdicts([verdict({ code: CODE, phase: "draft", message: "a plain sentence" })])}
+          phases={PHASES}
+          degraded={null}
+          checking={false}
+          open
+          onToggle={vi.fn()}
+          onJumpToStep={vi.fn()}
+        />
+      </TechnicalNamesProvider>,
+    )
+
+    const list = screen.getByTestId("problems-tray-list")
+    expect(list.textContent ?? "").toContain("a plain sentence")
+    expect(list.textContent ?? "").not.toContain(CODE)
+
+    await userEvent.click(screen.getByTestId("reveal-toggle"))
+    expect(screen.getByTestId("problems-tray-list").textContent ?? "").toContain(CODE)
+    // …and the plain sentence did not go anywhere. The reveal ADDS the technical name; it
+    // never swaps the business one out.
+    expect(screen.getByTestId("problems-tray-list").textContent ?? "").toContain("a plain sentence")
+  })
+
+  it("⚠ NO FRIENDLY-MESSAGE MAP — the property the CANNOT-EXPRESS report rests on", () => {
+    // ⚠ THIS ASSERTION WAS DRIVEN RED AGAINST A REAL PLANT before it was trusted: a
+    // `const FRIENDLY_MESSAGE: Record<string, string> = { … }` was added to
+    // `ProblemsTray.tsx`, this case failed naming it, and the plant was removed (`grep -c
+    // "FRIENDLY_MESSAGE"` → 0). Without that drive it is a sweep that has never fired.
+    //
+    // Re-introducing such a map is the OBVIOUS fix for sheet c10 §4's language and is
+    // exactly what D-182-06 removed: Phase 185 ships new findings as new identifiers in the
+    // module that owns them, and a client-side rewrite table puts a SECOND home under every
+    // one of them — silently stale for every identifier this client has not been taught.
+    const codeLines = problemsTraySource
+      .split("\n")
+      .filter((line) => !/^\s*(\*|\/\/)/.test(line))
+    for (const needle of ["FRIENDLY", "MESSAGE_FOR", "CODE_TO_MESSAGE", "messageFor", "rewrite"]) {
+      expect(`${needle}:${codeLines.filter((l) => l.includes(needle)).length}`).toBe(`${needle}:0`)
+    }
+    // NON-VACUITY, first: the source really loaded, and the server's own message really is
+    // what reaches the row.
+    expect(problemsTraySource.length).toBeGreaterThan(500)
+    expect(problemsTraySource).toContain("{verdict.message}")
+    // POSITIVE CONTROL — the line filter finds a planted map and drops prose about one.
+    const control = ["  * a FRIENDLY map would be wrong", "  const FRIENDLY = {}"]
+      .filter((line) => !/^\s*(\*|\/\/)/.test(line))
+      .filter((line) => line.includes("FRIENDLY"))
+    expect(control).toHaveLength(1)
+  })
+
+  it("and the sheet's own engineer sentences appear nowhere in this component", () => {
+    for (const needle of [
+      "Output schema invalid",
+      "JSON schema definition contains syntax errors",
+      "Retrieve step requires at least one connected datastore",
+      "A generation model must be selected",
+      "Issues preventing publish",
+    ]) {
+      expect(`${needle}:${problemsTraySource.includes(needle)}`).toBe(`${needle}:false`)
+    }
+    expect("Phase 5: Output schema invalid".includes("Output schema invalid")).toBe(true)
   })
 })

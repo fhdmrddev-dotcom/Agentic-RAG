@@ -39,7 +39,7 @@ import {
   vi,
   type MockInstance,
 } from "vitest"
-import { fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { StrictMode, useState } from "react"
 
@@ -1241,5 +1241,98 @@ describe("StepTypePicker — dismissal survives a stopPropagation'd press", () =
     )
     fireEvent.mouseDown(screen.getByRole("menu"))
     expect(onDismiss).not.toHaveBeenCalled()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// 199-09 (DES-01 · sheet `c10-builder-chrome` §5) — THE ROW AS A PREVIEW, RE-SET.
+//
+// Appended; nothing above this line was edited. The plan's change to this component is
+// TYPOGRAPHY AND SPACING ONLY — the title takes weight, the supporting line takes a beat
+// of air — so what these cases guard is that the WORDS did not move while the setting did.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("StepTypePicker — sheet c10 §5: the setting changed, the sentences did not", () => {
+  /** Every row's title and supporting line, class-free, in menu order. */
+  function rowReadings() {
+    return PHASE_TYPE_ORDER.map((type) => {
+      const row = screen.getByTestId(`step-type-choice-${type}`)
+      return (row.textContent ?? "").replace(/\s+/g, " ").trim()
+    })
+  }
+
+  it("every row title is still THE resolver's answer, over the phase the click really builds", () => {
+    // ⚠ ASSERTED AGAINST THE RESOLVER, NEVER AGAINST A STRING — the WR-03 rule, re-measured
+    // because this plan edits the element that carries the title. A literal here would be a
+    // SECOND answer to a question with one home, which is the defect this file exists to
+    // prevent and which survived every lexical fence last time because it was semantic.
+    render(<StepTypePicker phases={[]} index={0} open onChoose={vi.fn()} onDismiss={vi.fn()} />)
+    for (const type of PHASE_TYPE_ORDER) {
+      const expected = nodeTitle(minimalPhaseFor(type, "", 0))
+      expect(`${type}:${expected.length > 0}`).toBe(`${type}:true`)
+      expect(
+        within(screen.getByTestId(`step-type-choice-${type}`)).getByText(expected),
+      ).toBeInTheDocument()
+    }
+  })
+
+  it("the title is SET apart from the supporting line, and the mark still carries the type", () => {
+    render(<StepTypePicker phases={[]} index={0} open onChoose={vi.fn()} onDismiss={vi.fn()} />)
+    for (const type of PHASE_TYPE_ORDER) {
+      const title = within(screen.getByTestId(`step-type-choice-${type}`)).getByText(
+        nodeTitle(minimalPhaseFor(type, "", 0)),
+      )
+      // Hierarchy, stated as a property of the TITLE rather than of a class string on the
+      // row: the title carries weight and the supporting line does not.
+      expect(`${type}:${title.className}`).toBe(`${type}:block font-medium`)
+      // The 3D mark is still the row's glyph — sketch 137's locked rule, and never a text
+      // glyph. This plan spends no new colour: the tint behind the mark is the row's whole
+      // colour budget and it comes from the shared `ICON_TINT` table.
+      expect(screen.getByTestId(`step-type-mark-${type}`)).toBeInTheDocument()
+    }
+  })
+
+  it("the readings are BYTE-IDENTICAL to the sentences their two vocabularies own", () => {
+    // The strongest form of "the setting changed and the words did not": each row's whole
+    // class-free reading is reconstructed from the two modules that own its halves, and
+    // compared. Any transcription into this component — the sheet's six verbs above all —
+    // breaks this without needing a fence to name the specific words.
+    render(<StepTypePicker phases={[]} index={0} open onChoose={vi.fn()} onDismiss={vi.fn()} />)
+    const expected = PHASE_TYPE_ORDER.map(
+      (type) =>
+        `${nodeTitle(minimalPhaseFor(type, "", 0))}${PHASE_TYPE_SUBTITLES[type] ?? ""}`
+          .replace(/\s+/g, " ")
+          .trim(),
+    )
+    expect(expected.every((reading) => reading.length > 0)).toBe(true)
+    expect(rowReadings()).toEqual(expected)
+  })
+
+  it("⚠ RECORDED, NOT CONVERTED — the refusal amber is a hand-mixed literal with no token", () => {
+    // 199-09's report CE-3. `--warning` is `38 92% 60%`; this row mixes `38 92% 66%` — the
+    // same hue and saturation, lightened six points for text contrast. That is exactly the
+    // `accent-violet` (graphic) / `accent-violet-text` (text-safe) pair the config already
+    // ships, with the second member never declared. Converting to `text-warning` would
+    // DARKEN a 10.5 px line already sitting under `opacity-[0.42]`, and declaring
+    // `warning-text` is a shared-artifact edit this wave declines.
+    //
+    // ⚠ PINNED SO IT IS NOT REDISCOVERED. A later plan that declares the token FLIPS this
+    // assertion; today it records where the literal is and that there is exactly one of it.
+    const literals = stepTypePickerSource.match(/text-\[hsl\(38_92%_66%\)\]/g) ?? []
+    expect(literals).toHaveLength(1)
+    // ⚠ COMMENT LINES EXCLUDED. The block above this row's class list names `text-warning`
+    // in order to explain why it is NOT used, and a needle that matched prose would go red
+    // against the very paragraph stating the rule — `199-08`'s lesson that a fence which
+    // forbids explaining itself is a fence somebody deletes.
+    const codeLines = stepTypePickerSource
+      .split("\n")
+      .filter((line) => !/^\s*(\*|\/\/)/.test(line))
+    expect(codeLines.filter((line) => line.includes("text-warning"))).toHaveLength(0)
+    expect(codeLines.filter((line) => line.includes("text-[hsl(38_92%_66%)]"))).toHaveLength(1)
+    // POSITIVE CONTROL — the matcher is real, and it would find a second occurrence.
+    expect(
+      ('a text-[hsl(38_92%_66%)] b text-[hsl(38_92%_66%)]'.match(/text-\[hsl\(38_92%_66%\)\]/g) ?? [])
+        .length,
+    ).toBe(2)
   })
 })
