@@ -35,7 +35,7 @@ import workflowCanvasSource from "./WorkflowCanvas?raw"
 // can show and neither `tsc` nor eslint can fail on.
 import planeEditingLayerSource from "./PlaneEditingLayer?raw"
 import editAffordanceSource from "./editAffordance?raw"
-import { WorkflowCanvas } from "./WorkflowCanvas"
+import { WorkflowCanvas, BRANCH_CONNECTOR_WORD } from "./WorkflowCanvas"
 import { toCanvas } from "./canvasModel"
 // 189-15: the badge-slot-1 guard builds its own seven-type roster from the shipped type
 // order rather than adding an eighth entry to the shared fixture corpus — which would move
@@ -1183,6 +1183,107 @@ describe("WorkflowCanvas 199-05 — §2 the CONNECTION states the plane can expr
     for (const drawn of ["312 contracts", "48 extracted findings", "12 flagged", "36 routine"]) {
       expect(drawn).toMatch(/\d/)
     }
+  })
+})
+
+describe("WorkflowCanvas 199-05 Task 2 — the branch connector carries its WORD", () => {
+  it("prints the shipped word on the resolved branch, and on nothing else", async () => {
+    const { container } = await renderPlane(branching)
+
+    const texts = new Map(
+      Array.from(container.querySelectorAll(".react-flow__edge")).map((e) => [
+        e.getAttribute("data-id"),
+        (e.textContent ?? "").trim(),
+      ]),
+    )
+    // NON-VACUITY FIRST — all five connectors really are on the plane.
+    expect(texts.size).toBe(5)
+
+    expect(texts.get("skip:assess->escalate")).toBe(BRANCH_CONNECTOR_WORD)
+    // …and every run-order connector and the terminal cap stay wordless: "then" needs
+    // no word, and a word on every line would spend the reader's attention on nothing.
+    for (const id of [
+      "seq:gather->assess",
+      "seq:assess->draft",
+      "seq:draft->escalate",
+      "end:escalate->__canvas__end",
+    ]) {
+      expect(texts.get(id)).toBe("")
+    }
+  })
+
+  it("is the word the definition already holds — not a payload figure, not a new coinage", () => {
+    // The word is the one both sibling surfaces already print for this exact concept.
+    expect(BRANCH_CONNECTOR_WORD).toBe("on fail")
+    // It carries no digit, so it cannot be read as a count of anything.
+    expect(BRANCH_CONNECTOR_WORD).not.toMatch(/\d/)
+    // It ships from ONE home in this file and is not re-spelled at the use site.
+    expect(stripComments(workflowCanvasSource).match(/"on fail"/g) ?? []).toHaveLength(1)
+  })
+
+  it("does NOT double up on a BROKEN branch, whose stub already prints the sentence", async () => {
+    const { container } = await renderPlane(unresolvableSkip)
+    const broken = container.querySelector('.react-flow__edge[data-id="skip:check->?nonexistent"]')
+    expect(broken).not.toBeNull()
+    expect((broken!.textContent ?? "").trim()).toBe("")
+    // …while the stub it lands on still says the whole thing (non-vacuity for the pair).
+    expect(screen.getByTestId("canvas-unresolved-skip").textContent ?? "").toContain("on fail")
+  })
+
+  it("the word is a SIGNAL, never a control — no tab stop, no handler, no role", async () => {
+    // One tab stop per node is a canvas-level invariant. An edge label that could be
+    // focused or pressed would be a second one, on an element that does nothing.
+    const { container } = await renderPlane(branching)
+    const branch = container.querySelector('.react-flow__edge[data-id="skip:assess->escalate"]')!
+    expect(branch.querySelectorAll("[tabindex]")).toHaveLength(0)
+    expect(branch.querySelectorAll("button, a, [role]")).toHaveLength(0)
+    // POSITIVE CONTROL — the query really would find one if it existed.
+    expect(container.querySelectorAll("[tabindex]").length).toBeGreaterThan(0)
+  })
+
+  it("the branch is legible with COLOUR REMOVED — the dash and the word both survive", async () => {
+    // The `192.2-05` method, adapted for an edge: an edge's colour lives in the `style`
+    // attribute beside `stroke-width` and `stroke-dasharray`, so stripping `class` proves
+    // nothing here. Every colour channel is DELETED and the branch must still be
+    // distinguishable from run order.
+    const { container } = await renderPlane(branching)
+
+    const signature = (id: string) => {
+      const edge = container.querySelector(`.react-flow__edge[data-id="${id}"]`)!
+      const path = edge.querySelector<SVGPathElement>(".react-flow__edge-path")!
+      return {
+        dash: path.style.strokeDasharray,
+        width: path.style.strokeWidth,
+        word: (edge.textContent ?? "").trim(),
+      }
+    }
+
+    const order = signature("seq:gather->assess")
+    const branch = signature("skip:assess->escalate")
+
+    expect(order.width.length).toBeGreaterThan(0) // non-vacuity
+    expect(branch).not.toEqual(order)
+    // …and it differs on TWO independent non-colour channels, so losing either one
+    // still leaves the branch readable.
+    expect(branch.dash).not.toBe(order.dash)
+    expect(branch.word).not.toBe(order.word)
+  })
+
+  it("no connector's geometry moved — the drawn `d` is identical before and after the word", async () => {
+    // The label rides `EdgeText` at the path's own midpoint; it must not touch the path.
+    // Measured against the projection's own bezier rather than a typed literal.
+    const { container } = await renderPlane(branching)
+    const branchD = container
+      .querySelector('.react-flow__edge[data-id="skip:assess->escalate"] .react-flow__edge-path')!
+      .getAttribute("d")
+    const orderD = container
+      .querySelector('.react-flow__edge[data-id="seq:assess->draft"] .react-flow__edge-path')!
+      .getAttribute("d")
+    expect(branchD).toBeTruthy()
+    expect(orderD).toBeTruthy()
+    // Both start at the same source handle — the branch and the run order leave `assess`
+    // from one point, which is what proves the label changed no anchor.
+    expect(branchD!.split(" ")[0]).toBe(orderD!.split(" ")[0])
   })
 })
 

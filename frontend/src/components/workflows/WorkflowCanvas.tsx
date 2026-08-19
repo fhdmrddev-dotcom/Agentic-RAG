@@ -354,6 +354,57 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
 }
 
 /**
+ * 199-05 — THE BRANCH CONNECTOR'S WORD, and the one row sheet `c1-canvas-plane` asked
+ * for that this surface could honestly answer.
+ *
+ * ⚠ THE MEASURED GAP. Until this constant the resolved on-fail branch was the ONLY
+ * connector on the plane that means something other than "then", and it said so in
+ * NOTHING but a dash and an amber stroke. The same concept carries its word on both
+ * sibling surfaces — `PhaseSpineGraph.tsx` prints `on fail → skip to <slug>`, and this
+ * canvas's own broken-target stub prints `on fail → goes to <slug> — no such step` — so
+ * a reader who cannot see the amber got the branch from the shipped canvas and from
+ * nowhere else. The acceptance bar is that every state the plane can express is
+ * distinguishable WITHOUT colour and carries its word where a word exists. The word
+ * existed; the connector did not carry it.
+ *
+ * WHY THE WORD AND NOT THE GLYPH. The `⤳` mark is the shipped on-fail glyph
+ * (`icon-convention.md` §4) and both sibling homes draw it — but both wrap it in
+ * `aria-hidden`, because it is decoration beside a sentence that already carries the
+ * meaning. An SVG edge label is ONE text node with no room for that split, so shipping
+ * the glyph here would put an unlabelled mark into an accessible name. The dash already
+ * carries the shape; this carries the meaning. The card's own rule, stated in
+ * `PhaseNodeCard`'s docblock: **the WORD carries the meaning; tone is decoration.**
+ *
+ * WHY IT IS NOT THE SHEET'S LABEL. Sheet c1's connectors carry `312 contracts` →
+ * `48 extracted` → `12 flagged`: a per-edge PAYLOAD COUNT. Nothing in this system emits
+ * one, and drawing an approximation would be a fabricated business figure on the surface
+ * a business reader trusts most. That is reported as CANNOT-EXPRESS, in full, in this
+ * plan's summary. What ships here is the branch's own authored CONDITION, which the
+ * definition already holds and two other surfaces already print.
+ *
+ * NOT ON THE BROKEN BRANCH. An unresolvable `skip_to_phase` already terminates in a stub
+ * node that prints the whole sentence; a second `on fail` on its connector would be the
+ * same fact twice, three centimetres apart.
+ */
+export const BRANCH_CONNECTOR_WORD = "on fail"
+
+/**
+ * The label's own presentation, in the SAME raw hsl the branch stroke above already
+ * spends — deliberately not a Tailwind token. 15 of sheet 178's 18 colour tokens compile
+ * to nothing against this repo's config, and an unpainted class is indistinguishable from
+ * a deliberately unpainted arm (the `bg-warning` silent no-op that shipped unguarded
+ * until 192.2). A raw literal beside an identical raw literal cannot acquire that failure.
+ */
+const BRANCH_CONNECTOR_LABEL = {
+  label: BRANCH_CONNECTOR_WORD,
+  labelShowBg: true,
+  labelBgPadding: [6, 2] as [number, number],
+  labelBgBorderRadius: 4,
+  labelStyle: { fill: "hsl(38 92% 60% / 0.95)", fontSize: 10, fontWeight: 500 },
+  labelBgStyle: { fill: "hsl(var(--card))", stroke: "hsl(38 92% 60% / 0.35)" },
+} as const
+
+/**
  * WHAT THE SURFACE SAYS AFTER A STRUCTURAL EDIT — and the two acts are DIFFERENT acts,
  * so they are different members of a union rather than one string with a flag.
  *
@@ -761,14 +812,26 @@ export function WorkflowCanvas({
     [nodes],
   )
 
-  const edges = useMemo<CanvasEdge[]>(
-    () =>
-      projection.edges.map((edge) => ({
-        ...edge,
-        style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
-      })),
-    [projection.edges],
-  )
+  const edges = useMemo<CanvasEdge[]>(() => {
+    // 199-05 — the stubs a BROKEN branch terminates in. Read off the node TYPE rather
+    // than off the reserved id prefix, so renaming the namespace cannot silently start
+    // labelling the broken branch twice.
+    const brokenTargets = new Set(
+      projection.nodes
+        .filter((node) => node.type === CANVAS_NODE_TYPES.unresolvedSkip)
+        .map((node) => node.id),
+    )
+    return projection.edges.map((edge) => ({
+      ...edge,
+      style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
+      // The branch's word, on the RESOLVED branch only — see `BRANCH_CONNECTOR_WORD`.
+      // Spread CONDITIONALLY (the shipped D-14 idiom), so a run-order connector's object
+      // is byte-identical to what it was before this plan.
+      ...(edge.data?.kind === CANVAS_EDGE_KINDS.skip && !brokenTargets.has(edge.target)
+        ? BRANCH_CONNECTOR_LABEL
+        : {}),
+    }))
+  }, [projection.edges, projection.nodes])
 
   /**
    * REQUIRED with a controlled `nodes` prop — see `dragOverlay`. Only `position`
