@@ -281,3 +281,174 @@ describe("PhaseCard — 127-03 density-by-status (WUX-03 / SC#2)  [owner: 127-03
     expect(head?.querySelector("svg")).toBeNull()
   })
 })
+
+// ── 199-02 Task 1 (DES-01 · sheet `c3-phase-spine`, Col 2) — THE PRE-CHANGE INVENTORY ──
+//
+// APPENDED, not woven in. Every assertion above belongs to 101.1-04 and 127-03 and stays
+// theirs; this block adds none to them and deletes none.
+//
+// It measures the live panel row's RESTING atoms — one per status the closed taxonomy
+// declares — so that 199-02's claim ("the spine renders no MORE at rest than before") is
+// checkable against a before rather than asserted. The one atom this plan SUBTRACTS is
+// pinned PRESENT here, so its removal is an INVERSION and never a deletion (`192.2-05`).
+
+/** Every status the closed taxonomy declares, in `phaseStatusMeta`'s own order. Keeping
+ *  the whole union here is deliberate: a member missing from this array is a member no
+ *  inventory case ever measures, which is the `SUBSTEPS` lesson one describe block up. */
+const ALL_STATUSES: Phase["status"][] = [
+  "pending",
+  "running",
+  "done",
+  "failed",
+  "retrying",
+  "skipped",
+  "recorded-not-sent",
+  "unknown",
+  "cancelled",
+]
+
+/**
+ * The status atom's [glyph, text] as rendered — the `ml-auto` span in the header.
+ *
+ * ⚠ BYTE-IDENTICAL to `panel/__tests__/PhaseTimeline.test.tsx:303-307`, on purpose and
+ * recorded rather than left to be noticed. `STATUS_META` is module-private, so both suites
+ * must read the rendered DOM; two DIFFERENT selectors for one atom is how two halves of a
+ * contract start measuring different elements (the `SEAL_TEST_ID` lesson). If either
+ * selector moves, both move together.
+ */
+function statusAtomOf(container: HTMLElement): [string, string] {
+  const atom = container.querySelector("button span.ml-auto")
+  const parts = Array.from(atom?.children ?? []).map((el) => el.textContent ?? "")
+  return [parts[0] ?? "", parts[1] ?? ""]
+}
+
+/** The card ROOT — where the box (border + fill) lives. */
+function rootOf(container: HTMLElement): HTMLElement {
+  return container.firstElementChild as HTMLElement
+}
+
+describe("PhaseCard — 199-02 pre-change inventory (sheet c3 Col 2)", () => {
+  it("pins the resting [glyph, word] of all NINE declared statuses as exact literals", () => {
+    const atoms = ALL_STATUSES.map((status) => {
+      const r = render(<PhaseCard phase={fillPhase({ status })} position={0} />)
+      const pair = statusAtomOf(r.container)
+      r.unmount()
+      return pair
+    })
+    // ⚠ EXACT literals, not shapes. Sheet c3's column 2 spells four of these differently
+    // (`Waiting`, `Blocked`, `Action Req`, `Failed`) and spells TWO of them for what is
+    // ONE state here — the panel keeps its OWN vocabulary and this is the record of it.
+    expect(atoms).toStrictEqual([
+      ["○", "Locked"],
+      ["●", "Running"],
+      ["✓", "Complete"],
+      ["✕", "Failed"],
+      ["↻", "Attempt"],
+      ["⤳", "Skipped"],
+      ["↛", "Not sent"],
+      ["?", "Unknown"],
+      ["■", "Stopped"],
+    ])
+    // NON-VACUITY: nine distinct marks and nine distinct words, so the table above is a
+    // measurement of nine rows and not one row read nine times.
+    expect(new Set(atoms.map((a) => a[0])).size).toBe(9)
+    expect(new Set(atoms.map((a) => a[1])).size).toBe(9)
+  })
+
+  it("REFUSES a determinate mid-phase count in EVERY status (sheet flaw 1 / D-03)", () => {
+    // Sheet c3 prints `Processing liability caps section (4/12)` on its active row. Nothing
+    // in this system emits a within-a-step count — `PhaseTimeline`'s SUPPRESS-DON'T-FAKE
+    // (D-03) rule already forbids per-phase counts — so the sheet element is REFUSED and the
+    // refusal is pinned as a fence across the whole taxonomy rather than left as prose.
+    //
+    // ⚠ THE FENCE TARGETS THE PARENTHESISED MID-PHASE FORM, and that narrowness is the
+    // point: the run-level `Phase 2 / 3` ordinal is HONEST (it is the reconcile floor, and
+    // it counts whole steps, never work inside one), so a fence that also forbade it would
+    // be forbidding the shipped honesty contract.
+    const DETERMINATE = /\(\s*\d+\s*\/\s*\d+\s*\)/
+    for (const status of ALL_STATUSES) {
+      const r = render(<PhaseCard phase={fillPhase({ status, attempt: 2 })} position={3} />)
+      expect(r.container.textContent ?? "", `status ${status} leaked a mid-phase count`).not.toMatch(
+        DETERMINATE,
+      )
+      r.unmount()
+    }
+    // POSITIVE CONTROL — the fence can find the shape it forbids.
+    expect("Processing liability caps section (4/12)…").toMatch(DETERMINATE)
+  })
+
+  it("THE BOX is gone from the settled rows — the 199-02 subtraction, proved by inversion", () => {
+    // ⚠ THIS ASSERTION WAS COMMITTED AS `.toBe(true)` AGAINST THE SHIPPED TREE, one commit
+    // before the arms below were changed, and it is INVERTED here rather than deleted.
+    //
+    // Sheet c3's column 2 draws a BOX on exactly two rows — the live one and the one asking
+    // for a person — and lets every settled row sit on the bare spine. The shipped panel
+    // boxed ALL of them, so a six-step run rendered six competing frames and the eye had
+    // nothing to land on. 127-03 already decided the direction (quiet at rest, bloom
+    // active); this carries that decision into the frame itself.
+    const pending = render(<PhaseCard phase={fillPhase({ status: "pending" })} position={0} />)
+    expect(rootOf(pending.container).classList.contains("border-border/40")).toBe(false)
+    expect(rootOf(pending.container).classList.contains("bg-card/20")).toBe(false)
+    // ⚠ THE BORDER BOX STAYS, TRANSPARENT. Dropping the utility instead would move every
+    // row by 2px — a geometry change wearing a tone change's clothes.
+    expect(rootOf(pending.container).classList.contains("border")).toBe(true)
+    expect(rootOf(pending.container).classList.contains("border-transparent")).toBe(true)
+    // …and `opacity-60` survives, because "not yet" is what it carries and the box was
+    // never what said it.
+    expect(rootOf(pending.container).classList.contains("opacity-60")).toBe(true)
+    pending.unmount()
+
+    const done = render(<PhaseCard phase={fillPhase({ status: "done" })} position={0} />)
+    expect(rootOf(done.container).classList.contains("border-border/50")).toBe(false)
+    expect(rootOf(done.container).classList.contains("bg-card/30")).toBe(false)
+    expect(rootOf(done.container).classList.contains("border-transparent")).toBe(true)
+    done.unmount()
+
+    // The other five settled terminals take the same arm — asserted rather than assumed,
+    // because a ternary chain is exactly where "and the rest" silently stops being true.
+    for (const status of ["skipped", "recorded-not-sent", "unknown", "cancelled"] as const) {
+      const r = render(<PhaseCard phase={fillPhase({ status })} position={0} />)
+      expect(
+        rootOf(r.container).classList.contains("border-transparent"),
+        `settled status ${status} kept a visible box`,
+      ).toBe(true)
+      r.unmount()
+    }
+  })
+
+  it("the SUBTRACTION changed no word and no mark — the atoms are byte-identical", () => {
+    // The claim that this is a re-PRESENTATION and not a re-wording, checked against the
+    // same nine-row table the inventory above pins. If a tone change had cost a status its
+    // word, this is where it would show.
+    const atoms = ALL_STATUSES.map((status) => {
+      const r = render(<PhaseCard phase={fillPhase({ status })} position={0} />)
+      const pair = statusAtomOf(r.container)
+      r.unmount()
+      return pair
+    })
+    expect(atoms).toStrictEqual([
+      ["○", "Locked"],
+      ["●", "Running"],
+      ["✓", "Complete"],
+      ["✕", "Failed"],
+      ["↻", "Attempt"],
+      ["⤳", "Skipped"],
+      ["↛", "Not sent"],
+      ["?", "Unknown"],
+      ["■", "Stopped"],
+    ])
+  })
+
+  it("pins the two rows that KEEP their box — the live one and the failed one", () => {
+    // The other half of the same claim, and the reason the subtraction above is a hierarchy
+    // move rather than a flattening: what makes a bloom loud is that nothing else is.
+    const running = render(<PhaseCard phase={fillPhase({ status: "running" })} position={0} />)
+    const runClass = rootOf(running.container).className
+    expect(runClass).toContain("border-l-[hsl(var(--panel-status-active))]")
+    running.unmount()
+
+    const failed = render(<PhaseCard phase={fillPhase({ status: "failed" })} position={0} />)
+    expect(rootOf(failed.container).className).toContain("border-[hsl(var(--destructive)/0.55)]")
+    failed.unmount()
+  })
+})

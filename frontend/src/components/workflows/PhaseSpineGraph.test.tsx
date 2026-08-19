@@ -29,6 +29,11 @@ import { nodeTitle, type NameContext, type PhaseSpecJSON } from "./phaseVocabula
 // SURFACES agree, so the comparison is against the canvas PROJECTION, not against a
 // second call of the same pure function.
 import { toCanvas } from "./canvasModel"
+// 199-02: the locked 019-D legend, IMPORTED rather than re-typed, so the inventory pin at
+// the foot of this file compares character-identity against the component's own exported
+// constant instead of a second copy of it (the `186-16` rule). Its own import statement, so
+// this plan's diff on this file reads as added lines only.
+import { READ_ONLY_LEGEND } from "./PhaseSpineGraph"
 
 /**
  * The rendered title of one spine node.
@@ -531,5 +536,104 @@ describe("PhaseSpineGraph — the injected name context (D-187-05)", () => {
     // markup it guards disappeared.
     expect(phaseSpineGraphSource).toMatch(/phase\.config\.phase_type/)
     expect(phaseSpineGraphSource).toMatch(/phase_index \{/)
+  })
+})
+
+/**
+ * ── 199-02 Task 1 (DES-01 · sheet `c3-phase-spine`, Col 1) — THE PRE-CHANGE INVENTORY ──
+ *
+ * APPENDED, not woven in: everything above belongs to 103-04, 183-04 and 187-09 and stays
+ * theirs. This block adds ZERO assertions to those and deletes none.
+ *
+ * WHY AN INVENTORY EXISTS AT ALL. This plan's binding claim is that the authoring spine
+ * renders **no MORE at rest** than it did before — the sheet's two-line-per-node
+ * description is a recorded drift of the "text is noise" rule, and the correct read is the
+ * OPPOSITE of the drawing. A claim about "less" is only checkable against a measurement of
+ * "before", so the resting face is pinned here as LITERAL STRINGS first, and a removal is
+ * then proved by INVERTING an assertion rather than by deleting one (the `192.2-05` method).
+ *
+ * ⚠ THE LITERALS ARE READ OUT OF THE REAL RENDER, not composed from the source. A pin
+ * assembled by re-typing the JSX would go green against a component that renders nothing at
+ * all, which is the failure mode a characterization pin exists to refuse.
+ */
+describe("PhaseSpineGraph — 199-02 pre-change inventory (sheet c3 Col 1)", () => {
+  /** The whole node face at rest — glyph (an svg, contributing no text) + title + raw
+   *  type chip + raw index line, concatenated exactly as a reader receives them. */
+  function faceOf(slug: string): string {
+    return (screen.getByTestId(`spine-node-${slug}`).textContent ?? "").trim()
+  }
+
+  it("pins the HEADER chrome as three literal atoms — one of which is an engineering note", () => {
+    const { container } = render(
+      <PhaseSpineGraph phases={threePhases} selectedSlug={null} onSelectNode={vi.fn()} />,
+    )
+    const header = container.querySelector("section > div")
+    expect(header).not.toBeNull()
+
+    // Atom 1 — the shipped cross-surface read-only vocabulary. `WorkflowCanvas.tsx:1000`
+    // and `WorkflowRunPage.tsx:960` render the SAME two words, so this one is not this
+    // component's to spend. It STAYS.
+    expect(header!.textContent).toContain("👁 View only")
+
+    // Atom 2 — ⚠ THE ATOM 199-02 SUBTRACTED. This assertion was committed as
+    // `.toContain(...)` against the shipped tree one commit before the span was removed,
+    // and it is INVERTED here rather than deleted — a removal proved by a live assertion
+    // is a removal that a later re-add reddens, which a deleted assertion cannot do
+    // (`192.2-05`). It stated how the component is IMPLEMENTED ("NET-NEW", "no graph
+    // lib") to the person authoring a workflow, which is the adopted mindset's third rule
+    // ("never name the mechanism to the user") failing on the widest column. Safe to
+    // spend because a repo-wide grep measured ZERO other assertions on it.
+    expect(header!.textContent).not.toContain("NET-NEW")
+    expect(header!.textContent).not.toContain("no graph lib")
+    // NON-VACUITY: the header still exists and still renders its one surviving atom, so
+    // the two refusals above are statements about a header rather than about a null.
+    expect((header!.textContent ?? "").trim()).toBe("👁 View only")
+
+    // Atom 3 — the locked 019-D legend. It is machine vocabulary (`phase_index`,
+    // `skip_to_phase`, `depends_on`) and the sheet's authoring column draws no legend at
+    // all — but it is a LOCKED SKETCH CONTRACT and it is asserted in four places
+    // (`:142` here plus three probes in `pages/WorkflowBuilderPage.test.tsx`, where it is
+    // how the graph view's presence is detected). Re-opening it is a phase, not a
+    // re-presentation, so it STAYS and the observation is recorded in the summary.
+    expect(screen.getByTestId("graph-legend").textContent).toBe(READ_ONLY_LEGEND)
+  })
+
+  it("pins the RESTING node face of every node as an exact literal", () => {
+    render(<PhaseSpineGraph phases={threePhases} selectedSlug={null} onSelectNode={vi.fn()} />)
+    // Three atoms per node and no fourth: the resolved title, the RAW `phase_type` chip and
+    // the RAW `phase_index` line. There is NO description line — which is precisely the
+    // sheet element this plan refuses to import.
+    expect(faceOf("gather")).toBe("Gather sourcesllm_agentphase_index 0")
+    expect(faceOf("emit")).toBe("Produce the deliverablellm_emitphase_index 1")
+    expect(faceOf("review")).toBe("Review the findingsllm_agentphase_index 2")
+  })
+
+  it("the branch outcome reads as WORDS, never as line-style alone (must_have)", () => {
+    render(<PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />)
+    const edge = screen.getAllByTestId("skip-edge")[0]
+    // The shipped edge already carries its meaning in words. The sheet's own requirement —
+    // "a branch reads as a word, not colour alone" — is therefore ALREADY-SHIPPED here, and
+    // pinning it is what stops a later re-skin quietly reducing it to a dashed amber rule.
+    expect((edge.textContent ?? "").trim()).toBe("⤳on fail → skip to human-confirm")
+    // Non-vacuity: the words survive with every class attribute stripped, so the claim is
+    // about text and not about a colour that happens to spell one.
+    const stripped = edge.cloneNode(true) as HTMLElement
+    stripped.querySelectorAll("*").forEach((el) => el.removeAttribute("class"))
+    stripped.removeAttribute("class")
+    expect(stripped.textContent).toContain("on fail → skip to")
+  })
+
+  it("REFUSES a determinate mid-phase count anywhere in the authoring spine (sheet flaw 1)", () => {
+    // Sheet c3 prints `Processing liability caps section (4/12)`. Nothing in this system
+    // emits a within-a-step count, so drawing one is a promise we cannot keep. The refusal
+    // is pinned as a fence rather than left to the summary's prose.
+    const { container } = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug="gather" onSelectNode={vi.fn()} />,
+    )
+    const DETERMINATE = /\(\s*\d+\s*\/\s*\d+\s*\)/
+    expect(container.textContent ?? "").not.toMatch(DETERMINATE)
+    // POSITIVE CONTROL — the fence can actually find the shape it forbids, so the
+    // assertion above is a measurement and not a regex that never matches anything.
+    expect("Processing liability caps section (4/12)…").toMatch(DETERMINATE)
   })
 })
