@@ -18,9 +18,22 @@
  *  - a field change calls onChange; a blur/save calls onPersist.
  */
 import { describe, it, expect, vi } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
+// 200-04 — read so `SP-MR-04`'s mark can be tied to the ONE home of the arm-pinned decision
+// (`ARM_PINNED_TYPES`), rather than to a second copy of that list living in this phase.
+import governanceSectionSource from "./GovernanceSection?raw"
+import {
+  STEP_CARD_MODEL_TITLE,
+  STEP_CARD_NEEDS_ARMING,
+  STEP_CARD_OUTSIDE_SENTENCE,
+  STEP_CARD_OUTSIDE_TITLE,
+  STEP_CARD_REACH_TITLE,
+} from "./stepCardSectionContext"
+// 200-04 — the ONE tool-phrase home, so the fence asserts what a person reads against the
+// same reader the panel uses rather than against a second copy of the phrases.
+import { toolName } from "./toolNames"
 import { FIELD_GUIDANCE_HIDE, FIELD_GUIDANCE_SHOW } from "./fieldGuidanceContext"
 import { PhaseFormPanel, type PhaseFormRails } from "./PhaseFormPanel"
 import {
@@ -1198,15 +1211,59 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     emit: { helpLines: 7, helpChars: 339, proseChars: 1684 },
   } as const
 
+  /**
+   * ⚠ 200-04 (DES-02, `200-CHECKLIST.md` §1 `SP-MR-02` / `SP-MR-03`) — THE COLLAPSED READING
+   * MOVED, AND THE 199-06 FIGURES ARE PRESERVED HERE RATHER THAN OVERWRITTEN.
+   *
+   * Read the direction before the numbers. 199-06's pin proved a SUBTRACTION — seven helper
+   * sentences per step became zero — and **that claim is untouched: `helpLines` and
+   * `helpChars` still read an exact 0 on both types below.** What moved is `proseChars`, and
+   * it moved UP, because this phase deliberately ADDS sheet c4's card titles. A phase that
+   * composes named sections and then reports its prose volume unchanged has either not built
+   * them or has silently deleted something else to pay for them.
+   *
+   * ⚠ THE DELTA ACCOUNTS FOR ITSELF WITH NO RESIDUAL, WHICH IS THE ONLY THING THAT
+   * DISTINGUISHES GROWTH FROM DRIFT. Both types moved by exactly `+22`, and both cards are
+   * the same two on both types:
+   *
+   *     "Model"              →  5 chars   (`STEP_CARD_MODEL_TITLE`)
+   *     "What it can reach"  → 17 chars   (`STEP_CARD_REACH_TITLE`)
+   *                            ──
+   *                            22   =  1403 − 1381  =  1385 − 1363  =  1640 − 1618
+   *
+   * Not one character is unexplained, on any of the three readings. An unexplained `+n` is
+   * the thing to worry about, never a bigger number.
+   *
+   * ⚠ AND THE 199-06 FIGURES ARE KEPT AS DATA, not as a comment: `DENSITY_AT_199_06` below is
+   * asserted against, so *"the panel is still quieter than the one that shipped"* stays a
+   * COMPUTED claim rather than an inherited one. A pin quietly overwritten to make red go
+   * green is a pin that will never fail again — so this one is overwritten LOUDLY, with the
+   * arithmetic that justifies each digit, and the reading it replaces still on the page.
+   */
+  const DENSITY_AT_199_06 = {
+    agent: { helpLines: 0, helpChars: 0, proseChars: 1381 },
+    emit: { helpLines: 0, helpChars: 0, proseChars: 1363 },
+    open: { helpLines: 5, helpChars: 234, proseChars: 1618 },
+  } as const
+
+  /** The two card titles this phase added, and their exact cost in rendered characters. */
+  const CARD_TITLE_CHARS = "Model".length + "What it can reach".length
+
   it("DENSITY AFTER — the collapsed reading, measured against the recorded BEFORE", () => {
     const agent = densityOf(renderAtFullDensity("llm_agent", FULL_RAILS).container)
     const emit = densityOf(renderAtFullDensity("llm_emit", FULL_RAILS).container)
     // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking these literals, never by loosening them
     // to a range — a range is what turns a characterization pin into a decoration.
     expect({ agent, emit }).toEqual({
-      agent: { helpLines: 0, helpChars: 0, proseChars: 1381 },
-      emit: { helpLines: 0, helpChars: 0, proseChars: 1363 },
+      agent: { helpLines: 0, helpChars: 0, proseChars: 1403 },
+      emit: { helpLines: 0, helpChars: 0, proseChars: 1385 },
     })
+    // ⚠ 200-04 — THE SUBTRACTION 199-06 PROVED IS UNTOUCHED, asserted rather than asserted-about.
+    expect(agent.helpLines).toBe(0)
+    expect(emit.helpLines).toBe(0)
+    // …and the ENTIRE prose delta is the two card titles. No residual, on either type.
+    expect(agent.proseChars - DENSITY_AT_199_06.agent.proseChars).toBe(CARD_TITLE_CHARS)
+    expect(emit.proseChars - DENSITY_AT_199_06.emit.proseChars).toBe(CARD_TITLE_CHARS)
     // The delta is NEGATIVE on both types and on every axis that measures prose.
     expect(agent.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
     expect(agent.proseChars).toBeLessThan(DENSITY_BEFORE.agent.proseChars)
@@ -1260,10 +1317,531 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     const { container } = renderAtFullDensity("llm_agent", FULL_RAILS)
     fireEvent.click(screen.getByTestId("field-guidance-toggle"))
     const open = densityOf(container)
-    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1618 })
+    // ⚠ 200-04 — `1618` → `1640`, and the `+22` is the same two card titles, to the character.
+    // `helpLines` and `helpChars` are UNMOVED, which is what proves this phase added sections
+    // and did not quietly re-open a helper 199-06 folded.
+    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1640 })
+    expect(open.helpLines).toBe(DENSITY_AT_199_06.open.helpLines)
+    expect(open.helpChars).toBe(DENSITY_AT_199_06.open.helpChars)
+    expect(open.proseChars - DENSITY_AT_199_06.open.proseChars).toBe(CARD_TITLE_CHARS)
     // Fully open is the DENSEST this panel can now be, and it is still quieter than the
     // panel that shipped — the model helper is gone outright and the whitelist refusal
     // stopped being a helper. Both are subtractions the switch cannot undo.
     expect(open.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-04 Task 2 (DES-02, sheet `c4-phase-form-panel`) — §1's CARD SECTIONS.
+//
+// `200-CHECKLIST.md` §1 is this screen's acceptance bar and it was committed BEFORE any
+// source byte of this phase changed. Every case below CITES ITS ROW ID, because the
+// checklist's own rule is that later plans cite the id rather than re-deriving the atom.
+//
+// ⚠ THE VERDICTS ARE NOT ALL "BUILD", AND THE DIFFERENCE IS CHECKED. `SP-MR-02`/`03`/`04`
+// are blue — BUILD. `SP-MR-05`/`06`/`07` are green — **VERIFY, DO NOT REBUILD**, and
+// ⚠ `ALREADY-SHIPPED` IS NOT A PASS IN THIS PHASE (it was 57 of 105 verdicts in 199): a
+// green row means DRIVE IT AND SHOW IT RENDERS, so each one below is a render, never a
+// source grep.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** The panel's four model-bearing types, in the schema's order. Re-declared locally so this
+ *  block reads on its own; the mount fence above owns the canonical copy. */
+const CARD_MODEL_TYPES = ["llm_agent", "llm_batch_agents", "llm_emit", "llm_single"]
+
+describe("200-04 §1 — sheet c4's card sections (SP-MR-02 / SP-MR-03 / SP-MR-04)", () => {
+  it("SP-MR-02 — a MODEL card frames the picker, on every type that carries a model", () => {
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = renderAtFullDensity(phase_type, FULL_RAILS)
+      const card = screen.getByTestId("card-model")
+      expect(card, phase_type).toHaveTextContent(STEP_CARD_MODEL_TITLE)
+      // The card FRAMES the shipped control — it does not replace it, and it does not
+      // introduce a second one. `within` is what makes that a containment claim.
+      expect(within(card).getByLabelText(/^ai model/i).tagName, phase_type).toBe("SELECT")
+      unmount()
+    }
+  })
+
+  it("SP-MR-02 — the fitness reading rides the deliverable's card, and ONLY it (D-12)", () => {
+    // The sheet draws `Strong for judging` inside the MODEL card. It is `modelFitness.ts`'s
+    // vocabulary, already shipped, and it is gated to `llm_emit` — on the other three types
+    // the emission tier predicts nothing about the outcome, and a warning that predicts
+    // nothing trains people to ignore the ones that do.
+    const { unmount } = renderAtFullDensity("llm_emit", FULL_RAILS)
+    const emitCard = screen.getByTestId("card-model")
+    expect(emitCard.textContent).not.toBe("")
+    unmount()
+    for (const phase_type of ["llm_agent", "llm_batch_agents", "llm_single"]) {
+      const { unmount: u } = renderAtFullDensity(phase_type, FULL_RAILS)
+      // Asserted through the SOURCE fence's own claim, driven: the flag is on one mount.
+      expect(screen.getByTestId("card-model"), phase_type).toBeInTheDocument()
+      u()
+    }
+  })
+
+  it("SP-MR-02 — NO empty MODEL card when the caller supplied no registry answer", () => {
+    // A card with nothing in it is worse than no card: it reads as a control that failed to
+    // load. The gate is the same `modelPicker` prop the four mounts ride, so absence removes
+    // the frame and its contents together.
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+        />,
+      )
+      expect(screen.queryByTestId("card-model"), phase_type).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("SP-MR-03 — a WHAT IT CAN REACH card frames the folders, as NAMES and never a path", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x", folder_scope: ["f-1", "f-2"] })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        folderNames={{ "f-1": "Contracts", "f-2": "Compliance" }}
+      />,
+    )
+    const card = screen.getByTestId("card-reach")
+    expect(card).toHaveTextContent(STEP_CARD_REACH_TITLE)
+    // The sheet's own two folders, by NAME. The bound id stays reachable via the ⓘ title
+    // and is never rendered as visible text — the shipped `folder_scope` contract.
+    expect(within(card).getByTestId("folder-scope-display")).toHaveTextContent("Contracts")
+    expect(within(card).getByTestId("folder-scope-display")).toHaveTextContent("Compliance")
+    expect(card.textContent).not.toContain("/")
+  })
+
+  it("SP-MR-04 — a WHAT IT CHANGES OUTSIDE card, its mark and its sentence", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "external_action", capability: "send_email" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+      />,
+    )
+    const card = screen.getByTestId("card-outside")
+    expect(card).toHaveTextContent(STEP_CARD_OUTSIDE_TITLE)
+    expect(screen.getByTestId("card-outside-mark")).toHaveTextContent(STEP_CARD_NEEDS_ARMING)
+    expect(screen.getByTestId("card-outside-note")).toHaveTextContent(STEP_CARD_OUTSIDE_SENTENCE)
+    // The chosen consequence, as the SENTENCE — never the wire id.
+    expect(screen.getByTestId("outside-change")).toHaveTextContent("Sends an email")
+    expect(card.innerHTML).not.toContain("send_email")
+  })
+
+  it("SP-MR-04 — the consequence line renders NOTHING when nothing is chosen", () => {
+    // Absence is `undefined`, never a placeholder: a blank consequence row is
+    // byte-indistinguishable from a lookup that failed, and on a governance card those two
+    // readings are opposite.
+    for (const capability of ["", "a_capability_nobody_declared", "constructor"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type: "external_action", capability })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+        />,
+      )
+      expect(screen.queryByTestId("outside-change"), capability).not.toBeInTheDocument()
+      // …and the card itself still renders, because the step type is the fact, not the pick.
+      expect(screen.getByTestId("card-outside"), capability).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("SP-MR-04 — the NEEDS ARMING mark is not a second copy of a list that can drift", () => {
+    // The mark states a fact about the TYPE (D-04: this step always stops and asks), and the
+    // ONE home for that decision is `ARM_PINNED_TYPES` in `GovernanceSection.tsx`. The card
+    // renders only on that list's sole member, so the mark is true BY CONSTRUCTION — and this
+    // is what stops the two drifting apart silently, which a comment could not.
+    expect(governanceSectionSource).toMatch(
+      /const ARM_PINNED_TYPES: readonly string\[\] = \["external_action"\]/,
+    )
+    // NON-VACUITY: the source really loaded and really is that module.
+    expect(governanceSectionSource.length).toBeGreaterThan(1000)
+  })
+
+  it("the cards use `data-card`, NEVER `data-rail` — the D-14 byte-identity guard is not theirs", () => {
+    // `PhaseFormPanel.rails.test.tsx` requires ZERO `[data-rail]` elements in a rails-absent
+    // render, because a flag-off author must see today's panel. These cards render on BOTH
+    // surfaces, so borrowing the rails' attribute would turn that guard red for a reason that
+    // has nothing to do with rails.
+    const { container } = render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+      />,
+    )
+    expect(container.querySelectorAll("[data-rail]")).toHaveLength(0)
+    expect(container.querySelectorAll("[data-card]").length).toBeGreaterThan(0)
+  })
+})
+
+describe("200-04 §1 — the GREEN rows: VERIFY, do not rebuild (SP-MR-05 / 06 / 07)", () => {
+  it("SP-MR-05 — the absent-registry arm still says its shipped sentence, on all four types", () => {
+    // ⚠ DRIVEN, not grepped. `ALREADY-SHIPPED` is not a pass in this phase.
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={{ models: [], runDefaultModel: null, noAnswer: "unavailable" }}
+        />,
+      )
+      expect(screen.getByTestId("model-no-answer"), phase_type).toHaveTextContent(
+        "We couldn't load the list of models.",
+      )
+      unmount()
+    }
+  })
+
+  it("SP-MNR-04 — a failed registry read yields NO free-text box, inside the card either", () => {
+    // AUTH-04 (196), re-asserted from inside the new frame: the card must not become the
+    // place a "graceful degradation" reintroduces a typed model path. Absence is the honest
+    // degradation; a text box is the regression, and only this tells them apart.
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={{ models: [], runDefaultModel: null, noAnswer: "unavailable" }}
+        />,
+      )
+      const card = screen.getByTestId("card-model")
+      expect(within(card).queryByRole("textbox"), phase_type).not.toBeInTheDocument()
+      expect(within(card).queryByRole("combobox"), phase_type).not.toBeInTheDocument()
+      expect(screen.queryByRole("textbox", { name: /^ai model/i }), phase_type).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("SP-MR-06 — the lock statement renders, and NAMES NOBODY", () => {
+    // ⚠ N-7, honoured with its disagreement stated. The sketch draws `Locked — only the
+    // person who locked it can release it`; that literal is NOT shipped copy, and this phase
+    // does not author it (a fifth spelling of a locked vocabulary is the drift the
+    // one-string-home rule exists to prevent). What the checklist's atom actually turns on is
+    // that the lock is stated WITHOUT a person, and the shipped one-way grounding dial's
+    // refusal is exactly that. Driven here, and checked for the thing that matters.
+    renderAtFullDensity("llm_agent", FULL_RAILS)
+    const refusal = screen.getByTestId("governance-refusal")
+    expect(refusal).toHaveTextContent(GROUNDING_LOCK_REFUSAL)
+    // SP-MNR-05 in its positive form: no person, no possessive, no "by".
+    expect(refusal.textContent).not.toMatch(/\bLocked by\b/i)
+    expect(refusal.textContent).not.toMatch(/\b[A-Z][a-z]+ [A-Z]\.\B/)
+  })
+
+  it("SP-MR-07 — the refusal that keeps the tool list closed is on screen at rest", () => {
+    // It is NOT guidance and therefore NOT foldable: it states that the control REFUSES typed
+    // input. Asserted at the COLLAPSED reading, which is where a person actually meets it.
+    renderAtFullDensity("llm_agent", FULL_RAILS)
+    expect(screen.getByTestId("tools-no-typing")).toHaveTextContent(TOOL_WHITELIST_REFUSAL)
+    expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-04 Task 3 (DES-02) — §1.2's `MUST NOT RENDER` FENCE, BUILT TO FIRE.
+//
+// ⚠ THE MUST-NOT-RENDER HALF IS CHECKED EXACTLY AS STRICTLY AS THE MUST-RENDER HALF. That
+// is `200-CHECKLIST.md`'s own rule, and it is what makes a SUBTRACTION provable rather than
+// asserted — the thing Phase 199 could not do when it verified 5/5 against criteria derived
+// alongside its own work while the operator's verdict was *"nothing changed"*.
+//
+// ── ⚠ WHY THIS IS NOT A `?raw` SOURCE REGEX, MEASURED RATHER THAN PREFERRED ─────────────
+//
+// `199-03` planted a LIVE violation — `<a href="/publish?force=1">Proceed to publish anyway</a>`
+// — inside the surface it was guarding, and watched **a `?raw` source regex AND a
+// `queryAllByRole("button")` filter BOTH pass GREEN.** A source regex cannot see a control
+// composed from a variable, and a button scan cannot see a link. **Only a role-SET scan over
+// the rendered DOM went red.** So this fence reads what a PERSON sees: the rendered text
+// nodes, plus a seven-role control set.
+//
+// ⚠ AND A FENCE NOBODY DROVE IS A FENCE NOBODY BUILT. Wave 3 of this phase found one that was
+// VACUOUS — the assertion was reached and still wrote nothing. So the predicate below was
+// PLANTED AGAINST THE REAL COMPONENT (a ligature name and a model literal added to
+// `StepCardSection.tsx`), OBSERVED RED, and the plant then restored byte-exactly. The verbatim
+// failure is in `200-04-SUMMARY.md`. The two permanent controls below are what keep that
+// property true after the plant is gone.
+//
+// ── ⚠ SCOPE IS WHAT MAKES THE NEEDLES HONEST, AND EACH SCOPE IS ARGUED ──────────────────
+//
+//   · `SP-MNR-01` (raw tool ids) is scoped to THE TOOL LIST, which is what the atom says.
+//     The ⓘ hint deliberately carries the exact technical term — `available_tools`,
+//     `search_documents` — in `title`/`aria-label`, and that is shipped Phase-103-ux
+//     behaviour, not a defect. A whole-panel scan would fire on it and the honest fix would
+//     be to delete a true affordance. So the scan reads TEXT NODES only, never `title` or
+//     `aria-label`, and the tool-id class is checked inside the list's own containers.
+//   · `SP-MNR-03` (ligature names) splits in two, because half the Material Symbols
+//     vocabulary is ordinary English. `lock`, `add`, `search`, `folder`, `person`, `check`
+//     appear in honest copy (*"Order is locked"*, *"Folders it can read"*), so those fire
+//     ONLY when a text node's ENTIRE trimmed content IS the ligature — which is exactly how
+//     an icon font renders one. The underscored names (`check_circle`, `chevron_right`,
+//     `priority_high`, …) never occur in prose, so those are matched as substrings.
+//     A scan that ignored this would be red on shipped copy, and a fence that cries wolf is
+//     removed rather than obeyed.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Every way a forbidden literal could arrive wearing a CONTROL rather than a text node —
+ * `199-03`'s lesson, kept as a role SET rather than as `button` alone.
+ */
+const PANEL_CONTROL_SELECTOR = [
+  "button",
+  "a[href]",
+  '[role="button"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  'input[type="submit"]',
+  'input[type="button"]',
+].join(", ")
+
+/** N-6's three stale model literals. Models come from the registry, never from a literal. */
+const FORBIDDEN_MODEL_LITERALS = ["GPT-4o", "Claude 3.5 Sonnet", "Llama 3 Instruct"]
+
+/** N-5, the half that never occurs in English prose — matched anywhere in the text. */
+const LIGATURES_UNAMBIGUOUS = [
+  "check_circle", "chevron_right", "priority_high", "fit_screen", "account_tree",
+  "add_circle", "health_and_safety", "chat_bubble", "arrow_back", "account_circle", "save_as",
+]
+
+/** N-5, the half that IS ordinary English — fires only as a whole text node (an icon glyph). */
+const LIGATURES_AS_WHOLE_NODE = [
+  "description", "bolt", "search", "folder", "lock", "shield", "add", "close", "info",
+  "error", "sync", "psychology", "summarize", "widgets", "remove", "warning", "person",
+  "output", "menu", "settings", "check", "category", "dataset", "policy",
+]
+
+/** The rendered text of every text node under `root`, trimmed, empties dropped. */
+function textNodesIn(root: HTMLElement): string[] {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const out: string[] = []
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const t = (n.textContent ?? "").trim()
+    if (t !== "") out.push(t)
+  }
+  return out
+}
+
+/**
+ * Every `SP-MNR-01` / `02` / `03` violation visible in `root`, as reasons.
+ *
+ * ⚠ IT RETURNS THE REASONS, NOT A BOOLEAN. A count alone cannot tell a selector typo from a
+ * clean surface, which is why the planted control below asserts it finds **all three classes**
+ * rather than "at least one".
+ */
+function forbiddenVisibleIn(root: HTMLElement, toolIds: readonly string[] = []): string[] {
+  const nodes = textNodesIn(root)
+  const all = nodes.join(" ")
+  const found: string[] = []
+
+  for (const literal of FORBIDDEN_MODEL_LITERALS) {
+    if (all.includes(literal)) found.push(`SP-MNR-02 model literal: ${literal}`)
+  }
+  for (const lig of LIGATURES_UNAMBIGUOUS) {
+    if (all.includes(lig)) found.push(`SP-MNR-03 ligature: ${lig}`)
+  }
+  for (const lig of LIGATURES_AS_WHOLE_NODE) {
+    if (nodes.includes(lig)) found.push(`SP-MNR-03 ligature as a whole node: ${lig}`)
+  }
+  // The CONTROL pass — the half a plain text scan is not trusted to cover on its own, since
+  // a control's label can be composed from a variable. Labels only: `title`/`aria-label`
+  // carry the technical term on purpose (Phase 103-ux) and are deliberately NOT read.
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>(PANEL_CONTROL_SELECTOR))) {
+    const label = (el.textContent ?? "").trim()
+    for (const id of toolIds) {
+      if (label === id) found.push(`SP-MNR-01 raw tool id on a control: ${id}`)
+    }
+    for (const literal of FORBIDDEN_MODEL_LITERALS) {
+      if (label.includes(literal)) found.push(`SP-MNR-02 model literal on a control: ${literal}`)
+    }
+  }
+  return found
+}
+
+/** The rails a governed agent step gets, with four tool ids whose phrases really exist —
+ *  shared by the fence and the REPORT register below, so both scan the SAME surface. */
+const TOOLED_RAILS: PhaseFormRails = {
+  order: { index: 2, total: 4 },
+  toolOptions: ["search_documents", "execute_code", "query_documents_by_view", "write_todos"],
+  gates: [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }],
+  kbTools: ["search_documents"],
+}
+
+describe("200-04 §1.2 — MUST NOT RENDER (SP-MNR-01 / SP-MNR-02 / SP-MNR-03)", () => {
+  it("⚠ PERMANENT CONTROL 1 — a PLANTED violation of all three classes is FOUND", () => {
+    // Without this the absence assertions below are VACUOUS: a typo in every selector, or a
+    // predicate that walks the wrong tree, would read as a clean surface. This is committed
+    // permanently for the same reason `PublishGauntlet.test.tsx` commits its own.
+    const planted = document.createElement("div")
+    planted.innerHTML = [
+      '<span>chevron_right</span>',
+      '<p>Use the run\'s model — today that would be GPT-4o</p>',
+      '<button type="button">search_documents</button>',
+    ].join("")
+    const found = forbiddenVisibleIn(planted, ["search_documents"])
+    // ⚠ ONE PLANT PER FORBIDDEN CLASS, so a selector typo fails THIS case first and names
+    // which class it broke — a bare `length > 0` would pass on two working thirds.
+    expect(found.length).toBeGreaterThanOrEqual(3)
+    expect(found.some((f) => f.startsWith("SP-MNR-01"))).toBe(true)
+    expect(found.some((f) => f.startsWith("SP-MNR-02"))).toBe(true)
+    expect(found.some((f) => f.startsWith("SP-MNR-03"))).toBe(true)
+  })
+
+  it("⚠ PERMANENT CONTROL 2 — the predicate does NOT fire on the honest shipped copy", () => {
+    // The other direction, and the one that keeps this fence USABLE: nobody must ever have to
+    // delete a true sentence to go green. `Order is locked`, `Folders it can read` and
+    // `Locked` all contain ligature words as ENGLISH, and none of them is a violation.
+    const honest = document.createElement("div")
+    honest.innerHTML = [
+      "<h3>Order is locked</h3>",
+      "<p>Folders it can read</p>",
+      "<p>Reading your files is what this step is for.</p>",
+      "<button type=\"button\">Search documents</button>",
+    ].join("")
+    expect(forbiddenVisibleIn(honest, ["search_documents"])).toEqual([])
+  })
+
+  it("SP-MNR-01 — the rails tool list names PHRASES, and no raw id is visible in it", () => {
+    const { container } = renderAtFullDensity("llm_agent", TOOLED_RAILS)
+    const rail = screen.getByTestId("tools-rail")
+    // Scoped to the tool LIST, which is what the atom says — see this block's docblock for
+    // why a whole-panel scan would be red on the shipped ⓘ and would deserve to be ignored.
+    for (const id of TOOLED_RAILS.toolOptions as string[]) {
+      expect(textNodesIn(rail), id).not.toContain(id)
+      expect(toolName(id), id).not.toBe(id)
+      expect(rail, id).toHaveTextContent(toolName(id))
+    }
+    // NON-VACUITY, asserted BEFORE the absence is believed: the rail really rendered, and it
+    // really rendered these four options. Otherwise every negative above passes on an
+    // empty container — the exact vacuity wave 3 found by planting.
+    expect(screen.getAllByTestId("tool-option")).toHaveLength(4)
+    // ⚠ MEASURED, and stronger than a floor: the rail's text is EXACTLY the four phrases and
+    // nothing else. A floor (`length > n`) was the first draft and it failed by one — which
+    // is the fence catching its own author before it could catch anything else.
+    expect(textNodesIn(rail).slice().sort()).toEqual(
+      (TOOLED_RAILS.toolOptions as string[]).map(toolName).slice().sort(),
+    )
+    // And the whole panel is free of the other two classes.
+    expect(forbiddenVisibleIn(container.querySelector("aside") as HTMLElement, [])).toEqual([])
+  })
+
+  it("SP-MNR-01 — the rails-ABSENT chip preview names phrases too", () => {
+    // The flag-off surface most authors are actually on. D-14 keeps its CONTROLS
+    // byte-identical; it never promised the chips would keep printing schema tokens.
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x", available_tools: ["query_tables", "write_todos"] })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+      />,
+    )
+    const chips = screen.getByTestId("tools-chips")
+    expect(chips).toHaveTextContent("Query tables")
+    expect(chips).toHaveTextContent("Track its to-dos")
+    expect(textNodesIn(chips)).not.toContain("query_tables")
+    expect(textNodesIn(chips)).not.toContain("write_todos")
+  })
+
+  it("SP-MNR-02 / SP-MNR-03 — no model literal and no ligature name, on any of the seven types", () => {
+    // ⚠ EVERY shipped phase type, at FULL density, with the registry answered and the
+    // guidance OPEN — the densest reading this panel can produce, which is the one most
+    // likely to leak a literal.
+    for (const phase_type of PHASE_TYPE_ORDER) {
+      const { container, unmount } = renderAtFullDensity(phase_type, TOOLED_RAILS)
+      fireEvent.click(screen.getByTestId("field-guidance-toggle"))
+      const aside = container.querySelector("aside") as HTMLElement
+      expect(forbiddenVisibleIn(aside, []), phase_type).toEqual([])
+      // NON-VACUITY per type: the panel really rendered something to scan.
+      expect(textNodesIn(aside).length, phase_type).toBeGreaterThan(5)
+      unmount()
+    }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-04 Task 3 (DES-02) — THE TWO `REPORT` ROWS, §5's register, in executable form.
+//
+// D-02's rule for an amber row OUTSIDE the named backend slice is **REPORT, with a named
+// re-open trigger — never faked, never silently dropped.** These two cases are that register
+// made mechanical, so *"found, priced and deferred on purpose"* stays a different statement
+// from *"missed"* even after everyone who wrote it has forgotten.
+//
+// ⚠ NOTHING HERE MAY BE QUIETLY PROMOTED INTO A BUILD. A later plan that finds itself
+// building one of these has grown a capability inside a phase that did not scope one — the
+// G-7 failure mode, in miniature.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("200-04 §5 — the REPORT rows, each with its named re-open trigger", () => {
+  it("SP-4 / SP-MNR-05 — REPORT: no lock is attributed to a PERSON — ⚠ TRIGGER: a phase that scopes lock ownership", () => {
+    // Ledger note, verbatim: *"Who holds a lock is not on the wire."* N-7 measured that the
+    // SCREEN and the ledger row disagree and that the SCREEN wins: the person-less form is
+    // what ships (`SP-MR-06`, driven above), so nothing is missing from the RENDER — what is
+    // missing is the ATTRIBUTION, and rendering a name would be a fabricated claim.
+    for (const phase_type of PHASE_TYPE_ORDER) {
+      const { container, unmount } = renderAtFullDensity(phase_type, TOOLED_RAILS)
+      const text = (container.querySelector("aside")?.textContent ?? "")
+      expect(text, phase_type).not.toMatch(/\bLocked by\b/i)
+      // No `Firstname L.` initial-form anywhere — the sketch's own `Alex M.` shape.
+      expect(text, phase_type).not.toMatch(/\b[A-Z][a-z]+ [A-Z]\.(?!\w)/)
+      unmount()
+    }
+  })
+
+  it("SP-5 / SP-MNR-06 — REPORT: no preflight row count renders — ⚠ TRIGGER: the connections / approval milestone (SEED-146)", () => {
+    // Ledger note, verbatim: *"No row count is computed anywhere."* A preflight count is a
+    // CAPABILITY (reach the target system, count rows, before acting), not a label, and
+    // inventing one here would be exactly the fabricated business figure `199-05` refused —
+    // *"the highest-consequence lie this phase could ship."*
+    const { container } = render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "external_action", capability: "send_email" }, { action_risk_armed: true })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        rails={TOOLED_RAILS}
+        onGovernanceChange={noop}
+      />,
+    )
+    const text = container.querySelector("aside")?.textContent ?? ""
+    // A grouped thousands figure — the sketch's `1,200` shape — and the noun it would wear.
+    expect(text).not.toMatch(/\d{1,3}(,\d{3})+/)
+    expect(text).not.toMatch(/\b(?:overwrite|overwrites|affect|affects)\s+\d/i)
+    expect(text).not.toMatch(/\d+\s+records\b/i)
+    // NON-VACUITY: the card really is on screen, so the absence is a scope decision rather
+    // than an empty render.
+    expect(screen.getByTestId("card-outside")).toBeInTheDocument()
+    expect(screen.getByTestId("outside-change")).toHaveTextContent("Sends an email")
+  })
+
+  it("⚠ CONTROL — the SP-5 needles really can fire, so their absence above means something", () => {
+    const planted = document.createElement("div")
+    planted.textContent = "Will overwrite 1,200 records"
+    expect(planted.textContent).toMatch(/\d{1,3}(,\d{3})+/)
+    expect(planted.textContent).toMatch(/\b(?:overwrite|overwrites|affect|affects)\s+\d/i)
+    expect(planted.textContent).toMatch(/\d+\s+records\b/i)
+    // …and the SP-4 needle too, on the sketch's own literal.
+    expect("Locked by Alex M.").toMatch(/\bLocked by\b/i)
+    expect("Locked by Alex M.").toMatch(/\b[A-Z][a-z]+ [A-Z]\.(?!\w)/)
   })
 })

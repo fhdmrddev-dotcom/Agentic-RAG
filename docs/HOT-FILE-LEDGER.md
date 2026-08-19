@@ -714,6 +714,130 @@ guards equals `["llm_agent","llm_batch_agents","llm_emit","llm_single"]`, and ad
 **Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation FIRST; it
 inherits `19 / 9 / 1216`, and that figure goes stale on the next commit touching the file.**
 
+### Phase 200 (plan `200-04`) — the FIFTH honouring, and the row was stale in TWO documents at once
+
+**RE-DERIVED 2026-08-19 by plan `200-04`, at its own close rather than at its start: `24 commits / 11 phases / 1375 L`**
+(quick-task bucket excluded: `260814`; phase list gains `200`). ⚠ **This is the FOURTH consecutive close at
+which this file's row has been found stale, and this time it was stale in two places at once:**
+
+| | read | **measured 2026-08-19** |
+|---|---|---|
+| `CLAUDE.md`'s scan-list row | `21 / 10 / 1289` | **24 / 11 / 1375** |
+| `200-CHECKLIST.md` §6.6 (row 2, re-derived only hours earlier by `200-01`) | `22 / 10 / 1290` | **24 / 11 / 1375** |
+
+⚠ **The checklist's figure was measured THIS WEEK by a plan whose entire discipline was re-deriving rather
+than inheriting, and it was still one commit behind by the time this plan ran** — which is the ledger's own
+repeated finding demonstrated on itself, not a criticism of `200-01`. **The habit that survives is
+re-deriving at the moment of writing; no figure in either document is safe to quote at any distance.**
+
+**What 200-04 did, and the headline is that a DEFECT left the file rather than a feature entering it:**
+
+| Grep on this file | before | after |
+|---|---|---:|
+| `friendlyToolName` | **5** (a declaration + 3 call sites + 1 prose mention) | **0** |
+| a coalesced bracket read on a display map | **1** | **0** |
+| `useMemo(` · `useState(` · `useEffect(` | 0 · 0 · 0 | **0 · 0 · 0** |
+| `<ModelField` mounts / `<TemplateNameCheck` mounts | 4 / 1 | **4 / 1**, byte-identical lines |
+
+⚠ **THE EIGHTH LIVE WR-04 PROTOTYPE-KEY SINK IN THIS TREE LIVED IN THIS FILE, AND THE OBSERVED RED WAS
+WORSE THAN THE REGISTER PREDICTED.** `friendlyToolName` read a plain object literal with a bracket index
+coalesced against the id, so `map["constructor"]` resolved the inherited `Object.prototype.constructor` — a
+function, never nullish, so the coalesce never fired. The register predicted *"a function returned into JSX"*.
+Driven against the shipped panel with `available_tools: ["constructor"]` — a value the author really can
+produce, because the non-rails variant's tool field is a **free-text comma field** — React **REFUSED the
+child**:
+
+```
+stderr | Functions are not valid as a React child. ... <span>{Object}</span>
+stdout | RENDERED CHIP TEXT >>> "ⓘ"
+```
+
+**So the chip's label rendered as NOTHING AT ALL: a tool the step really names vanished from the list of what
+that step can do.** `[Function Object]` would at least have been visible. The map moved to `toolNames.ts` and
+is read through `own()`.
+
+**The card sections are the FIFTH honouring of the standing one-gated-line order** (185 · 193 · 193.1 · 196 ·
+200), and D-11 forced the shape rather than taste choosing it: the ABSOLUTE-ZERO hook pin means any card that
+needed a collapse switch had to keep that state elsewhere, so `StepCardSection.tsx` + `stepCardSectionContext.ts`
+are the `FieldGuidance.tsx` precedent applied a second time. **The pin passed UNEDITED, and that is MEASURED:
+the whole 220-line `196-08 picker mounts` describe block diffs BYTE-IDENTICAL against this plan's parent
+commit.** The cards do not collapse at all — two of the three carry DECISIONS (`What it can reach`, `What it
+changes outside this workflow`), and SEED-184 rule 3 forbids folding a decision behind a click.
+
+**Three invariants this phase adds:**
+
+1. ⚠ **`data-card`, NEVER `data-rail`.** `PhaseFormPanel.rails.test.tsx`'s D-14 assertion requires **zero**
+   `[data-rail]` elements in a rails-absent render, because a flag-off author must see today's panel. The
+   cards render on BOTH surfaces, so borrowing the rails' attribute turns a passing byte-identity guard red
+   for a reason unrelated to rails.
+2. ⚠ **The `NEEDS ARMING` mark is true BY CONSTRUCTION, not by a second copy of a list.** Its fact is the step
+   TYPE's (D-04), whose one home is `ARM_PINNED_TYPES` in `GovernanceSection.tsx:141`. The card renders only on
+   that list's sole member, and a case asserts the list still reads exactly `["external_action"]` — a comment
+   could not have stopped the two drifting.
+3. ⚠ **The three density literals in `PhaseFormPanel.test.tsx` MOVED, and were overwritten LOUDLY.** `1381 →
+   1403`, `1363 → 1385`, `1618 → 1640`; the 199-06 reading is preserved as `DENSITY_AT_199_06` and asserted
+   against, so *"still quieter than the panel that shipped"* stays COMPUTED. **The delta closes with no
+   residual on all three readings: `+22` = `"Model"` (5) + `"What it can reach"` (17).** `helpLines` and
+   `helpChars` are UNMOVED at `0 / 0`, which is what proves 199-06's actual claim — the SUBTRACTION — was not
+   quietly undone to pay for the new sections.
+
+**Per G-5 the next phase adding a genuinely second concern here owes a refactor recommendation FIRST; it
+inherits `24 / 11 / 1375`, and that figure goes stale on the next commit touching the file. NEXT SEAM NAMED
+rather than left `satisfied` with no successor: the seven per-phase-type field blocks in the render body are
+~360 of these 1375 lines and differ only in which fields they list — one `PhaseTypeFields.tsx` keyed by
+`phase_type` would take the largest single block out, and it is the only remaining concern in this file that
+is not already a one-gated-line mount.**
+
+---
+
+## `frontend/src/components/workflows/toolNames.ts`
+
+**Measured at creation 2026-08-19 (plan `200-04`): `1 commit / 1 phase / 128 L` · G-5 does not fire (1 phase).**
+Listed anyway — ⚠ **listed BELOW the threshold ON PURPOSE**, the `fileIcon.tsx` / `libraryRow.ts` precedent,
+because a file escapes G-5 for years purely by not being written down (`WorkflowsPage.tsx` for ten phases,
+`config.py` for its entire life).
+
+**The ONE tool-id → human-phrase home.** The panel spells no tool phrase inline any more.
+
+- ⚠ **READ IT THROUGH `own()`, NEVER A COALESCED BRACKET READ.** This module exists because the shipped reader
+  was that shape and it was the **eighth live WR-04 sink** in this tree. See the `PhaseFormPanel.tsx` section
+  above for the verbatim RED — React refused the function child and the chip's label rendered as **nothing**.
+- ⚠ **THE FORBIDDEN FORM IS NEVER SPELLED IN THIS MODULE'S OWN PROSE.** The plan's acceptance grep counts that
+  shape in this file, so a docblock quoting the needle makes its own guard lie — the 187-24 trap, which this
+  file hit on its first draft (the grep read **3**, all three of them comments).
+- ⚠ **COVERAGE IS A SET DIFFERENCE, NOT A COUNT.** The table's key set is asserted EQUAL to the 28 ids
+  `get_tools(None)` offers, so a tool added server-side fails the test rather than reaching a business user as
+  a schema token. The inherited figure *"3 of 27"* is **stale and may not be quoted**; the measured pair is
+  **5 map entries / 28 offered ids, of which 3 could ever fire** (`200-CHECKLIST.md` X-13).
+- ⚠ **TWO DEAD ENTRIES WERE DELETED, AND WHICH IS SAID.** `fetch_url` and `list_folders` named ids the server
+  never offers. A phrase for an unoffered id is invisible until somebody counts — the same failure shape as a
+  ledger row that is present and wrong.
+- **The honest fallback STAYS.** An id with no phrase prints as itself. Title-casing the id would invent copy
+  the product never authored and make the gap invisible.
+
+---
+
+## `frontend/src/components/workflows/StepCardSection.tsx` · `stepCardSectionContext.ts`
+
+**Measured at creation 2026-08-19 (plan `200-04`): `1 / 1 / 95` and `1 / 1 / 89` · G-5 does not fire.** Listed
+below the threshold on purpose, and listed as a PAIR because they are one concern split by a lint rule.
+
+- ⚠ **THE SPLIT IS NOT TASTE.** A component file may not export shared non-component values
+  (`react-refresh/only-export-components`); 27 files in this tree answer that with a sibling leaf and there are
+  **zero** eslint disables of that rule. ⚠ **And the `Context` suffix is load-bearing:** a leaf whose name
+  differs from its component sibling ONLY IN CASE is a hard TS1149/TS1261 on this case-insensitive Windows box
+  — measured at 199-06, where `tsc` went 33 → 38 on the first attempt.
+- ⚠ **THE SHELL HOLDS NO STATE, BY FENCE.** `PhaseFormPanel.test.tsx` pins the panel's hook count at an
+  ABSOLUTE ZERO, so state would have had to live here — and then SEED-184 rule 3 removed the need for any,
+  because two of the three cards carry DECISIONS and a decision may not be folded behind a click.
+- ⚠ **THE STRINGS THIS LEAF DOES *NOT* OWN ARE AS DELIBERATE AS THE ONES IT DOES.** The door's words, its
+  refusal, the arming switch's label and what arming costs stay in `definitionOps.ts`; the three capability
+  sentences stay in `phaseVocabulary.EXTERNAL_CAPABILITY_SENTENCES`. Re-spelling any of them here is the drift
+  the one-string-home rule exists to prevent, one file further along.
+- ⚠ **ABSENCE IS `undefined`, NEVER A FALLBACK STRING.** `outsideChangeSentence` returns nothing for a
+  capability the closed set lacks, and the caller renders nothing — a blank consequence row is
+  byte-indistinguishable from a lookup that failed, and on a governance card those readings are opposite.
+
 ---
 
 ## `backend/app/db/workflows.py`
