@@ -76,7 +76,7 @@ is the incumbent any proposal must beat.
 - [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
 - [x] **Phase 196: Registry-Backed Model Picker (canvas)** — a step's model comes from the live registry, never typed (AUTH-04)
 - [ ] **Phase 197: Guided Authoring** — drafting from a description guides the decisions that change the result (AUTH-02)
-- [ ] **Phase 199: The Component Map** — every workflow surface is re-presented in the adopted design language; ten of sketch 178's eleven component sheets, built against the components that actually ship (DES-01). ⚠ **INSERTED 2026-08-19 on an explicit operator instruction to implement the whole map in ONE body of work.** **PRESENTATION ONLY — no data, no endpoint, no migration, no new capability**; that fence is what makes it affordable and a plan that needs to cross it STOPS and reports. ⚠ **G-2 is satisfied by sketch 178 plus the operator's standing ratification, and the method's step-3 re-sketch is DELIBERATELY SKIPPED** — recorded as a decision, with `SEED-155` carried into execution as a hard rule instead (*if the shipped component cannot express the sheet, report it, never fake it*).
+- [ ] **Phase 199: The Component Map** — **PLANNED 2026-08-19: 10 plans / 3 waves, one plan per sheet** (`/gsd:execute-phase 199`) — every workflow surface is re-presented in the adopted design language; ten of sketch 178's eleven component sheets, built against the components that actually ship (DES-01). ⚠ **INSERTED 2026-08-19 on an explicit operator instruction to implement the whole map in ONE body of work.** **PRESENTATION ONLY — no data, no endpoint, no migration, no new capability**; that fence is what makes it affordable and a plan that needs to cross it STOPS and reports. ⚠ **G-2 is satisfied by sketch 178 plus the operator's standing ratification, and the method's step-3 re-sketch is DELIBERATELY SKIPPED** — recorded as a decision, with `SEED-155` carried into execution as a hard rule instead (*if the shipped component cannot express the sheet, report it, never fake it*).
 - [ ] **Phase 198: Node Vocabulary (research-first)** — prove the deterministic-primitive need before shipping one; cover structured mid-run input (NODE-01, NODE-02)
 
 ### Phase Details
@@ -830,6 +830,57 @@ Plans:
 5. Gates hold: `tsc` unmoved, count gate `failed 0` with no per-file decrease, and every touched suite green.
 
 **Deliberately OUT of scope, by operator instruction** — *"later on maybe we can modify some bugs on the application overall to match it"*: `SEED-182` (the composing moment is a dead greyed-out duplicate form) and `SEED-183` (draft configuration vanishes, taking the only rename control with it). ⚠ **Both are BEHAVIOUR defects in this same journey, both `priority: high`, and both stay `planted`** — named here so the deferral has a home rather than being forgotten. `SEED-184` (*"information is dumped as text, not presented"*, an explicitly RECURRING operator complaint) **is** what this phase answers.
+
+**Plans**: **10 plans / 3 waves** — planned 2026-08-19, one plan per sheet. ⚠ **The wave table above was
+corrected against the real files during planning, and both corrections are recorded rather than applied
+silently.** (1) **`c5-draft-arrival` was ABSENT from the wave table** — the scope table lists TEN sheets
+and the wave table listed NINE surfaces; it is now Wave 1. (2) **`c9-doors-describe` moved from Wave 3 to
+Wave 2**, so that `WorkflowBuilderPage.tsx` is owned by exactly ONE plan (`199-09`); the door plan lands
+its refusal copy in `doorVocabulary.ts` and `199-09` imports the same constant a wave later. ⚠ **The
+ROADMAP's file mapping for `c3` was also WRONG**: it named `PhaseSpine.tsx`, which is the SOUL's
+glyph-dot spine and carries a G-5 RED LINE forbidding it from touching the run-surface timeline. `c3`
+ships against `PhaseSpineGraph.tsx` + `panel/PhaseTimeline.tsx` + `panel/PhaseCard.tsx`; `PhaseSpine.tsx`
+moved to `199-03` with the soul.
+
+⚠ **Every one of the 83 files across the ten plans is owned by EXACTLY ONE plan** — verified, zero
+overlap within a wave and zero overlap across the phase. The waves are therefore a SEQUENCING and
+CONCURRENCY decision, not a dependency graph: CLAUDE.md records that at three concurrent test-running
+agents the count gate goes non-deterministic regardless of the worker cap. ⚠ **Dispatch at most TWO
+plans concurrently**, in batches, rather than a whole four-plan wave at once.
+
+| Wave | Plan | Sheet | Owns |
+|---|---|---|---|
+| 1 | `199-01` | `c2-phase-node` | `PhaseNodeCard` · `PhaseNode` · the three node mark modules |
+| 1 | `199-02` | `c3-phase-spine` | `PhaseSpineGraph` · `panel/PhaseTimeline` · `panel/PhaseCard` |
+| 1 | `199-03` | `c7-gauntlet-soul` | `PublishGauntlet` · `WorkflowSoul` · `PhaseSpine` · `soulData` |
+| 1 | `199-04` | `c5-draft-arrival` | `DraftArrivalCard` · `DecisionsList` · `decisionsVocabulary` (⚠ `SeedReceipt` stays byte-unmodified) |
+| 2 | `199-05` | `c1-canvas-plane` | `WorkflowCanvas` · `FlowEdge` · `CanvasToolbar` · `PlaneEditingLayer` |
+| 2 | `199-06` | `c4-phase-form-panel` | `PhaseFormPanel` · `GovernanceSection` · `ExternalActionSection` · `TemplateAttachSection` · `ModelField` |
+| 2 | `199-07` | `c8-run-panel` | `WorkflowRunPage` · `WorkspacePanel` · `FilesSection` · `PendingAskCard` · `PanelEmpty` |
+| 2 | `199-08` | `c9-doors-describe` | `WorkflowDoorSwitch` · `DoorHeaderStrip` · `DescribeKbPicker` · `DescribeTemplateRow` · `TemplateNameCheck` · `doorVocabulary` |
+| 3 | `199-09` | `c10-builder-chrome` | `WorkflowBuilderPage` · `BuilderHeaderBar` · `BuilderSaveRegion` · `ProblemsTray` · `StepTypePicker` |
+| 3 | `199-10` | `c6-library-dialogs` | `LibraryToolbar` · `RunModal` · `ForkNameDialog` · `WorkflowDeleteSheet` (⚠ `WorkflowCard` / `WorkflowsPage` untouched — 192.2 built the card half) |
+
+⚠ **`c11-journey-arc` has NO plan**, by scope decision — it is marked FAILED / re-running in sketch 178.
+
+**Three flagship CANNOT-EXPRESS reports are pre-identified and are DELIVERABLES, not failures** — each
+must arrive in three parts (what the sheet asks for, what the component can do, the gap): the canvas's
+**payload-bearing connection label** (`199-05`, nothing emits a per-edge count), the **problems tray's
+business language** (`199-09` — `ProblemsTray` renders the server's `message` verbatim by decision
+D-182-06, so the fix is server-side and outside the fence), and the **chat-sized receipt spine**
+(`199-02`). Four sheet elements are pre-REFUSED as sheet defects: `(4/12)` determinate mid-phase
+progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time: ~45s`.
+
+- [ ] `199-01-PLAN.md` — the phase node [Wave 1]
+- [ ] `199-02-PLAN.md` — the phase spine, all three columns [Wave 1]
+- [ ] `199-03-PLAN.md` — the publish gauntlet + the workflow soul [Wave 1]
+- [ ] `199-04-PLAN.md` — the draft-arrival cluster [Wave 1]
+- [ ] `199-05-PLAN.md` — the canvas plane + its connections [Wave 2]
+- [ ] `199-06-PLAN.md` — the phase form panel's density ceiling [Wave 2]
+- [ ] `199-07-PLAN.md` — the run panel (⚠ cross-surface: lands in CHAT first) [Wave 2]
+- [ ] `199-08-PLAN.md` — the two doors + the describe surface [Wave 2]
+- [ ] `199-09-PLAN.md` — the builder chrome [Wave 3]
+- [ ] `199-10-PLAN.md` — the library toolbar + the three dialogs [Wave 3]
 
 #### Phase 198: Node Vocabulary (research-first)
 
