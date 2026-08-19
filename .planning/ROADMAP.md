@@ -938,7 +938,18 @@ progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time:
 
 ⚠ **`SEED-148` — its trigger FIRED here and its `status: open` was found STALE.** Phase 195 already shipped the run-surface listing and download (`WorkflowRunPage.tsx:63`, `:625`, `:1143-1177`, both empty-state strings), so under the colour rule it is a **green row: verify, do not rebuild.** ⚠ **The no-previewer fence on the run page STANDS** — `WorkflowRunPage.test.tsx` records the reason: *"the template engine emits .docx, so the flagship deliverable is exactly the artefact that cannot be shown in place."* What genuinely remains open in that seed is its **canvas** and **workflow-panel** halves, plus a case the seed does not cover: **`PendingAskCard` has no file affordance at all**, so a human step asking a person to approve a generated document has nothing to open.
 
-**Plans**: not yet planned — run `/gsd:plan-phase 200`. The approved shape is **six plans**: `200-01` derive the checklist (source diff MUST be empty) · `200-02` the backend slice (timestamps + counts + the human-gate pause + the executor extraction) · `200-03` the step panel · `200-04` the spine and its receipt · `200-05` the canvas · `200-06` the run surface. ⚠ **Dispatch at most TWO plans concurrently** and cap `GSD_VITEST_MAX_WORKERS=2`.
+**Plans**: **7 plans** — planned 2026-08-19. ⚠ **The approved shape was SIX; RESEARCH R1 measured that `200-02` carried two concerns that are not additive, so the backend became TWO plans.** `grep -rn "'paused'" backend/app --include=*.py` returns **seven hits, ALL READS** — `workflow_runs.status = 'paused'` has never been written by anything; the only `UPDATE workflow_runs SET status` writer is `finish_run`, which clears the thread anchor and makes the run permanently unresumable; and the only re-drive in the product is `main.py:406`'s boot sweep. So the human gate is a control-flow change needing its own RED-first proof, while the wire slice is additive — and SC#5's *"the extraction changes no behaviour beyond the human-gate fix"* is unprovable if the two ride together. Plans `200-04`…`200-07` are the original `03`…`06`, shifted by one.
+
+Plans:
+- [ ] 200-01-PLAN.md — derive the acceptance checklist for the four in-scope screens (⚠ **modifies ZERO source files**; `git show --name-only HEAD` is the proof, D-03) and publish the phase baselines
+- [ ] 200-02-PLAN.md — the measurable wire: migration 121 + `started_at`/`completed_at` at all **SEVEN** write sites + the declared count across the **SEVEN** phase types + **all FOUR** transports widened (⚠ **runs ALONE** — its migration test mutates the local DB)
+- [ ] 200-03-PLAN.md — the human gate: the D-13 extraction, `pause_run`, a new `PhaseOutcome` kind, the engine arm and the answer-triggered re-drive (⚠ **runs ALONE and AFTER `200-02`** — both touch `phase_types.py`)
+- [ ] 200-04-PLAN.md — the step panel (`PhaseFormPanel`), closing the **eighth** live WR-04 prototype-key sink
+- [ ] 200-05-PLAN.md — the authoring spine + the receipt (built here, **mounted in `200-07`**)
+- [ ] 200-06-PLAN.md — the canvas, plus `BUG-260813-01` by `ThemeProvider` (⚠ lands in CHAT first)
+- [ ] 200-07-PLAN.md — the run surface + the panel trio, and the phase's closing N/N report
+
+⚠ **Waves 1-7, ONE plan per wave — fully serialized, and the reason is measured rather than cautious.** Every screen plan owns a `scripts/vitest-count-gate.cjs` edit (a new-leaf pin or a de-slack) plus CLAUDE.md + `docs/HOT-FILE-LEDGER.md` rows under the same-commit sync rule, so **no two plans have disjoint `files_modified`** — the condition the orchestrator set for pairing `200-04` with `200-05`. `200-02` and `200-03` were already required to run alone. `GSD_VITEST_MAX_WORKERS=2` still binds every test invocation.
 
 #### Phase 198: Node Vocabulary (research-first)
 
