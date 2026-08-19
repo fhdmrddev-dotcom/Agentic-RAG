@@ -1684,7 +1684,7 @@ const BASELINE = {
   // READ FROM THIS SCRIPT'S OWN `actual` COLUMN across TWO AGREEING RUNS, 2026-08-13, both
   // printing `WorkflowsPage.test.tsx 48 52 +4` and `librarySubtree.fences.test.ts 116 117 +1`
   // at `total 3436 · failed 0` — never hand-counted from `it(` literals.
-  "WorkflowsPage.test.tsx": 52,
+  "WorkflowsPage.test.tsx": 59,
   // 193-01 + 193-07 (AUTH-03 / D-17 / D-18 / D-19 / D-20), pinned by 193-10's sweep: 32 → 40. An
   // EXTENSION, never a lowering — Phase 193 deleted no `it(` here. The +8 are the two halves of
   // the template cut: 193-01's WAVE-0 case, written BEFORE the cut and driven RED, that a launch
@@ -1763,7 +1763,7 @@ const BASELINE = {
   // reporting `libraryFilter.test.ts  36  48  +12` and `total 3200 · failed 0`. Never
   // hand-counted from `it(` literals, never carried from a SUMMARY — the distinction this
   // block's header paragraph records is not ceremonial.
-  "libraryFilter.test.ts": 48,
+  "libraryFilter.test.ts": 96,
   // ── 192.1-03 Task 1 (D-01 / D-33): 64 → 67. AN EXTENSION, NEVER A LOWERING. ────────────
   // The +3 are arithmetic, not authorship: `LIBRARY_SUBTREE_PATHS` gained ONE path
   // (`./libraryFork.ts`, the G-5 fork extraction's pure leaves) and exactly three
@@ -2004,7 +2004,29 @@ const BASELINE = {
   // that no template is needed. Two separate expectations would drift apart without failing.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`WorkflowCard.test.tsx 80 90 +10`).
-  "WorkflowCard.test.tsx": 90,
+  "WorkflowCard.test.tsx": 128,
+  // ── Phase 192.2 gap round 1 — THE CR-01 REGRESSION TESTS WERE DELETABLE WITH A GREEN GATE ────
+  //
+  // ⚠ Found by the round's own code review (`192.2-REVIEW-R1.md`, WR-01) and confirmed against
+  // THIS SCRIPT'S OWN `actual` column, which read WORSE than the review reported:
+  //   `WorkflowCard.test.tsx    90  128  +38`
+  //   `libraryFilter.test.ts    48   96  +48`
+  //   `WorkflowsPage.test.tsx   52   59   +7`
+  // and `runFacts.test.ts`, `cardFace.test.ts` and `gutterTokens.fences.test.ts` printed `new` —
+  // i.e. NO PIN AT ALL. `runFacts.test.ts` is the four-arm matrix that proves CR-01 itself: the
+  // whole suite could have been deleted and this gate would still have said OK.
+  //
+  // ⚠ The shape worth remembering: `192.2-10` correctly pinned `apiRunFields.fences.test.ts` in
+  // its creating commit, so the round PROVED it knew how — nothing did the same for the suites
+  // that actually hold the blocker's fix. **A guard that is itself unguarded is the recurring
+  // failure in this file, not an exception.**
+  //
+  // Raised/added at the round's close, read from the `actual` column, never hand-counted.
+  // ⚠ Raising a pin necessarily DELETES a line; ADDING one does not — this edit does both.
+  "runFacts.test.ts": 65,
+  "cardFace.test.ts": 34,
+  "gutterTokens.fences.test.ts": 11,
+
   // ── The four RAISES owed by suites Phase 192 GREW ──────────────────────────────────────
   //
   // All four already sat in this map (192-01 adopted them in the phase's first commit). Each

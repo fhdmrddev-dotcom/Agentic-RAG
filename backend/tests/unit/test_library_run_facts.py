@@ -417,10 +417,28 @@ def test_the_serializers_do_not_COERCE_the_row_level_bit():
     from app.api import workflows as wf
 
     source = inspect.getsource(wf)
-    assert 'has_any_run=r.get("has_any_run")' in source
-    assert 'bool(r.get("has_any_run"))' not in source
-    # Two declarations + three serializer sites.
-    assert source.count("has_any_run") >= 5, source.count("has_any_run")
+    # ⚠ THIS FENCE WAS SATISFIABLE BY PROSE, AND THE OBVIOUS FIX DOES NOT WORK EITHER.
+    # It previously read `source.count("has_any_run") >= 5` over the RAW source. `has_any_run`
+    # occurs 13 times there, most of them narrative — so two of the three serializer sites
+    # could be deleted and this test stayed green. Found by the gap-round code review
+    # (`192.2-REVIEW-R1.md` WR-03).
+    #
+    # ⚠ Routing it through `_code_only` — the sibling DB fences' fix for the 187-24 trap —
+    # was MEASURED NOT TO HELP: the code-only count is ALSO 13, because the prose hits live
+    # inside SQL **string literals**, which `ast.unparse` correctly preserves. Stripping
+    # comments cannot remove text that is not a comment.
+    #
+    # So the fence counts the SITES, not the token. Quote-normalised because `ast.unparse`
+    # re-emits string literals single-quoted while the file is written double-quoted — a
+    # needle matching only one form is a fence that fires on formatting.
+    code = _code_only(source).replace("'", '"')
+    sites = code.count('has_any_run=r.get("has_any_run")')
+    decls = code.count("has_any_run: bool | None = None")
+    assert 'bool(r.get("has_any_run"))' not in code
+    # THREE serializer sites (published, starters, drafts) and TWO wire declarations.
+    # Exact, never `>=`: a fourth site is a projection nobody reviewed, a second is one dropped.
+    assert sites == 3, f"expected 3 serializer sites, got {sites}"
+    assert decls == 2, f"expected 2 wire declarations, got {decls}"
 
 
 def test_both_models_default_the_fields_so_an_old_row_still_validates():
