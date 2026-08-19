@@ -271,8 +271,27 @@ export function RunModal({
       className="fixed inset-0 z-[9000] grid place-items-center bg-black/60 p-6 backdrop-blur-sm"
     >
       <div className="w-[min(560px,92%)] overflow-hidden rounded-lg border border-border bg-card shadow-lg">
+        {/* ⚠ 199-10 (DES-01) — THE HEADER SPENDS NO MARK. It carried an `aria-hidden`
+            page glyph beside the name; it is removed, and the removal is the whole of this
+            plan's change to this file.
+
+            Three reasons, none of them taste. (1) It reached NOBODY using a screen reader,
+            by its own attribute, so it was decoration by construction. (2) It said "document"
+            about a WORKFLOW — this product has no category-glyph vocabulary and inventing one
+            is the drift `icon-convention.md` §4 forbids by name; a workflow's identity is
+            already carried by its phase spine. (3) Sheet c6 draws this dialog's header as
+            plain text and spends no mark on it either.
+
+            ⚠ THE WRAPPER'S `className` IS DELIBERATELY UNTOUCHED, INCLUDING THE NOW-INERT
+            `gap-2`. The six whole-`innerHTML` captures below this file's tests are DERIVED
+            from their predecessors by deleting exactly one specified substring — the glyph
+            span and nothing else — so keeping every other byte identical is what makes that
+            derivation checkable rather than a re-capture in disguise. Tidying the class here
+            would put a second, unrelated delta into the same six strings.
+
+            ⚠ The sheet's own header WORD is refused separately: it reads *"Execute {name}"*,
+            and this product's verb for this action is Run. */}
         <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <span aria-hidden="true">📄</span>
           <span className="text-[15px] font-semibold text-foreground">{wf.name}</span>
         </div>
         <div className="flex flex-col gap-3 px-4 py-4">
