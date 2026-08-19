@@ -15,6 +15,18 @@
  * power users, but the plain helper needs NO hover/click — a non-technical user knows
  * what each parameter means at a glance.
  *
+ * ⚠ CORRECTED at Phase 199-06 (DES-01, sheet `c4-phase-form-panel`), in the commit that
+ * falsified it, and kept above rather than overwritten because it was true for six phases.
+ * THE HELPER LINE IS NO LONGER ALWAYS-VISIBLE: it is the FULLY-OPEN reading of a density
+ * ceiling, offered by one switch at the top of the body (`FieldGuidance.tsx`). The reason is
+ * SEED-184's, measured rather than asserted — this panel printed SEVEN such sentences at
+ * once on an agent step, and the label above each one already said the same thing in the
+ * same words while the ⓘ beside it already carried the precise technical term. **Nothing a
+ * person needs in order to DECIDE moved**: the governance state, the strict/loose door, the
+ * armed-action state, the deliverable, every refusal and every per-option consequence
+ * caption stay at the collapsed reading, enumerated as `FENCED_IN` in this file's suite
+ * BEFORE anything moved. The ⓘ is untouched and still needs no toggle.
+ *
  * The fixed-width 400px right-side form panel that REFINES one phase of a draft
  * by FORM. It is the SECOND column of the Builder's push grid (the parent owns
  * the `gridTemplateColumns` reflow) — it PUSHES the read-only spine graph, it
@@ -55,6 +67,13 @@
  */
 import { useId } from "react"
 import { ExternalActionSection } from "./ExternalActionSection"
+// 199-06 (DES-01) — the density ceiling, its OWN component and one gated line, the fourth
+// honouring of this file's standing G-5 order. ⚠ THE SWITCH'S STATE LIVES IN THAT MODULE
+// AND NOT HERE, and that siting is a shipped fence rather than a taste: this file's suite
+// asserts an ABSOLUTE ZERO of the three state/effect/memo tokens over its own source, and a
+// pin relaxed to make red go green is a pin that never fails again. This file reads the
+// answer; it does not hold it.
+import { FieldGuidance, useFieldGuidance } from "./FieldGuidance"
 import { GovernanceSection } from "./GovernanceSection"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
@@ -278,7 +297,19 @@ export interface PhaseFormPanelProps {
    * spread at each mount matches the component's contract by construction: a prop renamed in
    * `ModelField` becomes a typecheck error here instead of a silently dropped attribute.
    */
-  modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical">
+  /**
+   * ⚠ 199-06 (DES-01) — `noAnswer` IS NOW IN THE PICK, AND WITH IT THE PARAGRAPH ABOVE THAT
+   * READS *"ABSENT ⇒ THE FOUR MOUNTS RENDER NOTHING"* HAS A SECOND HALF. It stays true and
+   * is kept verbatim, because a caller may still withhold the prop entirely. What changed is
+   * that withholding it is no longer the caller's ONLY move on a failed read: the picker can
+   * now be handed the reading instead of the rows, and it says so on screen. `196-08`'s own
+   * mount comment named this as a cost it was paying and named the file that owed the fix.
+   *
+   * The mounts are untouched — each still spreads the caller's answer WHOLE, so a widened
+   * `Pick` reaches all four without a fifth line, and the source fence that counts them
+   * still reads four.
+   */
+  modelPicker?: Pick<PickerProps, "models" | "runDefaultModel" | "showTechnical" | "noAnswer">
 }
 
 const CITATION_POLICIES = ["strict", "flag", "partial", "draft"] as const
@@ -333,9 +364,18 @@ function InfoHint({ text }: { text: string }) {
 }
 
 /** A friendly field label: plain text + optional grey "(qualifier)" + optional ⓘ,
- *  PLUS an ALWAYS-VISIBLE one-line plain-English helper sentence underneath (`help`).
- *  The ⓘ stays for the precise technical term; the `help` line needs no hover/click —
- *  it is the self-explanatory guidance a non-technical user reads at a glance. */
+ *  PLUS a one-line plain-English helper sentence underneath (`help`).
+ *
+ *  ⚠ 199-06 (DES-01) — THE HELPER LINE IS NO LONGER ALWAYS-VISIBLE, AND THAT SENTENCE IS
+ *  CORRECTED HERE RATHER THAN DELETED because it was true from Phase 103-ux until now. It
+ *  is the FULLY-OPEN reading of sheet c4's density ceiling: the label already carries the
+ *  plain name and the ⓘ already carries the exact technical term, so a helper restating the
+ *  label was one idea printed twice, seven times per form. The ⓘ is UNTOUCHED and still
+ *  needs no toggle — what moved is the duplication, never the power-user affordance.
+ *
+ *  Guidance ONLY. A sentence that states what the product will or will not do is a REFUSAL,
+ *  not guidance, and does not travel through this prop — see `ToolWhitelistRail` below,
+ *  whose "you cannot add one by typing" is rendered outside it for exactly that reason. */
 function FieldLabel({
   htmlFor,
   text,
@@ -349,17 +389,25 @@ function FieldLabel({
   hint?: string
   help?: string
 }) {
+  // ⚠ THE HOOK IS CALLED UNCONDITIONALLY, ON ITS OWN LINE. Folding it into the `&&` below
+  // reads better and is wrong: `&&` short-circuits, so a label with no `help` would skip
+  // the hook and the call order would differ between two renders of the same component.
+  const guidanceShown = useFieldGuidance()
+  // ⚠ THE EFFECTIVE RENDER, NOT THE PROP. The label's own bottom margin used to key off
+  // `help` being SUPPLIED; keying it off `help` being SHOWN is what keeps the collapsed
+  // reading spaced like a label with no helper rather than like one whose helper vanished.
+  const showHelp = help !== undefined && guidanceShown
   return (
     <>
       <label
         htmlFor={htmlFor}
-        className={`flex items-center text-[11px] font-medium text-foreground ${help ? "" : "mb-1"}`}
+        className={`flex items-center text-[11px] font-medium text-foreground ${showHelp ? "" : "mb-1"}`}
       >
         <span>{text}</span>
         {qualifier && <span className="ml-1 font-normal text-muted-foreground">{qualifier}</span>}
         {hint && <InfoHint text={hint} />}
       </label>
-      {help && (
+      {showHelp && (
         <p data-testid="field-help" className="mb-1 mt-0.5 text-[11px] leading-snug text-muted-foreground">
           {help}
         </p>
@@ -611,6 +659,16 @@ const TOOL_CHIP_BASE =
   "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] focus:outline-none focus:ring-1 focus:ring-primary"
 
 /**
+ * 199-06 (DES-01) — the whitelist's REFUSAL, hoisted to module scope so the sentence has one
+ * home rather than being an attribute value. It is deliberately NOT in `definitionOps`: that
+ * module is the home for the GOVERNANCE vocabulary, which is a lock, and adding an unrelated
+ * form sentence to a locked vocabulary is how a lock stops meaning anything. The literal is
+ * byte-identical to the one this file has rendered since Phase 184-09.
+ */
+const TOOL_WHITELIST_NO_TYPING =
+  "Pick from the tools this workspace allows — you cannot add one by typing."
+
+/**
  * The tool-whitelist rail (140-A) — a set the author chooses FROM, and nothing to type into.
  *
  * THE OPTION SET IS THE SERVER'S. It arrives as `rails.toolOptions`, which `useGroundingBundle`
@@ -653,8 +711,16 @@ function ToolWhitelistRail({
       <FieldLabel
         text="What this step can do"
         hint="available_tools — the tools the AI may use in this step (e.g. search_documents, execute_code)."
-        help="Pick from the tools this workspace allows — you cannot add one by typing."
       />
+      {/* ⚠ 199-06 (DES-01) — THIS SENTENCE LEFT THE GUIDANCE CHANNEL AND IS NOW ALWAYS ON
+          SCREEN. It was the `help` prop above and it was the ONE helper in this panel that
+          is not a restatement of its own label: it states that the control REFUSES typed
+          input. A refusal folded behind a disclosure is a refusal a person meets by being
+          surprised, so it is fenced in (SEED-184 rule 3). The literal is unchanged — it
+          moved four lines, it was not re-spelled. */}
+      <p data-testid="tools-no-typing" className="mb-1 mt-0.5 text-[11px] leading-snug text-muted-foreground">
+        {TOOL_WHITELIST_NO_TYPING}
+      </p>
       {options === "degraded" ? (
         <div data-rail="tools" data-testid="tools-degraded">
           <p className="text-[11px] leading-snug text-muted-foreground">
@@ -909,6 +975,12 @@ export function PhaseFormPanel({
           Refine this step — adjust what it does, then move on.
         </p>
 
+        {/* 199-06 (DES-01) — THE DENSITY CEILING, and the fourth honouring of this file's
+            standing G-5 order: its own component, one gated line. It wraps everything that
+            renders a `FieldLabel`, and NOTHING that renders a decision — the governance
+            section, the door, the armed switch, the gates and the deliverable all sit
+            inside it too, but they read no guidance context and are untouched by it. */}
+        <FieldGuidance>
         {/* The rails render ONLY when the caller supplies them. Absent ⇒ today's panel. */}
         {rails && <OrderRail index={rails.order.index} total={rails.order.total} />}
 
@@ -1168,6 +1240,7 @@ export function PhaseFormPanel({
           citationPolicy={asStr(cfg.citation_policy)} groundingEscalated={phase.grounding_escalated === true}
           actionRiskArmed={phase.action_risk_armed === true} onGovernanceChange={onGovernanceChange} />}
         {rails && <GatesRail gates={rails.gates} />}
+        </FieldGuidance>
       </div>
     </aside>
   )

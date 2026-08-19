@@ -521,3 +521,156 @@ describe("ModelField 196-05 — SOURCE fence: no component state, no effect, by 
     expect(typeImport.startsWith("import type")).toBe(true)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-06 Task 3 (DES-01, sheet c4) — THE PICKER CAN NOW SAY IT COULD NOT READ THE
+// REGISTRY, AND THAT IS A DIFFERENT SENTENCE FROM "there are no models".
+//
+// The hot-file ledger's row for this component read, for one whole phase: *"⚠ it cannot
+// express 'I could not read the registry'"*. `useModelRegistry` had resolved three readings
+// since the day it shipped; this component took only rows, so the caller's only honest move
+// was to remove the field. That is what changes here, and the matrix below is the point of
+// the change: THREE readings, driven separately, asserted to render three different things.
+//
+// ⚠ THE MATRIX REACHES THE EMPTY-BUT-ANSWERED CASE ON PURPOSE. A two-row matrix (failed vs
+// populated) would pass on a component that collapsed "answered with nothing" into "could
+// not be answered", which is exactly the substitution `useModelRegistry`'s own docblock was
+// written to make unconstructable — and the one this component would have re-created.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+const REGISTRY_UNAVAILABLE_SENTENCE =
+  "We couldn't load the list of models. Nothing is offered here rather than a list that would be wrong."
+const REGISTRY_LOADING_SENTENCE = "Loading the list of models…"
+const REGISTRY_EMPTY_SENTENCE = "This workspace offers no models for this step."
+
+describe("ModelField 199-06 — three readings, three different things on screen", () => {
+  it("A FAILED read says so, and offers NO control at all — not an empty dropdown", () => {
+    render(
+      <ModelField value="" onChange={vi.fn()} onPersist={vi.fn()} models={[]} runDefaultModel={null} noAnswer="unavailable" />,
+    )
+    expect(screen.getByTestId("model-no-answer").getAttribute("data-reading")).toBe("unavailable")
+    expect(screen.getByText(REGISTRY_UNAVAILABLE_SENTENCE)).toBeInTheDocument()
+    // The sheet's whole complaint: an empty dropdown reads as a correct control.
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument()
+    // …and AUTH-04's core claim survives the new arm — there is still no typed path.
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument()
+    // The technical term stays reachable exactly when the plain answer is missing.
+    expect(screen.getByLabelText(/^model — the registry id/i)).toBeInTheDocument()
+  })
+
+  it("A read IN FLIGHT says something ELSE — 'still asking' is not 'failed'", () => {
+    render(
+      <ModelField value="" onChange={vi.fn()} onPersist={vi.fn()} models={[]} runDefaultModel={null} noAnswer="loading" />,
+    )
+    expect(screen.getByTestId("model-no-answer").getAttribute("data-reading")).toBe("loading")
+    expect(screen.getByText(REGISTRY_LOADING_SENTENCE)).toBeInTheDocument()
+    // ⚠ The load-bearing negative: a request in flight must never accuse the server.
+    expect(screen.queryByText(REGISTRY_UNAVAILABLE_SENTENCE)).not.toBeInTheDocument()
+  })
+
+  it("⚠ AN EMPTY SUCCESSFUL READ IS A THIRD THING — a control, and its own sentence", () => {
+    render(<ModelField value="" onChange={vi.fn()} onPersist={vi.fn()} models={[]} runDefaultModel={null} />)
+    // It KEEPS its control, because there is a real answer to offer the inherit option from.
+    const select = screen.getByRole("combobox", { name: /ai model/i }) as HTMLSelectElement
+    expect(optionTexts(select)).toEqual([INHERIT_BARE])
+    expect(screen.getByText(REGISTRY_EMPTY_SENTENCE)).toBeInTheDocument()
+    // Neither of the other two sentences appears. Three readings, three renders.
+    expect(screen.queryByText(REGISTRY_UNAVAILABLE_SENTENCE)).not.toBeInTheDocument()
+    expect(screen.queryByText(REGISTRY_LOADING_SENTENCE)).not.toBeInTheDocument()
+    expect(screen.queryByTestId("model-no-answer")).not.toBeInTheDocument()
+  })
+
+  it("the three renders are pairwise DISTINCT — asserted, not assumed", () => {
+    const html = (props: Partial<Parameters<typeof ModelField>[0]>) => {
+      const { container, unmount } = render(
+        <ModelField value="" onChange={vi.fn()} onPersist={vi.fn()} models={[]} runDefaultModel={null} {...props} />,
+      )
+      const out = container.innerHTML
+      unmount()
+      return out
+    }
+    const failed = html({ noAnswer: "unavailable" })
+    const loading = html({ noAnswer: "loading" })
+    const empty = html({})
+    expect(failed).not.toBe(loading)
+    expect(failed).not.toBe(empty)
+    expect(loading).not.toBe(empty)
+  })
+
+  it("⚠ A FAILED read does NOT consult the rows, so it can never call a known model unknown", () => {
+    // The mitigation for T-199-06-01, driven rather than described. The rows here are the
+    // full fixture and the stored value IS in them — if the failed arm fell through to the
+    // retention branch it would print `(current) — not in the registry` about a model the
+    // registry knows perfectly well, and invite the author to change it.
+    render(
+      <ModelField
+        value={STRICT_ID}
+        onChange={vi.fn()}
+        onPersist={vi.fn()}
+        models={MODELS}
+        runDefaultModel={RESOLVED_DEFAULT}
+        noAnswer="unavailable"
+      />,
+    )
+    expect(screen.queryByText(UNKNOWN_CAPTION)).not.toBeInTheDocument()
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument()
+    // Nothing from the rows reached the screen at all — not even the resolved run default,
+    // which is the other thing a fall-through would have leaked.
+    expect(screen.queryByText(new RegExp(RESOLVED_DEFAULT))).not.toBeInTheDocument()
+    // …but a failed read is NOT a wipe: what the step already names is still printed, and
+    // it comes from the STORED value, which is why it is true without any row arriving.
+    expect(screen.getByTestId("model-no-answer-current")).toHaveTextContent(
+      `This step currently names: ${STRICT_ID}.`,
+    )
+  })
+
+  it("POSITIVE CONTROL — the retention branch really CAN print that caption, so zero means something", () => {
+    // Without this, the assertion above passes on a component that never prints it at all.
+    render(
+      <ModelField value="retired-9" onChange={vi.fn()} onPersist={vi.fn()} models={MODELS} runDefaultModel={null} />,
+    )
+    expect(screen.getByText(UNKNOWN_CAPTION)).toBeInTheDocument()
+  })
+
+  it("a blank step on a failed read says nothing about a value it does not have", () => {
+    render(
+      <ModelField value="" onChange={vi.fn()} onPersist={vi.fn()} models={MODELS} runDefaultModel={null} noAnswer="unavailable" />,
+    )
+    expect(screen.queryByTestId("model-no-answer-current")).not.toBeInTheDocument()
+  })
+
+  it("SOURCE — the discriminator is compared EXPLICITLY, never against emptiness", () => {
+    const src = modelFieldSource as string
+    // The guard reads the prop, not the row array's length or its truthiness. Either of the
+    // forbidden forms would fold the honest empty registry into the failed read — the one
+    // defect this whole branch exists to prevent.
+    //
+    // ⚠ THE NEEDLES ARE BUILT, NEVER SPELLED. This assertion's first draft named them in the
+    // comment above it and turned itself red: a fence that greps a file for a token is also
+    // grepping every comment that describes it (the 187-24 trap). The component's own
+    // docblock had to lose the literals for the same reason.
+    const LEN = "models." + "length"
+    expect(occurrences(src, "noAnswer !== undefined")).toBe(1)
+    expect(occurrences(src, "!" + LEN)).toBe(0)
+    expect(occurrences(src, LEN + " === 0")).toBe(0)
+    // …and the words come from module scope, not from a literal typed into the markup: each
+    // name appears at its declaration and at its ONE use site. ⚠ `REGISTRY_EMPTY` reads THREE
+    // because `noAnswer`'s docblock points a reader at it by name — a deliberate cross
+    // reference, recorded here rather than "fixed" by loosening the other two to `>= 2`.
+    expect(occurrences(src, "REGISTRY_UNAVAILABLE")).toBe(2)
+    expect(occurrences(src, "REGISTRY_LOADING")).toBe(2)
+    expect(occurrences(src, "REGISTRY_EMPTY")).toBe(3)
+    // The real claim underneath those counts: no sentence is spelled twice in this file.
+    for (const sentence of [REGISTRY_UNAVAILABLE_SENTENCE, REGISTRY_LOADING_SENTENCE, REGISTRY_EMPTY_SENTENCE]) {
+      expect(occurrences(src, sentence)).toBe(1)
+    }
+  })
+
+  it("POSITIVE CONTROL — the emptiness needles really can find what they forbid", () => {
+    const LEN = "models." + "length"
+    const planted = "  if (!" + LEN + ") return <p>failed</p>"
+    expect(occurrences(planted, "!" + LEN)).toBe(1)
+    const planted2 = "  if (" + LEN + " === 0) return <p>failed</p>"
+    expect(occurrences(planted2, LEN + " === 0")).toBe(1)
+  })
+})
