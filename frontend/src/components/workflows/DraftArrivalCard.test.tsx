@@ -41,6 +41,13 @@ import testSource from "./DraftArrivalCard.test?raw"
 import { DraftArrivalCard, type DraftArrivalCardProps } from "./DraftArrivalCard"
 import type { DecisionsListProps } from "./DecisionsList"
 import {
+  APPLIED_FILLS_LABEL,
+  APPLIED_HEADING,
+  APPLIED_MODEL_LABEL,
+  APPLIED_READS_LABEL,
+  ARRIVAL_BADGE,
+  ARRIVAL_SOURCE_ACTION,
+  ARRIVAL_SOURCE_LEAD,
   DECISIONS_FOLD_ACTION,
   DECISION_CHANGE_ACTION,
   DECISION_EDIT_LIMIT_NOTE,
@@ -595,9 +602,23 @@ describe("DraftArrivalCard — the five charter clauses, each fenced", () => {
     // THE PROPERTY, not a deny-list. The Phase-185 lesson says a deny-list cannot be made
     // fail-closed by extension, so rather than naming the shapes a predicate could take
     // this asserts there is nowhere for one to live.
+    /**
+     * ⚠ THIS FENCE WAS `toHaveLength(1)` AND IS NOW `2`, AND THE WIDENING IS NARROW AND
+     * NAMED RATHER THAN A LOOSENING. The property is *"no second GROUNDING derivation"*, not
+     * *"one function"* — the file-level count was simply the cheapest way to express it while
+     * the component was the only declaration.
+     *
+     * Sketch 200's `What I applied` block needs to know whether every step declared the SAME
+     * model. `declaredModel` answers that and NOTHING else: it reads `config.model`, names no
+     * cause token, consults no KB tool list, and cannot return a grounding verdict because it
+     * returns a model id or null. The two properties that actually matter are asserted below
+     * and are UNCHANGED IN STRENGTH — the second declaration is named explicitly (so a THIRD
+     * is still a red test), and the cause-token sweep is still total over the whole file.
+     */
     const declared = draftArrivalCardSource.match(declarationRx()) ?? []
-    expect(declared).toHaveLength(1)
-    expect(declared[0]).toContain("DraftArrivalCard")
+    expect(declared).toHaveLength(2)
+    expect(declared.some((d) => d.includes("DraftArrivalCard"))).toBe(true)
+    expect(declared.some((d) => d.includes("declaredModel"))).toBe(true)
     // …and no cause-token table, which is the other shape a second derivation takes.
     for (const token of CAUSE_TOKENS) {
       expect(draftArrivalCardSource, `${token} must not be named here`).not.toContain(token)
@@ -682,9 +703,25 @@ describe("DraftArrivalCard — the five charter clauses, each fenced", () => {
     // The three shapes a redrawn copy would take, each a SOURCE property.
     expect(draftArrivalCardSource).not.toContain(SEAL_GLYPH)
     expect(draftArrivalCardSource).not.toContain(STEP_HANDLE_PREFIX)
-    // It maps NOTHING: the receipt owns its own row list and the decisions list owns its
-    // own row order. A second mapping here is a second copy of one of those.
-    expect(draftArrivalCardSource).not.toContain(".map(")
+    /**
+     * ⚠ IT MAPPED NOTHING, AND NOW IT MAPS EXACTLY ONE THING — ITS OWN LIST. The original
+     * assertion was `expect(draftArrivalCardSource).not.toContain(".map(")`, standing in for
+     * the real property: *the receipt owns its own row list and the decisions list owns its
+     * own row order, so a second mapping here is a second copy of one of those.*
+     *
+     * Sketch 200's applied block is a list this card BUILDS from its own props — three
+     * absence checks over `phases`, `folderName` and `templateFilename` — and belongs to no
+     * child. So the ban becomes what it always meant: the ONLY mapped expression is
+     * `appliedPairs`, and neither child's row source is mapped here. Both halves are asserted,
+     * because "there is one map" alone would not say WHAT it maps.
+     */
+    const mapped = [...draftArrivalCardSource.matchAll(/([A-Za-z_$][\w$]*)\.map\(/g)].map(
+      (m) => m[1],
+    )
+    expect(mapped).toEqual(["appliedPairs"])
+    // …and neither child's row source is read here at all.
+    expect(draftArrivalCardSource).not.toContain("DECISION_ROW_ORDER.map")
+    expect(draftArrivalCardSource).not.toContain("phases.map")
   })
 
   it("POSITIVE CONTROL — the fence reads a file that really does compose the receipt", () => {
@@ -895,10 +932,33 @@ describe("DraftArrivalCard — the 199-04 resting inventory", () => {
 
   it("AT REST the card paints exactly these atoms, in this order", () => {
     renderCard()
-    // Nine atoms and not one more. Every one is an identifier, never a spelled literal.
+    /**
+     * ⚠ RE-BASELINED BY SKETCH 200. THE PREVIOUS NINE ARE KEPT VERBATIM BELOW, because a pin
+     * that simply grows a list is indistinguishable from a pin nobody checked:
+     *
+     *     seedReceiptHeading(...) · SEED_RECEIPT_DISMISS_GLYPH ·
+     *     FOLD_GLYPH_ATOM · groundingFoldSummary(...) · GROUNDING_FOLD_ACTION ·
+     *     FOLD_GLYPH_ATOM · decisionsFoldSummary(...) · DECISIONS_FOLD_ACTION ·
+     *     SEED_RECEIPT_NOTHING_COMMITTED
+     *
+     * ⚠ ALL NINE SURVIVE, IN THEIR ORIGINAL RELATIVE ORDER. Nothing was removed to make room:
+     * the four additions are the sheet's state chip, the workflow's NAME as the card's title,
+     * and the source line's lead + echo + control. The chip leads because the sheet's header
+     * row is the first thing on the card, and the dismiss control follows it in that same row.
+     *
+     * ⚠ AND EVERY ADDITION IS STILL AN IDENTIFIER OR A PROP — never a spelled literal. The two
+     * that are neither (`WORKFLOW_NAME`, `BUSINESS_REQUIREMENT`) are this suite's own fixture
+     * values, which is the point: they prove the card renders what it was HANDED rather than
+     * anything it authored.
+     */
     expect(cardAtoms()).toEqual([
-      seedReceiptHeading(GROUNDED_PHASES.length),
+      ARRIVAL_BADGE,
       SEED_RECEIPT_DISMISS_GLYPH,
+      WORKFLOW_NAME,
+      seedReceiptHeading(GROUNDED_PHASES.length),
+      ARRIVAL_SOURCE_LEAD,
+      BUSINESS_REQUIREMENT,
+      ARRIVAL_SOURCE_ACTION,
       FOLD_GLYPH_ATOM,
       groundingFoldSummary(GROUNDED_COUNT),
       GROUNDING_FOLD_ACTION,
@@ -929,11 +989,10 @@ describe("DraftArrivalCard — the 199-04 resting inventory", () => {
     expect(atomsOf(body).length).toBeGreaterThan(0)
     expect(within(body).getAllByTestId("seed-receipt")).toHaveLength(1)
     // The card's OWN opening atoms are unchanged by opening a fold — a fold ADDS, it never
-    // rewrites what the card already said.
-    expect(cardAtoms().slice(0, 2)).toEqual([
-      seedReceiptHeading(GROUNDED_PHASES.length),
-      SEED_RECEIPT_DISMISS_GLYPH,
-    ])
+    // rewrites what the card already said. (Sketch 200 put the state chip first, ahead of the
+    // dismiss control, so the pair read here moved with the header row; the PROPERTY is the
+    // same one and is still what is asserted.)
+    expect(cardAtoms().slice(0, 2)).toEqual([ARRIVAL_BADGE, SEED_RECEIPT_DISMISS_GLYPH])
   })
 
   it("FOLD 2 OPEN — the body is NON-EMPTY first, and carries all five decision labels", async () => {
@@ -982,11 +1041,27 @@ describe("DraftArrivalCard — the declared vertical box (a SURROGATE, never a p
    * type to each of its descendants instead would double-count every nested span, which is
    * the worse error. The figure is a consistent yardstick, never a page height.
    */
-  const COLLAPSED = { boxPx: 76, linePx: 39, totalPx: 115 }
+  /**
+   * ⚠ RE-MEASURED FOR SKETCH 200's PORT. The pre-port reading is kept beside it rather than
+   * over it, because the whole value of this surrogate is that its movements are legible:
+   *
+   *     pre-port  COLLAPSED   = { boxPx:  76, linePx:  39,      totalPx: 115 }
+   *     pre-port  FULLY_OPEN  = { boxPx: 217, linePx: 231.925,  totalPx: 448.925 }
+   *
+   * The card grew, and it grew for a reason the sheet asked for: the resting card now carries
+   * the sheet's header row, a title, a step-count line and a two-line source echo, inside the
+   * sheet's `p-6 pl-8` body and above its own top-ruled footer strip. The pre-port card said
+   * only the step count and two fold lines.
+   *
+   * ⚠ THE PROPERTY THIS BLOCK GUARDS IS UNCHANGED AND IS STILL PROVED BY THE CASE BELOW: the
+   * resting figure is never REWRITTEN by opening a fold — a fold only ADDS. That is the claim
+   * a re-measure could have quietly destroyed, and it is re-asserted against the new numbers.
+   */
+  const COLLAPSED = { boxPx: 84, linePx: 101.7, totalPx: 185.7 }
 
   /** The same reading with BOTH folds open — the composed receipt and the five-row list
    *  included, since both are children of the card and the card is what an author sees. */
-  const FULLY_OPEN = { boxPx: 217, linePx: 231.925, totalPx: 448.925 }
+  const FULLY_OPEN = { boxPx: 329, linePx: 408.625, totalPx: 737.625 }
 
   it("the helper is NOT vacuous — it reads a real box and a real line off a plant", () => {
     // Without this, every figure below could be zero and every comparison would still hold.
@@ -1019,6 +1094,156 @@ describe("DraftArrivalCard — the declared vertical box (a SURROGATE, never a p
   })
 })
 
+describe("DraftArrivalCard — sketch 200's card face, and what it REFUSES to invent", () => {
+  it("the chip, the title and the source line are all on the card's FACE at rest", () => {
+    renderCard()
+    expect(screen.getByTestId("draft-arrival-badge")).toHaveTextContent(ARRIVAL_BADGE)
+    expect(screen.getByTestId("draft-arrival-title")).toHaveTextContent(WORKFLOW_NAME)
+    expect(screen.getByTestId("draft-arrival-source")).toHaveTextContent(ARRIVAL_SOURCE_LEAD)
+    expect(screen.getByTestId("draft-arrival-source-text")).toHaveTextContent(
+      BUSINESS_REQUIREMENT,
+    )
+  })
+
+  it("⚠ AN UNNAMED WORKFLOW GETS NO TITLE — never a placeholder, never an id", () => {
+    // `""` is a real state (a generation that named nothing), and the sheet's example name is
+    // the sheet's, not this workflow's. The rest of the card is unaffected, which is what
+    // makes rendering nothing the cheap and honest answer.
+    renderCard({ decisions: decisionsProps({ name: "" }) })
+    expect(screen.queryByTestId("draft-arrival-title")).toBeNull()
+    expect(screen.getByTestId("draft-arrival-badge")).toBeInTheDocument()
+    expect(screen.getByTestId("draft-arrival-source")).toBeInTheDocument()
+  })
+
+  it("⚠ NO REQUIREMENT ⇒ NO SOURCE LINE AT ALL, and no second 'there is none' sentence", () => {
+    // That absence already has exactly one home — the decisions fold's third row — and a
+    // second spelling of it on the card's face would be two places saying one thing.
+    renderCard({ decisions: decisionsProps({ businessRequirement: "" }) })
+    expect(screen.queryByTestId("draft-arrival-source")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-source-text")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-source-toggle")).toBeNull()
+  })
+
+  it("the echo is CLAMPED at rest and the control unclamps it — nothing written is unreachable", async () => {
+    const user = userEvent.setup()
+    renderCard()
+    const text = screen.getByTestId("draft-arrival-source-text")
+    const toggle = screen.getByTestId("draft-arrival-source-toggle")
+    // The clamp is a CLASS, so jsdom cannot measure it; what is asserted is the state machine
+    // behind it, which is the half a test can actually own. Appearance is owed to G-4.
+    expect(toggle).toHaveTextContent(ARRIVAL_SOURCE_ACTION)
+    expect(toggle).toHaveAttribute("aria-expanded", "false")
+    expect(text.className).toContain("line-clamp-2")
+
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute("aria-expanded", "true")
+    expect(text.className).not.toContain("line-clamp-2")
+    // …and the whole requirement was in the DOM the entire time, clamped or not.
+    expect(text).toHaveTextContent(BUSINESS_REQUIREMENT)
+  })
+
+  it("the applied block names only the pairs this card really holds", async () => {
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    const applied = screen.getByTestId("draft-arrival-applied")
+    expect(applied).toHaveTextContent(APPLIED_HEADING)
+    expect(applied).toHaveTextContent(APPLIED_READS_LABEL)
+    expect(applied).toHaveTextContent(FOLDER_NAME)
+    expect(applied).toHaveTextContent(APPLIED_FILLS_LABEL)
+    expect(applied).toHaveTextContent(TEMPLATE_FILENAME)
+  })
+
+  it("⚠ THE MODEL PAIR IS ABSENT UNLESS EVERY DECLARING STEP AGREES", async () => {
+    const user = userEvent.setup()
+
+    // (a) THE FIXTURE DECLARES NO MODEL AT ALL ⇒ no pair. "Nothing declared" is not agreement.
+    const bare = renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    expect(screen.getByTestId("draft-arrival-applied")).not.toHaveTextContent(APPLIED_MODEL_LABEL)
+    bare.unmount()
+
+    // (b) TWO STEPS DISAGREE ⇒ still no pair. One value over a definition whose steps named
+    // two would be a false claim about every step but one.
+    const split = renderCard({
+      phases: [
+        { ...GROUNDED_PHASES[0], config: { ...GROUNDED_PHASES[0].config, model: "model-a" } },
+        { ...GROUNDED_PHASES[1], config: { ...GROUNDED_PHASES[1].config, model: "model-b" } },
+      ],
+    })
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    expect(screen.getByTestId("draft-arrival-applied")).not.toHaveTextContent(APPLIED_MODEL_LABEL)
+    expect(screen.getByTestId("draft-arrival-applied")).not.toHaveTextContent("model-a")
+    split.unmount()
+
+    // (c) EVERY DECLARING STEP NAMES THE SAME ONE ⇒ the pair, carrying that value.
+    renderCard({
+      phases: [
+        { ...GROUNDED_PHASES[0], config: { ...GROUNDED_PHASES[0].config, model: "model-a" } },
+        { ...GROUNDED_PHASES[1], config: { ...GROUNDED_PHASES[1].config, model: "model-a" } },
+      ],
+    })
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    const applied = screen.getByTestId("draft-arrival-applied")
+    expect(applied).toHaveTextContent(APPLIED_MODEL_LABEL)
+    expect(applied).toHaveTextContent("model-a")
+  })
+
+  it("⚠ WITH NO PAIR AT ALL THE BLOCK DOES NOT RENDER — the sheet's own closing annotation, HONOURED rather than PRINTED", async () => {
+    const user = userEvent.setup()
+    renderCard({
+      decisions: decisionsProps({ folderName: null, templateFilename: null }),
+    })
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    expect(screen.queryByTestId("draft-arrival-applied")).toBeNull()
+    // …and the fold is still worth opening: the receipt itself is untouched by that absence.
+    expect(
+      within(screen.getByTestId("draft-arrival-grounding-body")).getAllByTestId("seed-receipt"),
+    ).toHaveLength(1)
+    // ⚠ AND THE ANNOTATION ITSELF IS NOWHERE ON SCREEN. It is an instruction to the
+    // implementer, not copy for an author; printing it would be printing the mechanism.
+    expect(cardAtoms().join(" ")).not.toContain("absent when nothing")
+  })
+
+  it("⚠ THE SHEET'S PRIMARY FOOTER ACTION IS NOT BUILT — no control, and no word for one", () => {
+    // Recorded as a DECISION rather than left as an absence nobody can account for. The three
+    // grounds are in the component; this is the checkable half. The token is assembled so this
+    // file's own source cannot satisfy a grep run over it.
+    const GATE_WORD = ["pub", "lish"].join("")
+    renderCard()
+
+    /**
+     * ⚠ THE SWEEP IS OVER CONTROLS, NOT OVER TEXT, AND THE FIRST DRAFT OF THIS CASE GOT THAT
+     * WRONG — usefully. Written as a sweep of every atom on the card it went RED, and the
+     * offending string was the receipt's OWN locked closing sentence, which says plainly that
+     * nothing is saved or published yet.
+     *
+     * That sentence is exactly right and must stay: it is a STATEMENT ABOUT STATE, and the
+     * thing this case is about is a CONTROL THAT ACTS. Banning the word outright would have
+     * deleted an honest sentence to satisfy a fence — the failure mode this project calls
+     * re-baselining to make a red go green. So the property is stated as what it really is.
+     */
+    const controls = Array.from(
+      screen.getByTestId("draft-arrival-card").querySelectorAll("button, a[href]"),
+    )
+    // NON-VACUITY FIRST: the card really does have controls, so the negative below is a claim
+    // about a real set rather than about an empty one.
+    expect(controls.length).toBeGreaterThan(0)
+    for (const control of controls) {
+      const label = `${control.textContent ?? ""} ${control.getAttribute("aria-label") ?? ""}`
+      expect(label.toLowerCase(), `a control offers to ${GATE_WORD}`).not.toContain(GATE_WORD)
+    }
+    // …and there is no handler for one either: no prop, no callback, no seam.
+    expect(draftArrivalCardSource.toLowerCase()).not.toContain(`on${GATE_WORD}`)
+
+    // POSITIVE CONTROLS — both halves of the detector really fire.
+    expect(`Proceed to ${GATE_WORD}`.toLowerCase()).toContain(GATE_WORD)
+    const plant = document.createElement("button")
+    plant.textContent = `Proceed to ${GATE_WORD}`
+    expect((plant.textContent ?? "").toLowerCase()).toContain(GATE_WORD)
+  })
+})
+
 describe("DraftArrivalCard — sheet c5 asks for a vocabulary this surface does not speak", () => {
   /**
    * ⚠ THE ONE PLACE THIS FILE SPELLS STRINGS AS LITERALS, AND THE REASON IS THE POINT.
@@ -1031,6 +1256,30 @@ describe("DraftArrivalCard — sheet c5 asks for a vocabulary this surface does 
    * PRINTS THE MECHANISM to the reader — the rule sketch 178's own `designMd` added — or
    * puts a door on this card that already has exactly one home elsewhere. The verdicts are
    * in `199-04-SUMMARY.md`; this case is what makes them checkable rather than asserted.
+   *
+   * ══════════════════════════════════════════════════════════════════════════════════════
+   * ⚠ SKETCH 200 DRAWS TWO OF THOSE SHAPES AGAIN, AND TWO OF THE THREE VERDICTS ARE NOW
+   *   SPLIT RATHER THAN REVERSED. THIS BLOCK IS UNCHANGED AND STILL GREEN — READ WHY.
+   * ══════════════════════════════════════════════════════════════════════════════════════
+   *
+   * `draft-arrival.html` draws a state chip and a describe-text echo with its own control,
+   * and the operator has named sketch 200 as the absolute reference. Both shapes are now
+   * BUILT. Not one needle below changed, and that is the substance of the split rather than
+   * a lucky escape:
+   *
+   *  • **THE SHAPES ARE ADMITTED; SKETCH 178's WORDS ARE STILL REFUSED.** 199-04's objection
+   *    to the chip was never that a card may not carry one — it was that *"Freshly Arrived"*
+   *    and *"Returned-to"* name the arrival MECHANISM. Sketch 200's chip names WHEN, in the
+   *    author's terms, and its echo control says what it shows rather than what it opens. So
+   *    every literal in `SHEET_C5_WORDS` stays absent from the rendered card, and this case
+   *    still proves it.
+   *  • **THE DOOR PAIR STAYS REFUSED OUTRIGHT.** That verdict rested on a second reason the
+   *    sketch cannot overrule — the flows those buttons name have exactly one home elsewhere
+   *    — and sketch 200's own primary footer action is declined on the same ground plus two
+   *    more, in its own case above.
+   *
+   * ⚠ SO A READER WHO FINDS THIS BLOCK GREEN MUST NOT CONCLUDE THAT THE SHAPES ARE STILL
+   * ABSENT FROM THE CARD. It measures WORDS, and it was always only ever measuring words.
    */
   const SHEET_C5_WORDS = [
     "Freshly Arrived",

@@ -224,3 +224,71 @@ export const DECISION_NAME_FIELD_LABEL = "Workflow name"
  */
 export const DECISION_EDIT_LIMIT_NOTE =
   "Changing an answer updates the workflow — the steps already written around the old answer stay as they are."
+
+
+// ══════════════════════════════════════════════════════════════════════════════════════════
+// SKETCH 200 (`draft-arrival.html`) — THE ARRIVAL CARD'S OWN FACE
+//
+// The sheet draws three things the shipped card had nowhere to put: a state chip, the
+// workflow's NAME as the card's title, and an echo of what the author asked for. They live
+// here rather than in a new module for the reason `GROUNDING_FOLD_ACTION` already does —
+// this module is where the arrival card's card-LEVEL words live, not only its five rows.
+//
+// ⚠ EVERY VALUE BELOW STILL OBEYS THE FIVE RULES ABOVE, and the one that binds hardest here
+// is rule 1 (D-20): no value may contain the gate-claim token. That is why sketch 200's
+// primary footer action has NO id in this table — see `DraftArrivalCard.tsx` for why it is
+// not built rather than merely not worded.
+// ══════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * The state chip at the top of the card.
+ *
+ * ⚠ IT CLAIMS A FACT THE MOUNT ALREADY GUARANTEES, WHICH IS WHY IT MAY BE SAID AT ALL. The
+ * card's `open` is the page's `showReceipt`, set in the `onDrafted` handler and NOWHERE else
+ * (D-06), so a re-opened draft, a fork and a hand-built canvas workflow never render this
+ * card. The chip is therefore true by construction rather than by a predicate someone has to
+ * keep correct.
+ *
+ * ⚠ IT IS NOT SKETCH 178's LIFECYCLE CHIP. That sheet proposed a chip naming the arrival
+ * MECHANISM, and `199-04` refused it under sketch 178's own `designMd` rule against printing
+ * the mechanism; those words stay refused and are still asserted absent in the suite. This one
+ * names WHEN, in the author's terms, and nothing about how it got here.
+ */
+export const ARRIVAL_BADGE = "Just drafted"
+
+/**
+ * The lead on the source line — the author's own request, echoed back.
+ *
+ * ⚠ A LABEL, NEVER A SENTENCE. It introduces text this repository did not author (the
+ * author's own paragraph), so anything longer would be this surface speaking over them.
+ */
+export const ARRIVAL_SOURCE_LEAD = "From:"
+
+/**
+ * The source line's disclosure control.
+ *
+ * The echo is clamped, because a requirement can be a page long and the card's whole measured
+ * property is that it arrives about four lines tall. This is the way to the rest of it — the
+ * hover/disclosure mechanism rather than a deletion, so nothing the author wrote is unreachable.
+ */
+export const ARRIVAL_SOURCE_ACTION = "See what I asked for"
+
+// ── The applied block (sketch 200's third region) ─────────────────────────────────────────
+
+/**
+ * The heading over the pairs the generation actually applied.
+ *
+ * ⚠ IT NAMES NO CONSEQUENCE. Rule 2: the card says a model made a choice; it never says the
+ * choice is good, durable or correct, and it never says what the choice will cause. The three
+ * labels below are SUBJECTS in the `decisionRowLabel` register for the same reason.
+ */
+export const APPLIED_HEADING = "What I applied"
+
+/** The model pair's label. Rendered only where every step agrees — see `DraftArrivalCard.tsx`. */
+export const APPLIED_MODEL_LABEL = "Model"
+
+/** The knowledge-base pair's label. */
+export const APPLIED_READS_LABEL = "Reads from"
+
+/** The template pair's label. */
+export const APPLIED_FILLS_LABEL = "Fills in"
