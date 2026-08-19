@@ -35,7 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 192.2 (does-this-one-work) — **ALL 6 PLANS EXECUTED · VERIFIED `gaps_found` 4/6 · NOT CLOSED**
+Phase: 192.2 (does-this-one-work) — **6 EXECUTED · `gaps_found` 4/6 · GAP ROUND 1 PLANNED (5 plans / 3 waves) · NOT CLOSED**
 Plan: **6 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
 (`192.2-02` the G-5 discharge + `192.2-03` the run-facts join), Wave 3 (`192.2-04`, the run
 truth's wire→words path) and **Wave 4 (`192.2-05`, THE SUBTRACTION + THE LANGUAGE)** COMPLETE.
@@ -43,11 +43,68 @@ Wave 2 ran its two plans in PARALLEL worktrees and they merged clean at `00b81f6
 — zero `files_modified` overlap (frontend vs backend), and only `192.2-03` touched Postgres, so
 CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied without serialising the wave.
 Waves 3, 4 and 5 ran SEQUENTIALLY on the main working tree.
-Next action: **`/gsd:plan-phase 192.2 --gaps`** — verification ran and scored **4 of 6 must-haves**
-(`192.2-VERIFICATION.md`), and code review scored **1 critical / 4 warning / 5 info**
-(`192.2-REVIEW.md`, `status: issues_found`). **G-7 is CLEAR** — `check-gap-closure-rounds.cjs`
-reports `6 total · 0 gap-closure`, so this would be round 1, and **ROADMAP SC#1 is genuinely
-UNMET**, which is the one thing that justifies a round.
+Next action: **`/gsd:execute-phase 192.2 --gaps-only`** — gap-closure **round 1** is PLANNED:
+`192.2-07` .. `192.2-11`, five plans across three waves, committed `504c538f` + `185693ae`.
+**G-7 was clear** (`6 total · 0 gap-closure`) and **ROADMAP SC#1 is genuinely UNMET**, which is
+the one thing that justifies a round.
+
+**OPERATOR DECISIONS, LOCKED — chosen against a presented trade-off, not inferred:**
+1. **CR-01 is fixed by `has_any_run` + a FOURTH arm**, not by rewording alone. The lateral gains
+   `EXISTS(SELECT 1 FROM workflow_runs WHERE definition_id = wd.id) AS has_any_run`; the scope
+   clause `r.user_id = $1` is **UNCHANGED — the security boundary stands.** Arms become
+   `ran` / `never` / **`not-by-you` (NEW)** / `unknown`. ⚠ **An explicit DISCLOSURE TRADE was
+   accepted:** `has_any_run` reveals that SOMEBODY ran a workflow the caller can already see. It
+   must never reveal who, when, how many, or with what outcome — `EXISTS` only. On a
+   world-readable starter that disclosure is arguably the point; recorded so a future reader can
+   re-open the reasoning rather than rediscover it.
+2. **All four warnings fold into this round** — WR-01, WR-02, WR-03, WR-04.
+
+**Wave plan:** W1 `07` (WR-01 tailwind/CSS) ∥ `08` (backend `has_any_run`, **`autonomous: false`
+= DB serialization, NOT a human checkpoint**) ∥ `09` (WR-04 filter chips) — **zero files_modified
+overlap, verified pairwise**. W2 `10` (wire→row→word seam + WR-02). W3 `11` (the fourth arm on
+screen + WR-03 + the UAT script amendment).
+
+⚠ **THE PLAN-CHECKER RETURNED `NEEDS-REVISION` ON A REAL CROSS-PLAN DEFECT, AND IT WAS FIXED
+BEFORE EXECUTION — recorded because the shape recurs.** `192.2-07` creates
+`gutterTokens.fences.test.ts` pinning an **EXACT SIZE** over the literals in `GUTTER_TONE` /
+`RUN_TONE`, measured against the FIVE-arm shape. `192.2-11` adds a **sixth** arm to both maps,
+mentioned `gutterTokens` **ZERO times**, did not list it in `files_modified` — and its own
+`<verification>` runs the whole `src/components/workflows/library` subtree. Plan 11 would have
+broken a sibling plan's fence with **no authority to touch the file**, so the round could not have
+landed `failed 0`. Independently confirmed against both plan texts before revising. `11` now owns
+the fence with a **mandatory RE-DERIVE step (not a `+2` bump — the two maps do not contribute
+equally: `GUTTER_TONE["not-by-you"]` is a NEW literal, `RUN_TONE["not-by-you"]` is a THIRD
+occurrence of an existing one)**, plus criteria proving the fence still passes, is still an EXACT
+size, and that 07's two positive controls still fire. `07` gained a matching note to keep its
+assertion exact and **explicitly NOT to pre-emptively loosen it**.
+
+⚠ **DEC-11-B — THE PLANNER REFINED A LOCKED DECISION, AND THE REFINEMENT WAS SCRUTINIZED AND
+UPHELD RATHER THAN WAVED THROUGH.** The operator's four arms name `has_any_run = true` and
+`= false` but **do not name ABSENT**. The planner routes `last_run_status === null` + `hasAnyRun`
+absent to **`unknown`**, not `never`, reasoning that *"Never run"* is an affirmative row-level
+claim and an absent bit is not a fact we hold. The plan-checker tested it three ways and passed
+it: it resolves an ambiguity rather than contradicting the two arms that WERE specified; the
+resolver stays TOTAL with explicit `=== true` / `=== false` comparisons (⚠ a truthiness test
+would fold `false`/`null`/`undefined` into one answer, and DEC-11-B turns on those being three);
+and in a real stale-backend window every row reads *"Not recorded"* rather than a false
+*"Never run"*. **This is an interpretation of an ambiguous input and is flagged as such** — if
+the operator meant absent to read `never`, say so before executing wave 3.
+
+⚠ **SCOPE FENCE HONOURED — gap 2 has NO plan and must not get one.** The nine G-4 rows
+(`driven: false`, 0/9) can only be closed by an operator at a screen; a plan that "added tests for
+it" would substitute an automated proxy for the lived evidence G-4 exists to require. `192.2-11`
+AMENDS the script (adds `has_any_run` to U4's override-key list — ⚠ without which **U4 would
+pass while blind to the omission**, since rule 1 short-circuits — and adds a U10 for the fourth
+arm) and is required to leave `driven: false` with ten empty `result:` fields, grep-verified.
+**That gap routes to `/gsd:verify-work 192.2`.**
+
+⚠ **A G-7 JUDGEMENT IS RECORDED RATHER THAN LEFT TO BE REDISCOVERED.** G-7 forbids a closure
+round introducing a new user-facing capability, and the fourth arm puts a NEW WORD on screen
+(*"Run by someone else"*). The judgement: the card ALREADY claims to report run truth and
+currently claims it FALSELY — a correct claim is repair, not new capability. The mechanical check
+does not trip (it fails only when a gap plan's `files_modified` names a non-test source file that
+did not exist when the plan was written; every file here already exists). **No guardrail override
+was needed or recorded.**
 
 ⚠ **CR-01 — THE PHASE SHIPS THE EXACT LIE ITS OWN THESIS EXISTS TO PREVENT, and it is NOT
 deploy skew.** The lateral join is scoped `r.user_id = $1` (`db/workflows.py:161-169`) — the
