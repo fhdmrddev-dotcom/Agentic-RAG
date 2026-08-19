@@ -1188,12 +1188,40 @@ describe("PublishGauntlet 199-03 — the pre-change RESTING inventory (sheet c7)
     )
     expect(screen.getByPlaceholderText(/Choose something typical, not a corner case/)).toBeInTheDocument()
 
-    // ⚠ THE DUPLICATION, MEASURED. The dialog's title bar and the form's section heading
-    // say the SAME four words about two lines apart. Task 2 INVERTS these two counts
-    // rather than deleting this case — "text is noise, cut it; the purpose must survive
-    // the cut", and here the purpose survives untouched in the title bar.
+    // ⚠ THE DUPLICATION, MEASURED — AND THEN SUBTRACTED (Task 2). Before this plan the
+    // dialog's title bar and the form's section heading said the SAME four words about two
+    // lines apart. EXACTLY ONE of these two lines moved, and saying which is the point:
+    //   · the FIRST is the "purpose survives the cut" guard and it reads 1 BOTH before and
+    //     after — the title bar's node is untouched. (It never counted the section heading,
+    //     because that node's text is "◆ Publish this workflow" and this match is exact.)
+    //   · the SECOND is the INVERSION: `toHaveLength(1)` → `not.toBeInTheDocument()`. The
+    //     same atom, asserted at the opposite polarity, rather than an assertion deleted.
     expect(screen.getAllByText("Publish this workflow")).toHaveLength(1)
-    expect(screen.getAllByText("◆ Publish this workflow")).toHaveLength(1)
+    expect(screen.queryByText("◆ Publish this workflow")).not.toBeInTheDocument()
+  })
+
+  it("(subtraction) the whole strip FITS the modal body — arithmetic over the RENDERED widths", async () => {
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    const spine = screen.getByTestId("gauntlet-spine")
+
+    // Widths are read BACK off the render, so this is a measurement of the shipped strip
+    // and not a second copy of a number written in the component.
+    const widestPx = (el: HTMLElement): number => {
+      const hits = Array.from(el.className.matchAll(/w-\[(\d+)px\]/g)).map((m) => Number(m[1]))
+      expect(hits.length).toBeGreaterThan(0) // non-vacuity: a class change must not silently pass
+      return Math.max(...hits)
+    }
+
+    const cols = Array.from(spine.querySelectorAll<HTMLElement>('[data-testid="spine-stage"]'))
+    const conns = Array.from(spine.querySelectorAll<HTMLElement>('[data-testid="spine-conn"]'))
+    expect(cols).toHaveLength(10)
+    expect(conns).toHaveLength(9) // one fewer than the nodes, by construction
+
+    // The modal body's inner width: `max-w-2xl` (672px) minus `px-4` on both sides.
+    const MODAL_BODY_PX = 672 - 32
+    const strip = cols.length * widestPx(cols[0]) + conns.length * widestPx(conns[0])
+    expect(strip).toBeLessThanOrEqual(MODAL_BODY_PX)
   })
 
   it("(rest) the spine names its ten server stages as literals, in the server's own order", async () => {

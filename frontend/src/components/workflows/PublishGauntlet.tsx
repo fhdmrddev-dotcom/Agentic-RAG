@@ -415,6 +415,21 @@ function HardWall({ onFix }: { onFix: () => void }) {
  * edit here. There is deliberately NO client-side list of acceptable stages — the server
  * owns the verdict vocabulary (D-182-06 / VALID-03, stated on `Verdict.code` in the API
  * client), so the client renders what arrives and fails closed on what it has not seen.
+ *
+ * ── PHASE 199-03 (DES-01, sheet 178 `c7-gauntlet-soul`): ONE COMPACT STRIP, MEASURED ──
+ * The sheet's whole gauntlet claim is that it reads as ONE compact strip. Ours already WAS
+ * one strip — the shape was right — but it did not FIT: ten 64px columns plus nine 16/24px
+ * connectors measure 856px against a modal body of 640px (`max-w-2xl` 672 − `px-4` twice),
+ * so the strip that is supposed to show every check at a glance ended in a horizontal
+ * scrollbar with the Judge and Commit nodes off-screen. A strip you have to scroll to
+ * finish reading is not a glance.
+ *
+ * This is pure subtraction — the column, the node box, the icon and the connectors each
+ * shrink; NOTHING is removed from the strip and no stage is folded away. 10 × 48 + 9 × 16
+ * = 624 ≤ 640, and that arithmetic is CHECKED rather than asserted: the suite reads the
+ * widths back off the rendered `data-testid="spine-stage"` / `"spine-conn"` class strings
+ * and does the sum, so the next person who nudges a width finds out from a test instead of
+ * from a scrollbar. `overflow-x-auto` stays as the safety valve for narrow viewports.
  */
 function GauntletSpine({ blockedStage, running }: { blockedStage: string | null; running: boolean }) {
   // Find the FIRST stage whose codes contain the server's blocked_stage (visual only).
@@ -427,7 +442,7 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
   // Derived ONCE, above the map, so the two per-node reads cannot drift apart again.
   const unknownBlock = blockedStage != null && blockedIndex === -1
   return (
-    <div data-testid="gauntlet-spine" className="flex items-start overflow-x-auto py-4">
+    <div data-testid="gauntlet-spine" className="flex items-start overflow-x-auto py-3">
       {STAGES.map((stage, i) => {
         const isBlocked = blockedIndex === i
         // Unplaceable block first, placed block second, no block last. Only in that order
@@ -459,18 +474,21 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
         return (
           <div key={stage.label} className="flex items-start" title={stage.what}>
             {i > 0 && (
-              <div className={`relative mt-[20px] h-[3px] w-4 shrink-0 rounded-full sm:w-6 ${connReached ? "bg-success/50" : "bg-border"}`}>
+              <div
+                data-testid="spine-conn"
+                className={`relative mt-[18px] h-[3px] w-[12px] shrink-0 rounded-full sm:w-[16px] ${connReached ? "bg-success/50" : "bg-border"}`}
+              >
                 {/* The energy comet flows along the connector INTO the running golden-run node. */}
                 {running && i === RUNNING_STAGE_INDEX && <span className="gauntlet-comet" aria-hidden />}
               </div>
             )}
-            <div className="flex w-[64px] shrink-0 flex-col items-center gap-1">
+            <div data-testid="spine-stage" className="flex w-[48px] shrink-0 flex-col items-center gap-1">
               <div
-                className={`relative grid h-10 w-10 place-items-center rounded-xl border-2 ${nodeTone} ${
+                className={`relative grid h-9 w-9 place-items-center rounded-xl border-2 ${nodeTone} ${
                   isRunning ? "gauntlet-node-run" : ""
                 }`}
               >
-                <Icon className="h-5 w-5" aria-hidden />
+                <Icon className="h-4 w-4" aria-hidden />
                 {isPassed && (
                   <span
                     className="absolute -right-1.5 -top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-success text-[8px] font-bold leading-none text-white"
@@ -667,8 +685,15 @@ function GauntletContent({
           (no verdict body) the form stays visible so the user can still try again. */}
       {!verdict && (
         <div className="mt-2 rounded-lg border border-border bg-card p-4">
-          <div className="font-mono text-[11px] font-semibold text-foreground">◆ Publish this workflow</div>
-          <p className="mt-1 text-[12px] leading-relaxed text-muted-foreground">
+          {/* Phase 199-03 (DES-01, sheet 178 c7): the section heading that used to sit here
+              said "◆ Publish this workflow" — the SAME four words the dialog's own title bar
+              says about two lines above it. "Text is noise — cut it, but the purpose must
+              survive the cut": the purpose is untouched, because the title bar still carries
+              it, and the paragraph below (what publishing COSTS, and that it can honestly
+              block) is the part that actually carries information and is deliberately kept.
+              The suite proves the subtraction by INVERTING its resting-inventory count from
+              two occurrences to one, never by deleting the assertion. */}
+          <p className="text-[12px] leading-relaxed text-muted-foreground">
             Publishing runs the <b>full gauntlet above</b> — including a <b>real golden run</b> of this workflow against
             your project KB and an <b>independent judge</b> of the result. It can honestly block.
           </p>

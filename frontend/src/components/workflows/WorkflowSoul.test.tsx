@@ -21,6 +21,9 @@ import workflowSoulSource from "./WorkflowSoul?raw"
 // vocabulary entry, and only one of those three lives in the component.
 import soulDataSource from "./soulData?raw"
 import deriveTierSource from "./deriveTier?raw"
+// The glyph + label vocabulary, read from its ONE home rather than re-typed here — a test
+// that spelled 🔒/Strict itself would pass against a chip that had drifted from TIERS.
+import { TIERS } from "./deriveTier"
 import { WorkflowSoul } from "./WorkflowSoul"
 import type { DefShape } from "./soulData"
 
@@ -249,6 +252,56 @@ describe("WorkflowSoul 199-03 — the sheet's UNDETERMINED third arm is NOT adop
       unmount()
     }
     expect(seen).toEqual(["STRICT", "MIDDLE", "LOOSE"])
+  })
+
+  it("(subtraction/tone) the three arms carry three DISTINGUISHABLE weights — and none is colour-alone", () => {
+    // The sheet's one genuinely applicable idea for this atom: the arms should not weigh
+    // the same. Before this plan all three rendered one identical treatment, so the only
+    // separator was the word. The weighting is ADDITIVE — glyph and WORD still render on
+    // every arm, which is what keeps WCAG 1.4.1 satisfied without relying on the tone.
+    const faces = new Map<string, string>()
+    for (const [def, expected] of [
+      [strictDef, "STRICT"],
+      [middleDef, "MIDDLE"],
+      [looseDef, "LOOSE"],
+    ] as const) {
+      const { unmount } = render(<WorkflowSoul def={def} scale="pub" />)
+      const chip = screen.getByTestId("soul-tier")
+      expect(chip).toHaveAttribute("data-tier", expected)
+      // Glyph AND word survive the re-tone, on every arm — both read from TIERS, the
+      // vocabulary's own home, so this cannot go green against a re-spelled chip.
+      expect(within(chip).getByText(TIERS[expected].glyph)).toBeInTheDocument()
+      expect(chip.textContent ?? "").toContain(TIERS[expected].label)
+      faces.set(expected, chip.className)
+      unmount()
+    }
+    // Three arms, three DIFFERENT class strings — a tone that collapses two arms into one
+    // treatment would leave the surface unable to say them apart without reading.
+    expect(new Set(faces.values()).size).toBe(3)
+    // STRICT is the loudest (it alone carries a filled ground); LOOSE is the quietest.
+    expect(faces.get("STRICT")).toMatch(/\bbg-muted\b/)
+    expect(faces.get("LOOSE")).toMatch(/text-muted-foreground/)
+    expect(faces.get("MIDDLE")).not.toMatch(/\bbg-muted\b/)
+    expect(faces.get("MIDDLE")).not.toMatch(/text-muted-foreground/)
+  })
+
+  it("(scale invariance) the tone follows the TIER, never the scale — the same tier looks the same at run and pub", () => {
+    // `scale` tunes layout and typography ONLY. A tone keyed on scale would let the run
+    // header and the publish summary disagree about how governed a workflow is.
+    const toneOf = (scale: (typeof LIVE_SCALES)[number], def: DefShape) => {
+      const { unmount } = render(<WorkflowSoul def={def} scale={scale} />)
+      const cls = screen.getByTestId("soul-tier").className
+      unmount()
+      // Drop the per-scale sizing classes; what remains is the tone.
+      return cls
+        .split(/\s+/)
+        .filter((c) => !/^(px-|py-|text-\[)/.test(c))
+        .sort()
+        .join(" ")
+    }
+    for (const def of [strictDef, middleDef, looseDef]) {
+      expect(toneOf("run", def)).toEqual(toneOf("pub", def))
+    }
   })
 
   it("no soul module spells the sheet's word — and the sweep is NON-VACUOUS", () => {
