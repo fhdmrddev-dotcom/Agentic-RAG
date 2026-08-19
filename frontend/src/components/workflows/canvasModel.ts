@@ -44,6 +44,7 @@ import type { Edge, Node } from "@xyflow/react"
 import type { ConnectionState } from "@/components/workflows/connectionState"
 import {
   actionRiskArmed,
+  branchConditionOf,
   groundingCauseOf,
   nodeTitle,
   notConnectedOf,
@@ -178,6 +179,21 @@ export interface PhaseNodeData {
    * neither this file nor `PhaseNode.tsx` nor the card is touched.
    */
   notConnected: boolean
+  /**
+   * Phase 200-06 (`BC-MR-03`) — this step's own branch condition, already resolved to the
+   * TARGET STEP'S NAME, or ABSENT when there is nothing honest to say.
+   *
+   * Absent in three distinct cases, and the third is a decision rather than a gap: the
+   * step declares no `on_failure` at all; the directive is not a skip; or the target slug
+   * resolves to no phase in this definition — in which case the broken-reference STUB
+   * already prints the whole sentence and a second copy on the source card would be the
+   * same fact twice, three centimetres apart (199-05's own rule).
+   *
+   * ⚠ THE SLUG NEVER REACHES THE FACE. `workflow_phases.slug` is an identifier; the card
+   * carries business words. The resolution happens once, in the projection, against the
+   * definition the projection already holds.
+   */
+  condition?: string
   [k: string]: unknown
 }
 
@@ -373,8 +389,26 @@ function buildPhaseData(
   phase: PhaseSpecJSON,
   kbTools: readonly string[],
   nameContext: NameContext,
+  /**
+   * 200-06 (BC-MR-03) — slug → the step's own NAME, over the definition being projected.
+   *
+   * INJECTED rather than looked up here, for the reason the `nameContext` parameter beside
+   * it exists: this helper sees ONE phase, and resolving a branch target needs all of
+   * them. The caller is `toCanvas`, which already holds `bySlug`.
+   *
+   * OPTIONAL, and omitting it means "no condition on any face" rather than "a condition
+   * with a slug in it". Every shipped caller of `toCanvas` supplies it (it is not a public
+   * parameter — the resolver is built inside the projection), so the default exists only
+   * so this helper stays total on its own.
+   */
+  resolveName: (slug: string) => string | null = () => null,
 ): PhaseNodeData {
   const phaseType = phase.config.phase_type
+  // The whole line, or null when this step declares no branch worth stating. Spread
+  // CONDITIONALLY below (the shipped D-14 idiom), so a step with no branch produces a
+  // `data` object byte-identical to what it produced before this plan — which is what
+  // keeps the committed projection snapshot unmoved for every fixture but the branching one.
+  const condition = branchConditionOf(phase, resolveName)
   return {
     slug: phase.slug,
     phaseIndex: phase.phase_index,
@@ -399,6 +433,7 @@ function buildPhaseData(
     armed: isArmed(phase),
     waitsForYou: waitsForYou(phase),
     notConnected: isNotConnected(phase),
+    ...(condition === null ? {} : { condition }),
   }
 }
 
@@ -476,8 +511,17 @@ export function toCanvas(
   // (0) PHASE NODES — one per phase, id === slug (SC#3). `llm_batch_agents` gets ONE
   // node: the ×N fan-out is a RUNTIME behaviour, not topology, and drawing N lanes
   // would disagree with the server's adjacency.
+  // 200-06 (BC-MR-03) — slug → this definition's own step NAME. A `Map`, so a slug named
+  // `constructor` cannot resolve an inherited member: `Map.get` reads no prototype chain.
+  // `nodeTitle` is the SAME function the face's own title comes from, so the condition
+  // names a step exactly as that step names itself.
+  const nameOfSlug = (slug: string): string | null => {
+    const target = bySlug.get(slug)
+    return target === undefined ? null : nodeTitle(target, nameContext)
+  }
+
   for (const [col, phase] of ordered.entries()) {
-    const data = buildPhaseData(phase, kbTools, nameContext)
+    const data = buildPhaseData(phase, kbTools, nameContext, nameOfSlug)
     nodes.push({
       id: phase.slug,
       type: CANVAS_NODE_TYPES.phase,

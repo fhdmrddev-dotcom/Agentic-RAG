@@ -1762,6 +1762,60 @@ describe("WorkflowCanvas 200-06 — BC-MR-02, the four connection states", () =>
     expect(dashed.length).toBe(1)
   })
 
+  it("BC-MR-03 — a branch node states its own condition, in the TARGET STEP'S NAME", async () => {
+    const { container } = await renderPlane(branching)
+    const card = screen.getByTestId("canvas-node-assess")
+    const line = within(card).getByTestId("canvas-node-condition")
+    // The NAME the target step gives itself, resolved through the same `nodeTitle` the
+    // face's own title comes from — never the slug the definition stores.
+    expect(line.textContent).toBe("If the check fails → Wait for your approval")
+    expect(line.textContent).not.toContain("escalate")
+    expect(line.textContent).not.toContain("skip_to_phase")
+    // NON-VACUITY — the slug really is what the definition carries, so "not the slug" is a
+    // statement about a resolution that happened rather than about a string that never
+    // existed.
+    expect(branching[1].validators?.[0].on_failure).toBe("skip_to_phase:escalate")
+    expect(container.querySelectorAll('[data-testid="canvas-node-condition"]')).toHaveLength(1)
+  })
+
+  it("a step that declares NO branch renders no condition element at all", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    expect(container.querySelectorAll('[data-testid="canvas-node-condition"]')).toHaveLength(0)
+    // NON-VACUITY — the cards really rendered.
+    expect(screen.getAllByTestId(/^canvas-node-/).length).toBe(researchSummarize.length)
+  })
+
+  it("a BROKEN branch states it ONCE — on the stub, never twice on the plane", async () => {
+    // 199-05's own rule, applied to a new element: the unresolvable target already
+    // terminates in a stub that prints the whole sentence, so a condition line on the
+    // source card would be the same fact three centimetres away.
+    const { container } = await renderPlane(unresolvableSkip)
+    expect(screen.getByTestId("canvas-unresolved-skip")).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-testid="canvas-node-condition"]')).toHaveLength(0)
+  })
+
+  it("a `constructor`-slugged branch TARGET resolves to a step, not to a function", async () => {
+    // The slug the UI cannot author (D-184-11) pointed at from an `on_failure`. A bare
+    // object index would resolve `Object.prototype.constructor`; the projection uses a
+    // `Map`, which reads no prototype chain at all.
+    const poisonedTarget: PhaseSpecJSON[] = [
+      {
+        slug: "check",
+        phase_index: 0,
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "skip_to_phase:constructor" }],
+      },
+      { slug: "constructor", phase_index: 1, config: { phase_type: "llm_human_input" } },
+    ]
+    const { container } = await renderPlane(poisonedTarget)
+    const line = within(screen.getByTestId("canvas-node-check")).getByTestId(
+      "canvas-node-condition",
+    )
+    expect(line.textContent).toBe("If the check fails → Wait for your approval")
+    expect(container.textContent ?? "").not.toContain("function")
+    expect(container.textContent ?? "").not.toContain("[object")
+  })
+
   it("the LEGEND names all four, and is inert", async () => {
     const { container } = await renderPlane(researchSummarize)
     const legend = container.querySelector<HTMLElement>('[data-testid="canvas-connection-legend"]')

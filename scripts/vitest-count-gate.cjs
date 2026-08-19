@@ -298,7 +298,13 @@ const BASELINE = {
   // carried forward as another paragraph about it: an unpinned case is an unguarded one, and
   // this file's own eleven-times-stale marker is the standing evidence that a drift left in a
   // comment outlives every plan that noticed it. Read from the `actual` column, never counted.
-  "WorkflowCanvas.test.tsx": 89,
+  //
+  // ⚠ AND RAISED AGAIN IN THE SAME PLAN, 89 → 93, by its OWN second commit (BC-MR-03): the
+  // branch condition's four cases — the target step's NAME rather than its slug, no element
+  // where no branch is declared, the broken branch stated ONCE on the stub, and a
+  // `constructor`-slugged branch TARGET resolving to a step rather than to a function.
+  // Read from the `actual` column on the run that first executed them.
+  "WorkflowCanvas.test.tsx": 93,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:

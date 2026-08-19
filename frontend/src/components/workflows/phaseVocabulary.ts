@@ -125,6 +125,65 @@ export function parseSkipTarget(onFailure: string | null | undefined): string | 
   return target.length > 0 ? target : null
 }
 
+// ── Phase 200-06 (BC-MR-03) — A BRANCH NODE'S OWN CONDITION ─────────────────────
+//
+// `200-CHECKLIST.md` §3 `BC-MR-03`, ledger row `BC-3` verbatim: *"`on_failure:
+// skip_to_phase:<slug>` IS in the definition. This half is frontend-only and was never
+// built."* The sketch draws the slot as `Over £2m?` — an author-written condition this
+// product does not have a field for — so what the node can honestly state is the condition
+// the definition really carries: *if the check on this step fails, the run goes there.*
+//
+// ⚠ THE SLUG IS AN IDENTIFIER, NOT A SENTENCE. `skip_to_phase:escalate` names a row; a
+// person reading a canvas needs the STEP'S NAME. The resolution is injected rather than
+// performed here, because only the caller holding the whole definition can do it — and
+// because a resolver that could not find the target must be able to say so by returning
+// null rather than by inventing a name.
+//
+// ⚠ AND IT IS SILENT ON A BROKEN BRANCH, WHICH IS 199-05's OWN RULE APPLIED AGAIN. An
+// unresolvable `skip_to_phase` already terminates in a stub node that prints the entire
+// sentence; a condition line on the source card saying the same thing three centimetres
+// away is the same fact twice. The resolver returning null is exactly that case.
+//
+// ⚠ WHY THIS IS NOT `WorkflowCanvas.BRANCH_CONNECTOR_WORD`, and why that is not drift.
+// That constant is the LINE's label: three words on an SVG label, naming what the
+// connector means. This is the CARD's line: a sentence naming where the run would go, in
+// the body of the step that owns the check. Two different elements on two different parts
+// of the plane, each with exactly ONE home for its own string. Neither is a second
+// spelling of the other, and neither module imports the other (the canvas imports this
+// file's TYPES only, and a value import back from here would close a live ESM cycle).
+
+/** The lead — the condition itself, stated as a condition. ONE home. */
+export const BRANCH_CONDITION_LEAD = "If the check fails"
+
+/** The join between the condition and its destination. ONE home. */
+export const BRANCH_CONDITION_ARROW = "→"
+
+/**
+ * The whole line, or `null` when this step declares no branch the canvas should state.
+ *
+ * `resolveName` is the caller's slug→name lookup over the definition it holds. Returning
+ * null from it (an unresolvable target) makes this return null too — see the docblock
+ * above for why silence is the right answer there rather than a slug.
+ *
+ * TOTAL over malformed input: an absent `validators`, a validator with no `on_failure`,
+ * and an `on_failure` that is not a skip directive all resolve to null rather than throw.
+ * These are author-supplied definition JSONB, so totality is a property of the function
+ * and not of its current callers.
+ */
+export function branchConditionOf(
+  phase: PhaseSpecJSON,
+  resolveName: (slug: string) => string | null,
+): string | null {
+  for (const validator of phase.validators ?? []) {
+    const target = parseSkipTarget(validator?.on_failure)
+    if (target === null) continue
+    const name = resolveName(target)
+    if (name === null || name.length === 0) return null
+    return `${BRANCH_CONDITION_LEAD} ${BRANCH_CONDITION_ARROW} ${name}`
+  }
+  return null
+}
+
 // ── The node face vocabulary ────────────────────────────────────────────────────
 
 /**
