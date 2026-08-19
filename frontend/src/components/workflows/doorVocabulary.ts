@@ -339,3 +339,26 @@ export const SWITCH_CTA = "Build it myself ›"
 
 /** `soul.label` — the uppercase label above the `describe-soul-preview` aside. */
 export const SOUL_LABEL = "What this will do"
+
+// ── The refused CTA (sketch 200 · `doors.html`) ───────────────────────────────────────
+
+/**
+ * `cta.refused` — what the draft button SAYS while it is refusing, sketch 200's finding for
+ * this surface and the THIRD post-contract id (after `DESCRIBE_ATTACH_PROMPT` and
+ * `DESCRIBE_REFUSAL`). Same seam, same reason: sketch 200 is its acceptance bar and
+ * `doors-copy.generated.md` has no row for it and never will.
+ *
+ * ⚠ IT ADDS NO RULE AND CHANGES NO ENABLEMENT, exactly as `DESCRIBE_REFUSAL` does not. It is
+ * `refusingDescribe` read back a second time, on the control rather than beside the box —
+ * the sheet draws the disabled button CARRYING ITS REASON instead of being a greyed-out
+ * mystery, which is the same finding `DESCRIBE_REFUSAL` answers for the field.
+ *
+ * ⚠ IT IS NOT A SECOND SPELLING OF `DESCRIBE_CTA`. The two never render together: the button
+ * shows this string while refusing and `DESCRIBE_CTA` otherwise, so a reader sees exactly one
+ * of them. `DESCRIBE_CTA` remains the label for every non-refusing state, including the one
+ * where the template read is still in flight (that state has its own line on the attach row
+ * and is NOT this one — a second home for one fact is what the module exists to prevent).
+ *
+ * No severity word and no mechanism: it names the shortfall in the author's own terms.
+ */
+export const DESCRIBE_CTA_REFUSED = "Too thin to draft"
