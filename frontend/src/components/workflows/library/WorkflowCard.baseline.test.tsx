@@ -199,11 +199,19 @@ function renderCard(row: LibraryRow, over: Partial<WorkflowCardProps> = {}) {
   return screen.getByTestId(ROOT_TESTID[row.provenance])
 }
 
-/** The identity line's parts in DOM order, separators dropped (the `WorkflowCard.test.tsx:190` idiom). */
+/**
+ * The identity line's parts in DOM order, separators dropped (the `WorkflowCard.test.tsx:190`
+ * idiom).
+ *
+ * ⚠ THE SEPARATOR READ `·` UNTIL THE 200-PORT AND IS NOW `•`, the glyph sketch 200 draws on
+ * this line. A helper left on the old glyph does not fail loudly — it stops FILTERING, and
+ * every separator silently becomes a "part", which is why this one-character constant is
+ * called out rather than quietly swapped. See the same note in the sibling suite.
+ */
 const identityParts = (card: HTMLElement): string[] =>
   Array.from(within(card).getByTestId("row-identity").children)
     .map((child) => child.textContent ?? "")
-    .filter((text) => text !== "·")
+    .filter((text) => text !== "•")
 
 /**
  * D-01 line 2, as its own scope.
@@ -285,13 +293,37 @@ describe("BASELINE — the resting PUBLISHED card", () => {
     const identity = identityFor(PUBLISHED)
     // The WHOLE line, in order: the card paints exactly what the resolver said and invents
     // nothing. Asserting the array rather than a substring is what pins the ORDER too.
+    //
+    // ⚠ RE-BASELINED FOR `BUG-260819-01`, AND THIS CASE IS THE ONE THAT CAUGHT THE BUG.
+    // It read `...identity.segs` — the resolver's segments, spread WHOLE — and on this
+    // fixture that array is exactly `["Ready to run"]` (asserted three cases up, read out of
+    // this suite's own failing diff when it was written). The card ALSO renders the state
+    // unconditionally on line 2. So the pin was faithfully recording a card that said
+    // `Ready to run` twice, about forty pixels apart, on every name-colliding row — which is
+    // what the operator saw live as `… Shared starter | SHARED • Shared starter • …`.
+    //
+    // ⚠ THIS IS NOT A LOOSENING, AND THE `.filter` IS DELIBERATELY *NOT* A COPY OF THE CARD'S
+    // OWN EXPRESSION. It is a re-statement of the RULE — *the identity line does not repeat
+    // what line 2 already said* — driven from the resolver's real output and the real state
+    // word, so a card that dropped the WRONG segment, dropped ALL of them, or stopped
+    // dropping any still reds here. Every other part of the assertion is untouched: the
+    // order, the own pill at index 0, the AUTH-03 mark at index 1, the counter and the
+    // recency are all pinned exactly as hard as they were.
+    //
+    // ⚠ AND THE STATE IS STILL ASSERTED PRESENT ON THE CARD — one screen down, `atom 10`
+    // asserts `STATE_RUNNABLE` inside `answer(card)`. So this edit moves the word's HOME to
+    // exactly one place; it does not stop checking that the card says it.
     expect(identityParts(card)).toEqual([
       OWN_YOURS,
       CARD_TEMPLATE_MARK,
-      ...identity.segs,
+      ...identity.segs.filter((seg) => seg !== STATE_RUNNABLE),
       oneOfLabel(3),
       CHANGED_PREFIX + "5 days ago",
     ])
+    // NON-VACUITY — the filter above really removed something on this fixture, so the case
+    // cannot pass by filtering nothing out of a line that never carried the duplicate.
+    expect(identity.segs).toContain(STATE_RUNNABLE)
+    expect(identityParts(card)).not.toContain(STATE_RUNNABLE)
     expect(identity.own).toBe(OWN_YOURS)
   })
 
@@ -368,7 +400,9 @@ describe("BASELINE — the resting PUBLISHED card", () => {
 
   it("atom 17 · the one primary verb", () => {
     const card = renderCard(PUBLISHED)
-    expect(within(card).getByTestId("published-run")).toHaveTextContent("▶ Run")
+    // 200-PORT: the glyph left the label string and is now an aria-hidden icon node (Play /
+    // ExternalLink, the sheet own play_arrow / open_in_new). The word is the whole text.
+    expect(within(card).getByTestId("published-run")).toHaveTextContent("Run")
     expect(within(card).queryByTestId("draft-open")).toBeNull()
   })
 })
@@ -392,7 +426,9 @@ describe("BASELINE — the resting DRAFT card", () => {
 
   it("leads with Open, reaches NO Run affordance, and spends no consequence sentence", () => {
     const card = renderCard(DRAFT)
-    expect(within(card).getByTestId("draft-open")).toHaveTextContent("✎ Open")
+    // 200-PORT: the glyph left the label string and is now an aria-hidden icon node (Play /
+    // ExternalLink, the sheet own play_arrow / open_in_new). The word is the whole text.
+    expect(within(card).getByTestId("draft-open")).toHaveTextContent("Open")
     expect(within(card).queryByTestId("published-run")).toBeNull()
     expect(within(card).queryByTestId("fork-consequence")).toBeNull()
   })
@@ -427,7 +463,9 @@ describe("BASELINE — the resting STARTER card", () => {
 
   it("is runnable: it leads with Run, and its consequence sentence lives in the menu", async () => {
     const card = renderCard(STARTER)
-    expect(within(card).getByTestId("published-run")).toHaveTextContent("▶ Run")
+    // 200-PORT: the glyph left the label string and is now an aria-hidden icon node (Play /
+    // ExternalLink, the sheet own play_arrow / open_in_new). The word is the whole text.
+    expect(within(card).getByTestId("published-run")).toHaveTextContent("Run")
     expect(within(card).queryByTestId("fork-consequence")).toBeNull()
     await openOverflow(card)
     expect(screen.getByTestId("fork-consequence")).toHaveTextContent(FORK_CONSEQUENCE)
@@ -460,7 +498,9 @@ describe("BASELINE — a row whose name is the empty string (WR-01)", () => {
     expect(within(card).getByText("v1")).toBeInTheDocument()
     expect(identityParts(card)[0]).toBe(OWN_YOURS)
     expect(within(answer(card)).getByText(STATE_RUNNABLE)).toBeInTheDocument()
-    expect(within(card).getByTestId("published-run")).toHaveTextContent("▶ Run")
+    // 200-PORT: the glyph left the label string and is now an aria-hidden icon node (Play /
+    // ExternalLink, the sheet own play_arrow / open_in_new). The word is the whole text.
+    expect(within(card).getByTestId("published-run")).toHaveTextContent("Run")
     // ⚠ WAS `getByTestId("soul-purpose")`. A nameless row is now carried by line 2 alone —
     // which is precisely why line 2 has to be TOTAL over the arms (D-08).
     expect(within(card).getByTestId("row-answer")).toHaveTextContent(RUN_UNKNOWN)

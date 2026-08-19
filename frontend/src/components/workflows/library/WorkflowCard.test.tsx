@@ -212,8 +212,18 @@ const identityOf = (over: Partial<RowIdentity> = {}): RowIdentity => ({
   ...over,
 })
 
-/** The separator glyph, spelled ONCE so the helper below and the cases cannot disagree. */
-const IDENTITY_SEPARATOR = "·"
+/**
+ * The separator glyph, spelled ONCE so the helper below and the cases cannot disagree.
+ *
+ * ⚠ RE-BASELINED BY THE 200-PORT, AND IT IS A GLYPH SWAP RATHER THAN A LOOSENING. It read `·`
+ * (U+00B7 MIDDLE DOT); the card now spends `•` (U+2022 BULLET), which is what sketch 200 draws
+ * on this line — at 11px under the meta line's new letter-spacing a middle dot all but vanishes
+ * between two uppercase runs. Nothing this helper GUARANTEES has changed: it still strips
+ * exactly the separators and nothing else, so "never a dangling separator when a part is
+ * absent" is asserted with the same strength it always was. The one-line diff here is the whole
+ * cost of the swap, which is the property of spelling it once.
+ */
+const IDENTITY_SEPARATOR = "•"
 
 /**
  * The identity line's parts, IN DOM ORDER, with the separators removed.
@@ -291,7 +301,14 @@ describe("D-09 — exactly one primary verb per row state", () => {
     const verbs = primaryVerbs(card)
     expect(verbs).toHaveLength(1)
     expect(verbs[0]).toHaveAttribute("data-testid", "published-run")
-    expect(verbs[0].textContent).toBe("▶ Run")
+    // ⚠ RE-BASELINED BY THE 200-PORT: it read `"▶ Run"`. The glyph left the LABEL STRING and
+    // became an `aria-hidden` `Play` node beside it, which is what sketch 200 draws — so the
+    // control's TEXT is now the bare word while the control itself is unchanged in every other
+    // respect. `textContent` is still asserted EXACTLY (never `toContain`), so a second word,
+    // a re-introduced glyph character or a stray node still reds here. And the assertion is
+    // strictly STRONGER than it was: it now pins that the icon contributes no text at all,
+    // which is the D-06 property this card holds for every other mark on it.
+    expect(verbs[0].textContent).toBe("Run")
   })
 
   it("a starter row leads with the SAME verb — one vocabulary for one list", () => {
@@ -306,7 +323,10 @@ describe("D-09 — exactly one primary verb per row state", () => {
     const verbs = primaryVerbs(card)
     expect(verbs).toHaveLength(1)
     expect(verbs[0]).toHaveAttribute("data-testid", "draft-open")
-    expect(verbs[0].textContent).toBe("✎ Open")
+    // ⚠ RE-BASELINED BY THE 200-PORT: it read `"✎ Open"`. Same argument as the Run case above
+    // — the glyph is now an `aria-hidden` `ExternalLink` node (the sheet's `open_in_new`), not
+    // a character inside the label.
+    expect(verbs[0].textContent).toBe("Open")
   })
 
   it("the primary verb calls the handler for its row state", async () => {
@@ -998,7 +1018,12 @@ describe("AUTH-03 — the template mark, and the silence on either side of it", 
     const planted = document.createElement("div")
     planted.innerHTML =
       `<span>${OWN_YOURS}</span>` +
-      `<span aria-hidden="true">·</span><span>${CARD_TEMPLATE_MARK}</span>` +
+      // ⚠ THE GLYPH MOVES WITH THE CARD'S (200-PORT, `·` → `•`). It is spelled literally here
+      // rather than read from `IDENTITY_SEPARATOR` ON PURPOSE — this is the control that proves
+      // the helper strips separators at all, and a control built from the same constant as the
+      // thing it controls proves nothing. It must therefore be kept in step BY HAND, and a
+      // stale glyph here shows up as this case's own red rather than as a silent pass.
+      `<span aria-hidden="true">•</span><span>${CARD_TEMPLATE_MARK}</span>` +
       `<span class="chip">extra</span>`
     const parts = identityParts(planted).filter((text) => text !== "extra")
     // Legal shape without the plant: 1 pill + 1 separator + 1 text = 3. With it: 4.
@@ -1080,17 +1105,81 @@ describe("D-10 — a DRAFT gains lineage for the first time, and gains no senten
       identity: identityOf({ segs: ["v2 of v1", STATE_DRAFT], ofN: oneOfLabel(43) }),
     })
     expect(within(card).queryAllByTestId("row-identity")).toHaveLength(1)
+    // ⚠ RE-BASELINED FOR `BUG-260819-01` — `STATE_DRAFT` USED TO SIT BETWEEN `"v2 of v1"` AND
+    // THE COUNTER, AND ITS REMOVAL FROM THIS ARRAY IS THE FIX, NOT A CONCESSION TO IT.
+    //
+    // This case feeds a DRAFT row a `segs` array containing `STATE_DRAFT` — which is exactly
+    // what `resolveIdentity` really returns for a draft whose name collides, since `state` is
+    // one of its four discriminating axes. The card renders the same word UNCONDITIONALLY on
+    // line 2 (`face.state`, D-01's answer slot), so the shipped card printed *Still building*
+    // twice on this row: once as the answer and once as a discriminator. The card now drops a
+    // segment that line 2 has already said.
+    //
+    // ⚠ NOTHING IS LOST AND THE CASE PROVES IT RATHER THAN CLAIMING IT: the two assertions
+    // below check that the word is GONE from the identity line and PRESENT on line 2, so a
+    // regression in either direction — the duplicate returning, or the state disappearing
+    // from the card altogether — reds here. The `"v2 of v1"` lineage segment, the counter and
+    // the recency are untouched, which is what pins that only the DUPLICATE was removed.
     expect(identityParts(within(card).getByTestId("row-identity"))).toEqual([
       OWN_YOURS,
       // A DRAFT is marked on exactly the same rule as a published row — the predicate reads the
       // definition, never the provenance (D-15 has no per-provenance arm).
       CARD_TEMPLATE_MARK,
       "v2 of v1",
-      STATE_DRAFT,
       "43 share this name",
       "changed 2 months ago",
     ])
+    expect(within(card).getByTestId("row-answer")).toHaveTextContent(STATE_DRAFT)
     expect(screen.queryByTestId("fork-consequence")).toBeNull()
+  })
+
+  it("BUG-260819-01 — the state word is said ONCE per card, on every provenance", () => {
+    // The bug, stated as the property it violated: a library row's state has EXACTLY ONE home
+    // on the card. It was reported live as a card reading (as flowing text)
+    // `… Shared starter | SHARED • Shared starter • …`, and it reproduced on any row where the
+    // resolver's discrimination ranker had spent its `state` axis — i.e. on precisely the
+    // name-colliding rows the identity line exists to serve.
+    //
+    // ⚠ EACH ROW IS DRIVEN WITH ITS **OWN** STATE WORD IN `segs`, never a shared one. A single
+    // fixture would prove the card drops one particular string; three prove it drops whatever
+    // word its OWN face resolved to, which is the actual rule. `STATE_RUNNABLE` handed to a
+    // draft, say, must NOT be dropped — that is a genuine discriminator about some other row's
+    // state and the case two below pins it.
+    const cases: readonly [string, LibraryRow, string][] = [
+      ["published", PUBLISHED, STATE_RUNNABLE],
+      ["starter", STARTER, STATE_STARTER],
+      ["draft", DRAFT, STATE_DRAFT],
+    ]
+    for (const [, row, ownState] of cases) {
+      const { card, unmount } = renderCard(row, {
+        identity: identityOf({ segs: [LINEAGE_ORIGINAL, ownState], ofN: oneOfLabel(9) }),
+      })
+      const parts = identityParts(within(card).getByTestId("row-identity"))
+      // Said once — and the ONE place it is said is D-01's answer slot, never the meta line.
+      expect(parts).not.toContain(ownState)
+      expect(within(card).getByTestId("row-answer")).toHaveTextContent(ownState)
+      // …and the whole card contains it exactly once, counted over the rendered text rather
+      // than over a node query, because the defect was VISIBLE DUPLICATION and a node query
+      // would miss a second copy rendered by a different element.
+      const text = card.textContent ?? ""
+      expect(text.split(ownState).length - 1).toBe(1)
+      // The OTHER discriminator is untouched, so this is a de-duplication and not a purge.
+      expect(parts).toContain(LINEAGE_ORIGINAL)
+      unmount()
+    }
+  })
+
+  it("POSITIVE CONTROL — a state word that is NOT this row's own is still spent", () => {
+    // Without this, the case above passes on a card that dropped every state-shaped segment,
+    // or on one that dropped its whole `segs` array. A DRAFT handed `STATE_RUNNABLE` is a real
+    // shape: the ranker spends whatever narrows, and a namesake's state can be the segment
+    // that tells two rows apart. That word is NOT what line 2 says here, so it must survive.
+    const { card } = renderCard(DRAFT, {
+      identity: identityOf({ segs: [STATE_RUNNABLE], ofN: oneOfLabel(9) }),
+    })
+    const parts = identityParts(within(card).getByTestId("row-identity"))
+    expect(parts).toContain(STATE_RUNNABLE)
+    expect(within(card).getByTestId("row-answer")).toHaveTextContent(STATE_DRAFT)
   })
 
   it("POSITIVE CONTROL — both selectors resolve on a PUBLISHED row", async () => {
