@@ -54,7 +54,7 @@
  * the chip is provably the same mark as the card's own tier atom rather than a second mark
  * that agrees today.
  *
- * ── ⚠ FOUR STRINGS ARE DECLARED HERE, NOT IN `libraryVocabulary.ts`, AND IT IS A SCOPE
+ * ── ⚠ THREE STRINGS ARE DECLARED HERE, NOT IN `libraryVocabulary.ts`, AND IT IS A SCOPE
  *    BOUNDARY RATHER THAN AN OVERSIGHT ─────────────────────────────────────────────────
  * The house rule is one vocabulary home, and this plan's own verification gate is
  * `git diff --name-only` listing exactly TWO files under `library/` — the vocabulary module is
@@ -63,6 +63,12 @@
  * are not outside the honesty guarantee while they wait: `LibraryToolbar.tsx` is one of the
  * seven paths F5 sweeps BY NAME, so a word that overstated the search would red here exactly
  * as it would red in the vocabulary module.
+ *
+ * ⚠ THIS PARAGRAPH'S HEADING READ *"FOUR STRINGS"* UNTIL 199-10, AND THE CORRECTION IS
+ * RECORDED RATHER THAN OVERWRITTEN. The fourth was the create control's sub-line, which that
+ * plan removed on the adopted design language's *never name the mechanism to the user* rule.
+ * The re-home OWED to a later plan is therefore THREE strings, not four — and a count nobody
+ * re-derives is precisely how a later plan goes looking for a constant that no longer exists.
  */
 import { useId } from "react"
 
@@ -93,8 +99,26 @@ import {
  */
 const CREATE_LABEL = "Build a workflow"
 
-/** The build-card's sub-line, also verbatim (`WorkflowsPage.tsx:624`). */
-const CREATE_SUBLABEL = "Describe it in plain English → AI drafts it"
+// ── TOMBSTONE (199-10) — a removed constant's reasons, kept where it stood ───────────
+/**
+ * ⚠ 199-10 (DES-01) — THIS BLOCK DOCUMENTS A CONSTANT THAT NO LONGER EXISTS. It is NOT the
+ * docblock of the declaration below it. THE SUB-LINE IS GONE, AND ITS ABSENCE IS RECORDED HERE RATHER THAN
+ * LEFT AS A HOLE IN THE DIFF. It read *"Describe it in plain English → AI drafts it"*, and
+ * it was carried over verbatim from the dashed build-card this control replaced.
+ *
+ * It is removed on the adopted design language's own third rule — *never name the mechanism
+ * to the user* — which sketch 178's README records as one of three rules written into the
+ * design system's `designMd` rather than into a prompt. The sentence described HOW the
+ * Builder works (you type prose, a model drafts) at a moment when the only question is
+ * WHETHER to start one. The first rule applies as well: *text is noise, cut it — but the
+ * purpose must survive the cut.* The purpose is "start a new workflow", and `CREATE_LABEL`
+ * carries it alone.
+ *
+ * ⚠ THE REMOVAL IS PROVED BY INVERSION, NOT BY A DELETED TEST. `LibraryToolbar.test.tsx`
+ * pinned this sentence PRESENT in the commit before this one and now pins it ABSENT, so a
+ * later re-introduction reds rather than passes silently.
+ */
+// ── end tombstone ────────────────────────────────────────────────────────────────────
 
 /** The project select's "no narrowing" option — the shipped rail's own word (`:524`). */
 const PROJECT_ALL_LABEL = "All projects"
@@ -194,19 +218,45 @@ export function LibraryToolbar({
       {/* ── 1 · CREATE LEADS (D-02 / LIB-04 / SC#4) ──────────────────────────────────
           FIRST in DOM order, before search and before the chips. Asserted by
           `compareDocumentPosition`, never by reading this comment. */}
+      {/* ⚠ 199-10 (DES-01) — ONE LINE, ON THE TOOLBAR'S SHARED BASELINE, AND THE ONE
+          AFFIRMATIVE SKIN ON THE ROW.
+
+          Sheet c6 draws the toolbar's controls on ONE shared baseline and gives the create
+          affordance the only filled treatment on it. The shipped control was a two-line
+          DASHED box — the skin of the build-CARD it replaced, which made sense inside a grid
+          of cards and reads as an unfinished placeholder in a toolbar. It is now `h-9`, the
+          same height the search `Input` already renders at, so "one shared baseline" is a
+          property of the markup rather than of a screenshot.
+
+          ⚠ THE SHEET'S OWN PLACEMENT IS REFUSED. c6 puts create LAST on the row, behind an
+          `ml-auto`. D-02 is the structural fix for SC#4 and it says create LEADS; a visual
+          demotion that left DOM order intact would ALSO be a keyboard regression, since this
+          control is index 0 of every focusable node in the toolbar. Both orders are asserted.
+
+          ⚠ `bg-primary` / `text-primary-foreground` are VERIFIED TO RESOLVE against
+          `tailwind.config.js` and `index.css` by this file's suite, not assumed. A Tailwind
+          utility naming a key nobody declared compiles to NOTHING and renders identically to
+          a deliberately unpainted control — the `bg-warning` defect 192.2 shipped unguarded,
+          and 15 of sheet 178's own 18 colour NAMES are in exactly that state here.
+
+          ⚠ THE WORD "colour NAMES" IS DELIBERATE AND THE OBVIOUS SYNONYM IS AVOIDED, for the
+          same reason this file already declines to spell the tooltip attribute above.
+          `librarySubtree.fences.test.ts`'s F6 scoping control is a RAW `source.includes`
+          over this module, and its subject word is a substring of that synonym's plural — so
+          a comment about PAINT reds a fence about a DRAFT's opaque field. Measured, not
+          reasoned about: this paragraph's first draft failed F6 with
+          *"expected [ './LibraryToolbar.tsx', …(4) ] to deeply equal [ './WorkflowCard.tsx', …(3) ]"*.
+          The 187-24 trap, which this subtree has now recorded a fifth time. The right fix is
+          the prose, never the fence: widening F6's measured list to admit a false positive
+          would put a paint comment into a record about data handling. */}
       <button
         type="button"
         data-testid="library-create"
         onClick={onCreate}
-        className="flex flex-col items-start gap-0.5 rounded-md border border-dashed border-border px-3 py-1.5 text-left transition-colors hover:border-primary/60"
+        className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3.5 text-[13px] font-medium text-primary-foreground transition-opacity hover:opacity-90"
       >
-        <span className="flex items-center gap-1.5 text-[13px] font-medium text-foreground">
-          <span aria-hidden="true" className="text-muted-foreground">
-            ＋
-          </span>
-          {CREATE_LABEL}
-        </span>
-        <span className="text-[11px] text-muted-foreground">{CREATE_SUBLABEL}</span>
+        <span aria-hidden="true">＋</span>
+        {CREATE_LABEL}
       </button>
 
       {/* ── 2 · ALWAYS-ON SEARCH (D-06) ──────────────────────────────────────────────

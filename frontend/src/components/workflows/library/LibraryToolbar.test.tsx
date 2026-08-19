@@ -363,3 +363,230 @@ describe("LibraryToolbar — clear search & filters", () => {
     expect(onQueryChange).not.toHaveBeenCalled()
   })
 })
+
+// ── 8. 199-10 Task 1 — THE PRE-CHANGE RESTING INVENTORY (sheet `c6-library-dialogs`) ──
+
+/**
+ * Phase 199-10 Task 1 (DES-01) — WHAT THE TOOLBAR RENDERS AT REST, AS LITERALS, BEFORE
+ * ANYTHING MOVES.
+ *
+ * Phase 199 re-presents shipped surfaces in the adopted design language, and its premise is
+ * REMOVAL. A removal is only provable against a record of what was there, so this block is
+ * taken FIRST, in a commit that changes no source byte, and every literal below is READ OUT
+ * OF THIS ASSERTION'S OWN FAILING DIFF rather than predicted from the JSX.
+ *
+ * ⚠ THE REMOVALS THAT FOLLOW ARE PROVED BY INVERTING THESE ASSERTIONS FROM PRESENT TO
+ * ABSENT, NEVER BY DELETING THEM. A deleted assertion and a passing one are indistinguishable
+ * in a green run; an inverted one still fails if the atom comes back. Zero assertion
+ * deletions is the target for the whole plan.
+ *
+ * ⚠ `textContent` CONCATENATES, which is what killed a `\b` word boundary in `199-07`. These
+ * are EXACT equalities against whole strings, not substring or boundary matches, so the
+ * concatenation is the thing being pinned rather than a hazard to the matcher — and each is
+ * preceded by a non-vacuity assertion, because `toBe("")` against a surface that stopped
+ * rendering passes forever.
+ */
+describe("LibraryToolbar 199-10 — the resting inventory, pinned before the re-presentation", () => {
+  it("renders something at all (non-vacuity, before anything is asserted about its contents)", () => {
+    renderToolbar()
+    const toolbar = screen.getByTestId("library-toolbar")
+    expect(toolbar.querySelectorAll("*").length).toBeGreaterThan(15)
+    expect((toolbar.textContent ?? "").length).toBeGreaterThan(40)
+  })
+
+  /**
+   * ⚠ INVERTED BY 199-10 TASK 2, NOT DELETED. Each assertion below is the SAME assertion the
+   * previous commit made, with the removed sub-line taken out of the expected string. The
+   * pre-change value is quoted in the comment beside each one, so the delta is readable here
+   * rather than only in a diff, and a re-introduction of the sentence reds these rather than
+   * passing silently on a line somebody deleted.
+   */
+  it("the whole toolbar's resting text is EXACTLY this string", () => {
+    // WAS (199-10 Task 1, one commit earlier):
+    //   "＋Build a workflowDescribe it in plain English → AI drafts itMatches the letters…"
+    // The delta is exactly the create control's sub-line. Nothing else on the row moved.
+    renderToolbar()
+    expect(screen.getByTestId("library-toolbar").textContent).toBe(
+      "＋Build a workflowMatches the letters you type, in the name or the purpose.Ready to run7Yours3Still building2Starters4Makes a file0🔒Strict5ProjectAll projectsRiskLegalUnbound (no project)",
+    )
+  })
+
+  it("the create control's own resting text is EXACTLY this string", () => {
+    // WAS: "＋Build a workflowDescribe it in plain English → AI drafts it"
+    renderToolbar()
+    expect(screen.getByTestId("library-create").textContent).toBe("＋Build a workflow")
+  })
+
+  it("the create control renders ONE line — the sub-line is gone, not merely hidden", () => {
+    // WAS 3 spans (the wrapping line span, the glyph span, the sub-line span); now 1.
+    // The structural half of the same record: text alone cannot tell a removed node from a
+    // node rendered empty, and an empty node still costs a row of layout.
+    renderToolbar()
+    const create = screen.getByTestId("library-create")
+    expect(create.querySelectorAll("span").length).toBe(1)
+  })
+
+  it("nothing anywhere in the toolbar names the mechanism the sub-line named", () => {
+    // Scoped to the WHOLE toolbar rather than to the create control, because "removed" and
+    // "moved somewhere else on the same row" are the two outcomes this plan must tell apart.
+    const { container } = renderToolbar({
+      projectId: "f-risk",
+      query: "clause",
+      activeChips: ["strict"],
+      updating: true,
+    })
+    const text = container.textContent ?? ""
+    expect(text.length).toBeGreaterThan(40) // non-vacuity, before any absence is claimed
+    expect(text).not.toContain("plain English")
+    expect(text).not.toContain("AI drafts")
+  })
+
+  it("POSITIVE CONTROL — the same two checks DO fire on a node this test plants", () => {
+    // Without this, the absences above pass identically on a broken matcher.
+    const { container } = render(
+      <div>
+        <span>Describe it in plain English → AI drafts it</span>
+      </div>,
+    )
+    const text = container.textContent ?? ""
+    expect(text).toContain("plain English")
+    expect(text).toContain("AI drafts")
+  })
+})
+
+// ── 9. 199-10 Task 2 — CREATE LEADS VISUALLY AS WELL AS IN THE DOCUMENT ──────────────
+
+/**
+ * D-02's claim has two halves and only one of them was ever asserted.
+ *
+ * DOM order is asserted above by `compareDocumentPosition` and by the focusable-index-0 check,
+ * and that is the KEYBOARD half. The other half is that the control a person SEES first is the
+ * same one. A re-skin that reversed the row visually — `flex-row-reverse`, or an `order-*`
+ * utility on any child — would leave every DOM-order assertion above green while demoting the
+ * affordance on screen, and 199-10's own sheet (c6) draws create LAST behind an `ml-auto`,
+ * so this is a live temptation rather than a hypothetical one.
+ *
+ * ⚠ JSDOM RUNS NO LAYOUT. `getBoundingClientRect()` returns zeroes for every node here, so a
+ * geometric check would read `0 <= 0` and pass on a reversed row — the failure mode 199-07
+ * recorded on this phase. What is asserted instead is a STATED CLASS-LEVEL SURROGATE: the
+ * toolbar declares no reversing direction and no explicit ordering utility, so DOM order IS
+ * paint order by construction. That is a weaker claim than "the pixels are where we think",
+ * and the difference is OWED as a G-4 lived-experience UAT row rather than papered over.
+ */
+describe("LibraryToolbar 199-10 — create leads on screen too, not only in the document", () => {
+  it("the toolbar declares no reversing flex direction and no explicit order utility", () => {
+    const { container } = renderToolbar({ query: "clause", activeChips: ["strict"], updating: true })
+    const toolbar = screen.getByTestId("library-toolbar")
+    const classes = Array.from(container.querySelectorAll<HTMLElement>("*"))
+      .map((el) => el.getAttribute("class") ?? "")
+      .join(" ")
+    expect(classes.length).toBeGreaterThan(100) // non-vacuity: the sweep sees real classes
+    expect(toolbar.className).not.toMatch(/flex-(row|col)-reverse/)
+    expect(classes).not.toMatch(/(^|\s)order-(first|last|none|\d+)(\s|$)/)
+    expect(classes).not.toMatch(/(^|\s)-order-\d+(\s|$)/)
+  })
+
+  it("POSITIVE CONTROL — the same two matchers DO fire on planted markup", () => {
+    expect("flex flex-row-reverse gap-2").toMatch(/flex-(row|col)-reverse/)
+    expect("px-2 order-last text-sm").toMatch(/(^|\s)order-(first|last|none|\d+)(\s|$)/)
+    expect("px-2 -order-1 text-sm").toMatch(/(^|\s)-order-\d+(\s|$)/)
+    // …and they do NOT fire on the shipped strings, so the assertions above are not vacuous
+    // for want of anything resembling the forbidden shapes.
+    expect("flex flex-wrap items-start gap-x-4").not.toMatch(/flex-(row|col)-reverse/)
+    expect("flex h-9 items-center gap-1.5 rounded-md bg-primary").not.toMatch(
+      /(^|\s)order-(first|last|none|\d+)(\s|$)/,
+    )
+  })
+
+  it("the create control is still index 0 AFTER the re-skin, over the fullest toolbar", () => {
+    // The Task-1 block asserts this on the empty toolbar; this re-asserts it on the state
+    // with the most competing controls, which is the one a re-skin is likeliest to disturb.
+    renderToolbar({ query: "clause", activeChips: ["strict"], projectId: "f-risk", updating: true })
+    const focusable = Array.from(screen.getByTestId("library-toolbar").querySelectorAll(FOCUSABLE))
+    expect(focusable.length).toBeGreaterThanOrEqual(10)
+    expect(focusable[0]).toBe(screen.getByTestId("library-create"))
+  })
+})
+
+// ── 10. 199-10 Task 2 — THE CREATE CONTROL'S COLOUR TOKENS ACTUALLY RESOLVE ──────────
+
+/**
+ * ⚠ THIS FENCE EXISTS BECAUSE A TAILWIND UTILITY NAMING AN UNDECLARED KEY COMPILES TO NOTHING,
+ * SILENTLY. `bg-warning` did exactly that across four components and shipped unguarded until
+ * 192.2 measured it — `class="… bg-warning"` is a perfectly valid string to `tsc`, to eslint
+ * and to every rendering test in this repository. Sheet 178 makes the risk concrete rather than
+ * theoretical: 15 of its 18 colour tokens (`primary-container`, `tertiary`, `on-surface`, …)
+ * are declared in NEITHER `tailwind.config.js` NOR `index.css`, so a re-presentation that
+ * transcribed the sheet's palette would render an UNPAINTED control that looks, in every
+ * automated check, exactly like a deliberately quiet one.
+ *
+ * The re-skinned create control uses `bg-primary` and `text-primary-foreground`. Both links of
+ * the chain are checked: the key under `theme.extend.colors`, and its CSS variable in BOTH
+ * `:root` and `.dark`.
+ *
+ * ⚠ THE READ GOES THROUGH `vi.importActual("node:fs")`, NEVER `?raw`. Vite's `css` handling
+ * under vitest defaults `test.css` to `false`, which replaces a CSS module's contents with the
+ * EMPTY STRING and swallows the `?raw` query with it — nothing throws and nothing warns, and a
+ * fence sweeping "" passes green while defending nothing. `gutterTokens.fences.test.ts` records
+ * measuring exactly that. Non-vacuity is therefore asserted BEFORE any contents.
+ */
+const nodeFs199 = await vi.importActual<{ readFileSync(path: string, encoding: string): string }>(
+  "node:fs",
+)
+
+/** `file:///…/frontend/src/components/workflows/library/<this file>` → `…/frontend/`. */
+const FRONTEND_ROOT_199 = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/src/components/workflows/library/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error("fence cannot locate its own subtree in: " + here)
+  return here.slice(0, at) + "/"
+})()
+
+describe("LibraryToolbar 199-10 — the create control's colour tokens resolve (the whole chain)", () => {
+  const configSource = nodeFs199.readFileSync(FRONTEND_ROOT_199 + "tailwind.config.js", "utf8")
+  const cssSource199 = nodeFs199.readFileSync(FRONTEND_ROOT_199 + "src/index.css", "utf8")
+
+  it("both sources are non-empty (the `?raw`-returns-`\"\"` trap, asserted before anything else)", () => {
+    expect(configSource.length).toBeGreaterThan(500)
+    expect(cssSource199.length).toBeGreaterThan(500)
+  })
+
+  it("the control really does name the two tokens under test (non-vacuity of the fence itself)", () => {
+    renderToolbar()
+    const cls = screen.getByTestId("library-create").getAttribute("class") ?? ""
+    expect(cls).toContain("bg-primary")
+    expect(cls).toContain("text-primary-foreground")
+  })
+
+  it("L2 — `primary` is declared under theme.extend.colors, with a `foreground` member", () => {
+    expect(configSource).toMatch(/primary:\s*\{[^}]*DEFAULT:\s*"hsl\(var\(--primary\)\)"/)
+    expect(configSource).toMatch(/foreground:\s*"hsl\(var\(--primary-foreground\)\)"/)
+  })
+
+  it("L3 — both CSS variables are declared in BOTH themes, never dark-only", () => {
+    // A dark-only variable is the SECOND half of the 192.2 defect and is invisible to L2.
+    const block = (selector: string): string => {
+      const at = cssSource199.indexOf(selector)
+      expect(at, selector + " block not found").toBeGreaterThan(-1)
+      const open = cssSource199.indexOf("{", at)
+      const close = cssSource199.indexOf("}", open)
+      return cssSource199.slice(open, close)
+    }
+    for (const selector of [":root", ".dark"]) {
+      const body = block(selector)
+      expect(body.length, selector + " block is empty").toBeGreaterThan(50)
+      expect(body, selector + " is missing --primary").toContain("--primary:")
+      expect(body, selector + " is missing --primary-foreground").toContain(
+        "--primary-foreground:",
+      )
+    }
+  })
+
+  it("POSITIVE CONTROL — the L2 matcher DOES fail on a key nobody declared", () => {
+    // `primary-container` is one of sheet 178's own tokens and is absent from this config.
+    // Without this control, L2 would pass identically on a regex that matches anything.
+    expect(configSource).not.toMatch(/"?primary-container"?:/)
+    expect(cssSource199).not.toContain("--primary-container:")
+  })
+})
