@@ -79,11 +79,47 @@ import type { WorkspaceFile } from "@/types"
 import { FilePreview } from "./FilePreview"
 import { TemplateUpload } from "./TemplateUpload"
 
+/**
+ * ⚠ PHASE 199 PLAN 07 (sheet `c8-run-panel`) — THE HONESTY FIX, AND ITS THREE
+ * READINGS. Sketch 178's whole one-line finding for this sheet is:
+ *
+ *     "The run panel keeps discipline at 380px, and an unknown file time
+ *      SAYS SO instead of blanking."
+ *
+ * This function used to return `null` for an absent `expires_at`, and its comment
+ * said that arm was *"agent file → no badge (D-11)"*. **MEASURED, THAT COMMENT
+ * NAMES A CALLER THAT CANNOT REACH IT.** The caption is rendered only inside the
+ * `isTemplate` branch below, and an agent file is not a template — it renders no
+ * trailing slot at all. So the ONLY row that ever took the `null` arm was a
+ * TEMPLATE whose `expires_at` the wire did not carry, and what it rendered was an
+ * EMPTY `<span>` beside a "Template" badge: a blank where a time belongs.
+ *
+ * ⚠ THREE READINGS, NOT TWO — the same discipline the library card had to learn:
+ *     ABSENT       the wire did not say  → `expiry unknown`   (this fix)
+ *     KNOWN-PAST   it has run out        → `expired`
+ *     KNOWN-FUTURE it runs out at T      → `expires in 3h` / `expires in 30m`
+ *   plus a fourth, structural, reading OUTSIDE this function: a NON-TEMPLATE row
+ *   renders no caption at all, because there is nothing to say about it.
+ *
+ * ⚠ THE WORD IS `expiry unknown`, NEVER `no expiry`. "No expiry" is a KNOWN-NONE —
+ *   a claim that this template never expires — and it is a claim nobody made. The
+ *   sheet draws `--:--`; that is a machine token, and this row is prose already
+ *   ("expires in 3h"), so the sentence keeps the sentence's voice.
+ *
+ * ⚠ AND IT IS NOT AMBER. `isNearExpiry` stays FALSE for an absent value, so the
+ *   unknown reading paints in the calm muted token: unknown is not urgent, and
+ *   painting it amber would manufacture an alarm out of a missing field.
+ *
+ * The return type is now TOTAL (`string`, never `null`) — which is what makes the
+ * blank unrepresentable rather than merely unlikely.
+ */
+const EXPIRY_UNKNOWN = "expiry unknown"
+
 // ── Ephemeral-template expiry helpers (D-02) — compute on render from
-//    expires_at; NO per-second timer (Anti-Pattern). An agent file (no
-//    expires_at) returns null/false → byte-identical render (D-11). ──
-function expiryCaption(expiresAt?: string): string | null {
-  if (!expiresAt) return null            // agent file → no badge (D-11)
+//    expires_at; NO per-second timer (Anti-Pattern). An agent file renders no
+//    trailing slot at all, so it is byte-identical either way (D-11). ──
+function expiryCaption(expiresAt?: string): string {
+  if (!expiresAt) return EXPIRY_UNKNOWN  // the wire did not say — say THAT
   const ms = new Date(expiresAt).getTime() - Date.now()
   if (ms <= 0) return "expired"
   const h = Math.floor(ms / 3_600_000)

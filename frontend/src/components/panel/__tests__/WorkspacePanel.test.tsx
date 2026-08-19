@@ -1297,11 +1297,14 @@ describe("199-07 Task 1 — the panel's resting atoms (sheet c8 inventory)", () 
         /When the agent writes files, tracks todos, or needs your input, it'll show\s+up here\./,
       ),
     ).toBeInTheDocument()
-    // 3. ⚠ THE DECORATIVE GLYPH — PINNED **PRESENT** SO ITS REMOVAL IS PROVED BY
-    //    INVERSION. Sheet c8 draws BOTH of its empty states (files-empty and
-    //    panel-empty) with zero marks: a dashed frame and a sentence. This is the
-    //    one atom of the three that the sheet does not draw.
-    expect(container.querySelectorAll("svg.lucide-inbox")).toHaveLength(1)
+    // 3. ⚠ THE DECORATIVE GLYPH — Task 1 pinned this **PRESENT** (`toHaveLength(1)`)
+    //    and Task 2 INVERTED it. The line is edited, never deleted: `git diff
+    //    --numstat` against this plan's base still reads `+N / −0` on this file,
+    //    because the assertion Task 1 authored is the only one that moved. Sheet c8
+    //    draws BOTH of its empty states with zero marks — a dashed frame and a
+    //    sentence — and this was the one atom of the three the sheet does not draw.
+    expect(container.querySelectorAll("svg.lucide-inbox")).toHaveLength(0)
+    // …and the two atoms that survived the cut are asserted ABOVE, not implied.
   })
 
   it("EMPTY PANEL — nothing else: no section headers, no run chrome", () => {
