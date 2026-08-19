@@ -883,14 +883,28 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">
-      {/* Header */}
-      <header className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-3">
-          <h1 className="text-[20px] font-semibold text-foreground">Workflows</h1>
-          <span className="text-[13px] text-muted-foreground">
-            Repeatable, locked automations — author, publish, and Run into a thread.
-          </span>
-        </div>
+      {/* ── Header ───────────────────────────────────────────────────────────────────
+          ⚠ 200-PORT — STACKED, NOT SIDE BY SIDE, AND THE TITLE GROWS TO 24px.
+
+          It read `flex items-center gap-3` with a 20px `h1` and a 13px sentence sitting on the
+          SAME LINE, which made the page's name and its description one continuous run of text
+          that the eye parses as a single sentence. Sketch 200 draws them as `h2` (24px, 600,
+          `-0.02em`) over `body-md` (14px) — a title with a subtitle under it, the shape every
+          other page-level header in this product uses.
+
+          ⚠ THE SENTENCE IS THE SHIPPED ONE, NOT THE SHEET'S, AND THE DIFFERENCE IS DELIBERATE.
+          The sheet writes *"…author, publish, and run."*; the shipped line ends *"…and Run into
+          a thread."* That tail is a real product fact — Run opens a NEW CHAT THREAD and streams
+          there, which the Run modal also states at its own footer — and adopting the sheet's
+          wording would delete it. The sheet is the reference for STRUCTURE; it is not a licence
+          to drop a true statement it had no way of knowing. */}
+      <header className="flex flex-col gap-1 border-b border-border px-6 pb-4 pt-6">
+        <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] text-foreground">
+          Workflows
+        </h1>
+        <p className="text-[14px] leading-normal text-muted-foreground">
+          Repeatable, locked automations — author, publish, and Run into a thread.
+        </p>
       </header>
 
       {/* ── 192-10 (D-11) — THE D14 HONESTY BANNER WAS REMOVED, AND IT WAS REMOVED BECAUSE
@@ -1067,9 +1081,19 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           are still settling (the loading line above says so), "you have none" and "none
           match what you asked for" are DIFFERENT FACTS, and the second one keeps the
           toolbar's way out one click away. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+      {/* ⚠ 200-PORT — THE CANVAS GETS THE SHEET'S 24px MARGIN AND THE GRID GETS A CEILING.
+          `px-6 py-5` becomes the sheet's even `p-6`, and the grid is capped at `max-w-[1200px]
+          mx-auto` — its `max-w-[1200px] mx-auto`. Uncapped, a two-column grid on a wide monitor
+          stretches each card past 900px, at which point a 14px name and an 11px meta line are
+          separated by half a metre of empty card and the row stops reading as one object. The
+          cap is what keeps the card's internal hierarchy legible at any window width; `gap-3`
+          becomes the sheet's `gap-md` (16px) for the same reason. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {loading ? null : visibleRows.length > 0 ? (
-          <div data-testid="library-list" className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div
+            data-testid="library-list"
+            className="mx-auto grid max-w-[1200px] grid-cols-1 gap-4 md:grid-cols-2"
+          >
             {visibleRows.map((row) => (
               <WorkflowCard
                 key={row.id}
