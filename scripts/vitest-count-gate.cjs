@@ -2213,6 +2213,47 @@ const BASELINE = {
   // against REAL plants in `api.ts` first (a fourth declaration: 3 failed; one marker
   // deleted: 4 failed), each with an md5-verified restore.
   "apiRunFields.fences.test.ts": 12,
+  // ── Added in 200-05 Task 1 (DES-02 / D-06 / D-07 / D-09), in the SAME COMMIT that creates
+  //    both files, because *"an unpinned file is not a lightly-guarded one, it is an
+  //    UNGUARDED one"* (the 196-05 / 196-07 rule) and because a `BASELINE` key naming a path
+  //    that does not yet exist makes this gate ERROR (exit 2) rather than fail. ─────────────
+  //
+  // ⚠ ONE KNOB, NOT TWO, AND IT IS CHECKED RATHER THAN ASSUMED. Both files live under
+  // `src/components/workflows`, already a DIRECTORY entry in the `TARGETS` array below, so
+  // this gate EXECUTED both the moment they landed — the run that had no pin for them printed
+  // them as `— 31 new` and `— 16 new`, which is where these two numbers come from. **No
+  // `TARGETS` entry is added for either**; a second knob for a directory already covered is a
+  // duplicate, not a belt-and-braces.
+  //
+  // ⚠ BOTH FIGURES ARE READ FROM THIS SCRIPT'S OWN `actual` COLUMN — never hand-counted from
+  // `it(` literals, never quoted from a plan document. That run's verdict lines, verbatim:
+  //     phaseDuration.test.ts                         —      31     new
+  //     receiptVocabulary.test.ts                     —      16     new
+  //     total                                      4589    5047    +458
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THESE TWO PINS — the invariant each one carries:
+  //   · `phaseDuration.test.ts` (31) — D-06's NINE discriminated arms, and specifically that
+  //     `never ran (skipped)` and `time not recorded` are DIFFERENT SENTENCES. Folding an
+  //     absence together with a negative is the defect this repo has now shipped twice
+  //     (`runFacts.ts` CR-01 printed *"Never run"* about workflows that had really run;
+  //     `DecisionsList` D-20 rendered an absent readiness as a pass), and **a boolean cannot
+  //     express it** — `never ran` / `not reached` / `time not recorded` are three facts that
+  //     all have "no duration to show". It also pins IDIOM-3 (a declared `0` renders while an
+  //     ABSENT count renders nothing at all — never `0`, never a dash) with a POSITIVE CONTROL
+  //     reproducing the coalesce that destroys the distinction, and the WR-04 own-property
+  //     guard on a `constructor`-slugged phase, whose control proves the bare bracket read
+  //     really does hand back a function.
+  //   · `receiptVocabulary.test.ts` (16) — that this module IMPORTS NOTHING FROM THE LIBRARY
+  //     SUBTREE. ⚠ That is not a duplicate of the library's own 14-path fence: importing its
+  //     vocabulary from OUTSIDE the subtree would not TRIP that fence, it would BREAK its
+  //     contract (`LIBRARY_SUBTREE_PATHS` would stop describing the subtree's blast radius),
+  //     so nothing over there can catch it and only this suite can. It also pins the
+  //     zero-glyph rule, the TRUE-LEAF (zero imports) property, exact-match values for every
+  //     governed id, and the inequality against every one of `runVocabulary.ts`'s LOCKED
+  //     canvas words — asserted AFTER a non-vacuity check on that comparison set, because a
+  //     negative against an empty set passes while proving nothing.
+  "phaseDuration.test.ts": 31,
+  "receiptVocabulary.test.ts": 16,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
