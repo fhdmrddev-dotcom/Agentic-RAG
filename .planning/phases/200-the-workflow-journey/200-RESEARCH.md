@@ -1135,7 +1135,24 @@ This phase touches **the agent loop's phase executors and UI state**, so ROADMAP
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All five were resolved during planning on 2026-08-19. The original question, its recommendation
+> and the artifact that adopted it are kept together, so a later reader can see what was decided
+> **and on what evidence** rather than only the outcome.
+
+| # | Resolution | Adopted by | Evidence |
+|---|---|---|---|
+| 1 | **RESOLVED — option (b), the answer-triggered re-drive.** Not (a) pause-plus-boot-sweep, which is dishonest unless the UI says "this run resumes when the server restarts", and not (c) no-timeout, which contradicts the 1800 s hard cap and leaks a blocked coroutine per waiting run. | `200-03` Task 4 | §B8's measurement: `paused` has **zero writers**; `finish_run` clears the thread anchor; the only re-drive is `main.py:406`'s boot sweep |
+| 2 | **RESOLVED — narrow projection, no second migration.** The count rides in `workflow_phases.output` jsonb (CONTEXT's carrier); the projection selects `output`, but the **serializer extracts only `_measure.count` / `_measure.noun`** into declared `step_count` / `step_noun`, and **no wire model declares `output`** — so `response_model`'s silent-drop behaviour is what keeps `field_map`, `citations` and prompts off the wire. | `200-02` Task 4A | §B6 (`response_model` drops undeclared keys) + `harness_engine.py:142` (`_persist_output` is full-inline, CR-02) |
+| 3 | **RESOLVED — `sources` / `agents` / `fields`, recorded as AUTHORED COPY rather than a measured fact.** `200-01` records them as authored; `200-02` pins them at **one executor site each**, so a change is a one-line edit. ⚠ These are the step's own nouns, never the contract's — the sketch's `312 docs matched` / `48 fields extracted` are DOMAIN sentences and reproducing that phrasing would ship the fabricated business figure `199-05` refused. | `200-01` §0 · `200-02` Task 3 | D-07 + SEED-168 |
+| 4 | **RESOLVED — decline, as recommended.** `SEED-143`'s class fix is not taken while migration 121 is open: schema + API surface on a phase already carrying a behaviour change. Re-open trigger recorded verbatim: *"the next phase that opens a `workflow_phases` migration for another reason."* | `200-02` Task 1 | the decline is recorded with its trigger, never left silent |
+| 5 | **RESOLVED BY MEASUREMENT — local infra is UP.** Measured 2026-08-19 by the orchestrator: `127.0.0.1:54322` (Postgres), `:54321` (API) and `:6379` (Redis) **all accept a real TCP connection**, and `netsh int ipv4 show excludedportrange protocol=tcp` shows `54320 54335 *` — **the trailing `*` marks an ADMINISTERED exclusion, which is our own remedy, not the WinNAT auto-reservation fault.** The migration wave can therefore be scheduled honestly. `200-02`'s blocking checkpoint still carries the diagnosis path in case the box is rebooted before the wave runs. | `200-02` Task 2 | `Test-NetConnection` ×3 + `netsh` output, this session |
+
+---
+
+### The questions as originally written, preserved
+
 
 1. **How does a paused run resume?** — What we know: no writer, no re-drive path outside the boot sweep (§B8, measured). What's unclear: whether the operator wants (b) an answer-triggered re-drive or (c) no timeout at all. Recommendation: **take (b)** and make it an explicit SC#4 clause; it is the only option under which D-10's own sentence is true.
 2. **Does the count ride in `output` jsonb, given A7's exposure question?** — What we know: `_persist_output` is full-inline; the API does not currently select `output`. What's unclear: whether returning the whole executor dict to the browser is acceptable. Recommendation: a **narrow projection** — either two small columns (`step_count int`, `step_noun text`) or a server-side computed `{count, noun}` extracted from `output`, never the raw jsonb on the wire.

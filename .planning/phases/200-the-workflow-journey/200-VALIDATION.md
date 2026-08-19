@@ -1,9 +1,9 @@
 ---
 phase: 200
 slug: the-workflow-journey
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: approved
+nyquist_compliant: true
+wave_0_complete: false   # every item is COVERED BY A TASK; none is built yet
 created: 2026-08-19
 ---
 
@@ -67,6 +67,10 @@ Filled by the planner; one row per task. The skeleton below fixes the columns an
 
 ## Wave 0 Requirements
 
+> ⚠ **These boxes track BUILT, not PLANNED.** Every item below is covered by a real task in a
+> committed plan — none of them exists yet, which is why `wave_0_complete` stays `false`.
+> An executor ticks a box when the artifact is on disk and its command is green.
+
 - [ ] `backend/tests/test_migration_121.py` — columns exist, are nullable, and **no row was backfilled** (a negative control). Copy `test_migration_119.py`'s clean-skip shape. ⚠ **hits real Postgres `:54322` — this plan MUST be dispatched ALONE** (CLAUDE.md parallel-execution rule 4).
 - [ ] **A characterization pin on `phase_types.py`'s human-input executor, committed BEFORE the D-13 cut.** 188.1's most expensive lesson, re-proved four times: *"a baseline taken after the edit proves the edit against itself."*
 - [ ] `_FakeQuery.select` projection fix in `test_188_workflow_run_read.py` (`:121` is `def select(self, *_columns): return self` — a **no-op that discards its column list**), plus a positive control asserting an **unselected** key is ABSENT.
@@ -100,11 +104,11 @@ Filled by the planner; one row per task. The skeleton below fixes the columns an
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or a Wave 0 dependency
-- [ ] Sampling continuity: no 3 consecutive tasks without an automated verify
-- [ ] Wave 0 covers all MISSING references above
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 90 s per task
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or a Wave 0 dependency
+- [x] Sampling continuity: no 3 consecutive tasks without an automated verify
+- [x] Wave 0 covers all MISSING references above
+- [x] No watch-mode flags
+- [x] Feedback latency < 90 s per task
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-08-19 — verified against the seven committed plans; every Wave 0 item is a task (`200-02`: migration test, count table test, `_FakeQuery.select` fix · `200-03`: the characterization pin and the pause test · `200-04`…`200-07`: the four planted-violation fences, the new-leaf pins, the `PhaseSpineGraph` de-slack and the `phaseStatusMeta` pin).
