@@ -111,6 +111,27 @@ class _FakeQuery:
     Only the surface the run read chains is implemented: ``select`` / ``eq`` / ``order`` /
     ``maybe_single`` / ``execute``. ``execute`` is SYNC because ``aexec`` runs it through
     ``run_in_threadpool`` exactly as it would the real blocking client.
+
+    ⚠ **``select`` REALLY PROJECTS, as of Phase 200 — and the version it replaces is quoted
+    here because the defect it carried is the exact kind this file exists to catch.** It
+    read, verbatim:
+
+        def select(self, *_columns, **_kwargs):
+            return self
+
+    **A no-op that discarded its column list.** PostgREST does the opposite: a column absent
+    from ``.select(...)`` is absent from the row. So a test that seeded ``started_at`` read
+    it straight back **even if the handler's ``.select()`` had never been widened to ask for
+    it** — the fake answered from the store, not from the projection. The warning sign,
+    stated plainly for whoever reads this next: **a test that would still pass if you
+    deleted the handler's ``.select()`` line is not testing the projection.**
+
+    That mattered the moment the run read grew fields (Phase 200 / D-05, D-07): the route
+    declares ``response_model=WorkflowRunRead``, which DROPS UNDECLARED KEYS SILENTLY, so
+    the projection, the Pydantic model and the serializer must widen in LOCKSTEP. Two of
+    the three produce a green model and an empty field — 192.2 measured precisely that on
+    ``api/workflows.py``: a green db test beside an unchanged UI. With projection modelled
+    here, forgetting the ``.select()`` half now goes RED.
     """
 
     def __init__(self, store: "_FakeSupabase", table: str):
@@ -119,8 +140,22 @@ class _FakeQuery:
         self._filters: dict[str, str] = {}
         self._order_by: str | None = None
         self._single = False
+        self._columns: list[str] | None = None
 
-    def select(self, *_columns, **_kwargs):
+    def select(self, *columns, **_kwargs):
+        """Record the requested columns so ``execute`` can PROJECT to them.
+
+        supabase-py takes ONE comma-separated string (``"a, b, c"``); the star form is
+        accepted too so a future caller that passes several args is handled. ``"*"`` means
+        every column, which is the one case where projection is a no-op.
+        """
+        requested: list[str] = []
+        for chunk in columns:
+            requested.extend(part.strip() for part in str(chunk).split(",") if part.strip())
+        self._columns = None if "*" in requested else requested
+        # Recorded so a case can assert WHICH columns the handler asked for — the one
+        # member of the three-place lockstep that no type checker can see.
+        self._store.calls.append(("select", self._table, list(requested)))
         return self
 
     def eq(self, column, value):
@@ -144,6 +179,12 @@ class _FakeQuery:
         ]
         if self._order_by is not None:
             rows = sorted(rows, key=lambda r: r[self._order_by])
+        # ⚠ THE PROJECTION, applied the way PostgREST applies it: a column the handler did
+        # not ASK FOR is not in the row it gets back, however happily it sits in the store.
+        # Ordering/filtering above run against the FULL row (as they do server-side), so a
+        # handler may legitimately order by a column it does not select.
+        if self._columns is not None:
+            rows = [{k: v for k, v in row.items() if k in self._columns} for row in rows]
         self._store.calls.append(("execute", self._table, dict(self._filters)))
         if self._single:
             return SimpleNamespace(data=rows[0] if rows else None)
@@ -210,13 +251,36 @@ def _seed() -> _FakeSupabase:
                     "definition": _NEW_DEFINITION_JSON,
                 },
             ],
+            # Phase 200 (D-05 / D-07) — the three rows carry the THREE renders the wire
+            # must keep distinguishable, one per row, plus the secret-bearing `output`:
+            #   gather  -> ran, and DECLARED a count (llm_agent / "sources")
+            #   review  -> SKIPPED: never ran, so BOTH timestamps are NULL (D-06)
+            #   write   -> ran, but its type DECLARES NO COUNT (no `_measure` key at all)
+            # A fourth render — a real `count: 0` — is seeded by its own case below, since
+            # it needs a row whose declared count is zero rather than absent.
             "workflow_phases": [
                 {"workflow_run_id": _OWNED_RUN_ID, "slug": "write", "phase_index": 2,
-                 "status": "completed"},
+                 "status": "completed",
+                 "started_at": "2026-08-05T10:05:00+00:00",
+                 "completed_at": "2026-08-05T10:07:30+00:00",
+                 # no `_measure` key: llm_single declares nothing. The other keys are the
+                 # prompt-and-payload material that must NEVER reach the wire.
+                 "output": {"text": "the written section",
+                            "_internal_prompt": "SECRET-PROMPT-MUST-NOT-SHIP"}},
                 {"workflow_run_id": _OWNED_RUN_ID, "slug": "gather", "phase_index": 0,
-                 "status": "completed"},
+                 "status": "completed",
+                 "started_at": "2026-08-05T10:00:05+00:00",
+                 "completed_at": "2026-08-05T10:02:35+00:00",
+                 "output": {"text": "gathered",
+                            "_measure": {"count": 312, "noun": "sources"},
+                            "_internal_prompt": "SECRET-PROMPT-MUST-NOT-SHIP"}},
                 {"workflow_run_id": _OWNED_RUN_ID, "slug": "review", "phase_index": 1,
-                 "status": "skipped"},
+                 "status": "skipped",
+                 # ⚠ BOTH NULL, and that is the POINT of this row: a skipped phase never
+                 # ran (D-06 correct silence), and a historic pre-migration-121 row looks
+                 # identical. Neither may render as a zero duration.
+                 "started_at": None, "completed_at": None,
+                 "output": {}},
             ],
         }
     )
@@ -466,3 +530,168 @@ def test_flag_off_404s_for_owner_and_operator_with_the_gate_body(client, monkeyp
     assert ("/workflow-runs/{workflow_run_id}", "GET") in mounted, (
         "/workflow-runs/{workflow_run_id} is not mounted — every 404 above is vacuous"
     )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 7) Phase 200 (DES-02 / D-05 / D-07) — the measurable facts on the wire
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+def test_the_projection_is_real_an_unselected_column_is_absent(client, monkeypatch):
+    """⚠ **THE POSITIVE CONTROL FOR THE FAKE ITSELF.** Prove ``_FakeQuery`` projects.
+
+    Every assertion in this section is worthless if the fake still answers from the store
+    regardless of what the handler asked for — which is exactly what it did before Phase
+    200 (see ``_FakeQuery``'s docblock). So this case seeds a column NOBODY selects and
+    asserts it comes back ABSENT.
+
+    Falsifiable by construction: restore ``def select(self, *_columns): return self`` and
+    this case goes red immediately, and so does
+    ``test_a_forgotten_projection_is_now_detectable`` below.
+    """
+    store = _canvas_on(monkeypatch)
+    for row in store.rows["workflow_phases"]:
+        row["a_column_nobody_selects"] = "leak"
+
+    resp = client.get(f"/workflow-runs/{_OWNED_RUN_ID}")
+    assert resp.status_code == 200, resp.text
+
+    # Drive the fake directly: the handler's own projection is asserted by the next case.
+    projected = _FakeQuery(store, "workflow_phases").select(
+        "slug, phase_index, status"
+    ).eq("workflow_run_id", _OWNED_RUN_ID).execute().data
+    assert projected, "fixture guard: the filter matched no rows"
+    for row in projected:
+        assert "a_column_nobody_selects" not in row, (
+            "the fake returned a column the query never selected — it is not projecting, "
+            "so every projection assertion in this file is vacuous"
+        )
+        assert set(row) == {"slug", "phase_index", "status"}
+
+
+def test_a_forgotten_projection_is_now_detectable(client, monkeypatch):
+    """The handler really ASKS for the Phase 200 columns — not merely declares them.
+
+    The three-place lockstep (projection + model + serializer) has exactly one member that
+    no type checker and no Pydantic validation can see: the ``.select()`` string. This case
+    is the one that covers it, by reading the columns the handler actually requested off
+    the fake's own recorder.
+    """
+    store = _canvas_on(monkeypatch)
+    resp = client.get(f"/workflow-runs/{_OWNED_RUN_ID}")
+    assert resp.status_code == 200, resp.text
+
+    selected = [c for c in store.calls if c[0] == "select" and c[1] == "workflow_phases"]
+    assert selected, "the handler never called .select() on workflow_phases"
+    columns = set(selected[-1][2])
+    for required in ("slug", "phase_index", "status", "started_at", "completed_at", "output"):
+        assert required in columns, (
+            f"the workflow_phases projection does not ask for {required!r} — the model can "
+            f"declare it and the serializer can pass it through, and the field would still "
+            f"arrive empty. Requested: {sorted(columns)}"
+        )
+
+
+def test_a_phase_that_ran_carries_both_timestamps(client, monkeypatch):
+    """D-05 — a per-step duration is derivable from the wire for the first time."""
+    _canvas_on(monkeypatch)
+    body = client.get(f"/workflow-runs/{_OWNED_RUN_ID}").json()
+
+    gather = next(p for p in body["phases"] if p["slug"] == "gather")
+    assert gather["started_at"].startswith("2026-08-05T10:00:05")
+    assert gather["completed_at"].startswith("2026-08-05T10:02:35")
+
+    from datetime import datetime
+
+    span = (
+        datetime.fromisoformat(gather["completed_at"])
+        - datetime.fromisoformat(gather["started_at"])
+    )
+    assert span.total_seconds() == 150, (
+        "completed_at - started_at IS the per-step duration DES-02 exists to make "
+        "renderable; it was underivable before migration 121"
+    )
+
+
+def test_a_phase_that_never_ran_carries_neither_timestamp(client, monkeypatch):
+    """D-06 — NULL means *time not recorded*, and it must survive to the wire as null.
+
+    ⚠ The skipped row is the wire-side twin of migration 121's no-backfill control. If a
+    serializer ever coalesced these to ``0`` or to the run's own timestamps, the client
+    would render a confident duration for a step that never ran.
+    """
+    _canvas_on(monkeypatch)
+    body = client.get(f"/workflow-runs/{_OWNED_RUN_ID}").json()
+
+    review = next(p for p in body["phases"] if p["slug"] == "review")
+    assert review["status"] == "skipped"
+    assert review["started_at"] is None
+    assert review["completed_at"] is None
+
+
+def test_step_count_zero_is_distinct_from_step_count_null(client, monkeypatch):
+    """⚠ **D-07's CENTRAL DISTINCTION, on the wire: `0` is a FACT and `null` is a SILENCE.**
+
+    Three renders, asserted together in one case so the contrast cannot be split up and
+    half-forgotten:
+
+      * ``gather`` DECLARED 312 — a measured number;
+      * ``write``  declares NOTHING — ``step_count`` is ``null`` and so is ``step_noun``,
+        because its phase type does not count things. The client renders no count at all;
+      * ``count: 0`` — a step that searched and found nothing. ``step_count == 0``,
+        **not** ``None``, and the noun is still present.
+
+    A consumer that writes ``step_count ?? 0`` collapses the second into the third and
+    prints "0 sources" under a step that never claimed to measure anything. A producer
+    that suppressed falsy counts collapses the third into the second and erases an honest
+    zero. Both directions are the defect; this case pins both.
+    """
+    store = _canvas_on(monkeypatch)
+    body = client.get(f"/workflow-runs/{_OWNED_RUN_ID}").json()
+
+    gather = next(p for p in body["phases"] if p["slug"] == "gather")
+    assert gather["step_count"] == 312
+    assert gather["step_noun"] == "sources"
+
+    write = next(p for p in body["phases"] if p["slug"] == "write")
+    assert write["step_count"] is None, (
+        "a phase type that declares no count must send null - not 0. 0 would claim a "
+        "measurement of nothing, which is a different and false statement"
+    )
+    assert write["step_noun"] is None, "the noun is non-null iff the count is non-null"
+
+    # ...and the honest zero, on a row seeded for exactly this.
+    for row in store.rows["workflow_phases"]:
+        if row["slug"] == "gather":
+            row["output"] = {"_measure": {"count": 0, "noun": "sources"}}
+    zero = next(
+        p for p in client.get(f"/workflow-runs/{_OWNED_RUN_ID}").json()["phases"]
+        if p["slug"] == "gather"
+    )
+    assert zero["step_count"] == 0, "a real measurement of zero must survive to the wire"
+    assert zero["step_count"] is not None
+    assert zero["step_noun"] == "sources", "a zero count still carries its noun"
+
+
+def test_the_raw_output_jsonb_never_reaches_the_wire(client, monkeypatch):
+    """T-200-02-02 — ``output`` is SELECTED server-side but is NOT a wire field.
+
+    ``_persist_output`` stores each executor's dict FULL AND INLINE, so this jsonb carries
+    prompts, citations and field maps. The projection has to ask for it (that is where the
+    declared measure lives), and the thing that keeps it off the wire is that no response
+    model declares it: ``response_model=WorkflowRunRead`` drops undeclared keys.
+
+    The fixture plants a sentinel string in every phase's output, so this is a real search
+    of the response bytes rather than a check that one key name is absent.
+    """
+    _canvas_on(monkeypatch)
+    resp = client.get(f"/workflow-runs/{_OWNED_RUN_ID}")
+
+    assert resp.status_code == 200
+    assert "SECRET-PROMPT-MUST-NOT-SHIP" not in resp.text, (
+        "the raw output jsonb reached the client - it carries prompts and citations, and "
+        "only the two extracted scalars (step_count / step_noun) may cross"
+    )
+    for phase in resp.json()["phases"]:
+        assert "output" not in phase
+        assert "_measure" not in phase

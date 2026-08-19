@@ -503,6 +503,52 @@ def _build_phase_tool_context(phase, ctx, *, model: str | None = None) -> ToolCo
     )
 
 
+# ── 200 (DES-02 / D-07): the DECLARED per-step measure ────────────────────────
+# Key carried inside the executor's own returned dict. ``harness_engine._persist_output``
+# stores each executor dict FULL AND INLINE in ``workflow_phases.output`` (CR-02), so this
+# rides an existing jsonb column: no new column, no migration, no second write.
+MEASURE_KEY = "_measure"
+
+
+def _measure(count: int, noun: str) -> dict:
+    """Build the ``{"_measure": {"count", "noun"}}`` fragment for a DECLARING phase type.
+
+    ⚠ **A PHASE TYPE DECLARES A COUNT ONLY WHERE A COUNT IS ALREADY A FACT IN ITS OWN
+    OUTPUT.** The number is read off something the executor genuinely produced
+    (``len(source_refs)`` / ``len(sub_run_ids)`` / ``len(field_map)``) — it is never
+    authored by a model and never derived structurally by counting whichever key happens
+    to be a list. That structural derivation was OFFERED AND REJECTED (D-07): outputs
+    differ in shape per phase type and **no key marks "the thing produced"**, so a generic
+    count would silently mean something different on every type.
+
+    ⚠ **A TYPE WITH NO REAL NUMBER EMITS NO KEY AT ALL** — not ``0``, not ``null``, not a
+    dash. FOUR of the seven do exactly that (``programmatic``, ``llm_single``,
+    ``llm_human_input``, ``external_action``). The absence has to be an ABSENT KEY so the
+    client's arm can be ``hasOwnProperty``-shaped rather than ``?? 0``-shaped; a ``None``
+    with a noun beside it would render as a real measurement of zero.
+
+    ⚠ **BUT ``count: 0`` IS A REAL FACT AND IS EMITTED** (IDIOM-3 / SEED-159). A step that
+    searched and found nothing genuinely measured zero, and that is a DIFFERENT statement
+    from "this type does not count things". ``source_refs: []`` therefore yields
+    ``{"count": 0, "noun": "sources"}`` and must never be collapsed into silence — folding
+    the two together is the defect, in both directions.
+
+    ⚠ **THE NOUN IS THE STEP'S OWN, NEVER THE CONTRACT'S AND NEVER THE DOMAIN'S** (D-07 /
+    SEED-168, and it is AUTHORED COPY recorded in ``200-CHECKLIST.md`` §5.1). The three
+    words are ``sources`` / ``agents`` / ``fields`` — domain-neutral by construction. The
+    sketch's ``312 docs matched`` / ``48 fields extracted`` phrasing is a DOMAIN sentence,
+    and letting a model author that number would ship the fabricated business figure
+    ``199-05`` named "the highest-consequence lie this phase could ship". Each noun is
+    spelled at exactly ONE executor site so a later wording change is a one-line edit.
+
+    ⚠ ``programmatic`` DELIBERATELY DECLARES NOTHING even though several of its registry
+    members return lists. Its ``fn``s are pluggable and their shapes differ per ``fn``, so
+    ``len(whatever_list_is_there)`` is exactly the structural derivation D-07 rejected —
+    and a per-``fn`` declaration would be a FOURTH concern in this module, which G-5 fires on.
+    """
+    return {MEASURE_KEY: {"count": count, "noun": noun}}
+
+
 # ── executors ──────────────────────────────────────────────────────────────
 async def _exec_programmatic(phase, accumulated_outputs: dict, ctx) -> dict:
     """Run a server-controlled pure-Python fn resolved against the closed registry.
@@ -643,12 +689,20 @@ async def _exec_llm_agent(phase, accumulated_outputs: dict, ctx) -> dict:
     # it across ALL phases and attaches the accumulated set to the final answer —
     # so a Research→Summarize workflow shows the RESEARCH phase's sources on the
     # SUMMARIZE phase's prose (the final phase has none of its own).
+    agent_source_refs = result.get("source_refs") or []
     return {
         "text": result["summary"],
         "sub_run_id": str(result["sub_run_id"]),
-        "source_refs": result.get("source_refs") or [],
+        "source_refs": agent_source_refs,
         "citations": result.get("citations") or [],
         "similarity_scores": result.get("similarity_scores") or [],
+        # 200 (D-07) — DECLARED measure, site 1 of 3. The number is a fact this executor
+        # already produced: how many grounding sources the sub-agent actually gathered.
+        # ⚠ ZERO IS EMITTED, NOT SUPPRESSED: a sub-agent that searched and found nothing
+        # measured 0 sources, which is a REAL fact and is not the same statement as "this
+        # phase type does not count things" (IDIOM-3 / SEED-159). The noun is AUTHORED COPY
+        # (200-CHECKLIST.md §5.1) and this is its ONE home in the tree.
+        **_measure(len(agent_source_refs), "sources"),
     }
 
 
@@ -754,6 +808,14 @@ async def _exec_llm_batch_agents(phase, accumulated_outputs: dict, ctx) -> dict:
         "source_refs": batch_source_refs,
         "citations": batch_citations,
         "similarity_scores": batch_similarity_scores,
+        # 200 (D-07) — DECLARED measure, site 2 of 3. How many parallel sub-agents this
+        # phase actually fanned out to — one ``sub_run_id`` per branch that really ran, so
+        # the number is the executor's own fact and not a re-derivation of the config's
+        # ``max_parallel_agents`` cap (which is a LIMIT, not a count of what happened).
+        # ⚠ Counting ``sub_run_ids`` rather than ``source_refs`` on purpose: the grounding
+        # lists are UNIONED across branches here, so their length answers a different
+        # question. The noun is AUTHORED COPY (§5.1) and this is its ONE home.
+        **_measure(len(sub_run_ids), "agents"),
     }
 
 
@@ -1628,6 +1690,17 @@ async def _exec_llm_emit(phase, accumulated_outputs: dict, ctx) -> dict:
                 "placeholder_keys": placeholder_keys,
                 "source_refs": [],
                 "citations": [],
+                # 200 (D-07) — DECLARED measure, site 3 of 3, and the ONLY success return
+                # in this executor (every other exit routes through _emit_failure_output /
+                # _emit_unexpected_failure, which declare nothing — a failed emit produced
+                # no deliverable and has no honest count to report).
+                # ⚠ WHAT THIS NUMBER MEANS, PRECISELY: ``len(field_map)`` is the count of
+                # TOP-LEVEL entries in the legacy field-map — each scalar key, plus each
+                # collection as ONE entry. It is deliberately NOT a leaf-cell count: the
+                # map is the emitted deliverable's field structure, and that is the thing
+                # a person means by "how many fields did it fill". The noun is AUTHORED
+                # COPY (§5.1) and this is its ONE home.
+                **_measure(len(legacy_map), "fields"),
             }
 
         # A non-ok render: distinguish integrity failure (state d) from a render error (state c).

@@ -4180,6 +4180,40 @@ export interface WorkflowRunPhase {
   phase_index: number
   status: string
   phase_type: string | null
+  /** Phase 200 (DES-02 / D-05) — when this step flipped to active.
+   *
+   *  ⚠ `null` means **the time was not recorded**, not "zero". Either the step never ran
+   *  (a `skipped` phase is routed around, so it has no start instant at all) or it ran
+   *  before migration 121 existed. **There is NO BACKFILL** — a value derived from
+   *  `updated_at` would be right for some rows and silently wrong for others, with nothing
+   *  on the row to say which. Render nothing for `null`; never render `0s`. */
+  started_at?: string | null
+  /** Phase 200 (DES-02 / D-05) — when this step reached a terminal status.
+   *
+   *  With `started_at`, this is the first per-step duration the wire has ever carried:
+   *  `completed_at − started_at`. `null` while the step is still running, on a `skipped`
+   *  step, and on every pre-migration-121 row. ⚠ A run SPAN is
+   *  `min(started_at) → max(completed_at)` across the phases — see `WorkflowRunRead`. */
+  completed_at?: string | null
+  /** Phase 200 (DES-02 / D-07) — the count this step's phase type DECLARED, read from the
+   *  step's own output server-side.
+   *
+   *  ⚠ **`0` AND `null` ARE DIFFERENT ANSWERS AND MUST BE BRANCHED, NEVER COALESCED.**
+   *  `0` is a real measurement — the step searched and found nothing. `null` means **this
+   *  phase type declares no count at all**, and four of the seven do: `programmatic`,
+   *  `llm_single`, `llm_human_input`, `external_action`. Writing `step_count ?? 0` prints
+   *  "0 sources" under a step that never claimed to measure anything. Test for `null`
+   *  explicitly (or `typeof === "number"`) and render nothing when absent — never a `0`,
+   *  never a dash. */
+  step_count?: number | null
+  /** Phase 200 (DES-02 / D-07) — the noun for `step_count`: `sources` | `agents` |
+   *  `fields`. Non-null iff `step_count` is non-null.
+   *
+   *  ⚠ AUTHORED COPY owned by the executor that declares it, and deliberately
+   *  domain-neutral. Render the pair verbatim (`312 sources`). **Never substitute a domain
+   *  word of your own** — "312 docs matched" is a claim about the customer's domain that
+   *  nothing measured. */
+  step_noun?: string | null
 }
 
 /**
@@ -4202,10 +4236,21 @@ export interface WorkflowRunPhase {
  * executed — a spine whose steps the run never had. Carrying it inline also means a
  * terminal run renders with no stream and no second fetch.
  *
- * **`claimed_at` is the ONLY honest elapsed anchor.** `workflow_runs` has no
- * `started_at` and no `completed_at` (measured — `supabase/full-schema.sql`), so a
- * duration is `updated_at − claimed_at` and a null `claimed_at` means the run has not
- * started processing at all. See `WorkflowRunPage`'s elapsed contract (D-188-18).
+ * **`claimed_at` is the ONLY honest elapsed anchor** *(⚠ SUPERSEDED FOR A RUN SPAN —
+ * Phase 200. The original sentence is kept rather than deleted, because erasing a
+ * superseded invariant hides that a promise changed.)*
+ *
+ * It stays TRUE OF THIS TABLE: `workflow_runs` still has no `started_at` and no
+ * `completed_at`, so a run-row duration is `updated_at − claimed_at` and a null
+ * `claimed_at` means the run has not started processing at all (D-188-18).
+ *
+ * ⚠ **But it is no longer the best anchor for a run SPAN, and the reason is measured
+ * rather than stylistic: `claimed_at` is null on 100% of completed runs** — 149 rows, 0
+ * with `claimed_at` (`WorkflowRunPage.tsx:849-851`). So the anchor this sentence
+ * recommends is, in practice, absent exactly when a span is wanted. Since Phase 200 the
+ * PHASE rows carry their own timestamps, so the honest span is
+ * `min(phases.started_at) → max(phases.completed_at)` — derived from steps that really
+ * ran, and null-safe because a phase that never ran contributes neither end.
  *
  * The degrade path Plan 03 recorded: if the definition row cannot be read, the server
  * returns `workflow_name: ""` / `workflow_slug: ""` / `workflow_version: 0` /

@@ -426,6 +426,48 @@ inherits `42 / 13 / 2398`.**
 
 ---
 
+## `backend/app/api/workflow_runs.py`
+
+**⚠ ADDED 2026-08-19 by Phase 200 plan `200-02` (D-16) — BECAUSE IT WAS ABSENT, NOT BECAUSE IT WAS NEW.** Before this commit the file had **no row in `CLAUDE.md`'s scan list and no section here**, so **G-5 could never have fired on it at any count**. Wave 1 (`200-01`) found it at `3 commits / 3 phases / 260 L` — **EXACTLY AT THE G-5 THRESHOLD**, which is the `libraryRow.ts` / `doorVocabulary.ts` state where a missing row costs most: the guardrail is due to fire on the very next phase and there is nothing for it to fire on. Wave 1 identified **four** files owing rows; this plan owns **one** of them and deliberately did not absorb the other three (`FlowEdge.tsx` → `200-06`, `PhaseTimeline.tsx` and `phaseStatusMeta.ts` → `200-07`).
+
+**Re-derived at this commit: `4 commits / 4 phases / 330 L`** · buckets: `188`, `189`, `194.1`, `200` · no quick-task buckets to exclude · **G-5 FIRES** (4 phases vs threshold 3). ⚠ **The figure is published as it stands AFTER this commit, not before it.** Wave 1's `3 / 3 / 260` was correct when measured and was stale the moment this plan touched the file — which is this ledger's own most-repeated finding, so the row is written forward rather than being born stale. Re-derive with `git log --oneline -- backend/app/api/workflow_runs.py | wc -l` and `wc -l <file>`.
+
+**G-5 was honoured BY CONSTRUCTION and no override was requested.** The named test — *does this add a genuinely SECOND concern?* — is answered by the measured shape: **four optional fields on the one existing phase model, three columns on the one existing projection, and one loop in the one existing serializer.** The module still does exactly what its docblock says it does: ONE ownership-gated read of a run, its definition and its phase spine. Facts *about* a phase row this module already serializes are a call-out, not a concern.
+
+### THE BINDING INVARIANT: the three-place lockstep
+
+**The projection, the Pydantic model and the serializer widen TOGETHER, or the field ships empty.** This route declares `response_model=WorkflowRunRead`, and FastAPI **drops undeclared keys SILENTLY** — the identical hazard `api/workflows.py`'s section records for the three library feeds, where 192.2 measured *"a green db test beside an unchanged UI"*. The three places are:
+
+1. the `.select(...)` string on the `workflow_phases` query,
+2. `WorkflowRunPhaseRead`'s field declarations,
+3. the serializer loop that constructs it.
+
+⚠ **Only place 1 is invisible to every type checker and to Pydantic**, because it is a string. That is why `test_188_workflow_run_read.py` now reads the requested columns off the fake's own recorder (`test_a_forgotten_projection_is_now_detectable`).
+
+### ⚠ THE TEST FAKE WAS BLIND FOR TWO PHASES, AND THE BLINDNESS WAS MEASURED, NOT INFERRED
+
+`_FakeQuery.select` in `test_188_workflow_run_read.py` read, verbatim, `def select(self, *_columns, **_kwargs): return self` — **a no-op that discarded its column list**, the exact opposite of PostgREST. `200-02` replaced it with a real projection and then **ran the counterfactual rather than asserting the improvement**: with the handler's `.select()` deliberately narrowed to drop `started_at`/`completed_at`, the data assertion `test_a_phase_that_ran_carries_both_timestamps` **PASSED GREEN under the old no-op fake** and goes **RED under the new one**. The warning sign, in one sentence: **a test that would still pass if you deleted the handler's `.select()` line is not testing the projection.**
+
+### ⚠ THE IDOR POSTURE IS THIS MODULE'S PRIMARY DELIVERABLE AND NOTHING MAY ERODE IT
+
+`id` **and** `user_id` filtered on the **SAME** select, `.maybe_single()`, **404 never 403**, `Depends(require_canvas())` standing **ALONE** (a 403 admits the route exists-but-forbidden, which is the disclosure the 404 posture closes). A foreign run id and a nonexistent one take the same single-query path to the same body. Phase 200's widening **adds no second query, adds no dependency and changes no 404 body**: the new columns join a query already scoped by `.eq("workflow_run_id", run["id"])`, where `run` came from the ownership select — **no scope widens**. Tests 1, 2 and 6 re-ran unchanged. ⚠ **A `.select("*")` would also "work" and would WEAKEN the read** by shipping whatever column the table grows next; it is rejected in a code comment at the site.
+
+### ⚠ `output` IS SELECTED BUT IS NEVER A WIRE FIELD
+
+`_persist_output` (`harness_engine.py`) stores each executor's dict **full and inline**, so `workflow_phases.output` carries prompts, citations and field maps. Phase 200 needed it server-side because the declared `_measure` rides in it — so the projection asks for it, the serializer extracts **only** `_measure.count` / `_measure.noun`, and **no response model declares `output`**. `response_model`'s drop behaviour is the enforcement, and `test_the_raw_output_jsonb_never_reaches_the_wire` plants a sentinel string in every phase's output and searches the response bytes. This resolved RESEARCH's open question A7 **without a second migration**: the carrier stays the jsonb, the exposure stays bounded, the client never sees a prompt.
+
+### ⚠ `0` AND `null` ARE DIFFERENT ANSWERS ON THIS WIRE
+
+`step_count == 0` is a **real measurement** — the step searched and found nothing. `step_count is None` means **this phase type declares no count at all**, and four of the seven never do. The extractor (`declared_phase_measure`) therefore tests `isinstance(count, int)` rather than truthiness, and excludes `bool` explicitly (it is an `int` subclass in Python, so `{"count": true}` would serialize as `1`). A consumer writing `step_count ?? 0` prints *"0 sources"* under a step that never claimed to measure anything.
+
+### ⚠ THE READ-SIDE EXTRACTOR HAS ONE HOME, AND IT IS NOT THIS FILE
+
+`declared_phase_measure` lives in **`backend/app/models/thread.py`**, beside `WorkflowPhaseState`. That looks like an odd address until the reason is stated: it has exactly **two** consumers, and they are the **two independent wire models for the same `workflow_phases` rows** — `WorkflowRunPhaseRead` here (the RUN PAGE, canvas-gated) and `WorkflowPhaseState` there (the CHAT panel, ungated). A second copy is precisely how the two surfaces come to disagree about one row. `models/thread.py` is already imported by both API layers and carries no heavy dependencies; `phase_types.py`, where the WRITE side lives, pulls the provider services in at import time and cannot be reached from the API layer.
+
+### THE NAMED NEXT SEAM
+
+**None is proposed, and that is a verdict rather than an omission.** The module is 330 lines for **one route**, and roughly two thirds of it is the docblock recording why the path is `/workflow-runs/{id}` and not `/runs/{id}` (two tables, two id spaces, a documented repair in `runs.py:714-729`) and why `require_canvas` stands alone. A file doing one thing with its reasoning written down is the right shape. **Per G-5, the next phase that adds a genuinely SECOND concern here — a write, a list feed, or a second route — owes a refactor recommendation FIRST**, and the natural seam at that point is *the read* versus *the access posture*. It inherits `4 / 4 / 330`.
+
 ## `backend/app/api/workflows.py`
 
 **Re-derived 2026-08-17 (extraction):** `35 commits / 17 phases / 1962 L` · quick-task buckets excluded: `260814` · **G-5 FIRES** (17 phases vs threshold 3) — extraction due — not taken in q5r (no 2nd concern).

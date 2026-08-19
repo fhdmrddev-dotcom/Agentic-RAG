@@ -277,13 +277,43 @@ async def test_cancel_active_phases_is_correct_for_zero_one_or_many_rows(rowcoun
 
 
 def test_neither_writer_writes_any_other_phase_status_slug():
-    """D-07 / D-13 / D-04: the SET clause writes ``cancelled`` and nothing else."""
+    """D-07 / D-13 / D-04: the SET clause writes ``cancelled`` and nothing else.
+
+    ⚠ MADE PRECISE 2026-08-19 (Phase 200 / D-05), AND THE ORIGINAL IS QUOTED HERE RATHER
+    THAN SILENTLY REPLACED, because the change narrows a fence and that must be auditable.
+    The backstop loop read, verbatim:
+
+        for forbidden in _FORBIDDEN_WRITTEN:
+            assert forbidden not in set_clause
+
+    — a BARE SUBSTRING search. Phase 200 adds a ``completed_at`` COLUMN to five of the seven
+    ``workflow_phases`` status writers (migration 121 / D-05), and ``completed_at`` contains
+    the substring ``completed``, so the loop fired on ``cancel_phase`` for writing a COLUMN
+    NAME while the SQL's only status literal was still ``'cancelled'``.
+
+    **The narrowing is to the fence's own stated subject: a status SLUG.** A slug reaches
+    this column exclusively as a QUOTED SQL LITERAL — that is what
+    ``workflow_phases_status_check`` admits and what every one of the seven writers emits —
+    so the quoted form is what "writes the forbidden slug" has always meant. A column
+    identifier is a different lexical class and was never the target.
+
+    ⚠ **NOTHING THIS FENCE DEFENDS IS GIVEN UP, and it was PLANTED rather than reasoned
+    about**: with ``status='completed'`` spliced into ``cancel_phase``'s SET clause the
+    quoted form still goes RED (measured, Phase 200 Task 3). The precise first assertion —
+    the ``status\s*=\s*'...'`` regex, which must equal exactly ``["cancelled"]`` — is
+    untouched and remains the primary control; this loop is the backstop that also catches a
+    forbidden literal parked somewhere else in the SET clause.
+    """
     for name in _TARGETS:
         set_clause = _set_clause(_one_sql(name))
         written = re.findall(r"status\s*=\s*'([a-z_]+)'", set_clause)
         assert written == ["cancelled"], f"{name} writes {written}"
         for forbidden in _FORBIDDEN_WRITTEN:
-            assert forbidden not in set_clause, f"{name} writes the forbidden slug {forbidden!r}"
+            # The QUOTED form: a status slug is always a SQL string literal. A bare
+            # substring test also matches the ``completed_at`` COLUMN (Phase 200 / D-05).
+            assert f"'{forbidden}'" not in set_clause, (
+                f"{name} writes the forbidden slug {forbidden!r}"
+            )
 
 
 def test_neither_sql_names_a_bare_run_id_column():
