@@ -575,13 +575,19 @@ describe("PhaseSpineGraph — 199-02 pre-change inventory (sheet c3 Col 1)", () 
     // component's to spend. It STAYS.
     expect(header!.textContent).toContain("👁 View only")
 
-    // Atom 2 — ⚠ THE ATOM 199-02 SUBTRACTS, pinned PRESENT here so its removal is an
-    // INVERSION rather than a deletion. It states how the component is IMPLEMENTED
-    // ("NET-NEW", "no graph lib") to the person authoring a workflow, which is the
-    // adopted mindset's third rule ("never name the mechanism to the user") failing on
-    // the widest column. It is asserted NOWHERE ELSE in `frontend/src` — measured with a
-    // repo-wide grep before this pin was written, which is why it is safe to spend.
-    expect(header!.textContent).toContain("NET-NEW · no graph lib")
+    // Atom 2 — ⚠ THE ATOM 199-02 SUBTRACTED. This assertion was committed as
+    // `.toContain(...)` against the shipped tree one commit before the span was removed,
+    // and it is INVERTED here rather than deleted — a removal proved by a live assertion
+    // is a removal that a later re-add reddens, which a deleted assertion cannot do
+    // (`192.2-05`). It stated how the component is IMPLEMENTED ("NET-NEW", "no graph
+    // lib") to the person authoring a workflow, which is the adopted mindset's third rule
+    // ("never name the mechanism to the user") failing on the widest column. Safe to
+    // spend because a repo-wide grep measured ZERO other assertions on it.
+    expect(header!.textContent).not.toContain("NET-NEW")
+    expect(header!.textContent).not.toContain("no graph lib")
+    // NON-VACUITY: the header still exists and still renders its one surviving atom, so
+    // the two refusals above are statements about a header rather than about a null.
+    expect((header!.textContent ?? "").trim()).toBe("👁 View only")
 
     // Atom 3 — the locked 019-D legend. It is machine vocabulary (`phase_index`,
     // `skip_to_phase`, `depends_on`) and the sheet's authoring column draws no legend at

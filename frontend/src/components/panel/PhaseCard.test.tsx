@@ -377,23 +377,66 @@ describe("PhaseCard — 199-02 pre-change inventory (sheet c3 Col 2)", () => {
     expect("Processing liability caps section (4/12)…").toMatch(DETERMINATE)
   })
 
-  it("pins THE BOX: today every quiet row carries a visible border and fill", () => {
-    // ⚠ THIS IS THE ATOM 199-02 SUBTRACTS, pinned PRESENT so the removal is an inversion.
+  it("THE BOX is gone from the settled rows — the 199-02 subtraction, proved by inversion", () => {
+    // ⚠ THIS ASSERTION WAS COMMITTED AS `.toBe(true)` AGAINST THE SHIPPED TREE, one commit
+    // before the arms below were changed, and it is INVERTED here rather than deleted.
     //
-    // Sheet c3's column 2 draws a BOX on exactly two rows — the active one and the one
-    // asking for a person — and lets every settled row sit on the bare spine. The shipped
-    // panel boxes ALL of them, so a six-step run renders six competing frames and the eye
-    // has nothing to land on. 127-03 already decided the direction (quiet at rest, bloom
-    // active); this is that decision carried into the frame itself.
+    // Sheet c3's column 2 draws a BOX on exactly two rows — the live one and the one asking
+    // for a person — and lets every settled row sit on the bare spine. The shipped panel
+    // boxed ALL of them, so a six-step run rendered six competing frames and the eye had
+    // nothing to land on. 127-03 already decided the direction (quiet at rest, bloom
+    // active); this carries that decision into the frame itself.
     const pending = render(<PhaseCard phase={fillPhase({ status: "pending" })} position={0} />)
-    expect(rootOf(pending.container).classList.contains("border-border/40")).toBe(true)
-    expect(rootOf(pending.container).classList.contains("bg-card/20")).toBe(true)
+    expect(rootOf(pending.container).classList.contains("border-border/40")).toBe(false)
+    expect(rootOf(pending.container).classList.contains("bg-card/20")).toBe(false)
+    // ⚠ THE BORDER BOX STAYS, TRANSPARENT. Dropping the utility instead would move every
+    // row by 2px — a geometry change wearing a tone change's clothes.
+    expect(rootOf(pending.container).classList.contains("border")).toBe(true)
+    expect(rootOf(pending.container).classList.contains("border-transparent")).toBe(true)
+    // …and `opacity-60` survives, because "not yet" is what it carries and the box was
+    // never what said it.
+    expect(rootOf(pending.container).classList.contains("opacity-60")).toBe(true)
     pending.unmount()
 
     const done = render(<PhaseCard phase={fillPhase({ status: "done" })} position={0} />)
-    expect(rootOf(done.container).classList.contains("border-border/50")).toBe(true)
-    expect(rootOf(done.container).classList.contains("bg-card/30")).toBe(true)
+    expect(rootOf(done.container).classList.contains("border-border/50")).toBe(false)
+    expect(rootOf(done.container).classList.contains("bg-card/30")).toBe(false)
+    expect(rootOf(done.container).classList.contains("border-transparent")).toBe(true)
     done.unmount()
+
+    // The other five settled terminals take the same arm — asserted rather than assumed,
+    // because a ternary chain is exactly where "and the rest" silently stops being true.
+    for (const status of ["skipped", "recorded-not-sent", "unknown", "cancelled"] as const) {
+      const r = render(<PhaseCard phase={fillPhase({ status })} position={0} />)
+      expect(
+        rootOf(r.container).classList.contains("border-transparent"),
+        `settled status ${status} kept a visible box`,
+      ).toBe(true)
+      r.unmount()
+    }
+  })
+
+  it("the SUBTRACTION changed no word and no mark — the atoms are byte-identical", () => {
+    // The claim that this is a re-PRESENTATION and not a re-wording, checked against the
+    // same nine-row table the inventory above pins. If a tone change had cost a status its
+    // word, this is where it would show.
+    const atoms = ALL_STATUSES.map((status) => {
+      const r = render(<PhaseCard phase={fillPhase({ status })} position={0} />)
+      const pair = statusAtomOf(r.container)
+      r.unmount()
+      return pair
+    })
+    expect(atoms).toStrictEqual([
+      ["○", "Locked"],
+      ["●", "Running"],
+      ["✓", "Complete"],
+      ["✕", "Failed"],
+      ["↻", "Attempt"],
+      ["⤳", "Skipped"],
+      ["↛", "Not sent"],
+      ["?", "Unknown"],
+      ["■", "Stopped"],
+    ])
   })
 
   it("pins the two rows that KEEP their box — the live one and the failed one", () => {

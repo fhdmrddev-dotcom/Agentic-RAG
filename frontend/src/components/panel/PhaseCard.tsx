@@ -357,9 +357,30 @@ export function PhaseCard({ phase, position }: PhaseCardProps) {
               ? "border-accent-violet/50 bg-accent-violet/5"
               : phase.status === "pending"
                 ? // QUIET idle — dim, still, no motion (SC#2 "quiet at rest").
-                  "border-border/40 bg-card/20 opacity-60"
-                : // done / skipped — folded calm.
-                  "border-border/50 bg-card/30",
+                  //
+                  // Phase 199-02 (DES-01, sheet `c3-phase-spine` Col 2) — THE BOX IS GONE
+                  // FROM THE SETTLED ROWS. See the note on the arm below; this arm keeps
+                  // its `opacity-60`, which is what carries "not yet".
+                  "border-transparent opacity-60"
+                : // done / skipped / stopped / not-sent / unknown — folded calm.
+                  //
+                  // Phase 199-02 (DES-01) — was `border-border/50 bg-card/30`. Sheet c3's
+                  // panel column draws a box on exactly TWO rows: the one that is live and
+                  // the one that is asking for a person. Every settled row sits on the bare
+                  // spine. The shipped panel boxed all of them, so a six-step run rendered
+                  // six competing frames and the eye had nothing to land on — which is the
+                  // same finding 127-03 already acted on when it made the active step bloom
+                  // and the idle step go quiet. This carries that decision into the FRAME
+                  // rather than only into the fill, and it is a SUBTRACTION: no atom is
+                  // added, no word changes, no status is repainted.
+                  //
+                  // ⚠ `border-transparent` RATHER THAN dropping the `border` utility. The
+                  // border box is what reserves the 1px on each edge; removing the utility
+                  // would move every row by 2px and turn a tone change into a geometry
+                  // change. The class is stock Tailwind and already ships in this tree
+                  // (`admin/ModelRegistryTab.tsx:589`), so it cannot compile to nothing —
+                  // the `bg-warning` failure mode `gutterTokens.fences.test.ts` exists for.
+                  "border-transparent",
         // The llm_batch_agents purple left-border accent (--accent-violet, Plan 01).
         // Kept for non-running states; the running BLOOM owns the left bar while live.
         phase.phaseType === "llm_batch_agents" &&

@@ -113,13 +113,27 @@ export function PhaseSpineGraph({
       aria-label="Workflow phase spine (read-only)"
       className="flex h-full min-w-0 flex-col overflow-y-auto bg-background px-4 py-4"
     >
-      {/* Header: the View-only badge — the graph offers no build affordances. */}
+      {/* Header: the View-only badge — the graph offers no build affordances.
+          `👁 View only` is the SHIPPED cross-surface read-only vocabulary
+          (`WorkflowCanvas.tsx:1000`, `WorkflowRunPage.tsx:960` render the same two
+          words), so it is not this component's to re-spell or to spend.
+
+          Phase 199-02 (DES-01, sheet `c3-phase-spine` Col 1) — THE SECOND SPAN IS GONE,
+          and the subtraction is the point. It read `NET-NEW · no graph lib`: a note about
+          how this component is IMPLEMENTED, printed to the person authoring a workflow,
+          at the top of the widest column. The adopted design language's third rule is
+          "never name the mechanism to the user", and sketch 178's own read of this sheet
+          is that the authoring column is where the "text is noise" rule drifts because it
+          is the one place there is room to be lazy. The correct response to that drift is
+          to CUT, not to add the sheet's two-line descriptions.
+
+          It was safe to spend because it was load-bearing for nothing: a repo-wide grep
+          measured ZERO assertions on it anywhere in `frontend/src` before it was removed,
+          and its removal is proved by an INVERTED assertion in
+          `PhaseSpineGraph.test.tsx`'s 199-02 inventory rather than by a deleted one. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
           👁 View only
-        </span>
-        <span className="text-[11px] text-muted-foreground">
-          NET-NEW · no graph lib
         </span>
       </div>
 
