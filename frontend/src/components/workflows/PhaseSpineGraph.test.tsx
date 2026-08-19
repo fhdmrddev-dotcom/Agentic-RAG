@@ -995,3 +995,237 @@ describe("PhaseSpineGraph — the run tense (D-09 / BS-MR-03..05 / BS-MNR-05)", 
     }
   })
 })
+
+/**
+ * ── 200-05 Task 3 (DES-02 · `200-CHECKLIST.md` §2.2) — THE `MUST NOT RENDER` FENCE ───────
+ *
+ * ⚠ A `MUST NOT RENDER` FENCE THAT CANNOT FIRE IS NOT A FENCE, and this repo has TWO
+ * independent measurements of exactly that failure. `199-03` planted a live
+ * `<a href="/publish?force=1">Proceed to publish anyway</a>` inside a shipped hard wall and
+ * watched BOTH guards pass GREEN — a `?raw` source regex could not see a control composed
+ * from a variable, and a `queryAllByRole("button")` filter could not see a LINK. Only a
+ * role-SET scan went red. Wave 3 hit the other shape: a fence was reached and still wrote
+ * nothing, because its fixture queue was empty. So this fence:
+ *
+ *   • scans the RENDERED DOM, never the source. `BS-MNR-01` says so in capitals, and the
+ *     reason is structural: `READ_ONLY_LEGEND` is still `export`ed, so a source scan would go
+ *     RED on the export while proving nothing about what a person sees — a deliberate absence
+ *     must not trip its own fence;
+ *   • reads announced text as well as visible text (`aria-label`, `title`, `alt`,
+ *     `placeholder`), because an `aria-label` carrying a schema token would have removed the
+ *     chip from sighted readers only;
+ *   • sweeps a ROLE SET (`a[href]`, `button`, `[role]`) rather than filtering buttons, which
+ *     is the one predicate 199-03 measured as able to fire;
+ *   • carries TWO PERMANENT NON-VACUITY CONTROLS — a fixture that renders all three atoms and
+ *     is asserted to be CAUGHT, and the honest shipped render asserted CLEAN. Without the
+ *     first, every negative could pass against a predicate that matches nothing.
+ *
+ * ⚠ AND IT WAS DRIVEN AGAINST THE REAL COMPONENT. A violation was planted in
+ * `PhaseSpineGraph.tsx` itself — the legend restored to the header, the raw `phase_type` chip
+ * restored to the node face, and the `phase_index N` line restored beneath it — the fence
+ * observed RED naming all three row ids, and the source then restored byte-exactly
+ * (`git diff --numstat` → empty). A fence nobody drove is a fence nobody built. The result is
+ * recorded in `200-05-SUMMARY.md`.
+ *
+ * ⚠ SITING — A DECLARED DEVIATION. The plan lists this fence under Task 3's files, whose
+ * `<files>` names `RunReceipt.test.tsx`. It lives HERE instead, in the suite of the component
+ * it actually guards, because a fence sited in an unrelated suite is one nobody re-reads when
+ * the guarded component changes — which is how the four ledger rows this phase had to ADD
+ * went missing in the first place. Recorded in the SUMMARY rather than done quietly.
+ */
+describe("PhaseSpineGraph — the §2.2 MUST NOT RENDER fence", () => {
+  /**
+   * Everything a person can READ or HEAR from this subtree: visible text, plus the announced
+   * text a screen reader receives. ⚠ It deliberately does NOT read `data-*` attributes:
+   * `data-phase-type` and `data-branch-reading` are machine hooks this plan KEEPS on purpose,
+   * and a scan that could not tell a hook from a label would forbid the wrong thing.
+   */
+  function readableText(container: HTMLElement): string {
+    const chunks: string[] = [container.textContent ?? ""]
+    for (const el of Array.from(container.querySelectorAll("*"))) {
+      for (const attr of ["aria-label", "title", "alt", "placeholder", "aria-description"]) {
+        const v = el.getAttribute(attr)
+        if (v) chunks.push(v)
+      }
+    }
+    // ⚠ THE ROLE SET, not a button filter — 199-03's measured lesson. A violation smuggled in
+    // as a link, or as any element carrying an explicit role, is invisible to a button scan.
+    for (const el of Array.from(container.querySelectorAll("a[href], button, [role]"))) {
+      chunks.push(el.textContent ?? "", el.getAttribute("aria-label") ?? "")
+    }
+    return chunks.join("   ")
+  }
+
+  /** The seven raw `phase_type` ids — `BS-MNR-02` forbids any of them as visible text. */
+  const RAW_TYPE_IDS = [
+    "programmatic",
+    "llm_single",
+    "llm_agent",
+    "llm_batch_agents",
+    "llm_human_input",
+    "llm_emit",
+    "external_action",
+  ]
+
+  /**
+   * N-5's Material Symbols ligature names. ⚠ SPLIT INTO TWO CLASSES ON PURPOSE. The
+   * snake_case ones are unambiguous and are matched anywhere in the text. The single words
+   * (`search`, `person`, `info`, `add`, `output`, `description`, `psychology`) are ordinary
+   * English — the spine's own footer legitimately contains `person gate` — so those are
+   * matched only where an element's ENTIRE trimmed text is the ligature, which is exactly how
+   * one renders (`<span class="material-symbols">search</span>`). A needle that fired on
+   * honest prose would be worse than no needle at all.
+   */
+  const LIGATURES_SNAKE = [
+    "chat_bubble", "account_tree", "check_circle", "chevron_right", "health_and_safety",
+    "add_circle", "arrow_back", "account_circle", "priority_high", "fit_screen", "save_as",
+  ]
+  const LIGATURES_WORD = [
+    "search", "person", "info", "add", "output", "description", "psychology", "bolt",
+    "folder", "lock", "shield", "close", "error", "sync", "summarize", "widgets", "remove",
+    "warning", "menu", "settings", "check", "category", "dataset", "policy",
+  ]
+
+  /** Every §2.2 row this predicate can find, by its checklist id. */
+  function spineViolations(container: HTMLElement): string[] {
+    const text = readableText(container)
+    const found: string[] = []
+    if (/READ-ONLY GRAPH|inspect, don't drag|skip_to_phase\)|depends_on/.test(text)) {
+      found.push("BS-MNR-01")
+    }
+    // ⚠ A BARE `includes`, AND THE WORD-BOUNDARY VERSION IS THE BUG. The first draft used
+    // `(^|[^\w-])<id>([^\w-]|$)` and MISSED a real planted chip, because adjacent DOM text
+    // nodes concatenate without a separator — `<span>Gather sources</span><span>llm_agent</span>`
+    // reads as `Gather sourcesllm_agent`, so the id is preceded by a word character. These are
+    // schema tokens that appear in no product sentence, so containment is both sufficient and
+    // the only form that can actually fire. Found by the positive control, which is the whole
+    // reason it is permanent.
+    if (RAW_TYPE_IDS.some((id) => text.includes(id))) found.push("BS-MNR-02")
+    if (/phase_index\s*\d+/.test(text)) found.push("BS-MNR-03")
+    if (/Confirm the QBR before rendering|Fill the QBR template/.test(text)) {
+      found.push("BS-MNR-04")
+    }
+    if (LIGATURES_SNAKE.some((l) => text.includes(l))) found.push("BS-MNR-06")
+    else {
+      const exact = Array.from(container.querySelectorAll("*")).some((el) =>
+        el.children.length === 0 && LIGATURES_WORD.includes((el.textContent ?? "").trim()),
+      )
+      if (exact) found.push("BS-MNR-06")
+    }
+    return found
+  }
+
+  /** ⚠ PERMANENT NON-VACUITY CONTROL 1 — the predicate really finds what it forbids. */
+  it("POSITIVE CONTROL — a planted violation is CAUGHT, and all three atoms are named", () => {
+    const { container } = render(
+      <section aria-label="planted">
+        <p>{READ_ONLY_LEGEND}</p>
+        <button type="button">
+          <span>Gather sources</span>
+          <span>llm_agent</span>
+        </button>
+        <span>phase_index 3</span>
+      </section>,
+    )
+    const found = spineViolations(container)
+    expect(found).toContain("BS-MNR-01")
+    expect(found).toContain("BS-MNR-02")
+    expect(found).toContain("BS-MNR-03")
+    expect(found.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("POSITIVE CONTROL — it also catches a violation smuggled into a LINK's announced text", () => {
+    // 199-03's exact failure mode: a `queryAllByRole("button")` filter cannot see a link, and
+    // a source regex cannot see a control composed from a variable. The role SET can see both.
+    const { container } = render(
+      <section aria-label="planted-2">
+        <a href="/x" aria-label="phase_index 7 — jump">
+          jump
+        </a>
+      </section>,
+    )
+    expect(spineViolations(container)).toContain("BS-MNR-03")
+  })
+
+  it("POSITIVE CONTROL — a Material Symbols ligature is caught in BOTH of its shapes", () => {
+    const snake = render(
+      <section aria-label="planted-3">
+        <span className="material-symbols">chat_bubble</span>
+      </section>,
+    )
+    expect(spineViolations(snake.container)).toContain("BS-MNR-06")
+    snake.unmount()
+    const word = render(
+      <section aria-label="planted-4">
+        <span className="material-symbols">search</span>
+      </section>,
+    )
+    expect(spineViolations(word.container)).toContain("BS-MNR-06")
+  })
+
+  it("⚠ NEGATIVE CONTROL — the honest single word `person` in prose does NOT fire", () => {
+    // The spine's own footer reads `…, one person gate`. A needle that forbade that sentence
+    // would make this fence unusable, and an unusable fence gets loosened rather than obeyed.
+    const { container } = render(
+      <section aria-label="honest">
+        <p>3 steps, runs top to bottom, one person gate</p>
+      </section>,
+    )
+    expect(spineViolations(container)).toEqual([])
+  })
+
+  /** ⚠ PERMANENT NON-VACUITY CONTROL 2 — the honest shipped copy is CLEAN. */
+  it("the SHIPPED authoring render trips NOTHING in §2.2", () => {
+    const { container } = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug="gather" onSelectNode={vi.fn()} />,
+    )
+    expect(spineViolations(container)).toEqual([])
+    // NON-VACUITY: a real spine with three nodes and an on-fail edge, not an empty container.
+    expect(screen.getAllByTestId(/^spine-node-/)).toHaveLength(3)
+    expect(screen.getAllByTestId("skip-edge")).toHaveLength(1)
+  })
+
+  it("the shipped RUN-TENSE render trips nothing either — a second tense is a second surface", () => {
+    const NOW = Date.parse("2026-08-19T14:22:00.000Z")
+    const facts = phaseRunFacts(
+      {
+        slug: "gather",
+        status: "completed",
+        started_at: "2026-08-19T14:00:00.000Z",
+        completed_at: "2026-08-19T14:00:12.000Z",
+        step_count: 312,
+        step_noun: "sources",
+      },
+      "completed",
+      NOW,
+    )
+    const { container } = render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={{
+          factsOf: (slug: string) => (slug === "gather" ? { ...facts, branchTaken: true } : undefined),
+          total: "Ran 4m 12s",
+        }}
+      />,
+    )
+    expect(spineViolations(container)).toEqual([])
+    // NON-VACUITY: the run tense really did render, so this is a clean READING and not a
+    // clean absence — the wave-3 failure shape (a fence reached with an empty queue).
+    expect(screen.getByTestId("spine-total-runtime").textContent).toBe("Ran 4m 12s")
+    expect(screen.getByTestId("skip-edge-reading")).toBeInTheDocument()
+  })
+
+  it("the `data-*` machine hooks are DELIBERATELY not swept — a hook is not a label", () => {
+    const { container } = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />,
+    )
+    // The raw id survives where a machine needs it…
+    expect(
+      screen.getByTestId("spine-node-gather").getAttribute("data-phase-type"),
+    ).toBe("llm_agent")
+    // …and the fence is still clean, because that attribute is not text anyone reads.
+    expect(spineViolations(container)).toEqual([])
+  })
+})

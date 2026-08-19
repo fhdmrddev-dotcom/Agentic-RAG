@@ -59,6 +59,18 @@
  * `decisionsVocabulary.ts` shape, which makes an ESM cycle impossible by construction.
  */
 
+// ── The landmark ────────────────────────────────────────────────────────────────────────
+
+/**
+ * `receipt.landmark` — the receipt section's accessible name.
+ *
+ * ⚠ AN `aria-label` IS A USER-VISIBLE STRING. It is the text a screen-reader user receives,
+ * so leaving it as a literal in JSX would be a second home for governed copy that simply
+ * happens not to be legible to a sighted reviewer — which is the harder kind of drift to
+ * notice, not the lesser one.
+ */
+export const RECEIPT_LANDMARK_LABEL = "Run receipt"
+
 // ── The header: total runtime · step count · finish time ────────────────────────────────
 
 /**

@@ -555,7 +555,23 @@ const BASELINE = {
   // spine; a declared `0` rendering while an ABSENT count renders no slot at all; and the
   // branch reading as a THREE-state read whose absent arm renders nothing, because
   // `branch not taken` would be a claim about a run nobody measured.
-  "PhaseSpineGraph.test.tsx": 35,
+  // ⚠ 200-05 Task 3: 35 → 42, the §2.2 `MUST NOT RENDER` fence. It is sited HERE rather than
+  // in `RunReceipt.test.tsx` (where that task's own file list put it) because a fence in an
+  // unrelated suite is one nobody re-reads when the guarded component changes — declared as a
+  // deviation in `200-05-SUMMARY.md`, not done quietly. It scans the RENDERED DOM plus the
+  // ANNOUNCED text and sweeps a ROLE SET, which is the only predicate `199-03` measured as
+  // able to fire (a `?raw` regex and a `queryAllByRole("button")` filter both passed GREEN
+  // against a live planted violation there). It carries FOUR permanent positive controls, a
+  // negative control proving the honest word `person gate` does not trip it, and TWO clean
+  // shipped renders — authoring AND run tense — each asserted non-vacuous, because wave 3's
+  // fence was reached and still wrote nothing on an empty queue. **It was driven against the
+  // real component**: the legend, the raw chip and the `phase_index` line were planted back
+  // into `PhaseSpineGraph.tsx`, the fence went RED naming `BS-MNR-01`, `BS-MNR-02` and
+  // `BS-MNR-03`, and the source was restored byte-exactly (md5 `f14a58d7…` before and after,
+  // `git diff --numstat` empty). ⚠ The plant also FALSIFIED the fence's own first draft: a
+  // word-boundary regex MISSED a real chip, because adjacent DOM text nodes concatenate with
+  // no separator (`Gather sourcesllm_agent`).
+  "PhaseSpineGraph.test.tsx": 42,
   // 189-13 (CONN-01 / UI-SPEC §5a): 14 → 17. An EXTENSION, not a lowering — the six
   // individual PHASE_GLYPHS key assertions were NOT collapsed into the new property, they
   // were kept and the seventh added beside them, because a property rewrite that shrank
@@ -2276,6 +2292,31 @@ const BASELINE = {
   //     negative against an empty set passes while proving nothing.
   "phaseDuration.test.ts": 31,
   "receiptVocabulary.test.ts": 16,
+  // ── Added in 200-05 Task 3, in the SAME COMMIT that creates the file. Same one-knob check
+  //    as the two pins above: `src/components/workflows` is already a `TARGETS` directory
+  //    entry, so the gate RAN this suite the moment it existed and printed it as `— 20 new`.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT IT:
+  //   · D-07 REACHING THE DOM. A step that declared NO count renders NO count slot at all —
+  //     never `0`, never a dash, never prose. N-8 records that the sketch's own run surface
+  //     puts the SENTENCE `Summarized meeting notes` where the COUNT `Found 12 contracts`
+  //     goes, which is exactly the fabricated-figure failure D-07 exists to prevent, and
+  //     `199-05` called that class *"the highest-consequence lie this phase could ship."* A
+  //     DECLARED `0` is the opposite case and renders, because it is a measurement.
+  //   · D-06 reaching the DOM as TWO readings: `never ran (skipped)` and `time not recorded`
+  //     asserted DIFFERENT on both the time column and the outcome column.
+  //   · that the total runtime is derived from the PHASE TIMESTAMPS — proved by rendering the
+  //     same rows at two `now`s nine million ms apart and comparing the headers, which a
+  //     `claimed_at`- or `Date.now()`-anchored figure could not survive.
+  //   · ⚠ THAT THE COMPONENT IS MOUNTED NOWHERE. An `import.meta.glob` `?raw` sweep of
+  //     `/src/**` asserts zero importers outside its own two files, with a positive control
+  //     proving the needle finds a real mount. That is what keeps `199-02`'s refusal intact
+  //     BY CONSTRUCTION — a receipt that cannot reach the builder cannot fabricate a run-tense
+  //     claim on a draft — and `200-07` is the plan that mounts it.
+  //   · that the component spells NO user-visible string: a JSX text-position literal sweep
+  //     with its own positive control, plus the `aria-label` proved to come from the
+  //     vocabulary — an `aria-label` IS user-visible text, just not to a sighted reviewer.
+  "RunReceipt.test.tsx": 20,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the
