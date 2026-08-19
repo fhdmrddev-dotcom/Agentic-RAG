@@ -372,9 +372,14 @@ function RunLink({ goldenRunId }: { goldenRunId: string | null }) {
 function HardWall({ onFix }: { onFix: () => void }) {
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3 rounded border border-border bg-card px-3 py-2 text-[12px]">
+      {/* ⚠ BUG-260815-06 §5 REACHES THIS SENTENCE TOO. `HardWall` renders on EVERY block,
+          not only the grader's, and it read *"fix the DELIVERABLE and re-publish"* — which
+          on a `structural_gate` refusal names an artefact that was never produced. It now
+          says "the cause", which is true on every arm; the headline above it is what names
+          which cause. The no-override strip below is untouched, byte for byte. */}
       <span className="text-muted-foreground">
-        The only path forward is to fix the deliverable and re-publish — each attempt is a brand-new golden run and a
-        fresh judge verdict.
+        The only path forward is to fix the cause and publish again — each attempt is a brand-new trial run and a fresh
+        independent review.
       </span>
       <span className="font-mono text-[10px] text-muted-foreground">
         no override · <s className="opacity-60">publish anyway</s>
@@ -442,7 +447,7 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
   // Derived ONCE, above the map, so the two per-node reads cannot drift apart again.
   const unknownBlock = blockedStage != null && blockedIndex === -1
   return (
-    <div data-testid="gauntlet-spine" className="flex items-start overflow-x-auto py-3">
+    <div data-testid="gauntlet-spine" className="flex items-start justify-between overflow-x-auto py-4">
       {STAGES.map((stage, i) => {
         const isBlocked = blockedIndex === i
         // Unplaceable block first, placed block second, no block last. Only in that order
@@ -473,32 +478,59 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
               : "text-muted-foreground"
         return (
           <div key={stage.label} className="flex items-start" title={stage.what}>
+            {/* ── PORTED FROM SKETCH 200 `publish.html` (2026-08-20) ────────────────────
+                The sheet draws the strip as round 32px beads on ONE hairline rule, each with
+                a small ✓ tucked at its lower-right, under an uppercase wide-tracked caption.
+                Ours drew 36px rounded-XL boxes joined by 3px pills — the same information,
+                in a heavier hand.
+
+                ⚠ THE SEGMENTED CONNECTOR IS KEPT, THOUGH THE SHEET DRAWS ONE CONTINUOUS
+                LINE. The sheet's rule is a single absolutely-positioned element because it
+                has no state to carry; ours carries the reached/not-reached fact PER SEGMENT,
+                which is the second, independent read of the block index the F7 repair exists
+                to keep honest. Collapsing nine stateful segments into one decorative rule
+                would delete a fact to match a drawing. They are drawn AS the sheet's rule —
+                one hairline — and keep their meaning.
+
+                ⚠ AND THE SHEET'S GLYPHS ARE NOT ADOPTED. It names nine Material Symbols
+                (`person`, `fact_check`, `flag`, `account_tree`, `pause`, `anchor`,
+                `emoji_events`, `format_quote`, `gavel`); this product's stage glyphs are the
+                bundled 3D fluent-emoji set fixed by `icon-convention.md` §3, and a second
+                icon family on one surface is exactly the drift that convention forbids. The
+                sheet also draws NINE stages; the server runs TEN (`Commit` is real and
+                refuses on a moved draft), and dropping it to match a drawing would hide a
+                refusal an author can actually hit. */}
             {i > 0 && (
               <div
                 data-testid="spine-conn"
-                className={`relative mt-[18px] h-[3px] w-[12px] shrink-0 rounded-full sm:w-[16px] ${connReached ? "bg-success/50" : "bg-border"}`}
+                className={`relative mt-[16px] h-px w-[12px] shrink-0 sm:w-[16px] ${connReached ? "bg-success/60" : "bg-border"}`}
               >
                 {/* The energy comet flows along the connector INTO the running golden-run node. */}
                 {running && i === RUNNING_STAGE_INDEX && <span className="gauntlet-comet" aria-hidden />}
               </div>
             )}
-            <div data-testid="spine-stage" className="flex w-[48px] shrink-0 flex-col items-center gap-1">
+            <div data-testid="spine-stage" className="flex w-[48px] shrink-0 flex-col items-center gap-2">
               <div
-                className={`relative grid h-9 w-9 place-items-center rounded-xl border-2 ${nodeTone} ${
+                data-testid="spine-node"
+                className={`relative grid h-8 w-8 place-items-center rounded-full border-2 ${nodeTone} ${
                   isRunning ? "gauntlet-node-run" : ""
                 }`}
               >
-                <Icon className="h-4 w-4" aria-hidden />
+                <Icon className="h-3.5 w-3.5" aria-hidden />
                 {isPassed && (
                   <span
-                    className="absolute -right-1.5 -top-1.5 grid h-3.5 w-3.5 place-items-center rounded-full bg-success text-[8px] font-bold leading-none text-white"
+                    className="absolute -bottom-1 -right-1 grid h-3.5 w-3.5 place-items-center rounded-full bg-success text-[8px] font-bold leading-none text-white"
                     aria-hidden
                   >
                     ✓
                   </span>
                 )}
               </div>
-              <div className={`text-center font-mono text-[9px] leading-tight ${labelTone}`}>{stage.label}</div>
+              <div
+                className={`text-center font-mono text-[9px] uppercase leading-tight tracking-wider ${labelTone}`}
+              >
+                {stage.label}
+              </div>
             </div>
           </div>
         )
@@ -581,6 +613,7 @@ function GauntletContent({
   goldenInputRef,
   blocked,
   blockedReason,
+  onCancel,
 }: {
   definitionId: string
   definition?: DefShape | null
@@ -593,6 +626,10 @@ function GauntletContent({
    *  inner Publish can never disagree about whether one was supplied. */
   blocked: boolean
   blockedReason?: string | null
+  /** The wrapper's `requestClose` — the SAME one the ✕ and the backdrop route through, so
+   *  the sheet's footer Cancel inherits the "never close mid-publish" guard rather than
+   *  becoming a second, unguarded exit. */
+  onCancel: () => void
 }) {
   const [goldenInput, setGoldenInput] = useState("")
   const [outcome, setOutcome] = useState<PublishOutcome | null>(null)
@@ -671,7 +708,13 @@ function GauntletContent({
           soul block — purpose · needs · glyph-dot spine · tier chip · output — ABOVE
           the resting publish form. When `definition` is absent the soul renders its
           honest draft empty-states. */}
-      <div data-testid="publish-soul" className="mb-3 rounded-lg border border-border bg-card p-4">
+      {/* ⚠ THE CARD AROUND THE SOUL IS GONE (sketch 200 `publish.html`). The sheet puts the
+          hero, the quiet line and the compact bar directly on the modal surface — a card
+          inside a card is a second frame around content that is already framed, and it cost
+          32px of the 640px body on a surface whose whole claim is "every check at a glance".
+          The `publish-soul` node itself STAYS (the resting-inventory pin reads it), and the
+          soul's own five atoms are untouched — only this wrapper's paint changed. */}
+      <div data-testid="publish-soul" className="mb-2">
         <WorkflowSoul def={definition} scale="pub" />
       </div>
 
@@ -693,25 +736,59 @@ function GauntletContent({
               block) is the part that actually carries information and is deliberately kept.
               The suite proves the subtraction by INVERTING its resting-inventory count from
               two occurrences to one, never by deleting the assertion. */}
+          {/* ── THE SHEET'S EXPLANATION SENTENCE, WORD FOR WORD (sketch 200) ────────────
+              *"Publishing runs the full check above, including a real trial run of this
+              workflow against your knowledge base and an independent review of the result.
+              It can honestly refuse."*
+
+              Three machine words leave with it — `gauntlet`, `golden run`, `judge` — and the
+              claim underneath is IDENTICAL: publishing costs a real run and a real review,
+              and it can say no. That is the purpose this paragraph has to keep, and it keeps
+              it. The mechanism's own names survive where they belong: `blocked_stage` and
+              `golden_run_id` still render verbatim inside the raw-verdict disclosure. */}
           <p className="text-[12px] leading-relaxed text-muted-foreground">
-            Publishing runs the <b>full gauntlet above</b> — including a <b>real golden run</b> of this workflow against
-            your project KB and an <b>independent judge</b> of the result. It can honestly block.
+            Publishing runs the <b>full check above</b>, including a <b>real trial run</b> of this workflow against your
+            knowledge base and an <b>independent review</b> of the result. It can honestly refuse.
           </p>
+          {/* The sheet labels the field *"A typical instruction to test with"* — a sentence,
+              not a wire key. ⚠ THE WIRE KEY IS NOT DROPPED, IT IS DEMOTED: `golden_input` is
+              the name of the field on `POST /workflows/{id}/publish` and an author reading
+              backend logs or a support thread needs to be able to connect the two, so it
+              rides along as a quiet mono token carrying the full sentence in its `title`.
+              It also keeps the field reachable by `getByLabelText(/golden_input/i)`, which
+              two suites outside this file needle. */}
           <label
             htmlFor="golden_input"
-            className="mt-4 mb-1.5 block font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
+            className="mt-4 mb-1.5 flex flex-wrap items-baseline gap-2 text-[13px] font-medium text-foreground"
           >
-            golden_input — a representative kickoff prompt
+            A typical instruction to test with
+            <span
+              data-testid="golden-input-wire-name"
+              title="Sent to the server as golden_input — the instruction the review is run against."
+              className="cursor-help font-mono text-[9px] uppercase tracking-wider text-muted-foreground"
+            >
+              golden_input
+            </span>
           </label>
           <textarea
             id="golden_input"
             ref={goldenInputRef}
             value={goldenInput}
             onChange={(e) => setGoldenInput(e.target.value)}
-            placeholder="Choose something typical, not a corner case — this is the prompt the judge grades."
+            placeholder="Choose something typical, not a corner case — this is what gets graded."
             className="min-h-[88px] w-full resize-y rounded border border-border bg-background px-3 py-2 text-[13px] leading-relaxed text-foreground focus:border-primary focus:outline-none"
           />
-          <div className="mt-3 flex items-center justify-end">
+          {/* ── THE SHEET'S FOOTER BAR ──────────────────────────────────────────────────
+              The sheet closes the dialog with a raised, full-bleed row carrying Cancel and
+              the primary, and nothing else. Ours had a bare right-aligned button floating at
+              the bottom of the form card and no Cancel at all — the only ways out were the
+              header ✕, the backdrop and Escape. `-mx-4 -mb-4` bleeds it to the card's edges
+              so it reads as a footer rather than as one more row of the form.
+
+              ⚠ CANCEL IS BLOCKED MID-PUBLISH, like every other close affordance: it routes
+              through the SAME `requestClose` the ✕ and the backdrop use, which no-ops while
+              the request is in flight. A second, unguarded exit would orphan the run. */}
+          <div className="-mx-4 -mb-4 mt-4 flex flex-wrap items-center justify-end gap-3 border-t border-border bg-muted/30 px-4 py-3">
             {/* R12, applied to the one control that did not have it: greying alone is
                 never enough. `mr-auto` puts the sentence at the row's left WITHOUT
                 changing the row's own classes, so with no reason supplied the rendered
@@ -727,12 +804,21 @@ function GauntletContent({
             )}
             <button
               type="button"
+              data-testid="publish-cancel"
+              onClick={onCancel}
+              disabled={loading}
+              className="h-9 rounded border border-border px-4 text-[13px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
               disabled={!canPublish}
               aria-describedby={blocked ? innerBlockedReasonId : undefined}
               onClick={runGauntlet}
-              className="rounded bg-primary px-4 py-1.5 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
+              className="h-9 rounded bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {loading ? "Publishing…" : "Publish ▸ run the gauntlet"}
+              {loading ? "Publishing…" : "Publish — run the checks"}
             </button>
           </div>
         </div>
@@ -800,11 +886,28 @@ function GauntletContent({
                   >
                     {wordedHeadline}
                   </div>
+                  {/* ── BUG-260815-06 §5: THREE ARMS, NOT TWO (2026-08-20) ──────────────
+                      The `else` arm read *"The gauntlet honestly blocked this publish. Fix
+                      the cause and re-publish."* — and on `structural_gate` that is
+                      misdirecting rather than merely vague. `structural_gate` covers a run
+                      that NEVER REACHED the review, so "fix the cause and re-publish" beside
+                      a headline about a deliverable sends an author to inspect an output
+                      that was never produced. The operator hit it three times in one sitting
+                      and could not diagnose any of them.
+
+                      ⚠ THE NEW ARM NAMES NO STEP, ON PURPOSE. The precise cause is stored
+                      verbatim in `harness_audit` against the `golden_run_id` this response
+                      already carries, and nothing joins them on the wire yet — that half of
+                      the report is a server change. Claiming a step here would be inventing
+                      one. What it can honestly say is WHICH SIDE stopped, and that is the
+                      part that redirects the author. */}
                   {isBlock && (
                     <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
                       {verdict.blocked_stage === "judge"
-                        ? 'The golden run succeeded — but the independent judge would not pass its result. This is a hard wall — there is no "publish anyway."'
-                        : "The gauntlet honestly blocked this publish. Fix the cause and re-publish."}
+                        ? 'The trial run finished — but the independent review would not pass its result. This is a hard wall — there is no "publish anyway."'
+                        : verdict.blocked_stage === "structural_gate"
+                          ? "The trial run stopped part-way: one of the steps did not satisfy its own checks, so nothing was produced for the review to look at. Your deliverable was not graded — the run did not get that far."
+                          : "Publishing honestly refused. Fix the cause named below and try again."}
                     </p>
                   )}
                 </div>
@@ -1015,6 +1118,7 @@ export function PublishGauntlet({
                 goldenInputRef={goldenInputRef}
                 blocked={blocked}
                 blockedReason={blockedReason}
+                onCancel={requestClose}
               />
             </div>
           </div>

@@ -184,6 +184,31 @@ export const BLOCKED_SENTENCE: Record<string, string> = {
     "Blocked by the grader — the run finished, but the independent grader would not pass the result",
   draft_changed:
     "Blocked at the last step — the draft changed while it was being checked",
+  /**
+   * ── BUG-260815-06, THE HALF A CLIENT CAN CLOSE (2026-08-20) ─────────────────────────
+   *
+   * The report's fifth requirement, verbatim: *"Distinguish 'the run failed' from 'the
+   * judge refused'. `blocked_stage: structural_gate` covers a run that never reached the
+   * judge at all. An author reading 'fix the deliverable and re-publish' reasonably
+   * concludes their OUTPUT was judged and found wanting, when in fact phase 1 of 5 never
+   * produced anything. That copy is actively misdirecting on this path."*
+   *
+   * Before this line, `structural_gate` fell through to `BLOCKED_FALLBACK_SENTENCE`, which
+   * says only that something below stopped it — and what rendered below was the server's
+   * one-line `named_failures` entry restating the stage. The operator hit this three times
+   * in one sitting and could not diagnose any of them.
+   *
+   * ⚠ WHAT THIS SENTENCE MAY AND MAY NOT CLAIM. The precise cause lives in
+   * `workflow_phases` / `harness_audit` against the `golden_run_id` the response already
+   * carries, and NOTHING joins them today — that is the report's requirements 1 and 2 and
+   * it is a SERVER change. So this sentence must not pretend to name the failing step: it
+   * says which SIDE of the pipeline stopped (the run's own checks, before any grading), so
+   * the author stops looking at their deliverable, and it points at the run rather than
+   * claiming to have read it. Requirement 3 — do not imply the gate is exhaustive, do not
+   * promise a future capability — is why it names no step and offers no link.
+   */
+  structural_gate:
+    "Blocked during the trial run — a step's own checks refused what it produced, so the run never reached the review",
 }
 
 /**

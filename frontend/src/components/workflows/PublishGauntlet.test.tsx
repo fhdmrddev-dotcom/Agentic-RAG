@@ -95,13 +95,13 @@ async function openModal() {
   await waitFor(() => expect(screen.getByLabelText(/golden_input/i)).toBeInTheDocument())
 }
 
-/** Open the modal, type the golden_input, and hit the "run the gauntlet" Publish. */
+/** Open the modal, type the golden_input, and hit the "run the checks" Publish. */
 async function doPublish(input = "a representative kickoff") {
   const user = userEvent.setup()
   await openModal()
   const textarea = screen.getByLabelText(/golden_input/i)
   await user.type(textarea, input)
-  await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+  await user.click(screen.getByRole("button", { name: /run the checks/i }))
 }
 
 describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => {
@@ -129,7 +129,7 @@ describe("PublishGauntlet — form + verbatim verdict + judge hard wall", () => 
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
 
-    const btn = screen.getByRole("button", { name: /run the gauntlet/i })
+    const btn = screen.getByRole("button", { name: /run the checks/i })
     expect(btn).toBeDisabled()
 
     const textarea = screen.getByLabelText(/golden_input/i)
@@ -445,7 +445,7 @@ describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
-    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    await user.click(screen.getByRole("button", { name: /run the checks/i }))
 
     // In flight: the in-progress notice + elapsed timer show; close is blocked.
     await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toBeInTheDocument())
@@ -469,7 +469,7 @@ describe("PublishGauntlet — modal shell (Phase 103-ux)", () => {
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
-    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    await user.click(screen.getByRole("button", { name: /run the checks/i }))
     await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toHaveTextContent(/elapsed/i))
   })
 })
@@ -809,7 +809,7 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     // about the table's length, not about the property — inserting the `Grounding` row made
     // it read 9 and failed a test whose claim had not changed at all.
     const spine = screen.getByTestId("gauntlet-spine")
-    const nodeBoxes = spine.querySelectorAll('[class*="rounded-xl"]')
+    const nodeBoxes = spine.querySelectorAll('[data-testid="spine-node"]')
     expect(nodeBoxes.length).toBeGreaterThan(1)
     expect(within(spine).queryAllByText("✓")).toHaveLength(nodeBoxes.length - 1)
 
@@ -837,7 +837,7 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     // scoped to one named row, that claim expired the moment `Grounding` was added and no
     // one thought to duplicate the test. Swept across the spine, it cannot expire again.
     const spine = screen.getByTestId("gauntlet-spine")
-    const nodeBoxes = [...spine.querySelectorAll('[class*="rounded-xl"]')]
+    const nodeBoxes = [...spine.querySelectorAll('[data-testid="spine-node"]')]
     expect(nodeBoxes.length).toBeGreaterThan(1)
     for (const box of nodeBoxes) {
       const svg = box.querySelector("svg")
@@ -855,7 +855,7 @@ describe("PublishGauntlet — a draft that moved mid-gauntlet blocks at the Comm
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
-    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    await user.click(screen.getByRole("button", { name: /run the checks/i }))
 
     // This test used to defend a WEAKER claim — that appending a row left a literal index
     // pointing at the right node. Phase 186-10 inserted `Grounding` at its true pipeline
@@ -901,7 +901,7 @@ describe("PublishGauntlet 186-16 — a gauntlet cannot START while a reason stan
     const user = userEvent.setup()
     await openModal()
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
-    const btn = screen.getByRole("button", { name: /run the gauntlet/i })
+    const btn = screen.getByRole("button", { name: /run the checks/i })
     expect(btn).toBeEnabled() // the positive control, before anything is blocked
     return { user, btn }
   }
@@ -934,7 +934,7 @@ describe("PublishGauntlet 186-16 — a gauntlet cannot START while a reason stan
     expect(mockedPublish).not.toHaveBeenCalled()
     // …and nothing was CLAIMED to be running either: `runGauntlet` returns before
     // `setLoading(true)`, so the button never wears the in-flight label.
-    expect(btn.textContent).toBe("Publish ▸ run the gauntlet")
+    expect(btn.textContent).toBe("Publish — run the checks")
   })
 
   it("the reason CLEARING re-opens the gate — one click, exactly one request", async () => {
@@ -1180,11 +1180,32 @@ describe("PublishGauntlet 199-03 — the pre-change RESTING inventory (sheet c7)
 
     // The form's own words, verbatim. These say what publishing COSTS, which is the
     // purpose that has to survive any cut.
-    expect(modal).toHaveTextContent("golden_input — a representative kickoff prompt")
-    expect(modal).toHaveTextContent(/Publishing runs the full gauntlet above/)
-    expect(modal).toHaveTextContent(/It can honestly block\./)
-    expect(screen.getByRole("button", { name: /run the gauntlet/i })).toHaveTextContent(
-      "Publish ▸ run the gauntlet",
+    //
+    // ⚠ RE-BASELINED BY THE SKETCH-200 PORT (2026-08-20). THE PREVIOUS LITERALS ARE KEPT
+    // HERE RATHER THAN OVERWRITTEN, because what changed and what did NOT is the point:
+    //
+    //   label   "golden_input — a representative kickoff prompt"
+    //   para    /Publishing runs the full gauntlet above/  ·  /It can honestly block\./
+    //   button  "Publish ▸ run the gauntlet"
+    //
+    // Sketch 200's `publish.html` writes all three in plain language — *"A typical
+    // instruction to test with"*, *"Publishing runs the full check above, including a real
+    // trial run … and an independent review of the result. It can honestly refuse."*,
+    // *"Publish — run the checks"*. Three MACHINE words leave (`gauntlet`, `golden run`,
+    // `judge`) and the CLAIM is identical: publishing costs a real run and a real review,
+    // and it can say no. That claim is the purpose that had to survive the cut, and the
+    // three assertions below are re-pointed at the same three sentences saying it.
+    //
+    // ⚠ `golden_input` IS NOT DROPPED, WHICH IS WHY THE `getByLabelText` ABOVE IS
+    // UNTOUCHED. It is demoted to a quiet mono token inside the same <label>, carrying the
+    // full wire sentence in its `title` — the "put it behind a hover, do not remove it"
+    // rule. Two suites outside this file needle that accessible name and neither moved.
+    expect(modal).toHaveTextContent("A typical instruction to test with")
+    expect(screen.getByTestId("golden-input-wire-name")).toHaveTextContent("golden_input")
+    expect(modal).toHaveTextContent(/Publishing runs the full check above/)
+    expect(modal).toHaveTextContent(/It can honestly refuse\./)
+    expect(screen.getByRole("button", { name: /run the checks/i })).toHaveTextContent(
+      "Publish — run the checks",
     )
     expect(screen.getByPlaceholderText(/Choose something typical, not a corner case/)).toBeInTheDocument()
 
@@ -1244,9 +1265,18 @@ describe("PublishGauntlet 199-03 — the pre-change RESTING inventory (sheet c7)
       expect(rendered).toContain(stage)
     }
     // The node COUNT follows the STAGES table; it is read off the render, never written
-    // twice. `rounded-xl` is the node box's own shape class and nothing else in the spine
-    // carries it — the connectors are `rounded-full`, the ✓ badge is a circle.
-    expect(spine.querySelectorAll('[class*="rounded-xl"]')).toHaveLength(10)
+    // twice.
+    //
+    // ⚠ RE-POINTED BY THE SKETCH-200 PORT, AND THIS IS A STRENGTHENING RATHER THAN A
+    // RE-BASELINE. It used to count `[class*="rounded-xl"]`, on the recorded argument that
+    // *"nothing else in the spine carries it — the connectors are `rounded-full`, the ✓
+    // badge is a circle."* The sheet draws the nodes as ROUND beads, so that argument
+    // inverts the moment the shape changes: `rounded-full` is worn by the node, the badge
+    // AND (before this port) the connectors, so counting a shape class would have read 29
+    // and been wrong for a reason nobody could see from here. The node now carries its own
+    // `data-testid="spine-node"` and the count is of the THING rather than of its paint —
+    // which is what the surrounding comment always claimed it was doing.
+    expect(spine.querySelectorAll('[data-testid="spine-node"]')).toHaveLength(10)
   })
 })
 
@@ -1258,7 +1288,7 @@ describe("PublishGauntlet 199-03 — IN PROGRESS is INDETERMINATE (sheet c7 row 
     render(<PublishGauntlet definitionId="def-1" />)
     await openModal()
     await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
-    await user.click(screen.getByRole("button", { name: /run the gauntlet/i }))
+    await user.click(screen.getByRole("button", { name: /run the checks/i }))
     await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toBeInTheDocument())
     return screen.getByTestId("publish-modal")
   }
@@ -1373,7 +1403,14 @@ describe("PublishGauntlet 199-03 — the judge wall carries NO override, over th
     await waitFor(() => expect(screen.getByTestId("verdict-headline")).toBeInTheDocument())
     expect(screen.getByTestId("verdict-headline")).toHaveTextContent(blockedSentence("lint"))
     // RECOVERABLE, in words — a route forward is named, and no wall is claimed.
-    expect(screen.getByTestId("publish-block")).toHaveTextContent(/Fix the cause and re-publish/i)
+    // ⚠ THE NEEDLE MOVED WITH BUG-260815-06, and the previous one is kept here: it read
+    // `/Fix the cause and re-publish/i`. The generic arm now reads *"Publishing honestly
+    // refused. Fix the cause named below and try again."* — "named below" is the addition,
+    // and it is the whole repair on this arm: the sentence now points at the thing that
+    // actually carries the cause instead of leaving the author to guess where to look. The
+    // PROPERTY is unchanged and is what this case is for: a route forward is named, and no
+    // wall is claimed.
+    expect(screen.getByTestId("publish-block")).toHaveTextContent(/Fix the cause named below/i)
     expect(screen.getByTestId("publish-block")).not.toHaveTextContent(/hard wall/i)
 
     // Two genuinely different strings — not one sentence tinted twice.
@@ -1393,5 +1430,122 @@ describe("PublishGauntlet 199-03 — the judge wall carries NO override, over th
     expect(raw.tagName).toBe("DETAILS")
     expect(raw.open).toBe(false)
     expect(within(raw).getByText(/Show raw verdict/i)).toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sketch-200 port (2026-08-20) — the two things the port ADDED, and the one live
+// bug it closes. Everything else the port touched is measured by the re-baselined
+// pins above, in place, with the previous literal kept beside the new one.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** A `structural_gate` refusal — the shape BUG-260815-06 was reported against, verbatim
+ *  from the report's own observed response (three attempts, 2026-08-15, all identical). */
+const STRUCTURAL_GATE_BLOCK: PublishOutcome = {
+  kind: "verdict",
+  verdict: {
+    published: false,
+    version: null,
+    golden_run_id: "d8f87920-run",
+    blocked_stage: "structural_gate",
+    named_failures: ["the golden run failed a structural gate"],
+  },
+}
+
+describe("PublishGauntlet — BUG-260815-06: a structural-gate refusal must not read as a graded deliverable", () => {
+  it("leads with a sentence about the RUN, not about the output — and it is the module's, not a re-spelling", async () => {
+    mockedPublish.mockResolvedValue(STRUCTURAL_GATE_BLOCK)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("verdict-headline")).toBeInTheDocument())
+    // The headline is the pure module's, imported — never spelled in the component.
+    expect(screen.getByTestId("verdict-headline")).toHaveTextContent(
+      blockedSentence("structural_gate"),
+    )
+    // …and it is a REAL entry, not the fallback wearing a different name. Before this fix
+    // `structural_gate` fell through to the fallback, which says only that something below
+    // stopped it — beside a `named_failures` entry that restated the stage.
+    expect(blockedSentence("structural_gate")).not.toEqual(blockedSentence("a-stage-nobody-has"))
+    expect(blockedSentence("structural_gate")).not.toEqual(blockedSentence("judge"))
+  })
+
+  it("says the deliverable was NOT graded — the report's §5, which the old copy got backwards", async () => {
+    mockedPublish.mockResolvedValue(STRUCTURAL_GATE_BLOCK)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+    const block = screen.getByTestId("publish-block")
+    // The shipped copy read "The gauntlet honestly blocked this publish. Fix the cause and
+    // re-publish." next to a headline about a deliverable — so an author reasonably went
+    // and inspected an output that was never produced.
+    expect(block).toHaveTextContent(/did not get that far/i)
+    expect(block).toHaveTextContent(/was not graded/i)
+    expect(block).not.toHaveTextContent(/fix the deliverable/i)
+    // …and it does NOT claim the wall the grader's refusal claims — this run never reached one.
+    expect(block).not.toHaveTextContent(/hard wall/i)
+  })
+
+  it("claims NO step and NO cause it cannot see — the server half of the report is not faked here", () => {
+    // Requirements 1 and 2 of BUG-260815-06 (name the failing phase, use the canvas label)
+    // need a join between the publish response and `workflow_phases` / `harness_audit` that
+    // does not exist on the wire. A client that invented a step here would be worse than one
+    // that says which SIDE stopped. This case is the fence on that.
+    const sentence = blockedSentence("structural_gate")
+    expect(sentence.length).toBeGreaterThan(30) // non-vacuity before any absence
+    // No slug, no phase index, no lint code, no promise of a future surface.
+    expect(sentence).not.toMatch(/\bphase\s*\d/i)
+    expect(sentence).not.toMatch(/[a-z]+_[a-z]+/) // no snake_case machine token
+    expect(sentence).not.toMatch(/coming soon|will be|shortly/i)
+  })
+})
+
+describe("PublishGauntlet — the sketch-200 footer, and the fence that still has to fire over it", () => {
+  it("the resting form ends in the sheet's footer bar: Cancel beside the primary", async () => {
+    const user = userEvent.setup()
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    const cancel = screen.getByTestId("publish-cancel")
+    expect(cancel).toHaveTextContent("Cancel")
+    // It closes, which the shipped form had no in-form way to do at all.
+    await user.click(cancel)
+    await waitFor(() => expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument())
+  })
+
+  it("the new Cancel inherits the mid-publish guard — it is not a second, unguarded exit", async () => {
+    const user = userEvent.setup()
+    mockedPublish.mockReturnValue(new Promise<PublishOutcome>(() => {}))
+    render(<PublishGauntlet definitionId="def-1" />)
+    await openModal()
+    await user.type(screen.getByLabelText(/golden_input/i), "a representative kickoff")
+    await user.click(screen.getByRole("button", { name: /run the checks/i }))
+    await waitFor(() => expect(screen.getByTestId("publish-elapsed")).toBeInTheDocument())
+    // ⚠ MEASURED, NOT ASSUMED — AND THE FIRST GUESS WAS WRONG. This case was first written
+    // expecting the footer to be GONE mid-publish, on the reasoning that the resting form is
+    // hidden once a verdict arrives. It is not: the form is gated on `!verdict`, and a
+    // publish in flight has no verdict yet, so the whole footer stays mounted for the entire
+    // synchronous wait. The `disabled` arm is therefore LOAD-BEARING rather than defensive,
+    // and this is the assertion that says so.
+    expect(screen.getByTestId("publish-cancel")).toBeDisabled()
+    // And the header ✕ is still refused, as it always was.
+    expect(screen.getByTestId("publish-modal-close")).toBeDisabled()
+  })
+
+  it("THE FENCE STILL FIRES OVER THE PORTED SURFACE — the footer added a control, and it is not a way past", async () => {
+    // ⚠ THE PORT ADDED A BUTTON TO THIS DIALOG. The role-SET scan is the only guard in this
+    // tree measured able to catch a planted override (a `?raw` source regex and a
+    // `queryAllByRole("button")` filter both passed GREEN against a real plant), so a port
+    // that adds controls has to be re-measured against it rather than assumed innocent.
+    mockedPublish.mockResolvedValue(JUDGE_BLOCK)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await doPublish()
+    await waitFor(() => expect(screen.getByTestId("publish-block")).toBeInTheDocument())
+    const modal = screen.getByTestId("publish-modal")
+    // NON-VACUITY: the scan really has controls to look at in this state.
+    expect(modal.querySelectorAll(FORWARD_CONTROL_SELECTOR).length).toBeGreaterThan(2)
+    expect(forwardControlsIn(modal)).toHaveLength(0)
+    // …and the deliberate ABSENCE still renders as text, which is what a weakened fence
+    // would have forced someone to delete to go green.
+    expect(modal).toHaveTextContent(/no override/i)
+    expect(modal.querySelector("s")).toHaveTextContent("publish anyway")
   })
 })
