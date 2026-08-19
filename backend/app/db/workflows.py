@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from uuid import UUID
 
 import asyncpg
@@ -1236,7 +1237,7 @@ async def load_run_phases(pool: asyncpg.Pool, run_id: UUID) -> list[dict]:
     """
     rows = await pool.fetch(
         """
-        SELECT id, slug, phase_index, status, output
+        SELECT id, slug, phase_index, status, output, started_at, completed_at
         FROM workflow_phases
         WHERE workflow_run_id = $1
         ORDER BY phase_index
@@ -1327,7 +1328,7 @@ async def get_active_phase(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
     """
     row = await pool.fetchrow(
         """
-        SELECT id, slug, phase_index, status, output
+        SELECT id, slug, phase_index, status, output, started_at, completed_at
         FROM workflow_phases
         WHERE workflow_run_id = $1 AND status = 'active'
         ORDER BY phase_index
@@ -1432,26 +1433,69 @@ async def get_pending_ask_user(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
 
 
 # ── workflow_phases writes (PHASE-KEYED → id) ────────────────────────────────
-async def mark_phase_active(pool: asyncpg.Pool, phase_id: UUID) -> None:
+async def mark_phase_active(pool: asyncpg.Pool, phase_id: UUID) -> datetime | None:
     """Flip a phase to ``active`` BEFORE its work runs (Pitfall 1: durable-first).
 
     PHASE-KEYED write → ``WHERE id=$1``.
+
+    ── 200 (DES-02 / D-05): THE ONE ``started_at`` WRITE SITE ────────────────
+    This is the ONLY writer of ``workflow_phases.started_at`` in the tree, and it is the
+    right one precisely because it happens BEFORE the phase's work: the durable-first flip
+    IS the moment the step began. **No other site may write that column** — a second home
+    would let two "when did this start" answers disagree.
+
+    ⚠ WHY ``created_at`` COULD NOT SUBSTITUTE, which is D-05's whole argument.
+    ``create_workflow_run`` batch-INSERTs EVERY phase row of a run inside one transaction
+    (:334 above), so ``created_at`` is the moment the RUN was created — identical across all
+    of a run's phases and unrelated to when any of them began work. And ``updated_at`` is
+    overwritten by all seven status writers on every transition, so it only ever means "the
+    last time anything about this row moved". Neither could answer "how long did this step
+    take"; a per-step duration was genuinely underivable before migration 121.
+
+    ⚠ RETURNS THE TIMESTAMP THE DATABASE ACTUALLY WROTE — via ``RETURNING``, not a
+    Python-side ``datetime.now()`` computed alongside. The engine emits this value on the
+    ``phase_started`` SSE frame so a live tick has an anchor without polling, and emitting a
+    number the row does not carry would be exactly the dishonesty this phase exists to
+    remove. ``fetchval`` (not ``execute``) is what makes ``RETURNING`` readable; the write
+    is otherwise byte-identical and still ONE statement.
+
+    Returns ``None`` when no row matched — the caller treats a missing anchor as "not
+    recorded" and renders nothing, never a zero.
     """
-    await pool.execute(
-        "UPDATE workflow_phases SET status='active', updated_at=now() WHERE id = $1",
+    return await pool.fetchval(
+        "UPDATE workflow_phases SET status='active', updated_at=now(), started_at = now() WHERE id = $1 RETURNING started_at",
         phase_id,
     )
 
 
-async def complete_phase(pool: asyncpg.Pool, phase_id: UUID, output: dict) -> None:
+async def complete_phase(
+    pool: asyncpg.Pool, phase_id: UUID, output: dict
+) -> datetime | None:
     """Flip to ``completed`` AND write ``output`` in ONE atomic UPDATE.
 
     Called ONLY after the output is durable. The status flip and the output
     write are a single statement (never two) so a crash between them is
     impossible — the resumability invariant (HARNESS-03).
     PHASE-KEYED write → ``WHERE id=$1``.
+
+    ── 200 (DES-02 / D-05): ONE OF THE FIVE ``completed_at`` WRITE SITES ─────
+    The other four are ``fail_phase``, ``record_phase_not_sent``, ``cancel_phase`` and
+    ``cancel_active_phases``. ⚠ ``skip_phase`` writes NEITHER timestamp, deliberately: a
+    skipped phase never ran, so both columns stay NULL and the row reads *never ran* rather
+    than a zero duration. That silence is D-06's, and it is not an omission to "fix".
+
+    ⚠ RETURNS THE TIMESTAMP THE DATABASE ACTUALLY WROTE (``RETURNING``), for the same
+    reason ``mark_phase_active`` does: the engine puts this value on the ``phase_completed``
+    SSE frame, and a Python-side ``datetime.now()`` computed beside the write would be a
+    number the row does not carry.
+
+    ⚠ ``RETURNING`` COMPOSES WITH THE ``IS DISTINCT FROM 'cancelled'`` FENCE RATHER THAN
+    WEAKENING IT, and that is the useful part: when the fence refuses the write (a Stop
+    already cancelled this phase — the L-01 residue) NO row is returned, so this yields
+    ``None`` and the caller emits no completion timestamp for a step that was never
+    completed. The guard and the return value agree by construction.
     """
-    await pool.execute(
+    return await pool.fetchval(
         # ── L-01 RESIDUE AT THE PHASE LEVEL (added 2026-08-16) ───────────────
         # ⚠ THIS CLAUSE EXISTS BECAUSE THE RUN-LEVEL GUARD CREATED A CONTRADICTION
         # IT DID NOT CLOSE. `finish_run` now refuses to overwrite a terminal
@@ -1480,7 +1524,7 @@ async def complete_phase(pool: asyncpg.Pool, phase_id: UUID, output: dict) -> No
         #
         # `IS DISTINCT FROM` rather than `<>` on purpose: `status` is NOT NULL
         # today, and `<>` would silently stop matching if that ever changed.
-        "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
+        "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled' RETURNING completed_at",
         phase_id,
         json.dumps(output),
     )
@@ -1502,7 +1546,7 @@ async def fail_phase(
     """
     payload: dict = {**(output or {}), "_failure_reason": reason}
     await pool.execute(
-        "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
+        "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
         json.dumps(payload),
     )
@@ -1512,6 +1556,16 @@ async def skip_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
     """Mark a phase ``skipped`` (skip_to_phase routing — Plan 05).
 
     PHASE-KEYED write → ``WHERE id=$1``.
+
+    ── 200 (DES-02 / D-06): THIS IS THE ONE STATUS WRITER THAT TOUCHES NEITHER ──
+    ⚠ **THE ABSENCE IS DELIBERATE AND MUST NOT BE "FIXED".** Six of the seven
+    ``workflow_phases`` status writers now stamp a timestamp; this one stamps none. A skipped
+    phase NEVER RAN — it was routed around, not executed — so it has no start instant and no
+    completion instant, and both columns stay NULL. The row then reads *never ran*, which is
+    a DIFFERENT client-facing state from *time not recorded* (a phase that did run, before
+    migration 121 existed). Writing ``completed_at`` here would claim the step finished;
+    writing ``started_at`` would claim it began. D-06 calls this CORRECT SILENCE, and it is
+    the count-side twin of the rule that a type with no real number emits no key at all.
     """
     await pool.execute(
         "UPDATE workflow_phases SET status='skipped', updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
@@ -1545,7 +1599,7 @@ async def record_phase_not_sent(pool: asyncpg.Pool, phase_id: UUID, output: dict
     PHASE-KEYED write → ``WHERE id=$1``.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
+        "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
         json.dumps(output),
     )
@@ -1594,7 +1648,7 @@ async def cancel_phase(pool: asyncpg.Pool, phase_id: UUID) -> None:
     PHASE-KEYED write → ``WHERE id=$1``.
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='cancelled', updated_at=now() WHERE id = $1",
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now() WHERE id = $1",
         phase_id,
     )
 
@@ -1646,7 +1700,7 @@ async def cancel_active_phases(pool: asyncpg.Pool, workflow_run_id: UUID) -> Non
     written WRAPPED failed its own literal ``grep -q`` and read as "already fixed").
     """
     await pool.execute(
-        "UPDATE workflow_phases SET status='cancelled', updated_at=now() WHERE workflow_run_id = $1 AND status = 'active'",
+        "UPDATE workflow_phases SET status='cancelled', updated_at=now(), completed_at = now() WHERE workflow_run_id = $1 AND status = 'active'",
         workflow_run_id,
     )
 
