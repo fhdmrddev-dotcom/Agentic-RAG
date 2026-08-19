@@ -35,7 +35,7 @@ import workflowCanvasSource from "./WorkflowCanvas?raw"
 // can show and neither `tsc` nor eslint can fail on.
 import planeEditingLayerSource from "./PlaneEditingLayer?raw"
 import editAffordanceSource from "./editAffordance?raw"
-import { WorkflowCanvas, BRANCH_CONNECTOR_WORD } from "./WorkflowCanvas"
+import { WorkflowCanvas, BRANCH_CONNECTOR_WORD, BACKGROUND_GROUND } from "./WorkflowCanvas"
 import { toCanvas } from "./canvasModel"
 // 189-15: the badge-slot-1 guard builds its own seven-type roster from the shipped type
 // order rather than adding an eighth entry to the shared fixture corpus — which would move
@@ -1305,6 +1305,176 @@ describe("WorkflowCanvas 199-05 — §3 the FLOATING controls", () => {
     expect(controls.textContent ?? "").not.toMatch(/\d+\s*%/)
     // POSITIVE CONTROL — the matcher catches the sheet's own readout.
     expect("85%").toMatch(/\d+\s*%/)
+  })
+})
+
+describe("WorkflowCanvas 199-05 Task 3 — the ground is COMMITTED, not inherited", () => {
+  it("states its own geometry instead of taking the library's defaults", () => {
+    // The point of the commit: a library upgrade that moves a default cannot move this
+    // surface's ground without appearing in a diff.
+    expect(BACKGROUND_GROUND.gap).toBe(20)
+    expect(BACKGROUND_GROUND.size).toBe(1)
+    expect(BACKGROUND_GROUND.variant).toBe("dots")
+    expect(workflowCanvasSource).toMatch(/variant=\{BACKGROUND_GROUND\.variant\}/)
+    expect(workflowCanvasSource).toMatch(/gap=\{BACKGROUND_GROUND\.gap\}/)
+    expect(workflowCanvasSource).toMatch(/size=\{BACKGROUND_GROUND\.size\}/)
+    // A frozen table, never a literal at the use site (S5).
+    expect(workflowCanvasSource).not.toMatch(/<Background[\s\S]{0,200}gap=\{20\}/)
+  })
+
+  it("commits GEOMETRY and deliberately NOT colour — the dots stay on the theme", async () => {
+    // Passing `color` would emit an inline fill and take the ground off the theme's own
+    // variables, so light/dark would stop following it. The absence is the decision.
+    expect(workflowCanvasSource).not.toMatch(/<Background[\s\S]{0,300}color=/)
+    const { container } = await renderPlane(branching)
+    const dot = container.querySelector<SVGCircleElement>(".react-flow__background-pattern.dots")!
+    expect(dot.getAttribute("style")).toBeNull()
+    expect(dot.getAttribute("fill")).toBeNull()
+    // Non-vacuity: the dot is really there and really is classed by the library.
+    expect(dot.getAttribute("class")).toContain("react-flow__background-pattern")
+  })
+})
+
+describe("WorkflowCanvas 199-05 Task 3 — every drawn MARK traces to icon-convention §4", () => {
+  /**
+   * §4's own closing instruction: *"a sketch touching the canvas should be greppable for
+   * glyph literals, and every one should trace to a row in the table above or be
+   * explicitly flagged as a proposal."* This is that audit, run over the RENDERED plane
+   * rather than over source — because what a reader is taught is what is painted, and a
+   * comment can spell a glyph the surface never draws.
+   */
+  const SHIPPED_CANVAS_MARKS: Record<string, string> = {
+    "＋": "insert — icon-convention §4, on the LANE never the card",
+    "✕": "remove — icon-convention §4, on the LANE never the card",
+    "⤳": "the on-fail branch — icon-convention §4",
+    "⛨": "the governance seal — icon-convention §4",
+  }
+
+  /**
+   * KEY NAMES, not canvas concepts. §4 is a vocabulary of marks that mean something about
+   * the FLOW; these name a physical key, which is a different vocabulary. Listed
+   * separately, with reasons, so one can never be mistaken for a §4 row.
+   */
+  const KEYBOARD_SYMBOLS: Record<string, string> = {
+    "⌥": "the Option/Alt key — the Technical-names reveal in this canvas's header",
+    "←": "the Left-arrow key — `WorkflowCanvas.tsx` keyboard-reorder hint `⌥← / ⌥→`",
+    "→": "the Right-arrow key — the same hint",
+  }
+
+  /**
+   * ⚠ THE FINDING THIS SWEEP PRODUCED, RECORDED RATHER THAN ABSORBED — and it is a gap in
+   * `icon-convention.md` §4's OWN TABLE, not in this surface.
+   *
+   * Both marks below are SHIPPED vocabulary with real homes, painted on this canvas
+   * today, and §4 carries neither. §4's table is the audit scan list for canvas marks, and
+   * a mark missing from it is permanently invisible to its own convention — the exact
+   * failure the hot-file ledger's completeness rule exists to prevent, in a second place.
+   *
+   *   ○  the END CAP — `PhaseNode.tsx:280`, sketch 136's "every flow ends in an explicit
+   *      cap, never a dangling edge stub". A canvas mark by any definition: it says where
+   *      the flow stops. Also spelled at `nodePresentation.ts:71`, `deriveTier.ts:46` and
+   *      `definitionOps.ts:218` (`○ Free to think`, the loose grounding dial).
+   *   ✎  the WRITES receipt — `WorkflowCanvas.tsx:512` (`✎ Editing`), and the same mark on
+   *      three sibling surfaces: `library/WorkflowCard.tsx:48` (`✎ Open`),
+   *      `WorkflowDoorSwitch.tsx:213` and `library/WorkflowDeleteSheet.tsx:193`. It is the
+   *      Control Room's always-on audit-receipt vocabulary (Phases 146-148, "✎ writes"),
+   *      reused here — one mark, four surfaces, and no row in §4.
+   *
+   * ⚠ NOT FIXED HERE, DELIBERATELY. `icon-convention.md` lives outside this plan's file
+   * envelope and is a SHARED artifact being read by sibling plans in the same wave;
+   * `197-10`'s precedent is that editing one mid-wave is the wrong call. Reported instead,
+   * with a named follow-up, and pinned here so the gap cannot close silently either.
+   */
+  const SHIPPED_BUT_ABSENT_FROM_SECTION_4: Record<string, string> = {
+    "○": "the end cap — PhaseNode.tsx:280, sketch 136; §4 has no row for it",
+    "✎": "the writes receipt — WorkflowCanvas.tsx:512 + 3 siblings; §4 has no row for it",
+  }
+
+  /**
+   * A MARK, not a piece of punctuation. General Punctuation (U+2000–U+206F) is excluded
+   * by RANGE, because that is where the em dash, the ellipsis and the curly quotes live —
+   * the sibling sweep in `CanvasToolbar.test.tsx` measured `U+2014` in a tooltip sentence.
+   * Excluding the block rather than the characters it happened to see means the next em
+   * dash somebody types cannot turn this fence red for a prose reason.
+   */
+  const isMark = (ch: string) => {
+    const cp = ch.codePointAt(0)!
+    return cp > 0x2000 && !(cp >= 0x2000 && cp <= 0x206f)
+  }
+
+  /** Every mark the plane actually paints, visible text and accessible names. */
+  function drawnMarks(container: HTMLElement): Set<string> {
+    const marks = new Set<string>()
+    const consider = (text: string | null) => {
+      for (const ch of text ?? "") if (isMark(ch)) marks.add(ch)
+    }
+    const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+    while (walker.nextNode()) consider(walker.currentNode.textContent)
+    for (const el of Array.from(container.querySelectorAll("[aria-label], [title]"))) {
+      consider(el.getAttribute("aria-label"))
+      consider(el.getAttribute("title"))
+    }
+    return marks
+  }
+
+  it("the EDITABLE plane draws no mark outside the two declared vocabularies", async () => {
+    const view = renderCanvas(docQaHuman, { editable: true, provider: true })
+    await waitFor(() => {
+      expect(view.container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+    })
+    const marks = drawnMarks(view.container)
+
+    // NON-VACUITY FIRST — the plane really does paint marks, so an empty sweep cannot
+    // pass. This project has measured three fences that swept the empty string green.
+    expect(marks.size).toBeGreaterThan(0)
+    expect(marks.has("＋")).toBe(true)
+    expect(marks.has("✕")).toBe(true)
+
+    const unaccounted = Array.from(marks).filter(
+      (m) =>
+        !(m in SHIPPED_CANVAS_MARKS) &&
+        !(m in KEYBOARD_SYMBOLS) &&
+        !(m in SHIPPED_BUT_ABSENT_FROM_SECTION_4),
+    )
+    expect(unaccounted.map((m) => `U+${m.codePointAt(0)!.toString(16).toUpperCase()}`)).toEqual([])
+
+    // …and the §4 GAP is pinned as PRESENT, so it cannot close silently either. If a
+    // future phase adds these two rows to §4 and moves them into `SHIPPED_CANVAS_MARKS`,
+    // this assertion inverts — which is the point: the gap is proved by inversion, never
+    // by a deletion nobody notices.
+    expect(marks.has("○")).toBe(true)
+    expect(marks.has("✎")).toBe(true)
+    for (const [mark, why] of Object.entries(SHIPPED_BUT_ABSENT_FROM_SECTION_4)) {
+      expect(why).toContain("§4 has no row for it")
+      expect(mark in SHIPPED_CANVAS_MARKS).toBe(false)
+    }
+  })
+
+  it("draws NO phase-type glyph as a category icon, and no invented mark", async () => {
+    // §4's worst recorded drift: a phase-type glyph used to say what a WHOLE workflow is
+    // about. There is no category-icon vocabulary and this surface must not mint one.
+    const view = renderCanvas(docQaHuman, { editable: true })
+    await waitFor(() => {
+      expect(view.container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
+    })
+    // The phase marks that DO ship are bundled SVG components, never text glyphs — so a
+    // 3D-mark emoji appearing as TEXT anywhere would be a re-declaration.
+    const text = view.container.textContent ?? ""
+    expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+    // POSITIVE CONTROL — the matcher really does catch an emoji glyph.
+    expect("\u{1F916}").toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+  })
+
+  it("POSITIVE CONTROL — an invented mark would NOT be accounted for", () => {
+    const invented = "✦" // flagged in §4 as a PROPOSAL, never shipped vocabulary
+    expect(invented in SHIPPED_CANVAS_MARKS).toBe(false)
+    expect(invented in KEYBOARD_SYMBOLS).toBe(false)
+    expect(invented in SHIPPED_BUT_ABSENT_FROM_SECTION_4).toBe(false)
+    // …and the sweep's own predicate really would flag it, while correctly ignoring the
+    // punctuation it is not about.
+    expect(isMark(invented)).toBe(true)
+    expect(isMark("—")).toBe(false)
+    expect(isMark("…")).toBe(false)
   })
 })
 

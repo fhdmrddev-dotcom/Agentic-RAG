@@ -288,3 +288,95 @@ describe("CanvasToolbar — R6: the save state never implies published", () => {
     expect(screen.getByTestId("canvas-toolbar-save-error").className).toContain("hsl(0_85%_74%)")
   })
 })
+
+// ── 199-05 Task 3 — the toolbar's marks, against icon-convention §4 ─────────────
+//
+// Sheet `c1-canvas-plane` §3 draws a floating control cluster. The shipped chrome is split
+// in two: the LIBRARY's zoom/fit cluster (pinned in `WorkflowCanvas.test.tsx`) and this
+// toolbar. §4 lists `↶` / `↷` for undo / redo and names this file as their source of
+// truth, so the audit that closes §4's loop has to run here too — a mark invented on the
+// toolbar teaches the wrong vocabulary just as effectively as one invented on the plane.
+
+describe("CanvasToolbar 199-05 — every drawn mark traces to icon-convention §4", () => {
+  /** §4's two rows for this file, and nothing else. */
+  const SECTION_4_ROWS: Record<string, string> = {
+    "↶": "undo — icon-convention §4, sourced to CanvasToolbar.tsx",
+    "↷": "redo — icon-convention §4, sourced to CanvasToolbar.tsx",
+  }
+
+  /** Key NAMES rather than canvas concepts — the accelerators in the two aria-labels. */
+  const KEY_NAMES = new Set(["⌘", "⇧"])
+
+  /**
+   * A MARK, not a piece of punctuation. General Punctuation (U+2000–U+206F) is excluded
+   * because it is where the em dash, the ellipsis and the curly quotes live — this suite
+   * measured `U+2014` in the tidy-up tooltip, which is a sentence, not a symbol. Excluding
+   * the block by RANGE rather than listing the characters it happened to see means the
+   * next em dash somebody types does not turn this fence red for a prose reason.
+   */
+  const isMark = (ch: string) => {
+    const cp = ch.codePointAt(0)!
+    return cp > 0x2000 && !(cp >= 0x2000 && cp <= 0x206f)
+  }
+
+  function drawnMarks(container: HTMLElement): Set<string> {
+    const marks = new Set<string>()
+    const consider = (text: string | null) => {
+      for (const ch of text ?? "") if (isMark(ch)) marks.add(ch)
+    }
+    consider(container.textContent)
+    for (const el of Array.from(container.querySelectorAll("[aria-label], [title]"))) {
+      consider(el.getAttribute("aria-label"))
+      consider(el.getAttribute("title"))
+    }
+    return marks
+  }
+
+  it("draws exactly §4's two marks, plus the key names its accelerators need", () => {
+    const { container } = renderToolbar(draftedStore(), { saveState: "saved" })
+    const marks = drawnMarks(container)
+
+    // NON-VACUITY FIRST — the toolbar really does paint marks.
+    expect(marks.size).toBeGreaterThan(0)
+    expect(marks.has("↶")).toBe(true)
+    expect(marks.has("↷")).toBe(true)
+
+    const unaccounted = Array.from(marks).filter(
+      (m) => !(m in SECTION_4_ROWS) && !KEY_NAMES.has(m),
+    )
+    expect(unaccounted.map((m) => `U+${m.codePointAt(0)!.toString(16).toUpperCase()}`)).toEqual([])
+  })
+
+  it("puts NO phase-type glyph and no category icon on the toolbar", () => {
+    // §4's worst recorded drift is a phase-type glyph pressed into service as a category
+    // icon. A toolbar is exactly the place that temptation arrives.
+    const { container } = renderToolbar(draftedStore(), { saveState: "saved" })
+    expect(container.textContent ?? "").not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+    // POSITIVE CONTROL — the matcher really does catch a 3D-map glyph.
+    expect("\u{1F916}").toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+  })
+
+  it("the two marks are aria-hidden — the WORD in the label carries the meaning", () => {
+    // A mark that reaches the accessible name would be read aloud as an unknown
+    // character, so each button's name comes from `aria-label` and the glyph is hidden.
+    renderToolbar(draftedStore())
+    for (const testId of ["canvas-toolbar-undo", "canvas-toolbar-redo"]) {
+      const button = screen.getByTestId(testId)
+      expect(button.getAttribute("aria-label")).toBeTruthy()
+      const glyph = button.querySelector("span")
+      expect(glyph).not.toBeNull()
+      expect(glyph!.getAttribute("aria-hidden")).toBe("true")
+    }
+  })
+
+  it("adds NO zoom control of its own — the sheet's cluster has ONE home", () => {
+    // The sheet draws zoom out / percentage / zoom in / fit / lock as one floating pill.
+    // Three of those five ship, in the library's own `<Controls>`; a second zoom control
+    // here would be two homes for one concern.
+    const { container } = renderToolbar(draftedStore())
+    const text = (container.textContent ?? "").toLowerCase()
+    expect(text).not.toContain("zoom")
+    expect(text).not.toMatch(/\d+\s*%/)
+    expect(container.querySelector(".react-flow__controls")).toBeNull()
+  })
+})

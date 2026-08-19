@@ -195,6 +195,9 @@ import {
 } from "react"
 import {
   Background,
+  // 199-05 — the ENUM, never the string `"dots"`. A typo in a string literal falls back
+  // to the library's own default and draws a ground that merely looks committed.
+  BackgroundVariant,
   Controls,
   MarkerType,
   ReactFlow,
@@ -387,6 +390,22 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
  * same fact twice, three centimetres apart.
  */
 export const BRANCH_CONNECTOR_WORD = "on fail"
+
+/**
+ * 199-05 — the plane's ground, stated rather than inherited. See the `<Background>` use
+ * site for why the colour is deliberately absent from this table.
+ *
+ * Every number was MEASURED off the shipped rendering before it was written down: the
+ * library was drawing a 20px dot lattice with a 1px dot, and it still is.
+ */
+export const BACKGROUND_GROUND = {
+  /** Dots, never lines or crosses — the sheet's commitment and already the shipped one. */
+  variant: BackgroundVariant.Dots,
+  /** The lattice pitch, in canvas pixels. */
+  gap: 20,
+  /** One dot, one pixel. The quietest mark this plane draws. */
+  size: 1,
+} as const
 
 /**
  * The label's own presentation, in the SAME raw hsl the branch stroke above already
@@ -1328,7 +1347,29 @@ export function WorkflowCanvas({
           // tables at module scope). The read-only table is byte-unchanged.
           ariaLabelConfig={editable ? ARIA_LABELS_EDITABLE : ARIA_LABELS}
         >
-          <Background />
+          {/* 199-05 — THE GROUND, COMMITTED. Sheet `c1-canvas-plane`'s one structural
+              claim about the plane is that it *commits* to a ground rather than leaving
+              one to happen: "a quiet dot grid, quiet enough that a step at rest is still
+              the loudest thing on the plane."
+
+              Until this line the ground was whatever `@xyflow/react` defaults to. The
+              three values below are the ones it was ALREADY producing — MEASURED off the
+              shipped rendering, not copied from the sheet — so this changes no pixel and
+              buys one thing: a library upgrade that moves a default can no longer move
+              this surface's ground without a diff. `BACKGROUND_GROUND` is the frozen
+              table (S5 — never a literal at a use site).
+
+              ⚠ THE COLOUR IS DELIBERATELY NOT COMMITTED. `color` would emit an inline
+              fill and take the dots OFF the theme's own variables, so the ground would
+              stop following light/dark. Geometry is ours to state; the palette belongs to
+              the theme. The sheet's own `#212631` on `#090e18` is declined for the same
+              reason 15 of its 18 colour tokens are: they are that sheet's palette, and
+              this repo's config does not carry them. */}
+          <Background
+            variant={BACKGROUND_GROUND.variant}
+            gap={BACKGROUND_GROUND.gap}
+            size={BACKGROUND_GROUND.size}
+          />
           {/* The prop below removes the interactivity padlock — see the docblock;
               without it read-only is two clicks deep. */}
           <Controls showInteractive={false} />
