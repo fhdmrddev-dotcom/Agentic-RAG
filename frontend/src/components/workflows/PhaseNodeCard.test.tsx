@@ -76,6 +76,12 @@ import { RUN_READING_WORD, runReadingLabel } from "./runVocabulary"
 // cast. Its own import statement rather than a widening of the 184-08 line above — the
 // `canvasModel.purity.test.ts:18-21` rule, so this plan's whole diff reads as ADDED lines.
 import type { VerdictMarkKind } from "./nodePresentation"
+// 199-01 Task 1: the REAL 3D mark resolver, so the resting inventory below pins the atoms
+// the shipped adapter paints rather than the atoms a fixture glyph paints. `renderCard`'s
+// `◆` probe is a test fixture and contributes a text node the real card never has; an
+// inventory taken through it would pin a string that does not ship. Its own import
+// statement, the `canvasModel.purity.test.ts:18-21` convention this file already follows.
+import { renderPhaseMark } from "./nodePresentation"
 
 // ── 188.2-01 — THE SUBTREE SOURCE, and why it names five files that do not exist yet ──
 //
@@ -4150,5 +4156,319 @@ describe("PhaseNodeCard 188.2-03 — the geometry matrix, under its contract nam
     expect(Object.keys(CARD_SHAPE_BASELINE.borders).sort()).toEqual(
       Object.keys(CARD_BORDER_ROWS).sort(),
     )
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 199-01 Task 1 (DES-01) — THE RESTING-ATOM INVENTORY AND THE MECHANISM SWEEP
+//
+// Sheet `c2-phase-node` of sketch 178 is DIRECTION, not an acceptance bar: it renders
+// zero shipped components and draws its node in the SUPERSEDED 137-D language (a 16rem
+// horizontal row with a left icon well). Before any of it can be reconciled against the
+// shipped 137-B card, what the shipped card actually PAINTS has to be written down as
+// literals — because the phase's headline claim is *"the node renders no MORE at rest
+// than it did before"*, and a claim of that shape is only checkable against a list that
+// predates the change.
+//
+// THE METHOD IS `192.2-05`'s, FOLLOWED EXACTLY. An atom is asserted PRESENT here so that
+// a later REMOVAL is proved by INVERTING the assertion to ABSENT — never by deleting it.
+// A deleted assertion and a satisfied one are indistinguishable in a green run, which is
+// the whole reason this file has never re-baselined a pin to make red go green.
+// ════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Every non-empty text node under the node box, IN DOCUMENT ORDER.
+ *
+ * `sr-only` text is DELIBERATELY INCLUDED. An identifier hidden inside an accessible
+ * label is still printed to a person — it is read aloud rather than drawn — so a sweep
+ * that skipped it would leave the one channel a screen-reader user has unguarded. The
+ * verdict mark and the governance seal both carry a visible glyph plus an `sr-only`
+ * label, and both halves are pinned below.
+ */
+function nodeTextAtoms(root: HTMLElement): string[] {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const out: string[] = []
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const text = (n.textContent ?? "").trim()
+    if (text) out.push(text)
+  }
+  return out
+}
+
+/**
+ * The Builder's card, rendered through the REAL mark resolver.
+ *
+ * The strings are a real 5-step procurement flow's third step, not lorem: sketch 178's
+ * own re-run named its steps as business work, and a fixture worded *"Phase 1"* would let
+ * a mechanism sweep pass by having nothing to say.
+ */
+const RESTING_SLUG = "weigh-each-contract"
+const RESTING_TITLE = "Weigh each contract against our risk policy"
+const RESTING_SUBTITLE = "Searches and decides its own next move"
+
+function renderRestingCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
+  return render(
+    <PhaseNodeCard
+      slug={RESTING_SLUG}
+      phaseType="llm_agent"
+      icon={renderPhaseMark("llm_agent")}
+      title={RESTING_TITLE}
+      subtitle={RESTING_SUBTITLE}
+      tint={ICON_TINT.llm_agent}
+      {...overrides}
+    />,
+  )
+}
+
+describe("199-01 — the RESTING inventory (sheet c2 section 3, the AT REST specimen)", () => {
+  it("paints EXACTLY TWO text atoms at rest, and both are literals", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+
+    // LITERALS, NOT SHAPES. `[expect.any(String), expect.any(String)]` would pass on a
+    // card that had silently started printing its own phase type, which is the exact
+    // failure sheet 178 was built to fix.
+    expect(nodeTextAtoms(box)).toEqual([
+      "Weigh each contract against our risk policy",
+      "Searches and decides its own next move",
+    ])
+  })
+
+  it("pins the resting DATA-ATTRIBUTE atoms — three, and no fourth", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    expect(box.getAttribute("data-slug")).toBe("weigh-each-contract")
+    expect(box.getAttribute("data-phase-type")).toBe("llm_agent")
+    expect(box.getAttribute("data-selected")).toBe("false")
+  })
+
+  it("pins the resting MARK inventory: the 3D well only — no ring, seal, verdict or chip", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+
+    // PRESENT, so a later removal inverts rather than deletes.
+    expect(box.querySelector("svg")).not.toBeNull()
+
+    // ABSENT, each named individually: a single "no extra elements" count would pass on
+    // a substitution, and this file's own 188.2 block records why that is not enough.
+    expect(screen.queryByTestId(RING_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(ARC_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(RUN_LINE_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(PAUSE_CHIP_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(SEAL_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId("canvas-node-verdict")).toBeNull()
+    expect(screen.queryByTestId("canvas-node-technical-line")).toBeNull()
+  })
+
+  it("the FULLY DRESSED design-time card pins eight atoms, in document order", () => {
+    // Everything the Builder can put on one face at once: a verdict, both badge slots and
+    // the governance seal. The ORDER is the card's own child order — body, then corner
+    // marks — and it is pinned because the marks are absolutely positioned and their paint
+    // order IS their document order (`PhaseNodeCard.tsx`'s own note on the 188.2 cut).
+    renderRestingCard({
+      verdict: "error",
+      grounded: true,
+      badges: [
+        { testId: "canvas-not-connected", tone: "muted", label: "Not connected" },
+        { testId: "canvas-waits-for-you", tone: "primary", label: "Waits for you" },
+      ],
+    })
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+
+    expect(nodeTextAtoms(box)).toEqual([
+      "Weigh each contract against our risk policy",
+      "Searches and decides its own next move",
+      "Not connected",
+      "Waits for you",
+      VERDICT_MARK.error.glyph,
+      VERDICT_MARK.error.label,
+      "⛨",
+      GOVERNANCE_SEAL_LABEL,
+    ])
+  })
+})
+
+/**
+ * THE RUN-MODE FACE, one literal per reading.
+ *
+ * Written out rather than computed from `runReadingLabel`, and that is the point of a
+ * characterization pin: a table derived from the function under observation moves WITH it
+ * and can never report that it moved. The suite already asserts elsewhere that the card
+ * calls that one function; this asserts what the function currently SAYS.
+ *
+ * It is keyed `Record<CanvasReading, string>`, so a tenth reading is a TYPECHECK ERROR
+ * here rather than a silently-uncovered face — the mechanism this file has now watched
+ * fire twice (189's eighth reading, 194's ninth).
+ */
+const RUN_LINE_LITERAL_AT_199: Record<CanvasReading, string> = {
+  "not-started": "Not started",
+  running: "Running",
+  done: "Complete",
+  failed: "Failed — this step did not finish",
+  skipped: "Skipped — the run took a different path",
+  "waiting-for-you": "Paused for your answer — it needs your reply before it can continue",
+  unknown: "State unknown — we can't tell what happened to this step",
+  "recorded-not-sent": "Not sent — recorded",
+  cancelled: "Stopped by you — you ended the run while this step was still working",
+}
+
+describe("199-01 — the RUN-MODE inventory (sheet c2 section 4, all NINE readings)", () => {
+  it("pins the run line as a LITERAL at every reading — and the sheet draws only six of nine", () => {
+    for (const reading of ALL_READINGS) {
+      const { unmount } = renderRestingCard({ status: reading })
+      expect(screen.getByTestId(RUN_LINE_TEST_ID).textContent).toBe(
+        RUN_LINE_LITERAL_AT_199[reading],
+      )
+      unmount()
+    }
+
+    // THE SHEET UNDER-COVERS THE SHIPPED SET, and that is recorded as a measurement rather
+    // than left to be noticed. c2 section 4 draws six run states; the card ships NINE. A
+    // sheet that draws six teaches that there are six.
+    expect(ALL_READINGS.length).toBe(9)
+  })
+
+  it("the run-mode face adds ONE atom to the resting two, and nothing else", () => {
+    for (const reading of ALL_READINGS) {
+      const { unmount } = renderRestingCard({ status: reading })
+      const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+      expect(nodeTextAtoms(box)).toEqual([
+        "Weigh each contract against our risk policy",
+        "Searches and decides its own next move",
+        RUN_LINE_LITERAL_AT_199[reading],
+      ])
+      unmount()
+    }
+  })
+})
+
+// ── THE MECHANISM-ABSENCE SWEEP ────────────────────────────────────────────────
+//
+// Sketch 177 printed *"Author name" / "Derived name" / "Type description"* into node
+// subtitles — the fallback RULE, shown to the person the rule exists to protect. Sketch
+// 178 fixed it by captioning the three name cases only by their TEXT LENGTH, and the fix
+// went into the design system's `designMd` as *"never name the mechanism to the user"*.
+// This is that rule as something a machine checks on the shipped card.
+//
+// NON-VACUITY IS ASSERTED FIRST, and it is not ceremony. This project has measured THREE
+// fences that swept the empty string and passed green defending nothing (`192.1`'s three,
+// and `gutterTokens.fences.test.ts`'s `?raw`-cannot-read-CSS finding). A sweep over a card
+// that failed to render would be the same defect wearing this file's name, so every sweep
+// below proves it has something to read BEFORE it reads it.
+
+/**
+ * The vocabulary a node face may never print. Anchored on word boundaries rather than
+ * bare `includes`, because a substring test bans *"gateway"* by banning *"gate"* and a
+ * fence that fires on innocent copy gets loosened rather than obeyed.
+ *
+ * Five families, each traceable to something this project has actually shipped or drawn:
+ *   1. the fallback RULE — sketch 177's literal defect
+ *   2. the LADDER's rungs — `nodeTitle`'s four tiers, which must stay invisible
+ *   3. the raw phase-type discriminators — `PHASE_GLYPHS`' own keys
+ *   4. the definition's machine keys — `phase_type`, `phase_index`, `skip_to_phase`
+ *   5. the gate / validator identifiers — the closed set `validator_kinds` names
+ */
+const MECHANISM_PATTERNS: readonly RegExp[] = [
+  /\bfallback\b/i,
+  /\bauthor name\b/i,
+  /\bderived name\b/i,
+  /\btype description\b/i,
+  /\bdefault name\b/i,
+  /\bladder\b/i,
+  /\brung\b/i,
+  /\btier\b/i,
+  /\bderivation\b/i,
+  /\bdiscriminator\b/i,
+  /\bphase_type\b/i,
+  /\bphase_index\b/i,
+  /\bskip_to_phase\b/i,
+  /\bcitations_required\b/i,
+  /\boutput_file_valid\b/i,
+  /\bllm_[a-z_]+\b/i,
+  /\bprogrammatic\b/i,
+  /\bexternal_action\b/i,
+  /\bcitation gate\b/i,
+  /\bvalidator\b/i,
+]
+
+/** Every pattern that FIRES on the given text. Returns the matched sources, so a red run
+ *  names WHICH rule was printed rather than only that one was. */
+function mechanismHits(text: string): string[] {
+  return MECHANISM_PATTERNS.filter((re) => re.test(text)).map((re) => re.source)
+}
+
+describe("199-01 — the mechanism-absence sweep is FALSIFIABLE (the positive controls)", () => {
+  it("fires on sketch 177's ACTUAL defect — the three subtitles it printed", () => {
+    expect(mechanismHits("Author name")).not.toEqual([])
+    expect(mechanismHits("Derived name")).not.toEqual([])
+    expect(mechanismHits("Type description")).not.toEqual([])
+  })
+
+  it("fires on a raw discriminator and on a definition key", () => {
+    expect(mechanismHits("llm_agent")).not.toEqual([])
+    expect(mechanismHits("phase_index 3")).not.toEqual([])
+    expect(mechanismHits("skip_to_phase:publish")).not.toEqual([])
+  })
+
+  it("does NOT fire on any shipped word the card really renders (no false positive)", () => {
+    // Every business string on this surface, swept: if the fence fired on one of these it
+    // would be loosened rather than obeyed, and a loosened fence defends nothing.
+    const shipped = [
+      RESTING_TITLE,
+      RESTING_SUBTITLE,
+      ...Object.values(RUN_LINE_LITERAL_AT_199),
+      ...Object.values(RUN_READING_WORD),
+      GOVERNANCE_SEAL_LABEL,
+      VERDICT_MARK.error.label,
+      VERDICT_MARK.incomplete.label,
+      VERDICT_MARK.unknown.label,
+      "Waits for you",
+      "Not connected",
+    ]
+    for (const s of shipped) expect(mechanismHits(s)).toEqual([])
+  })
+})
+
+describe("199-01 — the node face NEVER prints the mechanism (SC#4)", () => {
+  it("prints none of it at rest, at every run reading, or fully dressed", () => {
+    const cases: Array<Partial<React.ComponentProps<typeof PhaseNodeCard>>> = [
+      {},
+      { verdict: "error", grounded: true },
+      { verdict: "incomplete" },
+      { verdict: "unknown" },
+      {
+        grounded: true,
+        badges: [
+          { testId: "canvas-not-connected", tone: "muted", label: "Not connected" },
+          { testId: "canvas-waits-for-you", tone: "primary", label: "Waits for you" },
+        ],
+      },
+      ...ALL_READINGS.map((reading) => ({ status: reading })),
+    ]
+
+    for (const overrides of cases) {
+      const { unmount } = renderRestingCard(overrides)
+      const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+      const swept = nodeTextAtoms(box).join("   ")
+
+      // NON-VACUITY BEFORE CONTENTS. A card that rendered nothing would satisfy every
+      // assertion below by having nothing to fail on.
+      expect(swept.length).toBeGreaterThan(0)
+      expect(swept).toContain(RESTING_TITLE)
+
+      expect(mechanismHits(swept)).toEqual([])
+      unmount()
+    }
+  })
+
+  it("prints no SLUG either — the one technical token, and it lives behind the reveal", () => {
+    // `nodeTitle`'s own floor (`phaseVocabulary.ts`): the slug NEVER appears in the default
+    // face. The card is handed a resolved title, so this asserts the surface rather than
+    // the resolver — which is the only thing a card-level fence can honestly claim.
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    const swept = nodeTextAtoms(box).join(" ")
+    expect(swept.length).toBeGreaterThan(0)
+    expect(swept).not.toContain(RESTING_SLUG)
   })
 })
