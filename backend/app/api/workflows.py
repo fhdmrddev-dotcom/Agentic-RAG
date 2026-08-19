@@ -225,7 +225,37 @@ class PublishedWorkflow(BaseModel):
     THEY PASS THIS MODEL'S BINDING RULE FOR THE RULE'S OWN STATED REASON — they "describe the
     ROW, never a person". ⚠ And the join behind them is OWNER-SCOPED (``r.user_id = $1``), so
     on a world-readable ``is_system_global`` row a caller sees THEIR run of it and never
-    another tenant's; the raw ``user_id`` is never projected onto this model at all."""
+    another tenant's; the raw ``user_id`` is never projected onto this model at all.
+
+    ── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — ``has_any_run`` ──────────────────────
+
+    **What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact.
+
+    ⚠ **What it is NOT, and the pair is the whole point of the field.** It is not
+    ``last_run_at`` / ``last_run_status``, which are OWNER-SCOPED and answer *did MY last run
+    of this work?*. The two DISAGREE on exactly the rows CR-01 named, and that disagreement is
+    the message rather than an inconsistency: **``has_any_run=true`` with ``last_run_at=null``
+    means *somebody ran it, and it was not you*.** Before this field existed the surface had
+    only the second half and rendered it as the first — printing an explicit "Never run" about
+    five ``is_system_global`` rows carrying 20 / 15 / 11 / 7 / 1 real runs, to every caller but
+    the one user who ran them. A caller-scoped fact rendered as a row-level one is FALSE, not
+    merely unhelpful.
+
+    ⚠ **The disclosure budget is EXISTENCE ONLY** — no count, no timestamp, no user id, no org
+    id, no status. The argument is recorded ONCE, on ``_HAS_ANY_RUN_SQL``'s docblock in
+    ``app/db/workflows.py``; it is not restated here, because a rule written twice drifts.
+
+    ⚠ **It is ``bool | None`` and it DEFAULTS TO ``None``, never to ``False`` (DEC-08-C).** A
+    SQL ``EXISTS`` is never null, so live the value is always ``True``/``False``; ``None``
+    exists for exactly one case — a read path that omits the column. Coercing that absence to
+    ``False`` would manufacture the affirmative claim *"nobody has run this"* out of nothing,
+    which is the shape of this very bug one layer down. The serializers use
+    ``r.get("has_any_run")``, never ``bool(...)``.
+
+    ⚠ **THE ``response_model`` TRAP, verbatim from ``192.2-03``'s finding:** these routes
+    declare ``response_model``, which DROPS UNDECLARED KEYS SILENTLY — a green backend test
+    beside an unchanged UI. The model and the builders move together or the column never
+    reaches the client."""
 
     id: UUID
     slug: str
@@ -236,6 +266,7 @@ class PublishedWorkflow(BaseModel):
     updated_at: str | None = None
     last_run_at: str | None = None
     last_run_status: str | None = None
+    has_any_run: bool | None = None
 
 
 def _caller_uuid(current_user: dict) -> UUID | None:
@@ -342,7 +373,29 @@ class DraftRow(BaseModel):
     FACTS. ``token`` is ``to_char(updated_at …)`` — opaque, never parsed. ``updated_at`` is
     when the DRAFT was last edited. ``last_run_at`` is when it was last RUN, from
     ``workflow_runs``, and a draft genuinely can have runs — the publish gauntlet's golden run
-    is one. Collapsing any pair of these is a lie in a different direction each time."""
+    is one. Collapsing any pair of these is a lie in a different direction each time.
+
+    ── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — ``has_any_run`` ──────────────────────
+
+    **What it is:** whether ANY run of this definition exists, by ANYBODY. A ROW-LEVEL fact,
+    mirroring ``PublishedWorkflow`` field-for-field so the library speaks ONE language across
+    its three shelves.
+
+    ⚠ **What it is NOT:** it is not ``last_run_at`` / ``last_run_status``, which are
+    OWNER-SCOPED and answer *did MY last run of this work?*. ``has_any_run=true`` with
+    ``last_run_at=null`` means *somebody ran it, and it was not you*.
+
+    ⚠ **On THIS shelf the two agree today, and that is precisely why the field is still
+    projected here rather than "only where it can differ".** A draft is owner-scoped, so the
+    caller IS the only person with runs of it — but "the two agree" is an UNSTATED invariant
+    that nothing enforces, and a shelf that omitted the key would be claiming the opposite of
+    what ``PublishedWorkflow`` says about the same concept. See that model's docblock for the
+    typing rule (``bool | None``, defaulting to ``None``, never coerced) and
+    ``_HAS_ANY_RUN_SQL`` in ``app/db/workflows.py`` for the disclosure budget; neither is
+    restated here.
+
+    ⚠ **The ``response_model`` trap applies verbatim** — ``response_model=list[DraftRow]``
+    drops undeclared keys silently, so this model and the builder move together."""
 
     id: UUID
     slug: str
@@ -353,6 +406,7 @@ class DraftRow(BaseModel):
     updated_at: str | None = None
     last_run_at: str | None = None
     last_run_status: str | None = None
+    has_any_run: bool | None = None
 
 
 # Phase 148 (VIS-01) — RUN CARVE-OUT: DO NOT gate /published or /starters. They are the Run
@@ -442,6 +496,11 @@ async def get_published_workflows(
             updated_at=_iso_or_none(r.get("updated_at")),
             last_run_at=_iso_or_none(r.get("last_run_at")),
             last_run_status=r.get("last_run_status"),
+            # Phase 192.2 gap round 1 (CR-01): the ROW-LEVEL bit, beside the two caller-scoped
+            # ones. ⚠ ``r.get(...)`` and NEVER ``bool(...)`` — a coercion would turn a MISSING
+            # key into ``False``, i.e. into the affirmative claim "nobody has run this", which
+            # is this bug one layer down (DEC-08-C).
+            has_any_run=r.get("has_any_run"),
         )
         for r in rows
     ]
@@ -504,6 +563,12 @@ async def get_starter_workflows(
             updated_at=_iso_or_none(r.get("updated_at")),
             last_run_at=_iso_or_none(r.get("last_run_at")),
             last_run_status=r.get("last_run_status"),
+            # ⚠ Phase 192.2 gap round 1 (CR-01): THIS shelf is why the field exists. It is
+            # WORLD-READABLE and it is the one a newcomer meets first — measured 2026-08-19 it
+            # is 3 curated rows, ONE of which has ever been run, so for every caller but that
+            # runner the card printed an explicit "Never run" about a workflow that HAS run.
+            # Same no-coercion rule as /published: ``r.get(...)``, never ``bool(...)``.
+            has_any_run=r.get("has_any_run"),
         )
         for r in rows
     ]
@@ -1307,6 +1372,11 @@ async def list_drafts(
             # builder move together or the column never reaches the client.
             last_run_at=_iso_or_none(r.get("last_run_at")),
             last_run_status=r.get("last_run_status"),
+            # Phase 192.2 gap round 1 (CR-01): mirrored here for the reason ``DraftRow``'s
+            # docblock states — on an owner-scoped shelf the two facts agree today, and "they
+            # agree" is an unstated invariant nothing enforces. Same no-coercion rule; the same
+            # ``response_model`` trap applies, so this line and the model moved together.
+            has_any_run=r.get("has_any_run"),
         )
         for r in rows
     ]

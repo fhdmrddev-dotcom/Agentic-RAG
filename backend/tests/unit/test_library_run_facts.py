@@ -113,6 +113,7 @@ def _published_row(
     created_by: UUID = _CALLER,
     last_run_at: object = _RAN_AT,
     last_run_status: object = "completed",
+    has_any_run: object = True,
 ) -> dict:
     return {
         "id": UUID("33333333-3333-3333-3333-333333333333"),
@@ -124,11 +125,18 @@ def _published_row(
         "updated_at": _UPDATED,
         "last_run_at": last_run_at,
         "last_run_status": last_run_status,
+        # Phase 192.2 gap round 1 (CR-01). ⚠ The DEFAULT is ``True`` while the scoped pair also
+        # defaults populated, because live those agree on an owned row — the interesting states
+        # are passed explicitly by the tests that mean them.
+        "has_any_run": has_any_run,
     }
 
 
 def _draft_row(
-    *, last_run_at: object = _RAN_AT, last_run_status: object = "failed"
+    *,
+    last_run_at: object = _RAN_AT,
+    last_run_status: object = "failed",
+    has_any_run: object = True,
 ) -> dict:
     return {
         "id": UUID("44444444-4444-4444-4444-444444444444"),
@@ -140,6 +148,7 @@ def _draft_row(
         "updated_at": _UPDATED,
         "last_run_at": last_run_at,
         "last_run_status": last_run_status,
+        "has_any_run": has_any_run,
     }
 
 
@@ -267,6 +276,151 @@ async def test_a_draft_row_with_no_run_carries_explicit_nulls(monkeypatch, absen
 
     assert out[0].last_run_at is None
     assert out[0].last_run_status is None
+
+
+# ══ GROUP A2 — the ROW-LEVEL bit on the wire (CR-01, gap round 1) ═════════════════════
+#
+# ⚠ T-11 FIRES AGAIN, AND IT IS THE ONLY REASON THIS GROUP EXISTS SEPARATELY FROM GROUP B2.
+# All three routes declare ``response_model``, which DROPS UNDECLARED KEYS SILENTLY — a green
+# db test beside an unchanged UI. The model and the builder move together or the column never
+# reaches the client, so both halves are pinned here on the SERIALIZED dump, which is what the
+# browser actually receives.
+
+
+async def test_published_serializes_the_row_level_bit(monkeypatch):
+    from app.api.workflows import get_published_workflows
+
+    _patch_published(monkeypatch, [_published_row(has_any_run=True)])
+    out = await get_published_workflows(current_user={"id": str(_CALLER)})
+
+    assert out[0].has_any_run is True
+    assert out[0].model_dump(mode="json")["has_any_run"] is True
+
+
+async def test_starters_serializes_the_row_level_bit(monkeypatch):
+    """C-6 again: ONE model, TWO feeds. ⚠ And this is the shelf the bit was ADDED for — it is
+    world-readable, so it is where a caller-scoped null was most often read as a row fact."""
+    from app.api.workflows import get_starter_workflows
+
+    _patch_starters(
+        monkeypatch, [_published_row(created_by=_SEED_SYSTEM_USER, has_any_run=True)]
+    )
+    out = await get_starter_workflows(current_user={"id": str(_CALLER)})
+
+    assert out[0].has_any_run is True
+    assert out[0].model_dump(mode="json")["has_any_run"] is True
+
+
+async def test_drafts_serializes_the_row_level_bit(monkeypatch):
+    from app.api.workflows import list_drafts
+
+    _patch_drafts(monkeypatch, [_draft_row(has_any_run=False)])
+    out = await list_drafts(current_user={"id": str(_CALLER)})
+
+    assert out[0].has_any_run is False
+    assert out[0].model_dump(mode="json")["has_any_run"] is False
+
+
+@pytest.mark.parametrize("feed", ["published", "starters", "drafts"])
+async def test_the_CR_01_SHAPE_survives_the_response_model(monkeypatch, feed):
+    """⚠ **THE PAIR CR-01 IS ABOUT**, carried all the way to the serialized dump.
+
+    ``has_any_run=true`` together with ``last_run_at=null`` means *somebody ran it, and it was
+    not you*. Before this change the second half was the ONLY half, and the card read it as
+    *nobody ever ran it*. The two keys disagreeing is the POINT, not an inconsistency, so it is
+    asserted as a pair rather than as two independent fields.
+    """
+    if feed == "drafts":
+        from app.api.workflows import list_drafts as handler
+
+        row = _draft_row(last_run_at=None, last_run_status=None, has_any_run=True)
+        _patch_drafts(monkeypatch, [row])
+    else:
+        row = _published_row(last_run_at=None, last_run_status=None, has_any_run=True)
+        if feed == "published":
+            from app.api.workflows import get_published_workflows as handler
+
+            _patch_published(monkeypatch, [row])
+        else:
+            from app.api.workflows import get_starter_workflows as handler
+
+            _patch_starters(monkeypatch, [row])
+
+    out = await handler(current_user={"id": str(_CALLER)})
+    dumped = out[0].model_dump(mode="json")
+
+    assert dumped["has_any_run"] is True, feed
+    assert dumped["last_run_at"] is None, feed
+    assert dumped["last_run_status"] is None, feed
+
+
+@pytest.mark.parametrize("feed", ["published", "starters", "drafts"])
+async def test_a_MISSING_row_level_bit_is_None_and_NEVER_coerced_to_False(monkeypatch, feed):
+    """⚠ DEC-08-C, AND THIS IS THE ONE THAT WOULD RE-CREATE CR-01 ONE LAYER DOWN.
+
+    A SQL ``EXISTS`` is never null, so live the value is always ``True``/``False``. ``None``
+    exists for exactly one case: a read path that omits the column. ``bool(r.get(...))`` there
+    would manufacture the AFFIRMATIVE claim *"nobody has run this"* out of an ABSENCE — which
+    is the precise shape of the bug this change closes. Absence must stay absence.
+
+    POSITIVE CONTROL is the trio above: a row that DOES carry the key yields ``True``/``False``
+    on the same code path, so this cannot pass because the field is simply never populated.
+    """
+    if feed == "drafts":
+        from app.api.workflows import list_drafts as handler
+
+        row = _draft_row()
+        del row["has_any_run"]
+        _patch_drafts(monkeypatch, [row])
+    else:
+        row = _published_row()
+        del row["has_any_run"]
+        if feed == "published":
+            from app.api.workflows import get_published_workflows as handler
+
+            _patch_published(monkeypatch, [row])
+        else:
+            from app.api.workflows import get_starter_workflows as handler
+
+            _patch_starters(monkeypatch, [row])
+
+    out = await handler(current_user={"id": str(_CALLER)})
+    dumped = out[0].model_dump(mode="json")
+
+    assert out[0].has_any_run is None, feed
+    assert dumped["has_any_run"] is None, feed
+    # ⚠ NOT False. An explicit False is a CLAIM; None is the absence of one.
+    assert dumped["has_any_run"] is not False, feed
+
+
+def test_the_row_level_bit_is_typed_bool_or_None_on_BOTH_models():
+    """DEC-08-C as a type assertion, on both models, so a later ``bool`` narrowing reds here.
+
+    ⚠ Deliberately NOT parallel to ``last_run_status``'s rule (a plain nullable ``str``, never
+    an enum, so a seventh terminal state cannot 500 the library). This one is nullable for a
+    DIFFERENT reason: ``None`` is a third message — *this backend cannot say* — and a
+    non-optional ``bool`` cannot express it.
+    """
+    from app.api.workflows import DraftRow, PublishedWorkflow
+
+    for model in (PublishedWorkflow, DraftRow):
+        field = model.model_fields["has_any_run"]
+        annotation = str(field.annotation)
+        assert "bool" in annotation, annotation
+        assert "None" in annotation or "Optional" in annotation, annotation
+        assert field.default is None, f"{model.__name__}: default must be None, not False"
+
+
+def test_the_serializers_do_not_COERCE_the_row_level_bit():
+    """A source fence beside the behavioural ones, because ``bool(r.get("has_any_run"))`` is the
+    natural thing to write and it silently converts an absence into a claim."""
+    from app.api import workflows as wf
+
+    source = inspect.getsource(wf)
+    assert 'has_any_run=r.get("has_any_run")' in source
+    assert 'bool(r.get("has_any_run"))' not in source
+    # Two declarations + three serializer sites.
+    assert source.count("has_any_run") >= 5, source.count("has_any_run")
 
 
 def test_both_models_default_the_fields_so_an_old_row_still_validates():
