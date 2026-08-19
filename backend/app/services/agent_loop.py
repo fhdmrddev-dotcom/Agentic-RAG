@@ -1472,10 +1472,33 @@ async def run_agent_loop(
         )
     )
 
+    # The model the request will ACTUALLY be served by — identical expression to the
+    # one the stream itself uses at :1663. Both trim sites previously passed
+    # ``user_settings.llm_model``, which is the org/user DEFAULT, not the per-request
+    # pick: a composer-selected `body.model` never reached the context budget at all.
+    # Measured 2026-08-18 — `user_settings` had zero rows, so the budget for a run
+    # served by `qwen3.6-35b-a3b-mtp` (32,768-token window) was resolved against
+    # `deepseek-v4-flash`, yielding an 80,000-token budget the trimmer never hit. The
+    # run then died at `finish_reason=length` mid-tool-call with all its data gathered.
+    _budget_model = body.model or user_settings.llm_model or settings.llm_model
+
+    # Warm the 30s-TTL override cache BEFORE the first trim. resolve_context_budget's
+    # registry clamp reads that cache synchronously (it has no await), so on a cold
+    # process the very first trim of a run would otherwise miss the model's declared
+    # context window and fall through to the provider default. The call is already
+    # TTL-cached and made again at :1663, so this is a no-op on a warm cache.
+    try:
+        await get_model_capability_async(_budget_model)
+    except Exception:
+        logger.warning(
+            "context budget: could not warm model overrides for %s; "
+            "falling back to the static context chain", _budget_model, exc_info=True
+        )
+
     # Trim conversation history to fit context window before the first LLM call
     messages = trim_messages_to_fit(
         messages,
-        max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
+        max_tokens=resolve_context_budget(user_settings.active_provider, _budget_model),
         reserve_recent=settings.context_window_reserve_recent,
     )
     logger.debug(
@@ -1813,7 +1836,7 @@ async def run_agent_loop(
             # Re-trim after tool results have been appended (context grows each iteration)
             messages = trim_messages_to_fit(
                 messages,
-                max_tokens=resolve_context_budget(user_settings.active_provider, user_settings.llm_model),
+                max_tokens=resolve_context_budget(user_settings.active_provider, _budget_model),
                 reserve_recent=settings.context_window_reserve_recent,
             )
             if len(messages) < _pre_trim_len:

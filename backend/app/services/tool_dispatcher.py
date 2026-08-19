@@ -1233,8 +1233,54 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
         .order("is_system", desc=True).order("is_org_shared", desc=True)
     )
     skill_row = _skill_resp.data
+
     if not skill_row:
-        return ToolResult(result=json.dumps({"error": f"Skill '{skill_name}' not found or not enabled."}))
+        # Exact-name miss. Weaker models -- local ones especially -- emit the skill's
+        # HUMAN-READABLE title ("Weekly Report Writer") where the registry stores a slug
+        # ("weekly-report-writer"). Measured 2026-08-18 on openai/gpt-oss-20b: the run
+        # completed but told the operator to upload a template that WAS already attached,
+        # because the miss above returned a dead end -- an error naming no valid
+        # alternative, so the model could not self-correct and reasoned on from a false
+        # premise. A stronger cloud model emits the slug first try and never reaches this
+        # branch, which is exactly why the gap read as "local models are broken".
+        #
+        # Two additive recoveries, both reached ONLY where the code above already failed:
+        #   1. normalised match (casefold, separators unified) -- resolves the title form
+        #   2. an error that LISTS the loadable names, so one retry can succeed
+        import re as _re_local   # module-local idiom used elsewhere in this file
+
+        def _norm(v: str) -> str:
+            return _re_local.sub(r"[\s_-]+", "-", (v or "").strip().casefold())
+
+        _all_resp = await aexec(
+            ctx.supabase.table("skills")
+            .select("id, name, description, instructions, user_id")
+            .or_(_skill_filter)
+            .eq("is_enabled", True)
+            .order("is_system", desc=True).order("is_org_shared", desc=True)
+        )
+        _candidates = _all_resp.data or []
+        if not isinstance(_candidates, list):
+            _candidates = [_candidates]
+
+        _target = _norm(skill_name)
+        # First match wins: the query keeps the is_system > is_org_shared precedence
+        # the exact-match path relies on (SEED-102 / SEED-125), so iteration order IS
+        # the authority order. Never re-sort here.
+        _match = next((c for c in _candidates if _norm(c.get("name")) == _target), None)
+
+        if _match is None:
+            _available = sorted({c.get("name") for c in _candidates if c.get("name")})
+            return ToolResult(result=json.dumps({
+                "error": f"Skill '{skill_name}' not found or not enabled.",
+                "available_skills": _available,
+                "hint": "Call load_skill again with one of the names in available_skills, exactly as written.",
+            }))
+
+        logger.info(
+            "load_skill: resolved '%s' to '%s' by normalised name", skill_name, _match.get("name"),
+        )
+        skill_row = _match
 
     row = skill_row[0] if isinstance(skill_row, list) else skill_row
 
@@ -1267,10 +1313,18 @@ async def _handle_load_skill(args: dict, ctx: ToolContext) -> ToolResult:
     # skill's name; else the live DB row's body (byte-identical Deep). getattr so a
     # duck-typed ctx stub predating the field still works (096 workflow_run_id
     # precedent). Keyed on skill_name — the SAME value `.eq("name", ...)` looked up.
+    # 2026-08-18: the normalised-name fallback above means `skill_name` (what the MODEL
+    # typed) may differ from `row["name"]` (what actually resolved). This map is keyed by
+    # the REAL skill name, so check the resolved name too -- checking only the caller's
+    # string would silently serve LIVE instructions to a re-eval that asked for DRAFT
+    # ones, and the eval would score the wrong text while reporting success.
     override = getattr(ctx, "skill_instructions_override", None)
     instructions = row["instructions"]
-    if override is not None and skill_name in override:
-        instructions = override[skill_name]
+    if override is not None:
+        for _key in (skill_name, row.get("name")):
+            if _key is not None and _key in override:
+                instructions = override[_key]
+                break
     result_payload = {
         "name": row["name"],
         "instructions": instructions,
@@ -2067,6 +2121,40 @@ async def _handle_execute_code(args: dict, ctx: ToolContext) -> ToolResult:
             "stdout": exec_result.stdout or "",
             "stderr": exec_result.stderr or "",
         }
+        # 2026-08-19 — SELF-REPAIR for the single most expensive authoring mistake
+        # observed: the model writes correct code that opens `/sandbox/<file>` but
+        # omits the `skill_files` argument, so the file is never injected. The raw
+        # error it gets back is `PackageNotFoundError` / `FileNotFoundError` naming a
+        # path — which says nothing about the argument it forgot, so it cannot
+        # self-correct. Measured: a local 20B model burned FOUR attempts and 26
+        # minutes on exactly this; a frontier model read the tool schema and got it
+        # right first try. Naming the missing argument turns a dead end into one
+        # retry. Fires ONLY on a failing run that referenced an un-injected
+        # /sandbox path, so a correct call is byte-identical.
+        import re as _re_hint   # module-local idiom (see _handle_load_skill)
+        _stderr_txt = exec_result.stderr or ""
+        if actual_exit_code != 0 or "Traceback" in _stderr_txt:
+            _injected = {
+                (sf.get("filename") or "") for sf in (skill_files_req or [])
+            }
+            _referenced = set(_re_hint.findall(r"/sandbox/([A-Za-z0-9._-]+)", _stderr_txt))
+            # /sandbox/output/<name> is the OUTPUT dir, never an injected input.
+            _missing = {f for f in _referenced if f and f != "output" and f not in _injected}
+            if _missing:
+                _names = ", ".join(sorted(_missing))
+                _llm_payload["missing_skill_file"] = (
+                    f"The code referenced /sandbox/{_names} but that file was NOT injected "
+                    f"into the sandbox, because this execute_code call did not pass a "
+                    f"`skill_files` argument for it. Retry the SAME call with "
+                    f'`skill_files: [{{"skill_name": "<skill name as returned by '
+                    f'load_skill>", "filename": "{sorted(_missing)[0]}"}}]` added. '
+                    f"Do not change the code."
+                )
+                logger.info(
+                    "execute_code: missing_skill_file hint emitted for %s (injected=%s)",
+                    _names, sorted(_injected),
+                )
+
         # Phase 142 (SRH-01 / D-06) — POST-HOC reshape. Classify the completed
         # failure against the fixed KNOWN_MISSING allowlist; on a HIT append a
         # PERMANENT-framed `runtime_gap` note to the MODEL-facing llm_content (so a
