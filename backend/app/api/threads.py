@@ -95,7 +95,11 @@ from app.services.workflow_kickoff import (
 # _load_run_definition are imported LOCALLY inside the producer branch to keep
 # the heavier service graph (agent_loop/tool_dispatcher) off the module-load path.
 from app.db.workflows import create_workflow_run, list_published_workflows
-from app.models.thread import ThreadWorkflowState, WorkflowPhaseState
+from app.models.thread import (
+    ThreadWorkflowState,
+    WorkflowPhaseState,
+    declared_phase_measure,
+)
 from app.models.user_settings import (
     load_all_model_overrides,
     load_user_settings,
@@ -1188,8 +1192,18 @@ async def get_thread_workflow(
             last_run_created_at = latest_wf["created_at"]
             last_run_updated_at = latest_wf["updated_at"]
     if phases_source_run_id is not None:
+        # 200 (DES-02 / D-05 / D-07) — widened in LOCKSTEP with `WorkflowPhaseState` and
+        # with `api/workflow_runs.py`'s projection: the chat panel and the run page read
+        # the SAME rows and must not disagree about them.
+        # ⚠ `output` is SELECTED but NEVER put on the wire — `_persist_output` stores each
+        # executor's dict full and inline (prompts, citations, field_map). The serializer
+        # below extracts ONLY `_measure.count` / `_measure.noun`, and `WorkflowPhaseState`
+        # declares no `output` field, so `response_model` drops anything undeclared.
+        # ⚠ This read goes through `_rls_fetch` (the user-JWT path), so RLS is the access
+        # boundary here; adding columns to the SELECT widens no scope.
         phase_rows = await _rls_fetch(
-            "SELECT slug, phase_index, status FROM workflow_phases "
+            "SELECT slug, phase_index, status, started_at, completed_at, output "
+            "FROM workflow_phases "
             "WHERE workflow_run_id = $1 ORDER BY phase_index",
             UUID(phases_source_run_id) if isinstance(phases_source_run_id, str) else phases_source_run_id,
         )
@@ -1217,15 +1231,21 @@ async def get_thread_workflow(
                             slug_to_type[slug] = ptype
                 except Exception:
                     pass
-            phases_list = [
-                WorkflowPhaseState(
-                    slug=r["slug"],
-                    phase_index=r["phase_index"],
-                    status=r["status"],
-                    phase_type=slug_to_type.get(r["slug"]),
+            phases_list = []
+            for r in phase_rows:
+                _count, _noun = declared_phase_measure(r["output"])
+                phases_list.append(
+                    WorkflowPhaseState(
+                        slug=r["slug"],
+                        phase_index=r["phase_index"],
+                        status=r["status"],
+                        phase_type=slug_to_type.get(r["slug"]),
+                        started_at=r["started_at"],
+                        completed_at=r["completed_at"],
+                        step_count=_count,
+                        step_noun=_noun,
+                    )
                 )
-                for r in phase_rows
-            ]
 
     return ThreadWorkflowState(
         thread_id=UUID(thread_id) if isinstance(thread_id, str) else thread_id,

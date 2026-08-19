@@ -45,6 +45,52 @@ class ThreadSnapshotResponse(BaseModel):
     since_cursors: dict[str, str]
 
 
+def declared_phase_measure(raw: object) -> tuple[int | None, str | None]:
+    """Extract the executor-DECLARED ``(count, noun)`` from a phase's ``output`` jsonb.
+
+    Phase 200 / D-07. A phase type declares a measure ONLY where a count is already a fact
+    in its own output; the executor writes ``output["_measure"] = {"count", "noun"}``
+    (``harness/phase_types.py``) and FOUR of the seven types write no such key at all.
+
+    ⚠ **THIS IS THE ONE HOME FOR THE READ SIDE, and it is sited here on purpose.** It has
+    exactly TWO consumers, and they are the two independent wire models for the same
+    ``workflow_phases`` rows: ``WorkflowPhaseState`` below (the CHAT surface's workspace
+    panel, via the ungated ``GET /threads/{id}/workflow``) and ``WorkflowRunPhaseRead``
+    (``api/workflow_runs.py`` — the RUN PAGE, via the canvas-gated ``GET
+    /workflow-runs/{id}``). A second copy is how the two surfaces come to disagree about
+    the same row, which is the exact failure this phase exists to prevent. This module is
+    already imported by both and carries no heavy dependencies, so it is the cheapest
+    shared home; ``phase_types.py`` — where the WRITE side lives — pulls the provider
+    services in at import time and cannot be reached from the API layer.
+
+    ⚠ **``0`` AND ``None`` ARE DIFFERENT ANSWERS AND THIS FUNCTION MUST NOT COLLAPSE THEM.**
+    ``(0, "sources")`` means the step searched and found nothing — a real measurement.
+    ``(None, None)`` means this phase type declares no count at all. Hence the explicit
+    ``isinstance(count, int)`` test rather than a truthiness check or an ``or None``: both
+    of those silently turn an honest zero into an absence, and the client renders nothing
+    for ``null`` while rendering "0 sources" for ``0``.
+
+    ⚠ ``bool`` is excluded deliberately — it is a subclass of ``int`` in Python, so a stray
+    ``{"count": true}`` would otherwise serialize as ``1``.
+
+    Defensive by construction: this reads model-influenced jsonb, so every layer is
+    ``isinstance``-guarded and anything unexpected degrades to ``(None, None)`` rather than
+    raising. Never ``raw["_measure"]``.
+    """
+    if not isinstance(raw, dict):
+        return None, None
+    measure = raw.get("_measure")
+    if not isinstance(measure, dict):
+        return None, None
+    count = measure.get("count")
+    noun = measure.get("noun")
+    if not isinstance(count, int) or isinstance(count, bool):
+        return None, None
+    if not isinstance(noun, str) or not noun:
+        return None, None
+    return count, noun
+
+
 class WorkflowPhaseState(BaseModel):
     """Phase 098-UAT run-honesty fix (B) — one ``workflow_phases`` row's durable
     per-phase status, surfaced so the frontend reconcile floor can rebuild an
@@ -58,6 +104,25 @@ class WorkflowPhaseState(BaseModel):
     phase_index: int
     status: str
     phase_type: str | None = None
+
+    # ── 200 (DES-02 / D-05 / D-07) — the same four facts `WorkflowRunPhaseRead` carries ──
+    # ⚠ THIS IS A SECOND, INDEPENDENT WIRE MODEL FOR THE SAME `workflow_phases` ROWS, and
+    # that is why these fields are duplicated here rather than shared. `WorkflowRunPhaseRead`
+    # (`api/workflow_runs.py`) feeds the RUN PAGE through a canvas-gated route; this one
+    # feeds the CHAT surface's workspace panel (PhaseTimeline / PhaseCard) through an
+    # UNGATED one. **Widening only the other model would ship a run page with durations and
+    # a chat panel without them** — the same facts, two surfaces, silently disagreeing.
+    # The two models must be widened in the SAME commit; they are the two halves of one
+    # contract, not a model and its copy.
+    #
+    # Semantics are identical and are stated once, in `WorkflowRunPhaseRead`'s field
+    # descriptions. The two that matter most: a NULL timestamp means TIME NOT RECORDED
+    # (there is no backfill — D-06), and `step_count` distinguishes `0` (a real measurement
+    # of nothing) from `null` (this phase type declares no count) — never `?? 0`.
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    step_count: int | None = None
+    step_noun: str | None = None
 
 
 class ThreadWorkflowState(BaseModel):

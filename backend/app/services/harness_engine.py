@@ -66,6 +66,9 @@ from app.db.workflows import (
     write_audit,
 )
 from app.models.harness import WorkflowDefinition
+# 200 (D-07) — the ONE home for the `_measure` read side, shared with the two wire
+# models for these same rows. The SSE frame and the two fetches must agree.
+from app.models.thread import declared_phase_measure
 from app.services.ask_user_service import resume_pending_prompt
 
 logger = logging.getLogger(__name__)
@@ -137,6 +140,24 @@ async def _emit(redis, run_id: UUID, type: str, **fields) -> None:
         maxlen=10000,
         approximate=True,
     )
+
+
+def _iso(value) -> str | None:
+    """Render a DB timestamp for the wire, or ``None`` when there is nothing to say.
+
+    Phase 200 / D-05. The five terminal writers and ``mark_phase_active`` return what
+    Postgres stored; a row that did not move returns ``None`` and this yields ``None``, so
+    the frame announces no time rather than a fabricated one.
+
+    ⚠ Tolerant of a non-datetime by design. These values come back through a pool that is
+    a RECORDING MOCK in most of this repo's engine tests, where the fake's ``fetchval``
+    returns whatever a test injected. A frame is not the place to raise over that, and a
+    ``str()`` of some unrelated object would be worse than silence — so anything that is
+    not a datetime degrades to ``None``.
+    """
+    from datetime import datetime as _dt
+
+    return value.isoformat() if isinstance(value, _dt) else None
 
 
 def _persist_output(output: dict) -> dict:
@@ -1576,7 +1597,12 @@ async def run_workflow(
         )
 
         # 1. DURABLE active BEFORE any work (Pitfall 1).
-        await mark_phase_active(pool, phase_id)
+        # 200 (DES-02 / D-05): the write RETURNS the timestamp it stored, so the frame
+        # below carries the value the ROW carries — never a Python-side now() computed
+        # beside it. WRITE-before-EMIT is what makes that possible: the durable flip has
+        # already happened by the time this frame is built, so nothing here announces a
+        # fact the database does not yet hold.
+        phase_started_at = await mark_phase_active(pool, phase_id)
         # WRITE-before-EMIT.
         await write_audit(
             pool,
@@ -1590,6 +1616,14 @@ async def run_workflow(
             phase=phase.slug,
             phase_index=phase.phase_index,
             phase_type=phase.config.phase_type,
+            # 200 (D-05) — THE LIVE TICK'S ANCHOR. FETCH STAYS AUTHORITATIVE
+            # (D-v2.5-03): the client reconciles from `GET /threads/{id}/workflow` and
+            # `GET /workflow-runs/{id}`, and a terminal run has no stream at all, so the
+            # panel's reconcile floor cannot depend on this frame. What the frame buys is
+            # the anchor AT THE INSTANT THE STEP STARTS, so a running step can tick
+            # without polling. `None` when the row did not move — the client then renders
+            # nothing rather than counting up from an invented zero.
+            started_at=_iso(phase_started_at),
         )
 
         # 2. Execute under the bounded-retry gate loop (wall-clock cap + gates +
@@ -1837,6 +1871,12 @@ async def run_workflow(
         _recorded_intent = (
             output.get(RECORDED_INTENT_KEY) if isinstance(output, dict) else None
         )
+        # 200 (D-05): bound BEFORE the branch, not only inside it. The completion frame
+        # further down sits in the `else` of a SECOND if/elif/else whose conditions mirror
+        # this one, so the two agree today — but they are two chains, and a later edit to
+        # either would make this an UnboundLocalError at emit time on a path that used to
+        # work. None is also the honest value on the two arms that skip complete_phase.
+        phase_completed_at = None
         if _emit_failure:
             # 101.1 review WR-02: persist the FULL failure output (incl. the cited
             # field_map states b/c/d carry) on the phase row — fail_phase merges it
@@ -1845,7 +1885,7 @@ async def run_workflow(
         elif _recorded_intent:
             await record_phase_not_sent(pool, phase_id, durable_output)
         else:
-            await complete_phase(pool, phase_id, durable_output)
+            phase_completed_at = await complete_phase(pool, phase_id, durable_output)
         accumulated_outputs[phase.slug] = output
         last_output = output
         # F7 (092-07): fold this phase's grounding into the run-level union.
@@ -1959,10 +1999,24 @@ async def run_workflow(
                 event_type="phase_completed",
                 metadata={"phase": phase.slug, "phase_index": phase.phase_index},
             )
+            _count, _noun = declared_phase_measure(output)
             await _emit(redis, stream_run_id,
                 "phase_completed",
                 phase=phase.slug,
                 phase_index=phase.phase_index,
+                # 200 (D-05) — the terminal instant, as the ROW carries it. `None` when
+                # `complete_phase`'s `IS DISTINCT FROM 'cancelled'` fence refused the
+                # write (a Stop already cancelled this phase — the L-01 residue): the
+                # step was never completed, so no completion time is announced for it.
+                completed_at=_iso(phase_completed_at),
+                # 200 (D-07) — the DECLARED per-step count, read from the executor's own
+                # output. ⚠ BOTH KEYS ARE ALWAYS PRESENT ON THE FRAME and carry `null`
+                # for the four phase types that declare nothing, because a wire frame's
+                # shape is fixed while the JSONB row's is not. `null` means "this type
+                # declares no count"; `0` means "measured, and it was zero". The client
+                # must branch on the two, never coalesce with `?? 0`.
+                step_count=_count,
+                step_noun=_noun,
             )
         if next_phase_id is not None:
             await write_audit(

@@ -63,6 +63,10 @@ from app.dependencies import (
     get_user_supabase_client,
     require_canvas,
 )
+# 200 (D-07) — the ONE home for the `_measure` read side, shared with the SECOND wire
+# model for these same rows (`WorkflowPhaseState`, the chat panel's). A local copy here
+# is how the run page and the chat panel come to disagree about the same phase row.
+from app.models.thread import declared_phase_measure
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -101,6 +105,51 @@ class WorkflowRunPhaseRead(BaseModel):
         )
     )
     phase_type: str | None = None
+
+    # ── 200 (DES-02 / D-05 / D-07) — the measurable facts ────────────────────
+    # ⚠ THESE FOUR FIELDS, THE `.select()` PROJECTION BELOW AND THE SERIALIZER MOVE IN
+    # LOCKSTEP. Widening two of the three ships a green model and an empty field, because
+    # this route declares `response_model=WorkflowRunRead` and FastAPI DROPS UNDECLARED
+    # KEYS SILENTLY — 192.2 measured exactly that on `api/workflows.py`: a green db test
+    # sitting beside an unchanged UI.
+    started_at: datetime | None = Field(
+        default=None,
+        description=(
+            "When this phase flipped to active. NULL means the time was NOT RECORDED — "
+            "either the phase never ran, or it ran before migration 121 existed. ⚠ There "
+            "is NO BACKFILL (D-06): a value derived from updated_at would be right for "
+            "some rows and silently wrong for others, with nothing on the row to say "
+            "which. Render nothing for a NULL; never render a zero duration."
+        ),
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        description=(
+            "When this phase reached a terminal status. NULL on a phase still running, on "
+            "a SKIPPED phase (which never ran at all — D-06 calls that correct silence), "
+            "and on every pre-migration-121 row."
+        ),
+    )
+    step_count: int | None = Field(
+        default=None,
+        description=(
+            "The per-step count DECLARED by this phase type, extracted server-side from "
+            "the phase's own output (D-07). ⚠ `0` IS A REAL MEASUREMENT — a step that "
+            "searched and found nothing genuinely measured zero — and it is NOT the same "
+            "as `null`, which means THIS PHASE TYPE DECLARES NO COUNT AT ALL. Four of the "
+            "seven types are always null here. Consumers must branch on `null` vs `0`, "
+            "never coalesce with `?? 0`."
+        ),
+    )
+    step_noun: str | None = Field(
+        default=None,
+        description=(
+            "The noun for `step_count` — `sources` | `agents` | `fields`. Non-null iff "
+            "`step_count` is non-null. AUTHORED COPY owned by the executor that declares "
+            "it, deliberately domain-neutral: the client renders the pair verbatim and "
+            "must never substitute a domain word of its own."
+        ),
+    )
 
 
 class WorkflowRunRead(BaseModel):
@@ -225,24 +274,45 @@ async def read_workflow_run(
     definition = _coerce_definition(definition_row.get("definition"))
 
     # ── Step 3: the durable phase spine, ORDER BY phase_index ──
+    # ── 200 (DES-02): the projection, widened in LOCKSTEP with the model + serializer ──
+    # ⚠ V4 ACCESS CONTROL IS UNCHANGED BY THIS WIDENING, and a reviewer will ask, so it is
+    # answered here: these columns are added to a query ALREADY scoped by
+    # `.eq("workflow_run_id", run["id"])`, where `run` came from the ownership select
+    # above (id AND user_id on the SAME select). No second query, no new dependency, no
+    # changed 404 body — and NO SCOPE WIDENS. A `.select("*")` would also "work" and
+    # would WEAKEN the read by shipping whatever columns the table grows next; reject it.
+    #
+    # ⚠ `output` IS SELECTED BUT NEVER PUT ON THE WIRE. `_persist_output` stores each
+    # executor's dict FULL AND INLINE, so this jsonb carries field_map, citations and
+    # prompts. The SERIALIZER below extracts ONLY `_measure.count` / `_measure.noun` into
+    # `step_count` / `step_noun`, and `WorkflowRunPhaseRead` declares no `output` field —
+    # so `response_model`'s drop behaviour is what keeps the payload narrow. That is the
+    # answer to RESEARCH's open question A7 with no second migration: the carrier stays
+    # the jsonb, the exposure stays bounded, and the client never sees a prompt.
     phases_resp = await aexec(
         supabase.table("workflow_phases")
-        .select("slug, phase_index, status")
+        .select("slug, phase_index, status, started_at, completed_at, output")
         .eq("workflow_run_id", str(run["id"]))
         .order("phase_index")
     )
     phase_rows = (phases_resp.data if phases_resp is not None else None) or []
 
     slug_to_type = _slug_to_phase_type(definition)
-    phases = [
-        WorkflowRunPhaseRead(
-            slug=row["slug"],
-            phase_index=row["phase_index"],
-            status=row["status"],
-            phase_type=slug_to_type.get(row["slug"]),
+    phases = []
+    for row in phase_rows:
+        count, noun = declared_phase_measure(row.get("output"))
+        phases.append(
+            WorkflowRunPhaseRead(
+                slug=row["slug"],
+                phase_index=row["phase_index"],
+                status=row["status"],
+                phase_type=slug_to_type.get(row["slug"]),
+                started_at=row.get("started_at"),
+                completed_at=row.get("completed_at"),
+                step_count=count,
+                step_noun=noun,
+            )
         )
-        for row in phase_rows
-    ]
 
     return WorkflowRunRead(
         id=run["id"],
