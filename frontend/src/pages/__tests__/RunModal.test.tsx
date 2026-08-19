@@ -1213,3 +1213,93 @@ describe("RunModal 193-07 — the template block across all three admission stat
     rendered.unmount()
   })
 })
+
+// ── 199-10 Task 1 — THE RUN DIALOG'S RESTING INVENTORY, AND THE TWO REFUSED SHEET ROWS ──
+
+/**
+ * Phase 199-10 Task 1 (DES-01) — sheet `c6-library-dialogs` reconciled against the shipped
+ * run dialog, in the two places a machine can hold the line.
+ *
+ * ── THE TWO REFUSALS, AND WHY THEY ARE FENCES RATHER THAN NOTES ─────────────────────────
+ * Sheet c6's run dialog draws a mono "spec" block with three rows. Two of them are refused on
+ * sight, on this project's own recorded rules rather than on taste:
+ *
+ *   1. `Target nodes: production-cluster` — INFRASTRUCTURE VOCABULARY printed to a business
+ *      user. DES-01's own clause is *the mechanism is never printed to the user*, and sketch
+ *      178's README records the same rule as the third thing written into the design system.
+ *   2. `Estimated time: ~45s` — a DETERMINATE ESTIMATE nothing in this system computes. It is
+ *      the same class of fabricated precision as sheet c3's `(4/12)`, which the sketch's own
+ *      README already names as the one fabricated-progress defect of the batch.
+ *
+ * A refusal recorded only in a SUMMARY is a refusal that a later plan re-adopts by reading the
+ * sheet and not the summary. These are therefore live assertions over the RENDERED modal, each
+ * with a POSITIVE CONTROL running the SAME detector over a planted string — the Phase 187
+ * lesson this subtree has now recorded repeatedly: an absence assertion with a broken matcher
+ * passes exactly like one that holds.
+ *
+ * ⚠ THE DETECTORS ARE SPELLED HERE ON PURPOSE, AND THAT IS SAFE ONLY BECAUSE THIS IS A TEST
+ * FILE. `librarySubtree.fences.test.ts`'s raw-regex fences sweep an EXPLICIT list of seven
+ * source modules and no test file, so naming a forbidden phrase here cannot red the guard that
+ * forbids it — the 187-24 trap, avoided by scope rather than by circumlocution.
+ */
+
+/** Sheet row 1: an infrastructure identifier reaching a business reader. */
+const namesInfrastructure = (text: string): boolean =>
+  /target\s+nodes?|production-cluster|\bcluster\b|\bnode pool\b/i.test(text)
+
+/** Sheet row 2: a determinate duration estimate — a number this system cannot compute. */
+const claimsAnEstimate = (text: string): boolean =>
+  /estimated\s+time|~\s*\d+\s*(s|sec|secs|seconds|m|min|mins|minutes|h|hr|hrs)\b/i.test(text)
+
+const readModalText = (modal: HTMLElement): string => modal.textContent ?? ""
+
+describe("RunModal 199-10 — the two sheet rows that do not ship (DES-01)", () => {
+  it("POSITIVE CONTROL — both detectors DO fire on the sheet's own two strings", () => {
+    // Without this, every absence below passes identically on a regex that matches nothing.
+    expect(namesInfrastructure("Target nodes: production-cluster")).toBe(true)
+    expect(claimsAnEstimate("Estimated time: ~45s")).toBe(true)
+    // …and they are not so greedy that they fire on the shipped copy's ordinary words.
+    expect(namesInfrastructure("Run opens a new chat thread and streams there.")).toBe(false)
+    expect(claimsAnEstimate("Run opens a new chat thread and streams there.")).toBe(false)
+  })
+
+  it("the shipped modal names NO infrastructure and claims NO estimate, in every captured state", async () => {
+    for (const row of Object.keys(RUN_MODAL_HTML_ROWS)) {
+      const text = await runModalCapture({ ...RUN_MODAL_HTML_ROWS[row], read: readModalText })
+      // Non-vacuity first: an empty render satisfies both absences forever.
+      expect(text.length, `${row} rendered nothing`).toBeGreaterThan(40)
+      expect(namesInfrastructure(text), `${row} names infrastructure`).toBe(false)
+      expect(claimsAnEstimate(text), `${row} claims an estimate`).toBe(false)
+    }
+  })
+})
+
+/**
+ * ── THE RESTING INVENTORY ───────────────────────────────────────────────────────────────
+ *
+ * The six `innerHTML` captures above already record the modal's markup byte for byte, and
+ * they are not replaced by this. They answer *"is the markup unchanged?"*; this answers
+ * *"what does a PERSON read?"* — which is the question Phase 199 is asking, and the one whose
+ * answer must not grow. Read out of this assertion's own failing diff, never predicted.
+ *
+ * ⚠ INVERTED, NEVER DELETED, when the re-presentation removes an atom.
+ */
+describe("RunModal 199-10 — what a person reads at rest, pinned before the re-presentation", () => {
+  it("the modal's resting text is EXACTLY this string", async () => {
+    const text = await runModalCapture({
+      ...RUN_MODAL_HTML_ROWS.BOUND_WITH_FOLDERS,
+      read: readModalText,
+    })
+    expect(text.length).toBeGreaterThan(40)
+    expect(text).toBe("📄Vendor-risk reviewKnowledge base:Workflow default — 📁 DBA Chapters📁 ContractsWhat should this run work on?Template to fillUpload templateStored untrusted — never run as code, never fed to the fill engine.This workflow expects: kickoff_promptRun opens a new chat thread and streams there.Cancel▶ Run workflow")
+  })
+
+  it("the header carries a decorative page glyph beside the workflow name — TODAY", async () => {
+    // Pinned PRESENT so its removal is provable by inversion rather than by a deleted line.
+    // ⚠ `aria-hidden`, so it reaches nobody using a screen reader and carries no meaning to
+    // anyone else: a workflow is not a document, and this product has no category-glyph
+    // vocabulary for one (icon-convention §4).
+    const html = await runModalCapture(RUN_MODAL_HTML_ROWS.BOUND_WITH_FOLDERS)
+    expect(html).toContain('<span aria-hidden="true">📄</span>')
+  })
+})

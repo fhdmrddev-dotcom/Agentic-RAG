@@ -363,3 +363,56 @@ describe("LibraryToolbar — clear search & filters", () => {
     expect(onQueryChange).not.toHaveBeenCalled()
   })
 })
+
+// ── 8. 199-10 Task 1 — THE PRE-CHANGE RESTING INVENTORY (sheet `c6-library-dialogs`) ──
+
+/**
+ * Phase 199-10 Task 1 (DES-01) — WHAT THE TOOLBAR RENDERS AT REST, AS LITERALS, BEFORE
+ * ANYTHING MOVES.
+ *
+ * Phase 199 re-presents shipped surfaces in the adopted design language, and its premise is
+ * REMOVAL. A removal is only provable against a record of what was there, so this block is
+ * taken FIRST, in a commit that changes no source byte, and every literal below is READ OUT
+ * OF THIS ASSERTION'S OWN FAILING DIFF rather than predicted from the JSX.
+ *
+ * ⚠ THE REMOVALS THAT FOLLOW ARE PROVED BY INVERTING THESE ASSERTIONS FROM PRESENT TO
+ * ABSENT, NEVER BY DELETING THEM. A deleted assertion and a passing one are indistinguishable
+ * in a green run; an inverted one still fails if the atom comes back. Zero assertion
+ * deletions is the target for the whole plan.
+ *
+ * ⚠ `textContent` CONCATENATES, which is what killed a `\b` word boundary in `199-07`. These
+ * are EXACT equalities against whole strings, not substring or boundary matches, so the
+ * concatenation is the thing being pinned rather than a hazard to the matcher — and each is
+ * preceded by a non-vacuity assertion, because `toBe("")` against a surface that stopped
+ * rendering passes forever.
+ */
+describe("LibraryToolbar 199-10 — the resting inventory, pinned before the re-presentation", () => {
+  it("renders something at all (non-vacuity, before anything is asserted about its contents)", () => {
+    renderToolbar()
+    const toolbar = screen.getByTestId("library-toolbar")
+    expect(toolbar.querySelectorAll("*").length).toBeGreaterThan(15)
+    expect((toolbar.textContent ?? "").length).toBeGreaterThan(40)
+  })
+
+  it("the whole toolbar's resting text is EXACTLY this string", () => {
+    renderToolbar()
+    expect(screen.getByTestId("library-toolbar").textContent).toBe(
+      "＋Build a workflowDescribe it in plain English → AI drafts itMatches the letters you type, in the name or the purpose.Ready to run7Yours3Still building2Starters4Makes a file0🔒Strict5ProjectAll projectsRiskLegalUnbound (no project)",
+    )
+  })
+
+  it("the create control's own resting text is EXACTLY this string", () => {
+    renderToolbar()
+    expect(screen.getByTestId("library-create").textContent).toBe(
+      "＋Build a workflowDescribe it in plain English → AI drafts it",
+    )
+  })
+
+  it("the create control renders TWO lines today — a heading line and a sub-line", () => {
+    // The structural half of the same record. Text alone cannot tell a two-line affordance
+    // from a one-line one that happens to concatenate to the same characters.
+    renderToolbar()
+    const create = screen.getByTestId("library-create")
+    expect(create.querySelectorAll("span").length).toBe(3)
+  })
+})
