@@ -35,7 +35,7 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 192.2 (does-this-one-work) — **ALL 6 PLANS EXECUTED · VERIFICATION OWED**
+Phase: 192.2 (does-this-one-work) — **ALL 6 PLANS EXECUTED · VERIFIED `gaps_found` 4/6 · NOT CLOSED**
 Plan: **6 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
 (`192.2-02` the G-5 discharge + `192.2-03` the run-facts join), Wave 3 (`192.2-04`, the run
 truth's wire→words path) and **Wave 4 (`192.2-05`, THE SUBTRACTION + THE LANGUAGE)** COMPLETE.
@@ -43,7 +43,60 @@ Wave 2 ran its two plans in PARALLEL worktrees and they merged clean at `00b81f6
 — zero `files_modified` overlap (frontend vs backend), and only `192.2-03` touched Postgres, so
 CLAUDE.md rule 4 (serialize DB-MUTATING plans) was satisfied without serialising the wave.
 Waves 3, 4 and 5 ran SEQUENTIALLY on the main working tree.
-Next action: **`/gsd:verify-work 192.2`.** Execution is complete; the phase is NOT closed.
+Next action: **`/gsd:plan-phase 192.2 --gaps`** — verification ran and scored **4 of 6 must-haves**
+(`192.2-VERIFICATION.md`), and code review scored **1 critical / 4 warning / 5 info**
+(`192.2-REVIEW.md`, `status: issues_found`). **G-7 is CLEAR** — `check-gap-closure-rounds.cjs`
+reports `6 total · 0 gap-closure`, so this would be round 1, and **ROADMAP SC#1 is genuinely
+UNMET**, which is the one thing that justifies a round.
+
+⚠ **CR-01 — THE PHASE SHIPS THE EXACT LIE ITS OWN THESIS EXISTS TO PREVENT, and it is NOT
+deploy skew.** The lateral join is scoped `r.user_id = $1` (`db/workflows.py:161-169`) — the
+**correct** security call, which must STAND. But it silently changed the run fact from **row-level
+to caller-level** while the rendered word stayed row-level: `libraryVocabulary.ts:442`
+`RUN_NEVER = "Never run"` is documented as *"an affirmative statement about the row"*, and
+`runFacts.ts:16-17` repeats that claim. Measured consequence: five `is_system_global` published
+rows carry **20 / 15 / 11 / 7 / 1** runs belonging to ONE user, and `/starters` returns those same
+rows to everybody — so **every other caller sees a painted, explicit "Never run" about a workflow
+that has run twenty times.** `runFacts.ts`'s own header calls this defect class *"the single most
+likely place to ship a lie."* ⚠ **The three arms solve the stale-deploy case, which is nearly
+unreachable in production; they do NOT solve the shared-shelf case, which every user hits on every
+load.** Both the reviewer and the verifier reproduced it independently against live source.
+
+⚠ **This is a PRODUCT decision, not a mechanical fix, which is why it was NOT applied inline.**
+Two honest repairs exist and they answer different questions:
+  (a) **Reword to caller-scoped language** (*"You haven't run this"*) — cheap, no schema. But on a
+      shared starter it then answers a question nobody asked, and LIB-06's thesis (*does this one
+      work*) goes unanswered for exactly the rows a newcomer meets first.
+  (b) **Carry a row-level `has_any_run` (or global run facts for shared rows) and add a FOURTH
+      arm** — answers the real question, costs wire surface.
+**Operator picks.** ⚠ It spans FIVE files (`runFacts.ts`, `libraryVocabulary.ts`, `cardFace.ts`,
+`runFacts.test.ts`, `WorkflowCard.test.tsx`), so G-3's `/gsd:fast` envelope (≤1 file, ≤10 lines)
+does NOT apply.
+
+⚠ **Dating (G-7 protocol):** CR-01 lives entirely in code THIS phase authored — `d0605d09`
+(the lateral) and `4618c148` (the vocabulary + arms), both 2026-08-19. That is normal for a
+phase's FIRST verification; it would be a stop signal only inside a closure round.
+
+**Also open, non-blocking, all confirmed in code:**
+- **WR-01 — `bg-warning` / `text-warning` COMPILE TO NOTHING.** `frontend/tailwind.config.js` has
+  no `warning` key at all (grep exits 1) and `--warning` exists only under `.dark`
+  (`index.css:116`). So the `stopped`/cancelled gutter renders **unpainted — visually identical to
+  the arm the same docblock says is DELIBERATELY unpainted so the two "cannot be mistaken."**
+  Unguarded: the tests assert `data-run`, never the class.
+- **WR-04 — the purpose-search issue is WORSE than 192.2-05 recorded it.** Not just `purpose`:
+  the `makes-a-file` and `strict` chips still select on the **deliverable** and **tier** atoms that
+  D-03 cut, so filter chips now select on facts the card cannot show.
+- **WR-02** — `api.ts` now carries three identically-typed `last_run_status?: string | null`
+  fields, and `workflow_runs.created_at` has TWO wire names (`last_run_created_at` :1338,
+  `last_run_at` :1421) — the exact collision the file warns about twelve lines above it.
+- **WR-03** — an ARIA role violation in the fork-consequence menu item.
+- **`BUG-260819-01`** (`status: open`) — the state word renders twice on a name-colliding row.
+  The fix is one decision in `rowIdentity.ts`, not in the card.
+
+⛔ **NINE G-4 lived-experience rows remain OWED** (`192.2-VALIDATION.md`, every `result:` empty).
+Both of the phase's central claims — *"can tell what works"* and *"quieter, not louder"* — are
+felt claims **no person has verified by eye**. The verifier scored this UNCERTAIN rather than
+failed, which is the honest reading. Execution is complete; **the phase is NOT closed.**
 ⛔ **NINE G-4 lived-experience rows are OWED to the operator** (`192.2-VALIDATION.md`, every
 `result:` empty). **Run U4 FIRST** — the deploy-skew *unknown* arm. It is the row most likely to be
 skipped and it guards the phase's central honesty claim: a frontend deployed ahead of its backend
