@@ -353,9 +353,22 @@ describe("RunModal 192-03 — the pre-move dialog + focus CONTRACT (behaviour, n
     expect(focusables.length).toBeGreaterThan(1)
     const first = focusables[0]
     const last = focusables[focusables.length - 1]
-    // The shipped order, pinned: the KB-scope <select> opens the cycle and the
-    // "▶ Run workflow" button closes it.
-    expect(first).toBe(within(modal).getByTestId("run-scope-select"))
+    // The shipped order, pinned: the header ✕ opens the cycle and the "▶ Run workflow"
+    // button closes it.
+    //
+    // ⚠ RE-BASELINED BY THE SKETCH-200 PORT (2026-08-20), AND THE PREVIOUS VALUE IS KEPT
+    // HERE RATHER THAN OVERWRITTEN: the first focusable used to be `run-scope-select`,
+    // because the dialog had NO visible dismiss control at all. Sketch 200's `run-dialog`
+    // draws one in the header, and adding it necessarily makes it first in DOM order —
+    // which is also the right place for it, since a dismiss should be reachable in one Tab
+    // rather than after every field. The LAST focusable is unchanged, which is the half
+    // that matters most: the cycle still ENDS on the committing control.
+    //
+    // ⚠ The scope `<select>` is still IN the cycle and still second — this is a re-baseline
+    // of an ORDER, never a narrowing of the containment claim. `focusables.length > 1`
+    // above is the non-vacuity guard that keeps it falsifiable.
+    expect(first).toBe(within(modal).getByTestId("run-modal-close"))
+    expect(focusables[1]).toBe(within(modal).getByTestId("run-scope-select"))
     expect(last).toBe(within(modal).getByTestId("run-confirm"))
 
     last.focus()
@@ -468,10 +481,16 @@ describe("RunModal 193-07 a11y — D-18's label is inert (a text node, never a b
     )
     expect(focusables.length).toBeGreaterThan(1)
 
-    // The same shipped cycle the 192-03 contract above pins: the KB-scope <select> opens it
-    // and the "▶ Run workflow" button closes it. A label that had become focusable — or a
-    // binding that pulled the hidden input into the cycle — would move one of these.
-    expect(focusables[0]).toBe(within(modal).getByTestId("run-scope-select"))
+    // The same shipped cycle the 192-03 contract above pins: the header ✕ opens it and the
+    // "▶ Run workflow" button closes it. A label that had become focusable — or a binding
+    // that pulled the hidden input into the cycle — would move one of these.
+    //
+    // ⚠ RE-BASELINED BY THE SKETCH-200 PORT for the reason written out at the sibling
+    // assertion above; the previous first was `run-scope-select`, before the dialog had a
+    // visible dismiss. The scope `<select>` is asserted STILL PRESENT and STILL SECOND, so
+    // this remains a claim about ORDER and not a weaker claim about membership.
+    expect(focusables[0]).toBe(within(modal).getByTestId("run-modal-close"))
+    expect(focusables[1]).toBe(within(modal).getByTestId("run-scope-select"))
     expect(focusables[focusables.length - 1]).toBe(within(modal).getByTestId("run-confirm"))
 
     // The label itself is not in the cycle at all.
