@@ -4,12 +4,13 @@ title: verticalOffsetFor is an unguarded WR-04 sink — a prototype-key phase sl
 reported: 2026-08-07
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflow-canvas, frontend/edit-affordances, security/WR-04]
-folded_into: null
+folded_into: 200
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: >
+  Folded at /gsd:discuss-phase 200 (2026-08-19), together with BUG-260808-01 (same shape, both tagged security/WR-04). Correctness under the canvas plan 200-05 rebuilds. WARNING: this is NOT a checklist row under D-01 -- it widens 200-05 beyond the element inventory deliberately, and the planner must budget for it rather than discover it.
 reproduces_on:
   branch: develop
   commit: HEAD at /gsd:secure-phase 188.2 (post d6dfe716)

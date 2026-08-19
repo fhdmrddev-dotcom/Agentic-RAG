@@ -4,12 +4,13 @@ title: An unanswered `llm_human_input` step times out into a SILENT APPROVAL —
 reported: 2026-08-16
 surface: Agentic-RAG
 severity: major
-status: open
+status: folded
 affected_areas: [harness/phase-types, human-in-the-loop, run-honesty, governance]
-folded_into: null
+folded_into: 200
 verified_closed_by: null
 related_seeds: [SEED-167, SEED-164]
-re_open_trigger: null
+re_open_trigger: >
+  Folded at /gsd:discuss-phase 200 (2026-08-19) as CONTEXT decision D-10. On timeout the phase stays unfinished and the run flips to paused -- a status that ALREADY SHIPS beside cap_paused, so no new literal is needed on workflow_runs.status. fail_phase was considered and REJECTED: it discards completed upstream work, so stepping away for six minutes would lose the run rather than resume it. This matches FORWARD-CHECK #6 recorded intent, unanswered must stop, not approve. The fix site is phase_types.py:818-856, and D-13 extracts the human-input executor to its own module as the vehicle for the fix (G-5 discharge). Re-open if any run is observed completing an llm_human_input phase with an empty answer.
 reproduces_on:
   branch: develop
   commit: 25104616

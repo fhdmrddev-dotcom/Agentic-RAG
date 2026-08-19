@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T04:13:39.119Z"
+last_updated: "2026-08-19T18:00:00.000Z"
 last_activity: 2026-08-19
 progress:
-  total_phases: 21
+  total_phases: 22
   completed_phases: 11
   total_plans: 126
   completed_plans: 118
@@ -31,12 +31,122 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 199 — the-component-map
+**Current focus:** Phase 200 — the-workflow-journey
 
 ## Current Position
 
-Phase: 199 (the-component-map) — EXECUTING
-Plan: 1 of 10
+Phase: 200 (the-workflow-journey) — **CONTEXT GATHERED, NOT PLANNED**
+Plan: 0 of 6 (the shape is approved; nothing is planned yet)
+Next action: **`/gsd:plan-phase 200`**
+
+⚠ **PHASE 200 DID NOT EXIST IN THE ROADMAP WHEN ITS DISCUSSION BEGAN.** `gsd-sdk query init.phase-op 200`
+returned `phase_found: false`, and it was **genuine — not the `#### Phase NNN:` heading quirk** (the v3.7
+table ended at 198 and the last detail heading was `#### Phase 198`). **Scope was therefore settled in the
+discussion and the ROADMAP entry was written FROM `200-CONTEXT.md`**, not the other way round. `DES-02` was
+created in `REQUIREMENTS.md` in the same pass, because referencing a phantom requirement id would have
+failed the decision-coverage plan gate later. Re-verified after the edits: `phase_found: true`,
+`phase_dir: .planning/phases/200-the-workflow-journey`.
+
+⚠ **THIS PHASE EXISTS BECAUSE PHASE 199 PASSED ITS OWN CRITERIA AND STILL FAILED THE OPERATOR.** 199
+verified **5/5** while the verdict was *"nothing changed from a UI perspective."* Both were true. Verdicts
+measured across its tables: **BUILT 17 · REFUSED/DECLINED/CANNOT-EXPRESS 31 · ALREADY-SHIPPED 57.** The
+cause was the charter, in the ROADMAP's own words — *"PRESENTATION ONLY — no data, no endpoint, no
+migration, no new capability."* Every one of sketch 178's richest sheets needed more on screen **and more
+on the wire**, so the phase refused them **correctly** and then passed criteria requiring it not to look
+like the sketches. **The work was honest; the charter was wrong.** Two things change here, both by explicit
+operator instruction: **the presentation-only fence is LIFTED** (backend is in scope), and
+**`ALREADY-SHIPPED` no longer counts as a pass.**
+
+**The approved shape — six plans:**
+
+| Plan | What | Note |
+|---|---|---|
+| `200-01` | derive the element checklist for the four in-scope screens | ⚠ **source diff MUST be empty** — the commit is the proof |
+| `200-02` | the wire slice | `started_at`/`completed_at` + declared per-step counts + the human-gate pause + the `phase_types.py` extraction |
+| `200-03` | the step panel | |
+| `200-04` | the spine + its receipt | |
+| `200-05` | the canvas | ⚠ also carries three folded canvas bugs, which are NOT checklist rows |
+| `200-06` | the run surface | |
+
+⚠ **Dispatch AT MOST TWO plans concurrently** and cap `GSD_VITEST_MAX_WORKERS=2`.
+
+**The acceptance bar is mechanical, by the sketch's own colour coding:** blue → BUILD · amber inside the
+slice → BUILD · amber outside → REPORT with a named trigger · **green → VERIFY, do not rebuild.** Each
+screen gets a `MUST RENDER` / `MUST NOT RENDER` inventory; the second half is what makes a subtraction
+provable rather than asserted.
+
+**The wire slice was MEASURED before it was scoped, not assumed.** `workflow_phases` already carries
+`created_at`/`updated_at` and **neither can yield a duration**: all phases are batch-INSERTed at run
+creation (`db/workflows.py:334`) and every transition writes `updated_at=now()` at six sites, so the
+`active` stamp is overwritten by the completion. ⚠ **`never ran` and `not recorded` must render
+DIFFERENTLY** — the lesson this repo has already learned twice (`runFacts.ts`'s four arms after CR-01;
+`DecisionsList`'s three under D-20). **No backfill**: one from `updated_at` is right for some rows,
+silently wrong for others, and nothing on the row would say which.
+
+⚠ **THE COUNTS HALF CARRIES `SEED-168`'s RISK.** A count is **declared by the phase type, and only where
+one is already a fact in its output**; a type with no number emits nothing and the UI renders nothing —
+never `0`, never a dash. Deriving structurally from the `output` jsonb was **rejected on measurement**:
+`_persist_output` stores each executor's dict full and inline (CR-02), shapes differ per type, and no key
+marks *"the thing produced"*.
+
+**Guardrail dispositions — no override was needed or recorded.**
+- **G-2 discharged** — sketch 200 (`64fc84cb`, `acceptance_bar: true`) is the operator-approved bar.
+- **G-5 fires on ten target files**, re-derived from git rather than read from the ledger — ⚠ **two cells
+  were already STALE** (`PhaseFormPanel.tsx` read `21/10/1289`, measures `22/10/1290`; `WorkflowCanvas.tsx`
+  read `25/7/1405`, measures `26/7/1390` — **lines went DOWN, 199 subtracting**). Nine honoured by
+  construction. ⚠ **`phase_types.py` TAKES ITS EXTRACTION** (39/16/2424, *"extraction due"*, never taken):
+  the human-input executor moves to its own module **as the vehicle for its own fix**, the
+  `threads.py` → `run_transport.py` precedent.
+- **`api.ts`'s Phase-197 decline HOLDS** — the trigger is *"a RUNTIME export or a second concern"*, and this
+  phase adds a **TYPE** with zero runtime exports, so `196-08`'s mock-factory failure mode cannot fire.
+  ⚠ **The planner must re-verify this by grep over the real diff, not by quoting the claim.**
+- ⚠ **`backend/app/api/workflow_runs.py` OWES A HOT-FILE LEDGER ROW** — `3 / 3 / 260`, **exactly at
+  threshold and absent from the scan list**, the `libraryRow.ts` state where a missing row costs most. The
+  CLAUDE.md row and the `docs/HOT-FILE-LEDGER.md` section land in the **same commit** that modifies it.
+- ⚠ **`PhaseFormPanel.test.tsx`'s ABSOLUTE-ZERO hook pin is honoured by EXTRACTION, never re-baselined**
+  (the `199-06` / `FieldGuidance.tsx` precedent). **Leaf sprawl is the accepted, stated cost.**
+  **`WorkflowDoorSwitch.baseline.test.tsx` is NOT in this blast radius** — flagged as a blocker at kickoff,
+  and the scope decision dissolved it.
+
+**Four bug reports folded** (`folded_into: 200`): `BUG-260813-01`, `BUG-260807-01`, `BUG-260808-01`,
+`BUG-260816-06`. ⚠ **`BUG-260610-01` is a PARTIAL fold and its `status:` DELIBERATELY STAYS `open`** — the
+timer half is folded (`started_at` removes the cause), the **duplicate-avatar half is live**, and a
+`folded` status would hide it from the routing scan (the exact failure recorded in
+`feedback_bug_status_frontmatter_is_the_index`).
+
+⚠ **`BUG-260816-06` IS THE ONE THAT CHANGES BEHAVIOUR, AND IT WAS MEASURED:** `HumanInputConfig.timeout_seconds`
+defaults to **300** (`models/harness.py:135`) and `phase_types.py:818-856` initialises `answer = ""` outside
+the response branch — so the timeout path falls straight through to a normal completion. **Four of five real
+runs** of `doc_qa_scoped_098uat` completed their approval step with `answer: ""` at exactly the 5-minute
+mark. It will now **pause the run**, using the `paused` status that **already ships** beside `cap_paused`.
+
+⚠ **`SEED-148`'s re-open trigger FIRED and produced a CORRECTION, not work.** Its `status: open` was **stale
+by a phase**: Phase 195 already shipped the run-surface listing and download (`WorkflowRunPage.tsx:63`,
+`:625`, `:1143-1177`, both empty-state strings), so under the colour rule it is a **green row — verify, do
+not rebuild.** **The no-previewer fence on the run page STANDS**, with its recorded reason: *"the template
+engine emits .docx, so the flagship deliverable is exactly the artefact that cannot be shown in place."*
+`FilePreview.tsx` is capable but reachable **only from chat** — one mount at `FilesSection.tsx:245`, inside
+`WorkspacePanel`, which itself has **exactly one production mount, `ChatLayout.tsx:673`**. Still genuinely
+open in that seed: the **canvas** half, the **workflow-panel** half, and a case it never covered —
+**`PendingAskCard` has no file affordance at all**, so a human step asking someone to approve a generated
+document has nothing to open.
+
+**Nine screens deferred to a named follow-on**, all all-blue or all-green so they carry **no wire risk**:
+library · the two doors · the draft arrival · the publish gauntlet · the run dialog · the node-identity
+sheet · the run-panel sheet · fork+delete (**already 3/3 green — verify-only**) · **the connections sheet**.
+⚠ **The connections sheet is a MILESTONE, not a screen** (`SEED-144`/`145`/`146` — **every capability is a
+WRITE**); no MCP client exists in the backend today. Three amber rows the slice cannot clear are
+**REPORTED, not built**: lock-holder attribution, the preflight row count, and the fan-out router (the
+spine is LINEAR by recorded decision).
+
+Resume file: `.planning/phases/200-the-workflow-journey/200-CONTEXT.md`
+
+---
+
+<!-- Prior position — Phase 199 — kept below rather than deleted; six G-4 rows are still owed. -->
+
+Phase: 199 (the-component-map) — **EXECUTED 10/10 · VERIFIED 5/5 · ⚠ SIX G-4 HUMAN UAT ROWS OWED**
+Plan: 10 of 10
 Next action: **`/gsd:execute-phase 199`** — ⚠ **dispatch AT MOST TWO plans concurrently, never a full
 four-plan wave.** File ownership is disjoint everywhere (83 files, each owned by exactly ONE plan,
 zero overlap within or across waves), so the waves are a SEQUENCING decision, not a dependency graph

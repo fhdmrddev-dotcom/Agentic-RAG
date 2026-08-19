@@ -4,12 +4,13 @@ title: The workflow canvas stays DARK in light mode — `colorMode` is hardcoded
 reported: 2026-08-13
 surface: Agentic-RAG
 severity: minor
-status: open
+status: folded
 affected_areas: [frontend/workflow-canvas, frontend/theming, WorkflowCanvas.tsx, useTheme]
-folded_into: null
+folded_into: 200
 verified_closed_by: null
 related_seeds: []
-re_open_trigger: null
+re_open_trigger: >
+  Folded at /gsd:discuss-phase 200 (2026-08-19). The canvas is one of Phase 200 four in-scope screens (plan 200-05 rebuilds it to sketch 200). Re-open if 200 ships without exercising light mode on the rebuilt canvas.
 reproduces_on:
   branch: develop
   commit: 031396dc

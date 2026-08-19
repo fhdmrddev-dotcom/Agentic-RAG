@@ -1,7 +1,9 @@
 ---
 id: SEED-148
 title: A workflow that produces a file has nowhere to show it — the run surface, the canvas and the workflow panel render no output files, though the chat surface has had an OutputFileCard for three milestones
-status: open
+status: open   # PARTIALLY CLOSED -- the RUN-SURFACE half shipped in Phase 195; see the 2026-08-19
+               # correction in the body. The CANVAS half, the WORKFLOW-PANEL half and the
+               # PendingAskCard case remain genuinely open, which is why this stays open.
 planted: 2026-08-10
 planted_by: Operator, reviewing the workflow product after the v3.6 deploy (2026-08-10) — "if the workflow produces a file at the end, this output is not shown in the output of the workflow in the canvas, also even in the chat area and the workflow panel"
 surface: Agentic-RAG
@@ -20,6 +22,59 @@ re_open_trigger: >
 ---
 
 # SEED-148 — the workflow produces the deliverable and then hides it
+
+## ⚠ CORRECTION 2026-08-19 (discuss-phase 200) — THE RUN-SURFACE HALF IS ALREADY CLOSED, AND THIS SEED HAD BEEN CARRYING A STALE CLAIM FOR A PHASE
+
+**The re-open trigger FIRED at Phase 200**, on two of its own clauses at once — *(1) the next workflow
+milestone opens* and *(3) any phase touches `llm_emit` or the run surface's phase spine.* Acting on it
+produced a **correction rather than work**, and the correction is recorded here rather than overwriting
+the original observation below.
+
+**Measured 2026-08-19 against the shipped tree — Phase 195 (Show the Deliverable) already closed the
+run-surface half:**
+
+| Evidence | Where |
+|---|---|
+| `import { FileRow } from "@/components/files/FileRow"` | `frontend/src/pages/WorkflowRunPage.tsx:63` |
+| `downloadWorkspaceFile(runThreadId, fileId, baseName(file.path))` | `WorkflowRunPage.tsx:625` |
+| the rows rendered at `density="run"` | `WorkflowRunPage.tsx:1143-1177` |
+| both honest empty states — *"No files yet — this run hasn't written anything."* / *"This run produced no files."* | `WorkflowRunPage.tsx:169-170`, each written exactly once and pinned |
+
+So the 2026-08-10 measurement below — *a grep for `output_files` / `outputFiles` over
+`WorkflowRunPage.tsx` returns nothing* — **was true when taken and is no longer true.** Under Phase 200's
+acceptance rule this is a **green row: verify, do not rebuild.**
+
+⚠ **AND THE PREVIEWER STAYING OUT IS A TESTED DECISION, NOT A REMAINING GAP.**
+`WorkflowRunPage.test.tsx` carries an active fence — *"promises no preview: the previewer is neither
+imported nor named"* — with its reason recorded verbatim:
+
+> *"DOCX/PPTX/XLSX/PDF are download-only by decision and the template engine emits .docx, so the flagship
+> deliverable is exactly the artefact that cannot be shown in place. Req 7 asks that it be listed and
+> downloadable — not that it be rendered."*
+
+`panel/FilePreview.tsx` is genuinely capable (markdown → `MarkdownRenderer`, code → `ShikiCode`, csv →
+`CsvTablePreview`, text → `<pre>`, images → signed URL, plus a calm *"No preview available · Download"*
+arm) — but it is reachable **only from chat**: one mount at `FilesSection.tsx:245`, inside
+`WorkspacePanel`, which itself has **exactly one production mount, `ChatLayout.tsx:673`**. Mounting it on
+the run surface would buy little, because the most common workflow output is the one format it cannot
+render. **Phase 200 leaves the fence standing, deliberately.**
+
+## What is still genuinely open
+
+1. **The CANVAS half** — the canvas still renders no output files.
+2. **The WORKFLOW-PANEL half** — `WorkspacePanel` has no mount in any workflow page at all.
+3. ⚠ **A case this seed never covered: `PendingAskCard` has NO file affordance.** It previews a draft's
+   **text** behind a faded mask (`PendingAskCard.tsx:56-94`), so an `llm_human_input` step asking a person
+   to approve a **generated document** has nothing to open. Raised by the operator during
+   `/gsd:discuss-phase 200` and deliberately not stacked onto that phase's three backend concerns — it
+   needs the ask to carry its artefact on the wire. Related: [[SEED-161]] (in-app document **editing**,
+   explicitly not this milestone), [[SEED-110]] (run-time template/file upload), [[SEED-169]] (RunCard's
+   file badge reads 0 for a real deliverable), [[SEED-170]] (two shipped comments credit `OutputFileCard`
+   for work it does not do).
+
+**Re-open trigger for the remainder:** the follow-on phase to 200 being scoped (it carries the run-panel
+sheet and the canvas), OR any phase whose `files_modified` names `WorkflowCanvas.tsx` or
+`PendingAskCard.tsx`.
 
 ## The observation (operator, 2026-08-10)
 

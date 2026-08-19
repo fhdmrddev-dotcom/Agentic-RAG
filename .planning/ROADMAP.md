@@ -42,6 +42,8 @@ the right vocabulary, stop it, and see what it produced.
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
 | 197 | Guided Authoring | 11/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
+| 199 | **(INSERT)** The Component Map | Every workflow surface re-presented in the adopted design language | DES-01 | 5 |
+| 200 | **(INSERT)** The Run Becomes Measurable | The wire carries per-step timings and counts, and the four surfaces that consume them are built to sketch 200 | DES-02 | 5 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
 most independent first — 194 in particular is mostly UI over an endpoint that already exists. 196 and
@@ -78,6 +80,7 @@ is the incumbent any proposal must beat.
 - [ ] **Phase 197: Guided Authoring** — drafting from a description guides the decisions that change the result (AUTH-02)
 - [ ] **Phase 199: The Component Map** — **PLANNED 2026-08-19: 10 plans / 3 waves, one plan per sheet** (`/gsd:execute-phase 199`) — every workflow surface is re-presented in the adopted design language; ten of sketch 178's eleven component sheets, built against the components that actually ship (DES-01). ⚠ **INSERTED 2026-08-19 on an explicit operator instruction to implement the whole map in ONE body of work.** **PRESENTATION ONLY — no data, no endpoint, no migration, no new capability**; that fence is what makes it affordable and a plan that needs to cross it STOPS and reports. ⚠ **G-2 is satisfied by sketch 178 plus the operator's standing ratification, and the method's step-3 re-sketch is DELIBERATELY SKIPPED** — recorded as a decision, with `SEED-155` carried into execution as a hard rule instead (*if the shipped component cannot express the sheet, report it, never fake it*).
 - [ ] **Phase 198: Node Vocabulary (research-first)** — prove the deterministic-primitive need before shipping one; cover structured mid-run input (NODE-01, NODE-02)
+- [ ] **Phase 200: The Run Becomes Measurable** — **CONTEXT GATHERED 2026-08-19** (`/gsd:plan-phase 200`) — the wire gains per-step timings and per-step counts, and the four surfaces that consume them (step panel · spine · canvas · run surface) are built to sketch 200 (DES-02). ⚠ **INSERTED 2026-08-19; it had NO roadmap entry when its discussion began** — `init.phase-op 200` returned `phase_found: false`, genuine rather than the heading quirk, so **scope was settled in discussion and this entry is written FROM `200-CONTEXT.md`**. ⚠ **THE PRESENTATION-ONLY FENCE IS LIFTED** — backend changes are in scope, and **`ALREADY-SHIPPED` no longer counts as a pass** (it was **57 of 105 verdicts** in 199). Folds four open bug reports incl. `BUG-260816-06`, the silent approval.
 
 ### Phase Details
 
@@ -881,6 +884,61 @@ progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time:
 - [ ] `199-08-PLAN.md` — the two doors + the describe surface [Wave 2]
 - [ ] `199-09-PLAN.md` — the builder chrome [Wave 3]
 - [ ] `199-10-PLAN.md` — the library toolbar + the three dialogs [Wave 3]
+
+#### Phase 200: The Run Becomes Measurable
+
+**Goal**: A person watching or reviewing a workflow run can tell how long each step took and how much it handled — the run becomes measurable, not merely watchable — and the four surfaces that carry that read in the adopted design language.
+**Depends on**: Phase 199 (which re-presented the surfaces) and Phase 195 (which shipped the run-surface deliverable listing this phase verifies rather than rebuilds).
+**Requirements**: DES-02
+**Inserted**: 2026-08-19. ⚠ **This phase had NO roadmap entry when its discussion began** — `gsd-sdk query init.phase-op 200` returned `phase_found: false`, and it was genuine rather than the `#### Phase NNN:` heading quirk (the v3.7 table ended at 198). **Scope was therefore settled in discussion, and this entry is written FROM `.planning/phases/200-the-workflow-journey/200-CONTEXT.md`** rather than the other way round. A planner must treat that file as the scope anchor.
+
+**Why this phase is not another 199.** Phase 199 verified **5/5** on its own success criteria while the operator's verdict was *"nothing changed from a UI perspective."* Both were true, and the cause was the charter, in the ROADMAP's own words: *"PRESENTATION ONLY — no data, no endpoint, no migration, no new capability."* Verdicts measured across that phase: **BUILT 17 · REFUSED/DECLINED/CANNOT-EXPRESS 31 · ALREADY-SHIPPED 57.** Two things therefore change here, both by explicit operator instruction:
+
+1. **The presentation-only fence is LIFTED.** Backend changes are in scope.
+2. **Acceptance is visual match to the sheet, not no-regression. `ALREADY-SHIPPED` no longer counts as a pass.**
+
+**The acceptance bar is a derived checklist, not a judgement.** Sketch 200 (`.planning/sketches/200-journey-interactive/`, committed `64fc84cb`, `acceptance_bar: true`) pairs every proposed screen with a real 1440×900 capture of the shipped product and attaches a per-row cost ledger: **21 changes are frontend-only · 7 need the wire to carry something new · 13 already ship · 1 is still to capture.** Plan `200-01` turns the in-scope screens into an explicit `MUST RENDER` / `MUST NOT RENDER` inventory **in a commit that modifies zero source files**, so `git diff --name-only` over it is the proof; later plans cite row ids and may not edit it. Resolution is mechanical, by the ledger's own colour: **blue → BUILD · amber inside the slice → BUILD · amber outside → REPORT with a named trigger · green → VERIFY, do not rebuild.**
+
+**Scope — four screens behind one wire slice.**
+
+| Screen | Sketch id | build / slice / verify |
+|---|---|---|
+| The step panel | `step-panel` | 2 / 2 / 1 |
+| The authoring spine (+ the receipt) | `builder-spine` | 3 / 1 / 0 |
+| The canvas | `builder-canvas` | 3 / 1 / 0 |
+| The run surface | `run-surface` | 0 / 2 / 0 |
+
+**The wire slice, measured rather than assumed.** `workflow_phases` already carries `created_at`/`updated_at` and **neither can yield a duration**: all phases are batch-INSERTed at run creation (`db/workflows.py:334`), and every transition writes `updated_at=now()` at six sites, so the `active` stamp is overwritten by the completion. The slice adds `started_at` + `completed_at` written at those six sites, and a per-step count **declared by the phase type only where a count is already a fact in its output**. ⚠ **`never ran` and `not recorded` must render DIFFERENTLY** — the lesson this repo has already learned twice (`runFacts.ts`'s four arms; `DecisionsList`'s three under D-20). No backfill: a backfill from `updated_at` is right for some rows, silently wrong for others, and nothing on the row would say which.
+
+**Four bug reports are folded**, `status: folded`, `folded_into: 200`: `BUG-260610-01` (the run timer resets on navigation — `started_at` is structurally the fix; ⚠ **its duplicate-avatar half is NOT taken**), `BUG-260813-01` (canvas dark in light mode), `BUG-260807-01` + `BUG-260808-01` (canvas prototype-key defects, `security/WR-04` — ⚠ **neither is a checklist row; they widen `200-05` deliberately**), and `BUG-260816-06` (an unanswered human step times out into a **silent approval** — measured on four of five real runs at exactly the 5-minute mark; it will now **pause the run**, using the `paused` status that already ships).
+
+**Guardrails**
+- **G-2 discharged** — sketch 200 is the operator-approved acceptance bar.
+- **G-5 fires on ten target files.** Nine are honoured by construction; `api.ts`'s Phase-197 decline **holds** (this phase adds a TYPE, zero runtime exports, so the trigger does not fire). ⚠ **`backend/app/services/harness/phase_types.py` takes its EXTRACTION** — 39 commits / 16 phases / 2424 lines, *"extraction due"*, never taken, and this phase touches it in two concerns. The human-input executor moves to its own module **as the vehicle for its own fix** (the `threads.py` → `run_transport.py` precedent).
+- ⚠ **`backend/app/api/workflow_runs.py` OWES A HOT-FILE LEDGER ROW** — 3 / 3 / 260, **exactly at threshold and absent from the scan list**, which is the state the ledger's own history says costs most. The CLAUDE.md row and the `docs/HOT-FILE-LEDGER.md` section land in the **same commit** that modifies it.
+- ⚠ **`PhaseFormPanel.test.tsx` pins hooks at an ABSOLUTE ZERO and is honoured by EXTRACTION, never re-baselined** (the `199-06` / `FieldGuidance.tsx` precedent). Leaf sprawl is the accepted, stated cost. **`WorkflowDoorSwitch.baseline.test.tsx` is NOT in this blast radius** — it was flagged as a blocker at kickoff and the scope decision dissolved it.
+
+**How we'd know this failed**
+- A screen ships and the operator again says nothing changed — the 199 outcome, reproduced with a bigger budget.
+- A count or a duration appears that nothing measured — a fabricated business figure on the canvas, which `199-05` named as the highest-consequence lie available here.
+- `never ran` and `not recorded` render the same, so an absence reads as a negative.
+- A checklist atom is quietly moved or dropped instead of reported as a deviation.
+- The phase grows a screen that was deferred, or the connections surface leaks in — that is a milestone (`SEED-144`/`145`/`146`), not a sheet.
+- A characterization pin is re-baselined to turn red green rather than because behaviour deliberately changed.
+- An unanswered human step still approves.
+
+**Success criteria**
+1. Every in-scope screen's checklist reports `N/N atoms` or **names the miss**; no atom is silently dropped, and the `MUST NOT RENDER` half is checked as strictly as the `MUST RENDER` half.
+2. `workflow_phases` carries `started_at` + `completed_at`, written at all six transition sites, and the run surface + spine render a real per-step duration and a real total runtime — with `never ran` and `not recorded` provably distinct renders.
+3. A per-step count appears **only** where the phase type declared one from a fact in its own output; a type with no number renders nothing at all — never `0`, never a dash — and the canvas edge label is the same declared count, not a second mechanism.
+4. An unanswered `llm_human_input` step **pauses the run and never approves**, provable against the measured 300 s default.
+5. Gates hold: the migration applies via the SQL editor and `full-schema.sql` is regenerated; `tsc -p tsconfig.app.json --noEmit` unmoved; count gate `failed 0` with no per-file decrease; every touched suite green; the `phase_types.py` extraction changes no behaviour beyond the human-gate fix.
+
+**Deliberately OUT of scope, each with a re-open trigger.** Nine screens — library · the two doors · the draft arrival · the publish gauntlet · the run dialog · the node-identity sheet · the run-panel sheet · fork+delete (**already 3/3 green — verify-only**) · **the connections sheet**. All are all-blue or all-green, so they carry **no wire risk** and can ship as a follow-on; trigger for every one is *the follow-on phase to 200 being scoped*. ⚠ **The connections sheet is a MILESTONE, not a screen** (`SEED-144` provider-shaped · `SEED-145` platform assets usable in chat AND workflows · `SEED-146` **every capability is a WRITE**); no MCP client exists in the backend today. Three amber rows the slice cannot clear are **REPORTED, not built**: lock-holder attribution, the preflight row count, and the fan-out router (the spine is LINEAR by recorded decision).
+
+⚠ **`SEED-148` — its trigger FIRED here and its `status: open` was found STALE.** Phase 195 already shipped the run-surface listing and download (`WorkflowRunPage.tsx:63`, `:625`, `:1143-1177`, both empty-state strings), so under the colour rule it is a **green row: verify, do not rebuild.** ⚠ **The no-previewer fence on the run page STANDS** — `WorkflowRunPage.test.tsx` records the reason: *"the template engine emits .docx, so the flagship deliverable is exactly the artefact that cannot be shown in place."* What genuinely remains open in that seed is its **canvas** and **workflow-panel** halves, plus a case the seed does not cover: **`PendingAskCard` has no file affordance at all**, so a human step asking a person to approve a generated document has nothing to open.
+
+**Plans**: not yet planned — run `/gsd:plan-phase 200`. The approved shape is **six plans**: `200-01` derive the checklist (source diff MUST be empty) · `200-02` the backend slice (timestamps + counts + the human-gate pause + the executor extraction) · `200-03` the step panel · `200-04` the spine and its receipt · `200-05` the canvas · `200-06` the run surface. ⚠ **Dispatch at most TWO plans concurrently** and cap `GSD_VITEST_MAX_WORKERS=2`.
 
 #### Phase 198: Node Vocabulary (research-first)
 
