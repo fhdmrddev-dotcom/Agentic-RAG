@@ -226,6 +226,117 @@ G-5 fires — adapter pattern audit due
 
 **satisfied (188.1 — 2026-08-06).** `185-10` named the seam and 188.1 executed it: `PlaneEditingLayer` now lives in `PlaneEditingLayer.tsx` (268 L) and the exported `EDIT_AFFORDANCE` geometry table in `editAffordance.ts` (164 L), as a verbatim move measured at 22 insertions / 323 deletions with Plan 02's captured `AFFORDANCE_SHAPE_BASELINE` still deep-equal, `tsc` unmoved at 33 and `eslint src/components/workflows/` 6 → 5. The live ESM-cycle constraint `185-10` discovered — `WorkflowCanvas` imports `FlowEdge`'s VALUE at module scope for the `edgeTypes` map, so the extracted module must not import back — was **proved, not retired**: it is now enforced by a `?raw` cycle fence in `WorkflowCanvas.test.tsx` with inline positive controls, observed RED against a deliberate back-import, rather than by this prose. Note the file is still the largest in the tree at 1292 L; D5 (extracting the header / notice / bottom regions too) is deferred with its own trigger in `188.1-DEFERRED.md`.
 
+### ⚠ RE-DERIVED AGAIN 2026-08-20 (Phase 200-06) — the row was stale for the FOURTH consecutive close
+
+`27 commits / 8 phases / 1565 L` — the CLAUDE.md row read `25 / 7 / 1405`, and `200-CHECKLIST.md` §6.6
+read `26 / 7 / 1390` **from a re-derivation `200-01` performed only hours earlier in this same phase**.
+Two documents, both stale, both by different amounts: waves 1-5 landed between them and this plan.
+Phases now: `183 184 185 187 188 188.1 199 200`.
+
+**G-5 status: honoured by construction (200-06), no override.** The plan added three concerns and put
+**none** of them in this file: the four connection states went to `connectionState.ts` (a true leaf
+importing one React type), the branch-condition sentence to `phaseVocabulary.ts` (which already owned
+`parseSkipTarget`), and the theme state to `providers/ThemeProvider.tsx`. What this file gained is
+wiring: one memo, one context read, three first-class plane props and a legend.
+
+⚠ **THE PLACEMENT OF THE PAYLOAD MEMO IS LOAD-BEARING AND ITS FENCE FIRED DURING AUTHORING.** This
+file's own suite slices its source at the drag-overlay memo's declaration and requires the whole
+REMAINDER to name the run lookup nowhere — the anti-blink split, which exists because a run lookup in
+the overlay memo rebuilt every node's `data` ~60×/s and visibly flickered the cards. The edges memo
+lives below that line, so the payload read had to be hoisted ABOVE `settledNodes`. **Then the memo's
+own docblock QUOTED the slice anchor, which moved the suite's `indexOf` to the comment and handed the
+fence an EMPTY slice — observed RED.** The docblock now describes the anchor instead of spelling it,
+and says so. A guard whose subject can be displaced by prose about the guard is worth knowing about.
+
+⚠ **`onEdgeClick` / `onEdgeMouseEnter` / `onEdgeMouseLeave` ARE FIRST-CLASS PLANE PROPS BY NECESSITY,
+NOT BY TASTE.** `FlowEdge.tsx`'s criterion-24 fence greps that file for four attribute spellings
+(`role=`, `tabIndex`, `onClick`, `onPointer`) and requires **zero** hits, because one tab stop per node
+is a canvas-level invariant. Pointer and selection state therefore cannot live in the edge component
+at all. Selection is tracked locally rather than through the library's own edge selection, and that is
+measured: `edges` is a CONTROLLED prop with no `onEdgesChange`, so a library-managed `selected` flag
+could never be applied back and the state would have been unreachable.
+
+⚠ **`colorMode` — the hardcoded `"dark"` is gone (`BUG-260813-01`), and the fence that replaced it
+asserts the RENDER, not the prop.** See the `ThemeProvider.tsx` entry under *Young files* for the
+mechanism; what belongs here is the consequence for this file: a source-only fence would have passed
+green in the exact scenario where React Flow's colour-mode class and Tailwind's dark-mode class stop
+agreeing on the spelling `dark`, and the canvas half-fixes (plane light, cards dark). **Driven:
+re-planting `colorMode="dark"` reddened FOUR cases including the node-card half; restored md5-identical
+(`c5bc0e18…`).**
+
+**Next seam, named rather than left `satisfied` with no successor:** the header / notice / bottom
+regions (D5, deferred with its own trigger in `188.1-DEFERRED.md`) — still unpaid, and this file is
+still the largest in the workflow directory at 1565 L.
+
+---
+
+## `frontend/src/components/workflows/FlowEdge.tsx`
+
+**Added 2026-08-20 (Phase 200-06, D-16 / X-16) — it was ABSENT from BOTH this file and CLAUDE.md.**
+
+**Re-derived at this commit:** `3 commits / 3 phases / 462 L` · ⚠ **G-5 FIRES — EXACTLY AT THRESHOLD,
+and it crossed IN THE COMMIT THAT ADDED THIS ROW.** `200-CHECKLIST.md` §6.6 measured it at `2 / 2 / 378`
+and listed it as *"below threshold on purpose"*, on the `fileIcon.tsx` / `useTemplateFirstDraft.ts`
+precedent. Phase 200 is its third phase, so the row that was written to be a courtesy is now the
+guardrail's own scan entry. **This is exactly the `libraryRow.ts` state — absent, on the boundary —
+where a missing row costs most**, and it is the reason the checklist told this plan to add it anyway.
+
+### Phases touched (verbatim)
+
+185 (185-10 — the file's creation: the armed action-risk checkpoint drawn as a DETOUR) / 188.1 (188.1-03
+— the `EDIT_AFFORDANCE` extraction that superseded its cycle reason) / 200 (200-06 — the payload label
+and the four connection states).
+
+### G-5 status
+
+**Honoured by construction (200-06), no override.** The four connection states are RESOLVED elsewhere
+(`connectionState.ts`) and the payload string is COMPOSED elsewhere (`runVocabulary.payloadLabel`);
+this file renders what it is handed. It gained two render sites and no decision.
+
+### The invariants this file carries
+
+⚠ **CRITERION 24 IS A GREP OVER THIS FILE'S OWN SOURCE, INCLUDING ITS PROSE.** `FlowEdge.test.tsx`
+requires **zero** occurrences of four attribute spellings — the two ARIA ones, the click handler and
+the pointer handler — because the canvas has exactly one tab stop per node and a pressable mark on a
+line would be a second. **A docblock that spells a banned token defeats the grep that protects it**
+(the D-ITEM-183-02 trap), so this file's prose is written deliberately without them, and any new prose
+here must be too. The practical consequence for a later plan: **pointer and selection state CANNOT
+live here** — they live on the plane, as first-class `<ReactFlow>` props.
+
+⚠ **THE ORDINARY BRANCH MUST STAY BYTE-IDENTICAL.** `185-VALIDATION.md` carries a manual row —
+*"screenshot a 5-step unarmed workflow before and after; edges must be indistinguishable"* — and every
+canvas shipped today is in that branch. 200-06 wrapped it in a fragment; that adds NO DOM, because the
+payload mark is `null` on any canvas supplying no run state, and a fragment around one child and a
+`null` produces exactly the child. A future change that adds an unconditional element here breaks a
+promise three phases old.
+
+⚠ **NOTHING AND `0` ARE DIFFERENT FACTS.** A step whose phase type declares no count renders **no
+element** — not a `0`, not a dash, not an empty pill; a step that searched and found nothing declared a
+real `0` and MUST render it. That is why the absence arrives as an ABSENT `data.payload` rather than as
+a zero, and why `payloadLabel` returns `null` rather than `""`: an empty string still renders an
+element. The arm is `typeof count === "number"` and a source fence forbids `?? 0` and `if (count)`.
+
+⚠ **THIS FILE SPELLS NO COUNT NOUN.** `sources` · `agents` · `fields` are authored at exactly one
+executor site each and arrive on the wire; a case greps this file's source for all three and requires
+zero hits, so the label can never become the client's guess about the domain. That is D-07's
+`SEED-168` axis — *the noun is the step's own, never the contract's* — made mechanical.
+
+⚠ **`DETOUR_ARMED_LABEL` / `DETOUR_OPEN_LABEL` ARE GOVERNED STRINGS.** `"nobody is asked"` was
+deliberately reworded from the sketch's `"nobody asked"`, which read as a verdict on the author. Both
+are asserted character-identical by the suite; 200-06 left both untouched, proved by
+`git diff -U0 | grep -c 'DETOUR_\(ARMED\|OPEN\)_LABEL ='` returning 0.
+
+⚠ **THE ESM-CYCLE REASON IN THE DOCBLOCK IS HISTORY, NOT A LIVE CONSTRAINT — AND THE DUPLICATION IT
+EXPLAINS STAYS ANYWAY.** `EDIT_AFFORDANCE` moved to `editAffordance.ts` at 188.1-03, so importing it
+would close no cycle today. The `DETOUR` table is nevertheless kept as a second derivation, because the
+drift pin between the two IS the value and deleting one side deletes the pin's meaning. What IS still
+live: `WorkflowCanvas` imports this module's component VALUE at module scope for `edgeTypes`, so an
+extracted module that imports `WorkflowCanvas` back is a real cycle — fenced, and observed RED.
+
+**Next seam, named:** the two mark components (`GhostMarks` / `ArmedMarks`) plus the `DETOUR`/`ARC`/
+`LINE` geometry table are a separable drawing concern from the edge's branch logic. Not taken here —
+200-06 added no decision to this file, so there was nothing to justify moving one.
+
 ---
 
 ## `frontend/src/components/workflows/PhaseNodeCard.tsx`
@@ -2124,6 +2235,64 @@ only because the implementer opened the named file before editing it.
 single-concern phase-type module and broken a split-brain guard that exists only so a test can assert
 `phaseGlyph`'s key set equals `soulData.PHASE_GLYPHS`'s. **A plan's `files_modified` may be DECLINED with a
 written reason — it is not an instruction to edit a file that should not change.**
+
+---
+
+## `frontend/src/providers/ThemeProvider.tsx`
+
+**Added 2026-08-20 (Phase 200-06) — young (`1 commit / 1 phase / 149 L`), sectioned anyway.**
+
+It is listed with a full section BELOW the G-5 threshold on purpose (the `fileIcon.tsx` precedent),
+because what it carries is not a size problem — it is a **cross-surface invariant that a later plan can
+break in one line without any guard noticing**, and the row alone cannot say that.
+
+### Why it exists — and why the obvious fix was the wrong one
+
+`BUG-260813-01`: `WorkflowCanvas.tsx` hardcoded `colorMode="dark"`, so the canvas stayed dark while the
+rest of the app went light. ⚠ **The one-line patch was AVAILABLE and it was WRONG.** `hooks/useTheme.ts`
+was a **bare per-consumer hook** holding its own `useState`, with exactly ONE consumer in the tree
+(`ChatLayout.tsx:111`) and **no provider anywhere**. A second call site creates a SECOND `useState`, each
+initialised from localStorage at its own mount time, each running an effect that WRITES localStorage and
+toggles the root class — and **neither re-renders the other**. The canvas would have read the right value
+once and then ignored every toggle: **fixed on first load, stale on the exact gesture that exposed the
+defect.** `TechnicalNamesProvider.tsx:15-16` says this about this very module in writing, which is why
+that file was the shape to copy rather than a thing to invent.
+
+⚠ **`colorMode="system"` is ALSO wrong**, recorded so it is not re-proposed: it reads the OPERATING
+SYSTEM's preference, while this app's theme is a manual class toggle persisted to localStorage.
+
+### The invariants it carries
+
+⚠ **THE NON-THROWING ACCESSOR IS REQUIRED, NOT A CONVENIENCE.** `useThemeOptional()` exists because
+`WorkflowCanvas`'s four suites mount it with **no provider at all**. A throwing hook in the canvas would
+have reddened every one of them, and the reflex fix — wrapping the tests — quietly turns the provider
+into a test fixture rather than a production invariant.
+
+⚠ **`hooks/useTheme.ts` IS NOW A RE-EXPORT, AND THAT IS LOAD-BEARING RATHER THAN LAZY.** Three shipped
+suites carry `vi.mock("@/hooks/useTheme", …)` — `ChatLayout.launch.test.tsx`,
+`ChatLayout.orgRefetch.test.tsx`, `__tests__/ChatLayoutLaunch.test.tsx`. Repointing `ChatLayout`'s import
+at the provider would make all three mocks **INERT, silently** (a `vi.mock` of a module nobody imports
+does not fail), and the real throwing hook would then run with no provider in those trees. The house rule
+it bends is 188.2-06's *"no re-export shim"*, which is about TYPES acquiring two importable names; here
+the risk that rule guards — two theme states — is structurally impossible, because this file declares no
+state and does not re-export the non-throwing accessor.
+
+⚠ **THIS CHANGE LANDS IN CHAT FIRST, AND A WORKFLOW-ONLY UAT WILL MISS IT.** `ChatLayout.tsx` is
+`useTheme`'s sole consumer AND `WorkspacePanel`'s only production mount
+(`project_panel_is_a_cross_surface_shell`). The provider is mounted in `main.tsx`, above `<App />`.
+
+⚠ **THE CANVAS FIX IS COMPLETE BY COINCIDENCE, AND THE FENCE IS WHAT MAKES THAT SAFE.** React Flow puts
+its colour-mode class — the literal string `"dark"` — on its wrapper
+(`@xyflow/react/dist/esm/index.js:3736`, via `useColorModeClass` `:334-349`), and `tailwind.config.js` is
+`darkMode: ["class"]`, which Tailwind scopes by the **nearest ancestor**. So ONE prop wrapped the whole
+subtree in a `.dark` ancestor and darkened the plane, the dot grid, the controls, the attribution **and
+our own node cards** — which hardcode nothing and use theme tokens throughout (`bg-card/30`,
+`text-foreground`, `border-border/50`). Two unrelated systems agreeing on one spelling; nothing in this
+repository enforces it. **If `darkMode` ever moves to a `[data-theme]` selector, or the library renames
+its class, the canvas HALF-fixes — plane light, cards dark — and reads as a fresh bug.** That is why
+`200-06`'s fence asserts the **plane AND a node card's computed containment**, in both directions, plus a
+provider-broadcast toggle. **DRIVEN: re-planting `colorMode="dark"` reddened FOUR cases, including the
+node-card half a source-only fence cannot see; restored md5-identical (`c5bc0e18…`).**
 
 ---
 

@@ -304,7 +304,20 @@ const BASELINE = {
   // where no branch is declared, the broken branch stated ONCE on the stub, and a
   // `constructor`-slugged branch TARGET resolving to a step rather than to a function.
   // Read from the `actual` column on the run that first executed them.
-  "WorkflowCanvas.test.tsx": 93,
+  //
+  // ⚠ AND A THIRD TIME IN THE SAME PLAN, 93 → 105, by its THIRD commit: `BUG-260813-01`'s
+  // light-mode fence (the plane AND a node card, in BOTH directions, plus a
+  // provider-broadcast toggle and the no-provider posture) and §3.2's MUST-NOT-RENDER fence
+  // with its two permanent controls and the role-SET pin. Three raises in one plan are
+  // recorded as three lines rather than one, because a single `53 → 105` would hide that
+  // +24 of it was pre-existing drift and none of it was this plan's.
+  //
+  // ⚠ NO `TARGETS` EDIT ACCOMPANIES THE PROVIDER WORK, and that was CHECKED rather than
+  // assumed. `ThemeProvider.tsx` is a SOURCE file, not a suite: its behaviour is asserted
+  // from `WorkflowCanvas.test.tsx`, which the `src/components/workflows` directory entry
+  // already runs and this map already pins. Adding a `src/providers` TARGETS entry would
+  // have pulled in unrelated unpinned suites and told nobody anything about this fix.
+  "WorkflowCanvas.test.tsx": 105,
   // 187-29: gap-closure round 5's three suites, pinned for exactly the reason
   // 187-25 pinned its two — each now carries a guard that a failures-only
   // differential cannot see the deletion of:

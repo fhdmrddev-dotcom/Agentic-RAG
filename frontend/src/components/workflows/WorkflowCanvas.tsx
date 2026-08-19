@@ -239,6 +239,10 @@ import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
+// 200-06 (BUG-260813-01) — the NON-THROWING accessor, deliberately. The throwing
+// `useTheme` belongs to writers; this canvas only reads, and its four suites mount it with
+// no provider.
+import { useThemeOptional } from "@/providers/ThemeProvider"
 // Type-only: the check-state union has ONE owner and this file declares no second
 // spelling of it, so a rename there is a typecheck error here rather than a branch that
 // quietly stops matching. Erased at build — no runtime edge. 187-27 moved the owner from
@@ -652,6 +656,12 @@ export function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
+  // 200-06 (BUG-260813-01) — the app's ONE theme, read the same way the ⌥ reveal above is:
+  // a non-throwing context read, so this component still renders with no provider mounted.
+  // Because it is a CONTEXT and not a per-consumer hook, a toggle made anywhere — the chat
+  // shell owns the only one — re-renders this canvas. That is the property a second
+  // `useTheme()` call could not have had, and it is the reason this fix is a provider.
+  const themeCtx = useThemeOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
 
   const projection = useMemo(() => toCanvas(phases, { kbTools, nameContext }), [phases, kbTools, nameContext])
@@ -1403,7 +1413,25 @@ export function WorkflowCanvas({
           fitViewOptions={{ padding: 0.1, minZoom: 0.3 }}
           minZoom={0.3}
           maxZoom={2}
-          colorMode="dark"
+          // ── 200-06 (BUG-260813-01 · BC-MNR-03) — THE PLANE FOLLOWS THE APP ─────────
+          //
+          // This read `colorMode="dark"`, hardcoded, and it was the whole bug: the canvas
+          // was the only dark island in a light page. ⚠ AND IT DARKENED MORE THAN THE
+          // PLANE. React Flow puts this value on its wrapper as a CLASS — the literal
+          // string `"dark"` — and `tailwind.config.js` is `darkMode: ["class"]`, which
+          // Tailwind scopes by the NEAREST ANCESTOR. So one prop wrapped the whole subtree
+          // in a `.dark` ancestor and took the dot grid, the controls, the attribution and
+          // our own node cards with it — cards that hardcode nothing and use theme tokens
+          // throughout. That is why no per-card work was owed, and why the fence for this
+          // asserts the PLANE and a CARD rather than the prop: the completeness is a
+          // coincidence of two unrelated systems agreeing on one spelling, and if they ever
+          // diverge the canvas half-fixes and reads as a fresh bug.
+          //
+          // NON-THROWING, and required: this canvas's four suites mount it with no provider
+          // at all. `"dark"` is the fallback because it is what `getInitialTheme` returns
+          // with no window and no stored preference — so a provider-less render is
+          // byte-identical to the pre-fix rendering rather than newly light.
+          colorMode={themeCtx?.theme ?? "dark"}
           // D-183-05 — the EXISTING selection contract. The callback fires outside
           // the library's selectability guard, and `node.id === phase.slug` is what
           // carries the identity end to end. The cap and the broken-reference stub
