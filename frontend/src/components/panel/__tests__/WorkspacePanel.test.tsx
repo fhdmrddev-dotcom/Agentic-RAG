@@ -1247,3 +1247,100 @@ describe("F-1 / V-05 — no Stop mount resolves a cancel through the workflow lo
 function codeOf(src: string): string {
   return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
 }
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PHASE 199 PLAN 07 TASK 1 — THE PANEL'S RESTING ATOMS, PINNED AS LITERALS.
+ *
+ * This block MEASURES before anything changes. Its whole purpose is to make "the
+ * panel renders no MORE at rest" a measurement rather than a claim, and to make a
+ * later REMOVAL provable by INVERTING an assertion here — never by deleting one.
+ * `git diff --numstat` on this file across the plan must read `+N / −0`, for the
+ * same reason plan `199-02` made that its machine-checkable proof.
+ *
+ * ⚠ THE PANEL IS A CROSS-SURFACE SHELL AND A CHANGE HERE LANDS IN **CHAT** FIRST.
+ *   `WorkspacePanel` is mounted by `components/layout/ChatLayout.tsx` and by NO
+ *   workflow page; `components/metadata/DocumentDetailPanel.tsx` reuses its sheet
+ *   shape. So sheet c8's own title — "the live run panel" — is wrong in a way that
+ *   matters, and any UAT that exercises only the workflow surface will miss this.
+ *
+ * ⚠ jsdom RUNS NO LAYOUT. `getBoundingClientRect()` returns zeroes here, so the
+ *   sheet's headline "380px discipline" CANNOT be measured in this environment. A
+ *   `width <= 380` assertion would read `0 <= 380` and pass against a panel that
+ *   overflowed catastrophically in a browser. The zero is therefore asserted ON THE
+ *   RECORD below, the width claim is discharged by a CLASS-LEVEL surrogate, and the
+ *   real check is an owed G-4 UAT row named in the SUMMARY.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("199-07 Task 1 — the panel's resting atoms (sheet c8 inventory)", () => {
+  beforeEach(() => {
+    setViewport(1280)
+    setHooks({ todos: [], files: [], asks: [], phases: [], tasks: [], derived: [] })
+    setRunSoulSource()
+  })
+
+  it("EMPTY PANEL — the three atoms it renders at rest, as literals", () => {
+    const { container } = renderPanel()
+
+    // Non-vacuity FIRST: the panel really mounted, so an assertion about its
+    // contents is an assertion about something. A green test against a tree that
+    // rendered nothing is the failure mode this ordering exists to prevent.
+    expect(container.querySelector("aside")).not.toBeNull()
+
+    // 1. the state heading (already asserted in three other cases in this file)
+    expect(screen.getByText("No workspace activity yet")).toBeInTheDocument()
+    // 2. the forward-looking hint — pinned here for the FIRST time. Sheet c8's own
+    //    empty panel is exactly ONE forward-looking sentence, so this is the atom
+    //    the sheet AGREES with and it must survive any subtraction.
+    expect(
+      screen.getByText(
+        /When the agent writes files, tracks todos, or needs your input, it'll show\s+up here\./,
+      ),
+    ).toBeInTheDocument()
+    // 3. ⚠ THE DECORATIVE GLYPH — PINNED **PRESENT** SO ITS REMOVAL IS PROVED BY
+    //    INVERSION. Sheet c8 draws BOTH of its empty states (files-empty and
+    //    panel-empty) with zero marks: a dashed frame and a sentence. This is the
+    //    one atom of the three that the sheet does not draw.
+    expect(container.querySelectorAll("svg.lucide-inbox")).toHaveLength(1)
+  })
+
+  it("EMPTY PANEL — nothing else: no section headers, no run chrome", () => {
+    const { container } = renderPanel()
+    // panel-shell.md's "What to Avoid": never four empty section headers.
+    expect(container.querySelectorAll("button[aria-expanded]")).toHaveLength(0)
+    expect(screen.queryByTestId("panel-stop-run")).toBeNull()
+    expect(screen.queryByTestId("panel-run-receipt")).toBeNull()
+    expect(screen.queryByTestId("phase-timeline")).toBeNull()
+  })
+
+  it("POPULATED (Deep thread) — exactly three section titles, in order", () => {
+    setHooks({ asks: [], phases: [], tasks: [], derived: [] })
+    const { container } = renderPanel()
+    // Read off the DOM rather than asserted one-by-one, so an ADDED section reds
+    // this case instead of slipping past a list of individual `getByText` calls.
+    const titles = Array.from(container.querySelectorAll("button[aria-expanded]")).map(
+      (b) => b.querySelector("span")?.textContent ?? "",
+    )
+    expect(titles).toEqual(["Todos", "Files", "Versions"])
+  })
+
+  it("380px DISCIPLINE — the surrogate, and the jsdom zero asserted ON THE RECORD", () => {
+    const { container } = renderPanel()
+    const aside = container.querySelector("aside")
+    expect(aside).not.toBeNull()
+
+    // ⚠ THE HONEST HALF FIRST. This is what jsdom actually reports, recorded so no
+    // future reader mistakes the surrogate below for a measurement.
+    expect(aside!.getBoundingClientRect().width).toBe(0)
+
+    // THE SURROGATE: the shell declares NO width of its own — it fills the grid
+    // track `ChatLayout` sizes (panel-shell.md D1). So nothing inside this file can
+    // widen the panel, and the only way an element can overflow it is by refusing
+    // to shrink. Both halves are class-level and both are checkable here.
+    const cls = aside!.className
+    expect(cls).not.toMatch(/(^|\s)w-\[/)
+    expect(cls).not.toMatch(/(^|\s)min-w-\[/)
+    expect(cls).toMatch(/min-w-0/)
+    expect(cls).toMatch(/overflow-hidden/)
+  })
+})
