@@ -70,6 +70,7 @@ is the incumbent any proposal must beat.
   | 3 | `192.2-11` | **CR-01 on screen** — the fourth arm + **WR-03** (an invalid ARIA child of `role="menu"`) + the owed UAT script amended to four arms | `runFacts.ts`, `cardFace.ts`, `WorkflowCard.tsx`, `192.2-VALIDATION.md` |
 
   ⚠ **THE OPERATOR PICKED THE ROW-LEVEL FACT OVER THE REWORD, AND ACCEPTED AN EXPLICIT DISCLOSURE TRADE.** `has_any_run` reveals that **somebody** ran a workflow the caller can already see; it must **never** reveal who, when, or with what outcome — **`EXISTS` only, no count, no timestamp, no user id, no status.** On a world-readable starter that disclosure is arguably the point of the feature. Recorded so a future reader can re-open it rather than rediscover it. ⚠ **AND THE G-7 JUDGEMENT IS RECORDED RATHER THAN LEFT TO BE INFERRED:** the fourth arm puts a NEW WORD on screen (`Run by someone else`), which looks like new capability — but **the card already claims to report run truth and currently claims it FALSELY**, so a correct claim in place of a false one is REPAIR. The mechanical check does not trip: it fails only when a gap plan's `files_modified` names a non-test source file that did not exist when the plan was written, and **every file here already exists.**
+
 - [ ] **Phase 193: Authoring Doors + Template Placement** — the two doors are tellable apart before choosing; template supply has a findable home (AUTH-01, AUTH-03)
 - [x] **Phase 193.1: Template-First Authoring** — the AI drafts knowing what the template asks for (AUTH-03, the re-opened half). ⚠ **INSERTED 2026-08-14.** `REQUIREMENTS.md` records AUTH-03 as **"ANSWERED WRONGLY, not delivered — RE-OPENED, needs a new phase"**: 193 shipped the *draft-then-attach* half (and quick task `260814-q5r` added the placeholder read on top of it), but a user who describes a workflow still gets a draft built **blind to the template it will have to fill** (`SEED-157`). Measured: `POST /workflows/generate` has accepted `template_placeholders` since **Phase 103** and the frontend has **never sent it** (`WorkflowBuilderPage.tsx:1267` sends `{describe, project_folder_id?}` only); its sibling `template_asset_id` is typed `UUID` while asset ids are Storage **paths**, a measured 422. Same shape as 192 → 192.1: the parent phase shipped, a real gap was found in lived experience, and the gap gets its own phase rather than a closure round (G-7) ✅ **CLOSED 2026-08-15 — AUTH-03 SATISFIED on a real run** (`193.1-UAT.md` § U5: run `d8331add`, all 10 template fields rendered, branding intact, 11 of 13 planted facts). 11 plans / 7 waves; **plan `193.1-11` was authored MID-PHASE** after `193.1-04` measured the phase's central assumption false. Gates at close: `tsc` **33** unmoved, count gate **3892 / failed 0 / 75 pinned**, backend **62 (SEED-056 rot) / 2092**, G-7 clear, **no guardrail override** (G-5 fired on THREE files, all honoured). ⛔ **CLOSED WITH THREE UAT ROWS OWED BY DECISION, not by oversight — U2, U3, U4** (screen-judgement rows: control confusability, the disabled-CTA explanation, the describe-column fold). ⚠ **Two publish blockers found on the phase's own headline path and NOT fixed here** — `SEED-163` and `BUG-260815-01` (blocking), both routed to 197 / AUTH-02; the second is a consequence of this phase's own D-26 fix.
 - [x] **Phase 193.2: From Authored to Runnable** ✅ **CLOSED 2026-08-15 — all four SCs DRIVEN, `AUTH-03` SATISFIED END TO END** (run `b021c7b0`: 10 of 10 template fields filled, 0 residual `{{ }}`, branding verified against a screenshot, all eight planted facts grounded; requirement pre-filled and durable; published with the canvas untouched; found at rendered position 4 of 112 without searching). ⏸ **Closed with TWO UAT rows NOT driven, by decision: U5** (the composer picker — the one consequence of the sort outside the library, thirty seconds) **and U2** (⚠ **unschedulable — no interactive step appeared, so the rewritten refusal copy has still never been read by a person; the defect not occurring is not the same as its message reading well**). 10 plans / 6 waves; **five hot-file ledger rows written for files G-5 could never see**; code review 0 Critical / 0 Warning / 5 Info; **G-7 clear**; **no guardrail override — the third consecutive phase to decline one**. Both blocking reports **CLOSED on driven evidence**, each with a falsifiable re-open trigger because `BUG-260815-01`'s closure rests on a **frequency (0/20), not an absence**. Four bugs + three seeds filed from the UAT session, incl. **`SEED-159`, whose trigger FIRED and whose prediction was WRONG** — everything between *"the AI wrote my workflow"* and *"I can run it and find it again"* (SEED-163, BUG-260815-01, BUG-260815-02). ⚠ **INSERTED 2026-08-15 on an explicit operator instruction that overruled the original routing.** All three were first routed to 197 / AUTH-02 because that is the phase already scoped to authoring; the operator hit **two publish walls in a single sitting** on Phase 193.1's own headline path and ruled them blocking. **The original reasoning is left visible in each artifact rather than overwritten** — it optimised for tidiness of scope, not for whether the product could be used. **The three share ONE root, which is why they are one phase and not three fixes: the authoring path makes decisions the author is never shown, and does not know what the publish gate requires.** ⏸ **EXECUTED 2026-08-15 — 10 of 10 plans, all gates green at HEAD, and DELIBERATELY NOT MARKED COMPLETE: all five UAT rows are OWED and no success criterion is ticked that a person has driven** (`193.2-UAT.md`). Gates: backend **62 failed / 2154 passed** (failures identical to baseline — the SEED-056 rot set) · six backend workflow suites **110 / 0** · five frontend workflow suites **359 / 0** · count gate **OK · 3918 · failed 0 · 75/75** · `tsc` **33** unmoved. **No guardrail override recorded — the third consecutive phase to be offered one and decline; G-5 fired on seven files and all seven were honoured by construction.** ⚠ **Both blocking reports stay `folded`, not `closed`, and the reason is a measurement:** `BUG-260815-01`'s fix is prompt-level and non-deterministic — measured `llm_human_input` **0/20** against a pre-fix 2/2-with-a-template, **a REDUCTION and never an absence**, which is exactly why the publish gate stays; `BUG-260815-02`'s ordering half is closed and proved server-side, but **position 4 of 109 is not position 1** and whether that is "findable" is the operator's judgement. ⚠ **Its own G-5 flag was measured FALSE — `api/workflows.py` was never touched** — and its `db/workflows.py` prediction understated the file, which turned out **absent from the hot-file ledger entirely at 17 phases**, the second-hottest backend file in the tree. **FIVE ledger rows were owed, not the three planned.**
@@ -356,6 +357,7 @@ paragraph all leave the resting card.
 (`published` / `draft`) rather than business vocabulary.
 
 **Success criteria**
+
 1. A published workflow's card states when it last ran and whether that run succeeded, in words plus colour — and a workflow that has never run says so explicitly rather than rendering blank.
 2. The run facts reach the card from the library feed (no per-card fetch), and a feed that does not carry them degrades to "unknown", never to a fabricated time or a green tick.
 3. The lead/defer decision lives in a presentation module, not in `WorkflowCard.tsx` — G-5 discharged, and the three library surfaces share ONE language rather than three copies.
@@ -819,6 +821,7 @@ Plans:
 | 3 | builder chrome · doors + describe · library dialogs |
 
 **How we'd know this failed**
+
 - A surface gains text or chrome instead of losing it — the phase's whole premise inverted.
 - A plan adds a backend change, an endpoint, a migration or a new user-facing capability. **That is the scope fence; crossing it means the phase became a feature phase without anyone deciding to.**
 - The mechanism gets printed to the user again (sketch 177's worst mistake: node subtitles literally reading *"Author name" / "Derived name"*).
@@ -826,6 +829,7 @@ Plans:
 - A characterization pin is re-baselined to make red go green rather than because behaviour deliberately changed.
 
 **Success criteria**
+
 1. Each of the ten sheets is built against its shipped component, and any sheet a component structurally cannot express is **reported with the reason**, never faked and never dropped silently.
 2. No backend file, migration, endpoint or wire model is modified by this phase — provable by an empty `git diff` over `backend/` and `supabase/`.
 3. No surface renders MORE at rest than it did before; where a sheet removes an atom, the removal is proved against a pre-change inventory rather than asserted.
@@ -913,12 +917,14 @@ progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time:
 **Four bug reports are folded**, `status: folded`, `folded_into: 200`: `BUG-260610-01` (the run timer resets on navigation — `started_at` is structurally the fix; ⚠ **its duplicate-avatar half is NOT taken**), `BUG-260813-01` (canvas dark in light mode), `BUG-260807-01` + `BUG-260808-01` (canvas prototype-key defects, `security/WR-04` — ⚠ **neither is a checklist row; they widen `200-05` deliberately**), and `BUG-260816-06` (an unanswered human step times out into a **silent approval** — measured on four of five real runs at exactly the 5-minute mark; it will now **pause the run**, using the `paused` status that already ships).
 
 **Guardrails**
+
 - **G-2 discharged** — sketch 200 is the operator-approved acceptance bar.
 - **G-5 fires on ten target files.** Nine are honoured by construction; `api.ts`'s Phase-197 decline **holds** (this phase adds a TYPE, zero runtime exports, so the trigger does not fire). ⚠ **`backend/app/services/harness/phase_types.py` takes its EXTRACTION** — 39 commits / 16 phases / 2424 lines, *"extraction due"*, never taken, and this phase touches it in two concerns. The human-input executor moves to its own module **as the vehicle for its own fix** (the `threads.py` → `run_transport.py` precedent).
 - ⚠ **`backend/app/api/workflow_runs.py` OWES A HOT-FILE LEDGER ROW** — 3 / 3 / 260, **exactly at threshold and absent from the scan list**, which is the state the ledger's own history says costs most. The CLAUDE.md row and the `docs/HOT-FILE-LEDGER.md` section land in the **same commit** that modifies it.
 - ⚠ **`PhaseFormPanel.test.tsx` pins hooks at an ABSOLUTE ZERO and is honoured by EXTRACTION, never re-baselined** (the `199-06` / `FieldGuidance.tsx` precedent). Leaf sprawl is the accepted, stated cost. **`WorkflowDoorSwitch.baseline.test.tsx` is NOT in this blast radius** — it was flagged as a blocker at kickoff and the scope decision dissolved it.
 
 **How we'd know this failed**
+
 - A screen ships and the operator again says nothing changed — the 199 outcome, reproduced with a bigger budget.
 - A count or a duration appears that nothing measured — a fabricated business figure on the canvas, which `199-05` named as the highest-consequence lie available here.
 - `never ran` and `not recorded` render the same, so an absence reads as a negative.
@@ -928,6 +934,7 @@ progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time:
 - An unanswered human step still approves.
 
 **Success criteria**
+
 1. Every in-scope screen's checklist reports `N/N atoms` or **names the miss**; no atom is silently dropped, and the `MUST NOT RENDER` half is checked as strictly as the `MUST RENDER` half.
 2. `workflow_phases` carries `started_at` + `completed_at`, written at all six transition sites, and the run surface + spine render a real per-step duration and a real total runtime — with `never ran` and `not recorded` provably distinct renders.
 3. A per-step count appears **only** where the phase type declared one from a fact in its own output; a type with no number renders nothing at all — never `0`, never a dash — and the canvas edge label is the same declared count, not a second mechanism.
@@ -941,12 +948,32 @@ progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time:
 **Plans**: **7 plans** — planned 2026-08-19. ⚠ **The approved shape was SIX; RESEARCH R1 measured that `200-02` carried two concerns that are not additive, so the backend became TWO plans.** `grep -rn "'paused'" backend/app --include=*.py` returns **seven hits, ALL READS** — `workflow_runs.status = 'paused'` has never been written by anything; the only `UPDATE workflow_runs SET status` writer is `finish_run`, which clears the thread anchor and makes the run permanently unresumable; and the only re-drive in the product is `main.py:406`'s boot sweep. So the human gate is a control-flow change needing its own RED-first proof, while the wire slice is additive — and SC#5's *"the extraction changes no behaviour beyond the human-gate fix"* is unprovable if the two ride together. Plans `200-04`…`200-07` are the original `03`…`06`, shifted by one.
 
 Plans:
+**Wave 1**
+
 - [ ] 200-01-PLAN.md — derive the acceptance checklist for the four in-scope screens (⚠ **modifies ZERO source files**; `git show --name-only HEAD` is the proof, D-03) and publish the phase baselines
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 200-02-PLAN.md — the measurable wire: migration 121 + `started_at`/`completed_at` at all **SEVEN** write sites + the declared count across the **SEVEN** phase types + **all FOUR** transports widened (⚠ **runs ALONE** — its migration test mutates the local DB)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 200-03-PLAN.md — the human gate: the D-13 extraction, `pause_run`, a new `PhaseOutcome` kind, the engine arm and the answer-triggered re-drive (⚠ **runs ALONE and AFTER `200-02`** — both touch `phase_types.py`)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 200-04-PLAN.md — the step panel (`PhaseFormPanel`), closing the **eighth** live WR-04 prototype-key sink
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 200-05-PLAN.md — the authoring spine + the receipt (built here, **mounted in `200-07`**)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 200-06-PLAN.md — the canvas, plus `BUG-260813-01` by `ThemeProvider` (⚠ lands in CHAT first)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
 - [ ] 200-07-PLAN.md — the run surface + the panel trio, and the phase's closing N/N report
 
 ⚠ **Waves 1-7, ONE plan per wave — fully serialized, and the reason is measured rather than cautious.** Every screen plan owns a `scripts/vitest-count-gate.cjs` edit (a new-leaf pin or a de-slack) plus CLAUDE.md + `docs/HOT-FILE-LEDGER.md` rows under the same-commit sync rule, so **no two plans have disjoint `files_modified`** — the condition the orchestrator set for pairing `200-04` with `200-05`. `200-02` and `200-03` were already required to run alone. `GSD_VITEST_MAX_WORKERS=2` still binds every test invocation.

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T18:00:00.000Z"
+last_updated: "2026-08-19T15:17:46.498Z"
 last_activity: 2026-08-19
 progress:
   total_phases: 22
-  completed_phases: 11
-  total_plans: 126
-  completed_plans: 118
-  percent: 52
+  completed_phases: 12
+  total_plans: 133
+  completed_plans: 128
+  percent: 55
 ---
 
 # Project State
@@ -90,6 +90,7 @@ never `0`, never a dash. Deriving structurally from the `output` jsonb was **rej
 marks *"the thing produced"*.
 
 **Guardrail dispositions — no override was needed or recorded.**
+
 - **G-2 discharged** — sketch 200 (`64fc84cb`, `acceptance_bar: true`) is the operator-approved bar.
 - **G-5 fires on ten target files**, re-derived from git rather than read from the ledger — ⚠ **two cells
   were already STALE** (`PhaseFormPanel.tsx` read `21/10/1289`, measures `22/10/1290`; `WorkflowCanvas.tsx`
@@ -97,12 +98,15 @@ marks *"the thing produced"*.
   construction. ⚠ **`phase_types.py` TAKES ITS EXTRACTION** (39/16/2424, *"extraction due"*, never taken):
   the human-input executor moves to its own module **as the vehicle for its own fix**, the
   `threads.py` → `run_transport.py` precedent.
+
 - **`api.ts`'s Phase-197 decline HOLDS** — the trigger is *"a RUNTIME export or a second concern"*, and this
   phase adds a **TYPE** with zero runtime exports, so `196-08`'s mock-factory failure mode cannot fire.
   ⚠ **The planner must re-verify this by grep over the real diff, not by quoting the claim.**
+
 - ⚠ **`backend/app/api/workflow_runs.py` OWES A HOT-FILE LEDGER ROW** — `3 / 3 / 260`, **exactly at
   threshold and absent from the scan list**, the `libraryRow.ts` state where a missing row costs most. The
   CLAUDE.md row and the `docs/HOT-FILE-LEDGER.md` section land in the **same commit** that modifies it.
+
 - ⚠ **`PhaseFormPanel.test.tsx`'s ABSOLUTE-ZERO hook pin is honoured by EXTRACTION, never re-baselined**
   (the `199-06` / `FieldGuidance.tsx` precedent). **Leaf sprawl is the accepted, stated cost.**
   **`WorkflowDoorSwitch.baseline.test.tsx` is NOT in this blast radius** — flagged as a blocker at kickoff,
@@ -613,7 +617,7 @@ UAT rows are still owed)
 
 Phase: 197 (guided-authoring) — **EXECUTED 11/11, NOT COMPLETE**
 Plan: 1 of 6
-Status: Executing Phase 199
+Status: Ready to execute
 Next action: drive `197-HUMAN-UAT.md` — **11 rows, row U5 first**. Rows 10 and 11 confirm the two
 review fixes on screen.
 
@@ -1904,7 +1908,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Executing Phase 199
+**Status:** Ready to execute
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
