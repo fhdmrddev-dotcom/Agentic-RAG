@@ -205,7 +205,20 @@ export interface TemplateAttachSectionProps {
   onAttached: (asset: WorkflowTemplateAsset) => void
 }
 
-const SECTION_CLASSES = "mt-3 rounded border border-border bg-muted/40 px-2.5 py-2"
+/**
+ * ⚠ 200 (the step-panel port) — THE SHELL WEARS THE SHEET'S CARD SHAPE NOW. This section is
+ * the sheet's `Files it starts from`, and the reference draws every group as a small-caps
+ * outside label over an inset panel darker than the aside around it. Only the shape moved:
+ * `TEMPLATE_SECTION_HEADING` still reads `The file this step fills in`, deliberately, because
+ * that sentence says what the file is FOR and the sheet's does not.
+ */
+const SECTION_CLASSES = "mt-3 flex flex-col gap-1.5"
+
+/** The sheet's inset panel — the same two class strings `StepCardSection.tsx` uses. */
+const SECTION_BODY_CLASSES = "rounded border border-border bg-background p-3"
+
+const SECTION_HEADING_CLASSES =
+  "text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
 const NOTE_CLASSES = "mt-1.5 text-[10.5px] leading-snug text-muted-foreground"
 const FILENAME_CLASSES =
   "mt-1.5 flex items-center gap-1.5 text-[11px] leading-snug text-foreground"
@@ -271,7 +284,8 @@ export function TemplateAttachSection({
       data-attached={attached ? "true" : "false"}
       className={SECTION_CLASSES}
     >
-      <h3 className="text-[11px] font-medium text-foreground">{TEMPLATE_SECTION_HEADING}</h3>
+      <h3 className={SECTION_HEADING_CLASSES}>{TEMPLATE_SECTION_HEADING}</h3>
+      <div className={SECTION_BODY_CLASSES}>
 
       {attached ? (
         <p data-testid="template-filename" className={FILENAME_CLASSES}>
@@ -381,6 +395,7 @@ export function TemplateAttachSection({
       <p data-testid="template-types" className={NOTE_CLASSES}>
         {TEMPLATE_TYPES_NOTE}
       </p>
+      </div>
     </section>
   )
 }
