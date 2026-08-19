@@ -38,6 +38,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
+import { axe } from "vitest-axe"
 
 const { mockDeleteDraft, mockCascade, mockPreview } = vi.hoisted(() => ({
   mockDeleteDraft: vi.fn(),
@@ -470,6 +471,51 @@ describe("D-13 / D-14 — one sentence, as real DOM text, wired by aria-describe
       </button>,
     )
     expect(screen.getByTitle(FORK_CONSEQUENCE)).toBeInTheDocument()
+  })
+
+  it("⚠ WR-03 — the OPEN menu carries no ARIA violation, driven through the real trigger", async () => {
+    // ⚠ THE MENU IS OPENED BY DRIVING THE TRIGGER, NEVER BY RENDERING `DropdownMenuContent`
+    // DIRECTLY. The violation lives in the PORTAL SUBTREE Radix builds, so a case that mounted
+    // the content alone could not see it and would be green over nothing.
+    //
+    // ⚠ THIS CASE DID **NOT** LAND RED, AND SAYING SO IS THE POINT. It was driven against
+    // the UNEDITED card — the bare `<p id={consequenceId}>` as a direct child of `role="menu"`
+    // that WR-03 reports — and **axe passed it green**. Measured 2026-08-19, vitest-axe over
+    // axe-core 4.11.4 under jsdom; `aria-required-children` did not fire on the real portal
+    // subtree. The rule is real and the violation is real; what is NOT true is that this
+    // assertion can catch it here.
+    //
+    // ⚠ SO THIS CASE IS A REGRESSION BACKSTOP, NOT THE FENCE. A green-only axe assertion
+    // with no recorded failure mode is not evidence, and shipping it as though it were is how a
+    // fence that defends nothing gets believed. **The fence for WR-03 is the STRUCTURAL case
+    // below**, which was driven RED against the same unedited card and reported `p[role=none]`.
+    // This one is kept because it is broad — it would catch a DIFFERENT a11y regression in the
+    // menu that the five-role sweep cannot see — and because its silence on this defect is now
+    // written down instead of being rediscovered.
+    const { card } = renderCard(PUBLISHED)
+    await openOverflow(card)
+    expect(await axe(screen.getByRole("menu"))).toHaveNoViolations()
+  })
+
+  it("⚠ WR-03 — every direct element child of `role=\"menu\"` carries a permitted role", async () => {
+    // The STRUCTURAL statement of the same contract, kept beside the axe case rather than
+    // instead of it. axe is a third-party ruleset that can be re-tuned between versions; this
+    // one names the five roles ARIA permits and is ours. It also fails with a readable message
+    // — the offending tag — where axe's output has to be read.
+    const PERMITTED = ["menuitem", "menuitemradio", "menuitemcheckbox", "group", "separator"]
+    const { card } = renderCard(PUBLISHED)
+    await openOverflow(card)
+    const menu = screen.getByRole("menu")
+    const children = Array.from(menu.children)
+    // Non-vacuity: an empty menu would satisfy the loop below while proving nothing.
+    expect(children.length).toBeGreaterThan(1)
+    const offending = children
+      .filter((el) => !PERMITTED.includes(el.getAttribute("role") ?? ""))
+      .map((el) => `${el.tagName.toLowerCase()}[role=${el.getAttribute("role") ?? "none"}]`)
+    expect(offending).toEqual([])
+    // …and the fork-consequence node really is one of those children, so the sweep above
+    // genuinely covers it rather than passing because it sits somewhere else.
+    expect(children).toContain(screen.getByTestId("fork-consequence"))
   })
 
   it("a DRAFT row spends no sentence — the surface pays for it once, on the fork", () => {

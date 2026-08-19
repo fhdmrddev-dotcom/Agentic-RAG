@@ -260,6 +260,10 @@ import type { LucideIcon } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  // 192.2-11 (WR-03). The shipped primitive that carries `role="group"` — one of the five
+  // children ARIA permits inside `role="menu"`, which a `<p>` is not. ⚠ NOT
+  // `DropdownMenuLabel`, and the reason is measured; see the ⚠ paragraph at its use site.
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
@@ -1106,22 +1110,70 @@ export function WorkflowCard({
                     describes, where the person is when the warning is worth anything. The
                     `aria-describedby` round trip is unchanged and still asserted.
 
-                    ⚠ IT IS NOT A MENU ITEM. A plain `<p>` inside the content carries no
-                    role, takes no focus and is skipped by Radix's roving focus and
-                    typeahead, so the menu still offers exactly the actions it offered.
+                    ⚠ IT IS NOT A MENU ITEM — AND THE ORIGINAL REASONING FOR THAT WAS
+                    CORRECT BUT INSUFFICIENT, WHICH IS WHY IT IS AMENDED HERE RATHER THAN
+                    REPLACED. It said: *"A plain `<p>` inside the content carries no role,
+                    takes no focus and is skipped by Radix's roving focus and typeahead, so
+                    the menu still offers exactly the actions it offered."* Every clause of
+                    that is true, and **that property still holds with `DropdownMenuLabel`**
+                    — the label is equally unfocusable and equally skipped, so nothing about
+                    the menu's offered ACTIONS changes.
+
+                    What it missed is a different contract (WR-03): ARIA's
+                    `aria-required-children` requires the children of `role="menu"` to be
+                    `menuitem` / `menuitemradio` / `menuitemcheckbox` / `group` /
+                    `separator`, and a raw `<p>` is NONE of them — so the menu was
+                    MISDESCRIBED to assistive technology even though it behaved correctly
+                    for a sighted mouse user.
+
+                    ⚠ THE FIX IS `DropdownMenuGroup`, **NOT** `DropdownMenuLabel`, AND THE
+                    CHANGE OF PRIMITIVE IS MEASURED RATHER THAN PREFERRED. Both the review's
+                    fix block and this plan's DEC-11-E named `DropdownMenuLabel` as *"the same
+                    visual node with a valid role"*. **Both halves of that are false**, and
+                    each was checked rather than argued:
+
+                      · IT CARRIES NO ROLE AT ALL. Radix's `Menu.Label` is a bare
+                        `Primitive.div` with no `role` prop
+                        (`@radix-ui/react-menu/dist/index.mjs:356-362`), so swapping to it left
+                        the five-role sweep still RED — `div[role=none]` where it had said
+                        `p[role=none]`. That is a renamed defect, not a fixed one.
+                      · IT IS NOT THE SAME VISUAL NODE. `DropdownMenuLabel` merges
+                        `"px-2 py-1.5 text-sm font-semibold"` UNDER our `className`, and
+                        `MENU_NOTE_CLASSES` names no font weight — so the note would have
+                        rendered SEMIBOLD, a pixel change D-03 did not sanction on a card this
+                        phase exists to quieten.
+
+                    `Menu.Group` renders `role="group"` and nothing else
+                    (`index.mjs:348-354`), so this is ONE node, a permitted role, and the
+                    identical paint. It is also exactly the review's own parenthetical
+                    alternative — wrap it in a `role="group"` — reached through the
+                    shipped primitive instead of a hand-rolled div.
+
+                    ⚠ THE `aria-describedby` ROUND TRIP IS UNCHANGED AND STILL ASSERTED:
+                    `id`, `data-testid` and `className` all move across verbatim, so the two
+                    fork items still resolve to this node and its existing round-trip cases
+                    pass UNEDITED.
+
+                    ⚠ AND AXE DID NOT CATCH THIS — measured, not assumed. `vitest-axe`
+                    (axe-core 4.11.4) over the REAL open menu, opened by driving the trigger,
+                    passed GREEN against the `<p>` under jsdom; `aria-required-children` never
+                    fired. So the fence that actually holds WR-03 is the explicit five-role
+                    sweep over the menu's direct element children in `WorkflowCard.test.tsx`,
+                    which was driven RED twice — once on the `<p>` and once on the
+                    `DropdownMenuLabel` attempt — and named the offending node both times.
 
                     ⚠ 192-13: WHICH sentence depends on the row's real state. On a row the
                     person has already forked, the verb opens their EXISTING draft and
                     creates nothing, so promising "a new private copy" there would be a quiet
                     lie. STILL EXACTLY ONE NODE: the sentence is selected, never appended. */}
                 {runnable && (
-                  <p
+                  <DropdownMenuGroup
                     id={consequenceId}
                     data-testid="fork-consequence"
                     className={MENU_NOTE_CLASSES}
                   >
                     {hasExistingFork ? FORK_CONSEQUENCE_EXISTING : FORK_CONSEQUENCE}
-                  </p>
+                  </DropdownMenuGroup>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
