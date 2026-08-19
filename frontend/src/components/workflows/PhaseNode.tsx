@@ -317,6 +317,21 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       icon={renderPhaseMark(data.phaseType)}
       title={data.title}
       subtitle={technical ? data.technicalTitle : data.subtitle}
+      // 200-06 (BC-MR-03) — the branch condition, resolved to the target step's NAME at
+      // projection time by `canvasModel.buildPhaseData` via `phaseVocabulary
+      // .branchConditionOf`. This adapter derives nothing and resolves nothing: the value
+      // is `undefined` for every step that declares no branch, and the card then renders
+      // no condition element at all.
+      //
+      // ⚠ IT IS NOT SWAPPED BY THE ⌥ REVEAL, and that is the point. The reveal swaps a
+      // TITLE for its technical form; the condition is a sentence about the workflow's
+      // shape and reads the same to both audiences. Its identifier — the target slug —
+      // never reaches this face in either mode.
+      //
+      // The cast is the same price `verdict` and `run` pay above: `PhaseNodeData` carries
+      // an `[k: string]: unknown` index signature because @xyflow/react requires one on
+      // every node-data shape.
+      condition={data.condition as string | undefined}
       tint={tint}
       badges={badges}
       status={run?.reading}

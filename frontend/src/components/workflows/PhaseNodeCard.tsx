@@ -132,6 +132,7 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     icon,
     title,
     subtitle,
+    condition,
     technicalLine,
     tint,
     badges,
@@ -242,6 +243,28 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
 
         {subtitle ? (
           <p className="mt-1 text-[11px] leading-snug text-muted-foreground">{subtitle}</p>
+        ) : null}
+
+        {/* THE BRANCH CONDITION (200-06 · BC-MR-03 · ledger row `BC-3`).
+            The step's own condition, in business words, resolved to the target step's
+            NAME by the projection — never a slug, and never on a step that declares no
+            branch. It is a BODY line rather than a badge because both badge slots are
+            spent and a third is a typecheck error, and because it is a sentence.
+
+            It sits BELOW the type sentence and ABOVE the run line on purpose: the two
+            lines above it say what this step IS, and the run line says what it is DOING
+            right now. A condition is a fact about the SHAPE of the workflow, so it reads
+            with the design-time half rather than interleaved with the live half.
+
+            A `<p>`: no tooltip trigger, no control, no tab index. One tab stop per node is
+            a canvas-level invariant and this is not an exception to it. */}
+        {condition ? (
+          <p
+            data-testid="canvas-node-condition"
+            className="mt-1 line-clamp-2 text-[11px] leading-snug text-[hsl(38_92%_60%/0.95)]"
+          >
+            {condition}
+          </p>
         ) : null}
 
         {/* THE RUN LINE (188-06 · sketch 154-A · UI-SPEC § Card Body Budget slot 3).

@@ -215,8 +215,18 @@ import {
   toCanvas,
   type CanvasEdge,
   type CanvasNode,
+  type EdgePayload,
 } from "@/components/workflows/canvasModel"
 import { CanvasToolbar, type ToolbarSaveState } from "@/components/workflows/CanvasToolbar"
+// 200-06 (BC-MR-02) — the four connection states have ONE home, and it is a leaf that
+// imports nothing but a React type. This shell owns the pointer and the selection, so it
+// resolves the state; it does not decide what the four ARE.
+import {
+  CONNECTION_STATE_DELTA,
+  CONNECTION_STATE_WORD,
+  CONNECTION_STATES,
+  connectionStateOf,
+} from "@/components/workflows/connectionState"
 import { resolveDrop, type PhaseTypeId } from "@/components/workflows/definitionOps"
 import { FlowEdge } from "@/components/workflows/FlowEdge"
 import type { VerdictMarkKind } from "@/components/workflows/nodePresentation"
@@ -229,6 +239,10 @@ import type { NodeRunState } from "@/components/workflows/runVocabulary"
 import { StepTypePicker } from "@/components/workflows/StepTypePicker"
 import type { VerdictGroups } from "@/components/workflows/verdictModel"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
+// 200-06 (BUG-260813-01) — the NON-THROWING accessor, deliberately. The throwing
+// `useTheme` belongs to writers; this canvas only reads, and its four suites mount it with
+// no provider.
+import { useThemeOptional } from "@/providers/ThemeProvider"
 // Type-only: the check-state union has ONE owner and this file declares no second
 // spelling of it, so a rename there is a typecheck error here rather than a branch that
 // quietly stops matching. Erased at build — no runtime edge. 187-27 moved the owner from
@@ -642,6 +656,12 @@ export function WorkflowCanvas({
 }: WorkflowCanvasProps) {
   // The app-wide reveal, READ (never owned) here. Null outside a provider.
   const technicalNames = useTechnicalNamesOptional()
+  // 200-06 (BUG-260813-01) — the app's ONE theme, read the same way the ⌥ reveal above is:
+  // a non-throwing context read, so this component still renders with no provider mounted.
+  // Because it is a CONTEXT and not a per-consumer hook, a toggle made anywhere — the chat
+  // shell owns the only one — re-renders this canvas. That is the property a second
+  // `useTheme()` call could not have had, and it is the reason this fix is a provider.
+  const themeCtx = useThemeOptional()
   const showTechnical = technicalNames?.showTechnical ?? false
 
   const projection = useMemo(() => toCanvas(phases, { kbTools, nameContext }), [phases, kbTools, nameContext])
@@ -670,6 +690,56 @@ export function WorkflowCanvas({
   /** Where the dragged card started. Captured on drag start; the axis split is read
    *  against it, never against the lane it happens to be nearest. */
   const dragOriginRef = useRef<XYPosition | null>(null)
+
+  // ── 200-06 (BC-MR-02) — the two VIEW facts a connection's state is read from ─────
+  //
+  // Both live here rather than on the projection: they are where the pointer is and what
+  // the person picked, neither of which belongs in a pure function of the definition.
+  // Neither participates in the node memos, so a hover cannot re-render a card.
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null)
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null)
+
+  /**
+   * 200-06 (BC-MR-01 · D-08) — slug → THE STEP'S OWN DECLARED COUNT, ready to render.
+   *
+   * ⚠ **PLACED ABOVE `settledNodes` ON PURPOSE, AND THE PLACEMENT IS FENCED.** This
+   * file's own suite slices its source at the drag-overlay memo's declaration and asserts
+   * that the whole REMAINDER names the run lookup nowhere — the anti-blink split, which
+   * exists because a run lookup in the overlay memo rebuilt every node's `data` ~60×/s and
+   * visibly flickered the cards. The edges memo lives below that line, so it may not name
+   * the lookup either; this memo does the read once, up here, and the edges memo reads it.
+   *
+   * ⚠ AND THE SLICE ANCHOR IS A LITERAL STRING, SO THIS DOCBLOCK MAY NOT SPELL IT. Writing
+   * the anchor out here — even inside a comment, even to explain the rule — moves the
+   * suite's `indexOf` to this line and hands it an EMPTY slice, which then matches nothing.
+   * Measured RED exactly that way while this memo was being written, which is the whole
+   * reason the sentence above describes the anchor instead of quoting it.
+   *
+   * ⚠ **THE CANVAS STILL DERIVES NOTHING.** It calls the page-supplied function and keeps
+   * what came back. It computes no count, opens no fetch, reads no step ordinal and
+   * imports no vocabulary — the three properties its suite greps for. D-08's whole point
+   * is that the connection's label and the live per-step column are ONE mechanism; a
+   * second counting path here is what would let the two drift apart (BC-MNR-05).
+   *
+   * `typeof count === "number"` — never `count ?? …`, never `if (count)`. A step that
+   * searched and found nothing declared a real `0` and it must survive to the render;
+   * a type that declares no count at all must produce NO entry, so the edge can omit the
+   * label element rather than draw an empty one (BC-MNR-01).
+   */
+  const edgePayloads = useMemo<Record<string, EdgePayload>>(() => {
+    const out: Record<string, EdgePayload> = Object.create(null) as Record<string, EdgePayload>
+    if (runState === undefined) return out
+    for (const node of projection.nodes) {
+      if (node.type !== CANVAS_NODE_TYPES.phase) continue
+      const state = runState(node.id)
+      if (state === undefined) continue
+      const { count, noun } = state
+      if (typeof count !== "number" || Number.isNaN(count)) continue
+      if (typeof noun !== "string" || noun.length === 0) continue
+      out[node.id] = { count, noun }
+    }
+    return out
+  }, [projection.nodes, runState])
 
   // A COPY. Selection, the ⌥ boolean, the cosmetic `dy`, the per-node drag flag and the
   // server verdict mark are all view state; the model output and the definition behind
@@ -825,17 +895,46 @@ export function WorkflowCanvas({
         .filter((node) => node.type === CANVAS_NODE_TYPES.unresolvedSkip)
         .map((node) => node.id),
     )
-    return projection.edges.map((edge) => ({
-      ...edge,
-      style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
-      // The branch's word, on the RESOLVED branch only — see `BRANCH_CONNECTOR_WORD`.
-      // Spread CONDITIONALLY (the shipped D-14 idiom), so a run-order connector's object
-      // is byte-identical to what it was before this plan.
-      ...(edge.data?.kind === CANVAS_EDGE_KINDS.skip && !brokenTargets.has(edge.target)
-        ? BRANCH_CONNECTOR_LABEL
-        : {}),
-    }))
-  }, [projection.edges, projection.nodes])
+    return projection.edges.map((edge) => {
+      const kind = edge.data?.kind ?? CANVAS_EDGE_KINDS.flow
+      // 200-06 (BC-MR-02) — the four states, resolved by the ONE leaf that defines them.
+      //
+      // `not taken` is the CONDITIONAL BRANCH and nothing else. It is a fact about the
+      // DEFINITION — this line is only followed when a check fails — never a claim that a
+      // run did not follow it, which would need rows this canvas does not read.
+      const connection = connectionStateOf({
+        selected: edge.id === selectedEdgeId,
+        hovered: edge.id === hoveredEdgeId,
+        conditional: kind === CANVAS_EDGE_KINDS.skip,
+      })
+      // ⚠ `own()`, not a bare index (WR-04 · BUG-260807-01 / BUG-260808-01). An edge's
+      // `source` IS a phase slug, `workflow_phases.slug` is unconstrained `text`, and a
+      // slug named `constructor` resolves an INHERITED FUNCTION through a bare index —
+      // never nullish, so every downstream guard passes and a function reaches the render.
+      // The map is null-prototype as well, so the write side cannot be poisoned either.
+      const payload = own(edgePayloads, edge.source)
+      return {
+        ...edge,
+        // At rest and not-taken contribute an EMPTY delta, so the shipped run-order
+        // connector and the shipped dashed branch are byte-identical to before this plan.
+        style: { ...EDGE_STYLE[kind], ...CONNECTION_STATE_DELTA[connection] },
+        // The branch's word, on the RESOLVED branch only — see `BRANCH_CONNECTOR_WORD`.
+        // Spread CONDITIONALLY (the shipped D-14 idiom), so a run-order connector's object
+        // is byte-identical to what it was before this plan.
+        ...(kind === CANVAS_EDGE_KINDS.skip && !brokenTargets.has(edge.target)
+          ? BRANCH_CONNECTOR_LABEL
+          : {}),
+        data: {
+          ...(edge.data ?? { kind }),
+          connection,
+          // CONDITIONAL, for the same D-14 reason: an upstream step that declared nothing
+          // leaves the key absent, and `FlowEdge` then renders NO label element at all —
+          // never a `0`, never a dash, never an empty pill (BC-MNR-01).
+          ...(payload === undefined ? {} : { payload }),
+        },
+      }
+    })
+  }, [projection.edges, projection.nodes, edgePayloads, hoveredEdgeId, selectedEdgeId])
 
   /**
    * REQUIRED with a controlled `nodes` prop — see `dragOverlay`. Only `position`
@@ -1314,7 +1413,25 @@ export function WorkflowCanvas({
           fitViewOptions={{ padding: 0.1, minZoom: 0.3 }}
           minZoom={0.3}
           maxZoom={2}
-          colorMode="dark"
+          // ── 200-06 (BUG-260813-01 · BC-MNR-03) — THE PLANE FOLLOWS THE APP ─────────
+          //
+          // This read `colorMode="dark"`, hardcoded, and it was the whole bug: the canvas
+          // was the only dark island in a light page. ⚠ AND IT DARKENED MORE THAN THE
+          // PLANE. React Flow puts this value on its wrapper as a CLASS — the literal
+          // string `"dark"` — and `tailwind.config.js` is `darkMode: ["class"]`, which
+          // Tailwind scopes by the NEAREST ANCESTOR. So one prop wrapped the whole subtree
+          // in a `.dark` ancestor and took the dot grid, the controls, the attribution and
+          // our own node cards with it — cards that hardcode nothing and use theme tokens
+          // throughout. That is why no per-card work was owed, and why the fence for this
+          // asserts the PLANE and a CARD rather than the prop: the completeness is a
+          // coincidence of two unrelated systems agreeing on one spelling, and if they ever
+          // diverge the canvas half-fixes and reads as a fresh bug.
+          //
+          // NON-THROWING, and required: this canvas's four suites mount it with no provider
+          // at all. `"dark"` is the fallback because it is what `getInitialTheme` returns
+          // with no window and no stored preference — so a provider-less render is
+          // byte-identical to the pre-fix rendering rather than newly light.
+          colorMode={themeCtx?.theme ?? "dark"}
           // D-183-05 — the EXISTING selection contract. The callback fires outside
           // the library's selectability guard, and `node.id === phase.slug` is what
           // carries the identity end to end. The cap and the broken-reference stub
@@ -1322,10 +1439,35 @@ export function WorkflowCanvas({
           onNodeClick={(_, node) => {
             if (node.type === CANVAS_NODE_TYPES.phase) onSelectNode(node.id)
           }}
+          // ── 200-06 (BC-MR-02) — the two states the plane could not express ────────
+          //
+          // FIRST-CLASS PROPS ON AN ALREADY-INTERACTIVE PLANE, exactly as `onPaneClick`
+          // below is, and for the same reason: the alternative was a handler bolted onto
+          // the edge component, and `FlowEdge`'s own suite forbids that outright — it
+          // greps that file for four attribute spellings and requires zero hits, because
+          // one tab stop per node is a canvas-level invariant and a pressable mark on a
+          // line would be a second. The pointer and the pick therefore live HERE, and the
+          // edge renders the state it is handed.
+          //
+          // Selection is tracked locally rather than through the library's own edge
+          // selection: `edges` is a CONTROLLED prop with no `onEdgesChange`, so a
+          // library-managed `selected` flag could never be applied back and the state
+          // would be unreachable. This mirrors the node contract two lines below, where
+          // `selectedSlug` is the page's and the click is the library's.
+          onEdgeClick={(_, edge) => setSelectedEdgeId(edge.id)}
+          onEdgeMouseEnter={(_, edge) => setHoveredEdgeId(edge.id)}
+          onEdgeMouseLeave={() => setHoveredEdgeId(null)}
           // …and the deselect half, read straight off the library's own pane element.
           // A first-class prop on an already-interactive plane — not a DOM handler
           // bolted onto a non-interactive element — so the a11y gate stays clean.
-          onPaneClick={onClearSelection}
+          //
+          // 200-06 — it clears the CONNECTION pick too. A click on empty plane means "I am
+          // done with what I had picked", and leaving a line lit while the node selection
+          // cleared would leave two selections disagreeing on one surface.
+          onPaneClick={() => {
+            setSelectedEdgeId(null)
+            onClearSelection()
+          }}
           // …and the same contract from the keyboard (CR-01). One rule, two devices.
           onKeyDown={activateFromKeyboard}
           // …and the announced affordance, which has to match the MODE (see the two
@@ -1358,6 +1500,39 @@ export function WorkflowCanvas({
           {/* The prop below removes the interactivity padlock — see the docblock;
               without it read-only is two clicks deep. */}
           <Controls showInteractive={false} />
+          {/* 200-06 (BC-MR-02) — THE LEGEND STRIP, the sketch's own bottom-right panel.
+              It is what makes the four states legible rather than merely distinct: a line
+              that changes weight under the pointer says nothing until the plane has said
+              what its line weights MEAN. The words are the leaf's, so the legend and the
+              lines can never end up naming the same state differently.
+
+              Decorative and inert: `aria-hidden`, no control, no tab stop — one tab stop
+              per node is a canvas-level invariant and a legend is not an exception to it.
+              The swatches carry SHAPE (weight and dash), never colour alone. */}
+          <div
+            aria-hidden="true"
+            data-testid="canvas-connection-legend"
+            className="pointer-events-none absolute bottom-2 right-2 z-10 flex items-center gap-3 rounded-md border border-border/60 bg-card/85 px-3 py-1.5 backdrop-blur-sm"
+          >
+            {CONNECTION_STATES.map((state) => (
+              <span key={state} className="flex items-center gap-1.5" data-legend-state={state}>
+                <svg width="16" height="4" viewBox="0 0 16 4" className="block">
+                  <line
+                    x1="0"
+                    y1="2"
+                    x2="16"
+                    y2="2"
+                    strokeWidth={CONNECTION_STATE_DELTA[state].strokeWidth ?? 2}
+                    stroke={CONNECTION_STATE_DELTA[state].stroke ?? "hsl(var(--border))"}
+                    strokeDasharray={state === "not-taken" ? "3 2" : undefined}
+                  />
+                </svg>
+                <span className="text-[11px] leading-none text-muted-foreground">
+                  {CONNECTION_STATE_WORD[state]}
+                </span>
+              </span>
+            ))}
+          </div>
           {/* 184-12 — the `＋` / `✕` layer. A CHILD of `<ReactFlow>` so it can read the
               viewport, and drawn through `<ViewportPortal>` so it lives on the plane
               beside the nodes rather than inside any of them. Editing-only. */}

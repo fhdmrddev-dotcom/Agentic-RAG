@@ -608,3 +608,137 @@ describe("FlowEdge 199-05 — the three states it can express are distinct WITHO
     expect(withColour).not.toContain("stroke=")
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 200-06 — THE PAYLOAD LABEL AND THE FOUR CONNECTION STATES
+//
+// `200-CHECKLIST.md` §3: `BC-MR-01` (the connection carries the upstream step's DECLARED
+// count), `BC-MR-02` (the four states, drawn distinctly), `BC-MNR-01` (no label at all
+// where nothing was declared — not `0`, not a dash, not an empty pill) and `BC-MNR-02`
+// (no fabricated figure: every number and every noun arrives from outside this file).
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** Render one edge carrying a payload and/or a connection state. Deliberately a SECOND
+ *  helper rather than a widening of `renderEdge`, so every shipped assertion above keeps
+ *  calling exactly the function it called before this plan. */
+async function renderPayloadEdge(data: CanvasEdgeData) {
+  const edge: Edge = {
+    id: "seq:a->b",
+    source: "a",
+    target: "b",
+    style: FLOW_STYLE,
+    data,
+    type: "flow",
+  }
+  const view = render(
+    <div style={{ width: 1200, height: 800 }}>
+      <ReactFlow
+        nodes={PROBE_NODES}
+        edges={[edge]}
+        nodeTypes={probeNodeTypes}
+        edgeTypes={probeEdgeTypes}
+        defaultEdgeOptions={PROBE_EDGE_OPTIONS}
+        fitView={false}
+      />
+    </div>,
+  )
+  await waitFor(() => {
+    expect(view.container.querySelectorAll(".react-flow__edge-path").length).toBeGreaterThan(0)
+  })
+  return view
+}
+
+const PAYLOAD_TESTID = '[data-testid="canvas-edge-payload"]'
+
+describe("FlowEdge 200-06 — the connection carries a fact it did not invent (BC-MR-01)", () => {
+  it("renders `<n> <noun>` when the upstream step declared a count", async () => {
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      payload: { count: 312, noun: "sources" },
+    })
+    const mark = container.querySelector(PAYLOAD_TESTID)
+    expect(mark).not.toBeNull()
+    expect(mark?.textContent).toBe("312 sources")
+  })
+
+  it("renders NO LABEL ELEMENT AT ALL when the upstream declared nothing (BC-MNR-01)", async () => {
+    const { container } = await renderPayloadEdge({ kind: "flow" })
+    // A DOM ABSENCE, never an empty string: an empty `<text>` is still an element, and the
+    // checklist forbids an empty pill exactly as firmly as it forbids a `0`.
+    expect(container.querySelectorAll(PAYLOAD_TESTID)).toHaveLength(0)
+    // NON-VACUITY — the edge really did render, so "no label" is a statement about a drawn
+    // connection rather than about an empty plane.
+    expect(container.querySelectorAll(".react-flow__edge-path").length).toBeGreaterThan(0)
+  })
+
+  it("renders a DECLARED ZERO — `0` is a fact, not an absence (BC-MNR-01)", async () => {
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      payload: { count: 0, noun: "sources" },
+    })
+    // The case a `count ?? …` or an `if (count)` arm would silently swallow: a step that
+    // searched and found nothing gave a real answer and the plane must say so.
+    expect(container.querySelector(PAYLOAD_TESTID)?.textContent).toBe("0 sources")
+  })
+
+  it("the noun is rendered VERBATIM — this component spells none of its own (BC-MNR-02)", async () => {
+    // A noun no vocabulary in this repo contains. It reaches the plane unchanged, which is
+    // the property that makes the label the SERVER's word rather than the client's guess.
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      payload: { count: 7, noun: "zzqx" },
+    })
+    expect(container.querySelector(PAYLOAD_TESTID)?.textContent).toBe("7 zzqx")
+    // …and the component's own source contains none of the three shipped count nouns, so
+    // it cannot be supplying one from a table of its own.
+    for (const noun of ["sources", "agents", "fields"]) expect(flowEdgeSource).not.toContain(noun)
+    // POSITIVE CONTROL — the needles are real strings a `toContain` can find.
+    expect("312 sources").toContain("sources")
+  })
+
+  it("the label survives on an ARMED connector too — the detour does not swallow it", async () => {
+    const { container } = await renderPayloadEdge({
+      kind: "flow",
+      armed: true,
+      payload: { count: 12, noun: "zzqx" },
+    })
+    expect(container.querySelector(PAYLOAD_TESTID)?.textContent).toBe("12 zzqx")
+    // …and the detour's own word is still there, so the two labels coexist rather than
+    // competing for one slot.
+    expect(container.querySelector('[data-testid="canvas-detour-label"]')?.textContent).toBe(
+      DETOUR_ARMED_LABEL,
+    )
+  })
+
+  it("the absence arm is a TYPEOF test — no `?? 0` and no truthiness arm in the source", () => {
+    // The grep is over CODE, and the positive controls prove the needles are real shapes
+    // rather than a matcher that can never match.
+    const code = flowEdgeSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "")
+    expect(code).not.toMatch(/\?\?\s*0\b/)
+    expect(code).not.toMatch(/if\s*\(\s*count\s*\)/)
+    expect("const n = count ?? 0").toMatch(/\?\?\s*0\b/)
+    expect("if (count) { }").toMatch(/if\s*\(\s*count\s*\)/)
+  })
+})
+
+describe("FlowEdge 200-06 — the four connection states are expressed (BC-MR-02)", () => {
+  it("each of the four reaches the drawn path as its own state", async () => {
+    for (const state of ["at-rest", "selected", "hovered", "not-taken"] as const) {
+      const view = await renderPayloadEdge({ kind: "flow", connection: state })
+      expect(edgePath(view.container).getAttribute("data-connection-state")).toBe(state)
+      view.unmount()
+    }
+  })
+
+  it("an edge with NO state declared carries no state attribute — byte-identical to before", async () => {
+    const { container } = await renderPayloadEdge({ kind: "flow" })
+    // The shipped canvas rendered no such attribute before this plan, and a canvas that
+    // supplies no state still renders exactly what it rendered then.
+    expect(edgePath(container).getAttribute("data-connection-state")).toBeNull()
+  })
+
+  it("POSITIVE CONTROL — the attribute really is readable, so the absence above is evidence", async () => {
+    const { container } = await renderPayloadEdge({ kind: "flow", connection: "selected" })
+    expect(edgePath(container).getAttribute("data-connection-state")).toBe("selected")
+  })
+})

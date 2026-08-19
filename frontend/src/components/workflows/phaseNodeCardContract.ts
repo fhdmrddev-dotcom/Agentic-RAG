@@ -167,6 +167,20 @@ export interface PhaseNodeCardProps {
    *  title swap today; this slot exists so a later phase adds a line without
    *  re-cutting the card. Absent ⇒ renders nothing. */
   technicalLine?: string
+  /** Phase 200-06 (`BC-MR-03`) — this step's own BRANCH CONDITION, already resolved to
+   *  the target step's NAME by `canvasModel`'s projection. Absent ⇒ the card renders no
+   *  condition element at all, which is the state every step without an `on_failure`
+   *  branch is in, and also the state a step whose branch target does not resolve is in
+   *  (the broken-reference stub already prints that whole sentence — 199-05's rule).
+   *
+   *  ⚠ IT IS A BODY LINE, NOT A BADGE, AND THAT IS FORCED RATHER THAN CHOSEN. `BadgeSlots`
+   *  is a max-2 tuple union and both slots are SPENT ("Not connected", "Waits for you"), so
+   *  a third badge is a TYPECHECK ERROR. The condition therefore lands in the body, which
+   *  is also where it belongs: it is a SENTENCE, and a word-badge carries one word.
+   *
+   *  ⚠ NO SLUG EVER REACHES THIS SLOT. The value is business words about a named step; a
+   *  slug here would put an identifier on the one surface a non-technical person reads. */
+  condition?: string
   /** The icon-well tint, already resolved (with `DEFAULT_TINT` as the fallback) by
    *  the caller. The card performs no lookup and so cannot crash on an unknown type. */
   tint: string

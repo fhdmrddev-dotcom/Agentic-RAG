@@ -68,6 +68,19 @@ import { CANVAS_LAYOUT } from "./canvasModel"
 // 199-05: the ONE shared 3D phase-mark map, read so the §4 audit below checks the real
 // slugs rather than a hand-kept copy of them.
 import { PHASE_GLYPHS } from "./soulData"
+// 200-06: the phase shape, so the `constructor`-slug fixture is built against the real
+// type rather than cast. Added as a SEPARATE statement, same auditability rule as above.
+import type { PhaseSpecJSON } from "./phaseVocabulary"
+// 200-06 (BUG-260813-01): the ONE theme state, and the WRITER's hook — the light-mode
+// fence drives a real provider and a real toggle rather than a prop, because the defect
+// this closes was precisely that a toggle did not reach this component.
+import { ThemeProvider, useTheme } from "@/providers/ThemeProvider"
+import themeProviderSource from "@/providers/ThemeProvider?raw"
+import useThemeHookSource from "@/hooks/useTheme?raw"
+// …and the shipped provider this one is modelled on, read ONLY as the positive control for
+// the "no consumer forks the state" fence: a `useState` needle that finds nothing proves
+// nothing unless it is shown to find something.
+import technicalNamesProviderSource from "@/providers/TechnicalNamesProvider?raw"
 
 // ── 188.1-01 — THE SUBTREE SOURCE, and why it names files that do not exist yet ──────
 //
@@ -1560,5 +1573,658 @@ describe("WorkflowCanvas 199-05 — the sheet's RIGHT-OVERFLOW flaw is not inher
     expect(screen.getByTestId("canvas-node-escalate")).toBeInTheDocument()
     expect(screen.getByTestId("canvas-end-cap")).toBeInTheDocument()
     expect(container.querySelectorAll(".react-flow__node")).toHaveLength(branching.length + 1)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 200-06 — THE CONNECTION CARRIES THE UPSTREAM'S DECLARED COUNT
+//
+// `200-CHECKLIST.md` §3 `BC-MR-01` / `BC-MNR-01` / `BC-MNR-05`, and D-08's ONE-mechanism
+// rule. `FlowEdge.test.tsx` drives the RENDER of a payload; this block drives the SEAM —
+// that the number the page declared for a step is the number that reaches the connection
+// LEAVING that step, that a step which declared nothing produces no label anywhere on the
+// plane, and that the canvas is a pass-through which computes none of it.
+// ════════════════════════════════════════════════════════════════════════════════
+
+const EDGE_PAYLOAD = '[data-testid="canvas-edge-payload"]'
+
+/** A run state carrying a declared count — the shape the PAGE builds one in once
+ *  `200-07` wires the two wire fields through. `mkRun` above is deliberately left
+ *  untouched, so every shipped RUNVIZ-01 assertion keeps calling exactly what it called. */
+function mkCountedRun(reading: CanvasReading, count: number, noun: string): NodeRunState {
+  return { reading, label: runReadingLabel(reading), count, noun }
+}
+
+/** Render the plane with a page-supplied lookup and wait for the edges to draw. */
+async function renderCounted(
+  phases: Parameters<typeof toCanvas>[0],
+  runState: (slug: string) => NodeRunState | undefined,
+) {
+  const view = renderCanvas(phases, { runState })
+  await waitFor(() => {
+    expect(view.container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+  })
+  return view
+}
+
+describe("WorkflowCanvas 200-06 — BC-MR-01, the edge label IS the upstream's declared count", () => {
+  it("labels the connection LEAVING the step that declared the count", async () => {
+    const { container } = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug
+        ? mkCountedRun("done", 312, "sources")
+        : mkCountedRun("done", 0, "zzqx"),
+    )
+    const marks = [...container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent)
+    // The first step declared 312 sources, so the one connection leaving it says so.
+    expect(marks).toContain("312 sources")
+  })
+
+  it("a step that declared NOTHING puts no label anywhere on the plane (BC-MNR-01)", async () => {
+    const { container } = await renderCounted(researchSummarize, () => mkRun("done"))
+    // NON-VACUITY FIRST — the plane really drew connections, so "no label" is a statement
+    // about drawn edges rather than about an empty canvas. This project has now measured
+    // three fences that were reached and still defended nothing.
+    expect(container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+    expect(container.querySelectorAll(EDGE_PAYLOAD)).toHaveLength(0)
+  })
+
+  it("a DECLARED ZERO reaches the plane — `0` is a fact, absence is the other one", async () => {
+    const { container } = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 0, "zzqx") : undefined,
+    )
+    const marks = [...container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent)
+    expect(marks).toContain("0 zzqx")
+  })
+
+  it("HALF a declaration is no declaration — a count with no noun renders nothing", async () => {
+    const { container } = await renderCounted(researchSummarize, () => ({
+      reading: "done",
+      label: runReadingLabel("done"),
+      count: 9,
+    }))
+    expect(container.querySelectorAll(EDGE_PAYLOAD)).toHaveLength(0)
+  })
+
+  it("the canvas is a PASS-THROUGH — change the seam and the plane changes with it (BC-MNR-05)", async () => {
+    // D-08: ONE mechanism. If the canvas ever grew a counting path of its own, the label
+    // would stop tracking the seam — which is exactly how the edge label and the live
+    // per-step column would drift apart. Driven rather than grepped.
+    const first = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 312, "zzqx") : undefined,
+    )
+    expect(
+      [...first.container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent),
+    ).toContain("312 zzqx")
+    first.unmount()
+
+    const second = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 7, "zzqx") : undefined,
+    )
+    expect([...second.container.querySelectorAll(EDGE_PAYLOAD)].map((n) => n.textContent)).toContain(
+      "7 zzqx",
+    )
+  })
+
+  it("a `constructor`-slugged step cannot poison the payload map (WR-04 · own())", async () => {
+    // `workflow_phases.slug` is unconstrained `text` and the UI cannot author this slug
+    // (D-184-11), so only a seeded definition reaches it — which is why the fixture is
+    // built here. A bare index would resolve `Object.prototype.constructor`, a FUNCTION,
+    // which is never nullish and therefore passes every downstream guard.
+    const poisoned: PhaseSpecJSON[] = [
+      { slug: "first", phase_index: 0, config: { phase_type: "llm_agent" } },
+      { slug: "constructor", phase_index: 1, config: { phase_type: "llm_single" } },
+      { slug: "last", phase_index: 2, config: { phase_type: "llm_emit" } },
+    ]
+    const { container } = await renderCounted(poisoned, () => undefined)
+    // Nothing declared anything, so NO label may appear — and in particular no label whose
+    // text is a stringified function.
+    expect(container.querySelectorAll(EDGE_PAYLOAD)).toHaveLength(0)
+    expect(container.textContent ?? "").not.toContain("function")
+    expect(container.textContent ?? "").not.toContain("[object")
+    // NON-VACUITY — the poisoned node really is on the plane.
+    expect(screen.getByTestId("canvas-node-constructor")).toBeInTheDocument()
+  })
+
+  it("the poisoned slug still renders a real, finite position (BUG-260808-01's floor)", async () => {
+    // The automated floor beneath `200-VALIDATION.md`'s driven row. 808's defect was a
+    // node whose `position` became a Function with no `.x`/`.y`, after which the library
+    // wrote NO transform at all and painted the card at the origin on top of phase 1.
+    const poisoned: PhaseSpecJSON[] = [
+      { slug: "first", phase_index: 0, config: { phase_type: "llm_agent" } },
+      { slug: "constructor", phase_index: 1, config: { phase_type: "llm_single" } },
+    ]
+    const { container } = await renderCounted(poisoned, () => undefined)
+    const wrapper = container.querySelector<HTMLElement>('.react-flow__node[data-id="constructor"]')
+    expect(wrapper).not.toBeNull()
+    const transform = wrapper!.style.transform
+    // A REAL transform with FINITE numbers — not the empty string 808 measured, and not a
+    // `NaN` that would render as `translate(NaN px, NaN px)`.
+    expect(transform).not.toBe("")
+    expect(transform).not.toContain("NaN")
+    const numbers = [...transform.matchAll(/-?\d+(?:\.\d+)?/g)].map((m) => Number(m[0]))
+    expect(numbers.length).toBeGreaterThan(0)
+    for (const n of numbers) expect(Number.isFinite(n)).toBe(true)
+    // …and it is NOT at the origin, which is where the defect parked it.
+    expect(numbers.some((n) => n !== 0)).toBe(true)
+  })
+})
+
+describe("WorkflowCanvas 200-06 — BC-MR-02, the four connection states", () => {
+  it("an ordinary connector rests, and says so", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const path = container.querySelector(".react-flow__edge-path")
+    expect(path?.getAttribute("data-connection-state")).toBe("at-rest")
+  })
+
+  it("HOVER is reachable and changes the state the connector reports", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const edge = container.querySelector<SVGGElement>(".react-flow__edge")
+    expect(edge).not.toBeNull()
+    fireEvent.mouseEnter(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("hovered")
+    })
+    // …and it RELEASES. A state that never clears is a stuck highlight, not a hover.
+    fireEvent.mouseLeave(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("at-rest")
+    })
+  })
+
+  it("SELECTION is reachable, outranks hover, and a pane click clears it", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const edge = container.querySelector<SVGGElement>(".react-flow__edge")
+    fireEvent.click(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("selected")
+    })
+    // Precedence, driven rather than asserted at the leaf alone: the pointer is over the
+    // line it just picked, and the reading stays `selected`.
+    fireEvent.mouseEnter(edge!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).toBe("selected")
+    })
+    const pane = container.querySelector<HTMLElement>(".react-flow__pane")
+    expect(pane).not.toBeNull()
+    fireEvent.click(pane!)
+    await waitFor(() => {
+      expect(
+        container.querySelector(".react-flow__edge-path")?.getAttribute("data-connection-state"),
+      ).not.toBe("selected")
+    })
+  })
+
+  it("the CONDITIONAL BRANCH reads as `not taken` — the dash it has carried since 183", async () => {
+    const { container } = await renderPlane(branching)
+    const dashed = [...container.querySelectorAll<SVGPathElement>(".react-flow__edge-path")].filter(
+      (p) => (p.getAttribute("style") ?? "").includes("dasharray"),
+    )
+    // Exactly one conditional branch in this fixture, and it is drawn distinctly from
+    // every run-order connector WITHOUT relying on a hue.
+    expect(dashed.length).toBe(1)
+  })
+
+  it("BC-MR-03 — a branch node states its own condition, in the TARGET STEP'S NAME", async () => {
+    const { container } = await renderPlane(branching)
+    const card = screen.getByTestId("canvas-node-assess")
+    const line = within(card).getByTestId("canvas-node-condition")
+    // The NAME the target step gives itself, resolved through the same `nodeTitle` the
+    // face's own title comes from — never the slug the definition stores.
+    expect(line.textContent).toBe("If the check fails → Wait for your approval")
+    expect(line.textContent).not.toContain("escalate")
+    expect(line.textContent).not.toContain("skip_to_phase")
+    // NON-VACUITY — the slug really is what the definition carries, so "not the slug" is a
+    // statement about a resolution that happened rather than about a string that never
+    // existed.
+    expect(branching[1].validators?.[0].on_failure).toBe("skip_to_phase:escalate")
+    expect(container.querySelectorAll('[data-testid="canvas-node-condition"]')).toHaveLength(1)
+  })
+
+  it("a step that declares NO branch renders no condition element at all", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    expect(container.querySelectorAll('[data-testid="canvas-node-condition"]')).toHaveLength(0)
+    // NON-VACUITY — the cards really rendered.
+    expect(screen.getAllByTestId(/^canvas-node-/).length).toBe(researchSummarize.length)
+  })
+
+  it("a BROKEN branch states it ONCE — on the stub, never twice on the plane", async () => {
+    // 199-05's own rule, applied to a new element: the unresolvable target already
+    // terminates in a stub that prints the whole sentence, so a condition line on the
+    // source card would be the same fact three centimetres away.
+    const { container } = await renderPlane(unresolvableSkip)
+    expect(screen.getByTestId("canvas-unresolved-skip")).toBeInTheDocument()
+    expect(container.querySelectorAll('[data-testid="canvas-node-condition"]')).toHaveLength(0)
+  })
+
+  it("a `constructor`-slugged branch TARGET resolves to a step, not to a function", async () => {
+    // The slug the UI cannot author (D-184-11) pointed at from an `on_failure`. A bare
+    // object index would resolve `Object.prototype.constructor`; the projection uses a
+    // `Map`, which reads no prototype chain at all.
+    const poisonedTarget: PhaseSpecJSON[] = [
+      {
+        slug: "check",
+        phase_index: 0,
+        config: { phase_type: "llm_single" },
+        validators: [{ kind: "structure_check", on_failure: "skip_to_phase:constructor" }],
+      },
+      { slug: "constructor", phase_index: 1, config: { phase_type: "llm_human_input" } },
+    ]
+    const { container } = await renderPlane(poisonedTarget)
+    const line = within(screen.getByTestId("canvas-node-check")).getByTestId(
+      "canvas-node-condition",
+    )
+    expect(line.textContent).toBe("If the check fails → Wait for your approval")
+    expect(container.textContent ?? "").not.toContain("function")
+    expect(container.textContent ?? "").not.toContain("[object")
+  })
+
+  it("the LEGEND names all four, and is inert", async () => {
+    const { container } = await renderPlane(researchSummarize)
+    const legend = container.querySelector<HTMLElement>('[data-testid="canvas-connection-legend"]')
+    expect(legend).not.toBeNull()
+    for (const word of ["at rest", "selected", "hovered", "not taken"]) {
+      expect(legend!.textContent).toContain(word)
+    }
+    // One tab stop per node is a canvas-level invariant, and a legend is not an exception.
+    expect(legend!.querySelectorAll("[role], [tabindex], button, a")).toHaveLength(0)
+    expect(legend!.getAttribute("aria-hidden")).toBe("true")
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 200-06 — `BUG-260813-01`: THE CANVAS FOLLOWS THE APP THEME
+//
+// `200-CHECKLIST.md` §3 `BC-MR-05` / `BC-MNR-03`. ⚠ **BOTH HALVES ARE ASSERTED IN LIGHT
+// MODE — THE PLANE *AND* A NODE CARD.** The report's own 2026-08-19 addendum is explicit
+// about why: the single-prop fix is complete only because React Flow's colour-mode class
+// and Tailwind's dark-mode class happen to be spelled the same, and NOTHING in this
+// repository enforces that agreement. If `darkMode` ever moves to a `[data-theme]`
+// selector, or the library renames its class, the canvas HALF-fixes — plane light, cards
+// dark — and a fence that checked only `colorMode={theme}` in the source would pass green
+// in exactly that scenario.
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** Render the canvas inside a real `ThemeProvider` seeded to a theme. `localStorage` is the
+ *  provider's own initial-read seam, which is also the seam a person's stored choice
+ *  arrives through — so this drives the production path rather than a test-only prop. */
+async function renderThemed(theme: "light" | "dark") {
+  window.localStorage.setItem("theme", theme)
+  const view = render(
+    <ThemeProvider>
+      <div style={{ width: 1200, height: 800 }}>
+        <WorkflowCanvas
+          phases={researchSummarize}
+          selectedSlug={null}
+          onSelectNode={vi.fn()}
+          onClearSelection={vi.fn()}
+        />
+      </div>
+    </ThemeProvider>,
+  )
+  await waitFor(() => {
+    expect(view.container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
+  })
+  return view
+}
+
+/** The library's own wrapper — the element that carries the colour-mode class. */
+function planeWrapper(container: HTMLElement): HTMLElement {
+  const el = container.querySelector<HTMLElement>(".react-flow")
+  expect(el).not.toBeNull()
+  return el!
+}
+
+describe("WorkflowCanvas 200-06 — BUG-260813-01, and the fence asserts BOTH halves", () => {
+  it("IN LIGHT MODE: the PLANE is light", async () => {
+    const { container } = await renderThemed("light")
+    const plane = planeWrapper(container)
+    expect(plane.className).toContain("light")
+    expect(plane.className.split(/\s+/)).not.toContain("dark")
+  })
+
+  it("IN LIGHT MODE: a NODE CARD has no `.dark` ancestor either — the second half", async () => {
+    // THE HALF A SOURCE-ONLY FENCE CANNOT SEE. The cards hardcode nothing; they went dark
+    // because `colorMode="dark"` put a `.dark` ancestor above them and Tailwind's class
+    // strategy is scoped by the nearest ancestor. This asserts the computed containment,
+    // so a future divergence between the two mechanisms reddens here rather than shipping.
+    const { container } = await renderThemed("light")
+    const card = screen.getByTestId(`canvas-node-${researchSummarize[0].slug}`)
+    expect(card.closest(".dark")).toBeNull()
+    // NON-VACUITY — the card really is inside the plane, so "no dark ancestor" is a claim
+    // about a mounted subtree rather than about a detached element.
+    expect(planeWrapper(container).contains(card)).toBe(true)
+  })
+
+  it("POSITIVE CONTROL — in DARK mode BOTH halves go dark, so the two above can fire", async () => {
+    // A fence nobody has seen fire is a claim. This is the same two assertions with the
+    // theme swung the other way: if either could not distinguish the modes, one of these
+    // four expectations fails.
+    const { container } = await renderThemed("dark")
+    const plane = planeWrapper(container)
+    expect(plane.className.split(/\s+/)).toContain("dark")
+    expect(plane.className).not.toContain("light")
+    const card = screen.getByTestId(`canvas-node-${researchSummarize[0].slug}`)
+    expect(card.closest(".dark")).not.toBeNull()
+    expect(planeWrapper(container).contains(card)).toBe(true)
+  })
+
+  it("A THEME CHANGE BROADCAST BY THE PROVIDER RE-RENDERS THE CANVAS", async () => {
+    // ⚠ THE PROPERTY A FORKED `useTheme()` COULD NOT HAVE, and therefore the assertion that
+    // makes this fix a provider rather than a one-liner. A second per-consumer `useState`
+    // would read the right value at mount and then never hear the toggle; the canvas would
+    // look fixed on first load and go stale on the very gesture that exposed the bug.
+    window.localStorage.setItem("theme", "dark")
+    function Harness() {
+      const { theme, toggleTheme } = useTheme()
+      return (
+        <div style={{ width: 1200, height: 800 }}>
+          <button type="button" onClick={toggleTheme} data-testid="theme-toggle">
+            {theme}
+          </button>
+          <WorkflowCanvas
+            phases={researchSummarize}
+            selectedSlug={null}
+            onSelectNode={vi.fn()}
+            onClearSelection={vi.fn()}
+          />
+        </div>
+      )
+    }
+    const { container } = render(
+      <ThemeProvider>
+        <Harness />
+      </ThemeProvider>,
+    )
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
+    })
+    expect(planeWrapper(container).className.split(/\s+/)).toContain("dark")
+
+    fireEvent.click(screen.getByTestId("theme-toggle"))
+
+    await waitFor(() => {
+      expect(planeWrapper(container).className).toContain("light")
+    })
+    // …and the CARD followed it, which is the half the addendum says must not be assumed.
+    expect(
+      screen.getByTestId(`canvas-node-${researchSummarize[0].slug}`).closest(".dark"),
+    ).toBeNull()
+  })
+
+  it("mounts with NO provider at all and still renders — the four suites' own posture", async () => {
+    // The non-throwing accessor is REQUIRED rather than convenient: every assertion above
+    // this block in this file mounts the canvas with no provider. A throwing hook would
+    // have reddened all of them, and the reflex fix — wrapping the tests — would quietly
+    // make the provider a test fixture instead of a production invariant.
+    const { container } = await renderPlane(researchSummarize)
+    expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
+  })
+
+  it("the hardcoded literal is GONE from the source (BC-MNR-03)", () => {
+    // The source half of the fence — kept, but deliberately NOT the whole fence. The four
+    // rendered assertions above are what catch a half-fix; this one catches a re-hardcode.
+    expect(stripComments(workflowCanvasSource)).not.toContain('colorMode="dark"')
+    // POSITIVE CONTROL — the needle is the real shape it forbids.
+    expect('<ReactFlow colorMode="dark" />').toContain('colorMode="dark"')
+    // ⚠ AND `system` IS FORBIDDEN TOO: it reads the OPERATING SYSTEM's preference, while
+    // this app's theme is a manual toggle persisted to localStorage, so a person who chose
+    // light on a dark-preferring machine would still get a dark canvas.
+    expect(stripComments(workflowCanvasSource)).not.toContain('colorMode="system"')
+  })
+
+  it("NO consumer forks the theme state — there is exactly one useState for it", () => {
+    // `hooks/useTheme.ts` held its own `useState` and had one consumer; a second call site
+    // would have created a second state, a second localStorage writer and a second root-class
+    // toggler, with neither re-rendering the other. The hook module now declares no state.
+    //
+    // ⚠ ANCHORED ON CODE, NOT ON RAW SOURCE, AND THAT IS A MEASURED CORRECTION. The first
+    // form of this fence read the raw text and went RED against the correct tree — both
+    // files EXPLAIN the forked-state defect in their docblocks, so the needle appeared in
+    // prose that exists precisely to stop the defect coming back. A fence that a correct
+    // explanation can break is a fence that gets its explanation deleted.
+    const hookCode = stripComments(useThemeHookSource)
+    const providerCode = stripComments(themeProviderSource)
+    expect(hookCode).not.toContain("useState")
+    // Exactly ONE state declaration in the whole app for the theme, and it is here.
+    expect(providerCode.match(/useState</g) ?? []).toHaveLength(1)
+    // POSITIVE CONTROLS — both needles are findable in a file that really does hold state,
+    // so neither negative above can be vacuous.
+    expect(stripComments(technicalNamesProviderSource)).toContain("useState")
+    expect(stripComments(technicalNamesProviderSource)).toMatch(/useState</)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 200-06 — THE `builder-canvas` MUST NOT RENDER FENCE (§3.2, BC-MNR-01…05)
+//
+// ⚠ THE SHAPE IS ROLE-SET + RENDERED TEXT, AND THE SHAPE WAS CHOSEN BY MEASUREMENT
+// RATHER THAN BY PREFERENCE. This phase has now watched three weaker forms defend
+// nothing:
+//   · `199-03` — a `?raw` SOURCE REGEX and a `queryAllByRole("button")` filter BOTH passed
+//     GREEN against a live planted violation. A source regex cannot see a control composed
+//     from a variable, and a button scan cannot see a link. Only a role-SET scan went red.
+//   · wave 3 — a fence was REACHED and still wrote nothing: its fixture queue was empty.
+//   · wave 5 — a word-boundary regex MISSED a real planted chip, because adjacent DOM text
+//     nodes concatenate with no separator (`Gather sourcesllm_agent`).
+//
+// So the predicate below walks the RENDERED DOM, reads LEAF elements (which is what
+// survives concatenation), compares a SET of roles rather than counting one tag, and is
+// kept honest by TWO PERMANENT CONTROLS: a planted-violation case asserting it finds every
+// plant, and a deliberate-absence case proving it stays silent on honest copy.
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** Material Symbols ligature names that CANNOT be ordinary copy — every one carries an
+ *  underscore, so a hit is unambiguous and can be scanned over the whole rendered text. */
+const LIGATURES_UNAMBIGUOUS = [
+  "account_tree",
+  "fit_screen",
+  "check_circle",
+  "priority_high",
+  "chat_bubble",
+  "save_as",
+  "health_and_safety",
+  "add_circle",
+  "arrow_back",
+  "account_circle",
+]
+
+/** Ligature names that ARE ordinary English words ("add", "search", "lock"). A whole-text
+ *  scan on these would fire on honest copy — `Add the first step` is a real shipped string —
+ *  so they are matched as a LEAF ELEMENT'S ENTIRE TEXT, which is how a Material Symbols
+ *  span actually renders and is not how a sentence does. */
+const LIGATURES_AMBIGUOUS = [
+  "search",
+  "folder",
+  "lock",
+  "shield",
+  "add",
+  "close",
+  "info",
+  "error",
+  "sync",
+  "remove",
+  "warning",
+  "bolt",
+  "description",
+  "psychology",
+  "summarize",
+  "widgets",
+]
+
+/**
+ * The plane's role SET, CAPTURED from the shipped render rather than predicted.
+ *
+ * ⚠ It is pinned as a SET so that a control arriving in ANY tag reddens this — the shape
+ * 199-03 measured as the only one that fired against a live planted violation. Raising it
+ * is a decision about the canvas's tab-stop invariant, never a re-baseline.
+ *
+ * ⚠ MEASURED, NOT PREDICTED, AND THE FIRST GUESS WAS WRONG — which is the point of
+ * capturing rather than reasoning. The first form of this pin read
+ * `["button", "implicit:button"]` and went RED against the correct tree: the real plane
+ * also carries `application` (the library's own plane wrapper), `img` and — the one worth
+ * naming — **`implicit:link`, the React Flow attribution anchor**. A link is exactly the
+ * tag `199-03` proved a `queryAllByRole("button")` scan walks straight past, so the fence
+ * now knows about the one that already ships and will notice the next one.
+ */
+const CANVAS_ROLE_SET = ["application", "button", "img", "implicit:button", "implicit:link"]
+
+/** Strings that would be an ABSENCE dressed up as a fact on a payload label. */
+const ABSENCE_SUBSTITUTES = ["", "0", "-", "–", "—", "n/a", "N/A", "null", "undefined"]
+
+/** Every element with no element children — the text-bearing leaves. */
+function leafElements(root: HTMLElement): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>("*")].filter((el) => el.childElementCount === 0)
+}
+
+/**
+ * The role SET present under a root: explicit `role` attributes plus the implicit roles of
+ * the two tags that carry one without asking. A SET rather than a count, because 199-03
+ * measured that a count of one tag is exactly what a violation composed from another tag
+ * walks straight past.
+ */
+function roleSetOf(root: HTMLElement): string[] {
+  const roles = new Set<string>()
+  for (const el of root.querySelectorAll<HTMLElement>("[role]")) {
+    const r = el.getAttribute("role")
+    if (r !== null && r.length > 0) roles.add(r)
+  }
+  for (const _ of root.querySelectorAll("button")) roles.add("implicit:button")
+  for (const _ of root.querySelectorAll("a[href]")) roles.add("implicit:link")
+  return [...roles].sort()
+}
+
+/**
+ * THE PREDICATE. Returns one finding per violation found, so a caller can assert BOTH that
+ * it is silent on the real plane AND that it finds every kind of plant.
+ */
+function forbiddenOnCanvas(root: HTMLElement): string[] {
+  const findings: string[] = []
+  const wholeText = root.textContent ?? ""
+
+  // BC-MNR-04 — a Material Symbols ligature reaching a person as visible text.
+  for (const name of LIGATURES_UNAMBIGUOUS) {
+    if (wholeText.includes(name)) findings.push(`ligature:${name}`)
+  }
+  for (const el of leafElements(root)) {
+    const text = (el.textContent ?? "").trim().toLowerCase()
+    if (LIGATURES_AMBIGUOUS.includes(text)) findings.push(`ligature-leaf:${text}`)
+  }
+
+  // BC-MNR-01 — an absence rendered as a payload label. An element that exists at all is
+  // already the violation when the fact behind it does not.
+  for (const el of root.querySelectorAll<HTMLElement>('[data-testid="canvas-edge-payload"]')) {
+    const text = (el.textContent ?? "").trim()
+    if (ABSENCE_SUBSTITUTES.includes(text)) findings.push(`absence-as-label:${JSON.stringify(text)}`)
+  }
+
+  // BC-MNR-02 — a fabricated business figure. The sheet's own `312 docs matched` shape: a
+  // number followed by a DOMAIN noun this product never declares. The three nouns the
+  // executors really author (`sources` · `agents` · `fields`) are the allow-list; anything
+  // else numeric on a payload label is a figure nobody measured.
+  for (const el of root.querySelectorAll<HTMLElement>('[data-testid="canvas-edge-payload"]')) {
+    const text = (el.textContent ?? "").trim()
+    const m = /^(-?\d+)\s+(.+)$/.exec(text)
+    if (m !== null && ["docs matched", "documents", "records", "rows"].includes(m[2])) {
+      findings.push(`fabricated-figure:${text}`)
+    }
+  }
+
+  return findings
+}
+
+describe("WorkflowCanvas 200-06 — §3.2 MUST NOT RENDER, and the fence can FIRE", () => {
+  it("CONTROL 1 (planted violations) — the predicate finds EVERY kind of plant", () => {
+    // ⚠ NON-VACUITY ASSERTED BEFORE CONTENTS. A fence nobody has watched fire is a claim,
+    // and this project has measured three that were reached and defended nothing.
+    const plant = document.createElement("div")
+    plant.innerHTML = [
+      // BC-MNR-04, the unambiguous form — a ligature anywhere in the text.
+      '<span class="material-symbols-outlined">fit_screen</span>',
+      // BC-MNR-04, the ambiguous form — only catchable as a LEAF's whole text.
+      '<span class="material-symbols-outlined">search</span>',
+      // BC-MNR-01 — an absence dressed as a fact.
+      '<text data-testid="canvas-edge-payload">0</text>',
+      '<text data-testid="canvas-edge-payload">—</text>',
+      // BC-MNR-02 — the sheet's own fabricated business figure.
+      '<text data-testid="canvas-edge-payload">312 docs matched</text>',
+    ].join("")
+    document.body.appendChild(plant)
+    try {
+      const found = forbiddenOnCanvas(plant)
+      expect(found).toContain("ligature:fit_screen")
+      expect(found).toContain("ligature-leaf:search")
+      expect(found).toContain('absence-as-label:"0"')
+      expect(found).toContain('absence-as-label:"—"')
+      expect(found).toContain("fabricated-figure:312 docs matched")
+      expect(found.length).toBeGreaterThanOrEqual(5)
+      // …and the role-SET scan notices a control the button-count form would miss, which
+      // is the 199-03 measurement written down as a test rather than as a paragraph.
+      const withLink = document.createElement("div")
+      withLink.innerHTML = '<a href="/publish?force=1">Proceed anyway</a>'
+      expect(roleSetOf(withLink)).toContain("implicit:link")
+      expect(roleSetOf(document.createElement("div"))).toEqual([])
+    } finally {
+      plant.remove()
+    }
+  })
+
+  it("CONTROL 2 (deliberate absence) — it stays SILENT on honest shipped copy", () => {
+    // The predicate must not fire on real product words, or it would be turned off. The
+    // empty-state invitation contains the word `add`, and the honest payload label contains
+    // a number followed by a noun — neither is a violation.
+    const honest = document.createElement("div")
+    honest.innerHTML = [
+      "<p>Add the first step</p>",
+      '<text data-testid="canvas-edge-payload">312 sources</text>',
+      '<text data-testid="canvas-edge-payload">0 sources</text>',
+    ].join("")
+    document.body.appendChild(honest)
+    try {
+      expect(forbiddenOnCanvas(honest)).toEqual([])
+    } finally {
+      honest.remove()
+    }
+  })
+
+  it("THE REAL PLANE renders none of them — with a payload on it", async () => {
+    const { container } = await renderCounted(researchSummarize, (slug) =>
+      slug === researchSummarize[0].slug ? mkCountedRun("done", 312, "sources") : undefined,
+    )
+    // NON-VACUITY — the plane really rendered nodes AND a payload label, so an empty
+    // findings list is a statement about a drawn canvas rather than about nothing.
+    expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
+    expect(container.querySelectorAll(EDGE_PAYLOAD).length).toBeGreaterThan(0)
+    expect(forbiddenOnCanvas(container)).toEqual([])
+  })
+
+  it("THE REAL PLANE renders none of them — on a BRANCHING definition with a broken target", async () => {
+    // The two fixtures that draw every element this plan added: a resolved branch (a
+    // condition line) and an unresolvable one (the stub sentence).
+    const branchView = await renderPlane(branching)
+    expect(forbiddenOnCanvas(branchView.container)).toEqual([])
+    branchView.unmount()
+
+    const brokenView = await renderPlane(unresolvableSkip)
+    expect(screen.getByTestId("canvas-unresolved-skip")).toBeInTheDocument()
+    expect(forbiddenOnCanvas(brokenView.container)).toEqual([])
+  })
+
+  it("the plane's ROLE SET is exactly what it was — no new control appeared", async () => {
+    // ⚠ A SET, NEVER A COUNT. One tab stop per node is a canvas-level invariant, and the
+    // measured lesson is that a scan for one tag is precisely what a control composed from
+    // a different tag walks past. A NEW role here means a new control reached a surface
+    // that is supposed to have none beyond its nodes.
+    const { container } = await renderPlane(researchSummarize)
+    const roles = roleSetOf(container)
+    expect(roles.length).toBeGreaterThan(0)
+    expect(roles).toEqual(CANVAS_ROLE_SET)
   })
 })

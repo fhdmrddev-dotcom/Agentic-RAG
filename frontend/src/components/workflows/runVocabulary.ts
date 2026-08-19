@@ -293,6 +293,55 @@ export interface NodeRunState {
   /** The step's terminal emit failure, when its run row carries one. Selects which of the
    *  three fixed clauses follows the failure word; ignored at every other reading. */
   emitFailure?: EmitFailure | null
+  /**
+   * Phase 200-06 (D-08 · `200-CHECKLIST.md` `BC-MR-01`) — THE STEP'S OWN DECLARED COUNT,
+   * as the executor declared it, carried straight off the wire (`step_count`).
+   *
+   * ⚠ **A REAL INTEGER, INCLUDING `0`.** A search step that ran and found nothing declared
+   * a real `0` and it must render. **`undefined` / `null` is the DIFFERENT fact** — the
+   * phase type declares no count at all (four of the seven do not: `programmatic`,
+   * `llm_single`, `llm_human_input`, `external_action`), and the UI then renders NOTHING:
+   * never `0`, never a dash, never an empty pill (`BC-MNR-01`). The two must never be
+   * folded together, which is why the arm is `typeof count === "number"` everywhere and
+   * never `count ?? …` and never `if (count)`.
+   *
+   * ⚠ **THE CANVAS COUNTS NOTHING** (`BC-MNR-05` / D-08). This field rides the seam that
+   * already exists; there is no second counting path and no second fetch. `200-02` put it
+   * on the wire at all four transports, and the PAGE joins it to the slug exactly as it
+   * already joins the reading and the words.
+   */
+  count?: number | null
+  /**
+   * The NOUN for that count — `sources` · `agents` · `fields` — authored at exactly one
+   * executor site per phase type and carried on the wire beside the number (`step_noun`).
+   *
+   * ⚠ **THE STEP'S OWN NOUN, NEVER THE CONTRACT'S AND NEVER THE DOMAIN'S** (D-07 /
+   * `SEED-168`). Sheet c1 draws `312 contracts → 48 extracted → 12 flagged`; reproducing
+   * that phrasing by letting a model author the word is the fabricated business figure
+   * `199-05` called *"the highest-consequence lie this phase could ship"*. The client
+   * spells no noun of its own — it renders the one the server declared, or nothing.
+   */
+  noun?: string | null
+}
+
+/**
+ * THE PAYLOAD LABEL — the whole string a connection carries, or `null` for "say nothing".
+ *
+ * ONE function, so the composition has one home and the absence rule has one arm. The
+ * canvas cannot call it (its own suite forbids a value import of this module, which is
+ * what keeps the vocabulary out of a G-5 hot file), so the caller is `FlowEdge`.
+ *
+ * ⚠ **BOTH HALVES ARE REQUIRED, AND THE NUMBER'S TEST IS `typeof`.** A declared `0` with
+ * a noun renders `0 sources` — the fact that a step searched and found nothing. A missing
+ * number, or a number with no noun, renders NOTHING AT ALL: the caller must be able to
+ * omit the label ELEMENT, so this returns `null` rather than an empty string (an empty
+ * string still renders an element, and `BC-MNR-01` forbids an empty pill exactly as
+ * firmly as it forbids a `0`).
+ */
+export function payloadLabel(count?: number | null, noun?: string | null): string | null {
+  if (typeof count !== "number" || Number.isNaN(count)) return null
+  if (typeof noun !== "string" || noun.length === 0) return null
+  return `${count} ${noun}`
 }
 
 // ── The card border ─────────────────────────────────────────────────────────────
