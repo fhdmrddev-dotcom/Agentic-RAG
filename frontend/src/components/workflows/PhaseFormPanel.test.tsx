@@ -21,6 +21,7 @@ import { describe, it, expect, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
+import { FIELD_GUIDANCE_HIDE, FIELD_GUIDANCE_SHOW } from "./FieldGuidance"
 import { PhaseFormPanel, type PhaseFormRails } from "./PhaseFormPanel"
 import {
   ACTION_RISK_ARM_LABEL,
@@ -221,7 +222,13 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     expect(screen.getByText(/every claim must be cited/i)).toBeInTheDocument()
   })
 
-  it("every field shows an ALWAYS-VISIBLE plain-English helper line under its label (not a title attr)", () => {
+  it("every field shows a plain-English helper line under its label (not a title attr) — AT THE OPEN READING", () => {
+    // ⚠ 199-06 (DES-01) — THE TITLE OF THIS CASE USED TO READ "ALWAYS-VISIBLE", AND THE
+    // WORD IS STRUCK FROM IT RATHER THAN THE CASE BEING DELETED. Every assertion below is
+    // the shipped one, unchanged, character for character; what is new is the click above
+    // them and the inverted twin directly below, which asserts the same sentences are
+    // ABSENT at the collapsed reading. That pair is what proves a subtraction happened —
+    // a deleted assertion proves nothing at all.
     render(
       <PhaseFormPanel
         phase={phaseOf({ phase_type: "llm_agent", prompt: "search", available_tools: ["search_documents"] })}
@@ -232,6 +239,7 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
         modelPicker={MODEL_PICKER}
       />,
     )
+    fireEvent.click(screen.getByTestId("field-guidance-toggle"))
     // The helper sentences are rendered as plain VISIBLE text (queryable via getByText),
     // not hidden behind a hover-only `title`/ⓘ tooltip.
     expect(screen.getByText("What you want the AI to do in this step.")).toBeInTheDocument()
@@ -240,7 +248,11 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     // default in the code. A run inherits whatever model STARTED it, which is knowable at run
     // time and not while somebody is authoring, so the picker's helper says that instead. The
     // assertion is updated to the shipped honest copy rather than loosened to a regex.
-    expect(screen.getByText("Leave blank to use the run's model.")).toBeInTheDocument()
+    // ⚠ 199-06 (DES-01) — AND IT IS NOW INVERTED, present → absent, because that sentence was
+    // CUT rather than folded: it restated the control's own first option. The assertion is
+    // kept and turned around, never deleted, and the surviving copy is asserted beside it.
+    expect(screen.queryByText("Leave blank to use the run's model.")).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/^ai model/i).textContent).toContain("Use the run's model")
     expect(screen.getByText("How many actions the AI may take before it stops.")).toBeInTheDocument()
     expect(screen.getByText("Stop this step after this many seconds (optional).")).toBeInTheDocument()
     expect(screen.getByText("The tools the AI may use here.")).toBeInTheDocument()
@@ -252,7 +264,52 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
     expect(help.textContent).not.toContain("available_tools")
   })
 
-  it("each phase type renders a helper line under its representative editable field", () => {
+  it("⚠ 199-06 INVERSION — the SAME sentences are ABSENT at the collapsed reading", () => {
+    // The exact twin of the case above, with every assertion inverted from present to
+    // absent and nothing dropped. If a future edit re-prints these at rest, this reds.
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "search", available_tools: ["search_documents"] })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        modelPicker={MODEL_PICKER}
+      />,
+    )
+    expect(screen.queryByText("What you want the AI to do in this step.")).not.toBeInTheDocument()
+    expect(screen.queryByText("Leave blank to use the run's model.")).not.toBeInTheDocument()
+    expect(screen.queryByText("How many actions the AI may take before it stops.")).not.toBeInTheDocument()
+    expect(screen.queryByText("Stop this step after this many seconds (optional).")).not.toBeInTheDocument()
+    expect(screen.queryByText("The tools the AI may use here.")).not.toBeInTheDocument()
+    expect(screen.queryByText("The knowledge-base folders this step may search.")).not.toBeInTheDocument()
+    expect(screen.queryByText("A saved skill to load for this step (optional).")).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
+    // ⚠ AND THE LABELS THEMSELVES DID NOT MOVE. Cutting a duplicate is only honest if the
+    // thing it duplicated is still on screen — otherwise this is a deletion wearing a
+    // disclosure. Every field is still reachable by its plain accessible name.
+    expect(screen.getByLabelText(/^instructions/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^ai model/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/max steps/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/time limit/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/what this step can do/i)).toBeInTheDocument()
+    // ⚠ `getAllBy…`, and the reason is worth recording because it took two red runs. The
+    // Skill field's ⓘ lives INSIDE its `<label>` and carries `aria-label="skill_ref — …"`,
+    // so `/^skill/i` matches BOTH the input and the hint — which is the two-audience label
+    // working exactly as designed. And a tighter `/^skill \(optional\)/` does not match the
+    // input either: the label's two spans are adjacent, so its text node reads
+    // `Skill(optional)` with no separating space. Asserting the INPUT is among the matches
+    // states the real claim — the field is still reachable by its plain name — without
+    // pinning the incidental spacing of two spans.
+    const skillMatches = screen.getAllByLabelText(/^skill/i)
+    expect(skillMatches.some((el) => el.tagName === "INPUT")).toBe(true)
+    // …and so is the ⓘ that carries the exact technical term — the power-user affordance
+    // is emphatically NOT the thing that was cut.
+    expect(screen.getByLabelText(/^prompt — what you're telling the AI to do/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/^skill_ref — a saved skill/i)).toBeInTheDocument()
+  })
+
+  it("each phase type renders a helper line under its representative editable field — AT THE OPEN READING", () => {
     const cases: Array<[Record<string, unknown>, string]> = [
       [{ phase_type: "programmatic", fn: "f", input_keys: ["x"] }, "The registered function this step runs."],
       [{ phase_type: "llm_single", prompt: "x", temperature: 0.2 }, "Higher = more varied wording; lower = more focused."],
@@ -264,9 +321,58 @@ describe("PhaseFormPanel — 6 phase_type-conditioned forms (friendly labels)", 
       const { unmount } = render(
         <PhaseFormPanel phase={phaseOf(config)} open onChange={noop} onPersist={noop} onClose={noop} />,
       )
+      // ⚠ 199-06 INVERSION, INLINE — absent first, then present after the one click. The
+      // five shipped `getByText` assertions are unchanged; each has gained its twin.
+      expect(screen.queryByText(helper)).not.toBeInTheDocument()
+      fireEvent.click(screen.getByTestId("field-guidance-toggle"))
       expect(screen.getByText(helper)).toBeInTheDocument()
       unmount()
     }
+  })
+
+  it("199-06 — the ceiling's switch says what it does, both ways, and writes NOTHING", () => {
+    const onChange = vi.fn()
+    const onPersist = vi.fn()
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "search", available_tools: ["search_documents"] })}
+        open
+        onChange={onChange}
+        onPersist={onPersist}
+        onClose={noop}
+      />,
+    )
+    const toggle = screen.getByTestId("field-guidance-toggle")
+    expect(toggle).toHaveTextContent(FIELD_GUIDANCE_SHOW)
+    expect(toggle.getAttribute("aria-expanded")).toBe("false")
+    fireEvent.click(toggle)
+    expect(toggle).toHaveTextContent(FIELD_GUIDANCE_HIDE)
+    expect(toggle.getAttribute("aria-expanded")).toBe("true")
+    // …and back, so the ceiling is a ceiling and not a one-way door.
+    fireEvent.click(toggle)
+    expect(toggle).toHaveTextContent(FIELD_GUIDANCE_SHOW)
+    expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
+    // ⚠ THE 184-11 TRAP, ONE CONTROL OVER. Asking to see the explanations is not an edit.
+    expect(onChange).not.toHaveBeenCalled()
+    expect(onPersist).not.toHaveBeenCalled()
+  })
+
+  it("199-06 — the whitelist's REFUSAL is fenced IN: on screen at rest, and not a helper", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x", available_tools: ["search_documents"] })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        rails={{ order: { index: 1, total: 2 }, toolOptions: ["search_documents"], gates: [] }}
+      />,
+    )
+    const refusal = screen.getByText("Pick from the tools this workspace allows — you cannot add one by typing.")
+    expect(refusal).toBeInTheDocument()
+    // It travels OUTSIDE the guidance channel — that is what keeps it at the resting read.
+    expect(refusal.getAttribute("data-testid")).toBe("tools-no-typing")
+    expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
   })
 
   it("the file-check / sourcing-strictness controls are ABSENT on every non-llm_emit type", () => {
@@ -888,6 +994,21 @@ const TOOL_WHITELIST_REFUSAL =
   "Pick from the tools this workspace allows — you cannot add one by typing."
 
 /**
+ * ⚠ THE ONE HELPER THAT WAS CUT OUTRIGHT RATHER THAN FOLDED, and it is named here so the
+ * exception is visible in the inventory instead of hiding inside a looser assertion.
+ *
+ * `ModelField` printed this sentence directly above a `<select>` whose FIRST OPTION reads
+ * *"Use the run's model"*. That is not a label restating a field, it is a sentence restating
+ * the control's own visible text — the strongest form of the duplication SEED-184 names, and
+ * the one case where the purpose provably survives the cut without any disclosure at all,
+ * because the surviving copy is inside the thing the person is already looking at. Folding
+ * it would have left the picker with a helper that says less than its own first row.
+ *
+ * The ⓘ on that field is untouched and still carries the precise term.
+ */
+const MODEL_HELPER_CUT = "Leave blank to use the run's model."
+
+/**
  * ⚠ THE FENCED-IN ATOMS — written down BEFORE any decision about what moves (SEED-184 rule 3,
  * threat T-199-06-03). A person may never be asked to click in order to discover a DECISION:
  * whether the step is governed, which side of the door it is on, whether it is armed, or what
@@ -957,15 +1078,47 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     expect(Object.values(HELPERS_AT_FULL_DENSITY).filter((v) => v.length > 0)).toHaveLength(6)
   })
 
-  it("every helper sentence in the inventory is PRESENT today, per phase type, as a literal", () => {
+  it("⚠ INVERTED at Task 2 — every helper sentence is ABSENT at the collapsed reading", () => {
+    // The Task-1 assertion said PRESENT. It is inverted here, per phase type, over the SAME
+    // literals — the list above is untouched. This is the whole subtraction, proved.
     for (const [phase_type, sentences] of Object.entries(HELPERS_AT_FULL_DENSITY)) {
       const { unmount } = renderAtFullDensity(phase_type)
       for (const sentence of sentences) {
-        expect(screen.getByText(sentence)).toBeInTheDocument()
+        expect(screen.queryByText(sentence), `${phase_type}: ${sentence}`).not.toBeInTheDocument()
       }
-      // …and the inventory is EXHAUSTIVE: no helper renders that this list does not name.
+      expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
+      unmount()
+    }
+  })
+
+  it("every helper sentence in the inventory returns UNCHANGED at the fully-open reading", () => {
+    // ⚠ Nothing was deleted and nothing was re-spelled — the same literals, one click away.
+    // ⚠ ONE exception, and it is named rather than absorbed: the model picker's own helper
+    // was CUT unconditionally at Task 3 (it duplicated the leading option's visible text),
+    // so it is subtracted from the expected set here rather than being quietly tolerated by
+    // a looser comparison. `MODEL_HELPER_CUT` is asserted absent at BOTH readings below.
+    for (const [phase_type, sentences] of Object.entries(HELPERS_AT_FULL_DENSITY)) {
+      const { unmount } = renderAtFullDensity(phase_type)
+      fireEvent.click(screen.getByTestId("field-guidance-toggle"))
+      const expected = sentences.filter((s) => s !== MODEL_HELPER_CUT)
+      for (const sentence of expected) {
+        expect(screen.getByText(sentence), `${phase_type}: ${sentence}`).toBeInTheDocument()
+      }
+      // …and the inventory is still EXHAUSTIVE: no helper renders that this list does not name.
       const rendered = screen.queryAllByTestId("field-help").map((el) => el.textContent ?? "")
-      expect(rendered.slice().sort()).toEqual([...sentences].sort())
+      expect(rendered.slice().sort()).toEqual([...expected].sort())
+      unmount()
+    }
+  })
+
+  it("the model picker's helper is gone at BOTH readings — a cut, not a fold", () => {
+    for (const open of [false, true]) {
+      const { unmount } = renderAtFullDensity("llm_single")
+      if (open) fireEvent.click(screen.getByTestId("field-guidance-toggle"))
+      expect(screen.queryByText(MODEL_HELPER_CUT)).not.toBeInTheDocument()
+      // ⚠ THE PURPOSE SURVIVED THE CUT, which is the only thing that makes it legitimate:
+      // the leading option says the same thing, in the control the person is looking at.
+      expect(screen.getByLabelText(/^ai model/i).textContent).toContain("Use the run's model")
       unmount()
     }
   })
@@ -974,10 +1127,25 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     const { unmount } = renderAtFullDensity("llm_agent", FULL_RAILS)
     expect(screen.getByText(TOOL_WHITELIST_REFUSAL)).toBeInTheDocument()
     unmount()
-    // And it really is the rails-only reading: flag-off prints the other sentence instead.
+    // And it really is the rails-only reading: flag-off prints the other sentence instead —
+    // ⚠ which is now the OPEN reading, since that one IS guidance and did fold.
     renderAtFullDensity("llm_agent")
     expect(screen.queryByText(TOOL_WHITELIST_REFUSAL)).not.toBeInTheDocument()
+    expect(screen.queryByText("The tools the AI may use here.")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("field-guidance-toggle"))
     expect(screen.getByText("The tools the AI may use here.")).toBeInTheDocument()
+  })
+
+  it("199-06 — the refusal is NOT foldable while its sibling guidance IS: the two differ", () => {
+    // The distinction the fence exists to hold, driven on one render rather than described:
+    // in the rails variant the refusal is on screen at rest, and NO helper is.
+    const { unmount } = renderAtFullDensity("llm_agent", FULL_RAILS)
+    expect(screen.getByText(TOOL_WHITELIST_REFUSAL)).toBeInTheDocument()
+    expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
+    // …and opening the guidance does not move the refusal, because it never was guidance.
+    fireEvent.click(screen.getByTestId("field-guidance-toggle"))
+    expect(screen.getAllByText(TOOL_WHITELIST_REFUSAL)).toHaveLength(1)
+    unmount()
   })
 
   it("FENCED IN — every governance / door / armed atom renders at the resting reading", () => {
@@ -1019,14 +1187,41 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     expect(densityOf(container).proseChars).toBeGreaterThan(500)
   })
 
-  it("DENSITY BEFORE — two representative phase types, as exact numbers", () => {
+  /**
+   * ⚠ THE PRE-CHANGE READING, PRESERVED VERBATIM AND NEVER RE-BASELINED. These are the exact
+   * numbers Task 1 measured and committed one commit before the ceiling existed. They are
+   * kept as data so the delta below is COMPUTED against them rather than asserted blind; a
+   * pin quietly overwritten to make red go green is a pin that will never fail again.
+   */
+  const DENSITY_BEFORE = {
+    agent: { helpLines: 7, helpChars: 342, proseChars: 1632 },
+    emit: { helpLines: 7, helpChars: 339, proseChars: 1684 },
+  } as const
+
+  it("DENSITY AFTER — the collapsed reading, measured against the recorded BEFORE", () => {
     const agent = densityOf(renderAtFullDensity("llm_agent", FULL_RAILS).container)
     const emit = densityOf(renderAtFullDensity("llm_emit", FULL_RAILS).container)
-    // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking this literal, never by loosening it to
-    // a range — a range is what turns a characterization pin into a decoration.
+    // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking these literals, never by loosening them
+    // to a range — a range is what turns a characterization pin into a decoration.
     expect({ agent, emit }).toEqual({
-      agent: { helpLines: 7, helpChars: 342, proseChars: 1632 },
-      emit: { helpLines: 7, helpChars: 339, proseChars: 1684 },
+      agent: { helpLines: 0, helpChars: 0, proseChars: 1381 },
+      emit: { helpLines: 0, helpChars: 0, proseChars: 1363 },
     })
+    // The delta is NEGATIVE on both types and on every axis that measures prose.
+    expect(agent.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
+    expect(agent.proseChars).toBeLessThan(DENSITY_BEFORE.agent.proseChars)
+    expect(emit.helpLines).toBeLessThan(DENSITY_BEFORE.emit.helpLines)
+    expect(emit.proseChars).toBeLessThan(DENSITY_BEFORE.emit.proseChars)
+  })
+
+  it("DENSITY AT THE OPEN READING — still below BEFORE, because one helper was CUT", () => {
+    const { container } = renderAtFullDensity("llm_agent", FULL_RAILS)
+    fireEvent.click(screen.getByTestId("field-guidance-toggle"))
+    const open = densityOf(container)
+    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1618 })
+    // Fully open is the DENSEST this panel can now be, and it is still quieter than the
+    // panel that shipped — the model helper is gone outright and the whitelist refusal
+    // stopped being a helper. Both are subtractions the switch cannot undo.
+    expect(open.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
   })
 })

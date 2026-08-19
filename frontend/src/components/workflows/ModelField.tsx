@@ -161,7 +161,6 @@ export function ModelField({
 
   const hint =
     "model — the registry id this step runs on. Blank inherits whatever model started the run."
-  const help = "Leave blank to use the run's model."
 
   return (
     <div>
@@ -181,12 +180,14 @@ export function ModelField({
           ⓘ
         </span>
       </label>
-      <p
-        data-testid="field-help"
-        className="mb-1 mt-0.5 text-[11px] leading-snug text-muted-foreground"
-      >
-        {help}
-      </p>
+      {/* ⚠ 199-06 (DES-01) — THE `help` LINE THAT SAT HERE IS CUT, not folded. It read
+          "Leave blank to use the run's model." directly above a control whose FIRST OPTION
+          reads "Use the run's model" — a sentence restating the control's own visible text,
+          which is the strongest form of the duplication SEED-184 names. Every other helper
+          in this panel moved behind the density ceiling's one switch; this one needed no
+          disclosure at all, because the surviving copy is inside the thing the person is
+          already reading. The ⓘ above still carries the precise technical term.
+          Its absence is asserted at BOTH readings in `PhaseFormPanel.test.tsx`. */}
       <select
         id={id}
         value={value}
