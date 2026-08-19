@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Workflow Builder - Quarterly review</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@500&amp;family=Manrope:wght@600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#28313f",
+                        "surface-dim": "#131318",
+                        "on-surface-variant": "#c7c5d3",
+                        "tertiary-fixed": "#ffe16c",
+                        "surface-container-high": "#2a292f",
+                        "inverse-primary": "#5355a9",
+                        "on-error-container": "#ffdad6",
+                        "on-tertiary": "#3a3000",
+                        "secondary-fixed-dim": "#bec7da",
+                        "on-primary-container": "#353789",
+                        "on-tertiary-fixed": "#221b00",
+                        "primary": "#c3c4ff",
+                        "on-secondary-fixed-variant": "#3e4757",
+                        "outline-variant": "#464651",
+                        "on-surface": "#e4e1e9",
+                        "surface-variant": "#35343a",
+                        "on-primary": "#242478",
+                        "secondary-fixed": "#dae3f6",
+                        "tertiary-container": "#c8ac33",
+                        "error-container": "#93000a",
+                        "on-tertiary-container": "#4e4000",
+                        "secondary-container": "#3e4757",
+                        "tertiary": "#e5c74c",
+                        "surface-container-highest": "#35343a",
+                        "tertiary-fixed-dim": "#e3c54a",
+                        "on-error": "#690005",
+                        "outline": "#918f9c",
+                        "secondary": "#bec7da",
+                        "inverse-surface": "#e4e1e9",
+                        "primary-fixed-dim": "#c1c1ff",
+                        "on-primary-fixed-variant": "#3b3d8f",
+                        "primary-fixed": "#e1e0ff",
+                        "on-secondary-fixed": "#131c2a",
+                        "on-background": "#e4e1e9",
+                        "surface-bright": "#39383f",
+                        "background": "#131318",
+                        "surface": "#131318",
+                        "primary-container": "#a3a5ff",
+                        "surface-tint": "#c1c1ff",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "on-primary-fixed": "#0b0664",
+                        "surface-container-lowest": "#0e0e13",
+                        "error": "#ffb4ab",
+                        "on-secondary-container": "#acb5c8",
+                        "surface-container": "#1f1f25",
+                        "inverse-on-surface": "#303036",
+                        "surface-container-low": "#1b1b21"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "xl": "32px",
+                        "gutter": "16px",
+                        "rail_width": "64px",
+                        "xs": "4px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "margin": "24px",
+                        "sm": "8px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "data-lg": ["JetBrains Mono"],
+                        "h2": ["Manrope"],
+                        "body-lg": ["Inter"],
+                        "h3": ["Manrope"],
+                        "body-sm": ["Inter"],
+                        "data-sm": ["JetBrains Mono"],
+                        "data-md": ["JetBrains Mono"],
+                        "body-md": ["Inter"],
+                        "h1": ["Manrope"]
+                    },
+                    "fontSize": {
+                        "data-lg": ["16px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "h2": ["24px", {"lineHeight": "1.3", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "1.6", "fontWeight": "400"}],
+                        "h3": ["18px", {"lineHeight": "1.4", "fontWeight": "600"}],
+                        "body-sm": ["12px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "data-sm": ["12px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "data-md": ["14px", {"lineHeight": "1.4", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "h1": ["32px", {"lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #151B24;
+            border-radius: 0px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #212631;
+            border-radius: 0px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #464651;
+        }
+        
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+        }
+        
+        /* Direct hardcoded colors based on style guidance */
+        .bg-page { background-color: #060A0F; }
+        .bg-rail { background-color: #080B11; }
+        .bg-card { background-color: #0D1117; }
+        .bg-raised { background-color: #0F141B; }
+        .bg-chip { background-color: #151B24; }
+        .border-line { border-color: #212631; }
+        
+        .text-primary-accent { color: #A3A5FF; }
+        .bg-primary-accent { background-color: #A3A5FF; }
+        .text-on-primary-accent { color: #060A0F; }
+        
+        .text-dim { color: #6B7383; }
+        .text-muted { color: #9AA3B5; }
+        .text-ghost { color: #F4F6FE; }
+        
+        .border-primary-accent { border-color: #A3A5FF; }
+        
+        .wait-border { border-left: 3px solid #895AF6; }
+    </style>
+</head>
+<body class="bg-page text-on-surface w-full h-screen overflow-hidden flex custom-scrollbar antialiased">
+<!-- SideNavBar -->
+<nav class="w-rail_width h-screen fixed left-0 top-0 bg-rail border-r border-line flex flex-col items-center py-md space-y-lg z-50 transition-colors duration-200">
+<!-- App Mark -->
+<div class="h-10 w-10 flex items-center justify-center font-h2 text-h2 text-primary-accent mb-4 cursor-pointer hover:bg-surface-container-high transition-colors rounded">
+<span class="material-symbols-outlined">dataset</span>
+</div>
+<!-- Expand -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors" title="Expand">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<!-- New Chat -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors mt-2 mb-2" title="add">
+<span class="material-symbols-outlined">add</span>
+</button>
+<div class="flex-1 w-full flex flex-col items-center space-y-2">
+<!-- Chat -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Chat">
+<span class="material-symbols-outlined">chat</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Chat</span>
+</button>
+<!-- Workflows (ACTIVE) -->
+<button class="w-10 h-10 flex items-center justify-center text-primary-accent bg-[#151B24] border-l-2 border-primary-accent rounded-r transition-colors group relative" title="Workflows">
+<span class="material-symbols-outlined">account_tree</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Workflows</span>
+</button>
+<!-- Documents -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Documents">
+<span class="material-symbols-outlined">description</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Documents</span>
+</button>
+<!-- Classification -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Classification">
+<span class="material-symbols-outlined">category</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Classification</span>
+</button>
+<!-- Library Health -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Library Health">
+<span class="material-symbols-outlined">health_and_safety</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Library Health</span>
+</button>
+<!-- Governance -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Governance">
+<span class="material-symbols-outlined">policy</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Governance</span>
+</button>
+<!-- Skills -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Skills">
+<span class="material-symbols-outlined">psychology</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Skills</span>
+</button>
+<!-- Settings -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative" title="Settings">
+<span class="material-symbols-outlined">settings</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Settings</span>
+</button>
+</div>
+<!-- Footer: Account -->
+<button class="w-10 h-10 flex items-center justify-center text-muted hover:text-on-surface hover:bg-surface-container-high rounded transition-colors group relative mt-auto" title="Account">
+<span class="material-symbols-outlined">account_circle</span>
+<span class="absolute left-14 bg-raised border border-line text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50">Account</span>
+</button>
+</nav>
+<!-- Main Content Area -->
+<main class="ml-rail_width flex-1 h-screen flex flex-col w-full relative">
+<!-- Builder Header -->
+<header class="w-full h-16 border-b border-line flex justify-between items-center px-6 bg-page flex-shrink-0">
+<!-- Left -->
+<div class="flex items-center space-x-4">
+<button class="flex items-center text-muted hover:text-ghost transition-colors font-body-sm text-body-sm group">
+<span class="material-symbols-outlined text-[18px] mr-1 group-hover:-translate-x-1 transition-transform">arrow_back</span>
+                    Workflows
+                </button>
+<div class="h-4 w-px bg-outline-variant/30"></div>
+<div class="flex items-center space-x-3">
+<h1 class="font-h3 text-h3 text-ghost tracking-tight">Quarterly review</h1>
+<span class="text-dim font-body-sm text-body-sm px-1">draft</span>
+<span class="bg-chip border border-line text-muted px-2 py-0.5 rounded font-data-sm text-[11px] uppercase tracking-wider flex items-center">
+<span class="material-symbols-outlined text-[14px] mr-1">folder</span>
+                        DBA
+                    </span>
+</div>
+</div>
+<!-- Right -->
+<div class="flex items-center space-x-3">
+<button class="px-4 py-1.5 border border-line text-ghost font-body-sm text-body-sm rounded hover:bg-surface-container-high transition-colors">
+                    Save draft
+                </button>
+<button class="px-4 py-1.5 bg-primary-accent text-on-primary-accent font-body-sm text-body-sm font-medium rounded hover:opacity-90 transition-opacity flex items-center">
+                    Publish...
+                </button>
+</div>
+</header>
+<!-- Navigation Tabs & Subheader -->
+<div class="w-full border-b border-line px-6 bg-page flex-shrink-0 flex items-center justify-between h-12">
+<div class="flex items-center h-full space-x-6">
+<!-- Spine (ACTIVE) -->
+<button class="h-full flex items-center text-primary-accent border-b-2 border-primary-accent font-body-md text-body-md pt-0.5 px-1">
+                    Spine
+                </button>
+<!-- Canvas -->
+<button class="h-full flex items-center text-muted hover:text-ghost transition-colors font-body-md text-body-md pt-0.5 px-1">
+                    Canvas
+                </button>
+</div>
+<!-- Quiet 12px line -->
+<div class="text-dim font-body-sm text-body-sm flex items-center">
+<span class="material-symbols-outlined text-[14px] mr-1.5">info</span>
+                View only — this is the order it will run in.
+            </div>
+</div>
+<!-- Scrollable Spine Area -->
+<div class="flex-1 overflow-y-auto custom-scrollbar p-8 w-full flex justify-center bg-page relative">
+<!-- Spine Container -->
+<div class="w-full max-w-3xl relative">
+<!-- Thin vertical rule down the left connecting nodes -->
+<div class="absolute left-[28px] top-4 bottom-4 w-px border-l border-dashed border-line z-0"></div>
+<div class="flex flex-col space-y-4 relative z-10">
+<!-- Step 1 -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group">
+<!-- Left Icon Area -->
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<span class="material-symbols-outlined text-[14px] text-muted group-hover:text-primary-accent transition-colors">search</span>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Pull usage and support history</h3>
+<span class="text-dim font-data-sm text-[11px] flex-shrink-0">GPT-4o</span>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Searches the knowledge base and decides its own next move</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-primary-accent bg-primary-accent/10 px-2 py-0.5 rounded border border-primary-accent/20">AI AGENT</span>
+</div>
+</div>
+</div>
+<!-- Step 2 -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2">
+<!-- Left Icon Area -->
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<span class="material-symbols-outlined text-[14px] text-muted group-hover:text-primary-accent transition-colors">search</span>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Gather the source material</h3>
+<span class="text-dim font-data-sm text-[11px] flex-shrink-0">GPT-4o</span>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Searches the knowledge base and decides its own next move</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-primary-accent bg-primary-accent/10 px-2 py-0.5 rounded border border-primary-accent/20">AI AGENT</span>
+</div>
+</div>
+</div>
+<!-- Step 3 Container (Includes Logic Fork) -->
+<div class="flex flex-col space-y-4 mt-2">
+<!-- Step 3 Card - Selected -->
+<div class="bg-card border border-primary-accent rounded flex overflow-hidden group shadow-[0_0_0_1px_rgba(163,165,255,1)]">
+<!-- Left Icon Area -->
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-primary-accent flex items-center justify-center z-10">
+<span class="material-symbols-outlined text-[14px] text-primary-accent">psychology</span>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Gather the supporting notes</h3>
+<span class="text-dim font-data-sm text-[11px] flex-shrink-0">Claude Sonnet</span>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Writes one piece in a single pass</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-muted bg-chip px-2 py-0.5 rounded border border-line">ONE-SHOT WRITER</span>
+</div>
+<!-- Indented Detail -->
+<div class="mt-4 pt-4 border-t border-line border-dashed flex flex-col space-y-3">
+<div class="flex flex-col space-y-1">
+<span class="text-[11px] font-body-sm uppercase tracking-wider text-dim">WHAT IT IS TOLD TO DO</span>
+<span class="font-body-sm text-body-sm text-ghost">Draft the summary sections based on meeting notes.</span>
+</div>
+<div class="flex flex-col space-y-1">
+<span class="text-[11px] font-body-sm uppercase tracking-wider text-dim">HOW LITERAL IT SHOULD BE</span>
+<span class="font-body-sm text-body-sm text-ghost">Very literal</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Logic Fork -->
+<div class="ml-14 flex flex-col relative pt-2">
+<!-- Split Marker -->
+<div class="absolute -top-3 left-1/2 transform -translate-x-1/2 flex flex-col items-center z-20">
+<div class="w-4 h-4 bg-raised border border-line flex items-center justify-center rotate-45 mb-1"></div>
+<span class="text-[11px] font-body-sm text-dim bg-page px-2">Which way this goes</span>
+</div>
+<div class="flex space-x-4 mt-4 w-full">
+<!-- Left Lane (Taken) -->
+<div class="flex-1 bg-card border border-primary-accent rounded p-3 flex flex-col space-y-1.5 relative overflow-hidden group">
+<span class="absolute top-0 right-0 bg-primary-accent text-on-primary-accent text-[9px] font-data-sm uppercase tracking-widest px-1.5 py-0.5 rounded-bl">THIS WAY</span>
+<span class="text-[11px] font-body-sm text-dim">If the draft needs a person</span>
+<h4 class="font-body-md text-body-md text-ghost font-medium">Confirm the QBR before rendering</h4>
+</div>
+<!-- Right Lane (Untaken) -->
+<div class="flex-1 bg-chip border border-dashed border-line rounded p-3 flex flex-col space-y-1.5 relative overflow-hidden group opacity-60">
+<span class="absolute top-0 right-0 bg-page text-dim border-l border-b border-line text-[9px] font-data-sm uppercase tracking-widest px-1.5 py-0.5 rounded-bl">NOT THIS WAY</span>
+<span class="text-[11px] font-body-sm text-dim">If it does not</span>
+<h4 class="font-body-md text-body-md text-muted">Fill the QBR template</h4>
+</div>
+</div>
+</div>
+</div>
+<!-- Step 4 -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2 wait-border">
+<!-- Left Icon Area -->
+<div class="w-[53px] flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<span class="material-symbols-outlined text-[14px] text-muted group-hover:text-primary-accent transition-colors">person</span>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Draft the sections</h3>
+<!-- No model -->
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Pauses and waits for a person</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-[#895AF6] bg-[#895AF6]/10 px-2 py-0.5 rounded border border-[#895AF6]/20">WAITS FOR A PERSON</span>
+</div>
+<div class="mt-2 pt-3 border-t border-line border-dashed flex flex-col space-y-3">
+<p class="font-body-sm text-body-sm text-muted">Someone has to approve this before it continues.</p>
+<div class="flex space-x-2">
+<button class="px-3 py-1 bg-chip border border-line text-muted font-body-sm text-body-sm rounded hover:text-ghost hover:bg-raised transition-colors">Approve</button>
+<button class="px-3 py-1 bg-chip border border-line text-muted font-body-sm text-body-sm rounded hover:text-ghost hover:bg-raised transition-colors">Send back</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Step 5 -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2">
+<!-- Left Icon Area -->
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<span class="material-symbols-outlined text-[14px] text-muted group-hover:text-primary-accent transition-colors">output</span>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Confirm before it goes out</h3>
+<!-- No model -->
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Produces the finished file</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-muted bg-chip px-2 py-0.5 rounded border border-line">PRODUCES THE FILE</span>
+</div>
+</div>
+</div><!-- Step 6: Slack -->
+<div class="flex flex-col space-y-4 mt-2"><div class="text-[11px] font-body-sm uppercase tracking-wider text-dim text-center">How a workflow can end</div><div class="flex space-x-4 w-full"><div class="flex-1 bg-card border border-line rounded flex flex-col overflow-hidden hover:bg-raised transition-colors group"><div class="flex p-4 space-x-4"><div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-[14px] text-muted" style="font-variation-settings: 'FILL' 0, 'wght' 400;">description</span></div><div class="flex-1 min-w-0"><h4 class="font-body-md text-body-md font-medium text-ghost truncate">Fill the report template</h4><p class="font-body-sm text-body-sm text-muted">Produces the finished file</p></div></div><div class="px-4 pb-3 border-t border-line border-dashed pt-2"><span class="text-[10px] font-data-sm uppercase tracking-widest text-muted">Ends by making a file</span></div></div><div class="flex-1 bg-card border border-line rounded flex flex-col overflow-hidden hover:bg-raised transition-colors group"><div class="flex p-4 space-x-4"><div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-[14px] text-muted" style="font-variation-settings: 'FILL' 0, 'wght' 400;">chat_bubble</span></div><div class="flex-1 min-w-0"><h4 class="font-body-md text-body-md font-medium text-ghost truncate">Answer in the chat</h4><p class="font-body-sm text-body-sm text-muted">Writes the answer straight into the conversation</p></div></div><div class="px-4 pb-3 border-t border-line border-dashed pt-2"><span class="text-[10px] font-data-sm uppercase tracking-widest text-muted">Ends by answering</span></div></div></div><p class="text-center text-dim font-body-sm text-body-sm">A workflow ends one way or the other. Both are complete.</p></div>
+<!-- Step 7: Google Drive -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2">
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<img alt="Google Drive" class="w-4 h-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDybSE0v6puQH7F_nzUE1QI-S3vhMREii_5bdfT5OLXKvUxBYRmEp9Wk3buj9ipmznuiUpjNYnSmD7LHseue3zP4mCbM6Trq8SySC3SLn3eEyfiKVxjErwVz6EdVgb9BhyK1v2MNQwIren7hrTsxNi9QLEeccctu-P75z-sapxSSmQ8S7tN3Cx9XXl9vkMhkpRR_6YN0ZqXNfxEAoAz_PdLZZn_N6BImpTmpBeUorvxBwqRTw5tvjtf"/>
+</div>
+</div>
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">File the report in the shared drive</h3>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Saves the file to Google Drive</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-[#F5A524] bg-[#F5A524]/10 px-2 py-0.5 rounded border border-[#F5A524]/20">CHANGES SOMETHING OUTSIDE</span>
+</div>
+</div>
+</div>
+<!-- Step 8: Jira (Write) -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2">
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<img alt="Slack" class="w-5 h-5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC0f6pHZZFetwZqAucT6i_gxDJBYncfFQfBIqBe-jlTb2L6F5FCILLr5G9z5Ijj6TwiQC_8LP8Txa_368CmZ4VgYBJt-EjDzV-4cLKvrYUn4S1cL802C5mevmnqxj0B4g0K5QzA4_7SgyhQoD7FS71dCiwrJJw0qht1DpukGrhiL22AknTyPGhXcqnKdOBiInvFL1HP_NvR3pasbCdfpJjmNB2Dq22hwffIJKErtFVZHYSssCnbvgXe"/>
+</div>
+</div>
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Post the summary to the team channel</h3>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Posts a message to Slack</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-[#F5A524] bg-[#F5A524]/10 px-2 py-0.5 rounded border border-[#F5A524]/20">CHANGES SOMETHING OUTSIDE</span>
+</div>
+</div>
+</div><div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2">
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<img alt="Jira" class="w-4 h-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDrMfwHtqjfOBls6RQHLjecEHFZ-u9GuTM2EfUa3SjVvwsDiiykVj4rbySNBiGe-ZWcE0WrCSEyWp5vO9FXB6nBEh4-BlIHNIZOFwSASuZn8wgt06lHD28ioYaSHf5FkXhp9mkXyk75GPrIrnIXK7Le1C30PWKHIVVTKKyLV5DHioizRQBn-LarIENtftjL1VDqLVbiD9sCK0hpA9UyVRfNaRYsYxm3nTBdcwofsBlFesPc-PwbrFJ4"/>
+</div>
+</div>
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Raise a ticket for anything unresolved</h3>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Creates an issue in Jira</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-[#F5A524] bg-[#F5A524]/10 px-2 py-0.5 rounded border border-[#F5A524]/20">CHANGES SOMETHING OUTSIDE</span>
+</div>
+</div>
+</div>
+<!-- Step 9: Jira (Read) -->
+<div class="bg-card border border-line rounded flex overflow-hidden hover:bg-raised transition-colors group mt-2">
+<div class="w-14 flex-shrink-0 border-r border-line flex justify-center pt-4 bg-chip/30">
+<div class="w-6 h-6 rounded-full bg-raised border border-line flex items-center justify-center z-10 group-hover:border-primary-accent/50 transition-colors">
+<img alt="Jira" class="w-4 h-4" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMy1aG9Zzxag-JRhAPHKDW8__RSRTBFVRgnBzgWpm761XaPVOx6X33vvEnNx1bCQCiuTlJPElmGI9U8WB-u8-j6fL630TzohO-5g6UFwYgG4QBO7CpY2lwVbASyI4EH0BYK6A4Fa7VWvOoarcJuXhQ8iACBEuiGb87NBosiczKdlDvuoj0nNXV87wY6mDFOWcRk2-dAmLR8mFl1mt3x-4Axr5bguYwPDIEACVw2t_hpQ8TEF2F3xxA"/>
+</div>
+</div>
+<div class="flex-1 p-4 min-w-0 flex flex-col space-y-3">
+<div class="flex justify-between items-baseline w-full gap-4">
+<h3 class="font-body-md text-body-md font-medium text-ghost truncate flex-1">Read this week's tickets</h3>
+</div>
+<p class="font-body-sm text-body-sm text-muted truncate w-full">Fetches recent tickets from Jira</p>
+<div class="flex items-center">
+<span class="text-[10px] font-data-sm uppercase tracking-widest text-dim bg-chip px-2 py-0.5 rounded border border-line">ONLY READS</span>
+</div>
+</div>
+</div>
+<!-- Add Step Button (Extra UI polish) -->
+<div class="w-full flex flex-col items-center pt-4 pb-8 relative z-10 space-y-6">
+<button class="h-8 px-4 bg-chip hover:bg-raised border border-line border-dashed rounded-full text-dim hover:text-muted transition-colors flex items-center space-x-1 font-body-sm text-body-sm">
+<span class="material-symbols-outlined text-[14px]">add</span>
+<span>Add Step</span>
+</button>
+<p class="text-[11px] font-body-sm text-dim">5 steps, runs top to bottom, one person gate</p>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+<script>
+(function(){
+  var HOPS = [["Publish","publish"],["Canvas","builder-canvas"],["Workflows","library"]];
+  var wired = 0, missed = [];
+  HOPS.forEach(function(pair){
+    var label = pair[0], to = pair[1], hit = null;
+    var all = document.querySelectorAll("button,a,[role=button],div,span,p");
+    for (var i=0;i<all.length;i++){
+      var el = all[i];
+      if (el.children.length) continue;
+      if ((el.textContent||"").trim().toLowerCase().indexOf(label.toLowerCase()) !== -1){ hit = el; break; }
+    }
+    if (!hit){ missed.push(label); return; }
+    var target = hit.closest("button,a,[role=button]") || hit;
+    target.style.cursor = "pointer";
+    target.setAttribute("data-hop", to);
+    target.addEventListener("click", function(e){
+      e.preventDefault(); e.stopPropagation();
+      parent.postMessage({ type:"hop", to: to }, "*");
+    }, true);
+    wired++;
+  });
+  parent.postMessage({ type:"wired", slug:"builder-spine", wired: wired, missed: missed }, "*");
+})();
+</script>
+</body></html>
