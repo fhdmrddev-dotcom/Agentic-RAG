@@ -16,8 +16,12 @@
  * ── THE VERB TABLE (D-09), LOCKED ────────────────────────────────────────────────────────
  *
  *   | Row state                       | Primary  | Overflow `⋯`                  |
- *   | runnable (published or starter) | `▶ Run`  | the fork verb · Delete workflow… |
- *   | draft ("Still building")        | `✎ Open` | Delete                        |
+ *   | runnable (published or starter) | `Run`  | the fork verb · Delete workflow… |
+ *   | draft ("Still building")        | `Open` | Delete                        |
+ *
+ * ⚠ THE TWO PRIMARY WORDS READ `▶ Run` AND `✎ Open` UNTIL THE 200-PORT. The glyphs are not
+ * gone from the CONTROL, only from the STRING — see `RUN_LABEL` for the argument. The table's
+ * shape, its counts and the draft's absolute exclusion from Run are unchanged.
  *
  * SEVEN verbs across three card types collapse to three. A DRAFT NEVER EXPOSES A RUN
  * AFFORDANCE — not on its face and not inside its menu. That is the page's own load-bearing
@@ -254,7 +258,21 @@ import { Fragment, useRef, useState } from "react"
 // 192.2-05 (D-06) — `FileText` / `Sparkles` / `SquarePen` replace the three emoji marks and
 // `Folder` replaces the folder chip's. The house's shipped chrome set, which this file already
 // drew three marks from; see `MARK_ICON`'s docblock for why NOT `phaseGlyph()`.
-import { FileText, Folder, Loader2, MoreHorizontal, Sparkles, SquarePen, Trash2 } from "lucide-react"
+// 200-PORT — `Play` / `ExternalLink` / `User` arrive with sketch 200's card: the sheet draws
+// the footer verbs as ICON + WORD (`play_arrow` / `open_in_new`) rather than as a glyph baked
+// into the label string, and it leads the `not-by-you` status line with `person`.
+import {
+  ExternalLink,
+  FileText,
+  Folder,
+  Loader2,
+  MoreHorizontal,
+  Play,
+  Sparkles,
+  SquarePen,
+  Trash2,
+  User,
+} from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
 import {
@@ -292,11 +310,20 @@ import {
 
 // ── The words owed a re-home (see the ⚠ paragraph above) ─────────────────────────────
 
-/** The primary verb for a runnable row, carried over verbatim (`WorkflowsPage.tsx:864`). */
-const RUN_LABEL = "▶ Run"
+/**
+ * The primary verb for a runnable row.
+ *
+ * ⚠ 200-PORT — IT READ `▶ Run` AND THE GLYPH IS GONE FROM THE STRING, not from the control.
+ * Sketch 200's card draws the footer verb as `play_arrow` + the word, i.e. an ICON NODE beside
+ * a plain label — the same split D-06 already made for the three provenance marks when it
+ * evicted their emoji from this file. A glyph baked into a label string cannot be sized, cannot
+ * be toned, and is read aloud as a character by a screen reader; the icon is `aria-hidden` and
+ * the word carries the meaning, which is this card's standing rule everywhere else.
+ */
+const RUN_LABEL = "Run"
 
-/** The primary verb for a draft, carried over verbatim (`WorkflowsPage.tsx:754`). */
-const OPEN_LABEL = "✎ Open"
+/** The primary verb for a draft. Same 200-PORT split as `RUN_LABEL` above — it read `✎ Open`. */
+const OPEN_LABEL = "Open"
 
 /**
  * The heaviest guard's trigger word, verbatim (`WorkflowsPage.tsx:834`). The ellipsis is
@@ -334,20 +361,40 @@ const DELETE_DRAFT_FAILED = "Couldn't delete this draft — try again."
  * column of 107 rows, which a mark nested inside the stacked content cannot do. Everything the
  * card stacked before now stacks inside `CARD_BODY_CLASSES`.
  */
-const CARD_CLASSES = "flex gap-3 rounded-lg border bg-card p-4"
-
-/** The stack that used to be the card root — same axis, same gap, one level in. */
-const CARD_BODY_CLASSES = "flex min-w-0 flex-1 flex-col gap-3"
+/**
+ * ⚠ 200-PORT — THE ROW BECOMES A CARD AGAIN, AND THE GUTTER LEAVES THE FLOW.
+ *
+ * It read `flex gap-3 rounded-lg border bg-card p-4`: a flex ROW whose first child was the 3px
+ * mark, which meant the mark started 16px in from the card's own edge and stopped 16px short of
+ * its bottom. Sketch 200 draws it `absolute left-0 top-0 bottom-0` — FLUSH, corner to corner —
+ * so down a column of 107 rows the marks form one continuous ruler rather than 107 floating
+ * ticks. That is only expressible with an absolutely-positioned child, hence `relative` here
+ * and the column axis for what is left.
+ *
+ * `rounded` (not `rounded-lg`) is the sheet's own `borderRadius.sm`, and `hover:bg-accent/30`
+ * is its `hover:bg-[#0f141b]` — a one-step lift on the card's own surface, no border change.
+ */
+const CARD_CLASSES = "group relative flex flex-col rounded border bg-card p-4 transition-colors hover:bg-accent/30"
 
 /**
- * D-01 slot 1 — the gutter. `3px` verbatim from the approved sketch (179-C), `flex-none` so it
- * never shrinks under a long name, and full height by virtue of the row's default `stretch`.
+ * The stack that used to be the card root.
+ *
+ * ⚠ `gap-3` IS GONE AND THE SPACING IS NOW PER-SLOT. The sheet gives its four rows DIFFERENT
+ * gaps — 8px under the title, 16px under the status line, 16px under the meta line — and a
+ * uniform gap flattens exactly the hierarchy the sheet spends those numbers on. `pl-1` is its
+ * `pl-xs`: the content clears the now-flush gutter.
  */
-const GUTTER_CLASSES = "w-[3px] flex-none rounded-full"
+const CARD_BODY_CLASSES = "flex min-w-0 flex-1 flex-col pl-1"
+
+/**
+ * D-01 slot 1 — the gutter. `3px` verbatim from the approved sketch (179-C), and since the
+ * 200-PORT it is FLUSH to the card's edges rather than inset by the padding: `rounded-l`
+ * follows the card's own left corners so the mark reads as part of the card's edge.
+ */
+const GUTTER_CLASSES = "absolute bottom-0 left-0 top-0 w-[3px] rounded-l"
 
 const NAME_CLASSES = "truncate text-[14px] font-medium text-foreground"
 const VERSION_CLASSES = "font-mono text-[11px] text-muted-foreground"
-const PILL_BASE = "shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase "
 /**
  * Phase 192.2-05 — the consequence sentence's classes, IN ITS NEW HOME.
  *
@@ -357,7 +404,19 @@ const PILL_BASE = "shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[9p
  * same left edge as the verb it describes rather than floating in the popover.
  */
 const MENU_NOTE_CLASSES = "px-2 py-1.5 text-[11.5px] leading-snug text-muted-foreground"
-const FOOTER_CLASSES = "mt-auto flex items-center gap-2 border-t border-border/60 pt-2"
+/**
+ * ⚠ 200-PORT — the footer's rule is now the card's FULL border tone, not `border-border/60`,
+ * and it sits on the sheet's own `pt-sm` (8px) with `justify-start`. The sheet's footer is a
+ * hairline the eye can actually find at the bottom of a two-column grid; a 60%-opacity rule
+ * disappeared against `bg-card` and made the verb look unanchored.
+ *
+ * ⚠ `mt-auto` IS REPLACED BY `mt-4` ON A GROWING HEADER BLOCK, and the swap is what makes the
+ * sheet's `mb-md` gap real. `mt-auto` guarantees only that the footer sits at the BOTTOM — on a
+ * card whose content already fills its box (a row of two where this one is the taller) it
+ * resolves to ZERO and the rule lands hard against the meta line. Growing the block ABOVE the
+ * footer instead keeps the bottom alignment across a grid row AND keeps a floor under the gap.
+ */
+const FOOTER_CLASSES = "mt-4 flex items-center gap-2 border-t border-border pt-2"
 
 /**
  * Phase 192.1-06 (D-08) — THE 14TH ATOM'S CLASSES, declared in this block rather than inline
@@ -370,25 +429,55 @@ const FOOTER_CLASSES = "mt-auto flex items-center gap-2 border-t border-border/6
  * SIBLING and D-08 stacks them, so two adjacent secondary lines at different sizes would read
  * as an accident. `flex-wrap` is load-bearing at the 43-row family's line length inside a
  * two-column grid.
+ *
+ * ⚠ 200-PORT — `uppercase tracking-wider leading-tight` JOIN IT, AND THE SIZE DOES NOT MOVE.
+ * Sketch 200 draws this exact line as `YOURS • Main • 42 share this name • changed last month`
+ * — 11px, uppercase, letter-spaced, and it is the ONLY uppercase run on the card. That is what
+ * demotes it below the 14px name and the 12px status line without spending a colour or a rule
+ * on it. The uppercasing is CSS, never a second spelling of any word: every string on this line
+ * still arrives from `libraryVocabulary.ts` in its sentence case, so `textContent` is unchanged
+ * and a copy change is still a one-line diff in one file. `mt-0.5` becomes `mt-4` — the sheet's
+ * `mb-md` under the status line, the gap that makes these two read as different registers.
  */
-const IDENTITY_CLASSES = "mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground"
+const IDENTITY_CLASSES =
+  "mt-4 flex flex-wrap items-center gap-1.5 text-[11px] uppercase leading-tight tracking-wider text-muted-foreground"
 
 /**
- * The owner word wears the card's OWN pill shape (`PILL_BASE`), reused rather than re-specced —
- * the mockup draws it as a small mono uppercase bordered pill, which is exactly what that
- * constant already is. The colour is picked from `owned` — the file's ONE existing ownership-
+ * The owner word. The colour is picked from `owned` — the file's ONE existing ownership-
  * predicate read, reused rather than re-tested, because a second copy of that predicate is the
  * drift D-03 forbids by name. The WORD itself is resolved by the page (D-09) and merely painted.
+ *
+ * ⚠ 200-PORT — THE PILL IS GONE AND ONLY THE PILL IS GONE. Both constants read
+ * `PILL_BASE + <tone>`: a bordered, `rounded-full`, 9px MONO chip. Sketch 200 draws this word
+ * as `YOURS`, in the meta line's own run, sharing its size, its tracking and its `•`
+ * separators — one line of text, not a text line with a badge welded to its head. That badge
+ * was the last thing on the card wearing a system token's clothes (the defect D-06 evicted the
+ * emoji for), and at 9px mono inside an 11px line it also broke the line's baseline.
+ *
+ * WHAT SURVIVES IS THE ONLY THING THE BADGE WAS CARRYING: the ownership TONE. `text-primary`
+ * for a row you own, muted for one you do not — so *whose is this?* is still answerable at a
+ * glance, with no border, no radius and no second font. `PILL_BASE` had no other consumer and
+ * leaves with it rather than sitting unused.
  *
  * ⚠ The predicate's identifier is deliberately NOT spelled in this prose. D-11's acceptance
  * check is a RAW SOURCE COUNT of it, so a docblock naming it would answer the very grep that
  * proves there is only one call — the 187-24 trap this file's header already records twice.
  */
-const IDENTITY_OWN_YOURS = PILL_BASE + "border-primary/40 text-primary"
-const IDENTITY_OWN_SHARED = PILL_BASE + "border-border text-muted-foreground"
+const IDENTITY_OWN_YOURS = "shrink-0 font-medium text-primary"
+const IDENTITY_OWN_SHARED = "shrink-0 font-medium text-muted-foreground"
 
-/** The separator, spent BETWEEN present parts only. Decorative — a reader hears the parts. */
-const IDENTITY_SEPARATOR = "·"
+/**
+ * The separator, spent BETWEEN present parts only. Decorative — a reader hears the parts.
+ *
+ * ⚠ 200-PORT — IT READ `·` (U+00B7 MIDDLE DOT) AND IS NOW `•` (U+2022 BULLET), which is the
+ * glyph sketch 200 draws on this line. At 11px with the line's new letter-spacing a middle dot
+ * all but vanishes between two uppercase runs, which is what made the shipped line read as one
+ * undifferentiated string. It is `aria-hidden` on both sides of the change, so nothing about
+ * what a screen reader receives moves — but the two test helpers that STRIP this glyph before
+ * comparing parts hold its literal, so they move in the same commit or every identity assertion
+ * in the subtree reds at once.
+ */
+const IDENTITY_SEPARATOR = "•"
 
 /**
  * Phase 192.2-09 (WR-04) — THE MATCH-REASON LINE'S CLASSES.
@@ -412,10 +501,27 @@ const MATCH_REASON_CLASSES = IDENTITY_CLASSES + " italic"
  * than a fresh `[]` minted on every render of every one of the operator's 107 rows.
  */
 const EMPTY_MATCH_REASONS: readonly MatchReason[] = []
-const PRIMARY_CLASSES =
-  "rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
-const SECONDARY_CLASSES =
-  "rounded-md border border-border px-3 py-1.5 text-[13px] text-foreground hover:bg-accent/40"
+/**
+ * ⚠ 200-PORT — BOTH VERBS BECOME TEXT ACTIONS. They read as a FILLED primary button and a
+ * BORDERED secondary one; sketch 200 draws both as a bare icon+word in the footer, tinted
+ * `primary` for Run and neutral `foreground` for Open, with no fill, no border and no radius.
+ *
+ * The reason is the grid, not taste: at two columns × 107 rows a filled block per card turns
+ * the shelf into a wall of buttons and the eye stops finding the NAMES, which is what a person
+ * actually scans for. The footer rule above already separates the action zone; a second, third
+ * and fourth signal (fill + border + radius) spends weight on a control the reader was not
+ * looking for. Weight is kept where D-18 says it belongs — the destructive menu items.
+ *
+ * The hit target does not shrink: `-mx-1 px-1 py-1` keeps the padded box while removing the
+ * paint, and both remain real `<button>`s with their shipped testids and handlers.
+ */
+const VERB_BASE =
+  "-mx-1 flex items-center gap-1.5 rounded px-1 py-1 text-[13px] font-medium transition-colors "
+const PRIMARY_CLASSES = VERB_BASE + "text-primary hover:text-primary/80"
+const SECONDARY_CLASSES = VERB_BASE + "text-foreground hover:text-muted-foreground"
+
+/** The footer verbs' glyph size — the sheet's 16px, the one it draws `play_arrow` at. */
+const VERB_ICON_CLASSES = "h-4 w-4 flex-none"
 
 /**
  * THE DESTRUCTIVE WEIGHT LIVES ON THE DELETE ITEMS AND NOWHERE ELSE ON THIS CARD — the
@@ -557,10 +663,41 @@ const RUN_TONE = {
  * and the identity line's 11px, which is what makes the run truth read as the SECOND thing on
  * the card rather than as more metadata.
  */
-const ANSWER_CLASSES = "mt-1.5 flex flex-wrap items-center gap-2 text-[12px]"
+const ANSWER_CLASSES = "mt-2 flex flex-wrap items-center gap-1.5 text-[12px]"
 
 /** The separator between the two halves of line 2 — decorative, exactly like the identity line's. */
 const ANSWER_SEPARATOR = "|"
+
+/**
+ * ⚠ 200-PORT — THE SHEET'S STATUS DOT, AND IT IS NET-NEW ON THIS CARD.
+ *
+ * Sketch 200 leads every status line with an 8px round mark in the outcome's own colour
+ * (`w-2 h-2 rounded-full bg-[#21C45D]`). It is the atom that makes the run truth findable
+ * before the sentence is read, at the one place the eye is already looking — the start of
+ * line 2 — where the full-height gutter is peripheral.
+ *
+ * ⚠ IT SPENDS NO NEW COLOUR AND ADDS NO NEW FACT. It is painted from `GUTTER_TONE`, the same
+ * arm-keyed table the gutter reads, so the dot and the bar cannot disagree; and the WORD one
+ * span to its right still says everything the colour hints at (*"colour, and never colour
+ * alone"*). `aria-hidden`, like the gutter, for exactly the same reason.
+ */
+const ANSWER_DOT_CLASSES = "h-2 w-2 flex-none rounded-full"
+
+/**
+ * ⚠ THE TWO ARMS THAT GET A GLYPH INSTEAD OF A DOT, AND THE ONE THAT GETS NEITHER.
+ *
+ * Sheet cards 5 and 6 do NOT lead with a dot: `Run by someone else` leads with `person` and
+ * `Still building` with `build`. That is the sheet distinguishing *a run outcome we hold* from
+ * *a fact about somebody else* — so `not-by-you` takes `User` here and no colour, because the
+ * caller has no outcome to report and a coloured dot would be a fabricated one (DEC-11-C).
+ *
+ * ⚠ `unknown` GETS NO MARK AT ALL, which is `GUTTER_TONE.unknown = bg-transparent`'s own
+ * documented rule applied one slot over: NO MARK FOR NO INFORMATION. A grey dot there would
+ * make *the wire did not say* look like a fact we hold, which is the whole reason D-08 keeps
+ * `unknown` and `never` apart. The sheet draws no such card, so nothing is being copied from
+ * it here and nothing is being invented either — the arm simply renders its word alone.
+ */
+const ANSWER_GLYPH_CLASSES = "h-3.5 w-3.5 flex-none text-muted-foreground"
 
 /**
  * Resolve the gutter key from the face's run arm. TOTAL by construction: `RunFact` has ~~three~~
@@ -868,7 +1005,36 @@ export function WorkflowCard({
    */
   const identityParts: string[] = [
     ...templateMark,
-    ...identity.segs,
+    // ⚠ BUG-260819-01 — THE STATE WORD RENDERED TWICE ON A NAME-COLLIDING ROW, and this is the
+    // one line that closes it. Confirmed live, reading (as flowing text) e.g.
+    // `… Shared starter | SHARED • Shared starter • …`.
+    //
+    // BOTH SPELLINGS ARE CORRECT IN ISOLATION, WHICH IS WHY NEITHER PRODUCER IS AT FAULT AND
+    // NEITHER IS BEING CHANGED. `rowIdentity.ts` ranks four discriminating axes over the rows
+    // that share a name and `state` is one of them, so on three same-named rows of three
+    // different provenances it correctly returns the state as the segment that narrows. Line 2
+    // — D-01's answer to *"does this one work?"* — renders `face.state` UNCONDITIONALLY, on
+    // every row, by design (its own docblock: *"NEITHER HALF IS EVER BLANK"*). Composed, the
+    // card says one word twice within about forty pixels.
+    //
+    // ⚠ THE FIX IS A DE-DUPLICATION AT THE ONE PLACE THAT CAN SEE BOTH, AND NOWHERE ELSE. The
+    // card is the only module holding `face` and `identity` at once: `cardFace` cannot know
+    // what the resolver ranked, and the resolver cannot know that this surface prints the state
+    // unconditionally (a THIRD surface consuming `RowIdentity` may not). Filtering inside
+    // `rowIdentity.ts` would break the ranker's own arithmetic; suppressing line 2 would break
+    // its totality guarantee. So the LIST drops the segment, because line 2 has already said it
+    // — the same "spend a `·` BETWEEN present parts and nowhere else" honesty this array
+    // already applies to `ofN` and `when`.
+    //
+    // ⚠ NO DISCRIMINATION IS LOST, and that is the property that makes this safe rather than
+    // merely tidy. The dropped segment's whole job is to tell two namesakes apart by state; the
+    // state is still on the card, one line up, on EVERY row including the ones with no
+    // collision. A reader comparing two namesakes reads it in the same glance either way.
+    //
+    // The comparison is `!==` against the resolved business word, never against a provenance
+    // spelling: the two producers already share ONE vocabulary home (`libraryVocabulary.ts`),
+    // so equal words are provably the same word rather than two that happen to look alike.
+    ...identity.segs.filter((seg) => seg !== face.state),
     ...(identity.ofN === null ? [] : [identity.ofN]),
     ...(identity.when === null ? [] : [identity.when]),
   ]
@@ -900,9 +1066,21 @@ export function WorkflowCard({
 
       <div className={CARD_BODY_CLASSES}>
       {/* ── Card chrome (NOT a soul atom): name/version header, folder chip, ⋯ ─────── */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
+      {/* ⚠ 200-PORT — `flex-1` JOINS THE COLUMN AND THE `⋯` LEAVES THE FLOW.
+          The sheet runs the status line and the meta line the FULL WIDTH of the card, under a
+          header row that holds the title and the overflow trigger. Here they live INSIDE the
+          header's left column (192.2-05 put them there and the suite pins them by child order
+          at indices 1 and 2), so a `⋯` sitting in the flow clipped both lines 32px short of
+          the card's right edge — visible as a ragged right margin down a two-column grid.
+          Absolutely positioning the trigger at the card's own top-right renders it in exactly
+          the place `justify-between` did, and returns the width to the two lines that need it.
+          `pr-8` is what keeps a long name from running under it. */}
+      <div className="flex flex-1 items-start justify-between gap-2 pr-8">
+        <div className="min-w-0 flex-1">
+          {/* ⚠ 200-PORT — `items-baseline`, the sheet's own alignment for this pair: the
+              version sits on the NAME's baseline rather than on its optical centre, which is
+              what stops a 11px mono token from looking like it is floating beside a 14px word. */}
+          <div className="flex items-baseline gap-2">
             <MarkIcon data-testid="row-mark" className={MARK_ICON_CLASSES} aria-hidden="true" />
             <span className={NAME_CLASSES}>{face.lead}</span>
             {face.version !== null && <span className={VERSION_CLASSES}>{face.version}</span>}
@@ -925,6 +1103,20 @@ export function WorkflowCard({
               provenances — so this line always says two things, on every row, including a
               row whose feed carried no run keys at all. */}
           <div data-testid="row-answer" className={ANSWER_CLASSES}>
+            {/* ⚠ 200-PORT — the sheet's leading mark. Three arms, and the third draws nothing;
+                see `ANSWER_DOT_CLASSES` / `ANSWER_GLYPH_CLASSES` for why each is what it is.
+                `data-run` repeats the gutter's key so a test can prove the two marks track ONE
+                derivation rather than asserting a colour class. */}
+            {gutter === "not-by-you" ? (
+              <User data-testid="row-answer-glyph" className={ANSWER_GLYPH_CLASSES} aria-hidden="true" />
+            ) : gutter === "unknown" ? null : (
+              <span
+                data-testid="row-answer-dot"
+                data-run={gutter}
+                aria-hidden="true"
+                className={ANSWER_DOT_CLASSES + " " + GUTTER_TONE[gutter]}
+              />
+            )}
             <span className={RUN_TONE[gutter]}>{face.runWord}</span>
             <span aria-hidden="true" className="text-border">
               {ANSWER_SEPARATOR}
@@ -985,8 +1177,15 @@ export function WorkflowCard({
               CONTEXT's constraint is *no emoji anywhere on the card*. Same house set, same
               muted tone; `inline-block` becomes `inline-flex` only because the glyph is now a
               sibling element rather than a character in the text run. */}
+          {/* ⚠ 200-PORT — IT NOW MATCHES THE LINE ABOVE IT, and it is a RESTYLE not a move.
+              Sketch 200 carries the project INSIDE the meta run (`YOURS • Main • 42 share this
+              name • …`). It is NOT moved there: the folder chip is `column.children[3]` and the
+              suite asserts this column's order by INDEX, so a merge would be a structural change
+              to a pinned composition for a purely typographic gain. Instead it takes the meta
+              line's exact register — 11px, uppercase, letter-spaced, muted — so the two read as
+              one continuous block that happens to wrap, which is what the sheet draws. */}
           {folderName && (
-            <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="mt-1 inline-flex items-center gap-1 text-[11px] uppercase leading-tight tracking-wider text-muted-foreground">
               <Folder className="h-3 w-3 flex-none" aria-hidden="true" />
               {folderName}
             </span>
@@ -1024,7 +1223,11 @@ export function WorkflowCard({
           )}
         </div>
 
-        <div className="flex flex-none items-center gap-1">
+        {/* ⚠ 200-PORT — OUT OF THE FLOW, INTO THE CARD'S OWN TOP-RIGHT. Same pixel position the
+            header row's `justify-between` put it in (the card's `p-4` and this offset agree);
+            what changes is that it no longer takes width from the two full-bleed lines below.
+            See the header row's own note. */}
+        <div className="absolute right-3 top-3 flex flex-none items-center gap-1">
           {showOverflow && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1192,6 +1395,10 @@ export function WorkflowCard({
             onClick={() => onRun(row)}
             className={PRIMARY_CLASSES}
           >
+            {/* ⚠ 200-PORT — the sheet's `play_arrow`, as an `aria-hidden` node beside the word
+                rather than as a character inside it. The accessible name is unchanged: it was
+                and is the visible word (the glyph never carried meaning, only weight). */}
+            <Play className={VERB_ICON_CLASSES} aria-hidden="true" />
             {RUN_LABEL}
           </button>
         ) : (
@@ -1201,6 +1408,8 @@ export function WorkflowCard({
             onClick={() => onOpen(row)}
             className={SECONDARY_CLASSES}
           >
+            {/* The sheet's `open_in_new`, on the same 200-PORT rule as `Play` above. */}
+            <ExternalLink className={VERB_ICON_CLASSES} aria-hidden="true" />
             {OPEN_LABEL}
           </button>
         )}
