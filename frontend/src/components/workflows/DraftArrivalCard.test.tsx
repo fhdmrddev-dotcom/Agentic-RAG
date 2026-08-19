@@ -43,12 +43,15 @@ import type { DecisionsListProps } from "./DecisionsList"
 import {
   DECISIONS_FOLD_ACTION,
   DECISION_CHANGE_ACTION,
+  DECISION_EDIT_LIMIT_NOTE,
   DECISION_ROW_ORDER,
   GROUNDING_FOLD_ACTION,
+  decisionRowLabel,
   decisionsFoldSummary,
   groundingFoldSummary,
 } from "./decisionsVocabulary"
 import {
+  SEED_RECEIPT_DISMISS_GLYPH,
   SEED_RECEIPT_DISMISS_LABEL,
   SEED_RECEIPT_NOTHING_COMMITTED,
   seedReceiptHeading,
@@ -796,5 +799,290 @@ describe("DraftArrivalCard — every rendered handle is queried by this suite", 
     expect([...' data-grounded-count={rows.length}'.matchAll(/\sdata-([a-z][a-z-]*)=\{/g)]).toHaveLength(
       1,
     )
+  })
+})
+
+// ── 8. THE 199-04 RESTING INVENTORY, AND THE SHEET-c5 RECONCILIATION ─────────────────
+//
+// Phase 199-04 Task 1 (DES-01, sketch 178 sheet `c5-draft-arrival`).
+//
+// ⚠ THESE ARE CHARACTERIZATION PINS, NOT PREFERENCES. Every atom the card paints at rest
+// and behind each fold is pinned PRESENT as an identifier, so that a later REMOVAL is
+// proved by INVERTING the assertion rather than by deleting it (the `192.2-05` method). A
+// pin deleted to turn a suite green proves nothing; a pin inverted states the change out
+// loud and keeps the arithmetic closable.
+//
+// ⚠ WHAT "HEIGHT" MEANS HERE, STATED RATHER THAN IMPLIED — AND IT IS NOT A PIXEL.
+// `SEED-184` measured this card at 147 px collapsed and 398 px with both folds open, in a
+// browser. jsdom applies no CSS and reports `clientHeight` 0 — the same fact
+// `editAffordance.test.ts` records at length — so those numbers are NOT reproducible here
+// and asserting them would be a fabricated measurement.
+//
+// What IS deterministic is the card's DECLARED vertical box: the spacing utilities it
+// emits, plus the type it declares on each text-bearing element. `declaredBox` below sums
+// exactly that. It is a SURROGATE — its absolute value is not a pixel and must never be
+// compared with `SEED-184`'s figures — but it MOVES whenever spacing or type changes,
+// which is the property that makes "the card got quieter" falsifiable instead of a
+// feeling. The real px reading stays OWED to a G-4 row, exactly as the suppression's
+// appearance does.
+
+/** The card's own private disclosure mark, read out of its source rather than spelled a
+ *  second time here. A private constant has no vocabulary module to be locked in, and a
+ *  literal copy would be exactly the second spelling this file exists to avoid. */
+const FOLD_GLYPH_ATOM = (/const FOLD_GLYPH = "([^"]+)"/.exec(draftArrivalCardSource) ?? [])[1] ?? ""
+
+/** Every atom an author READS inside `root`, trimmed, empty ones dropped, in DOCUMENT
+ *  order. An ORDERED array rather than a set: two atoms swapping places is a presentation
+ *  change and must fail rather than pass. */
+function atomsOf(root: HTMLElement): string[] {
+  const out: string[] = []
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const text = (n.textContent ?? "").trim()
+    if (text !== "") out.push(text)
+  }
+  return out
+}
+
+function cardAtoms(): string[] {
+  return atomsOf(screen.getByTestId("draft-arrival-card"))
+}
+
+/**
+ * The DECLARED vertical box of `root`, in the units the class strings declare.
+ *
+ *   `boxPx`   the sum of every vertical padding and margin utility on the subtree.
+ *             Arbitrary values are read verbatim; scale values use Tailwind's default 4px
+ *             step. `py-*` / `my-*` count twice, because they declare two edges.
+ *   `linePx`  the sum over every text-BEARING element of its declared font size times its
+ *             declared line height (1.5 when none is declared — Tailwind's `normal`).
+ *
+ * ⚠ NON-VACUITY IS ASSERTED BY ITS OWN CASE, NEVER ASSUMED. A helper that silently
+ * returned zero for everything would make every comparison below trivially stable, which
+ * is exactly the failure mode a surrogate metric invites.
+ */
+function declaredBox(root: HTMLElement): { boxPx: number; linePx: number; totalPx: number } {
+  let boxPx = 0
+  let linePx = 0
+  const all: HTMLElement[] = [root, ...root.querySelectorAll<HTMLElement>("*")]
+  for (const el of all) {
+    const cls = el.className
+    if (typeof cls !== "string") continue
+    for (const m of cls.matchAll(
+      /(?:^|\s)(m[tby]|p[tby])-(?:\[(\d+(?:\.\d+)?)px\]|(\d+(?:\.\d+)?))/g,
+    )) {
+      const raw = m[2] !== undefined ? Number(m[2]) : Number(m[3]) * 4
+      boxPx += m[1].endsWith("y") ? raw * 2 : raw
+    }
+    // Only elements that DIRECTLY own text declare a line — a wrapper's type is inherited
+    // by its children and would otherwise be counted twice.
+    const ownsText = [...el.childNodes].some(
+      (n) => n.nodeType === 3 && (n.textContent ?? "").trim() !== "",
+    )
+    if (!ownsText) continue
+    const size = /(?:^|\s)text-\[(\d+(?:\.\d+)?)px\]/.exec(cls)
+    if (size === null) continue
+    const lead = /(?:^|\s)leading-\[(\d+(?:\.\d+)?)\]/.exec(cls)
+    linePx += Number(size[1]) * (lead === null ? 1.5 : Number(lead[1]))
+  }
+  return { boxPx, linePx, totalPx: boxPx + linePx }
+}
+
+describe("DraftArrivalCard — the 199-04 resting inventory", () => {
+  it("reads the card's own disclosure mark out of its source, not out of a second spelling", () => {
+    expect(FOLD_GLYPH_ATOM.length).toBeGreaterThan(0)
+  })
+
+  it("AT REST the card paints exactly these atoms, in this order", () => {
+    renderCard()
+    // Nine atoms and not one more. Every one is an identifier, never a spelled literal.
+    expect(cardAtoms()).toEqual([
+      seedReceiptHeading(GROUNDED_PHASES.length),
+      SEED_RECEIPT_DISMISS_GLYPH,
+      FOLD_GLYPH_ATOM,
+      groundingFoldSummary(GROUNDED_COUNT),
+      GROUNDING_FOLD_ACTION,
+      FOLD_GLYPH_ATOM,
+      decisionsFoldSummary(DECISION_ROW_ORDER.length),
+      DECISIONS_FOLD_ACTION,
+      SEED_RECEIPT_NOTHING_COMMITTED,
+    ])
+  })
+
+  it("AT REST neither fold body exists at all — the atoms above are the WHOLE card", () => {
+    renderCard()
+    expect(screen.queryByTestId("draft-arrival-grounding-body")).toBeNull()
+    expect(screen.queryByTestId("draft-arrival-decisions-body")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    expect(screen.queryByTestId("decisions-list")).toBeNull()
+  })
+
+  it("FOLD 1 OPEN — the body is NON-EMPTY first, and only then is its shape asserted", async () => {
+    // ⚠ THE ORDER OF THESE TWO ASSERTIONS IS LOAD-BEARING. The suppression list neutralises
+    // the receipt's frame from the OUTSIDE; a future entry naming a CONTENT handle would
+    // blank the fold, and a blank fold satisfies every geometry assertion ever written
+    // about it. Non-vacuity is therefore asserted BEFORE shape, never after.
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    const body = screen.getByTestId("draft-arrival-grounding-body")
+    expect(atomsOf(body).length).toBeGreaterThan(0)
+    expect(within(body).getAllByTestId("seed-receipt")).toHaveLength(1)
+    // The card's OWN opening atoms are unchanged by opening a fold — a fold ADDS, it never
+    // rewrites what the card already said.
+    expect(cardAtoms().slice(0, 2)).toEqual([
+      seedReceiptHeading(GROUNDED_PHASES.length),
+      SEED_RECEIPT_DISMISS_GLYPH,
+    ])
+  })
+
+  it("FOLD 2 OPEN — the body is NON-EMPTY first, and carries all five decision labels", async () => {
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-decisions"))
+    const body = screen.getByTestId("draft-arrival-decisions-body")
+    const atoms = atomsOf(body)
+    expect(atoms.length).toBeGreaterThan(0)
+    for (const key of DECISION_ROW_ORDER) expect(atoms).toContain(decisionRowLabel(key))
+    expect(atoms).toContain(DECISION_EDIT_LIMIT_NOTE)
+  })
+
+  it("BOTH FOLDS OPEN — both bodies are non-empty at the same time", async () => {
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    await user.click(screen.getByTestId("draft-arrival-fold-decisions"))
+    expect(atomsOf(screen.getByTestId("draft-arrival-grounding-body")).length).toBeGreaterThan(0)
+    expect(atomsOf(screen.getByTestId("draft-arrival-decisions-body")).length).toBeGreaterThan(0)
+  })
+
+  it("the RECEIPT IS ABSENT when there is nothing to report (sheet c5 section 3, state B)", () => {
+    // `groundingFoldSummary(0)` is the empty string, so fold line 1 is not rendered at
+    // all — and with no fold line there is no way to reach a receipt. The sheet draws this
+    // as a dashed placeholder box that says so; the shipped card renders NOTHING, which is
+    // the stronger reading of the same idea. Asserted as an absence, never as a caption.
+    renderCard({ phases: UNGROUNDED_PHASES })
+    expect(groundingFoldSummary(0)).toBe("")
+    expect(screen.queryByTestId("draft-arrival-fold-grounding")).toBeNull()
+    expect(screen.queryByTestId("seed-receipt")).toBeNull()
+    // …and it is still a card: fold 2 and the closing line survive.
+    expect(screen.getByTestId("draft-arrival-fold-decisions")).toBeTruthy()
+    expect(screen.getByTestId("draft-arrival-close")).toBeTruthy()
+  })
+})
+
+describe("DraftArrivalCard — the declared vertical box (a SURROGATE, never a pixel)", () => {
+  /**
+   * The pre-change reading, MEASURED 2026-08-19 at the head of Phase 199-04.
+   *
+   * ⚠ `linePx` DELIBERATELY UNDER-COUNTS, and saying so is the difference between a
+   * surrogate and a lie. A text-bearing element that inherits its type from an ancestor
+   * contributes nothing here — the two fold lines declare `text-[12.5px]` on the BUTTON
+   * and paint their words in child spans, so neither is counted. Attributing an ancestor's
+   * type to each of its descendants instead would double-count every nested span, which is
+   * the worse error. The figure is a consistent yardstick, never a page height.
+   */
+  const COLLAPSED = { boxPx: 76, linePx: 39, totalPx: 115 }
+
+  /** The same reading with BOTH folds open — the composed receipt and the five-row list
+   *  included, since both are children of the card and the card is what an author sees. */
+  const FULLY_OPEN = { boxPx: 217, linePx: 231.925, totalPx: 448.925 }
+
+  it("the helper is NOT vacuous — it reads a real box and a real line off a plant", () => {
+    // Without this, every figure below could be zero and every comparison would still hold.
+    const plant = document.createElement("div")
+    plant.className = "py-4 mt-1"
+    const line = document.createElement("p")
+    line.className = "text-[10px] leading-[2]"
+    line.textContent = "x"
+    plant.appendChild(line)
+    // py-4 is 16 on two edges = 32, mt-1 is 4, so boxPx 36. 10px at a leading of 2 is 20.
+    expect(declaredBox(plant)).toEqual({ boxPx: 36, linePx: 20, totalPx: 56 })
+  })
+
+  it("AT REST the card declares this vertical box", () => {
+    renderCard()
+    expect(declaredBox(screen.getByTestId("draft-arrival-card"))).toEqual(COLLAPSED)
+  })
+
+  it("OPENING BOTH FOLDS only ADDS to the box — the resting figure is never rewritten", async () => {
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    await user.click(screen.getByTestId("draft-arrival-fold-decisions"))
+    const open = declaredBox(screen.getByTestId("draft-arrival-card"))
+    expect(open.boxPx).toBeGreaterThan(COLLAPSED.boxPx)
+    expect(open.linePx).toBeGreaterThan(COLLAPSED.linePx)
+    // Pinned as a NUMBER as well as a relation, so a later change is published as a DELTA
+    // rather than absorbed by an inequality that a grown card would still satisfy.
+    expect(open).toEqual(FULLY_OPEN)
+  })
+})
+
+describe("DraftArrivalCard — sheet c5 asks for a vocabulary this surface does not speak", () => {
+  /**
+   * ⚠ THE ONE PLACE THIS FILE SPELLS STRINGS AS LITERALS, AND THE REASON IS THE POINT.
+   * These are SKETCH 178's words, not this application's. They are needles asserted ABSENT
+   * from the rendered DOM, so a literal here can neither satisfy nor break anything — the
+   * D-ITEM-183-02 trap applies to source greps, and nothing below greps a source.
+   *
+   * Sheet `c5-draft-arrival` draws the arrival card with a lifecycle chip, a describe-text
+   * echo with its own control, and a two-button door pair. Every one of those either
+   * PRINTS THE MECHANISM to the reader — the rule sketch 178's own `designMd` added — or
+   * puts a door on this card that already has exactly one home elsewhere. The verdicts are
+   * in `199-04-SUMMARY.md`; this case is what makes them checkable rather than asserted.
+   */
+  const SHEET_C5_WORDS = [
+    "Freshly Arrived",
+    "Returned-to",
+    "View full",
+    "Open in builder",
+    "Applied Decisions",
+  ]
+
+  const SHEET_C5_ROW_SUBJECTS = [
+    "Data Source",
+    "Vendor Identification",
+    "Contract Duration",
+    "Knowledge-Grounding",
+    "Risk Assessment Logic",
+  ]
+
+  it("the card renders NONE of sheet c5's lifecycle or door vocabulary", async () => {
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-grounding"))
+    await user.click(screen.getByTestId("draft-arrival-fold-decisions"))
+    const read = cardAtoms().join("   ")
+    // Non-vacuity BEFORE the negatives: an empty read passes every `not.toContain`.
+    expect(read.length).toBeGreaterThan(0)
+    for (const word of SHEET_C5_WORDS) {
+      expect(read, `sheet c5's "${word}" reached the shipped card`).not.toContain(word)
+    }
+  })
+
+  it("POSITIVE CONTROL — the sweep really would see one of those words if it appeared", () => {
+    // Driven RED once against this plant during Task 1, then kept permanently: a fence
+    // whose positive control is removed after one green run is a fence nobody can re-verify.
+    const plant = document.createElement("div")
+    plant.textContent = `Vendor renewal brief ${SHEET_C5_WORDS[0]}`
+    const read = atomsOf(plant).join("   ")
+    expect(SHEET_C5_WORDS.some((w) => read.includes(w))).toBe(true)
+  })
+
+  it("the DECISIONS half speaks its own five subjects, not the sheet's", async () => {
+    // Sheet c5's five rows are model-invented subjects, none of which is one of the app's
+    // five decisions. The shipped labels are the module's, asserted by identity; the
+    // sheet's subjects are asserted absent.
+    const user = userEvent.setup()
+    renderCard()
+    await user.click(screen.getByTestId("draft-arrival-fold-decisions"))
+    const read = atomsOf(screen.getByTestId("draft-arrival-decisions-body")).join("   ")
+    for (const key of DECISION_ROW_ORDER) expect(read).toContain(decisionRowLabel(key))
+    for (const subject of SHEET_C5_ROW_SUBJECTS) {
+      expect(read, `sheet c5's row subject "${subject}" reached the shipped list`).not.toContain(
+        subject,
+      )
+    }
   })
 })

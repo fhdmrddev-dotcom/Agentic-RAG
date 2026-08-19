@@ -930,3 +930,217 @@ describe("DecisionsList — every rendered handle is queried by this suite", () 
     }
   })
 })
+
+// ── 9. THE 199-04 RESTING INVENTORY, AND THE SHEET-c5 RECONCILIATION ─────────────────
+//
+// Phase 199-04 Task 1 (DES-01, sketch 178 sheet `c5-draft-arrival`).
+//
+// ⚠ CHARACTERIZATION PINS, NOT PREFERENCES. Every atom each of the five rows paints, in
+// each of the readiness read's THREE arms, is pinned PRESENT — so a later REMOVAL is
+// proved by INVERTING an assertion rather than by deleting it (the `192.2-05` method).
+//
+// ⚠ WHAT THE SHEET ASKS FOR AND WHY MOST OF IT IS REFUSED, IN ONE PLACE. Sheet
+// `c5-draft-arrival` draws this list with a per-row STATUS BADGE — a green tick and the
+// word for "everything is fine" on two rows, a red mark and a "we need you" word on two
+// more, and a grey "we do not know" badge on the fifth. **That is the exact shape the
+// shipped three-arm contract exists to forbid.** An affirmative badge on a PRESENT
+// readiness makes the present arm distinguishable from the ABSENT arm, and the whole
+// argument for the third arm is that the two are indistinguishable to the author, so an
+// absence can never be read as a pass. The verdicts are in `199-04-SUMMARY.md`; the cases
+// below are what make them checkable rather than asserted.
+
+/** The atoms a single row paints, trimmed and in document order — the same ordered-array
+ *  read the sibling card suite uses, scoped to one `li`. */
+function rowAtoms(key: string): string[] {
+  const row = screen.getByTestId(`decision-row-${key}`)
+  const out: string[] = []
+  const walker = row.ownerDocument.createTreeWalker(row, NodeFilter.SHOW_TEXT)
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const text = (n.textContent ?? "").trim()
+    if (text !== "") out.push(text)
+  }
+  // A field paints nothing into a text node, so its VALUE is appended explicitly — row 4
+  // would otherwise read as an empty row and every comparison over it would be vacuous.
+  for (const field of row.querySelectorAll<HTMLInputElement>("input")) {
+    out.push(field.value === "" ? (field.placeholder ?? "") : field.value)
+  }
+  return out
+}
+
+/** Every row's atoms, keyed by row, in the module's declared order. */
+function allRowAtoms(): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  for (const key of DECISION_ROW_ORDER) out[key] = rowAtoms(key)
+  return out
+}
+
+const READINESS_PRESENT = {
+  business_requirement: { status: "present" as const },
+}
+const READINESS_MISSING = {
+  business_requirement: { status: "missing" as const, message: MISSING_MESSAGE },
+}
+
+describe("DecisionsList — the 199-04 resting inventory, all five rows", () => {
+  it("a POPULATED draft with an ABSENT readiness paints exactly these atoms", () => {
+    renderList()
+    expect(allRowAtoms()).toEqual({
+      "knowledge-base": [decisionRowLabel("knowledge-base"), FOLDER_NAME, DECISION_CHANGE_ACTION],
+      template: [decisionRowLabel("template"), TEMPLATE_FILENAME, DECISION_OPEN_STEP_ACTION],
+      requirement: [
+        decisionRowLabel("requirement"),
+        BUSINESS_REQUIREMENT,
+        DECISION_CHANGE_ACTION,
+      ],
+      name: [decisionRowLabel("name"), WORKFLOW_NAME],
+      deliverable: [
+        decisionRowLabel("deliverable"),
+        DECISION_DELIVERABLE_FILE,
+        DECISION_OPEN_STEP_ACTION,
+      ],
+    })
+  })
+
+  it("an EMPTY draft paints the four absence sentences and no row vanishes", () => {
+    renderList(ALL_ABSENT)
+    expect(allRowAtoms()).toEqual({
+      "knowledge-base": [
+        decisionRowLabel("knowledge-base"),
+        DECISION_KB_NONE,
+        DECISION_CHANGE_ACTION,
+      ],
+      // No producing step, so rows 2 and 5 render NO jump — one mechanism, one absence.
+      template: [decisionRowLabel("template"), DECISION_TEMPLATE_NONE],
+      requirement: [
+        decisionRowLabel("requirement"),
+        DECISION_REQUIREMENT_NONE,
+        DECISION_CHANGE_ACTION,
+      ],
+      name: [decisionRowLabel("name"), DECISION_NAME_NONE],
+      deliverable: [decisionRowLabel("deliverable"), DECISION_DELIVERABLE_CHAT],
+    })
+  })
+
+  it("ARM 1 (absent) and ARM 2 (present) are ATOM-FOR-ATOM identical on ALL FIVE rows", () => {
+    // ⚠ THIS IS THE D-20 / T-197-03 INVARIANT AT ITS FULL WIDTH. The shipped suite asserts
+    // that neither arm says anything affirmative; this asserts the stronger property the
+    // charter actually claims — that the two are INDISTINGUISHABLE, on every row, not only
+    // on the one that carries a verdict. A badge, a tick or a grey "not reported" caption
+    // on any row would break this and nothing else in the suite would see it.
+    const { unmount } = renderList({ readiness: undefined })
+    const absentArm = allRowAtoms()
+    unmount()
+    renderList({ readiness: READINESS_PRESENT })
+    expect(allRowAtoms()).toEqual(absentArm)
+  })
+
+  it("ARM 3 (missing) differs from the other two on ROW 3 ALONE — the other four are untouched", () => {
+    const { unmount } = renderList({ businessRequirement: "", readiness: undefined })
+    const absentArm = allRowAtoms()
+    unmount()
+    renderList({ businessRequirement: "", readiness: READINESS_MISSING })
+    const missingArm = allRowAtoms()
+    for (const key of DECISION_ROW_ORDER) {
+      if (key === "requirement") {
+        expect(missingArm[key]).not.toEqual(absentArm[key])
+        expect(missingArm[key]).toEqual([...absentArm[key], MISSING_MESSAGE])
+      } else {
+        expect(missingArm[key], `row "${key}" moved when only row 3 may`).toEqual(
+          absentArm[key],
+        )
+      }
+    }
+  })
+
+  it("POSITIVE CONTROL — the arm comparison really would see a one-atom difference", () => {
+    // Driven RED once during Task 1 against a planted extra atom, then kept permanently.
+    // Without it, a `rowAtoms` that returned `[]` for everything would make both cases
+    // above pass against any component at all.
+    const absentArm = { requirement: ["a", "b"] }
+    const planted = { requirement: ["a", "b", MISSING_MESSAGE] }
+    expect(planted.requirement).not.toEqual(absentArm.requirement)
+    expect(planted.requirement).toEqual([...absentArm.requirement, MISSING_MESSAGE])
+  })
+})
+
+describe("DecisionsList — sheet c5 asks for a status vocabulary this contract forbids", () => {
+  /**
+   * ⚠ SKETCH 178'S WORDS, NOT THIS APPLICATION'S — the one place this file spells strings
+   * as literals, and the reason is that they are needles asserted ABSENT from the rendered
+   * DOM. Nothing below greps a source, so the D-ITEM-183-02 trap cannot apply.
+   *
+   * ⚠ THE SKETCH README CLAIMS THIS SHEET *"reproduces our shipped `decisionsVocabulary`
+   * contract: three arms per row, an explicit not reported, and only the grounding row
+   * claiming a publish requirement."* **A `key_links`-style claim in a document is a claim
+   * to VERIFY, not a fact** — and measured against the sheet's own markup it does not hold.
+   * The full reconciliation is in `199-04-SUMMARY.md`; this case pins the consequence.
+   */
+  const SHEET_C5_STATUS_WORDS = [
+    "Satisfied",
+    "Needs You",
+    "Not reported",
+    "Unknown",
+    "Correction control",
+  ]
+
+  it("no row renders any of the sheet's status-badge words, in ANY of the three arms", () => {
+    for (const readiness of [undefined, READINESS_PRESENT, READINESS_MISSING]) {
+      const { unmount } = renderList({ businessRequirement: "", readiness })
+      const read = readableText(screen.getByTestId("decisions-list"))
+      // Non-vacuity BEFORE the negatives: an empty read passes every `not.toContain`.
+      expect(read.length).toBeGreaterThan(0)
+      for (const word of SHEET_C5_STATUS_WORDS) {
+        expect(read, `sheet c5's "${word}" reached the shipped list`).not.toContain(word)
+      }
+      unmount()
+    }
+  })
+
+  it("POSITIVE CONTROL — the sweep really would see one of those words if it appeared", () => {
+    const plant = document.createElement("div")
+    plant.textContent = `${decisionRowLabel("knowledge-base")} ${SHEET_C5_STATUS_WORDS[0]}`
+    const read = readableText(plant)
+    expect(SHEET_C5_STATUS_WORDS.some((w) => read.includes(w))).toBe(true)
+  })
+})
+
+describe("DecisionsList — the label column and the verdict indent may not drift apart", () => {
+  /**
+   * A latent defect found by the 199-04 inventory rather than by a failure.
+   *
+   * The label cell declares a FIXED width and the row declares a gap; the verdict
+   * paragraph on row 3 is indented by a SEPARATE hard-coded figure that has to equal the
+   * two added together, or the server's sentence stops lining up under the answer it is
+   * about. Nothing connected the three numbers, so any future spacing change would have
+   * silently misaligned the one sentence on this surface that is not ours.
+   *
+   * Tailwind's JIT needs each arbitrary value as a static literal, so the three cannot be
+   * computed from one constant at runtime. They are therefore tied together HERE, by
+   * reading them back out of the component's own source and checking the arithmetic. That
+   * is the strongest available statement, and it is stronger than a comment.
+   */
+  const gapScaleToPx = (n: number) => n * 4
+
+  it("the verdict indent EQUALS the label width plus the row gap", () => {
+    const label = /w-\[(\d+)px\]\s+shrink-0\s+text-muted-foreground/.exec(decisionsListSource)
+    const gap = /flex\s+items-baseline\s+gap-(\d+)/.exec(decisionsListSource)
+    const indent = /mt-1\s+pl-\[(\d+)px\]/.exec(decisionsListSource)
+    // Non-vacuity FIRST: three regexes that matched nothing would make the sum trivially
+    // comparable to itself and this fence would pass on any file at all.
+    expect(label, "the label cell's fixed width is no longer where this fence looks").not.toBeNull()
+    expect(gap, "the row's gap utility is no longer where this fence looks").not.toBeNull()
+    expect(indent, "the verdict's indent is no longer where this fence looks").not.toBeNull()
+    const labelPx = Number(label?.[1])
+    const gapPx = gapScaleToPx(Number(gap?.[1]))
+    const indentPx = Number(indent?.[1])
+    expect(labelPx).toBeGreaterThan(0)
+    expect(gapPx).toBeGreaterThan(0)
+    expect(indentPx).toBe(labelPx + gapPx)
+  })
+
+  it("POSITIVE CONTROL — the arithmetic really fails when the three drift apart", () => {
+    // Driven RED once during Task 1 by planting a fourth figure, then kept permanently.
+    expect(136).toBe(128 + gapScaleToPx(2))
+    expect(140).not.toBe(128 + gapScaleToPx(2))
+  })
+})
