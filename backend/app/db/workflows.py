@@ -168,6 +168,50 @@ _LAST_RUN_LATERAL_SQL = (
     ") lr ON TRUE "
 )
 
+# ── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — the ROW-LEVEL run bit ───────────────
+#
+# ⚠ THIS CONSTANT IS DELIBERATELY UNSCOPED, AND THAT IS THE WHOLE POINT OF IT EXISTING.
+# The lateral one line above answers *have YOU run this*. This answers *has ANYBODY run this*.
+# Everything the lateral's docblock argues — ``LEFT``, ``LATERAL … LIMIT 1``, the ``$1``, the
+# renames, one constant not three copies — is stated there and is NOT restated here; only what
+# is NEW is written down.
+#
+# ⚠ WHAT IS NEW, AND WHY IT HAD TO BE. ``192.2-VERIFICATION.md`` gap 1 / review **CR-01**
+# (BLOCKER): the lateral is correctly caller-scoped, but every downstream artifact rendered its
+# NULL as a ROW-LEVEL fact. Measured 2026-08-19, five ``is_system_global`` published rows carry
+# **20 / 15 / 11 / 7 / 1** runs belonging to ONE user, and ``/starters`` + ``/published``'s
+# global branch serve those same rows to everybody — so every other caller read an explicit
+# "Never run" about a workflow that had run twenty times. A caller-scoped fact rendered as a
+# row-level one is not merely unhelpful; it is false. THE FIX IS A SECOND FACT, NOT A WIDER
+# FIRST ONE — ``r.user_id = $1`` above stays byte-identical (DEC-08-B).
+#
+# ⚠ THE DISCLOSURE BUDGET, VERBATIM FROM DEC-08-A, AND IT IS OPERATOR-LOCKED. This bit may
+# reveal that SOMEBODY ran a workflow the caller CAN ALREADY SEE. It may reveal NOTHING ELSE:
+# **no count, no timestamp, no user id, no org id, no status** — ``EXISTS`` and nothing more.
+# A future edit that grows this constant a ``count(*)``, a ``MAX(created_at)``, a ``user_id``
+# or a ``status`` is a CROSS-TENANT DISCLOSURE, not an enhancement, and
+# ``test_library_run_facts.test_the_row_level_bit_discloses_existence_and_nothing_else``
+# sweeps this constant's VALUE (never the module source) to say so, with a synthetic positive
+# control. Re-open trigger for the trade itself: the first workflow row visible to a caller who
+# is not entitled to know it has been exercised at all.
+#
+# ⚠ WHY IT IS SAFE ON A WORLD-READABLE ROW. It is emitted ONLY for rows the caller can already
+# see, because it rides each feed's existing ``WHERE`` — and that predicate is untouched by
+# this change (the projection widens; the predicate does not, for the third phase running).
+#
+# ⚠ IT MUST LIVE IN THE OUTER PROJECTION, NEVER INSIDE THE LATERAL. Folded into
+# ``_LAST_RUN_LATERAL_SQL`` it would inherit ``r.user_id = $1`` and answer the same question
+# twice — the bug, restated as a fix. It binds NO placeholder, which is why branch B's
+# ``${len(params)}`` project filter is not renumbered (T-192.2-35, proved live rather than
+# assumed). The inner alias is ``r2``, never ``r``, so it cannot be misread as the lateral's
+# correlation name. ⚠ The correlation is ``wd.id`` — all four projection sites alias
+# ``workflow_definitions`` as ``wd``, and a MISCORRELATED ``EXISTS`` returns TRUE for EVERY
+# ROW, i.e. the exact opposite lie, looking green everywhere. NO INDEX, NO MIGRATION, NO NEW
+# COLUMN, NO NEW WRITE — same 228 rows, same recorded re-open trigger at ~10k runs.
+_HAS_ANY_RUN_SQL = (
+    "EXISTS (SELECT 1 FROM workflow_runs r2 WHERE r2.definition_id = wd.id) AS has_any_run "
+)
+
 # harness_audit.event_type CHECK (migration 059 = 9 kinds; migration 069 = +7 emit
 # kinds → 16; migration 070 = +6 judge/publish/policy/ask_user-approval kinds → 22;
 # migration 114 = +1 armed action-risk pause kind → 23; migration 117 = +1 send-receipt
@@ -371,10 +415,16 @@ async def list_published_workflows(
         # and ``LATERAL … LIMIT 1`` so no row multiplies, it reuses the ``$1`` bound below
         # rather than adding a placeholder, and it is owner-scoped so a world-readable global
         # row cannot leak another caller's activity. The full argument is on the constant.
+        #
+        # Phase 192.2 gap round 1 (CR-01): ``has_any_run`` joins the projection LAST — the
+        # existing columns, then the two CALLER-SCOPED run columns, then the one ROW-LEVEL
+        # bit. It is a projection-only ``EXISTS``: it binds no placeholder, touches no WHERE
+        # and no ORDER BY, and cannot move a row into or out of this result set.
         sql = (
             "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
-            "lr.last_run_at, lr.last_run_status "
-            "FROM workflow_definitions wd "
+            "lr.last_run_at, lr.last_run_status, "
+            + _HAS_ANY_RUN_SQL
+            + "FROM workflow_definitions wd "
             + _LAST_RUN_LATERAL_SQL
             + "WHERE status = 'published' AND created_by = $1"
         )
@@ -403,9 +453,18 @@ async def list_published_workflows(
             # 20 / 15 / 11 / 7 / 1 real runs belonging to ONE user. An unscoped lateral here
             # would be a cross-tenant read of run activity on a world-readable row. The
             # predicate itself is still byte-identical, and the join adds columns only.
+            #
+            # ⚠ Phase 192.2 gap round 1 (CR-01): ``has_any_run`` is appended here, and THIS IS
+            # THE BRANCH THE DEFECT WAS MEASURED ON. It returns the ``is_system_global`` rows
+            # to EVERY caller, and the five carrying 20 / 15 / 11 / 7 / 1 runs read an explicit
+            # "Never run" for everybody but the one user who ran them. The scoped pair stays
+            # scoped; the unscoped bit says only that SOMEBODY has — existence and nothing else
+            # (DEC-08-A). ⚠ It binds no placeholder, which is precisely why the ``$2`` project
+            # filter appended below is not renumbered.
             "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
-            "lr.last_run_at, lr.last_run_status "
-            "FROM workflow_definitions wd "
+            "lr.last_run_at, lr.last_run_status, "
+            + _HAS_ANY_RUN_SQL
+            + "FROM workflow_definitions wd "
             + _LAST_RUN_LATERAL_SQL
             + "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
@@ -579,10 +638,19 @@ async def list_starter_workflows(
     # a SUBQUERY's ordering, which is not this shelf's ordering. See the constant's own
     # comment; ``test_library_run_facts.test_the_starters_shelf_ordering_is_untouched``
     # re-pins both halves so neither is left to that coincidence.
+    #
+    # ⚠ Phase 192.2 gap round 1 (CR-01): ``has_any_run`` is appended here TOO, and this shelf
+    # is the reason the operator chose the row-level fact over rewording the caller-scoped one
+    # (DEC-08-A). It is WORLD-READABLE and it is the shelf a newcomer meets first: measured
+    # 2026-08-19 it is 3 rows, ONE of which has ever been run — so for every caller but that
+    # runner, LIB-06's own question (*does this one work*) went unanswered on the exact rows it
+    # most needed answering. ⚠ ``ORDER BY name`` and the three-clause WHERE stay byte-identical;
+    # the bit is projection-only and binds nothing.
     rows = await pool.fetch(
         "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
-        "lr.last_run_at, lr.last_run_status "
-        "FROM workflow_definitions wd "
+        "lr.last_run_at, lr.last_run_status, "
+        + _HAS_ANY_RUN_SQL
+        + "FROM workflow_definitions wd "
         + _LAST_RUN_LATERAL_SQL
         + "WHERE status = 'published' AND is_system_global = true "
         "AND definition->>'category' = 'starter' "
@@ -851,9 +919,19 @@ async def list_draft_workflows(pool: asyncpg.Pool, *, user_id: UUID) -> list[dic
         # The owner scope below is untouched and the lateral is scoped to the SAME ``$1``, so
         # this feed's answer cannot widen: a caller sees their own drafts and their own runs
         # of them, exactly as before plus two columns.
+        #
+        # ⚠ Phase 192.2 gap round 1 (CR-01): ``has_any_run`` is appended here for CONSISTENCY
+        # rather than because this shelf can lie the way the two published ones can — a draft
+        # is owner-scoped, so on this feed the caller IS the only person with runs and the bit
+        # agrees with ``last_run_at`` today. It is projected anyway because the library speaks
+        # ONE language across its three shelves, and because "today the two agree" is an
+        # UNSTATED invariant nothing enforces: the publish gauntlet's golden run is written by
+        # the run lifecycle, not by the shelf. ⚠ And it is a FOURTH time-shaped-adjacent fact
+        # that is NOT ``token`` and NOT ``updated_at``; see the paragraph above.
         f"SELECT id, slug, version, name, definition, {CONCURRENCY_TOKEN_SQL} AS token, updated_at, "
-        f"lr.last_run_at, lr.last_run_status "
-        f"FROM workflow_definitions wd "
+        f"lr.last_run_at, lr.last_run_status, "
+        + _HAS_ANY_RUN_SQL
+        + f"FROM workflow_definitions wd "
         + _LAST_RUN_LATERAL_SQL
         + f"WHERE status = 'draft' AND created_by = $1 "
         f"ORDER BY updated_at DESC, id DESC",

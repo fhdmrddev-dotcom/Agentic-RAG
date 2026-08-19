@@ -706,6 +706,230 @@ def test_the_source_accessors_are_not_vacuous():
     assert len(_lateral()) > 80
 
 
+# ══ GROUP B2 — the ROW-LEVEL run bit (CR-01, gap round 1) ══════════════════════════════
+#
+# ⚠ THE TWO FACTS ARE DIFFERENT QUESTIONS, AND THIS GROUP EXISTS BECAUSE THE DIFFERENCE WAS
+# SHIPPED AS A LIE. ``_LAST_RUN_LATERAL_SQL`` answers *have YOU run this* — it is scoped
+# ``r.user_id = $1``, that scope is the CORRECT security call, and GROUP B's T-10 fences over
+# it are untouched here. ``_HAS_ANY_RUN_SQL`` answers *has ANYBODY run this*. The card
+# rendered the caller-scoped NULL as though it were the row-level fact and printed an explicit
+# "Never run" about five ``is_system_global`` rows carrying 20 / 15 / 11 / 7 / 1 real runs —
+# rows that ``/starters`` and ``/published``'s global branch serve to EVERY caller who is not
+# the one user who ran them.
+#
+# ⚠ THE DISCLOSURE BUDGET IS THE HARDEST THING IN THIS GROUP AND IT IS OPERATOR-LOCKED
+# (DEC-08-A). ``has_any_run`` may reveal that SOMEBODY ran a workflow the caller CAN ALREADY
+# SEE. It may never reveal *who*, *when*, *how many* or *with what outcome*. EXISTS only — no
+# count, no timestamp, no user id, no org id, no status. The fence below is that budget made
+# executable, and it carries a SYNTHETIC POSITIVE CONTROL because a deny-list with nothing to
+# reject passes vacuously and looks identical to one that holds.
+
+
+def _has_any_run() -> str:
+    from app.db.workflows import _HAS_ANY_RUN_SQL
+
+    return _HAS_ANY_RUN_SQL
+
+
+# The budget, as data. Every needle is a REAL column on ``workflow_runs`` rather than a
+# hypothetical: ``user_id`` / ``org_id`` identify a person, ``created_at`` / ``updated_at`` are
+# when, ``status`` is the outcome, the aggregates are how many. ⚠ ``r2.id`` is here because
+# projecting the RUN's primary key hands out a handle to another tenant's run row.
+_DISCLOSURE_DENY = (
+    "user_id",
+    "org_id",
+    "created_at",
+    "updated_at",
+    "status",
+    "count(",
+    "max(",
+    "min(",
+    "array_agg",
+    "r2.id",
+)
+
+
+def _over_budget(sql: str) -> list[str]:
+    """The predicate the disclosure fence applies — FACTORED OUT so the positive control runs
+    the SAME code. A control that re-implements the check proves the control, not the check."""
+    lowered = sql.lower()
+    return [needle for needle in _DISCLOSURE_DENY if needle in lowered]
+
+
+def test_the_row_level_bit_discloses_existence_and_nothing_else():
+    """⚠ T-192.2-33 — THE HEADLINE RISK OF THIS CHANGE, as a fence over the constant's VALUE.
+
+    ⚠ IT SWEEPS ``_HAS_ANY_RUN_SQL`` ITSELF, NEVER THE MODULE SOURCE. The module legitimately
+    contains every one of these needles — ``r.user_id = $1`` is a dozen lines above — so a
+    needle pointed at the file would be judging something it was never written to judge: the
+    187-24 trap this subtree has now hit four times.
+
+    An edit that grows this constant a ``count(*)``, a ``MAX(created_at)``, a ``user_id`` or a
+    ``status`` turns a world-readable starter row into a cross-tenant read of another user's
+    activity. That is a disclosure, not an enhancement, and it reds here.
+    """
+    sql = _has_any_run()
+
+    # It IS an existence check …
+    assert "EXISTS" in sql.upper(), sql
+    assert "SELECT 1" in sql.upper(), sql
+    assert "AS has_any_run" in sql, sql
+    # … and it is nothing else.
+    assert _over_budget(sql) == [], sql
+
+    # ⚠ SYNTHETIC POSITIVE CONTROL — the detector really does reject what it claims to judge.
+    # Without these three the assertion above could hold because the predicate is broken.
+    assert _over_budget(
+        "EXISTS (SELECT 1 FROM workflow_runs r2 "
+        "WHERE r2.definition_id = wd.id AND r2.user_id IS NOT NULL) AS has_any_run "
+    ) == ["user_id"]
+    assert _over_budget(
+        "(SELECT count(*) FROM workflow_runs r2 WHERE r2.definition_id = wd.id) AS has_any_run "
+    ) == ["count("]
+    assert _over_budget(
+        "(SELECT max(r2.created_at) FROM workflow_runs r2 "
+        "WHERE r2.definition_id = wd.id) AS has_any_run "
+    ) == ["created_at", "max("]
+
+
+def test_the_row_level_bit_is_a_pure_read_that_binds_nothing_and_interpolates_nothing():
+    """T-192.2-35 + T-192.2-38, on the constant itself.
+
+    ⚠ THE ABSENCE OF ``$`` IS THE WHOLE REASON THIS SHAPE WAS CHOSEN. Branch B of
+    ``list_published_workflows`` appends its project filter as ``${len(params)}`` AFTER the
+    join; a projection that bound a placeholder would renumber it silently — the classic break
+    this repository has already recorded. An ``EXISTS`` in a SELECT list binds nothing.
+    """
+    sql = _has_any_run()
+
+    assert "$" not in sql, sql
+    assert "{" not in sql and "%" not in sql, sql
+    for statement_head in (
+        "INSERT INTO",
+        "UPDATE ",
+        "DELETE FROM",
+        "ALTER TABLE",
+        "CREATE ",
+        "DROP ",
+    ):
+        assert statement_head not in sql.upper(), statement_head
+    # POSITIVE CONTROL for the write-verb needles — they are statement HEADS, not bare verbs,
+    # for the reason ``test_no_migration_was_added_by_this_phase`` records.
+    assert "CREATE " in "CREATE INDEX idx ON workflow_runs (definition_id)".upper()
+    assert sql.endswith(" "), "it concatenates, like the constant beside it"
+
+
+def test_the_row_level_bit_correlates_on_the_OUTER_definition_row():
+    """⚠ A MISCORRELATED ``EXISTS`` RETURNS **TRUE FOR EVERY ROW**.
+
+    That failure claims every workflow has been run by somebody — the exact OPPOSITE lie to the
+    one this change repairs — and it looks green everywhere, because a feed on which every card
+    says "somebody ran this" is indistinguishable from a working one without data.
+
+    The correlation is ``r2.definition_id = wd.id``, and ``wd`` is the alias every one of the
+    four projection sites gives ``workflow_definitions`` (asserted below, per site). The inner
+    table is aliased ``r2``, never ``r``, so it cannot be confused at a glance with the
+    owner-scoped lateral's correlation name. GROUP C carries the other half of this proof: a
+    definition with NO runs must come back ``False`` at each of the four sites.
+    """
+    sql = _has_any_run()
+
+    assert "r2.definition_id = wd.id" in sql, sql
+    assert "workflow_runs r2" in sql, sql
+    # The lateral's own alias is untouched, and the two names are distinct.
+    assert "workflow_runs r " in _lateral(), _lateral()
+
+    for name, source in (
+        ("published", _published_source()),
+        ("starter", _starter_source()),
+        ("draft", _draft_source()),
+    ):
+        assert "FROM workflow_definitions wd " in _code_only(source), name
+
+
+def test_the_row_level_bit_is_projected_at_ALL_FOUR_SITES():
+    """The dropped-column guard, and the fifth-feed guard.
+
+    FOUR sites, THREE functions — ``list_published_workflows`` builds two SELECT lists. A feed
+    added later without the column reds here rather than silently answering the old, false way.
+
+    Read from the STRIPPED source so a comment that merely NAMES the constant cannot inflate
+    the count; the comments this change added do exactly that.
+    """
+    total = 0
+    for name, source, count in (
+        ("published", _published_source(), 2),
+        ("starter", _starter_source(), 1),
+        ("draft", _draft_source(), 1),
+    ):
+        code = _code_only(source)
+        assert code.count("_HAS_ANY_RUN_SQL") == count, name
+        total += count
+
+    assert total == 4
+
+    # ONE definition, not four copies — the argument the lateral's docblock already makes.
+    from app.db import workflows as db
+
+    assert inspect.getsource(db).count("_HAS_ANY_RUN_SQL = (") == 1
+
+
+def test_the_projection_order_puts_the_row_level_bit_LAST():
+    """Existing columns, then the two CALLER-SCOPED run columns, then the one ROW-LEVEL bit.
+
+    Not a style rule: the wire reads ``last_run_at`` / ``last_run_status`` / ``has_any_run`` in
+    that order on every feed, and a reader comparing SQL to model should not have to re-sort
+    them mentally to see that the scoped pair and the unscoped bit are different facts.
+    """
+    for name, source in (
+        ("published", _published_source()),
+        ("starter", _starter_source()),
+        ("draft", _draft_source()),
+    ):
+        code = _code_only(source)
+        assert code.index("lr.last_run_at") < code.index("lr.last_run_status"), name
+        assert code.index("lr.last_run_status") < code.index("_HAS_ANY_RUN_SQL"), name
+
+
+def test_the_placeholder_numbering_is_PROVED_unchanged():
+    """⚠ T-192.2-35 — PROVED, not assumed, because parameter renumbering is the classic silent
+    break and the review verified the current numbering is sound (so a regression here is NEW).
+
+    The counts are measured on the pre-change tip and pinned verbatim:
+    ``list_published_workflows`` **3** ``$`` (a ``$1`` in each of the two branches plus the
+    ``${len(params)}`` project filter); ``list_starter_workflows`` **0** — its only ``$1``
+    lives in the shared lateral, not in its own source; ``list_draft_workflows`` **1**.
+    """
+    for name, source, dollars, ones in (
+        ("published", _published_source(), 3, 2),
+        ("starter", _starter_source(), 0, 0),
+        ("draft", _draft_source(), 1, 1),
+    ):
+        code = _code_only(source)
+        assert code.count("$") == dollars, f"{name}: placeholder count moved"
+        assert code.count("$1") == ones, name
+
+    # Branch B's filter is still appended AFTER the join and still derived from the params
+    # list — so it is still ``$2`` at runtime. ``test_the_project_filter_still_binds_as_two``
+    # in GROUP C binds it for real against the live database.
+    published = _code_only(_published_source())
+    assert "params: list = [user_id]" in published
+    assert "definition->>'project_folder_id' = ${len(params)}" in published
+
+
+def test_the_owner_scope_on_the_lateral_is_STILL_byte_identical():
+    """⚠ DEC-08-B / T-192.2-34, re-pinned in THIS group deliberately.
+
+    GROUP B already asserts this. It is stated again here because this group is where an
+    "obvious simplification" would be attempted — the two constants sit one above the other and
+    they ask different questions on purpose. Dropping ``r.user_id = $1`` to make them agree
+    hands every caller another user's run timestamps on a world-readable row.
+    """
+    assert "WHERE r.definition_id = wd.id AND r.user_id = $1 " in _lateral()
+    # And the new constant did NOT inherit that scope — which is the point of it existing.
+    assert "user_id" not in _has_any_run()
+
+
 # ══ GROUP C — LIVE, READ-ONLY, against the local database ══════════════════════════════
 #
 # The properties below cannot be proved by a source fence: "the same rows, in the same order"
@@ -977,5 +1201,185 @@ async def test_the_starters_shelf_carries_run_facts_for_the_caller_who_ran_one()
                 assert row["last_run_status"] is None, row["slug"]
             else:
                 assert row["last_run_status"] is not None, row["slug"]
+    finally:
+        await pool.close()
+
+
+# ══ GROUP C2 — LIVE: the row-level bit, per site, on the data CR-01 was measured on ════
+#
+# ⚠ THESE ARE THE ASSERTIONS THAT PROVE THE FIX RATHER THAN THE PLUMBING. A source fence can
+# show the constant is present at four sites; only real rows can show it answers a DIFFERENT
+# question from the lateral beside it, and that it is not miscorrelated into a constant TRUE.
+# Still READ-ONLY: zero INSERT / UPDATE / DELETE / DDL, so a concurrent worktree is unaffected.
+
+
+@live
+async def test_the_row_level_bit_is_TRUE_where_the_caller_scoped_facts_are_NULL():
+    """⚠ **THE CR-01 SHAPE ITSELF**, live, on a real world-readable row with real runs.
+
+    ``has_any_run=true`` **with** ``last_run_at=null`` is the pair the card must learn to read.
+    It is exactly the state that made the shipped surface print an explicit "Never run" about a
+    workflow that had run twenty times, for every caller who is not the one user who ran it.
+
+    ⚠ IT CARRIES ITS OWN POSITIVE CONTROL, on the SAME rows: the real runner sees both scoped
+    facts populated, so the stranger's nulls cannot pass because the lateral is simply broken.
+
+    Follows IN-01's lesson from the review — if the local database currently holds no row in
+    this state, SKIP with the reason stated. A data-dependent assertion that reds on a
+    defect-free tree is worse than a skipped one.
+    """
+    from app.db.workflows import list_published_workflows
+
+    pool = await _pool()
+    try:
+        me = await _the_user_who_runs_things(pool)
+        stranger = uuid4()
+
+        globals_with_runs = await pool.fetch(
+            "SELECT DISTINCT d.id FROM workflow_definitions d "
+            "JOIN workflow_runs r ON r.definition_id = d.id "
+            "WHERE d.status = 'published' AND d.is_system_global = true "
+            "AND r.user_id = $1",
+            me,
+        )
+        target_ids = {r["id"] for r in globals_with_runs}
+        if not target_ids:
+            pytest.skip(
+                "no is_system_global published row currently carries a run — the CR-01 "
+                "state does not exist in this database, so it cannot be characterized"
+            )
+
+        mine = {r["id"]: r for r in await list_published_workflows(pool, user_id=me)}
+        theirs = {
+            r["id"]: r for r in await list_published_workflows(pool, user_id=stranger)
+        }
+
+        for def_id in target_ids:
+            # POSITIVE CONTROL — the runner sees the scoped facts on this very row.
+            assert mine[def_id]["last_run_at"] is not None, def_id
+            assert mine[def_id]["has_any_run"] is True, def_id
+
+            # ⚠ THE ASSERTION. The stranger still sees the ROW (visibility did not narrow),
+            # still inherits NOTHING scoped (visibility did not widen) — and now learns the
+            # one honest row-level bit instead of being told nobody ever ran it.
+            assert def_id in theirs, f"{def_id} vanished for a second caller"
+            assert theirs[def_id]["last_run_at"] is None, def_id
+            assert theirs[def_id]["last_run_status"] is None, def_id
+            assert theirs[def_id]["has_any_run"] is True, def_id
+    finally:
+        await pool.close()
+
+
+@live
+async def test_a_definition_with_NO_runs_is_FALSE_at_every_one_of_the_four_sites():
+    """⚠ THE ANTI-MISCORRELATION PROOF, and it must hold PER SITE.
+
+    An ``EXISTS`` whose correlation is wrong returns TRUE for every row — a feed on which every
+    card claims somebody ran it. That failure is invisible to any test that only looks at rows
+    which DO have runs, so this one looks only at rows that do NOT, at all four projection
+    sites: ``/published`` branch A (``owned_only``), branch B (the global branch),
+    ``/starters`` and ``/drafts``.
+
+    Each site's ``False`` is verified against ``workflow_runs`` directly rather than inferred
+    from the projection under test.
+    """
+    from app.db.workflows import (
+        list_draft_workflows,
+        list_published_workflows,
+        list_starter_workflows,
+    )
+
+    pool = await _pool()
+    try:
+        me = await _the_user_who_runs_things(pool)
+
+        sites = (
+            ("published/branch-A", await list_published_workflows(pool, user_id=me, owned_only=True)),
+            ("published/branch-B", await list_published_workflows(pool, user_id=me)),
+            ("starters", await list_starter_workflows(pool, user_id=me)),
+            ("drafts", await list_draft_workflows(pool, user_id=me)),
+        )
+
+        exercised = 0
+        for label, rows in sites:
+            assert rows, f"{label}: the feed is empty — nothing to characterize"
+            # Every row's bit agrees with the table, both ways.
+            for row in rows:
+                truth = await pool.fetchval(
+                    "SELECT EXISTS (SELECT 1 FROM workflow_runs WHERE definition_id = $1)",
+                    row["id"],
+                )
+                assert row["has_any_run"] == truth, f"{label}: {row['slug']}"
+
+            never = [r for r in rows if r["has_any_run"] is False]
+            assert never, (
+                f"{label}: EVERY row reports has_any_run=true — the correlation may be wrong, "
+                "which is the failure that claims the opposite lie"
+            )
+            exercised += 1
+
+        assert exercised == 4
+    finally:
+        await pool.close()
+
+
+@live
+async def test_the_row_level_bit_and_the_scoped_facts_DISAGREE_on_the_starters_shelf():
+    """The shelf a newcomer meets first, and the one LIB-06 exists for.
+
+    Measured 2026-08-19: 3 curated rows, exactly ONE with a run. For a caller who is not the
+    runner, that row must read ``has_any_run=true`` / ``last_run_at=null`` — *somebody ran it,
+    and it was not you* — while the other two read ``false`` / ``null``, which is the only row
+    state on this shelf that honestly earns the words "never run".
+    """
+    from app.db.workflows import list_starter_workflows
+
+    pool = await _pool()
+    try:
+        stranger = uuid4()
+        rows = await list_starter_workflows(pool, user_id=stranger)
+
+        assert rows, "the starters shelf is empty — nothing to characterize"
+        disagreeing = [
+            r for r in rows if r["has_any_run"] is True and r["last_run_at"] is None
+        ]
+        if not disagreeing:
+            pytest.skip(
+                "no starter row has been run by anybody — the CR-01 disagreement does not "
+                "exist on this shelf in this database"
+            )
+        for row in disagreeing:
+            assert row["last_run_status"] is None, row["slug"]
+        # POSITIVE CONTROL — the shelf also carries rows nobody has run, so the bit is not
+        # simply constant across this feed.
+        assert any(r["has_any_run"] is False for r in rows), rows
+    finally:
+        await pool.close()
+
+
+@live
+async def test_the_project_filter_still_binds_as_two():
+    """⚠ T-192.2-35, PROVED AGAINST POSTGRES rather than against the source text.
+
+    Branch B appends ``AND definition->>'project_folder_id' = $2`` AFTER the join. If the new
+    projection had bound a placeholder, this call would raise on the binding — asyncpg does not
+    silently tolerate a parameter-count mismatch. The row set is irrelevant; the fact that the
+    statement PREPARES and EXECUTES with exactly two parameters is the assertion.
+    """
+    from app.db.workflows import list_published_workflows
+
+    pool = await _pool()
+    try:
+        me = await _the_user_who_runs_things(pool)
+
+        unfiltered = await list_published_workflows(pool, user_id=me)
+        filtered = await list_published_workflows(
+            pool, user_id=me, project_folder_id=uuid4()
+        )
+
+        assert unfiltered, "the published feed is empty — nothing to characterize"
+        # A random folder id matches nothing, which is the point: the filter BOUND and APPLIED.
+        assert filtered == []
+        assert len(filtered) < len(unfiltered)
     finally:
         await pool.close()
