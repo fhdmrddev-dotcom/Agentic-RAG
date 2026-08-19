@@ -244,8 +244,20 @@ describe("T-05 — the seam does not leak impurity", () => {
 describe("the face carries the run truth, and it is the resolver's — not a second copy", () => {
   const DAY = 24 * 60 * 60 * 1000
   const at = (msAgo: number) => new Date(FIXTURE_NOW - msAgo).toISOString()
-  const faceOf = (lastRunStatus: string | null | undefined, lastRunAt: string | null | undefined) =>
-    cardFace(libraryRowOf({ lastRunStatus, lastRunAt }), FIXTURE_NOW)
+  /**
+   * ⚠ WIDENED BY `192.2-11` (CR-01), DEFAULTING TO `hasAnyRun: false` FOR THE SAME REASON
+   * `runFacts.test.ts`'s `rowWith` does. The `never` arm now fires only on an AFFIRMED
+   * `has_any_run === false`, so a case meaning *"the backend looked and there is no run"* must
+   * say so; an absent bit resolves to `unknown` (DEC-11-B). The default preserves each existing
+   * case's INTENT instead of silently re-pointing it at a different arm. **No code in
+   * `cardFace.ts` changed** — it hands `RunFact` over whole — so this file's job is unchanged:
+   * prove the face does not undo what the resolver decided.
+   */
+  const faceOf = (
+    lastRunStatus: string | null | undefined,
+    lastRunAt: string | null | undefined,
+    hasAnyRun: boolean | null | undefined = false,
+  ) => cardFace(libraryRowOf({ lastRunStatus, lastRunAt, hasAnyRun }), FIXTURE_NOW)
 
   it.each([
     ["completed", "worked", `${RUN_WORKED} 2 days ago`] as const,
@@ -282,6 +294,33 @@ describe("the face carries the run truth, and it is the resolver's — not a sec
       expect(face.runWord).not.toContain(RUN_WORKED)
       expect("outcome" in face.run).toBe(false)
     }
+  })
+
+  it("192.2-11 (CR-01) — ARM 4 reaches the face WHOLE, and the face re-derives nothing", () => {
+    // The fourth arm arrived through the TYPE. `cardFace.ts` never switches on `RunFact`, so
+    // this case would have passed on the day the arm landed with zero edits to the module — and
+    // asserting it is how that property is held rather than assumed. A face that had grown its
+    // own `runWord` fallback (`run.word ?? RUN_UNKNOWN`, say) would red here.
+    const face = faceOf(null, null, true)
+    expect(face).toMatchObject({ run: { kind: "not-by-you" }, runWord: RUN_NOT_BY_YOU })
+    // …and it carries no outcome and no time, so nothing downstream can render one.
+    expect("outcome" in face.run).toBe(false)
+    expect("when" in face.run).toBe(false)
+    // The three absence arms reach the face as THREE, not two — DEC-11-B one layer up.
+    //
+    // ⚠ THE ABSENT CASE GOES THROUGH `cardFace` DIRECTLY, NOT THROUGH `faceOf`, AND THAT IS
+    // MEASURED RATHER THAN STYLISTIC. A DEFAULT PARAMETER FIRES ON AN EXPLICIT `undefined`, so
+    // `faceOf(null, null, undefined)` silently becomes `hasAnyRun: false` and this assertion
+    // read `['never','not-by-you','never']` on its first run. That is the SAME absence-destroying
+    // shape `192.2-10` recorded for `?? false` — `true` and `false` survive it and only
+    // `null`/`undefined` are destroyed — met here through a different door.
+    const absent = cardFace(
+      libraryRowOf({ lastRunStatus: null, lastRunAt: null, hasAnyRun: undefined }),
+      FIXTURE_NOW,
+    )
+    const kinds = [faceOf(null, null, false), face, absent].map((f) => f.run.kind)
+    expect(kinds).toEqual(["never", "not-by-you", "unknown"])
+    expect(new Set(kinds).size).toBe(3)
   })
 
   it("an unrecognised status reaches the face as unknown, never as a tick", () => {

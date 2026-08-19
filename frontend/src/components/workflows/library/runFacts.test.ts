@@ -45,9 +45,23 @@ const at = (msAgo: number) => new Date(FIXTURE_NOW - msAgo).toISOString()
 const codeOnly = (source: string): string =>
   source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^[ \t]*\/\/[^\n]*$/gm, "")
 
-/** One row carrying exactly the two run fields under test, and nothing else that matters. */
-const rowWith = (lastRunStatus: string | null | undefined, lastRunAt: string | null | undefined) =>
-  libraryRowOf({ lastRunStatus, lastRunAt })
+/**
+ * One row carrying exactly the ~~two~~ THREE run fields under test, and nothing else that matters.
+ *
+ * ⚠ WIDENED BY `192.2-11` (CR-01), AND THE DEFAULT IS DELIBERATELY `false` RATHER THAN ABSENT.
+ * The `never` arm gained a PRECONDITION in that plan — it fires only on an affirmed
+ * `has_any_run === false` — so a case that means *"the backend looked and there is no run"* must
+ * now SAY so, exactly as the wire does. The cases below that pass `(null, null)` and expect
+ * `never` were written before the bit existed and read `undefined`, which now resolves to
+ * `unknown` (DEC-11-B); defaulting HERE keeps their intent intact rather than silently changing
+ * what each one asserts. The stale-deploy shape — `hasAnyRun` genuinely ABSENT — is exercised
+ * explicitly in §9, which passes `undefined` on purpose.
+ */
+const rowWith = (
+  lastRunStatus: string | null | undefined,
+  lastRunAt: string | null | undefined,
+  hasAnyRun: boolean | null | undefined = false,
+) => libraryRowOf({ lastRunStatus, lastRunAt, hasAnyRun })
 
 // ── 1 · the three arms exist, and each says what happened ────────────────────────────
 
@@ -459,12 +473,142 @@ describe("192.2-10 — RUN_NOT_BY_YOU, the word for *somebody ran this, and it w
     expect(/[0-9]/.test(RUN_NOT_BY_YOU)).toBe(false)
   })
 
-  it("`runFacts.ts` does NOT yet consume it — 192.2-11 owns the arm, and that is deliberate", () => {
-    // Recorded as a PROPERTY rather than left as an absence a reader must infer. Adding the
-    // fourth member to `RunFact` makes `runGutterOf` in `WorkflowCard.tsx` non-total, which is a
-    // typecheck error BY DESIGN; splitting the field and the word out keeps every commit in
-    // 192.2-10 green and lets 192.2-11 land the union member and its two colour maps atomically.
-    expect(runFactsSource).not.toContain("RUN_NOT_BY_YOU")
-    expect(runFactsSource).not.toContain("not-by-you")
+  it("⚠ FLIPPED BY 192.2-11 — `runFacts.ts` NOW consumes it, and the word is IMPORTED", () => {
+    // ⚠ THE ORIGINAL ASSERTION IS PRESERVED HERE RATHER THAN DELETED, because a flipped pin
+    // that leaves no trace reads exactly like a pin that never existed. 192.2-10 shipped:
+    //
+    //     expect(runFactsSource).not.toContain("RUN_NOT_BY_YOU")
+    //     expect(runFactsSource).not.toContain("not-by-you")
+    //
+    // …with the reasoning that adding the fourth member to `RunFact` makes `runGutterOf` in
+    // `WorkflowCard.tsx` non-total, which is a typecheck error BY DESIGN — so splitting the
+    // field and the word out kept every 192.2-10 commit green and let 192.2-11 land the union
+    // member and its two colour maps ATOMICALLY. That happened, in one commit, and this is the
+    // plan the pin named. The assertion is now INVERTED, never weakened: it still says exactly
+    // one thing about the source, and it would still red if the wiring were reverted.
+    expect(runFactsSource).toContain("RUN_NOT_BY_YOU")
+    expect(runFactsSource).toContain("not-by-you")
+    // …and the word arrives by IMPORT, never re-spelled. `codeOnly` strips comments first, so
+    // the ⚠ paragraphs that quote the arm name cannot satisfy this (the 187-24 trap).
+    expect(codeOnly(runFactsSource)).toContain("RUN_NOT_BY_YOU,")
+    expect(codeOnly(runFactsSource)).not.toContain(`"${RUN_NOT_BY_YOU}"`)
+  })
+})
+
+// ── 9 · 192.2-11 (CR-01): the FOURTH ARM's RESOLUTION — the whole point of the plan ────────
+
+describe("192.2-11 (CR-01) — `never` gains a precondition, and the case it swallowed gets a word", () => {
+  /** The row under test, carrying all THREE run fields the resolver may read. */
+  const rowOfRun = (
+    lastRunStatus: string | null | undefined,
+    lastRunAt: string | null | undefined,
+    hasAnyRun: boolean | null | undefined,
+  ) => libraryRowOf({ lastRunStatus, lastRunAt, hasAnyRun })
+
+  /** The four values `hasAnyRun` can hold. DEC-11-B turns on these NOT collapsing to two. */
+  const HAS_ANY_RUN_VALUES = [true, false, null, undefined] as const
+
+  it("⚠ THE HEADLINE — `null` status + `hasAnyRun: true` says `Run by someone else`, NOT `Never run`", () => {
+    // This is CR-01 in one assertion. The shipped card printed *"Never run"* about a
+    // `/starters` row that had really run, because the `last_run_*` lateral is OWNER-SCOPED and
+    // world-readable rows are served to callers who have never run them. Measured by 192.2-08:
+    // 1 of 3 starter rows and 5 of 92 published rows were affected.
+    const fact = runFacts(rowOfRun(null, null, true), FIXTURE_NOW)
+    expect(fact).toEqual<RunFact>({ kind: "not-by-you", word: RUN_NOT_BY_YOU })
+    expect(fact.word).not.toBe(RUN_NEVER)
+  })
+
+  it("`null` status + `hasAnyRun: false` still says `Never run` — the arm is narrowed, not removed", () => {
+    expect(runFacts(rowOfRun(null, null, false), FIXTURE_NOW)).toEqual<RunFact>({
+      kind: "never",
+      word: RUN_NEVER,
+    })
+  })
+
+  it("⚠ DEC-11-B — `null` status + hasAnyRun ABSENT is `unknown`, NEVER `never`", () => {
+    // The operator's locked four arms name `has_any_run = true` and `= false`. They do NOT name
+    // ABSENT. *Never run* is an AFFIRMATIVE row-level claim and an absent bit is not a fact we
+    // hold: we know the CALLER has no run and we do not know whether anybody does — which is
+    // exactly what `unknown` already means. A frontend running ahead of its backend therefore
+    // degrades to the QUIETER sentence, which is the direction D-08 already chose.
+    const absent = runFacts(rowOfRun(null, null, undefined), FIXTURE_NOW)
+    expect(absent).toEqual<RunFact>({ kind: "unknown", word: RUN_UNKNOWN })
+    expect(absent.kind).not.toBe("never")
+
+    const nulled = runFacts(rowOfRun(null, null, null), FIXTURE_NOW)
+    expect(nulled).toEqual<RunFact>({ kind: "unknown", word: RUN_UNKNOWN })
+    expect(nulled.kind).not.toBe("never")
+  })
+
+  it("⚠ T-192.2-47 — the four `hasAnyRun` values reach THREE arms, not two", () => {
+    // The threat stated as arithmetic. A truthiness test (`if (row.hasAnyRun)`) folds `false`,
+    // `null` and `undefined` into ONE answer, so it would produce TWO distinct arms here and
+    // would re-ship CR-01 for the stale-backend case. Only explicit `=== true` / `=== false`
+    // produces three.
+    const arms = HAS_ANY_RUN_VALUES.map((v) => runFacts(rowOfRun(null, null, v), FIXTURE_NOW).kind)
+    expect(arms).toEqual(["not-by-you", "never", "unknown", "unknown"])
+    expect(new Set(arms).size).toBe(3)
+    // …and the source really does compare explicitly, swept with comments stripped.
+    expect(codeOnly(runFactsSource)).toContain("row.hasAnyRun === true")
+    expect(codeOnly(runFactsSource)).toContain("row.hasAnyRun === false")
+  })
+
+  it("⚠ T-192.2-48 — rule 1 STILL short-circuits: `undefined` status wins over every `hasAnyRun`", () => {
+    // The stale-deploy case must not fall through to anything that reads the new field. If a
+    // later edit moved the `hasAnyRun` tests ABOVE the `status === undefined` return, this reds.
+    for (const v of HAS_ANY_RUN_VALUES) {
+      expect(runFacts(rowOfRun(undefined, undefined, v), FIXTURE_NOW)).toEqual<RunFact>({
+        kind: "unknown",
+        word: RUN_UNKNOWN,
+      })
+    }
+    // …including the pathological pair a real skew cannot produce but a hand-built row can.
+    expect(runFacts(rowOfRun(undefined, at(DAY), true), FIXTURE_NOW).kind).toBe("unknown")
+  })
+
+  it("a REAL run outranks the new field — `hasAnyRun: false` cannot override a terminal status", () => {
+    // The bit is a row-level EXISTS, and the caller's own run is stronger evidence than it. A
+    // resolver that consulted `hasAnyRun` before the status would erase somebody's own run.
+    const fact = runFacts(rowOfRun("completed", at(2 * DAY), false), FIXTURE_NOW)
+    expect(fact.kind).toBe("ran")
+    expect(fact.word).toContain(RUN_WORKED)
+    // …and an unrecognised status is still `unknown`, not `never`, whatever the bit says.
+    expect(runFacts(rowOfRun("who-knows", null, false), FIXTURE_NOW).kind).toBe("unknown")
+    expect(runFacts(rowOfRun("who-knows", null, true), FIXTURE_NOW).kind).toBe("unknown")
+  })
+
+  it("all FOUR arms carry a non-empty word — asserted as a property, not four literals", () => {
+    const everyArm: RunFact[] = [
+      runFacts(rowOfRun("completed", at(DAY), false), FIXTURE_NOW),
+      runFacts(rowOfRun(null, null, false), FIXTURE_NOW),
+      runFacts(rowOfRun(null, null, true), FIXTURE_NOW),
+      runFacts(rowOfRun(undefined, undefined, undefined), FIXTURE_NOW),
+    ]
+    // Non-vacuity: these really are the four DISTINCT arms, not one arm four times.
+    expect(new Set(everyArm.map((f) => f.kind))).toEqual(
+      new Set(["ran", "never", "not-by-you", "unknown"]),
+    )
+    for (const fact of everyArm) expect(fact.word.trim().length).toBeGreaterThan(2)
+    // …and the four words are four DIFFERENT sentences.
+    expect(new Set(everyArm.map((f) => f.word)).size).toBe(4)
+  })
+
+  it("no ABSENCE arm is structurally readable as a run — none carries `outcome` or `when`", () => {
+    // T-14 held by the TYPE rather than by a convention: a consumer cannot reach an outcome or
+    // a time through `never` / `not-by-you` / `unknown` even by mistake.
+    const quiet = [
+      runFacts(rowOfRun(null, null, false), FIXTURE_NOW),
+      runFacts(rowOfRun(null, null, true), FIXTURE_NOW),
+      runFacts(rowOfRun(undefined, undefined, undefined), FIXTURE_NOW),
+    ]
+    for (const fact of quiet) {
+      expect(Object.keys(fact).sort()).toEqual(["kind", "word"])
+      expect("outcome" in fact).toBe(false)
+      expect("when" in fact).toBe(false)
+    }
+    // …and a `lastRunAt` sitting on the row cannot leak into any of them.
+    const withStrayTime = runFacts(rowOfRun(null, at(DAY), true), FIXTURE_NOW)
+    expect(Object.keys(withStrayTime).sort()).toEqual(["kind", "word"])
+    expect(withStrayTime.word).not.toContain("ago")
   })
 })

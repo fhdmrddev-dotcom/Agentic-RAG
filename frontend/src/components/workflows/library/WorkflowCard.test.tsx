@@ -1499,11 +1499,26 @@ describe("the shipped surface survives the 14th atom at scale", () => {
 // shipped root testid and read by what they SAY; nothing here uses `getElementById`, which is
 // the rule Phase 192's own re-drive broke — the reason its UAT proved the code and not the task.
 
-/** The five arms as ROWS: same name, same version, same everything but the run. */
+/**
+ * The arms as ROWS: same name, same version, same everything but the run.
+ *
+ * ⚠ `hasAnyRun` ADDED BY `192.2-11` (CR-01), DEFAULTING TO `false`. The `never` arm gained a
+ * PRECONDITION in that plan — it fires only on an AFFIRMED `has_any_run === false` — so a row
+ * that means *never run* must now say so, exactly as the wire does; an ABSENT bit resolves to
+ * `unknown` (DEC-11-B). The default preserves the intent of the rows written before the bit
+ * existed rather than silently re-pointing them at a different arm, and the fourth-arm cases
+ * below pass `true` explicitly.
+ *
+ * ⚠ A DEFAULT PARAMETER FIRES ON AN EXPLICIT `undefined`, so this helper CANNOT express the
+ * absent-bit row: any case needing it builds the row through `rowOf` directly. Measured in
+ * `cardFace.test.ts`, not reasoned about — the same absence-destroying shape `192.2-10`
+ * recorded for `?? false`.
+ */
 const runRowOf = (
   id: string,
   lastRunStatus: string | null | undefined,
   lastRunAt: string | null | undefined,
+  hasAnyRun: boolean = false,
 ): LibraryRow =>
   rowOf("published", {
     id,
@@ -1511,6 +1526,7 @@ const runRowOf = (
     name: "Compliance Gap Report",
     lastRunStatus,
     lastRunAt,
+    hasAnyRun,
     source: {
       id,
       slug: `compliance-gap-${id}`,
@@ -1521,10 +1537,17 @@ const runRowOf = (
 const DAY_MS = 86_400_000
 const iso = (msAgo: number) => new Date(FIXTURE_NOW - msAgo).toISOString()
 
-/** The three rows the operator would be triaging: one worked, one failed, one never ran. */
+/**
+ * The rows the operator would be triaging: one worked, one failed, one never ran — and, since
+ * `192.2-11` (CR-01), one that SOMEBODY ELSE ran. `NOT_BY_YOU` is the shape the shipped card got
+ * wrong: an owner-scoped `last_run_*` lateral returns nothing for a caller who has not run a row,
+ * so a world-readable row that has really run arrived with `null` status and used to be printed
+ * as never-run. It is `hasAnyRun: true` with a `null` status BY CONSTRUCTION.
+ */
 const WORKED = runRowOf("gap-worked", "completed", iso(2 * DAY_MS))
 const FAILED = runRowOf("gap-failed", "failed", iso(40 * DAY_MS))
-const NEVER = runRowOf("gap-never", null, null)
+const NEVER = runRowOf("gap-never", null, null, false)
+const NOT_BY_YOU = runRowOf("gap-not-by-you", null, null, true)
 
 /** Line 2's text for one rendered card — the SLOT, read as a person reads it. */
 const answerText = (card: HTMLElement): string =>
@@ -1573,6 +1596,11 @@ describe("LIB-06 — three same-named rows are told apart by their run, in words
     expect(WORKED.lastRunStatus).toBe("completed")
     expect(FAILED.lastRunStatus).toBe("failed")
     expect(NEVER.lastRunStatus).toBeNull()
+    // ⚠ 192.2-11 (CR-01): `null` status is no longer sufficient to name the arm — the row-level
+    // bit picks between `never` and `not-by-you`, so the control has to see it too.
+    expect(NEVER.hasAnyRun).toBe(false)
+    expect(NOT_BY_YOU.lastRunStatus).toBeNull()
+    expect(NOT_BY_YOU.hasAnyRun).toBe(true)
   })
 
   it("SC — the three cards are MUTUALLY DISTINGUISHABLE by their visible text", () => {
@@ -1635,7 +1663,14 @@ describe("D-08 — the three arms on the card, and `unknown` is not `never` (T-2
     // CONTEXT `<measurements>`: 81 of 117 rows are drafts, and a draft has by definition never
     // been run (a draft cannot be Run at all — the page's own contract). This is the sentence
     // the majority of the operator's library will carry.
-    const draft = rowOf("draft", { id: "d-never", lastRunStatus: null, lastRunAt: null })
+    // ⚠ `hasAnyRun: false` ADDED BY 192.2-11 (CR-01). A draft nobody has ever run is exactly
+    // the row the wire now affirms, and the arm requires that affirmation.
+    const draft = rowOf("draft", {
+      id: "d-never",
+      lastRunStatus: null,
+      lastRunAt: null,
+      hasAnyRun: false,
+    })
     const { card } = renderCard(draft, { now: FIXTURE_NOW })
     expect(answerText(card)).toContain(RUN_NEVER)
     expect(answerText(card)).toContain(STATE_DRAFT)

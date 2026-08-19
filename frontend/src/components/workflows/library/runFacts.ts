@@ -8,14 +8,39 @@
  * answerable for 14%. That measurement is why the run truth earned a line on a card this
  * phase is otherwise SUBTRACTING from.
  *
- * ── THREE ARMS, AND A BOOLEAN CANNOT EXPRESS THEM (D-08, T-13) ───────────────────────────
+ * ── ~~THREE~~ FOUR ARMS, AND A BOOLEAN CANNOT EXPRESS THEM (D-08, T-13) ──────────────────
  * This is the whole design, and it is the single most likely place to ship a lie:
  *
- *   · `ran`     — it ran, and here is what happened. `worked` / `failed` / `stopped`.
- *   · `never`   — THE BACKEND LOOKED AND THERE IS NO RUN. The never-run arm; a real,
- *                 affirmative fact about the row, and the commonest one on a 69%-draft shelf.
- *   · `unknown` — THE WIRE DID NOT SAY. A frontend deployed AHEAD of its backend receives rows
- *                 with no run keys at all, and this arm is what it renders.
+ *   · `ran`        — it ran, and here is what happened. `worked` / `failed` / `stopped`.
+ *   · `never`      — THE BACKEND LOOKED AND THERE IS NO RUN, **ANYWHERE ON THE ROW**. The
+ *                    never-run arm, and the commonest one on a 69%-draft shelf.
+ *   · `not-by-you` — SOMEBODY RAN IT AND IT WAS NOT YOU. Added by `192.2-11`; see the ⚠
+ *                    CR-01 paragraph below, which is the reason this arm exists at all.
+ *   · `unknown`    — THE WIRE DID NOT SAY. A frontend deployed AHEAD of its backend receives
+ *                    rows with no run keys at all, and this arm is what it renders.
+ *
+ * ⚠ AMENDED 192.2-11 (CR-01 BLOCKER — `192.2-VERIFICATION.md` gap 1, the fourth of the four
+ * false sentences it names). THE ORIGINAL TEXT OF THE `never` BULLET IS PRESERVED HERE RATHER
+ * THAN OVERWRITTEN, because what it claimed was measurably untrue when it was written:
+ *
+ *     "`never` — THE BACKEND LOOKED AND THERE IS NO RUN. The never-run arm; a real,
+ *      affirmative fact about the row, and the commonest one on a 69%-draft shelf."
+ *
+ * **It was not a fact about the ROW. It was a fact about the CALLER.** The `last_run_*` fields
+ * arrive from an OWNER-SCOPED lateral join, so on any row a caller can see but has not run
+ * themselves — every `/starters` row and every `is_system_global` published row, served to
+ * everybody — the join returned nothing and this arm printed the never-run sentence about a
+ * workflow that had really run. ⚠ The sentence is deliberately NOT quoted verbatim here: the
+ * T-06 fence sweeps this module's RAW source for every run word in double quotes, and a comment
+ * that spells one satisfies it (the 187-24 trap, met a fifth time by this very paragraph).
+ * Measured by `192.2-08`: **1 of 3 starter rows** (only
+ * `weekly-status-report` has ever run) and **5 of 92 published rows**.
+ *
+ * The bullet is TRUE NOW, and only because the arm gained a precondition it never had: it
+ * fires only on an AFFIRMED `has_any_run === false`, which is a genuinely row-level bit
+ * (`192.2-08` added it as a bare `EXISTS`, deliberately unscoped to the caller). The
+ * caller-scoped case it used to swallow is `not-by-you`, above, and it now has its own
+ * sentence instead of borrowing a false one.
  *
  * ⚠ FOLDING `unknown` INTO `never` IS THE DEFECT, NOT A SIMPLIFICATION. It makes the product
  * state *"this has never run"* about a workflow that may have run a hundred times — a specific
@@ -81,6 +106,7 @@ import { relativeBand } from "./relativeChanged"
 import {
   RUN_FAILED,
   RUN_NEVER,
+  RUN_NOT_BY_YOU,
   RUN_STOPPED,
   RUN_UNKNOWN,
   RUN_WORKED,
@@ -94,17 +120,32 @@ import {
 export type RunOutcome = "worked" | "failed" | "stopped"
 
 /**
- * The run truth for one row, as a discriminated union with EXACTLY THREE ARMS.
+ * The run truth for one row, as a discriminated union with EXACTLY ~~THREE~~ **FOUR** ARMS
+ * (widened by `192.2-11`, CR-01).
  *
  * ⚠ EVERY ARM CARRIES A WORD. D-01 gives the outcome a 3px gutter mark and the standing
  * constraint on it is *"colour, and never colour alone"* — so no arm may be renderable as a
  * mark alone, and the type is what makes that true rather than a convention somebody keeps.
+ *
+ * ⚠ NO ABSENCE ARM IS STRUCTURALLY READABLE AS A RUN. The three non-`ran` arms carry a `word`
+ * and NOTHING ELSE — no `outcome`, no `when` — so a consumer cannot reach an outcome or a time
+ * through them even by mistake. That is the type doing T-14's work rather than a convention.
  */
 export type RunFact =
   /** It ran. `when` is `null` when the feed carried a status but no readable instant. */
   | { kind: "ran"; outcome: RunOutcome; when: string | null; word: string }
-  /** The backend looked and there is no run. NOT the same as `unknown`. */
+  /**
+   * The backend looked and there is no run ANYWHERE ON THE ROW — `has_any_run === false`.
+   * NOT the same as `unknown`, and (since `192.2-11`) NOT the same as `not-by-you`.
+   */
   | { kind: "never"; word: string }
+  /**
+   * Somebody has run this row and it was not the caller — `has_any_run === true` with no
+   * caller-scoped run to report. ⚠ It carries NO outcome and NO time on purpose: the wire
+   * holds a bare `EXISTS` bit and nothing else, so anything richer would be invented
+   * (`192.2-08` DEC-08-A, and threat T-192.2-50's disclosure budget).
+   */
+  | { kind: "not-by-you"; word: string }
   /** The wire did not say — or said something this build cannot read. NOT the same as `never`. */
   | { kind: "unknown"; word: string }
 
@@ -145,13 +186,29 @@ function ownOutcome(status: string): RunOutcome | undefined {
  *
  *  1. `lastRunStatus === undefined` → `unknown`. The key was absent from the payload. This is
  *     FIRST because it is the stale-deploy case and it must not fall through to anything that
- *     reads the timestamp.
- *  2. `lastRunStatus === null` → `never`. The backend joined and found no run row. A stronger
- *     fact than (1) and a different sentence.
+ *     reads the timestamp — **nor to anything that reads `hasAnyRun`**, which is why the new
+ *     rules below sit INSIDE the `=== null` branch and not beside it.
+ *  2. `lastRunStatus === null` → the caller has no run of this row, and WHICH sentence that
+ *     earns depends on the row-level bit (`192.2-11`, CR-01; DEC-11-A / DEC-11-B):
+ *       2a. `hasAnyRun === true`  → `not-by-you`. Somebody ran it; it was not you.
+ *       2b. `hasAnyRun === false` → `never`. Affirmed: nobody has ever run it.
+ *       2c. `hasAnyRun` ABSENT (`undefined`) or `null` → `unknown`.
  *  3. an unrecognised or blank status → `unknown`. T-15: never success, by default.
  *  4. a terminal status → `ran`, with a band if the instant is readable and `null` if it is not.
  *
- * @param row the normalized library row. Only its two run fields are read.
+ * ⚠ RULE 2c IS NOT A ROUNDING-OFF, IT IS THE WHOLE POINT (DEC-11-B, threat T-192.2-47). The
+ * operator's locked four arms name `has_any_run = true` and `= false`; they do not name ABSENT.
+ * *Never run* is an AFFIRMATIVE row-level claim and an absent bit is not a fact we hold — we
+ * know the CALLER has no run and we do not know whether anybody does, which is exactly what
+ * `unknown` already means. So the absent case resolves into an arm that already exists and the
+ * arm count stays four.
+ *
+ * ⚠ AND THE COMPARISONS ARE `=== true` / `=== false`, NEVER A TRUTHINESS TEST. A truthiness
+ * test folds `false`, `null` and `undefined` into ONE answer, and 2a/2b/2c turn on those being
+ * THREE. A `if (row.hasAnyRun)` here re-ships CR-01 for the stale-backend case in the one
+ * direction nothing else in the tree would catch.
+ *
+ * @param row the normalized library row. Only its ~~two~~ THREE run fields are read.
  * @param now the instant to measure recency against — hoist one per render (P-1).
  */
 export function runFacts(row: LibraryRow, now: number = Date.now()): RunFact {
@@ -160,8 +217,18 @@ export function runFacts(row: LibraryRow, now: number = Date.now()): RunFact {
   // (1) the wire did not say — the key is absent from the payload entirely.
   if (status === undefined) return { kind: "unknown", word: RUN_UNKNOWN }
 
-  // (2) the backend looked and there is no run. The never-run arm.
-  if (status === null) return { kind: "never", word: RUN_NEVER }
+  // (2) the caller has no run of this row. WHICH sentence that earns is a row-level question,
+  // and `hasAnyRun` is the only thing that answers it — read HERE and nowhere earlier, so rule
+  // (1)'s stale-deploy short-circuit is provably untouched by it.
+  if (status === null) {
+    // (2a) somebody ran it and it was not you. The arm CR-01 exists to add.
+    if (row.hasAnyRun === true) return { kind: "not-by-you", word: RUN_NOT_BY_YOU }
+    // (2b) affirmed: nobody has ever run it. The ONLY condition under which this is a real,
+    // affirmative fact about the ROW rather than about the caller.
+    if (row.hasAnyRun === false) return { kind: "never", word: RUN_NEVER }
+    // (2c) the bit is absent or null — we do not hold the fact. NEVER `never` (DEC-11-B).
+    return { kind: "unknown", word: RUN_UNKNOWN }
+  }
 
   // (3) a status this build does not recognise, or an empty one. NEVER success.
   const outcome = ownOutcome(status)

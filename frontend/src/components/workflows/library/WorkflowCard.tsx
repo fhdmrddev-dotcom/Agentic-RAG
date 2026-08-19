@@ -502,32 +502,49 @@ const STATE_TONE = {
  * The run arm as ONE key — the outcome when there was a run, the arm's own name when there was
  * not. It keys the gutter's colour and the run word's tone together, so the two cannot drift.
  */
-type RunGutter = RunOutcome | "never" | "unknown"
+type RunGutter = RunOutcome | "never" | "unknown" | "not-by-you"
 
 /**
  * D-01 slot 1 — the gutter's colour. Deep Midnight semantic tokens only; every one of these is
  * already in `index.css` and none is a new hex.
  *
- * ⚠ `unknown` IS DELIBERATELY UNPAINTED, AND THAT IS T-22's MITIGATION IN THE COLOUR AXIS.
- * D-08's whole point is that *the wire did not say* is not *this never ran*: a bar that merely
- * looked quiet would make the two read alike at a glance down a column. No mark for no
- * information; `never` keeps a real, quiet bar. Neither can be mistaken for a tick, and the
- * WORD on line 2 is what actually distinguishes them for the reader (T-20).
+ * ⚠ ~~`unknown` IS DELIBERATELY UNPAINTED~~ — AMENDED BY `192.2-11` (CR-01): THERE ARE NOW
+ * **THREE** QUIET ARMS, NOT TWO, AND THEY MUST BE PAIRWISE DISTINGUISHABLE. The original
+ * sentence stands and is extended rather than replaced: D-08's whole point is that *the wire
+ * did not say* is not *this never ran*, and `192.2-11` adds a third neighbour to that argument
+ * — *somebody ran it, and it was not you*. Down a column all three must read apart:
+ *
+ *   · `unknown`    — NO MARK for NO INFORMATION (`bg-transparent`). T-22's mitigation in the
+ *                    colour axis: a bar that merely looked quiet would make it read like a fact.
+ *   · `never`      — a real, quiet bar (`bg-border`) for a real NEGATIVE fact.
+ *   · `not-by-you` — a BRIGHTER NEUTRAL (`bg-muted-foreground`) for a real POSITIVE fact that
+ *                    carries more signal than `never` (somebody ran it) but no outcome of the
+ *                    caller's own. ⚠ It may never be `bg-success` / `bg-destructive` /
+ *                    `bg-warning`: the caller has no outcome to report and a coloured outcome
+ *                    would be a fabricated one (DEC-11-C).
+ *
+ * None of the three can be mistaken for a tick, and the WORD on line 2 is what actually
+ * distinguishes them for the reader (T-20) — which is what *"colour, and never colour alone"*
+ * requires, rather than three colours doing the work by themselves.
  */
 const GUTTER_TONE = {
   worked: "bg-success",
   failed: "bg-destructive",
   stopped: "bg-warning",
   never: "bg-border",
+  "not-by-you": "bg-muted-foreground",
   unknown: "bg-transparent",
 } as const satisfies Record<RunGutter, string>
 
-/** The run word's tone. Same five keys, so a new arm cannot get a colour and lose a word. */
+/** The run word's tone. Same SIX keys, so a new arm cannot get a colour and lose a word. */
 const RUN_TONE = {
   worked: "text-success",
   failed: "text-destructive",
   stopped: "text-warning",
   never: "text-muted-foreground",
+  // ⚠ Deliberately the SAME quiet tone as `never` / `unknown` (DEC-11-C). The three quiet arms
+  // are told apart by their WORDS, not by three shades of grey on a 12px line.
+  "not-by-you": "text-muted-foreground",
   unknown: "text-muted-foreground",
 } as const satisfies Record<RunGutter, string>
 
@@ -542,9 +559,14 @@ const ANSWER_CLASSES = "mt-1.5 flex flex-wrap items-center gap-2 text-[12px]"
 const ANSWER_SEPARATOR = "|"
 
 /**
- * Resolve the gutter key from the face's run arm. TOTAL by construction: `RunFact` has three
- * arms, `ran` contributes its outcome and the other two contribute their own `kind`, so a
- * fourth arm becomes a typecheck error here rather than an unpainted gutter.
+ * Resolve the gutter key from the face's run arm. TOTAL by construction: `RunFact` has ~~three~~
+ * FOUR arms, `ran` contributes its outcome and the other three contribute their own `kind`, so a
+ * FIFTH arm becomes a typecheck error here rather than an unpainted gutter.
+ *
+ * ⚠ THE PREDICTION IN THE ORIGINAL SENTENCE CAME TRUE AND IS KEPT AS THE RECORD: adding
+ * `not-by-you` to `RunFact` in `192.2-11` made this function non-total and red `tsc`, which is
+ * exactly why the union member and its two colour-map entries had to land in ONE commit. The
+ * body needed no change — the new arm contributes its own `kind`, as designed.
  */
 function runGutterOf(run: CardFace["run"]): RunGutter {
   return run.kind === "ran" ? run.outcome : run.kind

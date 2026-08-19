@@ -158,8 +158,32 @@ const cssSource = nodeFs.readFileSync(`${SRC_ROOT}index.css`, "utf8")
  * ⚠ `192.2-11` IS THE PLAN AUTHORISED TO RE-DERIVE THESE, when it adds a sixth arm. Read the
  * new numbers out of THIS assertion's own failing diff — never predict them — the way
  * `librarySubtree.fences.test.ts` has now done six consecutive times.
+ *
+ * ── ⚠ RE-DERIVED 2026-08-19 BY `192.2-11` (CR-01) — THE SIXTH ARM LANDED ─────────────────
+ * `192.2-11` adds `not-by-you` to BOTH tone maps, so `RunGutter` has SIX arms
+ * (`worked` · `failed` · `stopped` · `never` · `not-by-you` · `unknown`). **The numbers were
+ * re-derived by reading the two edited object bodies back — NOT by bumping each figure by two —
+ * and the reason that distinction matters is that the two maps DO NOT CONTRIBUTE EQUALLY:**
+ *
+ *   · `GUTTER_TONE["not-by-you"] = "bg-muted-foreground"`  → a GENUINELY NEW literal
+ *   · `RUN_TONE["not-by-you"]    = "text-muted-foreground"` → the THIRD occurrence of a literal
+ *     that `never` and `unknown` already name (DEC-11-C: the three quiet arms are told apart by
+ *     their WORDS, not by three shades of grey)
+ *
+ * So the three figures move by three DIFFERENT amounts, and a uniform `+2` guess would have
+ * landed on `unique: 11` — a number that is wrong while still looking plausible:
+ *
+ *   · `entries`  10 → **12**  (+2 — the extraction collects RAW OCCURRENCES, one per map)
+ *   · `unique`    9 → **10**  (+1 — `new Set(all).size`; only `bg-muted-foreground` is new)
+ *   · `perMap`    5 → **6**   (+1 — the two maps stay the same length, which is the invariant)
+ *
+ * Confirmed against this assertion's own failing diff, which read
+ * *"expected [ 'bg-success', …(11) ] to have a length of 10 but got 12"* before the edit.
+ * ⚠ THE ASSERTION IS STILL AN EXACT SIZE. No `>=`, no range, no tolerance, no removed check —
+ * loosening it to make a sixth arm fit would have left a fence that passes while defending
+ * nothing, which is this repository's most repeated failure mode.
  */
-const TONE_SHAPE = { entries: 10, unique: 9, perMap: 5 } as const
+const TONE_SHAPE = { entries: 12, unique: 10, perMap: 6 } as const
 
 /** The two maps, by the identifier the extractor anchors on. */
 const TONE_MAPS = ["GUTTER_TONE", "RUN_TONE"] as const
@@ -541,7 +565,7 @@ describe("the fence is looking at something (non-vacuity)", () => {
     expect(cssSource).toContain(".dark {")
   })
 
-  it("extracts exactly the tone-map shape measured at this SHA — five arms, two maps", () => {
+  it("extracts exactly the tone-map shape measured at this SHA — SIX arms, two maps", () => {
     const maps = toneUtilities(cardSource)
     const all = allToneUtilities(cardSource)
 
@@ -550,8 +574,10 @@ describe("the fence is looking at something (non-vacuity)", () => {
     // MEASURED that happening (192.1, a fence sweeping the empty string).
     expect(all.length).toBeGreaterThan(0)
 
-    // ⚠ EXACT, from `TONE_SHAPE`. `192.2-11` re-derives these three numbers when it adds a
-    // sixth arm; read them out of THIS assertion's failing diff rather than predicting them.
+    // ⚠ EXACT, from `TONE_SHAPE`. `192.2-11` DID re-derive these three numbers when it added
+    // the sixth arm (`not-by-you`) — 10/9/5 → 12/10/6, by reading the two edited object bodies
+    // back and NOT by bumping each by two; see `TONE_SHAPE`'s own re-derivation paragraph. A
+    // SEVENTH arm re-runs the same drill: read them out of THIS assertion's failing diff.
     expect(all).toHaveLength(TONE_SHAPE.entries)
     expect(new Set(all).size).toBe(TONE_SHAPE.unique)
     for (const { map, utilities } of maps) {

@@ -56,7 +56,7 @@
  * deliberate and it is this plan's whole constraint: **192.2-02 CHANGES NO PIXEL.** The emoji
  * leave in Wave 4, from the map in `WorkflowCard.tsx`, in one edit.
  *
- * ── ABSENCE IS EXPLICIT, NEVER A BLANK STRING (D-08's three arms) ────────────────────────
+ * ── ABSENCE IS EXPLICIT, NEVER A BLANK STRING (D-08's ~~three~~ four arms, 192.2-11) ──────
  * `lead` and `version` are `string | null`, and `null` means THE ROW CARRIED NONE. A blank string
  * would be a value that renders like an absence and compares like a presence — the defect
  * `libraryRow.ts` already legislates against for `isMine` and `updatedAt`, and the shape of
@@ -130,7 +130,8 @@ export interface CardFace {
    */
   runnable: boolean
   /**
-   * Phase 192.2-04 — THE RUN TRUTH, as the three-armed value `runFacts` resolved (D-08).
+   * Phase 192.2-04 — THE RUN TRUTH, as the ~~three~~ FOUR-armed value `runFacts` resolved (D-08;
+   * widened by `192.2-11`, CR-01).
    *
    * The ARM, not a word, is what the gutter mark keys off: D-01 gives the outcome a 3px mark
    * and the constraint is *"colour, and never colour alone"*, so a consumer needs the
@@ -147,7 +148,13 @@ export interface CardFace {
    * ⚠ EVERY ARM HAS ONE. There is no arm of `RunFact` for which this is empty, `null` or a
    * blank string, and that totality is the D-08 guarantee stated at the field a consumer will
    * actually read: *Worked 2 days ago* · *Failed last month* · *Stopped yesterday* ·
-   * *Never run* · *Not recorded*.
+   * *Never run* · **_Run by someone else_** · *Not recorded*.
+   *
+   * ⚠ AMENDED BY `192.2-11` (CR-01) — the list above was a PROSE enumeration and a fourth arm
+   * made it incomplete, which is the one way this docblock could go wrong silently. **No code
+   * in this module changed**: `cardFace` hands `RunFact` over WHOLE and never switches on it, so
+   * the fourth arm arrived through the type with nothing here to re-derive. That is the property
+   * this field's own paragraph above argues for, holding under a widening.
    */
   runWord: string
 }
@@ -183,7 +190,7 @@ const VERSION_PREFIX = "v"
  */
 export function cardFace(row: LibraryRow, now: number = Date.now()): CardFace {
   const face = FACES[row.provenance]
-  // ⚠ ASKED, NOT RE-DERIVED. The status→outcome map, the three arms and the words all live in
+  // ⚠ ASKED, NOT RE-DERIVED. The status→outcome map, the four arms and the words all live in
   // `runFacts.ts`; a `switch` here would be the second copy T-06 forbids, one field over from
   // the state vocabulary this module already refuses to re-spell.
   const run = runFacts(row, now)
