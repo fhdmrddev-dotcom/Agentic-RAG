@@ -1981,6 +1981,8 @@ CREATE TABLE public.workflow_phases (
     org_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    started_at timestamp with time zone,
+    completed_at timestamp with time zone,
     CONSTRAINT workflow_phases_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'active'::text, 'completed'::text, 'failed'::text, 'skipped'::text, 'recorded_not_sent'::text, 'cancelled'::text])))
 );
 
@@ -1990,6 +1992,20 @@ CREATE TABLE public.workflow_phases (
 --
 
 COMMENT ON COLUMN public.workflow_phases.org_id IS 'Forward-compat (D-PRD-02/D-11): org-level multi-tenancy. NULL in v2.8; no FK until org schema exists; RLS stays user-scoped.';
+
+
+--
+-- Name: COLUMN workflow_phases.started_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_phases.started_at IS 'Phase 200 (DES-02 / D-05): the instant this phase flipped to active, written ONCE by mark_phase_active (backend/app/db/workflows.py:1441) BEFORE any of the phase''s work runs. NULLABLE and NOT BACKFILLED (D-06): a pre-200 row keeps NULL forever, which reads "time not recorded" — distinct from "never ran". A backfill from updated_at is right for some rows and silently wrong for others, and nothing on the row would say which. created_at cannot substitute: every phase row of a run is batch-INSERTed together at run creation.';
+
+
+--
+-- Name: COLUMN workflow_phases.completed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_phases.completed_at IS 'Phase 200 (DES-02 / D-05): the instant this phase reached a terminal status. Written at FIVE sites in backend/app/db/workflows.py — complete_phase (:1483), fail_phase (:1505), record_phase_not_sent (:1548), cancel_phase (:1597) and cancel_active_phases (:1649, the run-keyed engineless-Stop arm 194 built, whose AND status = ''active'' predicate means it only moves rows that already carry a started_at). skip_phase (:1517) writes NEITHER column deliberately — a skipped phase never ran. NULLABLE and NOT BACKFILLED (D-06).';
 
 
 --
