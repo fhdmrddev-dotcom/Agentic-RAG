@@ -195,6 +195,9 @@ import {
 } from "react"
 import {
   Background,
+  // 199-05 — the ENUM, never the string `"dots"`. A typo in a string literal falls back
+  // to the library's own default and draws a ground that merely looks committed.
+  BackgroundVariant,
   Controls,
   MarkerType,
   ReactFlow,
@@ -352,6 +355,73 @@ const EDGE_STYLE: Record<string, CSSProperties> = {
     strokeDasharray: "5 4",
   },
 }
+
+/**
+ * 199-05 — THE BRANCH CONNECTOR'S WORD, and the one row sheet `c1-canvas-plane` asked
+ * for that this surface could honestly answer.
+ *
+ * ⚠ THE MEASURED GAP. Until this constant the resolved on-fail branch was the ONLY
+ * connector on the plane that means something other than "then", and it said so in
+ * NOTHING but a dash and an amber stroke. The same concept carries its word on both
+ * sibling surfaces — `PhaseSpineGraph.tsx` prints `on fail → skip to <slug>`, and this
+ * canvas's own broken-target stub prints `on fail → goes to <slug> — no such step` — so
+ * a reader who cannot see the amber got the branch from the shipped canvas and from
+ * nowhere else. The acceptance bar is that every state the plane can express is
+ * distinguishable WITHOUT colour and carries its word where a word exists. The word
+ * existed; the connector did not carry it.
+ *
+ * WHY THE WORD AND NOT THE GLYPH. The `⤳` mark is the shipped on-fail glyph
+ * (`icon-convention.md` §4) and both sibling homes draw it — but both wrap it in
+ * `aria-hidden`, because it is decoration beside a sentence that already carries the
+ * meaning. An SVG edge label is ONE text node with no room for that split, so shipping
+ * the glyph here would put an unlabelled mark into an accessible name. The dash already
+ * carries the shape; this carries the meaning. The card's own rule, stated in
+ * `PhaseNodeCard`'s docblock: **the WORD carries the meaning; tone is decoration.**
+ *
+ * WHY IT IS NOT THE SHEET'S LABEL. Sheet c1's connectors carry `312 contracts` →
+ * `48 extracted` → `12 flagged`: a per-edge PAYLOAD COUNT. Nothing in this system emits
+ * one, and drawing an approximation would be a fabricated business figure on the surface
+ * a business reader trusts most. That is reported as CANNOT-EXPRESS, in full, in this
+ * plan's summary. What ships here is the branch's own authored CONDITION, which the
+ * definition already holds and two other surfaces already print.
+ *
+ * NOT ON THE BROKEN BRANCH. An unresolvable `skip_to_phase` already terminates in a stub
+ * node that prints the whole sentence; a second `on fail` on its connector would be the
+ * same fact twice, three centimetres apart.
+ */
+export const BRANCH_CONNECTOR_WORD = "on fail"
+
+/**
+ * 199-05 — the plane's ground, stated rather than inherited. See the `<Background>` use
+ * site for why the colour is deliberately absent from this table.
+ *
+ * Every number was MEASURED off the shipped rendering before it was written down: the
+ * library was drawing a 20px dot lattice with a 1px dot, and it still is.
+ */
+export const BACKGROUND_GROUND = {
+  /** Dots, never lines or crosses — the sheet's commitment and already the shipped one. */
+  variant: BackgroundVariant.Dots,
+  /** The lattice pitch, in canvas pixels. */
+  gap: 20,
+  /** One dot, one pixel. The quietest mark this plane draws. */
+  size: 1,
+} as const
+
+/**
+ * The label's own presentation, in the SAME raw hsl the branch stroke above already
+ * spends — deliberately not a Tailwind token. 15 of sheet 178's 18 colour tokens compile
+ * to nothing against this repo's config, and an unpainted class is indistinguishable from
+ * a deliberately unpainted arm (the `bg-warning` silent no-op that shipped unguarded
+ * until 192.2). A raw literal beside an identical raw literal cannot acquire that failure.
+ */
+const BRANCH_CONNECTOR_LABEL = {
+  label: BRANCH_CONNECTOR_WORD,
+  labelShowBg: true,
+  labelBgPadding: [6, 2] as [number, number],
+  labelBgBorderRadius: 4,
+  labelStyle: { fill: "hsl(38 92% 60% / 0.95)", fontSize: 10, fontWeight: 500 },
+  labelBgStyle: { fill: "hsl(var(--card))", stroke: "hsl(38 92% 60% / 0.35)" },
+} as const
 
 /**
  * WHAT THE SURFACE SAYS AFTER A STRUCTURAL EDIT — and the two acts are DIFFERENT acts,
@@ -761,14 +831,26 @@ export function WorkflowCanvas({
     [nodes],
   )
 
-  const edges = useMemo<CanvasEdge[]>(
-    () =>
-      projection.edges.map((edge) => ({
-        ...edge,
-        style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
-      })),
-    [projection.edges],
-  )
+  const edges = useMemo<CanvasEdge[]>(() => {
+    // 199-05 — the stubs a BROKEN branch terminates in. Read off the node TYPE rather
+    // than off the reserved id prefix, so renaming the namespace cannot silently start
+    // labelling the broken branch twice.
+    const brokenTargets = new Set(
+      projection.nodes
+        .filter((node) => node.type === CANVAS_NODE_TYPES.unresolvedSkip)
+        .map((node) => node.id),
+    )
+    return projection.edges.map((edge) => ({
+      ...edge,
+      style: EDGE_STYLE[edge.data?.kind ?? CANVAS_EDGE_KINDS.flow],
+      // The branch's word, on the RESOLVED branch only — see `BRANCH_CONNECTOR_WORD`.
+      // Spread CONDITIONALLY (the shipped D-14 idiom), so a run-order connector's object
+      // is byte-identical to what it was before this plan.
+      ...(edge.data?.kind === CANVAS_EDGE_KINDS.skip && !brokenTargets.has(edge.target)
+        ? BRANCH_CONNECTOR_LABEL
+        : {}),
+    }))
+  }, [projection.edges, projection.nodes])
 
   /**
    * REQUIRED with a controlled `nodes` prop — see `dragOverlay`. Only `position`
@@ -1265,7 +1347,29 @@ export function WorkflowCanvas({
           // tables at module scope). The read-only table is byte-unchanged.
           ariaLabelConfig={editable ? ARIA_LABELS_EDITABLE : ARIA_LABELS}
         >
-          <Background />
+          {/* 199-05 — THE GROUND, COMMITTED. Sheet `c1-canvas-plane`'s one structural
+              claim about the plane is that it *commits* to a ground rather than leaving
+              one to happen: "a quiet dot grid, quiet enough that a step at rest is still
+              the loudest thing on the plane."
+
+              Until this line the ground was whatever `@xyflow/react` defaults to. The
+              three values below are the ones it was ALREADY producing — MEASURED off the
+              shipped rendering, not copied from the sheet — so this changes no pixel and
+              buys one thing: a library upgrade that moves a default can no longer move
+              this surface's ground without a diff. `BACKGROUND_GROUND` is the frozen
+              table (S5 — never a literal at a use site).
+
+              ⚠ THE COLOUR IS DELIBERATELY NOT COMMITTED. `color` would emit an inline
+              fill and take the dots OFF the theme's own variables, so the ground would
+              stop following light/dark. Geometry is ours to state; the palette belongs to
+              the theme. The sheet's own `#212631` on `#090e18` is declined for the same
+              reason 15 of its 18 colour tokens are: they are that sheet's palette, and
+              this repo's config does not carry them. */}
+          <Background
+            variant={BACKGROUND_GROUND.variant}
+            gap={BACKGROUND_GROUND.gap}
+            size={BACKGROUND_GROUND.size}
+          />
           {/* The prop below removes the interactivity padlock — see the docblock;
               without it read-only is two clicks deep. */}
           <Controls showInteractive={false} />

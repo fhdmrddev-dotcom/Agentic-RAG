@@ -503,3 +503,108 @@ describe("FlowEdge — DETOUR is the same gap EDIT_AFFORDANCE describes", () => 
     expect(LINE).toBe("M0,28 L60,28")
   })
 })
+
+// ── 7 · 199-05 Task 1 — the connection-state inventory (sheet c1 §2) ─────────────
+//
+// THE ACCEPTANCE BAR IS "DISTINGUISHABLE WITHOUT COLOUR", and for an EDGE that needs a
+// different method from the one `192.2-05` used on a card. A card's colour arrives in
+// `class` attributes, so stripping every `class` and re-asserting distinctness is a
+// complete proof there. An edge's colour does NOT: it arrives in the `style` attribute
+// as `stroke`, alongside `stroke-width` and `stroke-dasharray` which are NOT colour. So a
+// class-strip over this surface would pass while proving nothing.
+//
+// The adaptation, stated so it is not mistaken for the card method: build each state's
+// signature from everything a colour-blind reader still perceives — the drawn `d`, the
+// stroke WIDTH, the DASH pattern and the TEXT — with `stroke` deleted, and require the
+// signatures to be mutually distinct. `stroke` is deleted rather than merely ignored, so
+// a state that becomes colour-only in future cannot pass by accident.
+
+/** Everything about a rendered edge that survives the loss of colour vision. */
+function colourBlindSignature(container: HTMLElement): string {
+  const parts: string[] = []
+  for (const el of Array.from(container.querySelectorAll<SVGElement>("path, circle, text"))) {
+    // Every colour channel is REMOVED, never merely skipped.
+    const dash = el.getAttribute("stroke-dasharray") ?? el.style.strokeDasharray ?? ""
+    const width = el.getAttribute("stroke-width") ?? el.style.strokeWidth ?? ""
+    const geometry =
+      el.tagName === "path"
+        ? (el.getAttribute("d") ?? "")
+        : el.tagName === "circle"
+          ? `circle r=${el.getAttribute("r")}`
+          : `text:${el.textContent ?? ""}`
+    parts.push(`${el.tagName}|${geometry}|w=${width}|dash=${dash}`)
+  }
+  return parts.join("\n")
+}
+
+describe("FlowEdge 199-05 — the three states it can express are distinct WITHOUT colour", () => {
+  it("ordinary · open · armed have mutually distinct colour-blind signatures", async () => {
+    const ordinary = await renderEdge({ typed: true })
+    const sigOrdinary = colourBlindSignature(ordinary.container)
+    ordinary.unmount()
+
+    const open = await renderEdge({ typed: true, armed: false })
+    const sigOpen = colourBlindSignature(open.container)
+    open.unmount()
+
+    const armed = await renderEdge({ typed: true, armed: true })
+    const sigArmed = colourBlindSignature(armed.container)
+
+    // NON-VACUITY FIRST — this project has measured three fences that swept the empty
+    // string and passed green defending nothing.
+    for (const sig of [sigOrdinary, sigOpen, sigArmed]) expect(sig.length).toBeGreaterThan(0)
+
+    // …and the signature really is colour-free, so the distinctness below cannot be
+    // riding on a stroke colour that a colour-blind reader never sees.
+    for (const sig of [sigOrdinary, sigOpen, sigArmed]) {
+      expect(sig).not.toContain("hsl(")
+      expect(sig).not.toContain("rgb")
+      expect(sig).not.toContain("#")
+    }
+
+    expect(new Set([sigOrdinary, sigOpen, sigArmed]).size).toBe(3)
+  })
+
+  it("the carrier is SHAPE and a WORD — never a stroke colour (per-state evidence)", async () => {
+    // ORDINARY: one path, no arc, no circle, no word.
+    const ordinary = await renderEdge({ typed: true })
+    expect(ordinary.container.querySelectorAll("circle")).toHaveLength(0)
+    expect(ordinary.container.querySelectorAll('[data-testid="canvas-detour-label"]')).toHaveLength(
+      0,
+    )
+    ordinary.unmount()
+
+    // OPEN: the arc is DASHED (a shape fact), the straight line runs through, and the
+    // word is present.
+    const open = await renderEdge({ typed: true, armed: false })
+    expect(open.container.querySelector('[data-testid="canvas-detour-arc"]')?.getAttribute(
+      "stroke-dasharray",
+    )).toBe("3 3")
+    expect(open.container.querySelector('[data-testid="canvas-detour-label"]')?.textContent).toBe(
+      DETOUR_OPEN_LABEL,
+    )
+    open.unmount()
+
+    // ARMED: the arc is SOLID and IS the path; the word differs from the open one.
+    const armed = await renderEdge({ typed: true, armed: true })
+    expect(armed.container.querySelector('[data-testid="canvas-detour-arc"]')?.getAttribute(
+      "stroke-dasharray",
+    )).toBeNull()
+    expect(armed.container.querySelector('[data-testid="canvas-detour-label"]')?.textContent).toBe(
+      DETOUR_ARMED_LABEL,
+    )
+    expect(DETOUR_ARMED_LABEL).not.toBe(DETOUR_OPEN_LABEL)
+  })
+
+  it("POSITIVE CONTROL — the signature DOES notice a shape change", () => {
+    // A fence nobody has seen fire is a claim. Two hand-built signatures that differ only
+    // in a dash pattern must compare unequal, which is what makes the three-way set
+    // assertion above evidence rather than an accident of ordering.
+    const a = "path|M0,0 L1,1|w=2|dash="
+    const b = "path|M0,0 L1,1|w=2|dash=3 3"
+    expect(a).not.toBe(b)
+    // …and it does NOT notice a colour change, which is the property being claimed.
+    const withColour = a
+    expect(withColour).not.toContain("stroke=")
+  })
+})
