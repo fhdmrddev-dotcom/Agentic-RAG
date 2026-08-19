@@ -35,9 +35,54 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 200 (the-workflow-journey) — **CONTEXT GATHERED, NOT PLANNED**
-Plan: 0 of 6 (the shape is approved; nothing is planned yet)
-Next action: **`/gsd:plan-phase 200`**
+Phase: 200 (the-workflow-journey) — **EXECUTED 2026-08-20, 7/7 plans. NOT YET VERIFIED.**
+Plan: 7 of 7 (all merged to `develop`, HEAD `84f7c156`)
+Next action: **`/gsd:verify-work 200`** — then drive the eight owed UAT rows listed in `200-07-SUMMARY.md`.
+
+⚠ **THE SHAPE GREW FROM SIX PLANS TO SEVEN, and the reason is measured.** RESEARCH found that
+`workflow_runs.status = 'paused'` has **ZERO writers** in the entire backend (seven grep hits, all
+reads); the only `UPDATE workflow_runs SET status` writer is `finish_run`, which **clears the thread
+anchor in the same transaction** and so makes the run permanently unresumable; and the only re-drive
+path is `main.py:406`'s **boot-time sweep**. So D-10's recorded promise — *"answering later still
+resumes"* — was **not true of the architecture** and was not an additive change. The backend was
+therefore split: `200-02` (the measurable wire) and `200-03` (the human gate). Plans `03`…`06` of the
+approved shape became `04`…`07`.
+
+**Atom verdict: 47/49 across the four screens.** `run-surface` 13/13 · `builder-spine` 12/12 ·
+`builder-canvas` 9/10 · `step-panel` 13/14. **Both partials are NAMED, not aggregated away:**
+`SP-MR-03`'s *"each with its lock state"* half is **not on the wire** (`folder_scope` is a bare
+`string[]`, and the only lock this product has belongs to the *step*, not a folder — and the sketch
+draws those locks as `Lock`/`lock` ligatures the checklist forbids as visible text, so building the
+drawn form would have promoted a sketch defect to a criterion); `BC-MR-04`'s second half (re-toning
+the node's 62 px filled icon-well disc) was **withdrawn rather than re-baselined** — it is pinned
+byte-for-byte by three `CARD_HTML_BASELINE` captures plus a shape array and read by 11 further
+`radial-gradient` assertions across two suites. House precedent: `199-03`.
+
+**Gates re-derived by the orchestrator on the MERGED tree, not inherited from summaries:**
+count gate `total 5184 · failed 0 · pinned total 4824 · 102/102` · `tsc -p tsconfig.app.json --noEmit`
+**33 errors / 19 files, unmoved, and NONE of the phase's ~15 touched files among them** ·
+backend `tests/unit` **62 failed / 2350 passed — byte-identical to the pre-phase baseline**.
+
+⚠ **Migration 121 IS APPLIED to the live local DB** (`started_at` + `completed_at` on
+`workflow_phases`, both nullable, both `column_default=None`). Verified: 570 pre-existing rows, **0**
+carrying either timestamp — the no-backfill negative control PASSES. `full-schema.sql` regenerated
+(`+16 / −0`, no `--reset`). ⚠ **Applied by direct psycopg2 execution of the file, NOT via the Studio
+SQL editor** — the operator authorised it; CLAUDE.md's binding prohibition (`db push` / `db reset`)
+was respected and no data was lost. **Cloud parity is OWED at the next promotion:** migration 121 must
+be pasted into the cloud SQL editor in the SAME operation that deploys this backend, or the widened
+`.select()` reads a column the cloud DB does not have.
+
+⚠ **TWO TEST FIXTURES ARE SEEDED LIVE IN THE LOCAL DB** and are owed a cleanup:
+`zz-200-06-fixture-constructor` and `zz-200-06-fixture-harmless` (for the driven row that closes
+`BUG-260807-01` + `BUG-260808-01`).
+
+⚠ **`scripts/regenerate-full-schema.sh` CANNOT RUN INSIDE A WORKTREE** — `.supabase/` is gitignored, so
+`supabase status` reports *"not running locally"* even when it is. Run it from the main tree and copy
+the artifact in. This will bite the next migration-bearing plan.
+
+⚠ **THE WRONG-BASE WORKTREE FORK FIRED ON ALL SEVEN WAVES** — `merge-base` returned `3781a3fe` every
+single time, never the dispatched base. The HEAD assertion caught and corrected it seven for seven.
+**Do not dispatch a worktree executor without it.**
 
 ⚠ **PHASE 200 DID NOT EXIST IN THE ROADMAP WHEN ITS DISCUSSION BEGAN.** `gsd-sdk query init.phase-op 200`
 returned `phase_found: false`, and it was **genuine — not the `#### Phase NNN:` heading quirk** (the v3.7

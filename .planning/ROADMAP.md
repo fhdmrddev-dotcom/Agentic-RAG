@@ -43,7 +43,7 @@ the right vocabulary, stop it, and see what it produced.
 | 197 | Guided Authoring | 11/11 | In Progress|  |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 | 199 | **(INSERT)** The Component Map | Every workflow surface re-presented in the adopted design language | DES-01 | 5 |
-| 200 | **(INSERT)** The Run Becomes Measurable | The wire carries per-step timings and counts, and the four surfaces that consume them are built to sketch 200 | DES-02 | 5 |
+| 200 | **(INSERT)** The Run Becomes Measurable | 7/7 | Complete   | 2026-08-19 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
 most independent first — 194 in particular is mostly UI over an endpoint that already exists. 196 and
@@ -950,31 +950,31 @@ progress, `Fork Logic`, `Target nodes: production-cluster`, and `Estimated time:
 Plans:
 **Wave 1**
 
-- [ ] 200-01-PLAN.md — derive the acceptance checklist for the four in-scope screens (⚠ **modifies ZERO source files**; `git show --name-only HEAD` is the proof, D-03) and publish the phase baselines
+- [x] 200-01-PLAN.md — derive the acceptance checklist for the four in-scope screens (⚠ **modifies ZERO source files**; `git show --name-only HEAD` is the proof, D-03) and publish the phase baselines
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 200-02-PLAN.md — the measurable wire: migration 121 + `started_at`/`completed_at` at all **SEVEN** write sites + the declared count across the **SEVEN** phase types + **all FOUR** transports widened (⚠ **runs ALONE** — its migration test mutates the local DB)
+- [x] 200-02-PLAN.md — the measurable wire: migration 121 + `started_at`/`completed_at` at all **SEVEN** write sites + the declared count across the **SEVEN** phase types + **all FOUR** transports widened (⚠ **runs ALONE** — its migration test mutates the local DB)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 200-03-PLAN.md — the human gate: the D-13 extraction, `pause_run`, a new `PhaseOutcome` kind, the engine arm and the answer-triggered re-drive (⚠ **runs ALONE and AFTER `200-02`** — both touch `phase_types.py`)
+- [x] 200-03-PLAN.md — the human gate: the D-13 extraction, `pause_run`, a new `PhaseOutcome` kind, the engine arm and the answer-triggered re-drive (⚠ **runs ALONE and AFTER `200-02`** — both touch `phase_types.py`)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 200-04-PLAN.md — the step panel (`PhaseFormPanel`), closing the **eighth** live WR-04 prototype-key sink
+- [x] 200-04-PLAN.md — the step panel (`PhaseFormPanel`), closing the **eighth** live WR-04 prototype-key sink
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 200-05-PLAN.md — the authoring spine + the receipt (built here, **mounted in `200-07`**)
+- [x] 200-05-PLAN.md — the authoring spine + the receipt (built here, **mounted in `200-07`**)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 200-06-PLAN.md — the canvas, plus `BUG-260813-01` by `ThemeProvider` (⚠ lands in CHAT first)
+- [x] 200-06-PLAN.md — the canvas, plus `BUG-260813-01` by `ThemeProvider` (⚠ lands in CHAT first)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 200-07-PLAN.md — the run surface + the panel trio, and the phase's closing N/N report
+- [x] 200-07-PLAN.md — the run surface + the panel trio, and the phase's closing N/N report
 
 ⚠ **Waves 1-7, ONE plan per wave — fully serialized, and the reason is measured rather than cautious.** Every screen plan owns a `scripts/vitest-count-gate.cjs` edit (a new-leaf pin or a de-slack) plus CLAUDE.md + `docs/HOT-FILE-LEDGER.md` rows under the same-commit sync rule, so **no two plans have disjoint `files_modified`** — the condition the orchestrator set for pairing `200-04` with `200-05`. `200-02` and `200-03` were already required to run alone. `GSD_VITEST_MAX_WORKERS=2` still binds every test invocation.
 
