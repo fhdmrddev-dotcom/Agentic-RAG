@@ -84,11 +84,13 @@ import {
   NO_PROJECT,
   OWN_SHARED,
   OWN_YOURS,
-  // 192.2-05 (LIB-06 / D-01 line 2 / D-08) — the five run words, imported for the same D-14
-  // reason as every other string here: a test that retypes `Never run` has forked the
-  // acceptance bar, and these five are the ones that must never be confusable with each other.
+  // 192.2-05 (LIB-06 / D-01 line 2 / D-08) — the ~~five~~ SIX run words (192.2-11 added the
+  // sixth, CR-01), imported for the same D-14 reason as every other string here: a test that
+  // retypes `Never run` has forked the acceptance bar, and these are the ones that must never
+  // be confusable with each other.
   RUN_FAILED,
   RUN_NEVER,
+  RUN_NOT_BY_YOU,
   RUN_STOPPED,
   RUN_UNKNOWN,
   RUN_WORKED,
@@ -1624,21 +1626,27 @@ describe("LIB-06 — three same-named rows are told apart by their run, in words
   it("T-20 — the WORD carries it, not the colour: strip every class and they still differ", () => {
     // The standing project rule is *colour is never the only carrier*. Asserting the class
     // would satisfy a card that painted three bars and said one sentence, which is the defect.
-    renderRows([WORKED, FAILED, NEVER])
+    //
+    // ⚠ EXTENDED BY 192.2-11 (CR-01) FROM THREE ARMS TO FOUR — the EXISTING property widened,
+    // deliberately NOT a second copy beside it. `NOT_BY_YOU` is the arm the shipped card could
+    // not say at all, so a card that still collapsed it into never-run would produce three
+    // distinct sentences from four rows and red here on the SIZE rather than on a needle.
+    renderRows([WORKED, FAILED, NEVER, NOT_BY_YOU])
     const cards = screen.getAllByTestId("published-card")
     for (const card of cards) {
       for (const node of Array.from(card.querySelectorAll("*"))) node.removeAttribute("class")
     }
-    expect(new Set(cards.map(answerText)).size).toBe(3)
+    expect(cards).toHaveLength(4)
+    expect(new Set(cards.map(answerText)).size).toBe(4)
   })
 
   it("the gutter tracks the sentence — one derivation, never two switches", () => {
-    renderRows([WORKED, FAILED, NEVER])
+    renderRows([WORKED, FAILED, NEVER, NOT_BY_YOU])
     const cards = screen.getAllByTestId("published-card")
     const arms = cards.map((card) =>
       within(card).getByTestId("run-gutter").getAttribute("data-run"),
     )
-    expect(arms).toEqual(["worked", "failed", "never"])
+    expect(arms).toEqual(["worked", "failed", "never", "not-by-you"])
     // The gutter is decoration over the sentence: it is hidden from assistive tech precisely
     // BECAUSE the sentence already says everything it encodes.
     for (const card of cards) {
@@ -1718,6 +1726,113 @@ describe("D-08 — the three arms on the card, and `unknown` is not `never` (T-2
     expect(answerText(card)).toContain(RUN_UNKNOWN)
     expect(answerText(card)).not.toContain(RUN_WORKED)
     expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "unknown")
+  })
+})
+
+describe("192.2-11 (CR-01) — the FOURTH arm on the card: somebody ran it, and it was not you", () => {
+  it("⚠ CR-01 — a row somebody ELSE ran says so, and says NOTHING about never having run", () => {
+    // ⚠ THIS IS CR-01 IN ONE ASSERTION, and it is the sentence the shipped card printed about a
+    // workflow that had run twenty times. The `last_run_*` lateral is OWNER-SCOPED: a caller who
+    // can see a row but has not run it receives `null`, which the card read as *never run*.
+    // 192.2-08 measured the blast radius on real data — 1 of 3 starter rows and 5 of 92
+    // published rows, i.e. EVERY row the product shares with everybody.
+    const { card } = renderCard(NOT_BY_YOU, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_NOT_BY_YOU)
+
+    // The ABSENCE is the regression guard, and it is asserted over the WHOLE card rather than
+    // over line 2 alone: the false sentence must not survive anywhere on the row.
+    expect(card.textContent ?? "").not.toContain(RUN_NEVER)
+    expect(answerText(card)).not.toContain(RUN_NEVER)
+
+    // …and it claims no outcome it has no data for. The wire carries a bare EXISTS bit.
+    expect(answerText(card)).not.toContain(RUN_WORKED)
+    expect(answerText(card)).not.toContain(RUN_FAILED)
+    expect(answerText(card)).not.toContain("ago")
+
+    expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "not-by-you")
+  })
+
+  it("a row NOBODY has run still says `Never run` — the arm is narrowed, not removed", () => {
+    const { card } = renderCard(NEVER, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_NEVER)
+    expect(answerText(card)).not.toContain(RUN_NOT_BY_YOU)
+    expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "never")
+  })
+
+  it("⚠ DEC-11-B — an ABSENT `hasAnyRun` reads `Not recorded`, never `Never run`", () => {
+    // The deploy-skew row. `runRowOf` cannot express this — a default parameter fires on an
+    // explicit `undefined` — so the row is built through `rowOf` directly.
+    const absent = rowOf("published", {
+      id: "gap-absent-bit",
+      slug: "compliance-gap-absent",
+      name: "Compliance Gap Report",
+      lastRunStatus: null,
+      lastRunAt: null,
+      hasAnyRun: undefined,
+    })
+    const { card } = renderCard(absent, { now: FIXTURE_NOW })
+    expect(answerText(card)).toContain(RUN_UNKNOWN)
+    expect(answerText(card)).not.toContain(RUN_NEVER)
+    expect(answerText(card)).not.toContain(RUN_NOT_BY_YOU)
+    expect(within(card).getByTestId("run-gutter")).toHaveAttribute("data-run", "unknown")
+  })
+
+  it("⚠ THE DELIBERATE CLASS-LEVEL EXCEPTION — the three QUIET arms paint three DIFFERENT gutters", () => {
+    // ⚠ THIS FILE'S CONVENTION IS TO ASSERT `data-run` AND EXPLICITLY NOT A CLASS (see the
+    // `gutter tracks the sentence` case above, and `:1597` / `:1631` / `:1643` as they stood).
+    // THAT CONVENTION IS EXACTLY WHY WR-01 SHIPPED UNNOTICED: `bg-warning` named a Tailwind key
+    // nobody had declared, so the `stopped` gutter rendered UNPAINTED and pixel-identical to the
+    // arm whose docblock says the two "cannot be mistaken" — and every `data-run` assertion in
+    // this file passed throughout. This case is a DELIBERATE exception to the convention, and it
+    // is scoped to the one property `data-run` structurally cannot see: that `never`, `unknown`
+    // and `not-by-you` — three arms that all mean "no outcome to report" — are three visibly
+    // different gutters rather than two plus a duplicate (DEC-11-C).
+    //
+    // ⚠ It asserts DISTINCTNESS, not literal class names. Pinning `bg-muted-foreground` here
+    // would make a token rename a test edit; `gutterTokens.fences.test.ts` is what proves each
+    // literal resolves to a real, both-themes CSS variable.
+    const absent = rowOf("published", {
+      id: "gap-quiet-absent",
+      slug: "compliance-gap-quiet",
+      name: "Compliance Gap Report",
+      lastRunStatus: null,
+      lastRunAt: null,
+      hasAnyRun: undefined,
+    })
+    // ⚠ ONE render, not two. The two outcome rows are in the SAME shelf rather than in a
+    // second `renderCard` call: testing-library cleans up between CASES, not within one, so a
+    // second render inside this case makes every `getByTestId` ambiguous. Read out of its RED.
+    renderRows([NEVER, NOT_BY_YOU, absent, WORKED, FAILED])
+    const cards = screen.getAllByTestId("published-card")
+    expect(cards).toHaveLength(5)
+
+    const gutters = cards.map((card) => within(card).getByTestId("run-gutter"))
+    expect(gutters.map((g) => g.getAttribute("data-run"))).toEqual([
+      "never",
+      "not-by-you",
+      "unknown",
+      "worked",
+      "failed",
+    ])
+
+    const classes = gutters.slice(0, 3).map((g) => g.getAttribute("class") ?? "")
+    // Non-vacuity: a card that painted nothing at all would satisfy a bare distinctness check
+    // over three empty strings.
+    for (const c of classes) expect(c.trim().length).toBeGreaterThan(0)
+    expect(new Set(classes).size).toBe(3)
+    // …and stated PAIRWISE, so a failure names which two collapsed.
+    expect(classes[0]).not.toBe(classes[1])
+    expect(classes[1]).not.toBe(classes[2])
+    expect(classes[0]).not.toBe(classes[2])
+
+    // ⚠ AND NONE OF THE THREE BORROWS AN OUTCOME COLOUR. The caller has no outcome to report on
+    // any of them, so a success/failure/warning tone would be a fabricated one (DEC-11-C).
+    const outcomeClasses = gutters.slice(3).map((g) => g.getAttribute("class") ?? "")
+    expect(outcomeClasses).toHaveLength(2)
+    for (const c of outcomeClasses) expect(c.trim().length).toBeGreaterThan(0)
+    for (const quiet of classes) expect(outcomeClasses).not.toContain(quiet)
+    // …and all five gutters are five distinct paints, which is the whole map stated at once.
+    expect(new Set([...classes, ...outcomeClasses]).size).toBe(5)
   })
 })
 
