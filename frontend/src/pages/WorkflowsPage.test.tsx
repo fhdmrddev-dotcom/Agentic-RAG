@@ -146,6 +146,11 @@ import {
   // the sentence inline has forked the acceptance bar the generated contract exists to hold.
   FORK_HINT_CLASH,
   forkFailedMessage,
+  // 192.2-09 (WR-04): the reason line's fixed parts and its words. Two of the three ARE the
+  // chip labels, so asserting against these exports is what proves the chip a person pressed
+  // and the reason the row gives back are ONE word rather than two that agree today.
+  MATCH_REASON_PREFIX,
+  MATCH_REASON_WORDS,
 } from "@/components/workflows/library/libraryVocabulary"
 import type { Folder } from "@/types"
 
@@ -790,6 +795,143 @@ describe("WorkflowsPage — the soul tier picks the STRICTEST emit policy (WR-03
     expect(within(card).queryByTestId("soul-tier")).not.toBeInTheDocument()
     expect(card).not.toHaveTextContent("STRICT")
     expect(within(card).getByTestId("row-answer")).toBeInTheDocument()
+  })
+
+  // ══════════════════════════════════════════════════════════════════════════════════
+  // 192.2-09 (WR-04) — THE AMENDMENT. IT IS AN INVERSION-IN-PLACE, NOT A REPLACEMENT.
+  // ══════════════════════════════════════════════════════════════════════════════════
+  //
+  // The case directly above recorded a TRADE-OFF and called it intended: a STRICT row says
+  // nothing about its tier. Code review measured that the trade-off had grown teeth — the
+  // *Strict* chip still SELECTS on the tier D-03 cut, so filtering by it returned rows
+  // carrying no visible evidence of the property that selected them, and `chipCounts`
+  // published a number for a fact the surface would not show.
+  //
+  // ⚠ THE ORIGINAL ASSERTION IS NOT DELETED, AND ITS PROPERTY IS STILL TRUE. What changed is
+  // that it is now true of the RESTING card only. This phase's re-baseline discipline is
+  // INVERSION, never removal (`WorkflowCard.baseline.test.tsx`'s §6 states the rule): an
+  // assertion that merely stops being checked can come back silently. So the case above keeps
+  // the at-rest half verbatim, and these two add the halves it could not have had — the card
+  // explaining itself once the chip IS pressed, and the same for a purpose-only search hit.
+
+  it("with the Strict chip PRESSED, the row states the reason it was selected (WR-04)", async () => {
+    const multiEmit = {
+      id: "pub-multi",
+      slug: "multi-emit",
+      name: "Multi emit",
+      definition: {
+        slug: "multi-emit",
+        version: 1,
+        project_folder_id: null,
+        phases: [
+          { slug: "e1", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "flag" } },
+          { slug: "e2", phase_index: 1, config: { phase_type: "llm_emit", citation_policy: "strict" } },
+        ],
+      },
+    }
+    expect(tierForDefinition(multiEmit.definition as never).id).toBe("STRICT")
+
+    mockListPublished.mockResolvedValue([multiEmit])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const restingCard = await screen.findByTestId("published-card")
+    // AT REST — the original property, preserved verbatim here as well as above, so this
+    // case cannot pass on a page that simply shows the tier all the time.
+    expect(within(restingCard).queryByTestId("row-match-reason")).toBeNull()
+    expect(restingCard).not.toHaveTextContent("STRICT")
+
+    fireEvent.click(screen.getByTestId("library-chip-strict"))
+
+    const card = await screen.findByTestId("published-card")
+    const reason = within(card).getByTestId("row-match-reason")
+    expect(reason).toHaveTextContent(MATCH_REASON_PREFIX)
+    // Asserted against the EXPORT — which is `CHIP_WORDS.strict.label`, i.e. the chip's own
+    // word. The row answers with the word the person pressed.
+    expect(reason).toHaveTextContent(MATCH_REASON_WORDS.strict)
+  })
+
+  it("with the Makes a file chip PRESSED, the row states that reason too (WR-04)", async () => {
+    const emitsFile = {
+      id: "pub-file",
+      slug: "emits-a-file",
+      name: "Emits a file",
+      definition: {
+        slug: "emits-a-file",
+        version: 1,
+        project_folder_id: null,
+        phases: [
+          { slug: "e1", phase_index: 0, config: { phase_type: "llm_emit", citation_policy: "flag" } },
+        ],
+      },
+    }
+    mockListPublished.mockResolvedValue([emitsFile])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const restingCard = await screen.findByTestId("published-card")
+    expect(within(restingCard).queryByTestId("row-match-reason")).toBeNull()
+
+    fireEvent.click(screen.getByTestId("library-chip-makes-a-file"))
+
+    const card = await screen.findByTestId("published-card")
+    expect(within(card).getByTestId("row-match-reason")).toHaveTextContent(
+      MATCH_REASON_WORDS["makes-a-file"],
+    )
+  })
+
+  it("a search word that lives ONLY in the purpose says so, on the returned row (WR-04)", async () => {
+    // The instance `192.2-05` recorded: D-03 cut the purpose hero while the search still
+    // matches inside `business_requirement`, so a hit could arrive with nothing on the card
+    // to explain it. ⚠ The reason NAMES the field and never quotes the sentence (T-192.2-40).
+    const purposeOnly = {
+      id: "pub-purpose",
+      slug: "quarterly-recap",
+      name: "Quarterly recap",
+      definition: {
+        slug: "quarterly-recap",
+        version: 1,
+        project_folder_id: null,
+        business_requirement: "Check every supplier against the approved register.",
+        phases: [{ slug: "a", phase_index: 0, config: { phase_type: "llm_agent" } }],
+      },
+    }
+    mockListPublished.mockResolvedValue([purposeOnly])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    const restingCard = await screen.findByTestId("published-card")
+    expect(within(restingCard).queryByTestId("row-match-reason")).toBeNull()
+    // The needle is in the purpose and NOT in the name — otherwise `HighlightTitle` would
+    // already have answered and the reason would (correctly) stay silent.
+    expect(purposeOnly.name.toLowerCase()).not.toContain("supplier")
+
+    setSearch("supplier")
+
+    const card = await screen.findByTestId("published-card")
+    const reason = within(card).getByTestId("row-match-reason")
+    expect(reason).toHaveTextContent(MATCH_REASON_WORDS.purpose)
+    // The user-authored sentence itself stays off the card.
+    expect(reason.textContent).not.toContain(purposeOnly.definition.business_requirement)
+  })
+
+  it("a search word in the NAME adds no reason — HighlightTitle already answered it", async () => {
+    const named = {
+      id: "pub-named",
+      slug: "supplier-review",
+      name: "Supplier review",
+      definition: {
+        slug: "supplier-review",
+        version: 1,
+        project_folder_id: null,
+        business_requirement: "Check every supplier against the approved register.",
+        phases: [{ slug: "a", phase_index: 0, config: { phase_type: "llm_agent" } }],
+      },
+    }
+    mockListPublished.mockResolvedValue([named])
+    render(<WorkflowsPage folders={folders} onLaunch={vi.fn()} />)
+    await screen.findByTestId("published-card")
+
+    setSearch("supplier")
+
+    // The row IS in the filtered set — non-vacuity, so the silence below is not an artifact
+    // of an empty list — and it still says nothing extra, because the name hit is visible.
+    const card = await screen.findByTestId("published-card")
+    expect(within(card).queryByTestId("row-match-reason")).toBeNull()
   })
 })
 

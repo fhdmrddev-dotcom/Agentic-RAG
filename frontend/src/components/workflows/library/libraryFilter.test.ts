@@ -931,7 +931,17 @@ describe("F-7 extended — no client sort on the merged list (D-17)", () => {
     // where a sort would actually be written. These three anchors ARE that region: the merge,
     // the narrow, and the render.
     expect(workflowsPageCode).toContain("mergeLibrary(published, starters, drafts)")
-    expect(workflowsPageCode).toContain("filterLibrary(rows, { query, chips: activeChips")
+    // ⚠ RE-POINTED BY 192.2-09, AND THE ANCHOR'S JOB IS UNCHANGED. It read
+    // `filterLibrary(rows, { query, chips: activeChips` — the selection assembled INLINE
+    // inside the narrow. WR-04 gave that object a second consumer (`matchReasons`, per row),
+    // and two inline literals would be two answers to one question, so the object was hoisted
+    // into its own memo and the narrow now reads `filterLibrary(rows, selection)`.
+    //
+    // BOTH halves are anchored rather than one, so the region this guard exists to watch is
+    // still bracketed exactly as before: the SELECTION at its new home, and the NARROW that
+    // consumes it. A stripper that ate the ~600-line region would still fail here.
+    expect(workflowsPageCode).toContain("chips: activeChips")
+    expect(workflowsPageCode).toContain("filterLibrary(rows, selection)")
     expect(workflowsPageCode).toContain("visibleRows.map(")
   })
 
