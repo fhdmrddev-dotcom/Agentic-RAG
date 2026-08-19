@@ -2443,3 +2443,116 @@ describe("194.1-07 F1/F2 — the run page reaches the cancel through ONE mechani
     expect((`${src}\nvoid cancelRun(x)\n`.match(needle()) ?? []).length).toBe(1)
   })
 })
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PHASE 199 PLAN 07 TASK 1 — THE RUN SURFACE'S RESTING ATOMS.
+ *
+ * ⚠ SHEET c8 CONTAINS **ZERO** RUN-SURFACE ELEMENTS, and saying so is the finding
+ *   rather than an excuse for a thin block. Its six drawn elements — the ask card,
+ *   the paused cue, the files section, the file preview, the version diff and the
+ *   empty panel — are all PANEL elements at 380px. The only one with a run-surface
+ *   analogue is the FILE ROW, and Phase 195 already unified that: both surfaces
+ *   render `components/files/FileRow` through `components/files/fileRowUtils`, so
+ *   the sheet's file-row language is ALREADY one language across the two.
+ *
+ * What this block pins is therefore the run header at rest, INCLUDING the shipped
+ * behaviour of the definition-unavailable degrade path — which `WorkflowRunPage`'s
+ * own docblock claims the header "says so by way of the empty name". That claim is
+ * measured here BEFORE it is acted on, so a later correction is an inversion of a
+ * recorded reading rather than an assertion about remembered code.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run element)", () => {
+  it("HEADER at rest — the workflow's NAME and its version chip, as literals", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // Non-vacuity FIRST — the run really resolved, so the readings below are about
+    // a rendered header rather than about a loading state.
+    expect(screen.getByTestId("run-band")).toBeInTheDocument()
+
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Supplier contract renewals",
+    )
+    expect(screen.getByText("v4")).toBeInTheDocument()
+  })
+
+  it("HEADER at rest — the four top-level regions, and nothing else", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun())
+    const { container } = renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // header · the sr-only announcement pair · canvas region · deliverable region.
+    // Read off the DOM so an ADDED region reds this rather than passing unnoticed.
+    expect(container.querySelectorAll("header")).toHaveLength(1)
+    expect(screen.getByTestId("run-canvas-region")).toBeInTheDocument()
+    expect(screen.getByTestId("run-deliverables")).toBeInTheDocument()
+    // ⚠ ONE spine, and it is the CANVAS's. The panel owns the meaningful phase spine
+    // (workflow-run-surface.md D1); a second one on this page would be the
+    // dual-surface bounce sketch 004 warns against.
+    expect(container.querySelectorAll('[data-testid="canvas-stub"]')).toHaveLength(1)
+  })
+
+  /**
+   * ⚠ THE CHARACTERIZATION PIN THIS PLAN EXISTS TO INVERT.
+   *
+   * `WorkflowRunRead`'s own docblock records the server's degrade path verbatim:
+   * *"if the definition row cannot be read, the server returns `workflow_name: ""` /
+   * `workflow_slug: ""` / `workflow_version: 0` / `definition: null` rather than
+   * 404ing. Treat an empty `workflow_name` as 'definition unavailable', **never
+   * render the empty string**."* And `WorkflowRunPage`'s `specs` memo claims *"the
+   * header says so by way of the empty name."*
+   *
+   * MEASURED BELOW, at HEAD: it does not. The header renders the generic word
+   * `Workflow` — a plausible-looking default — and the version chip renders `v0`,
+   * a fabricated number that looks like a real one. Both are pinned PRESENT here so
+   * Task 3's correction is proved by INVERTING these two assertions rather than by
+   * deleting them.
+   */
+  it("DEGRADE PATH — the header SAYS the details could not be read, and prints no version", async () => {
+    getWorkflowRun.mockResolvedValue(
+      mkRun({ workflow_name: "", workflow_slug: "", workflow_version: 0, definition: null }),
+    )
+    const { container } = renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // Non-vacuity: the degrade fixture really rendered the run arm, not an error arm.
+    expect(screen.getByTestId("run-band")).toBeInTheDocument()
+
+    // ⚠ BOTH ASSERTIONS ARE TASK 1'S, INVERTED — the lines are edited, never deleted,
+    // so `git diff --numstat` against this plan's base still reads `+N / −0` on this
+    // file. Task 1 pinned `toHaveTextContent("Workflow")` and `toContain("v0")`; both
+    // were TRUE at HEAD and both were the defect.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "We couldn't read this workflow's details",
+    )
+    expect(container.textContent).not.toContain("v0")
+    // …and no version chip of ANY value. Absence is the honest reading; a version is
+    // a claim, and there is no version to claim.
+    //
+    // ⚠ THIS IS AN **ELEMENT** QUERY AND THE FIRST DRAFT WAS A `textContent` REGEX,
+    // WHICH WAS VACUOUS. `container.textContent` concatenates with no separator, so the
+    // page reads `…renewalsv4…` and `\bv\d` has no word boundary to anchor on: the
+    // needle could not match even when the chip WAS on screen. Caught by the positive
+    // control below failing rather than by reading the regex — which is the whole
+    // argument for pairing a count-zero fence with one.
+    expect(screen.queryByText(/^v\d+$/)).toBeNull()
+  })
+
+  it("DEGRADE PATH POSITIVE CONTROL — a healthy run still prints its name and its version", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    // The needles above are live: the SAME two queries, run against the healthy
+    // fixture, find a real name and a real version chip. A degrade fence whose needles
+    // could never match anything would report green forever — and this control has
+    // already earned its keep once (see the note on the vacuous regex above).
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Supplier contract renewals",
+    )
+    expect(screen.getByText(/^v\d+$/)).toHaveTextContent("v4")
+    expect(screen.queryByText("We couldn't read this workflow's details")).toBeNull()
+  })
+})

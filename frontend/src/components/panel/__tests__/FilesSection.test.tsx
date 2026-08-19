@@ -215,6 +215,120 @@ describe("FilesSection (TMPL-01 / D-02) — ephemeral template badge + countdown
     expect(caption.className).toMatch(/amber/)
   })
 
+  // ───────────────────────────────────────────────────────────────────────────
+  // PHASE 199 PLAN 07 (sheet `c8-run-panel`) — "AN UNKNOWN FILE TIME SAYS SO
+  // INSTEAD OF BLANKING". Three readings, asserted as three, plus the structural
+  // fourth (a non-template row says nothing at all, and that is correct).
+  //
+  // ⚠ THE ARM THIS FIXES WAS REACHABLE AND UNGUARDED. `WorkspaceFile.expires_at`
+  //   is optional on the wire, and the caption span was rendered unconditionally
+  //   inside the template branch — so a template row whose expiry the wire did not
+  //   carry rendered an EMPTY span beside its "Template" badge. Nothing in this
+  //   file's 24 shipped cases covered it.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /** A template the wire gave NO `expires_at` — the blank arm, made honest. Built
+   *  by spread so this file never names the `WorkspaceFile` type (it does not
+   *  import it; three pre-existing TS2304s at HEAD are exactly that, and a fourth
+   *  is not this plan's to add). */
+  const templateNoExpiry = {
+    ...templateFile,
+    id: "file-tmpl-unknown",
+    path: "no-expiry-on-the-wire.docx",
+    expires_at: undefined,
+  }
+
+  it("ABSENT — a template with no expires_at SAYS the expiry is unknown, never a blank", () => {
+    useWorkspaceFiles.mockReturnValue({
+      data: [templateNoExpiry],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+    const { container } = render(<FilesSection />)
+
+    // Non-vacuity FIRST: this really is a TEMPLATE row, so the caption slot exists
+    // at all. Asserting a caption's text against a row that renders no slot would
+    // be a green test about an element that was never on screen.
+    expect(screen.getByText("Template")).toBeInTheDocument()
+
+    expect(screen.getByText("expiry unknown")).toBeInTheDocument()
+    // ⚠ AND IT IS THE HONEST WORD, not a KNOWN-NONE. "no expiry" would claim this
+    // template never runs out — a claim nobody made.
+    expect(screen.queryByText(/no expiry/i)).toBeNull()
+    // …not a time, either. Absent must not read as a countdown.
+    expect(screen.queryByText(/expires in/i)).toBeNull()
+
+    // THE BLANK IS GONE — measured, not implied: no empty mono caption survives.
+    const blanks = Array.from(container.querySelectorAll("span.font-mono")).filter(
+      (s) => (s.textContent ?? "").trim() === "",
+    )
+    expect(blanks).toHaveLength(0)
+  })
+
+  it("ABSENT is NOT urgent — the unknown reading is muted, never the amber cue", () => {
+    useWorkspaceFiles.mockReturnValue({
+      data: [templateNoExpiry],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+    render(<FilesSection />)
+    const caption = screen.getByText("expiry unknown")
+    // The amber cue means "act soon". A missing field is not an emergency, and
+    // painting it amber manufactures an alarm out of an absence.
+    expect(caption.className).not.toMatch(/amber/)
+    // It takes the panel-scoped muted token — the one that clears AA on the panel
+    // ground in BOTH themes (088-05). Asserted as a CLASS: in dark theme the panel
+    // token and the global one resolve identically, so an `rgb()` assertion could
+    // not tell them apart.
+    expect(caption.className).toMatch(/text-panel-muted-foreground/)
+  })
+
+  it("the three readings are THREE — absent, known-past and known-future never collapse", () => {
+    const expiredAlready = {
+      ...templateFile,
+      id: "file-tmpl-past",
+      path: "ran-out.docx",
+      expires_at: new Date(Date.now() - 60_000).toISOString(),
+    }
+    useWorkspaceFiles.mockReturnValue({
+      data: [templateNoExpiry, expiredAlready, templateFile],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+    render(<FilesSection />)
+
+    // Non-vacuity: all three rows really rendered before their captions are read.
+    expect(screen.getAllByRole("option")).toHaveLength(3)
+
+    const captions = [
+      screen.getByText("expiry unknown").textContent,
+      screen.getByText("expired").textContent,
+      screen.getByText(/expires in \d+h/).textContent,
+    ]
+    // Three distinct strings. A collapse in either direction — absent reading as
+    // expired, or expired reading as unknown — reds this.
+    expect(new Set(captions).size).toBe(3)
+  })
+
+  it("STRUCTURAL FOURTH — an agent file renders no caption at all, and that is correct", () => {
+    useWorkspaceFiles.mockReturnValue({
+      data: [agentFile],
+      isLoading: false,
+      error: null,
+      reconcile: vi.fn(),
+    })
+    render(<FilesSection />)
+    // Non-vacuity: the row is on screen…
+    expect(screen.getAllByRole("option")).toHaveLength(1)
+    // …and says nothing about an expiry, because there is nothing to say. The
+    // honest-unknown word must NOT leak onto every ordinary file.
+    expect(screen.queryByText("expiry unknown")).toBeNull()
+    expect(screen.queryByText("Template")).toBeNull()
+  })
+
   it("a docx/pptx/xlsx template renders a distinct per-extension icon (not FileIcon)", () => {
     // Plan 100-06: iconFor() returns a per-extension office icon for the OOXML
     // template mime types (sketch-016 per-extension icons).

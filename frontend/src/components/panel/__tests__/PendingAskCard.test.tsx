@@ -192,6 +192,66 @@ describe("PendingAskCard (PANEL-04) — answer + resume", () => {
     expect(screen.getByText(mockPendingAskWithRunId.options[0])).toBeInTheDocument()
   })
 
+  /**
+   * ─────────────────────────────────────────────────────────────────────────
+   * PHASE 199 PLAN 07 (sheet `c8-run-panel`) — THE RESOLVED CARD IS A RECEIPT,
+   * NOT A FORM THAT STAYED ON SCREEN. Verdict: **ALREADY-SHIPPED, now FENCED.**
+   *
+   * The sheet draws its ANSWERED card as a receipt — the question demoted, the
+   * decision, and the moment it was taken — and the shipped card already reads
+   * that way. So this plan builds nothing here and pins the property instead,
+   * because it was TRUE AND UNGUARDED: the shipped answered case above asserts
+   * the three texts that ARE there and nothing about what must NOT be.
+   *
+   * ⚠ THIS IS ALSO THE PLAN'S REGISTERED THREAT `T-199-07-01` (Spoofing). A
+   *   resolved ask that kept a live control could be re-answered, or read as
+   *   still open, after the loop had already moved on. The disposition asks for
+   *   controls to be **GONE, not merely disabled** — so the fence counts
+   *   ELEMENTS, never `disabled` attributes.
+   *
+   * ⚠ THE NEEDLE IS DRIVEN AGAINST A REAL CONTRAST RATHER THAN A PLANT. The
+   *   PENDING arm of the SAME card, with the SAME fixture, is swept by the SAME
+   *   selector in the positive control below and must return a non-zero count —
+   *   which is what proves this selector can fire at all. A count-zero fence
+   *   with an unproven needle is exactly the guard that passes while defending
+   *   nothing.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  const INTERACTIVE = 'button, input, textarea, select, [role="radio"], [contenteditable="true"]'
+
+  it("RESOLVED — the answered card holds ZERO interactive controls (T-199-07-01)", async () => {
+    const user = userEvent.setup()
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />,
+    )
+    await user.click(screen.getAllByRole("radio")[0])
+    await user.click(screen.getByRole("button", { name: /send answer/i }))
+
+    // Non-vacuity FIRST: it really is the answered arm, and it really still
+    // carries its two facts. A zero-control count against an unmounted card
+    // would be a green test about an empty container.
+    await screen.findByText(/answered · agent resumed/i)
+    expect(screen.getByText(/you answered/i)).toBeInTheDocument()
+    expect(screen.getByText(mockPendingAskWithRunId.prompt)).toBeInTheDocument()
+
+    // GONE, not disabled. `disabled` is a browser courtesy; absence is the fact.
+    expect(container.querySelectorAll(INTERACTIVE)).toHaveLength(0)
+    // Said the other way round, so a future arm that re-introduced a dead control
+    // could not satisfy this case by marking it disabled.
+    expect(container.querySelectorAll("[disabled], [aria-disabled]")).toHaveLength(0)
+  })
+
+  it("POSITIVE CONTROL — the SAME selector finds the pending card's controls", () => {
+    const { container } = render(
+      <PendingAskCard ask={mockPendingAskWithRunId} reconcile={noopReconcile} />,
+    )
+    // The pending arm has two radios, a textarea and a submit — so the needle above
+    // is live, and the zero it reports on the answered arm is a measurement.
+    expect(container.querySelectorAll(INTERACTIVE).length).toBeGreaterThan(0)
+    expect(container.querySelectorAll('[role="radio"]').length).toBeGreaterThan(0)
+    expect(container.querySelectorAll("textarea")).toHaveLength(1)
+  })
+
   it("renders the calm '.expired' state on timeout, never an opaque crash (D5)", () => {
     const expired: PendingAsk = { ...mockPendingAskWithRunId, timeout_seconds: 0 }
     expect(() =>
