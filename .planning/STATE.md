@@ -35,6 +35,100 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
+Phase: 199 (the-component-map) — **PLANNED · 10 plans / 3 waves · plan-checker PASS, 0 blockers**
+Plan: **0 of 10 executed**
+Next action: **`/gsd:execute-phase 199`** — ⚠ **dispatch AT MOST TWO plans concurrently, never a full
+four-plan wave.** File ownership is disjoint everywhere (83 files, each owned by exactly ONE plan,
+zero overlap within or across waves), so the waves are a SEQUENCING decision, not a dependency graph
+— but CLAUDE.md records the count gate going non-deterministic at THREE concurrent test-running
+agents regardless of the worker cap.
+
+⚠ **THIS PHASE EXISTS BECAUSE OF AN OPERATOR COMPLAINT ABOUT PROCESS COST, AND THE PLAN COUNT IS
+ITSELF A DELIVERABLE.** Phase 192.2 spent **eleven plans on one card**; the instruction was *"implement
+everything so we can close the thing of the design of the full workflow … but we do not need to
+over-complicate things like this."* Ten sheets → **ten plans, 28 tasks, 2–3 tasks each**. What made
+192.2 expensive does not recur: no G-5 refactor blocks anything here, **no backend feature**, and
+**no new guarded module** (every test file in every `files_modified` already exists).
+
+⚠ **PRESENTATION-ONLY IS THE ECONOMIC PREMISE, NOT CAUTION.** No data, no endpoint, no migration, no
+wire-model change, no new capability; every plan carries an empty-`backend/`-and-`supabase/`-diff
+acceptance criterion and a STOP-and-report rule. Sketch 178's measured win came from **removing** text
+and chrome — three rules written into the design system's `designMd` took app-shell duplication from
+3 of 6 pages to **0 of 9**, stock photography 3 → **0**, printed-mechanism subtitles → **0**.
+
+⚠ **A RATIFIED METHOD STEP IS DELIBERATELY SKIPPED, AND IT IS RECORDED AS A DECISION.** STITCH-BRIEF
+§6.5's four-step loop puts a SECOND sketch — one that RENDERS shipped components — between Stitch and
+the build, and makes it the G-2 bar. We go straight from 178 to the build: the operator has ratified
+the language, and eleven more sketches is the over-complication this phase exists to avoid. `SEED-155`'s
+risk (a sketch drew an atom `WorkflowCard` **structurally could not render**) is carried into execution
+as a hard rule instead: **if the shipped component cannot express the sheet, REPORT it — never fake it,
+never grow a backend change to make it possible.** ⚠ Sketch 178 renders **ZERO** shipped components.
+
+✅ **THE SKIPPED-STEP RULE ALREADY PAID FOR ITSELF — three CANNOT-EXPRESS gaps were found at PLANNING
+time, not at build, and the plan-checker verified each against real source:**
+- **`199-05` — the payload-bearing connection label** (`312 contracts → 48 extracted → 12 flagged`).
+  The sketch README calls this *"the idea worth keeping from the whole exploration"*, and **nothing in
+  the app emits a per-edge count** (confirmed: zero occurrences across `FlowEdge.tsx`, the canvas model
+  files, `models/harness.py` and `services/harness/*`). Approximating it with a phase count would put a
+  **fabricated business figure on the canvas** — the highest-consequence lie this phase could ship.
+- **`199-09` — the problems tray's engineer language.** `ProblemsTray.tsx` renders the server's
+  `message` **verbatim by decision D-182-06** (*"no code table here and no friendly-message map"*,
+  confirmed verbatim in its docblock). A client-side rewrite re-introduces exactly what that decision
+  removed; fixing the sentences at source is a backend change the fence forbids. Routed, not built.
+- **`199-02` — the chat-sized receipt spine** with mono per-step durations.
+
+⚠ **FOUR sheet elements are pre-REFUSED as SHEET DEFECTS**, each citing a rule the checker confirmed
+exists: `(4/12)` determinate mid-phase progress (contradicts `PhaseTimeline.tsx:24`'s shipped
+**SUPPRESS-DON'T-FAKE D-03**) · `Fork Logic` · `Target nodes: production-cluster` ·
+`Estimated time: ~45s`. All four were verified to be **real sheet content**, byte-for-byte at the cited
+lines — not planner invention.
+
+✅ **TWO sheet claims were found ALREADY SHIPPED, so they are NOT rebuilt** — pure waste avoided:
+`c10`'s *name-not-slug* headline landed in **Phase 197** as `identityLabel` (D-19,
+`WorkflowBuilderPage.tsx:2430-2461`); and `c6`'s delete-consequence line ships **HEAVIER than the
+drawing** — `WorkflowDeleteSheet.tsx` fetches exact server counts, names the victim, shows the amber
+banner only when a run is live, never vanishes optimistically and offers no undo. `199-10` must
+re-present it **without weakening it**, asserting all four guard properties BEFORE and AFTER, because
+D-15/D-18 are arguments made by reference to that guard.
+
+⚠ **THREE ROADMAP ERRORS WERE CAUGHT BY THE PLANNER AND ONE WAS A REAL TRAP:** the ROADMAP mapped
+sheet `c3` to `PhaseSpine.tsx`, which is the **SOUL's glyph-dot spine** and carries a docblock
+**`G-5 RED LINE: it MUST NOT import or touch the run-surface live phase-timeline / phase-card`**
+(confirmed verbatim). `c3` ships against `PhaseSpineGraph.tsx` + `panel/PhaseTimeline.tsx` +
+`panel/PhaseCard.tsx`, and `PhaseSpine.tsx` moved to `199-03` with the soul it belongs to. Also:
+`c5-draft-arrival` was **missing from the wave table entirely**, and `c9-doors-describe` moved wave
+3 → 2 so `WorkflowBuilderPage.tsx` has exactly one owner.
+
+⏸ **ONE OPERATOR DECISION IS PENDING AND SHOULD BE ANSWERED BEFORE WAVE 1:** sheet `c7` draws the
+soul's third strictness arm as **`UNDETERMINED`**; the shipped word is **`MIDDLE`** (`deriveTier.ts`:
+`TierId = "STRICT" | "MIDDLE" | "LOOSE"`, derived every render from real enums, no stored label).
+`199-03` keeps `MIDDLE`, because the sheet's word would print *"we could not tell"* about a value the
+code **can** tell. The plan-checker agreed. **If the operator wants the sheet's vocabulary, say so
+before `199-03` runs.**
+
+⚠ **OUT OF SCOPE BY INSTRUCTION** (*"later on maybe we can modify some bugs … to match it"*):
+`SEED-182` (the composing moment is a dead greyed-out duplicate form) and `SEED-183` (draft
+configuration vanishes, taking the ONLY rename control with it). **Both are `priority: high` BEHAVIOUR
+defects in this same journey and both stay `planted`** — named here so the deferral has a home.
+`SEED-184` (*"information is dumped as text, not presented"*, an explicitly RECURRING complaint) is
+what this phase answers. ⚠ `c11-journey-arc` is **FAILED / re-running in the sketch** and has no plan.
+
+**Baselines for this phase:** count gate `total 4690 · failed 0 · pinned total 4543 · 96/96` · `tsc`
+**33** · backend `62 failed / 2350 passed` (SEED-056 rot — and this phase must not move it at all).
+
+---
+
+**⏸ PHASE 192.2 REMAINS OPEN AND IS NOT SUPERSEDED BY 199.** Verified `human_needed` 6/6; CR-01 closed
+and independently re-verified; **TEN G-4 rows still owed** (`192.2-VALIDATION.md`, `driven: false`,
+every `result:` empty) and **LIB-06 deliberately UNTICKED** until a person drives them. Drive **U10, U4,
+U5** first. ⚠ On U4: **DELETE the payload keys, do not null them** — `null` is a different arm, and
+U4's own key list was WRONG until `192.2-11` (it named two where three ship, and rule 1
+short-circuits, so **it would have passed while blind to the omission**).
+
+---
+
+<!-- Prior position — Phase 192.2 — kept below rather than deleted; it is still OPEN. -->
+
 Phase: 192.2 (does-this-one-work) — **11/11 EXECUTED · GAP ROUND 1 SHIPPED · VERIFIED `human_needed` 6/6 · NOT CLOSED**
 Plan: **6 of 6 executed** — Wave 1 (`192.2-01`, the measurement-only baseline), Wave 2
 (`192.2-02` the G-5 discharge + `192.2-03` the run-facts join), Wave 3 (`192.2-04`, the run
