@@ -163,6 +163,31 @@ export interface PhaseNodeCardProps {
   title: string
   /** The one supporting line. An empty string renders nothing. */
   subtitle?: string
+  /**
+   * Phase 200 (canvas port) — does `subtitle` carry a MACHINE IDENTIFIER rather than a
+   * sentence? It changes exactly one thing: whether that line may be truncated.
+   *
+   * ⚠ IT EXISTS BECAUSE TWO CORRECT RULES COLLIDED, and neither could simply win.
+   * `screens/builder-canvas.html` truncates its supporting line on all ten of its nodes,
+   * and the sketch is the absolute reference for LAYOUT. But 187-09 moved the ⌥
+   * Technical-names reveal OUT of the title slot and INTO this one for the measured reason
+   * that the title truncates: the reveal rendered as `AI agent step · find-renewal-t…`
+   * with the SLUG clipped — the one token the reveal exists to show. Porting the sheet's
+   * `truncate` unconditionally would have silently re-broken that fix.
+   *
+   * A shipped fix that prevents a real defect is a CONSTRAINT the layout must satisfy, not
+   * a competitor to it. So the sheet's truncation is kept for the sentence case — which is
+   * every card on a default Builder canvas, at the sheet's exact 72px — and suspended for
+   * the identifier case, where the line wraps and the whole slug reaches the reader. No
+   * hover or ⓘ affordance is needed, because nothing has to be hidden to satisfy both.
+   *
+   * DATA, NOT LAYOUT — extensibility seam #1's own rule. The card gains a slot; no caller
+   * of any other slot changes; absent ⇒ the sheet's behaviour, so a caller that never sets
+   * it gets the reference composition. The ADAPTER owns the answer, because the adapter is
+   * already the one place that knows whether the reveal is on (D-183-08: exactly ONE
+   * technical-names state in the app), and this card still renders provider-less.
+   */
+  subtitleIsIdentifier?: boolean
   /** An extra ⌥-reveal line. **Not passed by the 184 adapter** — the reveal is a
    *  title swap today; this slot exists so a later phase adds a line without
    *  re-cutting the card. Absent ⇒ renders nothing. */

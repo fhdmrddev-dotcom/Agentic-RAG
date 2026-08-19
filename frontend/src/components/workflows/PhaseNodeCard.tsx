@@ -163,6 +163,7 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     icon,
     title,
     subtitle,
+    subtitleIsIdentifier,
     condition,
     technicalLine,
     tint,
@@ -350,7 +351,22 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
             canvas-level invariant and the node's own accessible name states the type. */}
         <span
           aria-hidden="true"
-          data-testid="canvas-node-icon"
+          // ⚠ THE `canvas-icon-well` NAME IS LOAD-BEARING AND THE `canvas-node-` PREFIX IS
+          // RESERVED. Several suites enumerate the plane's node ROOTS with a test-id prefix
+          // selector, and that works only because every OTHER element wearing that prefix
+          // (the run ring, the run line, the verdict mark, the governance seal) is
+          // CONDITIONAL and therefore absent from a resting Builder card. This well renders
+          // ALWAYS, so a prefixed name would have inflated every one of those counts.
+          // Measured, not reasoned about: `PhaseNode.test.tsx`'s one-tab-stop walk read 6
+          // nodes where 3 exist, and `WorkflowCanvas.test.tsx`'s roster read 8 where 7 do.
+          //
+          // ⚠ AND THE SIBLING NAMES ARE DESCRIBED, NEVER SPELLED, in this comment. A source
+          // fence in the card's suite carves the seal's JSX block by finding the FIRST
+          // occurrence of its test id across the joined subtree source — and this file is
+          // joined first — so a docblock quoting that id verbatim silently steals the anchor
+          // and the fence dies with "could not carve". That happened once while writing this
+          // very comment; the guard is fine, the prose was not.
+          data-testid="canvas-icon-well"
           className="relative grid h-6 w-6 shrink-0 place-items-center"
         >
           <span
@@ -375,8 +391,24 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
             {title}
           </p>
 
+          {/* THE SUPPORTING LINE. The sheet truncates it on all ten of its nodes and that
+              is the default here — but NOT when the line is carrying a machine identifier.
+              187-09 moved the ⌥ Technical-names reveal into this slot precisely because the
+              title slot truncates and clipped the slug (`AI agent step · find-renewal-t…`),
+              so re-truncating it here would have silently undone a shipped fix. The whole
+              argument, and why this is a DATA slot rather than a layout branch, is on
+              `subtitleIsIdentifier` in `phaseNodeCardContract.ts`.
+
+              Every card on a default Builder canvas takes the truncating arm, which is the
+              sheet's exact 72px composition. */}
           {subtitle ? (
-            <p className="mt-1 truncate text-[11px] leading-snug text-muted-foreground">
+            <p
+              data-identifier={subtitleIsIdentifier ? "true" : undefined}
+              className={cn(
+                "mt-1 text-[11px] leading-snug text-muted-foreground",
+                subtitleIsIdentifier ? "break-words" : "truncate",
+              )}
+            >
               {subtitle}
             </p>
           ) : null}
@@ -392,7 +424,13 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
               lives in `nodeEffectBanner.ts`; the word itself has exactly one home there. */}
           {effectBanner ? (
             <p
-              data-testid="canvas-node-effect-banner"
+              // `canvas-effect-banner`, NOT `canvas-node-effect-banner` — the same
+              // root-enumeration hazard the icon well above documents. This line renders on a
+              // RESTING Builder card (any `external_action` step), so a `canvas-node-` name
+              // would be counted as a node by every suite that enumerates the plane with
+              // `getAllByTestId(/^canvas-node-/)`. Measured: `WorkflowCanvas.test.tsx`'s
+              // seven-type roster read 8 nodes.
+              data-testid="canvas-effect-banner"
               className="mt-1 text-[9px] font-bold leading-snug tracking-wider text-warning"
             >
               {effectBanner}

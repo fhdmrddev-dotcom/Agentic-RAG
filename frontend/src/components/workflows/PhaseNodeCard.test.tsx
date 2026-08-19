@@ -555,7 +555,7 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     //   "canvas-node-seal"                    → NodeCornerMarks.tsx
     //   "const RING_RADIUS"                   → NodeRunOverlay.tsx
     //   "canvas-node-pause-chip"              → NodeRunOverlay.tsx
-    //   "canvas-node-icon"                    → PhaseNodeCard.tsx  (see below)
+    //   "canvas-icon-well"                    → PhaseNodeCard.tsx  (see below)
     //
     // ⚠ THE SIXTH MARKER WAS `"h-[62px]" → NodeIconWell.tsx`, AND IT IS REPLACED RATHER
     // THAN DROPPED. The Phase 200 canvas port deleted that module: sketch 200 draws the
@@ -576,7 +576,7 @@ describe("PhaseNodeCard — the scope fences (source guard)", () => {
     expect(cardSubtreeSource).toContain("canvas-node-seal")
     expect(cardSubtreeSource).toContain("const RING_RADIUS")
     expect(cardSubtreeSource).toContain("canvas-node-pause-chip")
-    expect(cardSubtreeSource).toContain("canvas-node-icon")
+    expect(cardSubtreeSource).toContain("canvas-icon-well")
     // NON-VACUITY: a truncated list, or a glob that resolved to nothing, cannot satisfy the six
     // lines above by accident, because both the list's length and the record's non-emptiness are
     // pinned here (the `PhaseFormPanel.rails.test.tsx:440` control shape). The workflows
@@ -2959,25 +2959,31 @@ function withHoverLift199(capturedHtml: string): string {
   return capturedHtml.replace(match[1], classWithHoverLift199(match[1]))
 }
 
-/** The same delta applied to a captured SHAPE array: only the card div's `class` carries it,
- *  because only the card div holds the className the term was added to. */
-function shapeWithHoverLift199<T extends { key: string; class: string | null }>(
-  captured: readonly T[],
-): T[] {
-  return captured.map((entry) =>
-    entry.key === CARD_DIV_KEY && entry.class !== null
-      ? { ...entry, class: classWithHoverLift199(entry.class) }
-      : entry,
-  )
-}
+/*
+ * ⚠ `shapeWithHoverLift199` WAS DELETED HERE BY THE PHASE 200 CANVAS PORT, and it is
+ * recorded rather than silently removed. It read:
+ *
+ *   "The same delta applied to a captured SHAPE array: only the card div's `class` carries
+ *    it, because only the card div holds the className the term was added to."
+ *
+ * Its two call sites (the verdict matrix and the border-branch matrix) now compare against
+ * the captures DIRECTLY, because the port re-captured and the hover delta is inside those
+ * arrays — splicing it again would have applied it twice. With no caller left it became an
+ * unused declaration and `tsc` said so (TS6133), which is the right outcome: a splice helper
+ * kept "just in case" is a helper nobody can tell is still correct.
+ *
+ * ITS TWO SIBLINGS SURVIVE and are still exercised — `withHoverLift199` and
+ * `classWithHoverLift199` are the subjects of their own throw-on-miss control cases further
+ * down, which are the record of how 199-01 kept faith with a pin it was forbidden to move.
+ */
 
 const CARD_HTML_BASELINE: Record<string, string> = {
   MAXIMAL_RUNNING:
-    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 84px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 84px;\"><span aria-hidden=\"true\" data-testid=\"canvas-node-icon\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 truncate text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span></div>",
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 84px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 84px;\"><span aria-hidden=\"true\" data-testid=\"canvas-icon-well\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground truncate\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span></div>",
   MAXIMAL_WAITING:
-    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 84px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]\" style=\"min-height: 84px;\"><span aria-hidden=\"true\" data-testid=\"canvas-node-icon\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 truncate text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"waiting-for-you\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Paused for your answer — it needs your reply before it can continue</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"waiting-for-you\" class=\"pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--warning))\" stroke-dasharray=\"158.085 55.543\" stroke-dashoffset=\"25.635\"></circle></svg></span><span aria-hidden=\"true\" data-testid=\"canvas-node-pause-chip\" class=\"pointer-events-none absolute left-[31px] top-[46px] z-[9] flex gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]\"><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span></span></div>",
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 84px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-[hsl(var(--warning))]\" style=\"min-height: 84px;\"><span aria-hidden=\"true\" data-testid=\"canvas-icon-well\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground truncate\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"waiting-for-you\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Paused for your answer — it needs your reply before it can continue</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"waiting-for-you\" class=\"pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--warning))\" stroke-dasharray=\"158.085 55.543\" stroke-dashoffset=\"25.635\"></circle></svg></span><span aria-hidden=\"true\" data-testid=\"canvas-node-pause-chip\" class=\"pointer-events-none absolute left-[31px] top-[46px] z-[9] flex gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]\"><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span><span class=\"block h-[9px] w-[3px] bg-[hsl(var(--warning))]\"></span></span></div>",
   MINIMAL_BUILDER:
-    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"false\" class=\"relative\" style=\"width: 260px; min-height: 72px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border\" style=\"min-height: 72px;\"><span aria-hidden=\"true\" data-testid=\"canvas-node-icon\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p></div></div></div>",
+    "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"false\" class=\"relative\" style=\"width: 260px; min-height: 72px;\"><div class=\"mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground border-border\" style=\"min-height: 72px;\"><span aria-hidden=\"true\" data-testid=\"canvas-icon-well\" class=\"relative grid h-6 w-6 shrink-0 place-items-center\"><span class=\"absolute inset-[-5px] rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"relative grid place-items-center text-[18px] leading-none text-muted-foreground\"><span data-testid=\"probe-icon\">◆</span></span></span><div class=\"min-w-0 flex-1\"><p class=\"truncate text-[13px] font-medium leading-tight text-foreground\">Summarise the findings</p></div></div></div>",
 }
 
 describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", () => {
@@ -3194,7 +3200,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3274,7 +3280,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3367,7 +3373,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3460,7 +3466,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3553,7 +3559,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3646,7 +3652,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3752,7 +3758,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3845,7 +3851,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -3938,7 +3944,7 @@ const CARD_READING_SHAPES: Record<CanvasReading, ReturnType<typeof CARD_SHAPE>> 
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4037,7 +4043,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4104,7 +4110,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4171,7 +4177,7 @@ const CARD_VERDICT_SHAPES: Record<VerdictMarkKind, ReturnType<typeof CARD_SHAPE>
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4244,7 +4250,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4350,7 +4356,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4417,7 +4423,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",
@@ -4484,7 +4490,7 @@ const CARD_BORDER_SHAPES: Record<string, ReturnType<typeof CARD_SHAPE>> =
       strokeDashoffset: null,
     },
     {
-      key: "canvas-node-icon",
+      key: "canvas-icon-well",
       class: "relative grid h-6 w-6 shrink-0 place-items-center",
       style: null,
       ariaHidden: "true",

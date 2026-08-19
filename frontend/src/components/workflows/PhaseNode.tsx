@@ -317,6 +317,12 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       icon={renderPhaseMark(data.phaseType)}
       title={data.title}
       subtitle={technical ? data.technicalTitle : data.subtitle}
+      // Phase 200 (canvas port) — the reveal's form is `${label} · ${slug}`, a MACHINE
+      // IDENTIFIER, so the card must not truncate it. This adapter is the one place that
+      // knows the reveal is on (D-183-08 — exactly ONE technical-names state in the app),
+      // which is why the answer is resolved here and passed as data rather than re-derived
+      // inside a card that has to render provider-less. See `subtitleIsIdentifier`.
+      subtitleIsIdentifier={technical}
       // 200-06 (BC-MR-03) — the branch condition, resolved to the target step's NAME at
       // projection time by `canvasModel.buildPhaseData` via `phaseVocabulary
       // .branchConditionOf`. This adapter derives nothing and resolves nothing: the value
