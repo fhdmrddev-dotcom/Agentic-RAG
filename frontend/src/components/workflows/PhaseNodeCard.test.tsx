@@ -2685,6 +2685,83 @@ function cardHtml(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>>
  * deletions on the destination side is therefore expected and is not evidence of drift; a
  * diff against the strings below is.
  */
+// ── 199-01 Task 2 — THE ONE DECLARED DELTA AGAINST THE 188.2-03 CAPTURES ──────────────
+//
+// ⚠ NOT ONE CHARACTER OF THE THREE 188.2-03 LITERALS BELOW IS EDITED, AND THAT IS THE WHOLE
+// DESIGN OF THIS BLOCK. Their own header says a diff against them "IS A BEHAVIOUR CHANGE …
+// AND NOT A TEST TO UPDATE", and re-capturing them would "delete the only evidence anybody
+// has that the card still renders what it rendered". 199-01 makes a behaviour change on
+// purpose — the sheet-c2 §3 hover lift — so the honest move is neither to re-capture nor to
+// abandon the change: it is to keep the capture VERBATIM and declare the delta as a NAMED,
+// SINGULAR, machine-checked transformation of it. The originals stay readable; the
+// amendment sits beside them, never over them (this project's standing habit).
+//
+// THE ARITHMETIC CLOSES WITH NO RESIDUAL, which is what separates a declared change from
+// drift: shipped == captured + exactly this term, at exactly one position, on exactly the
+// Builder-mode rows. Every one of those four words is asserted below rather than asserted
+// in prose.
+//
+// ⚠ THE RUN-MODE ROWS ARE UNTOUCHED, AND THEY ARE THE PROOF THE SUPPRESSION WORKS.
+// `MAXIMAL_RUNNING` and `MAXIMAL_WAITING` went GREEN against the unamended capture on the
+// first run after the source change (measured — the only red rows were the three
+// Builder-mode ones). A hover lift that had leaked onto the run surface would have reddened
+// them, so their silence is evidence and not an absence of coverage.
+const HOVER_TERM_199 = "transition-colors duration-150 hover:bg-card/45"
+
+/**
+ * The captured class list as it reads AFTER 199-01, computed from the verbatim capture
+ * rather than re-typed.
+ *
+ * ⚠ THE ANCHOR IS THE BORDER UTILITY, AND THAT WAS MEASURED RATHER THAN REASONED. The first
+ * attempt anchored on the base box-shadow, on the assumption that `cn` emits its arguments in
+ * source order — and it threw on the `selected` branch, which is exactly what it was written
+ * to do. `cn` runs tailwind-merge, and the selected branch's own `shadow-[…]` REPLACES the
+ * base shadow rather than following it, so that capture reads `… backdrop-blur-sm
+ * border-primary shadow-[0_0_0_1px_…]` with no base-shadow token at all. Measured on all
+ * four branches, the term lands immediately BEFORE the border-colour utility every time —
+ * `border-primary`, `border-[hsl(220_30%_100%/0.34)]`, `border-border/50` — and that is the
+ * one anchor which holds across the merge.
+ *
+ * It THROWS rather than silently no-opping. A splice helper that quietly returned its input
+ * would turn every assertion using it into a comparison of the baseline with itself, which
+ * is the vacuous-fence failure this file has now met five times.
+ */
+function classWithHoverLift199(capturedClass: string): string {
+  const tokens = capturedClass.split(" ")
+  const at = tokens.findIndex((t) => t.startsWith("border-"))
+  if (at === -1) {
+    throw new Error(
+      "199-01 splice anchor found 0 times, expected exactly 1 — the capture moved",
+    )
+  }
+  return [...tokens.slice(0, at), HOVER_TERM_199, ...tokens.slice(at)].join(" ")
+}
+
+/** The same delta applied to a captured `innerHTML` string. The card div is located by its
+ *  own opening class list, which occurs exactly once in every Builder-mode capture; anything
+ *  else throws rather than passing a comparison of the baseline with itself. */
+function withHoverLift199(capturedHtml: string): string {
+  const match = capturedHtml.match(/<div class="(mx-auto[^"]*)"/)
+  if (match === null) {
+    throw new Error(
+      "199-01 splice anchor found 0 times, expected exactly 1 — the capture moved",
+    )
+  }
+  return capturedHtml.replace(match[1], classWithHoverLift199(match[1]))
+}
+
+/** The same delta applied to a captured SHAPE array: only the card div's `class` carries it,
+ *  because only the card div holds the className the term was added to. */
+function shapeWithHoverLift199<T extends { key: string; class: string | null }>(
+  captured: readonly T[],
+): T[] {
+  return captured.map((entry) =>
+    entry.key === CARD_DIV_KEY && entry.class !== null
+      ? { ...entry, class: classWithHoverLift199(entry.class) }
+      : entry,
+  )
+}
+
 const CARD_HTML_BASELINE: Record<string, string> = {
   MAXIMAL_RUNNING:
     "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 120px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 120px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
@@ -2700,7 +2777,15 @@ describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", 
       // NON-VACUITY, first: a `toBe` against an empty string would pass forever if the row
       // ever stopped rendering and the baseline were ever re-captured from that silence.
       expect(CARD_HTML_BASELINE[row].length).toBeGreaterThan(0)
-      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(CARD_HTML_BASELINE[row])
+      // 199-01: the Builder-mode rows carry the ONE declared delta; the run-mode rows are
+      // compared against the verbatim capture, unchanged, because the hover lift is
+      // suppressed the moment a reading is supplied. The predicate reads the ROW's own
+      // props rather than a hand-kept list of row names.
+      const builderMode = CARD_HTML_ROWS[row].status === undefined
+      const expected = builderMode
+        ? withHoverLift199(CARD_HTML_BASELINE[row])
+        : CARD_HTML_BASELINE[row]
+      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(expected)
     })
   }
 
@@ -4074,7 +4159,9 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     for (const verdict of ALL_VERDICTS) {
       const captured = cardShapeOf({ verdict })
       expect(captured.some((e) => e.key === VERDICT_TEST_ID)).toBe(true)
-      expect(captured).toEqual(CARD_VERDICT_SHAPES[verdict])
+      // 199-01: every verdict row is Builder-mode (no `status` is passed), so every one
+      // carries the declared hover delta — see `withHoverLift199`.
+      expect(captured).toEqual(shapeWithHoverLift199(CARD_VERDICT_SHAPES[verdict]))
     }
   })
 
@@ -4082,7 +4169,15 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     for (const branch of Object.keys(CARD_BORDER_ROWS)) {
       const captured = cardShapeOf(CARD_BORDER_ROWS[branch])
       expect(captured.some((e) => e.key === CARD_DIV_KEY)).toBe(true)
-      expect(captured).toEqual(CARD_BORDER_SHAPES[branch])
+      // 199-01: three of the four branches are Builder-mode and carry the declared hover
+      // delta; the `run` branch passes a `status`, so it is compared against the verbatim
+      // 188.2-03 capture. That asymmetry is the suppression rule, read off the row's props.
+      const builderMode = CARD_BORDER_ROWS[branch].status === undefined
+      expect(captured).toEqual(
+        builderMode
+          ? shapeWithHoverLift199(CARD_BORDER_SHAPES[branch])
+          : CARD_BORDER_SHAPES[branch],
+      )
     }
   })
 
@@ -4470,5 +4565,163 @@ describe("199-01 — the node face NEVER prints the mechanism (SC#4)", () => {
     const swept = nodeTextAtoms(box).join(" ")
     expect(swept.length).toBeGreaterThan(0)
     expect(swept).not.toContain(RESTING_SLUG)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 199-01 Task 2 (DES-01) — THE HOVER LIFT, AND THE FOUR INVARIANTS IT KEEPS
+//
+// Sheet c2 section 3 draws six interaction states. Five of them reconcile to
+// ALREADY-SHIPPED or to a CANNOT-EXPRESS with a named reason (the SUMMARY carries all
+// six rows in full). HOVERED is the one row the shipped card could express and did not:
+// measured before the change, `hover:` appeared ZERO times across all five files of the
+// node subtree. This block is the whole of the phase's build on this atom, plus the four
+// shipped invariants a hover treatment is most likely to break.
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** The node subtree, read as SOURCE — the same six paths every negative fence in this
+ *  file already reads, reused rather than re-listed. */
+const HOVER_SUBTREE_SOURCE = cardSubtreeSource
+
+describe("199-01 — the hover lift (sheet c2 section 3, HOVERED)", () => {
+  it("the Builder's card carries the term, and it is the ONE spelled home of it", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    const card = box.querySelector(":scope > div")
+    expect(card).not.toBeNull()
+
+    // NON-VACUITY BEFORE CONTENTS: an element with no class attribute would satisfy a
+    // `not.toContain` forever.
+    const classes = card?.getAttribute("class") ?? ""
+    expect(classes.length).toBeGreaterThan(0)
+    expect(classes).toContain("hover:bg-card/45")
+    expect(classes).toContain(HOVER_TERM_199)
+  })
+
+  it("is SUPPRESSED at every one of the nine run readings — no false affordance", () => {
+    for (const reading of ALL_READINGS) {
+      const { unmount } = renderRestingCard({ status: reading })
+      const card = screen
+        .getByTestId(`canvas-node-${RESTING_SLUG}`)
+        .querySelector(":scope > div")
+      const classes = card?.getAttribute("class") ?? ""
+      expect(classes.length).toBeGreaterThan(0)
+      expect(classes).not.toContain("hover:")
+      expect(classes).not.toContain("transition-")
+      unmount()
+    }
+  })
+
+  it("the ONE hover utility in the whole subtree is a FILL — never a border", () => {
+    // The sheet's own hover rule changes `border-color`. Taking it would put a fifth
+    // colour utility into a four-branch ternary whose entire argument is that exactly one
+    // border-colour utility is emitted per state. This is that decision, as a fence.
+    expect(HOVER_SUBTREE_SOURCE.length).toBeGreaterThan(0)
+    const hoverUtilities = HOVER_SUBTREE_SOURCE.match(/hover:[a-z0-9:[\]/._-]+/gi) ?? []
+    expect(hoverUtilities).toEqual(["hover:bg-card/45"])
+  })
+
+  it("the four border branches still emit exactly ONE border-colour utility each", () => {
+    for (const branch of Object.keys(CARD_BORDER_ROWS)) {
+      const { unmount } = renderRestingCard(CARD_BORDER_ROWS[branch])
+      const card = screen
+        .getByTestId(`canvas-node-${RESTING_SLUG}`)
+        .querySelector(":scope > div")
+      const classes = card?.getAttribute("class") ?? ""
+      expect(classes.length).toBeGreaterThan(0)
+
+      // `border-` prefixed COLOUR utilities only — the bare structural `border` and the
+      // `border-border/50` default both count, and a second one would mean two
+      // same-specificity colour classes racing.
+      const borderColours = (classes.match(/(?:^|\s)border-\S+/g) ?? []).map((s) => s.trim())
+      expect(borderColours.length).toBe(1)
+      unmount()
+    }
+  })
+
+  it("MOTION still keys off RUN STATE — the card emits no animation and no transform", () => {
+    // The run channel's motion is the ring's infinite `canvas-ring-spin`. A colour ease is
+    // not that, and this asserts the distinction rather than arguing it.
+    renderRestingCard()
+    const card = screen
+      .getByTestId(`canvas-node-${RESTING_SLUG}`)
+      .querySelector(":scope > div")
+    const classes = card?.getAttribute("class") ?? ""
+    expect(classes.length).toBeGreaterThan(0)
+    expect(classes).not.toContain("animate-")
+    expect(classes).not.toContain("canvas-ring-spin")
+    expect(classes).not.toMatch(/(?:^|\s)(?:scale|rotate|translate|skew)-/)
+    expect(classes).not.toMatch(/hover:(?:scale|rotate|translate|skew)-/)
+
+    // POSITIVE CONTROL: the spin utility really is the shipped motion carrier, so the
+    // negative above is a statement about the CARD and not about a token that never
+    // appears anywhere.
+    expect(HOVER_SUBTREE_SOURCE).toContain("canvas-ring-spin")
+  })
+
+  it("adds NO focusable control and NO handler — one tab stop per node survives", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    expect(
+      box.querySelectorAll("a, button, input, select, textarea, [tabindex], [role='button']")
+        .length,
+    ).toBe(0)
+    // A hover treatment implemented in JS would need one of these; this one is CSS.
+    expect(HOVER_SUBTREE_SOURCE).not.toMatch(/onMouseEnter|onMouseLeave|onPointerEnter/)
+  })
+
+  it("adds NO slot — `phaseNodeCardContract.ts` is not in this plan's file envelope", () => {
+    // The suppression is derived from `status`, a slot the card ALREADY holds. If a later
+    // author reaches for a dedicated `hovered` or `interactive` prop, this goes red and the
+    // decision has to be taken deliberately rather than drifted into.
+    const contract = CARD_MODULES["./phaseNodeCardContract.ts"] ?? ""
+    expect(contract.length).toBeGreaterThan(0)
+    expect(contract).not.toMatch(/\bhovered\b|\binteractive\b|\bdragging\b/)
+  })
+})
+
+describe("199-01 — the declared delta against the 188.2-03 captures is EXACT", () => {
+  it("the splice adds the term ONCE, at one position, and changes nothing else", () => {
+    const before = CARD_HTML_BASELINE.MINIMAL_BUILDER
+    const after = withHoverLift199(before)
+
+    expect(before.length).toBeGreaterThan(0)
+    expect(after).not.toBe(before)
+
+    // THE ARITHMETIC, CLOSED: after minus the term (and its one separating space) IS the
+    // verbatim capture. No residual, so nothing else can have been smuggled in.
+    expect(after.replace(`${HOVER_TERM_199} `, "")).toBe(before)
+    expect(after.split(HOVER_TERM_199).length - 1).toBe(1)
+  })
+
+  it("REFUSES to no-op — a capture whose anchor moved throws rather than passing", () => {
+    // The falsification control for the helper itself. A splice that silently returned its
+    // input would turn all three amended assertions into comparisons of the baseline with
+    // itself, which is the vacuous-fence failure this file has met four times.
+    expect(() => withHoverLift199("<div class=\"nothing-like-a-card\"></div>")).toThrow(
+      /expected exactly 1/,
+    )
+    // …and the class-level helper refuses the same way, on a list with no border utility.
+    expect(() => classWithHoverLift199("mx-auto block bg-card/30")).toThrow(
+      /expected exactly 1/,
+    )
+  })
+
+  it("the SELECTED branch is why the anchor is the border and not the shadow", () => {
+    // The measurement that corrected this helper, kept as a test rather than as a claim:
+    // tailwind-merge REPLACES the base shadow on the selected branch, so a shadow-anchored
+    // splice threw there. This pins the shape that forced the correction.
+    const selected = CARD_BORDER_SHAPES.selected.find((e) => e.key === CARD_DIV_KEY)
+    expect(selected).not.toBeUndefined()
+    expect(selected?.class ?? "").toContain("shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]")
+    expect(selected?.class ?? "").not.toContain("rgba(0,0,0,0.95)")
+  })
+
+  it("the run-mode captures are compared VERBATIM — the delta never reaches them", () => {
+    for (const row of ["MAXIMAL_RUNNING", "MAXIMAL_WAITING"]) {
+      expect(CARD_HTML_ROWS[row].status).not.toBeUndefined()
+      expect(CARD_HTML_BASELINE[row]).not.toContain("hover:")
+      expect(cardHtml(CARD_HTML_ROWS[row])).not.toContain("hover:")
+    }
   })
 })

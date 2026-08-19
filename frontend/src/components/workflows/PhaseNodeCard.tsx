@@ -182,6 +182,39 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center",
           "bg-card/30 backdrop-blur-sm",
           "shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)]",
+          // ── THE HOVER LIFT (199-01 · DES-01 · sheet `c2-phase-node` §3 "HOVERED") ────
+          //
+          // THE ONE ROW OF SHEET c2 THE SHIPPED CARD COULD EXPRESS AND DID NOT. Measured
+          // before it was written: `grep -n "hover:"` across all five files of the node
+          // subtree returned ZERO. Every other section of that sheet reconciles to
+          // ALREADY-SHIPPED or to a CANNOT-EXPRESS with a named reason (199-01's SUMMARY
+          // carries all six rows); this is the whole of the phase's build on this atom.
+          //
+          // IT DELIBERATELY DOES NOT TOUCH THE BORDER, and the sheet's own hover rule does
+          // (`border-color: #464651`). Taking that would put a fifth colour utility into a
+          // four-branch ternary whose entire argument is that exactly ONE border-colour
+          // utility is emitted per state, "so nothing depends on which order Tailwind
+          // happens to emit two same-specificity colour classes in" — the paragraph
+          // directly below. A hover border would make that sentence false for the one
+          // state a person is looking at while they decide whether to click. The fill is
+          // the calm carrier and it composes with all four branches instead of racing them.
+          //
+          // IT IS SUPPRESSED IN RUN MODE, from state the card ALREADY HOLDS. `reading` is
+          // the run-mode boolean this whole component hangs off; no slot is added and
+          // `phaseNodeCardContract.ts` is untouched. The reason is honesty rather than
+          // taste: the run surface renders the canvas with no selection and no select
+          // handler, so a card that lit up under the cursor there would be promising an
+          // interaction that does not exist. This is the same "mutually exclusive BY
+          // SURFACE" fact the border precedence below already relies on, read for a
+          // second purpose.
+          //
+          // THE TRANSITION IS A COLOUR EASE AND NOT MOTION. Motion on this canvas keys off
+          // RUN STATE and never off anything else — the run channel's motion is the ring's
+          // infinite `canvas-ring-spin`, and nothing here competes with it: no transform,
+          // no scale, no loop, no `animate-` utility. `duration-150` is below the threshold
+          // at which a colour change reads as liveness. The suite asserts the absence of an
+          // animation utility on this element rather than trusting this paragraph.
+          reading === null ? "transition-colors duration-150 hover:bg-card/45" : undefined,
           // 188-06 prepends ONE branch, so precedence reads:
           //   run state (when supplied) > selected > grounded > default.
           // It can never actually contend with the branch below it, and that is by
