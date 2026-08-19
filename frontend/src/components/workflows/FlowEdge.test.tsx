@@ -495,12 +495,29 @@ describe("FlowEdge — DETOUR is the same gap EDIT_AFFORDANCE describes", () => 
 
   it("holds the box size the verbatim transcription is only valid at", () => {
     // ARC's interior control points (14, 16, 30, 44, 46) are the sketch's literals, so
-    // the transcription is correct ONLY while the box is 60 wide with the line at 28.
-    // Pinning that here is what makes "transcribed, not re-derived" a safe instruction.
+    // the transcription is correct ONLY while the box is 60 wide with the line at a known
+    // baseline. Pinning that here is what makes "transcribed, not re-derived" a safe
+    // instruction.
+    //
+    // ⚠ THE BASELINE MOVED 28 → 36 AT THE PHASE 200 CANVAS PORT, AND THIS PIN IS WHAT
+    // CAUGHT IT — which is the pin working, not the pin being in the way. `INSERT_Y` is
+    // `LANE_Y + EDGE_ANCHOR_Y`, and that anchor moved because sketch 200's card is 72px
+    // tall and every connector on the sheet enters at its vertical centre (its nodes sit
+    // at `top: 64` and its paths are drawn at `y = 100`).
+    //
+    // ⚠ THE TRANSCRIPTION IS STILL VALID, and that is the part worth stating rather than
+    // assuming. `ARC` is a TEMPLATE built from `DETOUR.INSERT_Y` and `DETOUR.DIP`, so the
+    // whole curve TRANSLATED DOWN 8px and its shape is unchanged: every horizontal literal
+    // (14, 16, 30, 44, 46 and the 60 width) is untouched, because `PITCH_X` and
+    // `NODE_WIDTH` did not move. The dip is still 34 below the line. So the sketch's mark
+    // is the same mark, drawn 8px lower on a shorter card.
     expect(DETOUR.GAP).toBe(60)
-    expect(DETOUR.INSERT_Y).toBe(28)
-    expect(ARC).toBe("M0,28 C14,28 16,62 30,62 C44,62 46,28 60,28")
-    expect(LINE).toBe("M0,28 L60,28")
+    expect(DETOUR.INSERT_Y).toBe(36)
+    expect(ARC).toBe("M0,36 C14,36 16,70 30,70 C44,70 46,36 60,36")
+    expect(LINE).toBe("M0,36 L60,36")
+    // The dip, asserted as a RELATIVE fact so it cannot silently absorb a future baseline
+    // move the way the absolute strings above just did.
+    expect(DETOUR.INSERT_Y + DETOUR.DIP - DETOUR.INSERT_Y).toBe(34)
   })
 })
 
