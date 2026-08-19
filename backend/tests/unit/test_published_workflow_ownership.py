@@ -202,6 +202,37 @@ def test_published_workflow_field_set_excludes_created_by():
     real runs by ``test_library_run_facts.test_another_users_runs_are_NOT_inherited_on_a_
     world_readable_row``. No raw ``user_id`` is projected onto this model, so the sibling
     disclosure fence below still holds by construction.
+
+    ⚠ Phase 192.2 GAP ROUND 1 (CR-01): the set GREW BY ONE MORE — ``has_any_run`` — and this
+    is the addition that most needed forcing through this fence, because **it is the only field
+    on this model that is DELIBERATELY UNSCOPED**. The three paragraphs above all rest on the
+    lateral's ``r.user_id = $1``; this one does not, on purpose. So the argument is made in
+    full rather than by analogy:
+
+      • **Why the field exists at all.** The owner scope was the correct security call, but it
+        made the run fact CALLER-SCOPED while every downstream artifact rendered it as a
+        ROW-LEVEL one. Measured: five ``is_system_global`` rows carry 20 / 15 / 11 / 7 / 1 runs
+        belonging to ONE user, and ``/starters`` + ``/published``'s global branch serve those
+        rows to everybody — so every other caller read an explicit "Never run" about a workflow
+        that had run twenty times. That is a LIE on the wire, not a missing nicety.
+
+      • **What it discloses, exactly, and what it may never disclose (DEC-08-A, operator-locked
+        after the alternative was presented beside it).** It reveals that SOMEBODY has run a
+        workflow the caller CAN ALREADY SEE. It reveals nothing else: **no count, no timestamp,
+        no user id, no org id, no status** — a bare ``EXISTS``. It therefore still passes this
+        model's BINDING RULE for the rule's own stated reason: it describes the ROW, never a
+        person. There is no value of this field from which any identifier can be recovered.
+
+      • **Where that budget is ENFORCED rather than asserted.**
+        ``test_library_run_facts.test_the_row_level_bit_discloses_existence_and_nothing_else``
+        sweeps ``_HAS_ANY_RUN_SQL``'s VALUE for ``user_id`` / ``org_id`` / ``created_at`` /
+        ``status`` / aggregates, carries a synthetic positive control, and was driven RED
+        against a real over-budget plant. The sibling disclosure fence below is unaffected: a
+        ``bool`` cannot equal a UUID under any dump mode.
+
+      • **Re-open trigger, so a later reader can revisit the trade instead of rediscovering
+        it:** the first workflow row that is visible to a caller who is not entitled to know it
+        has been exercised at all.
     """
     from app.api.workflows import PublishedWorkflow
 
@@ -215,6 +246,7 @@ def test_published_workflow_field_set_excludes_created_by():
         "updated_at",
         "last_run_at",
         "last_run_status",
+        "has_any_run",
     }
     assert "created_by" not in PublishedWorkflow.model_fields
 
