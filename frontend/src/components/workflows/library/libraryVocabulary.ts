@@ -442,8 +442,58 @@ export const RUN_STOPPED = "Stopped"
  *
  * ⚠ NOT A BLANK. A blank renders like an absence and reads like a tick: the whole reason D-08
  * has three arms is that *silence is not success*.
+ *
+ * ⚠ AMENDED BY 192.2-10 (CR-01). THE PARAGRAPH ABOVE IS PRESERVED VERBATIM AND IS SUPERSEDED
+ * IN ONE RESPECT ONLY: *"an affirmative statement about the ROW"* was FALSE for eight months,
+ * because the join it rested on is OWNER-SCOPED (`r.user_id = $1`). It licensed a `null` that
+ * means *YOU have no run* to be printed as a global claim that NOBODY does — and on the
+ * world-readable shelves that claim was wrong on real rows: five `is_system_global` published
+ * rows carry 20 / 15 / 11 / 7 / 1 runs belonging to ONE user, and `/starters` serves those same
+ * rows to everybody.
+ *
+ * ⚠ WHAT MAKES IT TRUE AGAIN IS A PRECONDITION, NOT A REWORDING. As of `192.2-08` the wire
+ * carries `has_any_run`, and this arm fires ONLY when the wire AFFIRMS `has_any_run === false`.
+ * With that guard the affirmative row-level claim is once more backed by a row-level fact.
+ * `has_any_run === true` with no caller-scoped run takes `RUN_NOT_BY_YOU` below instead, and
+ * an ABSENT `has_any_run` cannot reach this arm at all — absence is never affirmation.
+ *
+ * ⚠ THE LITERAL IS DELIBERATELY UNCHANGED. The word was always right; it was the arm's
+ * PRECONDITION that was missing. Rewording it to *"You haven't run this"* was the review's
+ * suggested alternative and was weighed and declined by the operator — that answer makes every
+ * card caller-scoped in order to fix the few rows where the scope actually shows.
  */
 export const RUN_NEVER = "Never run"
+
+/**
+ * THE FOURTH ARM — SOMEBODY RAN THIS, AND IT WAS NOT YOU. Added by CR-01 beside D-08's
+ * original three; `RUN_UNKNOWN` below keeps its own name as arm 3, so this one is counted as
+ * the fourth rather than renumbering a shipped vocabulary.
+ *
+ * The state it names, precisely: the backend LOOKED, **you** have no run of this row
+ * (`last_run_at` / `last_run_status` are `null` off the owner-scoped lateral), and
+ * `has_any_run` is `true` — so somebody else does.
+ *
+ * ⚠ WHY IT EXISTS, MEASURED RATHER THAN ARGUED. Five `is_system_global` published rows carry
+ * **20 / 15 / 11 / 7 / 1** runs belonging to ONE user, and `/workflows/starters` serves those
+ * same rows to every caller. Driven over real HTTP on 2026-08-19 as a caller who is not the
+ * runner, **5 of 92** `/published` rows and **1 of 3** `/starters` rows come back in exactly
+ * this state. Before this word existed, every one of them printed an explicit, PAINTED
+ * *"Never run"* — `GUTTER_TONE.never` is a real quiet bar, not an absence — about a workflow
+ * that had run twenty times. A specific false claim, printed confidently, which is the defect
+ * D-08's arms were written to prevent in the first place.
+ *
+ * ⚠ THE DISCLOSURE BUDGET, AND IT IS THE CONSTRAINT ON THIS SENTENCE RATHER THAN A NOTE ABOUT
+ * IT. The word says **somebody**. It must never grow toward WHO, WHEN, HOW MANY or WITH WHAT
+ * OUTCOME. The wire carries an `EXISTS` bit and nothing else, by decision (`192.2-08`
+ * DEC-08-A) — so there is no data behind a richer sentence, and an edit that names a person
+ * here would be a cross-tenant disclosure rather than a nicer word.
+ *
+ * ⚠ AND IT MUST NOT BE CONFUSABLE WITH `RUN_NEVER` ABOVE OR `RUN_UNKNOWN` BELOW. Those three
+ * are the whole point of the distinction: *nobody ran it* · *somebody did, not you* · *no
+ * outcome is on record*. Three different truths; a card that blurs any two is back to the
+ * defect CR-01 named.
+ */
+export const RUN_NOT_BY_YOU = "Run by someone else"
 
 /**
  * D-08 arm 3 — THE WIRE DID NOT SAY. A frontend deployed ahead of its backend receives rows

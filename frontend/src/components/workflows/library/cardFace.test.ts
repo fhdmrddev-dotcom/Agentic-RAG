@@ -27,6 +27,7 @@ import type { LibraryRow } from "./libraryRow"
 import {
   RUN_FAILED,
   RUN_NEVER,
+  RUN_NOT_BY_YOU,
   RUN_STOPPED,
   RUN_UNKNOWN,
   RUN_WORKED,
@@ -315,7 +316,7 @@ describe("the face carries the run truth, and it is the resolver's — not a sec
   })
 
   it("the face SPELLS no run word of its own — every one is imported (T-06)", () => {
-    for (const word of [RUN_WORKED, RUN_FAILED, RUN_STOPPED, RUN_NEVER, RUN_UNKNOWN]) {
+    for (const word of [RUN_WORKED, RUN_FAILED, RUN_STOPPED, RUN_NEVER, RUN_NOT_BY_YOU, RUN_UNKNOWN]) {
       expect(cardFaceSource).not.toContain(`"${word}"`)
     }
     // …and it holds no status map: the database spellings appear nowhere in it.

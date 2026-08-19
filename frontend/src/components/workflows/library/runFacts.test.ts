@@ -23,6 +23,7 @@ import { relativeBand } from "./relativeChanged"
 import {
   RUN_FAILED,
   RUN_NEVER,
+  RUN_NOT_BY_YOU,
   RUN_STOPPED,
   RUN_UNKNOWN,
   RUN_WORKED,
@@ -342,8 +343,11 @@ describe("the words are imported, and no system spelling reaches the caller", ()
   })
 
   it("the module spells no word of its own — every string it returns is an import", () => {
-    // The T-06 fence, swept over source: the five run words must not appear as literals here.
-    for (const word of [RUN_WORKED, RUN_FAILED, RUN_STOPPED, RUN_NEVER, RUN_UNKNOWN]) {
+    // The T-06 fence, swept over source: the run words must not appear as literals here.
+    // ⚠ WIDENED BY 192.2-10 TO SIX. `RUN_NOT_BY_YOU` is authored in the vocabulary and is
+    // wired into this module by `192.2-11`; sweeping it from the commit that BIRTHS the word
+    // is what stops the wiring plan from re-spelling it, which is the only moment it could.
+    for (const word of [RUN_WORKED, RUN_FAILED, RUN_STOPPED, RUN_NEVER, RUN_NOT_BY_YOU, RUN_UNKNOWN]) {
       expect(runFactsSource).not.toContain(`"${word}"`)
     }
   })
@@ -408,5 +412,59 @@ describe("the resolver is a pure leaf", () => {
       def: undefined,
     })
     expect(runFacts(noisy, FIXTURE_NOW)).toEqual(runFacts(base, FIXTURE_NOW))
+  })
+})
+
+// ── 8 · 192.2-10 (CR-01): the FOURTH ARM's word, born here, wired in 192.2-11 ──────────
+
+describe("192.2-10 — RUN_NOT_BY_YOU, the word for *somebody ran this, and it was not you*", () => {
+  it("is EXACTLY `Run by someone else` — asserted by exact match, never by fragment", () => {
+    // ⚠ `libraryVocabulary.ts`'s module header forbids `toContain` on a fragment for this table:
+    // *Still building* and *Strict* share a prefix, so a fragment assertion is the vacuous fence
+    // `runVocabulary.ts:57-59` names. This is the whole literal, compared with `toBe`.
+    expect(RUN_NOT_BY_YOU).toBe("Run by someone else")
+  })
+
+  it("RUN_NEVER's literal is UNCHANGED — only its precondition moved", () => {
+    // CR-01 falsified the SENTENCE IN THE DOCBLOCK, not the word. A plan that "fixed" the word
+    // would have made every card caller-scoped to repair the few rows where the scope shows.
+    expect(RUN_NEVER).toBe("Never run")
+  })
+
+  it("the six run words are six DISTINCT strings, and none contains another", () => {
+    // The confusability rule stated mechanically. `RUN_UNKNOWN`'s docblock argues that it must
+    // never be confusable with `RUN_NEVER`; the fourth arm joins that argument, and a substring
+    // relation is the form the confusion would actually take on a rendered card.
+    const words = [RUN_WORKED, RUN_FAILED, RUN_STOPPED, RUN_NEVER, RUN_NOT_BY_YOU, RUN_UNKNOWN]
+    expect(new Set(words).size).toBe(6)
+    for (const a of words) {
+      for (const b of words) {
+        if (a === b) continue
+        expect(a.includes(b)).toBe(false)
+      }
+    }
+  })
+
+  it("⚠ THE DISCLOSURE BUDGET, ASSERTED RATHER THAN ONLY DOCUMENTED", () => {
+    // The word says *somebody*. It may never grow toward WHO, WHEN, HOW MANY or WITH WHAT
+    // OUTCOME — there is no data behind a richer sentence (the wire carries a bare `EXISTS`),
+    // so an edit in that direction is a cross-tenant disclosure rather than a nicer word.
+    const forbidden = ["@", "user", "by ", "ago", "times", "run by "]
+    const lower = RUN_NOT_BY_YOU.toLowerCase()
+    // Non-vacuity: at least one probe must be capable of matching SOMETHING, or the loop below
+    // is asserting over a set of tokens none of which could ever appear.
+    expect(forbidden.some((t) => "run by someone else at 10:04 by ada".includes(t))).toBe(true)
+    for (const token of ["@", "ago", "times"]) expect(lower).not.toContain(token)
+    // It names no digit — a count or a clock would both surface as one.
+    expect(/[0-9]/.test(RUN_NOT_BY_YOU)).toBe(false)
+  })
+
+  it("`runFacts.ts` does NOT yet consume it — 192.2-11 owns the arm, and that is deliberate", () => {
+    // Recorded as a PROPERTY rather than left as an absence a reader must infer. Adding the
+    // fourth member to `RunFact` makes `runGutterOf` in `WorkflowCard.tsx` non-total, which is a
+    // typecheck error BY DESIGN; splitting the field and the word out keeps every commit in
+    // 192.2-10 green and lets 192.2-11 land the union member and its two colour maps atomically.
+    expect(runFactsSource).not.toContain("RUN_NOT_BY_YOU")
+    expect(runFactsSource).not.toContain("not-by-you")
   })
 })
