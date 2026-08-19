@@ -688,14 +688,32 @@ describe("PhaseSpineGraph — 199-02 pre-change inventory (sheet c3 Col 1)", () 
     // with the reason written here — the `doorVocabulary.ts` rule for the first wave that
     // intentionally changes a rendered word.
     //
-    // Still THREE atoms per node and still no fourth: title, type word, and — where the config
-    // declares one — the model. There is NO description line, which remains precisely the
-    // sheet element this surface refuses to import. `threePhases` declares no model on any
-    // step, so no model atom appears: an absent model renders NOTHING rather than a default,
-    // and that is asserted as a face rather than as a prop.
-    expect(faceOf("gather")).toBe("Gather sourcesAI agent step")
-    expect(faceOf("emit")).toBe("Produce the deliverableDeliverable")
-    expect(faceOf("review")).toBe("Review the findingsAI agent step")
+    // ⚠ 2026-08-20 — THE REFUSAL RECORDED HERE IS RETIRED BY OPERATOR DECISION, and the
+    // original wording is kept in this note rather than quietly deleted. This pin used to
+    // read: "Still THREE atoms per node and still no fourth … There is NO description line,
+    // which remains precisely the sheet element this surface refuses to import."
+    //
+    // That refusal was honoured for two phases, and it is the single largest reason the
+    // shipped spine did not look like sketch 200: the sheet draws a plain-language reading on
+    // EVERY row, and this surface was pinned against importing it. The operator's verdict on
+    // the shipped result was that it is not what was designed, and their instruction is that
+    // the sketch is the absolute reference. So the description line is now BUILT, sourced from
+    // `PHASE_TYPE_SUBTITLES` — the CANVAS's own words, so the spine and the canvas still say
+    // exactly one thing about a step rather than two.
+    //
+    // FOUR atoms per node now: title, description, type word, and — where the config declares
+    // one — the model. `threePhases` declares no model on any step, so no model atom appears:
+    // an absent model renders NOTHING rather than a default (N-6), and that is still asserted
+    // as a face rather than as a prop.
+    expect(faceOf("gather")).toBe(
+      "Gather sourcesSearches and decides its own next moveAI agent step",
+    )
+    expect(faceOf("emit")).toBe(
+      "Produce the deliverableFills your template and produces the fileDeliverable",
+    )
+    expect(faceOf("review")).toBe(
+      "Review the findingsSearches and decides its own next moveAI agent step",
+    )
   })
 
   it("BS-MR-01 — the model renders ONLY where the config declares one", () => {

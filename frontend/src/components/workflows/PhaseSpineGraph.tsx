@@ -108,6 +108,7 @@ import {
   nodeTitle,
   parseSkipTarget,
   PHASE_TYPE_LABELS,
+  PHASE_TYPE_SUBTITLES,
   type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
@@ -311,7 +312,6 @@ export function PhaseSpineGraph({
           // tier needs; it reaches `nodeTitle` and nowhere else. Absent ⇒ every derived
           // tier misses and the generic type sentence renders, byte-identically to HEAD.
           const title = nodeTitle(phase, nameContext)
-          const isEmit = phase.config.phase_type === "llm_emit"
           // BS-MR-02 — the CANVAS's own word for this type, imported rather than re-spelled.
           // A second uppercase label map here would be exactly the two-views-two-languages
           // defect BS-2 exists to close, one map further down. An unmapped type falls back to
@@ -324,6 +324,11 @@ export function PhaseSpineGraph({
           // shape is checked rather than trusted.
           const rawModel = phase.config.model
           const model = typeof rawModel === "string" && rawModel.trim().length > 0 ? rawModel.trim() : null
+          // The one-line reading of what this KIND of step does — sketch 200's spine draws it
+          // on every row, under the title. These are the CANVAS's own words
+          // (`PHASE_TYPE_SUBTITLES`), the same map the node cards use, so the spine and the
+          // canvas keep saying one thing about a step rather than two.
+          const subtitle = PHASE_TYPE_SUBTITLES[phase.config.phase_type]
           // ⚠ RUN TENSE ONLY. `undefined` on the authoring mount, and `undefined` for a slug
           // this run never mentioned — two absences that render identically because both mean
           // "we hold no run fact about this step", which is not a fact about the step.
@@ -333,28 +338,16 @@ export function PhaseSpineGraph({
           const outgoingSkips = skipEdges.filter((e) => e.fromSlug === phase.slug)
 
           return (
-            <li key={phase.slug} className="relative pb-4 pl-9 last:pb-0">
-              {/* Solid run-order gutter edge (i→i+1); hidden on the last node. */}
+            <li key={phase.slug} className="relative pb-4 last:pb-0">
+              {/* Run-order gutter edge (i→i+1); hidden on the last node. Sketch 200 runs it
+                  DASHED and behind the cards, centred on the 56px icon rail — so the rail's
+                  rings read as beads on one thread rather than as separate ornaments. */}
               {!isLast && (
                 <span
                   aria-hidden="true"
-                  className="absolute left-[13px] top-[34px] bottom-0 w-0.5 bg-border"
+                  className="absolute left-[28px] top-[34px] bottom-0 z-0 w-px border-l border-dashed border-border"
                 />
               )}
-
-              {/* The node bullet (the spine glyph). */}
-              <span
-                aria-hidden="true"
-                className={[
-                  "absolute left-0 top-1 grid h-[26px] w-[26px] place-items-center rounded-full border font-mono text-[13px]",
-                  isEmit
-                    ? "border-accent-violet text-accent-violet"
-                    : "border-border text-foreground",
-                  isSelected ? "ring-2 ring-primary" : "",
-                ].join(" ")}
-              >
-                {Glyph ? <Glyph className="h-4 w-4" /> : glyphFallback}
-              </span>
 
               {/* The node CARD — a <button> (keyboard-selectable; selection only,
                   never draggable). No draggable attr, no drag handler. */}
@@ -374,60 +367,89 @@ export function PhaseSpineGraph({
                 aria-label={`Phase ${phase.phase_index + 1}: ${title}${typeWord ? ` (${typeWord})` : ""}`}
                 onClick={() => onSelectNode(phase.slug)}
                 className={[
-                  "w-full rounded-md border px-3 py-2 text-left transition-colors",
+                  "group flex w-full overflow-hidden rounded border text-left transition-colors",
                   isSelected
                     ? "border-primary bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
-                    : "border-border bg-card hover:border-primary/40",
+                    : "border-border bg-card hover:bg-accent/40",
                 ].join(" ")}
               >
-                <span className="flex items-center gap-2">
-                  <span aria-hidden="true" className="text-[13px] leading-none">
-                    {Glyph ? <Glyph className="h-4 w-4" /> : glyphFallback}
+                {/* The icon rail — sketch 200 gives every spine row a bordered 56px gutter
+                    holding the step's glyph in a small ring. It is what makes the row read as
+                    a CARD rather than a list item. */}
+                <span
+                  aria-hidden="true"
+                  className="flex w-14 shrink-0 justify-center border-r border-border bg-muted/30 pt-4"
+                >
+                  <span className="grid h-6 w-6 place-items-center rounded-full border border-border bg-background text-muted-foreground transition-colors group-hover:border-primary/50 group-hover:text-primary">
+                    {Glyph ? <Glyph className="h-3.5 w-3.5" /> : glyphFallback}
                   </span>
-                  <span
-                    data-testid="node-title"
-                    className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
-                  >
-                    {title}
-                  </span>
-                  {/* BS-MR-02 — the canvas's word, uppercased by CSS rather than by a second
-                      string, so there is still exactly ONE spelling of this label in the tree. */}
-                  {typeWord && (
-                    <span
-                      data-testid="node-type-word"
-                      className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
-                    >
-                      {typeWord}
-                    </span>
-                  )}
                 </span>
-                {/* BS-MR-01 — the model, only where one was declared. */}
-                {model && (
-                  <span
-                    data-testid="node-model"
-                    className="mt-0.5 block truncate text-[10px] text-muted-foreground"
-                  >
-                    {model}
-                  </span>
-                )}
-                {/* BS-MR-04 — the per-step reading. ⚠ RUN TENSE ONLY: absent prop ⇒ absent
-                    node. ONE reading per row (D-09's own shape), and a step that declared no
-                    count renders no count slot AT ALL — never `0`, never a dash, never prose
-                    (D-07 / N-8). A declared `0` renders as the fact it is. */}
-                {facts && (
-                  <span
-                    data-testid="node-run-reading"
-                    data-outcome={facts.outcome}
-                    className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground"
-                  >
-                    <span data-testid="node-run-time">{facts.timing.reading}</span>
-                    {facts.count && (
-                      <span data-testid="node-run-count">
-                        {countDeclared(facts.count.count, facts.count.noun)}
+
+                {/* The content column — three stacked lines, exactly the sheet's order:
+                    title + model on one baseline, then the plain-language reading, then the
+                    type badge on its own line. */}
+                <span className="flex min-w-0 flex-1 flex-col gap-3 p-4">
+                  <span className="flex w-full items-baseline justify-between gap-4">
+                    <span
+                      data-testid="node-title"
+                      className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground"
+                    >
+                      {title}
+                    </span>
+                    {/* BS-MR-01 — the model, only where one was declared. An absent value
+                        means "use the run's model", and printing a default here would be a
+                        fabricated claim (N-6). */}
+                    {model && (
+                      <span
+                        data-testid="node-model"
+                        className="shrink-0 font-mono text-[11px] text-muted-foreground"
+                      >
+                        {model}
                       </span>
                     )}
                   </span>
-                )}
+
+                  {/* The one-line reading of the step kind. */}
+                  {subtitle && (
+                    <span
+                      data-testid="node-subtitle"
+                      className="block w-full truncate text-[12px] text-muted-foreground"
+                    >
+                      {subtitle}
+                    </span>
+                  )}
+
+                  {/* BS-MR-02 — the canvas's word, uppercased by CSS rather than by a second
+                      string, so there is still exactly ONE spelling of this label in the tree. */}
+                  {typeWord && (
+                    <span className="flex items-center">
+                      <span
+                        data-testid="node-type-word"
+                        className="rounded border border-primary/20 bg-primary/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-primary"
+                      >
+                        {typeWord}
+                      </span>
+                    </span>
+                  )}
+                  {/* BS-MR-04 — the per-step reading. ⚠ RUN TENSE ONLY: absent prop ⇒ absent
+                      node. ONE reading per row (D-09's own shape), and a step that declared no
+                      count renders no count slot AT ALL — never `0`, never a dash, never prose
+                      (D-07 / N-8). A declared `0` renders as the fact it is. */}
+                  {facts && (
+                    <span
+                      data-testid="node-run-reading"
+                      data-outcome={facts.outcome}
+                      className="flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground"
+                    >
+                      <span data-testid="node-run-time">{facts.timing.reading}</span>
+                      {facts.count && (
+                        <span data-testid="node-run-count">
+                          {countDeclared(facts.count.count, facts.count.noun)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </span>
               </button>
 
               {/* The dashed on-fail skip branch label(s). The ONLY non-linear edge. */}
