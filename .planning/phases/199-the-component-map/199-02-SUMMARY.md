@@ -203,6 +203,17 @@ None. No network endpoint, auth path, file access pattern or schema touched — 
 
 ## Hot-file ledger note (same-commit sync rule)
 
-`frontend/src/components/panel/PhaseCard.tsx` carries a G-5-FIRING row. This plan **honoured it by construction**: the change is two `className` ternary arms, and ⚠ **`SUBSTEP_META` stays TOTAL over `EmitSubStep`** — its own-property `subStepMeta` fallback and every one of the seven declared members are byte-unchanged, which the suite's `it.each(SUBSTEPS)` sweep (7 members, including `model_fallback`) re-proved on every run. `frontend/src/components/workflows/PhaseSpineGraph.tsx` has **no ledger row** and measures `commits 12 / phases 6 / lines 278` — ⚠ **it is above the G-5 threshold and invisible to its own guardrail**, the same failure eleven files were found in at Phase 196. A row is owed; it is not added here because the ledger is a shared artifact and a sibling agent is executing in the same wave (the `197-10` precedent — correctly declining to edit a shared artifact mid-wave). **Re-open trigger: the orchestrator's post-wave ledger sync for Phase 199.**
+**Both triples RE-DERIVED with CLAUDE.md's own recipe rather than copied forward** — and the first draft of this paragraph got one of them wrong from memory, which is the ledger's own repeated finding arriving on schedule. The corrected, measured figures:
+
+| File | measured `commits / phases / lines` | ledger row says | Verdict |
+|---|---|---|---|
+| `frontend/src/components/panel/PhaseCard.tsx` | **12 / 8 / 543** | `11 / 7 / 522` | ⚠ **STALE** — row is short by 1 commit / 1 phase / 21 lines. **G-5 FIRES** (it already did) |
+| `frontend/src/components/workflows/PhaseSpineGraph.tsx` | **4 / 4 / 278** (phases `103 · 183 · 187 · 199`) | ⚠ **NO ROW AT ALL** | ⚠ **G-5 FIRES and could never have fired** — invisible to its own guardrail, the same failure eleven files were found in at Phase 196 |
+
+⚠ **The first draft of this section asserted `12 / 6` for the spine, from memory and unmeasured.** It was corrected by running the recipe before this file was committed. The lines figure happened to be right and the other two were wrong — which is exactly why the recipe exists and why a cell is never to be trusted over a re-derivation.
+
+`PhaseCard.tsx`'s G-5 row is **honoured by construction**: the change is two `className` ternary arms, and ⚠ **`SUBSTEP_META` stays TOTAL over `EmitSubStep`** — its own-property `subStepMeta` fallback and all seven declared members are byte-unchanged, which the suite's `it.each(SUBSTEPS)` sweep (7 members, including `model_fallback`) re-proved on every run.
+
+**Two ledger edits are OWED and deliberately NOT made here** — a stale row raised, and an absent row added — because the ledger is a shared artifact and a sibling agent is executing in the same wave (the `197-10` precedent: correctly declining to edit a shared artifact mid-wave). ⚠ Under the **same-commit sync rule** each row also owes a section in `docs/HOT-FILE-LEDGER.md`. **Re-open trigger: the orchestrator's post-wave ledger sync for Phase 199.**
 
 ## Self-Check: PASSED
