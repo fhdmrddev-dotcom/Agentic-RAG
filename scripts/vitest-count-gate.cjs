@@ -445,7 +445,44 @@ const BASELINE = {
   //     future "graceful degradation" that restores a text input reads as a fix.
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`PhaseFormPanel.test.tsx 24 38 +14`).
-  "PhaseFormPanel.test.tsx": 38,
+  //
+  // ── ⚠ 200-04 Task 3 (DES-02, `200-CHECKLIST.md` §1) — RAISED 38 → 74. ────────────────
+  //
+  // ⚠ NOTE THE ASYMMETRY, because it changes what a reviewer's grep should expect: ADDING a
+  // pin is `+n / −0`, but RAISING one necessarily DELETES a line. So `git diff -U0 -- this
+  // file | grep -c '^-[^-]'` is expected to be **exactly 1** for this plan — one raise here,
+  // one pure addition (`toolNames.test.ts`) above — and a criterion of 0 would be right for
+  // the add and WRONG for the raise.
+  //
+  // The +36 is this plan's §1 atom cases and nothing else, itemised so the number is
+  // auditable rather than asserted:
+  //   • 8 for the card sections `SP-MR-02`/`03`/`04` — the MODEL frame on all four
+  //     model-bearing types, the fitness siting, NO EMPTY CARD when the registry answer is
+  //     absent, the folders-by-name frame, the outside-change card with its mark and
+  //     sentence, the consequence line that renders NOTHING when nothing is chosen, the
+  //     `ARM_PINNED_TYPES` drift tie, and the `data-card`-not-`data-rail` guard.
+  //   • 4 GREEN rows DRIVEN rather than grepped (`SP-MR-05`/`06`/`07` + `SP-MNR-04`) —
+  //     ⚠ `ALREADY-SHIPPED` is not a pass in this phase; it was 57 of 105 verdicts in 199.
+  //   • 5 for the `MUST NOT RENDER` fence (`SP-MNR-01`/`02`/`03`) INCLUDING its **two
+  //     permanent non-vacuity controls** — a planted violation that must be FOUND (one plant
+  //     per forbidden class, so a selector typo fails that case first and names the class),
+  //     and a deliberate-absence case proving the predicate does NOT fire on honest copy, so
+  //     nobody has to delete a true sentence to go green.
+  //   • 3 for the two REPORT rows (`SP-4` / `SP-5`) and their own needle control.
+  //
+  // ⚠ THE FENCE WAS DRIVEN RED AGAINST REAL PLANTS IN PRODUCTION SOURCE, then both files
+  // restored byte-exactly (`git status` clean on each). A ligature name + a model literal in
+  // `StepCardSection.tsx` and a raw `{t}` in the panel's tool rail produced
+  // `expected [ 'search_documents', …(3) ] to not include 'search_documents'` and
+  // `llm_single: expected [ …(3) ] to deeply equal []` — three violations, one per class.
+  // **A fence never seen red is not evidence**, and wave 3 of this phase found one that was
+  // reached and still wrote nothing.
+  //
+  // ⚠ THE ABSOLUTE-ZERO HOOK PIN INSIDE THIS FILE WAS NOT TOUCHED, and that is MEASURED, not
+  // promised: the whole `196-08 picker mounts` describe block (220 lines) diffs BYTE-IDENTICAL
+  // against this plan's parent commit. D-11 is honoured by EXTRACTION — the card shell is a new
+  // leaf holding no state — never by re-baselining a guard whose point is that it reads zero.
+  "PhaseFormPanel.test.tsx": 74,
   // ── 200-04 Task 1 (DES-02, `200-CHECKLIST.md` §1 `SP-MR-01`) — pinned in the SAME COMMIT
   // that creates the file, because *"an unpinned file is not a lightly-guarded one, it is an
   // unguarded one"* and because a `BASELINE` key naming a path that does not yet exist makes
