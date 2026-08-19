@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T06:35:00.000Z"
+last_updated: "2026-08-19T04:13:39.119Z"
 last_activity: 2026-08-19
 progress:
   total_phases: 21
-  completed_phases: 10
-  total_plans: 117
-  completed_plans: 114
-  percent: 49
+  completed_phases: 11
+  total_plans: 126
+  completed_plans: 118
+  percent: 52
 ---
 
 # Project State
@@ -31,12 +31,12 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 192.2 — does-this-one-work
+**Current focus:** Phase 199 — the-component-map
 
 ## Current Position
 
-Phase: 199 (the-component-map) — **PLANNED · 10 plans / 3 waves · plan-checker PASS, 0 blockers**
-Plan: **0 of 10 executed**
+Phase: 199 (the-component-map) — EXECUTING
+Plan: 1 of 10
 Next action: **`/gsd:execute-phase 199`** — ⚠ **dispatch AT MOST TWO plans concurrently, never a full
 four-plan wave.** File ownership is disjoint everywhere (83 files, each owned by exactly ONE plan,
 zero overlap within or across waves), so the waves are a SEQUENCING decision, not a dependency graph
@@ -66,15 +66,18 @@ never grow a backend change to make it possible.** ⚠ Sketch 178 renders **ZERO
 
 ✅ **THE SKIPPED-STEP RULE ALREADY PAID FOR ITSELF — three CANNOT-EXPRESS gaps were found at PLANNING
 time, not at build, and the plan-checker verified each against real source:**
+
 - **`199-05` — the payload-bearing connection label** (`312 contracts → 48 extracted → 12 flagged`).
   The sketch README calls this *"the idea worth keeping from the whole exploration"*, and **nothing in
   the app emits a per-edge count** (confirmed: zero occurrences across `FlowEdge.tsx`, the canvas model
   files, `models/harness.py` and `services/harness/*`). Approximating it with a phase count would put a
   **fabricated business figure on the canvas** — the highest-consequence lie this phase could ship.
+
 - **`199-09` — the problems tray's engineer language.** `ProblemsTray.tsx` renders the server's
   `message` **verbatim by decision D-182-06** (*"no code table here and no friendly-message map"*,
   confirmed verbatim in its docblock). A client-side rewrite re-introduces exactly what that decision
   removed; fixing the sentences at source is a backend change the fence forbids. Routed, not built.
+
 - **`199-02` — the chat-sized receipt spine** with mono per-step durations.
 
 ⚠ **FOUR sheet elements are pre-REFUSED as SHEET DEFECTS**, each citing a rule the checker confirmed
@@ -145,6 +148,7 @@ Next action: **`/gsd:verify-work 192.2`** — execution and verification of the 
 the one thing that justifies a round.
 
 **OPERATOR DECISIONS, LOCKED — chosen against a presented trade-off, not inferred:**
+
 1. **CR-01 is fixed by `has_any_run` + a FOURTH arm**, not by rewording alone. The lateral gains
    `EXISTS(SELECT 1 FROM workflow_runs WHERE definition_id = wd.id) AS has_any_run`; the scope
    clause `r.user_id = $1` is **UNCHANGED — the security boundary stands.** Arms become
@@ -153,6 +157,7 @@ the one thing that justifies a round.
    must never reveal who, when, how many, or with what outcome — `EXISTS` only. On a
    world-readable starter that disclosure is arguably the point; recorded so a future reader can
    re-open the reasoning rather than rediscover it.
+
 2. **All four warnings fold into this round** — WR-01, WR-02, WR-03, WR-04.
 
 **Wave plan:** W1 `07` (WR-01 tailwind/CSS) ∥ `08` (backend `has_any_run`, **`autonomous: false`
@@ -231,17 +236,21 @@ does NOT apply.
 phase's FIRST verification; it would be a stop signal only inside a closure round.
 
 **Also open, non-blocking, all confirmed in code:**
+
 - **WR-01 — `bg-warning` / `text-warning` COMPILE TO NOTHING.** `frontend/tailwind.config.js` has
   no `warning` key at all (grep exits 1) and `--warning` exists only under `.dark`
   (`index.css:116`). So the `stopped`/cancelled gutter renders **unpainted — visually identical to
   the arm the same docblock says is DELIBERATELY unpainted so the two "cannot be mistaken."**
   Unguarded: the tests assert `data-run`, never the class.
+
 - **WR-04 — the purpose-search issue is WORSE than 192.2-05 recorded it.** Not just `purpose`:
   the `makes-a-file` and `strict` chips still select on the **deliverable** and **tier** atoms that
   D-03 cut, so filter chips now select on facts the card cannot show.
+
 - **WR-02** — `api.ts` now carries three identically-typed `last_run_status?: string | null`
   fields, and `workflow_runs.created_at` has TWO wire names (`last_run_created_at` :1338,
   `last_run_at` :1421) — the exact collision the file warns about twelve lines above it.
+
 - **WR-03** — an ARIA role violation in the fork-consequence menu item.
 - **`BUG-260819-01`** (`status: open`) — the state word renders twice on a name-colliding row.
   The fix is one decision in `rowIdentity.ts`, not in the card.
@@ -265,15 +274,18 @@ verification has not run. **That is a decision, not an oversight.**
 
 ⚠ **Wave 5 (`192.2-06`) COMPLETE — the phase's closing plan. 4 task commits `b38764ca` /
 `23334f0d` / `079cca07` / `eb279c08`. What it MEASURED, not what it assumed:**
+
 - ✅ **THE SKETCH SURFACE IS GONE AND IT IS PROVED, NOT ASSERTED.** `grep -rn
   "sketch-card|SketchLibraryCard" frontend/src` → **no match, exit 1**; `frontend/src/dev/` no
   longer exists; `main.tsx` is **byte-identical to its pre-sketch shape** (`git diff 17a508d7`
   → empty). Component + route branch deleted **in one commit**, as the sketch required.
+
 - ⚠ **TWO DOCBLOCKS STILL POINTED AT THE DELETED PATH** (`library/runFacts.ts`,
   `library/WorkflowCard.tsx`) and were amended in the same commit. **Nothing here typechecks
   prose**, so a dangling pointer survives every gate. The sketch README records the teardown as
   DISCHARGED with its original wording preserved beside it — and records that **the sketch's own
   two-armed `runWords` T-13 bug did NOT ship: the three-armed resolution lives in `runFacts.ts`.**
+
 - ⚠ **THE LEDGER DEBT WAS LARGER THAN ANY PLAN THOUGHT.** The plan named SEVEN files; the phase's
   real diff names **TWELVE** non-test source files. **FIVE existing rows were stale** (corrected
   beside their originals) and **THREE were ADDED BECAUSE THEY WERE ABSENT**, not because they were
@@ -282,14 +294,17 @@ verification has not run. **That is a decision, not an oversight.**
   three were at/over G-5 with no row, so the guardrail could never have fired on them at any count.
   ⚠ **`libraryFilter.ts`'s shape is worth remembering: 4 commits across 4 DIFFERENT phases** — a
   file touched once per phase never looks hot in any one plan's diff.
+
 - ✅ **`WorkflowCard.tsx`'s cell read *obligation UNDISCHARGED* for four phases and is now
   DISCHARGED (Wave 2), with the NEXT SEAM NAMED** — the `⋯` overflow menu + its armed-delete state
   machine — rather than marked `satisfied` with no successor, which is the exact state three of the
   five rows found stale on 2026-08-17 were in. It re-derives to **12 / 4 / 1105** (Wave 4 predicted
   `11 / 4 / 1104`; this plan's own commit moved it — the self-staling this ledger documents).
+
 - ✅ **`api.ts`'s 197 seam-DECLINE HOLDS and its re-open trigger did NOT fire**, stated explicitly
   rather than left as a silent cell: `+53 / −0`, **zero** new runtime exports, measured by grep over
   the diff, so `196-08`'s mock-factory failure mode measurably could not fire.
+
 - ⚠ **CLAUDE.md's count-gate constants rotted a FOURTH time and are corrected BESIDE the originals:**
   `4170 / 4096 / 83` (2026-08-17) → **`4594 / 4328 / 92`** — **`+424` cases in TWO DAYS.** 192.2's
   own arc is published with every increment attributed and no residual (`4455 → 4506 → 4574 →
@@ -297,34 +312,42 @@ verification has not run. **That is a decision, not an oversight.**
   it did not here — because no gated suite ever covered `src/dev/`. The gate could never have told
   anyone the dev surface had outlived its sketch; that obligation was carried by a README note and
   nothing executable.** The cap held at `2` on every run of every plan and was never adjusted.
+
 - ⚠ **A FIFTH WRONG PATH, in this plan's own prompt: `relativeBand` is an EXPORT at
   `relativeChanged.ts:103`, NOT a module.** All five are now collected in one table in
   `docs/HOT-FILE-LEDGER.md` — `ROW_FACE` · `models/harness.py` · `libraryRow.ts` · `phaseGlyph.tsx`
   · `relativeBand`. **`files_modified` was wrong in five of six plans**, and the rate is the finding:
   a plan's file list is a CLAIM, not a fact, and it is itself a scan list that can be incomplete.
+
 - ⚠ **`BUG-260819-01` FILED** — the state-word duplication on a name-colliding row, `status: open`,
   `surface: Agentic-RAG`. **A record living only in a phase summary is invisible to every touchpoint
   that scans for open bugs**, which is how a live bug hid for two months in this project.
+
 - ⚠ **`gsd-sdk query roadmap.update-plan-progress 192.2` RETURNED `updated: true` AND WROTE ZERO
   BYTES AGAIN** — second confirmation this phase, verified with `git diff --numstat`. It also
   reported `summary_count: 5`. ROADMAP.md and STATE.md were hand-edited. **Do not trust that verb.**
+
 - ⚠ **A MISFILED RECORD WAS FOUND AND MOVED (Rule 1):** Wave 4's entire ROADMAP block had been
   appended to **Phase 198's** bullet instead of Phase 192.2's — 4,267 characters of 192.2's record
   filed under an unrelated future phase, where it was both invisible and wrong. Phase 198's bullet is
   restored to its original 165 characters.
 ⚠ **Carried OUT of Wave 4 into Wave 5, measured not assumed:**
+
 - ✅ **LIB-06 IS SATISFIED ON SCREEN.** The card renders sketch 179 variant C: a 3px run gutter,
   the name leading line 1 with the version deferred, and **line 2 saying the run truth then the
   state in business words**. Three rows sharing ONE name and differing only by their last run
   now say **three different things**, asserted as a mutual-distinctness property and re-asserted
   after every `class` attribute is stripped off the DOM (colour is never the only carrier).
+
 - ⚠ **THE SUBTRACTION LANDED AS EXACTLY SIX ATOMS, AND THE DELTA IS PROVED RATHER THAN CLAIMED.**
   The characterization pin was RE-BASELINED by INVERSION — the six flip from *asserted present*
   to *asserted ABSENT*, none was deleted — and a new sweep asserts all six absent on all three
   provenance faces. Case count `24 → 29`, so the pin got STRICTER while growing.
+
 - ⚠ **THREE SURVIVING ATOMS CHANGED THEIR LITERAL AND NONE DEPARTED** (D-06): the provenance mark,
   the folder chip and the state word. An auditor counting "exactly six left" must count
   DEPARTURES, not edits.
+
 - ⚠ **`lib/phaseGlyph.tsx` WAS NOT TOUCHED — the plan's `files_modified` was DECLINED, not obeyed,
   and this is the FOURTH wrong path in this phase's plans** (after `models/harness.py` and
   `libraryRow.ts`). That map is TOTAL OVER PHASE TYPES and `icon-convention.md` §4 forbids a
@@ -332,11 +355,13 @@ verification has not run. **That is a decision, not an oversight.**
   equal `soulData.PHASE_GLYPHS`. The card stopped consuming it entirely when the spine left.
   The three marks became **`lucide-react`** icons — the house chrome set this file already drew
   `MoreHorizontal` / `Trash2` / `Loader2` from, so no fourth icon path was introduced.
+
 - ⚠ **THE IDENTITY LINE MOVED FROM DOM POSITION 2 TO POSITION 3**, deliberately. D-01 numbers the
   run truth as LINE 2 and sketch 179-C is SILENT on the order (it rendered no identity line at
   all). Five child-order assertions moved with it in the same wave — which is exactly what
   asserting placement by child order was for. **LIB-05 was NOT re-opened**: no field, word or
   resolver of `rowIdentity.ts` changed.
+
 - ⚠ **A NEW DUPLICATION IS OBSERVABLE AND IS RECORDED RATHER THAN FIXED.** On a row that collides
   on its name, `resolveIdentity` picks the STATE AXIS as the discriminator, so `Ready to run`
   now renders TWICE — once on line 2 and once as a seg of the identity line. Found by a
@@ -344,13 +369,16 @@ verification has not run. **That is a decision, not an oversight.**
   here**: D-04 says LIB-05 stays complete and must not be re-opened, `rowIdentity.ts` is outside
   `files_modified` with 72 pinned cases, and the card's own discipline is that it *invents no
   part and drops none*. **Re-open trigger: an operator reads the stutter on the real shelf.**
+
 - ⚠ **A SEARCH HIT IS NO LONGER SELF-EXPLAINING.** The library filter still matches on `purpose`,
   but D-03 cut the purpose hero, so a row found by a word only in its purpose shows no reason
   why. Pinned in that direction in `WorkflowsPage.test.tsx` with the trade written beside it.
   Accepted knowingly (`business_requirement` is populated on 14% of rows). Re-open trigger: a
   wave restoring a why-it-matched affordance.
+
 - ⚠ **THE FORK CONSEQUENCE MOVED INTO THE `⋯` MENU, IT DID NOT DIE** (T-21). `aria-describedby`
   round trip intact; it is a plain `<p>`, so Radix roving focus and typeahead skip it.
+
 - ⚠ **`WorkflowCard.tsx` RE-DERIVES TO `11 / 4 / 1104`** (ledger row says `8 / 3 / 818`) — a
   **fifth** ledger row Wave 5 owes, alongside `libraryVocabulary.ts` (`8 / 4 / 584`, no row at
   all) and the count-gate constants. **Its G-5 obligation stays DISCHARGED** (Wave 2), and this
@@ -358,25 +386,31 @@ verification has not run. **That is a decision, not an oversight.**
   changed here.
 
 ⚠ **Carried OUT of Wave 3 into Wave 4, measured not assumed:**
+
 - **`face.run` (the arm) and `face.runWord` (the sentence) already reach the card** — `cardFace.ts`
   asks `runFacts.ts` and re-derives nothing. The gutter mark keys off `face.run.kind`, and the
   three-way outcome colour off `face.run.outcome`. **Every arm carries a word**, which is what makes
   D-01's *"colour, and never colour alone"* enforceable rather than aspirational.
+
 - ⚠ **`cardFace(row, now)` — HOIST ONE `now` PER RENDER.** `WorkflowCard.tsx` currently takes the
   `Date.now()` default, which is harmless while nothing renders the band and is **P-1 the moment
   Wave 4 draws it**: 107 rows each reading their own clock can straddle a band boundary and two
   cards will disagree. The page already hoists one instant for `resolveIdentity` — pass the same one.
+
 - ⚠ **The run truth's three arms are `unknown` / `never` / `ran`, and `LibraryRow` types the two run
   fields `string | null | undefined` — NOT the plan's `string | undefined`.** Collapsing `null` into
   `undefined` (which is what the neighbouring `updatedAt` normalizer does deliberately) IS T-13. The
   five words live in `libraryVocabulary.ts`: `Worked` · `Failed` · `Stopped` · `Never run` ·
   `Not recorded`.
+
 - ⚠ **`Not recorded` is what an IN-FLIGHT run says today** — `active` / `paused` / `cap_paused` are
   deliberately absent from the outcome map so they take the honest default. Re-open trigger: the
   first phase that renders in-flight state on the library shelf.
+
 - ⚠ **The approved sketch's own `runWords` (`dev/SketchLibraryCard.tsx`) HAS the T-13 bug** — its
   comment claims three arms, its code has two plus a `Never run` catch-all. The sketch is the
   acceptance bar for the LANGUAGE, not for the RESOLUTION. Do not copy it.
+
 - ⚠ **`libraryVocabulary.ts` measures `8 / 4 / 584` and has NO hot-file-ledger row** — over the G-5
   threshold and invisible to its own guardrail, the `WorkflowsPage.tsx` failure one layer down.
   **Wave 5 owes it a row + a section.** `frontend/src/lib/api.ts` re-derived to **`172 / 99 / 6227`**
@@ -384,15 +418,19 @@ verification has not run. **That is a decision, not an oversight.**
   `+53 / -0` with **zero** new runtime exports, so the re-open trigger did not fire.
 
 ⚠ **Carried into Wave 3, and still true:**
+
 - `last_run_status` arrives **RAW** from the wire — a `switch` over it needs a TOTAL default arm.
 - An **absent** key is a THIRD state, distinct from `null`. D-08 forbids rendering either blank or green.
 - The starter word is **`Shared starter`**, not `Starter` — `cardFace.ts` imports the business words from
   `libraryVocabulary.ts:297-307` rather than re-spelling them, so there is exactly one place to change.
+
 - The mark map is **`FACE`**, not `ROW_FACE` (both the plans and CONTEXT.md name the latter; it does not exist).
 - `scripts/vitest-count-gate.cjs` lives at the **repo root**, not under `frontend/`; the plans' `| tail` form
   makes a `MODULE_NOT_FOUND` exit **0**, so a broken invocation reads as a green gate.
+
 - ⚠ **The worktrees forked from `master`'s tip (`fda79214`), NOT from the dispatched `develop` base.** Both
   executors' HEAD assertions caught it and reset. Every future executor prompt must carry the base SHA assertion.
+
 - ⚠ **`gsd-sdk query roadmap.update-plan-progress` returned `updated: true` and wrote ZERO bytes** to both
   ROADMAP.md and STATE.md. Both files were hand-edited instead. Do not trust that verb's return value.
 
@@ -465,7 +503,7 @@ UAT rows are still owed)
 
 Phase: 197 (guided-authoring) — **EXECUTED 11/11, NOT COMPLETE**
 Plan: 1 of 6
-Status: Executing Phase 192.2
+Status: Executing Phase 199
 Next action: drive `197-HUMAN-UAT.md` — **11 rows, row U5 first**. Rows 10 and 11 confirm the two
 review fixes on screen.
 
@@ -1756,7 +1794,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Executing Phase 192.2
+**Status:** Executing Phase 199
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
@@ -2504,7 +2542,7 @@ plain. Do not verify a behaviour that does not exist.
 
 **Next action:** `/gsd:verify-work 192` when you want the owed rows driven — or proceed knowing they
 are owed. Downstream MUST read `192-CONTEXT.md` (**18** decisions) and `192-RESEARCH.md`, which **corrects six CONTEXT.md line numbers** measured at `HEAD = a0795512` — re-derive every line number, HEAD has moved.
-**Last activity:** 2026-08-18
+**Last activity:** 2026-08-19
 
 **Prior activity:** 2026-08-10 — **Phase 192 wave 1 executed and merged** (`5178100e`). `192-01`: five `WorkflowsPage`-covering suites adopted into BOTH count-gate knobs (pinned files 51 → 56, pinned total 2838 → 2910), zero source changed. `192-02`: D-04 ownership — `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, raw `created_by` fenced off the wire. Post-merge gate green: `tsc -p tsconfig.app.json` unmoved at **33**, count gate exit 0 / `failed 0`, new backend suite 17/17.
 
