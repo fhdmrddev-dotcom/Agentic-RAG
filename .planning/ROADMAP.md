@@ -76,6 +76,7 @@ is the incumbent any proposal must beat.
 - [ ] **Phase 195: Show the Deliverable** — a produced file is shown from the run surface, reusing the shipped file presentation (RUN-02, RUN-03)
 - [x] **Phase 196: Registry-Backed Model Picker (canvas)** — a step's model comes from the live registry, never typed (AUTH-04)
 - [ ] **Phase 197: Guided Authoring** — drafting from a description guides the decisions that change the result (AUTH-02)
+- [ ] **Phase 199: The Component Map** — every workflow surface is re-presented in the adopted design language; ten of sketch 178's eleven component sheets, built against the components that actually ship (DES-01). ⚠ **INSERTED 2026-08-19 on an explicit operator instruction to implement the whole map in ONE body of work.** **PRESENTATION ONLY — no data, no endpoint, no migration, no new capability**; that fence is what makes it affordable and a plan that needs to cross it STOPS and reports. ⚠ **G-2 is satisfied by sketch 178 plus the operator's standing ratification, and the method's step-3 re-sketch is DELIBERATELY SKIPPED** — recorded as a decision, with `SEED-155` carried into execution as a hard rule instead (*if the shipped component cannot express the sheet, report it, never fake it*).
 - [ ] **Phase 198: Node Vocabulary (research-first)** — prove the deterministic-primitive need before shipping one; cover structured mid-run input (NODE-01, NODE-02)
 
 ### Phase Details
@@ -781,6 +782,54 @@ Plans:
 **Wave 7** *(blocked on Wave 6)*
 
 - [x] 197-11-PLAN.md — Wave 7: the records — three gate pins taken from the gate's own counts, nine hot-file ledger rows RE-DERIVED in one batch pass with `docs/HOT-FILE-LEDGER.md` synced in the same commit, every declared criterion run once more, and every declined decision given a written re-open trigger
+
+#### Phase 199: The Component Map
+
+**Goal**: A person moving through the workflow product — library, authoring, canvas, run — reads one consistent surface whose hierarchy carries the meaning, instead of flat text dumps. Nothing new is added; the noise is removed.
+**Depends on**: Phase 192.2 (which built the first sheet and discharged `WorkflowCard.tsx`'s G-5).
+**Requirements**: DES-01
+**Inserted**: 2026-08-19, operator instruction: *"we want to implement everything so we can close the thing of the design of the full workflow … but we do not need to over complicate things like this. One card took you eleven plans."*
+
+**Why this is ONE phase and not eleven.** Phase 192.2 cost 11 plans for a single card, and the reasons are known and **do not recur here**: it carried a G-5 refactor, a genuine BACKEND feature (`has_any_run` — new SQL on four projections, two wire models, a normalizer and a fourth vocabulary arm), and a review blocker that forced a gap round. This phase has **none of those**. Sketch 178's measured finding is that its win came from *removing* text and chrome, which is why a presentation pass across ten surfaces is cheaper than one card that also had to grow a data axis.
+
+**Scope — ten sheets, mapped to the components that actually ship.** ⚠ Sheet `c11-journey-arc` is marked **FAILED / re-running** in sketch 178 and is **OUT of scope**; it needs a re-run before it can be built to.
+
+| Sheet | Ships against |
+|---|---|
+| `c1-canvas-plane` | `WorkflowCanvas.tsx` (1301 L) |
+| `c2-phase-node` | `PhaseNodeCard.tsx` (280 L) — 178's own best artifact |
+| `c3-phase-spine` | `PhaseSpine.tsx` (104 L) + `PhaseCard.tsx` (522 L) |
+| `c4-phase-form-panel` | `PhaseFormPanel.tsx` (1216 L) |
+| `c5-draft-arrival` | `DraftArrivalCard.tsx` (338 L) |
+| `c6-library-dialogs` | `RunModal` + the library dialogs |
+| `c7-gauntlet-soul` | `PublishGauntlet.tsx` + `WorkflowSoul.tsx` (125 L) |
+| `c8-run-panel` | `WorkflowRunPage.tsx` (1156 L) + `WorkspacePanel.tsx` (646 L) |
+| `c9-doors-describe` | `WorkflowDoorSwitch.tsx` (522 L) |
+| `c10-builder-chrome` | `WorkflowBuilderPage.tsx` (2656 L) |
+
+**Waves** — grouped so no two plans in a wave share a file:
+
+| Wave | Surfaces |
+|---|---|
+| 1 | node · spine · soul + gauntlet |
+| 2 | canvas · form panel · run panel + workspace panel |
+| 3 | builder chrome · doors + describe · library dialogs |
+
+**How we'd know this failed**
+- A surface gains text or chrome instead of losing it — the phase's whole premise inverted.
+- A plan adds a backend change, an endpoint, a migration or a new user-facing capability. **That is the scope fence; crossing it means the phase became a feature phase without anyone deciding to.**
+- The mechanism gets printed to the user again (sketch 177's worst mistake: node subtitles literally reading *"Author name" / "Derived name"*).
+- A component is redrawn rather than re-presented — `SEED-155`, and the reason the skipped step-3 sketch is carried as an execution rule.
+- A characterization pin is re-baselined to make red go green rather than because behaviour deliberately changed.
+
+**Success criteria**
+1. Each of the ten sheets is built against its shipped component, and any sheet a component structurally cannot express is **reported with the reason**, never faked and never dropped silently.
+2. No backend file, migration, endpoint or wire model is modified by this phase — provable by an empty `git diff` over `backend/` and `supabase/`.
+3. No surface renders MORE at rest than it did before; where a sheet removes an atom, the removal is proved against a pre-change inventory rather than asserted.
+4. The mechanism is never printed to the user on any touched surface.
+5. Gates hold: `tsc` unmoved, count gate `failed 0` with no per-file decrease, and every touched suite green.
+
+**Deliberately OUT of scope, by operator instruction** — *"later on maybe we can modify some bugs on the application overall to match it"*: `SEED-182` (the composing moment is a dead greyed-out duplicate form) and `SEED-183` (draft configuration vanishes, taking the only rename control with it). ⚠ **Both are BEHAVIOUR defects in this same journey, both `priority: high`, and both stay `planted`** — named here so the deferral has a home rather than being forgotten. `SEED-184` (*"information is dumped as text, not presented"*, an explicitly RECURRING operator complaint) **is** what this phase answers.
 
 #### Phase 198: Node Vocabulary (research-first)
 
