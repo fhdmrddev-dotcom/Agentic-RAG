@@ -60,6 +60,9 @@ import { branching } from "./__fixtures__/canvasFixtures"
 // 199-05: the ONE frozen layout table, read so the ground-vs-node ordering below is
 // asserted against the shipped card width rather than against a re-typed number.
 import { CANVAS_LAYOUT } from "./canvasModel"
+// 199-05: the ONE shared 3D phase-mark map, read so the §4 audit below checks the real
+// slugs rather than a hand-kept copy of them.
+import { PHASE_GLYPHS } from "./soulData"
 
 // ── 188.1-01 — THE SUBTREE SOURCE, and why it names files that do not exist yet ──────
 //
@@ -1388,6 +1391,7 @@ describe("WorkflowCanvas 199-05 Task 3 — every drawn MARK traces to icon-conve
   const SHIPPED_BUT_ABSENT_FROM_SECTION_4: Record<string, string> = {
     "○": "the end cap — PhaseNode.tsx:280, sketch 136; §4 has no row for it",
     "✎": "the writes receipt — WorkflowCanvas.tsx:512 + 3 siblings; §4 has no row for it",
+    "👁": "the View-only mode chip — WorkflowCanvas.tsx:1082; §4 has no row for it",
   }
 
   /**
@@ -1417,18 +1421,29 @@ describe("WorkflowCanvas 199-05 Task 3 — every drawn MARK traces to icon-conve
     return marks
   }
 
-  it("the EDITABLE plane draws no mark outside the two declared vocabularies", async () => {
-    const view = renderCanvas(docQaHuman, { editable: true, provider: true })
-    await waitFor(() => {
-      expect(view.container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
-    })
-    const marks = drawnMarks(view.container)
+  it("neither plane draws a mark outside the three declared vocabularies", async () => {
+    // ⚠ BOTH MODES, and the plural is load-bearing. This sweep was written against the
+    // EDITABLE plane alone and was mode-blind: the two arms of the header are mutually
+    // exclusive, so a mark on the read-only arm (`👁 View only`) was invisible to it, and
+    // a phase glyph appearing only in read-only would have passed unseen. An invariance
+    // fence says nothing about what it does not cover — Phase 188's F7 lesson.
+    const marks = new Set<string>()
+    for (const editable of [true, false]) {
+      const view = renderCanvas(docQaHuman, { editable, provider: true })
+      await waitFor(() => {
+        expect(view.container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+      })
+      for (const mark of drawnMarks(view.container)) marks.add(mark)
+      view.unmount()
+    }
 
-    // NON-VACUITY FIRST — the plane really does paint marks, so an empty sweep cannot
+    // NON-VACUITY FIRST — both planes really do paint marks, so an empty sweep cannot
     // pass. This project has measured three fences that swept the empty string green.
     expect(marks.size).toBeGreaterThan(0)
-    expect(marks.has("＋")).toBe(true)
+    expect(marks.has("＋")).toBe(true) // only the editable arm has these…
     expect(marks.has("✕")).toBe(true)
+    expect(marks.has("👁")).toBe(true) // …and only the read-only arm has this one, which
+    expect(marks.has("✎")).toBe(true) // …is what proves BOTH arms were really walked
 
     const unaccounted = Array.from(marks).filter(
       (m) =>
@@ -1439,30 +1454,37 @@ describe("WorkflowCanvas 199-05 Task 3 — every drawn MARK traces to icon-conve
     expect(unaccounted.map((m) => `U+${m.codePointAt(0)!.toString(16).toUpperCase()}`)).toEqual([])
 
     // …and the §4 GAP is pinned as PRESENT, so it cannot close silently either. If a
-    // future phase adds these two rows to §4 and moves them into `SHIPPED_CANVAS_MARKS`,
-    // this assertion inverts — which is the point: the gap is proved by inversion, never
-    // by a deletion nobody notices.
+    // future phase adds these rows to §4 and moves them into `SHIPPED_CANVAS_MARKS`, this
+    // assertion inverts — which is the point: the gap is proved by inversion, never by a
+    // deletion nobody notices.
     expect(marks.has("○")).toBe(true)
-    expect(marks.has("✎")).toBe(true)
     for (const [mark, why] of Object.entries(SHIPPED_BUT_ABSENT_FROM_SECTION_4)) {
       expect(why).toContain("§4 has no row for it")
       expect(mark in SHIPPED_CANVAS_MARKS).toBe(false)
     }
   })
 
-  it("draws NO phase-type glyph as a category icon, and no invented mark", async () => {
-    // §4's worst recorded drift: a phase-type glyph used to say what a WHOLE workflow is
-    // about. There is no category-icon vocabulary and this surface must not mint one.
-    const view = renderCanvas(docQaHuman, { editable: true })
-    await waitFor(() => {
-      expect(view.container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
-    })
-    // The phase marks that DO ship are bundled SVG components, never text glyphs — so a
-    // 3D-mark emoji appearing as TEXT anywhere would be a re-declaration.
-    const text = view.container.textContent ?? ""
-    expect(text).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u)
-    // POSITIVE CONTROL — the matcher really does catch an emoji glyph.
-    expect("\u{1F916}").toMatch(/[\u{1F300}-\u{1FAFF}]/u)
+  it("no phase-type mark is re-declared as TEXT — the 3D map's slug never reaches a face", async () => {
+    // §4's worst recorded drift: a phase-type glyph pressed into service as a category
+    // icon. The shipped marks are BUNDLED SVG components resolved from `PHASE_GLYPHS`'
+    // slugs, so the failure shape here is a SLUG leaking onto the face — which is both
+    // the mechanism being printed and a re-declaration of the one shared map.
+    for (const editable of [true, false]) {
+      const view = renderCanvas(docQaHuman, { editable, provider: true })
+      await waitFor(() => {
+        expect(view.container.querySelectorAll(".react-flow__node").length).toBeGreaterThan(0)
+      })
+      const text = view.container.textContent ?? ""
+      expect(text.length).toBeGreaterThan(0) // non-vacuity before contents
+      for (const slug of Object.values(PHASE_GLYPHS)) {
+        expect(text).not.toContain(slug)
+      }
+      view.unmount()
+    }
+    // POSITIVE CONTROLS — the slugs are real, non-empty, and the check really would fire.
+    expect(Object.values(PHASE_GLYPHS).length).toBeGreaterThan(0)
+    for (const slug of Object.values(PHASE_GLYPHS)) expect(slug.length).toBeGreaterThan(0)
+    expect(`a face reading ${PHASE_GLYPHS.llm_agent}`).toContain(PHASE_GLYPHS.llm_agent)
   })
 
   it("POSITIVE CONTROL — an invented mark would NOT be accounted for", () => {
