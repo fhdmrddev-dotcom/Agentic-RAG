@@ -1053,7 +1053,7 @@ export function PhaseFormPanel({
         </button>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3">
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
         <p className="mb-3 text-[11px] text-muted-foreground">
           Refine this step — adjust what it does, then move on.
         </p>
@@ -1071,7 +1071,7 @@ export function PhaseFormPanel({
             groups at `gap-8` against a `gap-3` inside each card, and that ratio is what makes
             seven cards read as seven things. The grid itself is unchanged, because the fields
             INSIDE each card still use its two columns. */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-8">
           {/* ── programmatic: fn + input_keys (a deterministic server step — no LLM fields) ── */}
           {pt === "programmatic" && (
             <StepCardSection

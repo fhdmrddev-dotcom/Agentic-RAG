@@ -92,10 +92,10 @@ export interface StepCardSectionProps {
 
 /** The sheet's outside label: small caps, wide tracking, the dim ink. */
 const CARD_TITLE_CLASSES =
-  "text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground"
+  "text-[11px] font-semibold uppercase tracking-widest text-muted-foreground"
 
 /** The sheet's inset panel — DARKER than the aside around it, which is what reads as a card. */
-const CARD_BODY_BASE = "rounded border border-border bg-background p-3"
+const CARD_BODY_BASE = "rounded border border-border bg-background p-4"
 
 /** The amber left edge, mapped off the sheet's `#F5A524` onto the shipped `--warning` token.
  *  ⚠ `warning` is a real Tailwind key here (192.2 WR-01 added the declaration `bg-warning`
@@ -129,7 +129,7 @@ export function StepCardSection({
       id={anchorId}
       data-card="step"
       data-testid={testId}
-      className="col-span-2 flex flex-col gap-1.5 scroll-mt-3"
+      className="col-span-2 flex flex-col gap-3 scroll-mt-3"
     >
       <h3 className={CARD_TITLE_CLASSES}>{title}</h3>
       <div
