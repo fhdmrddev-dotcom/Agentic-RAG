@@ -465,3 +465,259 @@ any structural count would be the length of whichever key happened to be a list.
 Plus six register rows in §5 (`SP-4` · `SP-5` · `RS-3b` · `FAN-OUT` · `RS-1` · `X-6 ROW`).
 
 **Verification reports `N/N` against these counts, per screen, or NAMES THE MISS.**
+
+---
+
+## §6 PHASE BASELINES — re-derived, not inherited
+
+**Every figure below was executed by `200-01` in its own worktree at base SHA
+`393963cd0c191bf360474df48868e8f0dc05d7c7` on 2026-08-19.** Verdict lines are pasted **verbatim**;
+a summary is not a baseline. **Every later plan in this phase compares against THESE numbers, not
+against CLAUDE.md's** — see §6.1 for why that sentence is load-bearing rather than pedantic.
+
+### §6.1 The vitest count gate
+
+Command, run **from the repo root** (of the worktree), quiet tree:
+
+```
+GSD_VITEST_MAX_WORKERS=2 node scripts/vitest-count-gate.cjs
+```
+
+Verdict lines, **verbatim**:
+
+```
+  total                                      4543    4970    +427
+  total 4970  ·  failed 0  ·  pinned total 4543
+count gate OK — 96/96 pinned files present, no per-file decrease, 0 failing.
+```
+
+**This CONFIRMS `200-RESEARCH.md` §D17 exactly** (`4970 · 4543 · 96/96 · failed 0`), on a second
+independent run, in a different working tree, with a sibling agent active. `failed 0` on the first
+run at cap 2.
+
+| | CLAUDE.md publishes (192.2, **2026-08-19**) | **THIS PHASE'S BASELINE (2026-08-19, later)** |
+|---|---|---|
+| grand total | 4594 | **4970** |
+| pinned total | 4328 | **4543** |
+| pinned files | 92/92 | **96/96** |
+
+⚠ **This is the FIFTH rot of this constant, and it happened on the SAME DAY the fourth was written.**
+The published trajectory — `4170` (08-17) → `4594` (08-19) → **`4970`** (08-19, later) — is `+376`
+grand / `+215` pinned / `+4` files, from Phase 199 landing.
+
+⚠ **A GROWING NUMBER IS THE GATE WORKING.** Its contract is **no per-file DECREASE** and **zero
+failing** — **never a fixed grand total.** A later plan that reads a bigger figure than `4970` has
+read the correct current one; it should publish its own reading beside this one rather than doubt it.
+
+⚠ **`count gate OK` is NOT reliably reachable on demand** (`SEED-171`, §6.6), so a plan whose
+acceptance criterion is *"the gate is green"* has written a criterion that can fail for reasons no
+plan controls. **Pair it with per-file deltas and the explicitly-run in-scope suites**, which are
+deterministic.
+
+### §6.2 Backend — the full unit baseline
+
+```
+backend/venv/Scripts/python.exe -m pytest tests/unit -q
+⇒ 62 failed, 2350 passed, 2 xfailed, 2 xpassed, 32 warnings in 74.23s (0:01:14)
+```
+
+**Matches RESEARCH §D19 exactly.** The **failed count is stable at 62** and is the known SEED-era rot
+(`test_retrieval_service.py`, `test_sandbox_service.py`, `test_sql_service.py`,
+`test_streaming_reliability.py` and siblings) — **none in the workflow cluster**. CLAUDE.md's
+*"62 failed / 1986 passed"* is stale on the PASSED figure only; **2350** is the current one.
+
+### §6.3 Backend — the wire slice's own suites
+
+```
+backend/venv/Scripts/python.exe -m pytest \
+  tests/test_188_workflow_run_read.py tests/test_workflow_phase_cancel.py \
+  tests/test_l01_finish_run_terminal_guard.py tests/test_thread_workflow_endpoint.py \
+  tests/test_harness_engine.py tests/test_harness_resume.py -q
+⇒ FAILED tests/test_thread_workflow_endpoint.py::test_thread_workflow_state_shape
+⇒ 1 failed, 121 passed, 3 warnings in 7.12s
+```
+
+⚠ **THE ONE PRE-EXISTING FAILURE, NAMED SO IT CAN NEVER BE ATTRIBUTED TO THIS PHASE:**
+
+> **`tests/test_thread_workflow_endpoint.py::test_thread_workflow_state_shape`** — `assert body["locked"] is True` → `assert False is True`
+
+It is **RED BEFORE** this phase begins, and it is **IN the blast radius** — it asserts the very
+`ThreadWorkflowState` shape that `200-02` widens. **`200-02` must record it RED-before as a baseline,
+not fix it silently and not let it read as a regression.** If a later plan turns it green, that is a
+**deliberate change to explain**, never an incidental one.
+
+### §6.4 Frontend typecheck
+
+```
+cd frontend && npx tsc -p tsconfig.app.json --noEmit
+⇒ exit 2 · 33 errors across 19 files
+```
+
+⚠ **A bare `tsc --noEmit` checks ZERO files** — the `-p tsconfig.app.json` form is the one that means
+anything (and `tsc -b` is a third, different thing). All 33 are **pre-existing**, in
+`src/__tests__/**`, `src/components/chat/MessageSkeleton.tsx`, `src/components/layout/**`,
+`src/components/panel/__tests__/**`, `src/components/panel/FilePreview.test.tsx`,
+`src/components/settings/MemorySection.tsx`, `src/components/skills/SkillFormDialog.tsx`,
+`src/lib/api.test.ts`, `src/pages/SettingsPage.{tsx,test.tsx}`, `src/providers/{OrgProvider.test.tsx,StreamsProvider.tsx}`
+and `src/stores/streamsStore.ts`.
+
+✅ **ZERO errors in any of this phase's ten G-5 target files or four in-scope render files.**
+`src/lib/api.test.ts` is the closest hit and is a **test** file, not `api.ts`. **The criterion for
+every later plan is `33 / 19`, unmoved** — not "clean".
+
+### §6.5 The next free migration number
+
+```
+ls supabase/migrations/ | sort -V | tail -1
+⇒ 120_model_capabilities_overrides_emit_tier.sql
+```
+
+⇒ **`200-02` claims `121`.** ⚠ Filenames must match `<digits>_name.sql`; **letter suffixes like `121b`
+are SILENTLY SKIPPED by the Supabase CLI.** ⚠ Apply by pasting into the Supabase SQL editor — **never
+`supabase db push` / `db reset`** — then `bash scripts/regenerate-full-schema.sh` with **no** `--reset`,
+and commit the regenerated artifact. Never hand-edit `full-schema.sql`. ⚠ `200-02` **runs ALONE**: its
+`test_migration_121.py` will connect to real Postgres (the `test_migration_115` / `test_migration_119`
+pattern — `POSTGRES_DSN` default `postgresql://postgres:postgres@127.0.0.1:54322/postgres`), and
+CLAUDE.md rule 4 forbids running a DB-mutating plan concurrently.
+
+### §6.6 G-5 triples — RE-DERIVED FROM GIT, not read from a ledger cell (D-14)
+
+Recipe, CLAUDE.md's own, run per file. ⚠ **Six-digit buckets (`260814`, `260405`) are DATED QUICK
+TASKS, not phases, and are SUBTRACTED** — a filter this table applies and RESEARCH's X-7/X-8 did not.
+
+```bash
+git log --oneline -- <f> | wc -l                                       # commits
+git log --format=%s -- <f> | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' \
+  | sed -E 's/-.*//' | grep -E '^[0-9]+(\.[0-9]+)?$' \
+  | grep -vE '^[0-9]{6}$' | sort -u | wc -l                            # phases (quick tasks subtracted)
+wc -l <f>                                                              # lines
+```
+
+| # | File | commits / phases / lines | G-5 | Ledger row today | Disposition / owner |
+|---|---|---|---|---|---|
+| 1 | `frontend/src/components/workflows/WorkflowCanvas.tsx` | **26 / 7 / 1390** | **FIRES** | present (reads `25 / 7 / 1405` — **stale**) | honoured by construction — `200-06` |
+| 2 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | **22 / 10 / 1290** | **FIRES** | present (reads `21 / 10 / 1289` — **stale**) | honoured by construction + **D-11 (extraction, never re-baseline)** — `200-04` |
+| 3 | `frontend/src/components/panel/WorkspacePanel.tsx` | **16 / 10 / 646** | **FIRES** | present, **matches** | honoured by construction — `200-07` |
+| 4 | `frontend/src/components/panel/PhaseCard.tsx` | **12 / 8 / 543** | **FIRES** | present, **matches** | honoured by construction — `200-07` |
+| 5 | `frontend/src/pages/WorkflowRunPage.tsx` | **15 / 5 / 1197** | **FIRES** | present, **matches** | honoured by construction — `200-07` |
+| 6 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | **4 / 4 / 278** | **FIRES** | present, **matches** | honoured by construction — `200-05` |
+| 7 | `backend/app/services/harness/phase_types.py` | **39 / 16 / 2424** | **FIRES** | present, **matches** | ⚠ **EXTRACTION TAKEN — D-13.** The human-input executor moves to its own module **as the vehicle for its own fix** — `200-03` |
+| 8 | `backend/app/db/workflows.py` | **38 / 19 / 1889** | **FIRES** | present, **matches** | honoured by construction — `200-02` |
+| 9 | `frontend/src/lib/api.ts` | **174 / 99 / 6357** | ⚠ **FIRES HARDEST** | present, **matches** | ⚠ **the 197 DECLINE HOLDS — see §6.6.1** — `200-02` |
+| 10 | `backend/app/api/workflow_runs.py` | **3 / 3 / 260** | **FIRES — EXACTLY AT THRESHOLD** | ⚠ **ABSENT from BOTH CLAUDE.md and `docs/HOT-FILE-LEDGER.md`** | ⚠ **OWES A ROW — D-16.** Owner: **`200-02`**, same commit that modifies it |
+| 11 | `frontend/src/components/panel/PhaseTimeline.tsx` | **7 / 5 / 267** | **FIRES** | ⚠ **ABSENT from BOTH** | ⚠ **OWES A ROW — X-16.** Owner: **`200-07`** |
+| 12 | `frontend/src/components/panel/phaseStatusMeta.ts` | **2 / 2 / 206** | no (2 phases) | ⚠ **ABSENT from BOTH** | ⚠ **OWES A ROW — X-16**, listed **BELOW the threshold ON PURPOSE** (the `fileIcon.tsx` precedent). Owner: **`200-07`** |
+| 13 | `frontend/src/components/workflows/FlowEdge.tsx` | **2 / 2 / 378** | no (2 phases) | ⚠ **ABSENT from BOTH** | ⚠ **OWES A ROW — X-16**, below threshold on purpose. Owner: **`200-06`** |
+| 14 | `frontend/src/pages/WorkflowBuilderPage.tsx` | **49 / 15 / 2762** | **FIRES** | present, **matches** | measured, not modified beyond its two mounts — `200-04` / `200-05` |
+
+**Ledger-row ownership, restated as an obligation:** the CLAUDE.md scan-list row **and** the
+`docs/HOT-FILE-LEDGER.md` section land in the **SAME COMMIT** that modifies the file. *"A row without a
+section, or a section without a row, is drift."*
+
+| File owing a row | Owner |
+|---|---|
+| `backend/app/api/workflow_runs.py` | **`200-02`** |
+| `frontend/src/components/workflows/FlowEdge.tsx` | **`200-06`** |
+| `frontend/src/components/panel/PhaseTimeline.tsx` | **`200-07`** |
+| `frontend/src/components/panel/phaseStatusMeta.ts` | **`200-07`** |
+
+⚠ **THE ABSENCE IS THE FINDING, not the counts.** `PhaseTimeline.tsx` **fires G-5 at five phases and
+has no row at all**, so the guardrail could never have fired on it at any count — the identical failure
+`WorkflowsPage.tsx` suffered for ten phases, `config.py` for its entire life, and `api.ts` for
+ninety-seven. Two of the four are **below** threshold and are added anyway: *"listed BELOW the threshold
+on purpose"* is the ledger's own precedent, because a file escapes G-5 by not being written down.
+
+⚠ **TWO MORE CELLS MEASURED STALE, and RESEARCH's own corrections are themselves corrected here.**
+RESEARCH X-7 gives `PhaseFormPanel.tsx` as `22 / 11 / 1290` and X-8 gives `api.ts` as `174 / 101 / 6357`.
+**Both phase counts include six-digit dated quick tasks that CLAUDE.md's rule says to subtract** —
+`PhaseFormPanel.tsx`'s raw bucket list is `103 155 183 184 185 189 193 193.1 196 199 260814` (**11 raw,
+`260814` is a quick task ⇒ 10 phases**) and `api.ts` carries `260405` **and** `260814` (**101 raw ⇒ 99
+phases**). The verdicts are unchanged — both still FIRE — but the figures published here are the ones
+the recipe yields.
+
+#### §6.6.1 The `api.ts` decline — its trigger, and how to prove it did not fire
+
+Phase 197's decline on `frontend/src/lib/api.ts` **HOLDS**. Its re-open trigger, verbatim: **"the next
+phase adding a RUNTIME export or a second concern here."** This phase adds fields to the
+`WorkflowRunPhase` **interface** (`api.ts:4178-4183`) — a **TYPE**, fully erased at build — so
+`196-08`'s mock-factory failure mode (nine suites throwing at mount because a `vi.mock("@/lib/api")`
+factory did not declare a newly-added export) **measurably cannot fire**.
+
+⚠ **`200-02` MUST PROVE THIS BY GREP OVER ITS REAL DIFF, never by quoting this paragraph** (D-15):
+
+```bash
+git diff -U0 -- frontend/src/lib/api.ts \
+  | grep -E '^\+' \
+  | grep -E '^\+\s*export\s+(const|function|class|let|var|enum)\b' \
+  | grep -v '^\+\s*export\s+\(interface\|type\)'
+```
+
+**Expected output: EMPTY.** A non-empty result means the trigger fired and the decline must be revisited.
+
+⚠ **And the `WorkflowRunRead` docblock at `api.ts:4200-4204` becomes STALE in the same commit and must
+be corrected there**, not left: it says *"`claimed_at` is the ONLY honest elapsed anchor."* That stays
+true of `workflow_runs`, but the phase rows now carry both timestamps and `min(started_at) →
+max(completed_at)` is a strictly better span — measured: **`claimed_at` is null on 0 of 149 completed
+runs** (`WorkflowRunPage.tsx:849-851`).
+
+### §6.7 SEED-171 — the triage procedure, because TWO of its five suites are this phase's primaries
+
+`SEED-171`'s five flaky suites (`SEED-171-…:147-149`): `WorkflowsPage.test.tsx` ·
+`library/WorkflowCard.test.tsx` · `WorkflowBuilderPage.session.test.tsx` · **`WorkflowRunPage.test.tsx`**
+· **`WorkflowBuilderPage.canvas.test.tsx`**.
+
+| Suite | In this phase's blast radius? |
+|---|---|
+| `src/pages/WorkflowsPage.test.tsx` | ❌ library screen deferred |
+| `src/components/workflows/library/WorkflowCard.test.tsx` | ❌ library screen deferred |
+| `src/pages/WorkflowBuilderPage.session.test.tsx` | ⚠ **adjacent** — `200-04` / `200-05` edit that page's two mounts |
+| **`src/pages/WorkflowRunPage.test.tsx`** (pinned **108**) | ✅ **YES — `200-07`'s primary suite** |
+| **`src/pages/WorkflowBuilderPage.canvas.test.tsx`** | ✅ **YES — `200-06` edits the canvas; a `TARGETS` file entry** |
+
+**THE PROCEDURE, binding on every plan in this phase:**
+
+1. ⚠ **NEVER REACH FOR THE CAP.** `GSD_VITEST_MAX_WORKERS=2` stands and is not a knob to turn when a
+   run reds. **Adjusting the cap is MEASURED NOT TO FIX these failures** — cap 1 and cap 2 each produced
+   clean runs *and* red runs on byte-identical trees, and one suite flakes **in isolation**, which
+   oversubscription cannot explain.
+2. **Capture the failing filenames from the gate's OWN PERSISTED JSON REPORT *before* re-running
+   anything.** `193.2-02` recorded itself breaking this rule and could not afterwards prove its three
+   cases were innocent.
+3. **Check each named file against `git diff --numstat 393963cd HEAD` and `git status --short`.** If it
+   is **byte-unchanged and one of the five**, record it as an observation and move on.
+4. ⚠ **Say "provably unmodified", NEVER "fine".** One green sample of a flaky suite is not proof of
+   innocence.
+5. ⚠ **RED IS SOMETIMES REAL.** `196-08` hit **`failed 249`** and every one was genuine — nine suites
+   threw at mount because their `@/lib/api` mock factories did not declare a newly-added export. **What
+   separated the two cases was the PROCEDURE, not the colour.** §6.6.1's grep is what keeps that failure
+   mode unreachable here.
+6. ⚠ **The `STACK_TRACE_ERROR` signature is NOT a reliable tell for "not a real defect"** — three of
+   `SEED-171`'s five fail with a plain `AssertionError` instead.
+
+### §6.8 THE D-03 PROOF — the source diff is EMPTY
+
+`200-01` modifies **zero source files**. Pasted verbatim, run in this worktree over the whole plan
+(base `393963cd` → the plan's commits):
+
+```
+$ git diff --name-only 393963cd..HEAD
+.planning/phases/200-the-workflow-journey/200-CHECKLIST.md
+
+$ git diff --name-only 393963cd..HEAD | grep -v "^\.planning/" | grep -c .
+0
+```
+
+⚠ **The block above was captured after `200-01`'s FIRST TWO commits and before this third one**, which
+is the only ordering physically available to a document that records its own commit. The third commit
+adds **this section, to this same file** — `git status --short` immediately before it read exactly one
+line, `M .planning/phases/200-the-workflow-journey/200-CHECKLIST.md`. **The verifier re-runs the range
+form over the finished plan rather than trusting this paragraph:**
+
+```bash
+git diff --name-only 393963cd0c191bf360474df48868e8f0dc05d7c7..<200-01's last commit> \
+  | grep -v '^\.planning/' | grep -c .        # expect: 0
+```
+
+**This is D-03's whole point**: the acceptance bar above was fixed **before** a single byte of the
+implementation existed, so it cannot have been shaped by it. *"A baseline taken after the edit proves
+the edit against itself."*
