@@ -240,11 +240,94 @@ export const CHIP_PREDICATES = {
  * JSX text nodes and carries the T-156-01 control. Re-implementing that is the threat.
  */
 export function matchesQuery(row: LibraryRow, query: string): boolean {
-  const needle = query.trim().toLowerCase()
+  const needle = needleOf(query)
   if (!needle) return true
-  if (row.name.toLowerCase().includes(needle)) return true
-  const purpose = row.def?.business_requirement
-  return typeof purpose === "string" && purpose.toLowerCase().includes(needle)
+  return carries(row.name, needle) || carries(row.def?.business_requirement, needle)
+}
+
+/**
+ * The ONE normalization of a typed query, and the ONE containment test — extracted by
+ * 192.2-09 so `matchesQuery` above and `matchReasons` below cannot answer *did this match*
+ * two different ways.
+ *
+ * ⚠ A SECOND `.trim().toLowerCase()` WOULD BE A SECOND ANSWER TO ONE QUESTION, which is this
+ * module's own stated rule and the exact drift `soulData.ts` exists to forbid. The reason a
+ * row gives for matching has to be computed by the code that did the matching, or the card
+ * can claim a reason the filter did not use (T-192.2-41).
+ *
+ * `carries` takes `unknown` because `business_requirement` is user-authored JSONB and may be
+ * absent or not a string at all; the type guard IS the rule, not a defensive extra.
+ */
+const needleOf = (query: string): string => query.trim().toLowerCase()
+const carries = (value: unknown, needle: string): boolean =>
+  typeof value === "string" && value.toLowerCase().includes(needle)
+
+// ── why THIS row is in the filtered set (192.2-09 / WR-04) ───────────────────────────
+
+/**
+ * THE THREE FACTS A FILTERED ROW CANNOT OTHERWISE SHOW — a closed union, and closed is the
+ * point.
+ *
+ * D-03 cut six atoms from the resting card. Three of the six ways into the list still select
+ * on facts that left with them: `"makes-a-file"` selects on the deliverable atom, `strict` on
+ * the tier chip, and the search reaches inside the purpose sentence whose hero is gone. Those
+ * three, and nothing else, are what this union names.
+ *
+ * ⚠ THE OTHER FOUR CHIPS EMIT NOTHING, AND THAT IS A DECISION RATHER THAN AN OMISSION.
+ * `ready-to-run`, `yours`, `still-building` and `starters` each already have a visible carrier
+ * on line 2 or in the identity line, so a reason for them would repeat what the card already
+ * says — the noise D-03 exists to remove. Adding a fourth member here is a decision taken in
+ * CONTEXT, not a tidy-up; the `satisfies Record<MatchReason, …>` table in
+ * `libraryVocabulary.ts` makes forgetting its word a typecheck error.
+ */
+export type MatchReason = "makes-a-file" | "strict" | "purpose"
+
+/**
+ * The chip reasons, in `CHIP_ORDER`'s order so two reasons never render in two orders.
+ *
+ * ⚠ SPELLED HERE RATHER THAN DERIVED FROM `CHIP_ORDER`, which lives in `libraryVocabulary.ts`
+ * — importing it would make this module depend on the WORDS at runtime, and this module has
+ * deliberately held no user-facing string since it was written. The `satisfies` clause is what
+ * keeps the two honest: every member must be BOTH a `ChipId` and a `MatchReason`, so a rename
+ * on either side is a typecheck error rather than a silently-dropped reason.
+ */
+const CHIP_REASONS = ["makes-a-file", "strict"] as const satisfies readonly (ChipId & MatchReason)[]
+
+/**
+ * WHY IS THIS ROW HERE? — the reasons, as ids, for one row under one selection.
+ *
+ * ⚠ IT DERIVES; IT NEVER RE-IMPLEMENTS. The chip reasons call `CHIP_PREDICATES` — the very
+ * functions that did the selecting — and the purpose reason uses the same `needleOf` /
+ * `carries` pair `matchesQuery` uses. A hand-rolled copy of either would let the card state a
+ * reason the filter did not act on, which is a claim the surface cannot back (T-192.2-41), and
+ * the `strict` case is the one where a hand-rolled check is MEASURABLY wrong (WR-03).
+ *
+ * ⚠ THE NAME CLAUSE IN RULE 3 IS LOAD-BEARING. When the needle is in the row's NAME,
+ * `HighlightTitle` has already shown the person why the row matched; saying it again in words
+ * underneath is exactly the duplication D-03 removed. So the purpose reason fires only when
+ * the name did NOT carry the needle.
+ *
+ * ⚠ AN EMPTY SELECTION RETURNS AN EMPTY ARRAY, AND THE RESTING CARD DEPENDS ON IT. No chip
+ * pressed and a blank query means no reason, which is what makes the card's reason line
+ * structurally unable to appear at rest — the mechanical half of DEC-09-A's argument.
+ *
+ * A pure leaf: no React, no DOM, no store, no `@/lib/api`. It returns IDS, never rendered
+ * strings — the words are the card's to look up, the same DECISION-here / VOCABULARY-there
+ * split `cardFace.ts` and `runFacts.ts` already made.
+ */
+export function matchReasons(row: LibraryRow, selection: LibrarySelection): readonly MatchReason[] {
+  const reasons: MatchReason[] = []
+
+  for (const chip of CHIP_REASONS) {
+    if (selection.chips.includes(chip) && CHIP_PREDICATES[chip](row)) reasons.push(chip)
+  }
+
+  const needle = needleOf(selection.query)
+  if (needle && !carries(row.name, needle) && carries(row.def?.business_requirement, needle)) {
+    reasons.push("purpose")
+  }
+
+  return reasons
 }
 
 // ── the project filter (D-05 instrument, D-17 semantics) ─────────────────────────────

@@ -57,6 +57,15 @@ vi.mock("@/lib/api", () => ({
 import { WorkflowCard, type WorkflowCardProps } from "./WorkflowCard"
 import type { LibraryRow, Provenance } from "./libraryRow"
 import { FORK_CONSEQUENCE, FORK_CONSEQUENCE_EXISTING, FORK_VERB } from "./libraryVocabulary"
+// 192.2-09 (WR-04) — the reason line's fixed parts and its words, IMPORTED. The cases below
+// compare rendered text against these exports, never against a literal typed in this file.
+import {
+  CHIP_WORDS,
+  MATCH_REASON_PREFIX,
+  MATCH_REASON_SEPARATOR,
+  MATCH_REASON_WORDS,
+} from "./libraryVocabulary"
+import type { MatchReason } from "./libraryFilter"
 // ── Phase 192.1-06 (LIB-05 / D-06 / D-08 / D-09 / D-10 / D-11) — the 14th atom ──────────
 // The words and the resolver are IMPORTED, never re-typed: D-14 makes a copy change a
 // one-line diff in ONE file, and a test that spells `"Copy of "` inline has silently forked
@@ -1735,5 +1744,144 @@ describe("D-06 — no emoji and no system vocabulary reach the user, at scale", 
     // D-06 names by name are.
     expect(said).not.toMatch(/\bpublished\b/)
     expect(said).not.toMatch(/\bdraft\b/)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 192.2-09 (LIB-06 — gap-closure round 1, WR-04) — THE MATCH-REASON LINE
+// ══════════════════════════════════════════════════════════════════════════════════════
+//
+// The card can now explain why a FILTERED row is in the list. The half of that which
+// actually needed proving is the other one: that it says nothing at all when nothing was
+// asked. D-03's subtraction is this phase's whole thesis, and a line that could appear at
+// rest would be a back door for the six atoms it removed (T-192.2-39).
+
+describe("192.2-09 (WR-04) — the reason line CANNOT appear on a resting card", () => {
+  it.each<[Provenance, LibraryRow]>([
+    ["published", PUBLISHED],
+    ["starter", STARTER],
+    ["draft", DRAFT],
+  ])("on a %s row with the prop OMITTED there is no reason node at all", (_p, row) => {
+    const { card } = renderCard(row)
+    // `queryBy…` returning null, never a truthiness check: a truthiness check passes on an
+    // empty node that IS in the DOM, which is precisely the failure this asserts against.
+    expect(within(card).queryByTestId("row-match-reason")).toBeNull()
+    expect(within(card).queryAllByTestId("row-match-reason")).toHaveLength(0)
+  })
+
+  it("an EMPTY ARRAY renders nothing either — not an empty node, not a wrapper", () => {
+    const { card } = renderCard(PUBLISHED, { matchReasons: [] })
+    expect(within(card).queryByTestId("row-match-reason")).toBeNull()
+  })
+
+  it("the resting card's column child count is UNCHANGED by this prop", () => {
+    // The mechanical form of "byte-identical at rest". `WorkflowCard.baseline.test.tsx`
+    // makes the same claim by visible text and must come through this wave UNEDITED; this
+    // makes it by DOM shape, in the suite that owns child-order assertions.
+    const { card } = renderCard(PUBLISHED, { folderName: "Risk & Compliance" })
+    const column = within(card).getByTestId("row-identity").parentElement as HTMLElement
+    expect(column.children).toHaveLength(4)
+  })
+})
+
+describe("192.2-09 (WR-04) — with reasons, it says exactly what put the row here", () => {
+  /** The line's parts in DOM order, separators dropped — the `identityParts` idiom. */
+  const reasonParts = (card: HTMLElement): string[] =>
+    Array.from(within(card).getByTestId("row-match-reason").children)
+      .map((child) => child.textContent ?? "")
+      .filter((text) => text !== MATCH_REASON_SEPARATOR)
+
+  it.each<[MatchReason]>([["makes-a-file"], ["strict"], ["purpose"]])(
+    "a single %s reason renders the prefix and that one word",
+    (reason) => {
+      const { card } = renderCard(PUBLISHED, { matchReasons: [reason] })
+      // Asserted against the EXPORTS, so a literal typed into the card would red here.
+      expect(reasonParts(card)).toEqual([MATCH_REASON_PREFIX, MATCH_REASON_WORDS[reason]])
+    },
+  )
+
+  it("two reasons render ONE prefix, both words, and ONE separator between them", () => {
+    const { card } = renderCard(PUBLISHED, { matchReasons: ["makes-a-file", "strict"] })
+    expect(reasonParts(card)).toEqual([
+      MATCH_REASON_PREFIX,
+      MATCH_REASON_WORDS["makes-a-file"],
+      MATCH_REASON_WORDS.strict,
+    ])
+    // The separator is spent BETWEEN the words only — never leading, never doubled. Three
+    // parts + one separator = four children; a leading one would make five.
+    const line = within(card).getByTestId("row-match-reason")
+    expect(line.children).toHaveLength(4)
+    expect(line.children[0].textContent).toBe(MATCH_REASON_PREFIX)
+  })
+
+  it("all three reasons render in the order given, with two separators", () => {
+    const { card } = renderCard(PUBLISHED, {
+      matchReasons: ["makes-a-file", "strict", "purpose"],
+    })
+    expect(reasonParts(card)).toEqual([
+      MATCH_REASON_PREFIX,
+      MATCH_REASON_WORDS["makes-a-file"],
+      MATCH_REASON_WORDS.strict,
+      MATCH_REASON_WORDS.purpose,
+    ])
+    expect(within(card).getByTestId("row-match-reason").children).toHaveLength(6)
+  })
+
+  it("the line is the column's LAST child, below the identity line AND the folder chip", () => {
+    // BY CHILD ORDER, never by a class name — the rule this suite already follows. The
+    // reason is subordinate to the run truth (D-01 line 2) and to the identity line, so it
+    // must not push either down.
+    const { card } = renderCard(PUBLISHED, {
+      folderName: "Risk & Compliance",
+      matchReasons: ["strict"],
+    })
+    const line = within(card).getByTestId("row-match-reason")
+    const column = line.parentElement as HTMLElement
+    expect(column.children).toHaveLength(5)
+    expect(column.children[0].textContent).toContain(PUBLISHED.name)
+    expect(column.children[1]).toBe(within(card).getByTestId("row-answer"))
+    expect(column.children[2]).toBe(within(card).getByTestId("row-identity"))
+    expect(column.children[3].textContent).toContain("Risk & Compliance")
+    expect(column.children[4]).toBe(line)
+  })
+
+  it("with no folder chip it is STILL last — child index 3, not 4", () => {
+    const { card } = renderCard(PUBLISHED, { folderName: null, matchReasons: ["purpose"] })
+    const line = within(card).getByTestId("row-match-reason")
+    const column = line.parentElement as HTMLElement
+    expect(column.children).toHaveLength(4)
+    expect(column.children[3]).toBe(line)
+  })
+
+  it.each<[Provenance, LibraryRow]>([
+    ["published", PUBLISHED],
+    ["starter", STARTER],
+    ["draft", DRAFT],
+  ])("a %s row can carry a reason too — the line is not published-only", (_p, row) => {
+    const { card } = renderCard(row, { matchReasons: ["makes-a-file"] })
+    expect(within(card).getByTestId("row-match-reason")).toBeInTheDocument()
+    expect(reasonParts(card)).toEqual([
+      MATCH_REASON_PREFIX,
+      MATCH_REASON_WORDS["makes-a-file"],
+    ])
+  })
+
+  it("the words are spelled in ONE place — this file imports them and never retypes them", () => {
+    // The same D-14 one-home rule `CARD_TEMPLATE_MARK`'s case above follows, and the reason
+    // it matters more here: two of the three reason words ARE the chip labels, read from
+    // `CHIP_WORDS`. If the chip and the reason ever forked, a person would press one word
+    // and be answered with another.
+    expect(MATCH_REASON_WORDS["makes-a-file"]).toBe(CHIP_WORDS["makes-a-file"].label)
+    expect(MATCH_REASON_WORDS.strict).toBe(CHIP_WORDS.strict.label)
+  })
+
+  it("the reason NAMES the purpose field and never quotes it (T-192.2-40)", () => {
+    // The purpose sentence is user-authored text. This line says WHERE the hit was; putting
+    // the snippet on the card would open a new rendering path for user content and re-add,
+    // one row at a time, the purpose hero D-03 cut.
+    const purposeText = String(PUBLISHED.def?.business_requirement ?? "")
+    expect(purposeText.length).toBeGreaterThan(0) // non-vacuity — there IS a sentence to leak
+    const { card } = renderCard(PUBLISHED, { matchReasons: ["purpose"] })
+    expect(within(card).getByTestId("row-match-reason").textContent).not.toContain(purposeText)
   })
 })

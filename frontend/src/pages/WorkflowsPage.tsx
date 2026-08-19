@@ -127,6 +127,7 @@ import {
   chipCounts,
   filterLibrary,
   libraryDisplayName,
+  matchReasons,
   mergeLibrary,
 } from "@/components/workflows/library/libraryFilter"
 import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/library/libraryRow"
@@ -456,10 +457,24 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
   // starters are held OUT of the project filter entirely and stay visible, with the toolbar
   // stating that fact in words rather than leaving it to be inferred from a filter that looks
   // broken.
-  const visibleRows = useMemo(
-    () => filterLibrary(rows, { query, chips: activeChips, projectId: selectedProjectId }),
-    [rows, query, activeChips, selectedProjectId],
+  /**
+   * ── 192.2-09 (LIB-06 gap-closure round 1, WR-04) — THE SELECTION, AS ONE OBJECT ────────
+   *
+   * It was assembled inline inside the `filterLibrary` memo below, which was correct while
+   * exactly one consumer read it. There are two now: the list is narrowed by it, and each row
+   * is asked *why are you here* under it.
+   *
+   * ⚠ ONE OBJECT, NEVER TWO INLINE LITERALS. Two literals are two answers to one question and
+   * would drift the first time a fourth selection field arrives — a row could then explain
+   * itself under a selection that is not the one the list was narrowed by, which is exactly
+   * the claim-the-surface-cannot-back failure this repair exists to end (T-192.2-41).
+   */
+  const selection = useMemo(
+    () => ({ query, chips: activeChips, projectId: selectedProjectId }),
+    [query, activeChips, selectedProjectId],
   )
+
+  const visibleRows = useMemo(() => filterLibrary(rows, selection), [rows, selection])
 
   /**
    * D-03 — each chip's honest number, computed over the SAME rows the list renders and under
@@ -1086,6 +1101,16 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                    one pass could then straddle a band boundary. One clock per render pass,
                    two consumers — never two clocks. */
                 now={now}
+                /* 192.2-09 (LIB-06 / WR-04) — WHY THIS ROW IS HERE, RESOLVED BY THE PAGE.
+                   The third prop of exactly the kind the two above it are: only the page
+                   holds the SELECTION, so only the page can answer *why is this row in the
+                   filtered list*; the card paints what it is handed and derives nothing.
+                   The SAME `selection` object that narrowed the list is what each row is
+                   asked under — one object, never a second inline literal — so a row can
+                   never explain itself under a selection the list was not narrowed by.
+                   On a resting page this returns `[]` for every row and the card renders
+                   nothing, which is what keeps D-03's subtraction intact. */
+                matchReasons={matchReasons(row, selection)}
                 onDeleted={handleDeleted}
               />
             ))}

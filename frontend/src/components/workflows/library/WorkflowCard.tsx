@@ -267,7 +267,7 @@ import { templateAdmission } from "@/components/workflows/soulData"
 import { deleteWorkflowDraft } from "@/lib/api"
 
 import { cardFace, type CardFace, type CardMark } from "./cardFace"
-import { CHIP_PREDICATES } from "./libraryFilter"
+import { CHIP_PREDICATES, type MatchReason } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
 import type { RunOutcome } from "./runFacts"
 import {
@@ -275,6 +275,9 @@ import {
   FORK_CONSEQUENCE,
   FORK_CONSEQUENCE_EXISTING,
   FORK_VERB,
+  MATCH_REASON_PREFIX,
+  MATCH_REASON_SEPARATOR,
+  MATCH_REASON_WORDS,
 } from "./libraryVocabulary"
 import type { RowIdentity } from "./rowIdentity"
 import {
@@ -382,6 +385,29 @@ const IDENTITY_OWN_SHARED = PILL_BASE + "border-border text-muted-foreground"
 
 /** The separator, spent BETWEEN present parts only. Decorative — a reader hears the parts. */
 const IDENTITY_SEPARATOR = "·"
+
+/**
+ * Phase 192.2-09 (WR-04) — THE MATCH-REASON LINE'S CLASSES.
+ *
+ * ⚠ NO NEW SIZE AND NO NEW TONE. It READS `IDENTITY_CLASSES` above rather than restating
+ * `text-[11px] text-muted-foreground`, so the reason line and the identity line it sits under
+ * cannot drift into two secondary sizes — the same argument that block's own docblock makes
+ * about the folder chip, applied one line further down. `italic` is the ONLY thing added: the
+ * line is a note about the SEARCH the person just ran, not a further fact about the workflow,
+ * and it costs no colour, no border and no glyph (the SEED-155 / U8 lesson — a bordered chip
+ * here is a treatment this card structurally cannot render).
+ *
+ * ⚠ THE CLASSES DELIBERATELY DO NOT LIVE IN `GUTTER_TONE` OR `RUN_TONE`. Those two maps are
+ * `RunGutter`-keyed colour tables for D-01's slot 1, and a reason class inside either would be
+ * a member that answers a different question.
+ */
+const MATCH_REASON_CLASSES = IDENTITY_CLASSES + " italic"
+
+/**
+ * The default for the reason prop, hoisted to module scope so it is ONE frozen array rather
+ * than a fresh `[]` minted on every render of every one of the operator's 107 rows.
+ */
+const EMPTY_MATCH_REASONS: readonly MatchReason[] = []
 const PRIMARY_CLASSES =
   "rounded-md bg-primary px-3 py-1.5 text-[13px] font-medium text-primary-foreground hover:opacity-90"
 const SECONDARY_CLASSES =
@@ -618,6 +644,31 @@ export interface WorkflowCardProps {
    * cannot exist.
    */
   now?: number
+  /**
+   * Phase 192.2-09 (LIB-06 — gap-closure round 1, WR-04) — WHY THIS ROW IS IN THE FILTERED
+   * SET, already resolved by the page.
+   *
+   * ⚠ **EMPTY MEANS THIS COMPONENT RENDERS NOTHING AT ALL** — not an empty node, not a
+   * zero-height wrapper, no node in the column at all. That is not a nicety; it is what makes
+   * DEC-09-A's argument MECHANICAL rather than rhetorical. D-03's subtraction governs the
+   * RESTING card (*"six atoms leave the **resting** card"*), and the resting card is exactly
+   * the case where no chip is pressed and no search is typed — under which `matchReasons`
+   * returns `[]` and this prop's default is `[]`. The proof is
+   * `WorkflowCard.baseline.test.tsx`, which renders with no selection and comes through this
+   * wave BYTE-UNCHANGED; a re-baseline would have been the tell that the line leaked onto the
+   * resting card (T-192.2-39).
+   *
+   * ⚠ ONLY THE PAGE CAN KNOW THIS, for the same reason `hasExistingFork` and `identity` above
+   * arrive as props: the reason a row is here is a property of the SELECTION, and the card
+   * holds one row. The card paints what it is handed and derives nothing — it does not import
+   * `matchReasons`, only the id type, and it looks the WORDS up in `libraryVocabulary.ts`
+   * rather than spelling any of them.
+   *
+   * Optional with an empty default, following `hasExistingFork`'s precedent rather than
+   * `identity`'s: an omitted prop renders the card exactly as it shipped, which is the
+   * behaviour every existing call site and every shipped case is entitled to.
+   */
+  matchReasons?: readonly MatchReason[]
   /** Re-fetch after a CONFIRMED delete. Forwarded to the Sheet; also called by D-18's guard. */
   onDeleted: () => void
 }
@@ -634,6 +685,7 @@ export function WorkflowCard({
   hasExistingFork = false,
   identity,
   now = Date.now(),
+  matchReasons = EMPTY_MATCH_REASONS,
   onDeleted,
 }: WorkflowCardProps) {
   const deleteSheetRef = useRef<WorkflowDeleteSheetHandle>(null)
@@ -912,6 +964,37 @@ export function WorkflowCard({
               <Folder className="h-3 w-3 flex-none" aria-hidden="true" />
               {folderName}
             </span>
+          )}
+
+          {/* ── 192.2-09 (WR-04) — WHY THIS ROW IS HERE ────────────────────────────────
+              THE LAST CHILD, BELOW EVERYTHING, AND USUALLY ABSENT. D-01 numbers the run
+              truth as line 2 and the identity line already displaced to position 3 in
+              Wave 4; a reason for a filter the person just applied is subordinate to both
+              and must not push either down. Its placement is asserted by CHILD ORDER,
+              never by a class name — a class assertion passes on a node in the wrong
+              column and fails on a Tailwind tidy-up.
+
+              ⚠ THE GUARD IS THE WHOLE DESIGN ARGUMENT, NOT A PERFORMANCE TRICK. On the
+              resting card the array is empty and this renders NO NODE — which is why
+              `WorkflowCard.baseline.test.tsx` comes through byte-unchanged and why this
+              line cannot become a back door for the six atoms D-03 removed. `matchReasons`
+              itself emits ids ONLY for facts the card cannot otherwise show, and NOTHING at
+              all for a name hit, because `HighlightTitle` has already answered that one.
+
+              ⚠ NO STRING IS SPELLED HERE. The prefix, the words and the separator all come
+              from `libraryVocabulary.ts` (D-14: a copy change is a one-line diff in one
+              file), and the reason NAMES the purpose field without ever quoting the
+              user-authored sentence inside it (T-192.2-40). */}
+          {matchReasons.length > 0 && (
+            <div data-testid="row-match-reason" className={MATCH_REASON_CLASSES}>
+              <span>{MATCH_REASON_PREFIX}</span>
+              {matchReasons.map((reason, index) => (
+                <Fragment key={reason}>
+                  {index > 0 && <span aria-hidden="true">{MATCH_REASON_SEPARATOR}</span>}
+                  <span>{MATCH_REASON_WORDS[reason]}</span>
+                </Fragment>
+              ))}
+            </div>
           )}
         </div>
 
