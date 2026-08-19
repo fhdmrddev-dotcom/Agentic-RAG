@@ -480,12 +480,29 @@ export function StepTypePicker({
             </span>
 
             <span className="min-w-0">
-              <span className="block">{sentence}</span>
+              {/* 199-09 (DES-01 · sheet `c10-builder-chrome` §5) — HIERARCHY, and only
+                  hierarchy. The row is a TITLE and a SUPPORTING line, and until now they
+                  differed by size alone: at 12.5 px against 10.5 px, two lines of text with
+                  the same weight read as one paragraph. The sheet gives the title weight and
+                  the supporting line a beat of air; that is the whole change here.
+                  ⚠ THE SENTENCE ITSELF IS UNTOUCHED and still arrives from `nodeTitle` over
+                  the phase this click will build (WR-03). This edit moves how the row is
+                  SET, never where its words come from. */}
+              <span className="block font-medium">{sentence}</span>
               <small
                 id={refused ? reasonId : undefined}
                 data-testid={refused ? `step-type-reason-${choice.type}` : undefined}
                 className={[
-                  "block text-[10.5px] leading-snug",
+                  "mt-0.5 block text-[10.5px] leading-snug",
+                  // ⚠ THIS AMBER IS A HAND-MIXED LITERAL, NOT A TOKEN, and 199-09
+                  // deliberately did NOT convert it — see that plan's SUMMARY report CE-3.
+                  // `hsl(38 92% 66%)` is `--warning` (`38 92% 60%`) lightened six points for
+                  // text contrast, i.e. the `accent-violet` / `accent-violet-text` pattern
+                  // this config already ships, with the second token never declared.
+                  // Swapping in `text-warning` here would DARKEN a 10.5 px line that already
+                  // sits under `opacity-[0.42]`; declaring `warning-text` is a two-file edit
+                  // on `tailwind.config.js` + `index.css`, which is a shared-artifact change
+                  // this wave declines (the 197-10 / 199-03 precedent).
                   refused ? "text-[hsl(38_92%_66%)]" : "text-muted-foreground",
                 ].join(" ")}
               >
