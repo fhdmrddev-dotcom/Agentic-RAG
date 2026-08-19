@@ -945,3 +945,257 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
     expect(mockReadPlaceholders).toHaveBeenCalledTimes(1)
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 1 (DES-01 · sheet `c9-doors-describe`) — THE PRE-CHANGE RESTING
+// INVENTORY, AND THE MECHANICAL HALF OF THE RECONCILIATION.
+//
+// APPENDED, never interleaved. Not one assertion above this line moves.
+//
+// WHY AN INVENTORY AT ALL. This phase re-presents; it does not add. The only way to prove
+// "renders no MORE at rest than before" after the fact is to have written down what `before`
+// was, as LITERALS, in a commit that predates the change (the 188.1 lesson, re-used by
+// `199-03`). A subtraction is then proved by INVERTING one of these assertions from present
+// to absent — never by deleting it. Zero assertion deletions is the target for this plan.
+//
+// ⚠ THIS FILE IS ALLOWED TO SPELL GOVERNED DOOR WORDS AND THE COMPONENTS ARE NOT. The
+// D-24(a) copy fence above asserts its own exclusion of test files; that exclusion is what
+// makes an inventory pinned as LITERALS possible at all. A pin that named identifiers would
+// re-derive itself from the module and could never falsify a reword.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+const nodeFs199 = await vi.importActual<{ readFileSync(path: string, encoding: string): string }>(
+  "node:fs",
+)
+
+/** `file:///C:/…/frontend/src/components/workflows/<this file>` → `…/frontend/`. */
+const FRONTEND_ROOT_199 = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/src/components/workflows/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error(`199-08 inventory cannot locate its own subtree in: ${here}`)
+  return `${here.slice(0, at)}/`
+})()
+
+const tailwindConfigSource199 = nodeFs199.readFileSync(
+  `${FRONTEND_ROOT_199}tailwind.config.js`,
+  "utf8",
+)
+
+/** The chooser's resting atoms, spelled out. */
+const CHOOSER_ATOMS_199 = [
+  "How do you want to start?",
+  "Both end up in the same place. You can switch between them at any time.",
+  "you write one paragraph",
+  "Draft it for me",
+  "you can open the full editor at any point — nothing is locked in",
+  "you decide every setting",
+  "Build it myself",
+  "what it must cite · required checks · per-step sources & model",
+]
+
+/** The describe door's resting atoms, spelled out. */
+const DESCRIBE_ATOMS_199 = [
+  "‹ Change how I start",
+  "⚡ Drafting it for you",
+  "What recurring work should this automate?",
+  "Write the first draft",
+  "Need to set citations, checks, or per-step sources yourself?",
+  "Build it myself ›",
+  "What this will do",
+  "Have a document to fill in?",
+  "Attach a template",
+  "Word, PowerPoint or Excel — .docx, .pptx or .xlsx, up to 10 MB.",
+]
+
+describe("199-08 Task 1 — the RESTING inventory of the door surface (pinned PRESENT)", () => {
+  it("the chooser's eight resting atoms are all on screen, as literals", () => {
+    render(<WorkflowDoorSwitch />)
+    // NON-VACUITY FIRST: the chooser really rendered, so the `getByText` list below is a claim
+    // about a surface rather than a claim about an empty container.
+    expect(screen.getByTestId("workflow-doors")).toBeInTheDocument()
+    expect(CHOOSER_ATOMS_199).toHaveLength(8)
+    for (const atom of CHOOSER_ATOMS_199) {
+      expect(screen.getByText(atom), `chooser atom missing: ${atom}`).toBeInTheDocument()
+    }
+  })
+
+  it("the describe door's ten resting atoms are all on screen, as literals", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    expect(screen.getByTestId("door-describe")).toBeInTheDocument()
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    expect(DESCRIBE_ATOMS_199).toHaveLength(10)
+    for (const atom of DESCRIBE_ATOMS_199) {
+      expect(screen.getByText(atom), `describe atom missing: ${atom}`).toBeInTheDocument()
+    }
+  })
+
+  it("the describe door's resting CONTROL set is exactly these five testids — no more", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    const door = screen.getByTestId("door-describe")
+    const controls = Array.from(
+      door.querySelectorAll("button, input, textarea, select, a[href]"),
+    ).map((n) => n.getAttribute("data-testid"))
+    expect(controls).toEqual([
+      "both-doors",
+      "describe-box",
+      "describe-template-input",
+      "describe-draft",
+      "switch-to-govern",
+    ])
+  })
+})
+
+describe("199-08 Task 1 — THE REFUSAL ROW: does a gating predicate already exist?", () => {
+  it("IT DOES — the CTA is gated on trimmed length in SOURCE, so saying so out loud is presentation", () => {
+    // The shipped rule, read off the component rather than inferred from behaviour alone.
+    expect(workflowDoorSwitchSource).toContain("describe.trim().length > 0")
+    // POSITIVE CONTROL — the source really loaded, so the `toContain` is not passing on air.
+    expect(workflowDoorSwitchSource.length).toBeGreaterThan(1000)
+  })
+
+  it("…and the predicate BEHAVES: empty refuses, whitespace-only refuses, real text passes", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    const box = screen.getByTestId("describe-box")
+    const cta = screen.getByTestId("describe-draft")
+
+    expect(cta).toBeDisabled()
+    fireEvent.change(box, { target: { value: "   \n\t  " } })
+    expect(cta).toBeDisabled()
+    fireEvent.change(box, { target: { value: "Summarise weekly vendor risk" } })
+    expect(cta).toBeEnabled()
+  })
+
+  it("⚠ TODAY IT REFUSES IN SILENCE — a disabled button and no sentence (INVERTED by Task 2)", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "   " } })
+    // NON-VACUITY: the refusing state really is on screen and really is refusing.
+    expect(screen.getByTestId("describe-draft")).toBeDisabled()
+    // The absence Task 2 turns into a presence. This assertion is INVERTED, never deleted.
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+  })
+
+  it("the SECOND gating term already speaks for itself — an in-flight read says so out loud", () => {
+    // `templateRead.kind !== "loading"` is the other half of `canDraft`, and the row it comes
+    // from renders a loading sentence of its own. Recorded so the reconciliation's refusal row
+    // covers BOTH terms rather than only the one the sheet drew.
+    expect(workflowDoorSwitchSource).toContain('templateRead.kind !== "loading"')
+    expect(describeTemplateRowSource).toContain("FOOTING_LOADING")
+    expect(describeTemplateRowSource).toContain("TEMPLATE_FIELDS_LOADING")
+  })
+})
+
+describe("199-08 Task 1 — the knowledge picker's THREE readings, as they ship", () => {
+  it("READING 1 — none chosen: the control is offered and its value is the opt-out", async () => {
+    const select = await openDescribeDoorWithFolders()
+    expect(select.value).toBe("")
+    expect(within(select).getByText("No specific knowledge base")).toBeInTheDocument()
+  })
+
+  it("READING 2 — one chosen: the control carries the chosen folder's id", async () => {
+    const select = await openDescribeDoorWithFolders()
+    fireEvent.change(select, { target: { value: KB_CONTRACTS.id } })
+    expect(select.value).toBe(KB_CONTRACTS.id)
+  })
+
+  it("READING 3 — none available: NO control at all, and the reason is machine-readable only", async () => {
+    mockListFolders.mockResolvedValue([])
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+    const marker = await screen.findByTestId("describe-kb-state")
+    expect(marker.getAttribute("data-state")).toBe("none")
+    // ⚠ THE FINDING THE SHEET IS ABOUT: nothing on screen SAYS there are none. The marker is
+    // `hidden` + `aria-hidden`, so it reaches a test and never a person.
+    expect(marker.hasAttribute("hidden")).toBe(true)
+    expect(marker.getAttribute("aria-hidden")).toBe("true")
+  })
+
+  it("READING 3b — 'we could not ask' is a FOURTH state, held apart from 'there are none'", async () => {
+    mockListFolders.mockRejectedValue(new Error("offline"))
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    const marker = await screen.findByTestId("describe-kb-state")
+    await waitFor(() => expect(marker.getAttribute("data-state")).toBe("unavailable"))
+    expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+  })
+})
+
+describe("199-08 Task 1 — sheet c9's COLOUR TOKENS, resolved against the shipped config", () => {
+  /**
+   * ⚠ THE PHASE-WIDE MEASUREMENT, RE-DERIVED HERE FOR THIS SHEET RATHER THAN INHERITED.
+   * A Tailwind class naming a key the config does not carry compiles to NOTHING and renders
+   * identically to an arm that is deliberately unpainted — the `bg-warning` silent no-op that
+   * shipped unguarded in 192.2. So the sheet's palette is checked BEFORE any of it is copied.
+   */
+  const SHEET_C9_TOKENS = [
+    "background",
+    "error",
+    "error-container",
+    "on-background",
+    "on-surface",
+    "on-surface-variant",
+    "outline",
+    "outline-variant",
+    "primary",
+    "primary-container",
+    "primary-fixed",
+    "surface",
+    "surface-container-high",
+    "surface-container-low",
+    "surface-container-lowest",
+    "surface-variant",
+    "tertiary-fixed-dim",
+  ]
+
+  /** A colour key really declared in the shipped Tailwind config's `colors` block. */
+  const declares = (token: string): boolean =>
+    new RegExp(`(^|\\n)\\s*(?:"|')?${token.replace(/-/g, "\\-")}(?:"|')?\\s*:`, "m").test(
+      tailwindConfigSource199,
+    )
+
+  it("the config really loaded, and the detector really detects (POSITIVE + NEGATIVE control)", () => {
+    expect(tailwindConfigSource199.length).toBeGreaterThan(1000)
+    expect(declares("background")).toBe(true)
+    expect(declares("destructive")).toBe(true)
+    expect(declares("no-such-colour-key")).toBe(false)
+  })
+
+  it("⚠ FIFTEEN of the sheet's SEVENTEEN colour tokens compile to NOTHING here", () => {
+    expect(SHEET_C9_TOKENS).toHaveLength(17)
+    const resolves = SHEET_C9_TOKENS.filter(declares)
+    expect(resolves.sort()).toEqual(["background", "primary"])
+    expect(SHEET_C9_TOKENS.length - resolves.length).toBe(15)
+  })
+
+  it("every token THIS plan spends is a shipped one that RESOLVES", () => {
+    for (const token of ["destructive", "border", "muted", "foreground", "primary", "card"]) {
+      expect(declares(token), `${token} does not resolve`).toBe(true)
+    }
+  })
+})
+
+describe("199-08 Task 1 — the 199-09 SEAM, recorded rather than assumed", () => {
+  it("there are TWO pre-draft describe boxes and this plan owns exactly one of them", () => {
+    // THIS file's box carries a testid; the Builder's pre-draft box does not, and both spell
+    // the same placeholder. That is the duplication sheet c9's header strip designs out, and
+    // it is SHIPPED — this phase neither introduces it nor closes it.
+    expect(workflowDoorSwitchSource).toContain('data-testid="describe-box"')
+    expect(builderPageSource).toContain('placeholder="Describe the goal in plain language…"')
+    expect(builderPageSource).not.toContain('data-testid="describe-box"')
+  })
+
+  it("the Builder's box is UNGATED BY ANY SENTENCE today — 199-09's inheritance, pinned", () => {
+    // Wave 3 imports the SAME refusal constant this plan lands, rather than spelling a second
+    // one. The proof that it has not already done so is here, in wave 2.
+    expect(builderPageSource).not.toContain("DESCRIBE_REFUSAL")
+  })
+})
