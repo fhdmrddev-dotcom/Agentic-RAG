@@ -57,20 +57,107 @@
  * needs. It is OPTIONAL, it reaches `nodeTitle` and nowhere else, and an absent one makes
  * every derived tier MISS — the generic type sentence renders, never a fabricated or
  * id-shaped face — so a caller that omits it renders byte-identically to HEAD.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ * Phase 200-05 (DES-02 · `200-CHECKLIST.md` §2) — THE TWO TENSES, AND THREE SUBTRACTIONS
+ * ─────────────────────────────────────────────────────────────────────────────────────────
+ *
+ * ⚠ THIS COMPONENT STILL READS A DRAFT DEFINITION AND STILL HAS NO RUN. `199-02` refused
+ * run-time words here for exactly that reason, and the refusal is INTACT — it is now
+ * enforced rather than remembered. D-09 reconciles the contradiction CONTEXT carried (the
+ * spine has no run / the slice clears the spine's per-step timings) with **one component,
+ * two tenses**: the run tense arrives through the OPTIONAL `runTense` prop below, and
+ * **an absent prop leaves the authoring render byte-identical**. That is this file's own
+ * `nameContext?` pattern, and the house pattern three times over (`WorkflowCanvas.runState`,
+ * `WorkflowCanvas.editable`, `PhaseFormPanel.rails` — the last pinned LOAD-BEARING at
+ * `PhaseFormPanel.rails.test.tsx:125`). The authoring mount at `WorkflowBuilderPage.tsx:2136`
+ * passes nothing and is unchanged; the run mount is `200-07`'s, on a page that already holds
+ * the run and the definition in one fetch. **That siting is what keeps 199-02's refusal
+ * intact BY CONSTRUCTION rather than by care.**
+ *
+ * THREE ATOMS WERE SUBTRACTED, and each subtraction is the deliverable rather than a tidy-up:
+ *
+ *   • `BS-MNR-01` — the `READ_ONLY_LEGEND` no longer RENDERS. ⚠ **This deliberately reverses
+ *     `DEC-199-02-F`**, which kept it as a locked 019-D contract on the argument that it was
+ *     asserted in four places. `200-CHECKLIST.md` calls it *"11px mono, visible at rest — the
+ *     noisiest string in the product"*, and it is machine vocabulary (`phase_index`,
+ *     `skip_to_phase`, `depends_on`) printed to a business author at the top of the widest
+ *     column: the same *"never name the mechanism to the user"* rule under which 199-02 spent
+ *     this header's other engineering note. **The CONSTANT stays exported** — its four
+ *     assertion sites are re-pointed, not deleted, and the removal is proved by a DOM-level
+ *     scan rather than a source one, because a `?raw` scan would go red on the export itself
+ *     and a deliberate absence must not trip its own fence.
+ *   • `BS-MNR-02` — the per-step raw `phase_type` chip is gone as VISIBLE TEXT. Its
+ *     replacement is `PHASE_TYPE_LABELS`, **the canvas's own words**, so the same step no
+ *     longer reads `llm_agent` here and `AI agent step` one toggle away. The raw id survives
+ *     where a machine needs it (`data-phase-type`), which is not text a person reads.
+ *   • `BS-MNR-03` — the `phase_index N` line is gone as a rendered LABEL. ⚠ `phase_index`
+ *     itself is UNTOUCHED in the DATA: it is the ordering key and the sort below still reads
+ *     it. What was forbidden is printing it at a person.
+ *
+ * AND THREE ATOMS WERE BUILT. `BS-MR-01`, the per-step model name — rendered ONLY where the
+ * config declares one, because an absent model means *"use the run's model"* and naming a
+ * default here would be a fabricated claim (N-6: the sketch's `GPT-4o` is placeholder text,
+ * and models come from the registry, never from a literal). `BS-MR-02`, the type badge in the
+ * canvas's words. `BS-MR-06`, the plain-language order sentence and the footer count sentence
+ * that replace the legend's machine vocabulary — both derived from the definition the client
+ * already holds, so neither is a claim about a run.
  */
 import { PHASE_GLYPHS } from "@/components/workflows/soulData"
 import {
   nodeTitle,
   parseSkipTarget,
+  PHASE_TYPE_LABELS,
   type NameContext,
   type PhaseSpecJSON,
 } from "@/components/workflows/phaseVocabulary"
 import { phaseGlyph } from "@/lib/phaseGlyph"
+import { branchReading, type SpineRunTense } from "@/components/workflows/phaseDuration"
+import { countDeclared } from "@/components/workflows/receiptVocabulary"
 
-/** The verbatim read-only legend (locked contract — sketch 019-D / 103-PLAN). */
+/**
+ * The verbatim read-only legend (locked contract — sketch 019-D / 103-PLAN).
+ *
+ * ⚠ STILL EXPORTED, NO LONGER RENDERED (200-05, `BS-MNR-01`). The export is kept on purpose:
+ * a subtraction proved by an INVERTED assertion against a live constant is a subtraction a
+ * later re-add reddens, which a deleted constant cannot do (the `192.2-05` method, and the
+ * same choice 199-02 made for this header's other removed atom). Its four assertion sites —
+ * one in this component's suite and three in `pages/WorkflowBuilderPage.test.tsx`, where it
+ * was how the graph view's PRESENCE was detected — are re-pointed at the spine's own
+ * `aria-label`, which is a stabler presence probe than a body of copy.
+ */
 export const READ_ONLY_LEGEND =
   "READ-ONLY GRAPH · ordered by phase_index · run order (i→i+1) · " +
   "on-fail branch (skip_to_phase) · no depends_on · no parallel lanes · inspect, don't drag"
+
+/**
+ * `BS-MR-06` — the order sentence, in plain language.
+ *
+ * ⚠ IT DOES NOT REPEAT THE BADGE. The checklist words this atom as
+ * *"View only — this is the order it will run in."*, and the first two words already ship as
+ * the `👁 View only` badge beside it — the SHIPPED cross-surface read-only vocabulary that
+ * `WorkflowCanvas.tsx:1000` and `WorkflowRunPage.tsx:960` also render, which 199-02's
+ * inventory pins as an atom that STAYS. Printing "View only" twice in one header would be the
+ * noise this whole subtraction exists to remove, so the atom ships SPLIT across the badge and
+ * this line, character-complete between them.
+ */
+export const SPINE_ORDER_SENTENCE = "This is the order it will run in."
+
+/**
+ * `BS-MR-06` — the footer count sentence, derived entirely from the definition.
+ *
+ * ⚠ EVERY FIGURE IN IT IS COUNTED FROM THE PHASES IN HAND, never from a run: how many steps
+ * there are, and how many of them stop for a person. A step count is an authoring fact and is
+ * true before anything has ever run. ⚠ The person-gate clause is OMITTED at zero rather than
+ * rendered as `0 person gates` — an absent clause says nothing, where a zero invites the
+ * reader to wonder what it is counting.
+ */
+export function spineFooterSentence(stepCount: number, personGates: number): string {
+  const steps = stepCount === 1 ? "1 step" : `${stepCount} steps`
+  const lead = `${steps}, runs top to bottom`
+  if (personGates === 0) return lead
+  return `${lead}, ${personGates === 1 ? "one person gate" : `${personGates} person gates`}`
+}
 
 export interface PhaseSpineGraphProps {
   phases: PhaseSpecJSON[]
@@ -82,6 +169,21 @@ export interface PhaseSpineGraphProps {
    *  (Phase 187 / D-187-05). Absent ⇒ every derived tier misses and the generic type
    *  sentence renders — never a fabricated or id-shaped face. */
   nameContext?: NameContext
+  /**
+   * Phase 200-05 (DES-02 / D-09) — THE RUN TENSE, AND IT IS OPTIONAL FOR A REASON.
+   *
+   * ⚠ ABSENT ⇒ THE AUTHORING RENDER IS BYTE-IDENTICAL, and that is asserted rather than
+   * assumed: a case renders both ways and compares the two `innerHTML`s, and a second case
+   * proves the prop is LOAD-BEARING (the present render is NOT the same DOM), copying
+   * `PhaseFormPanel.rails.test.tsx:125`. Without both halves this prop could be inert and
+   * nothing would say so.
+   *
+   * ⚠ THE AUTHORING MOUNT MUST NEVER PASS IT. This component reads a DRAFT definition; a
+   * duration, an elapsed or a branch outcome on that surface is a claim about a run that has
+   * not happened. `199-02` refused exactly that, and the refusal now holds by construction:
+   * the only mount that supplies this prop is the run surface's, which really does hold a run.
+   */
+  runTense?: SpineRunTense
 }
 
 export function PhaseSpineGraph({
@@ -89,6 +191,7 @@ export function PhaseSpineGraph({
   selectedSlug,
   onSelectNode,
   nameContext,
+  runTense,
 }: PhaseSpineGraphProps) {
   // Sort by phase_index (strict run order). The input array order is irrelevant.
   const ordered = [...phases].sort((a, b) => a.phase_index - b.phase_index)
@@ -135,14 +238,36 @@ export function PhaseSpineGraph({
         <span className="rounded bg-muted px-2 py-0.5 font-mono text-[11px] font-medium text-muted-foreground">
           👁 View only
         </span>
+        {/* BS-MR-05 — the total runtime, RUN TENSE ONLY. It is already WORDED by the caller
+            (`receiptVocabulary.ts`), so this component neither formats a duration nor decides
+            what an unrecorded one reads as. Absent prop ⇒ this node does not exist. */}
+        {runTense && (
+          <span
+            data-testid="spine-total-runtime"
+            className="rounded bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"
+          >
+            {runTense.total}
+          </span>
+        )}
       </div>
 
-      {/* The verbatim read-only legend (run order, no depends_on, inspect-don't-drag). */}
+      {/* BS-MR-06 / BS-MNR-01 — the plain-language order sentence, in the slot the
+          machine-vocabulary legend used to occupy. Both figures below are counted from the
+          definition in hand, so neither is a claim about a run. */}
       <p
-        data-testid="graph-legend"
-        className="mb-4 font-mono text-[11px] leading-relaxed text-muted-foreground"
+        data-testid="graph-order-sentence"
+        className="mb-1 text-[12px] leading-relaxed text-muted-foreground"
       >
-        {READ_ONLY_LEGEND}
+        {SPINE_ORDER_SENTENCE}
+      </p>
+      <p
+        data-testid="graph-footer-count"
+        className="mb-4 text-[11px] leading-relaxed text-muted-foreground"
+      >
+        {spineFooterSentence(
+          ordered.length,
+          ordered.filter((p) => p.config.phase_type === "llm_human_input").length,
+        )}
       </p>
 
       {/* The vertical spine: an <ol> of nodes; the gutter line is a ::before on each
@@ -187,6 +312,22 @@ export function PhaseSpineGraph({
           // tier misses and the generic type sentence renders, byte-identically to HEAD.
           const title = nodeTitle(phase, nameContext)
           const isEmit = phase.config.phase_type === "llm_emit"
+          // BS-MR-02 — the CANVAS's own word for this type, imported rather than re-spelled.
+          // A second uppercase label map here would be exactly the two-views-two-languages
+          // defect BS-2 exists to close, one map further down. An unmapped type falls back to
+          // NOTHING rather than to the raw id: the title already says what the step is, and a
+          // schema token is not a word.
+          const typeWord = PHASE_TYPE_LABELS[phase.config.phase_type]
+          // BS-MR-01 — the per-step model, rendered ONLY where the config declares one. An
+          // absent or blank value means "use the run's model", and printing a default here
+          // would be a fabricated claim (N-6). `config` is untyped JSONB at the edge, so the
+          // shape is checked rather than trusted.
+          const rawModel = phase.config.model
+          const model = typeof rawModel === "string" && rawModel.trim().length > 0 ? rawModel.trim() : null
+          // ⚠ RUN TENSE ONLY. `undefined` on the authoring mount, and `undefined` for a slug
+          // this run never mentioned — two absences that render identically because both mean
+          // "we hold no run fact about this step", which is not a fact about the step.
+          const facts = runTense?.factsOf(phase.slug)
           // The dashed on-fail edges originating at THIS node (rendered as a labeled
           // skip-branch row beneath the node; the target slug is declared for assertion).
           const outgoingSkips = skipEdges.filter((e) => e.fromSlug === phase.slug)
@@ -224,7 +365,13 @@ export function PhaseSpineGraph({
                 data-phase-type={phase.config.phase_type}
                 data-selected={isSelected ? "true" : "false"}
                 aria-pressed={isSelected}
-                aria-label={`Phase ${phase.phase_index + 1}: ${title} (${phase.config.phase_type})`}
+                // ⚠ THE ACCESSIBLE NAME CARRIES THE CANVAS'S WORD, NOT THE RAW ID (200-05,
+                // BS-MNR-02). Until this plan it read `(llm_agent)`. An `aria-label` is not
+                // "invisible text" — it is the text a screen-reader user receives, so a
+                // subtraction that left the schema token here would have removed the chip
+                // from sighted readers only. An unmapped type drops the parenthetical
+                // entirely rather than falling back to the id.
+                aria-label={`Phase ${phase.phase_index + 1}: ${title}${typeWord ? ` (${typeWord})` : ""}`}
                 onClick={() => onSelectNode(phase.slug)}
                 className={[
                   "w-full rounded-md border px-3 py-2 text-left transition-colors",
@@ -243,13 +390,44 @@ export function PhaseSpineGraph({
                   >
                     {title}
                   </span>
-                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {phase.config.phase_type}
+                  {/* BS-MR-02 — the canvas's word, uppercased by CSS rather than by a second
+                      string, so there is still exactly ONE spelling of this label in the tree. */}
+                  {typeWord && (
+                    <span
+                      data-testid="node-type-word"
+                      className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground"
+                    >
+                      {typeWord}
+                    </span>
+                  )}
+                </span>
+                {/* BS-MR-01 — the model, only where one was declared. */}
+                {model && (
+                  <span
+                    data-testid="node-model"
+                    className="mt-0.5 block truncate text-[10px] text-muted-foreground"
+                  >
+                    {model}
                   </span>
-                </span>
-                <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
-                  phase_index {phase.phase_index}
-                </span>
+                )}
+                {/* BS-MR-04 — the per-step reading. ⚠ RUN TENSE ONLY: absent prop ⇒ absent
+                    node. ONE reading per row (D-09's own shape), and a step that declared no
+                    count renders no count slot AT ALL — never `0`, never a dash, never prose
+                    (D-07 / N-8). A declared `0` renders as the fact it is. */}
+                {facts && (
+                  <span
+                    data-testid="node-run-reading"
+                    data-outcome={facts.outcome}
+                    className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground"
+                  >
+                    <span data-testid="node-run-time">{facts.timing.reading}</span>
+                    {facts.count && (
+                      <span data-testid="node-run-count">
+                        {countDeclared(facts.count.count, facts.count.noun)}
+                      </span>
+                    )}
+                  </span>
+                )}
               </button>
 
               {/* The dashed on-fail skip branch label(s). The ONLY non-linear edge. */}
@@ -265,6 +443,23 @@ export function PhaseSpineGraph({
                   <span>
                     on fail → skip to <span className="font-mono font-medium">{edge.toSlug}</span>
                   </span>
+                  {/* BS-MR-03 — the branch reading. ⚠ RUN TENSE ONLY, and it is a THREE-state
+                      read, not a boolean: `undefined` means the caller does not hold the fact
+                      and nothing renders, which is not the same as "the run did not take it".
+                      On a DRAFT this sentence would be a fabricated claim — 199-02 refused
+                      exactly that — so it is unreachable without the run prop. The checklist's
+                      two machine tokens survive on `data-branch-reading` for a driven
+                      verifier; the WORDS are product English, because the adopted design
+                      language's third rule is never to name the mechanism to the reader. */}
+                  {typeof facts?.branchTaken === "boolean" && (
+                    <span
+                      data-testid="skip-edge-reading"
+                      data-branch-reading={facts.branchTaken ? "traversed" : "skipped"}
+                      className="font-medium"
+                    >
+                      {branchReading(facts.branchTaken)}
+                    </span>
+                  )}
                 </div>
               ))}
             </li>

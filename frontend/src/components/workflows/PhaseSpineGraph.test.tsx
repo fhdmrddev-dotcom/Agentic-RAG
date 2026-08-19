@@ -33,7 +33,16 @@ import { toCanvas } from "./canvasModel"
 // the foot of this file compares character-identity against the component's own exported
 // constant instead of a second copy of it (the `186-16` rule). Its own import statement, so
 // this plan's diff on this file reads as added lines only.
-import { READ_ONLY_LEGEND } from "./PhaseSpineGraph"
+import { READ_ONLY_LEGEND, SPINE_ORDER_SENTENCE, spineFooterSentence } from "./PhaseSpineGraph"
+// 200-05: the run tense's two artifacts, imported so the run-mount cases assert against the
+// SAME words the component renders rather than against re-typed copies of them.
+import { phaseRunFacts, type SpineRunTense } from "./phaseDuration"
+import {
+  BRANCH_NOT_TAKEN,
+  BRANCH_TAKEN,
+  OUTCOME_NEVER_RAN,
+  TIME_NOT_RECORDED,
+} from "./receiptVocabulary"
 
 /**
  * The rendered title of one spine node.
@@ -141,11 +150,35 @@ describe("PhaseSpineGraph — read-only vertical spine", () => {
     expect(emit.querySelector("svg")).not.toBeNull()
   })
 
-  it("renders a 'View only' badge and the read-only legend", () => {
+  it("renders a 'View only' badge and the plain-language order sentence", () => {
+    // ⚠ RE-POINTED BY 200-05 (BS-MNR-01 / BS-MR-06), and the re-pointing is the deliverable.
+    // The two legend assertions below used to read `getByText(/READ-ONLY GRAPH/i)` and
+    // `getByText(/inspect, don't drag/i)`. That legend is machine vocabulary printed at a
+    // business author, and it is now SUBTRACTED — so the assertions are INVERTED here rather
+    // than deleted (the `192.2-05` method: a removal proved by a live assertion is one a
+    // later re-add reddens, which a deleted assertion cannot do). Its replacement is the
+    // plain-language pair, asserted in the same breath so this case still measures a header
+    // that exists rather than a header that vanished.
     render(<PhaseSpineGraph phases={threePhases} selectedSlug={null} onSelectNode={vi.fn()} />)
     expect(screen.getByText(/view only/i)).toBeInTheDocument()
-    expect(screen.getByText(/READ-ONLY GRAPH/i)).toBeInTheDocument()
-    expect(screen.getByText(/inspect, don't drag/i)).toBeInTheDocument()
+    expect(screen.queryByText(/READ-ONLY GRAPH/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/inspect, don't drag/i)).not.toBeInTheDocument()
+    expect(screen.getByTestId("graph-order-sentence").textContent).toBe(SPINE_ORDER_SENTENCE)
+    expect(screen.getByTestId("graph-footer-count").textContent).toBe("3 steps, runs top to bottom")
+  })
+
+  it("the footer count sentence is DERIVED from the definition, person gates included", () => {
+    // Both figures are counted from the phases in hand, so both are true before anything has
+    // ever run — which is what makes them shippable on an authoring surface at all.
+    render(<PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />)
+    expect(screen.getByTestId("graph-footer-count").textContent).toBe(
+      "3 steps, runs top to bottom, one person gate",
+    )
+    // ⚠ ZERO GATES OMITS THE CLAUSE rather than rendering `0 person gates` — an absent clause
+    // says nothing, where a zero invites the reader to wonder what it counted (`threePhases`
+    // has no `llm_human_input` step, asserted in the case above).
+    expect(spineFooterSentence(1, 0)).toBe("1 step, runs top to bottom")
+    expect(spineFooterSentence(4, 2)).toBe("4 steps, runs top to bottom, 2 person gates")
   })
 
   it("renders EXACTLY ONE dashed skip edge landing on the resolved target node", () => {
@@ -332,28 +365,44 @@ describe("PhaseSpineGraph — ⌥ technical names reveal (D-183-06 / D-183-08 / 
         screen.getByTestId(`spine-node-${slug}`).getAttribute("aria-label"),
       ),
     ).toEqual(labelsBefore)
+    // ⚠ RE-BASELINED BY 200-05 (BS-MNR-02). This pair read `(llm_agent)` / `(llm_emit)` — the
+    // RAW `phase_type` inside the accessible name. An `aria-label` is not "invisible text": it
+    // is the text a screen-reader user receives, so subtracting the visible chip while leaving
+    // the schema token here would have removed it from sighted readers only. The label now
+    // carries the CANVAS's word, and the property this case actually guards — the reveal moves
+    // nothing, and the accessible name tracks the visible title (WCAG 2.5.3) — is unchanged.
     expect(labelsBefore).toEqual([
-      "Phase 1: Work out how to do it (llm_agent)",
-      "Phase 2: Produce the deliverable (llm_emit)",
+      "Phase 1: Work out how to do it (AI agent step)",
+      "Phase 2: Produce the deliverable (Deliverable)",
     ])
   })
 
-  it("keeps its raw phase_type chip and phase_index line in BOTH toggle states", () => {
-    // The spine's answer to "where did the technical names go?" — they were never
-    // hidden here. This is the measured basis of D-187-16, asserted rather than
-    // asserted-about: `:183-185` and `:187-189` are unconditional chrome.
+  it("the node face is IDENTICAL in both toggle states, and carries no raw id (200-05)", () => {
+    // ⚠ RE-SHAPED FROM "keeps its raw phase_type chip and phase_index line in BOTH toggle
+    // states", and the re-shaping is the deliverable rather than an erosion. That sentence was
+    // the measured BASIS of D-187-16 — the spine never hid the technical vocabulary, so it had
+    // nothing to lose by not swapping. 200-05's BS-MNR-02 / BS-MNR-03 SUBTRACT both atoms, so
+    // the old assertions are INVERTED here rather than deleted, and the invariant the case
+    // exists for — one control flips every node at once, and this surface's face does not move
+    // — is asserted in its stronger form: the WHOLE face, byte-identical across the flip.
     render(
       <TechnicalNamesProvider>
         <Harness />
       </TechnicalNamesProvider>,
     )
-    const readChrome = () => {
-      const node = screen.getByTestId("spine-node-m1")
-      return (node.textContent ?? "").trim()
-    }
+    const readChrome = () => (screen.getByTestId("spine-node-m1").textContent ?? "").trim()
     const chromeBefore = readChrome()
-    expect(chromeBefore).toContain("llm_emit")
-    expect(chromeBefore).toContain("phase_index 1")
+    // The two subtracted atoms, proved absent by a live assertion.
+    expect(chromeBefore).not.toContain("llm_emit")
+    expect(chromeBefore).not.toContain("phase_index")
+    // NON-VACUITY: the face still exists and still says what the step is, so the two refusals
+    // above are statements about a node rather than about an empty string.
+    expect(chromeBefore).toContain("Produce the deliverable")
+    // …and the raw chip's REPLACEMENT is there: the canvas's own word for this type. It is
+    // uppercased by CSS, never by a second string, so the DOM still carries one spelling.
+    expect(
+      within(screen.getByTestId("spine-node-m1")).getByTestId("node-type-word").textContent,
+    ).toBe("Deliverable")
 
     act(() => {
       screen.getByRole("button", { name: "flip" }).click()
@@ -492,10 +541,16 @@ describe("PhaseSpineGraph — the injected name context (D-187-05)", () => {
 
     expect(node().getAttribute("aria-label")).toBe(labelBefore)
     expect((node().textContent ?? "").trim()).toBe(textBefore)
-    // The accessible name still carries the RAW `phase_type`, exactly as it ships.
-    expect(labelBefore).toBe("Phase 1: Search Supplier Contracts (llm_agent)")
-    expect(textBefore).toContain("llm_agent")
-    expect(textBefore).toContain("phase_index 0")
+    // ⚠ RE-BASELINED BY 200-05 (BS-MNR-02 / BS-MNR-03), with the three original assertions
+    // inverted below rather than dropped. The accessible name read
+    // `(llm_agent)` and the face carried `llm_agent` plus `phase_index 0`; all three are
+    // subtracted, and the property this case guards — the toggle moves NOTHING on this
+    // surface — is untouched and is asserted two lines above, against the whole face.
+    expect(labelBefore).toBe("Phase 1: Search Supplier Contracts (AI agent step)")
+    expect(textBefore).not.toContain("llm_agent")
+    expect(textBefore).not.toContain("phase_index")
+    // NON-VACUITY: the face is real, so the two refusals are about a node and not a null.
+    expect(textBefore).toContain("Search Supplier Contracts")
   })
 
   it("the SOURCE stops swapping the title and spends the context in ONE place", () => {
@@ -532,10 +587,20 @@ describe("PhaseSpineGraph — the injected name context (D-187-05)", () => {
     // …declared exactly once on the props, and resolved by exactly one `nodeTitle` call.
     expect((phaseSpineGraphSource.match(/nameContext\?: NameContext/g) ?? []).length).toBe(1)
     expect((phaseSpineGraphSource.match(/nodeTitle\(/g) ?? []).length).toBe(1)
-    // The raw chrome is still declared here — the fence is not passing because the
-    // markup it guards disappeared.
+    // The type read is still declared here — the fence is not passing because the markup it
+    // guards disappeared. ⚠ `phase.config.phase_type` now feeds `data-phase-type` and the
+    // canvas-word lookup rather than a visible chip, which is BS-MNR-02's whole point: the id
+    // survives where a machine needs it and dies where a person reads it.
     expect(phaseSpineGraphSource).toMatch(/phase\.config\.phase_type/)
-    expect(phaseSpineGraphSource).toMatch(/phase_index \{/)
+    // ⚠ INVERTED BY 200-05 (BS-MNR-03). This read `toMatch(/phase_index \{/)` — the rendered
+    // `phase_index {phase.phase_index}` label. The LABEL is subtracted; the FIELD is not, and
+    // the next assertion is what keeps those two facts apart.
+    expect(phaseSpineGraphSource).not.toMatch(/phase_index \{/)
+    // ⚠ `phase_index` IS STILL READ — it is the ordering key, and subtracting the rendered
+    // label must never be mistaken for dropping the sort. The `.sort()` comparator and the
+    // 1-based ordinal in the accessible name both read it.
+    expect(phaseSpineGraphSource).toMatch(/a\.phase_index - b\.phase_index/)
+    expect(phaseSpineGraphSource).toMatch(/phase\.phase_index \+ 1/)
   })
 })
 
@@ -589,23 +654,65 @@ describe("PhaseSpineGraph — 199-02 pre-change inventory (sheet c3 Col 1)", () 
     // the two refusals above are statements about a header rather than about a null.
     expect((header!.textContent ?? "").trim()).toBe("👁 View only")
 
-    // Atom 3 — the locked 019-D legend. It is machine vocabulary (`phase_index`,
-    // `skip_to_phase`, `depends_on`) and the sheet's authoring column draws no legend at
-    // all — but it is a LOCKED SKETCH CONTRACT and it is asserted in four places
-    // (`:142` here plus three probes in `pages/WorkflowBuilderPage.test.tsx`, where it is
-    // how the graph view's presence is detected). Re-opening it is a phase, not a
-    // re-presentation, so it STAYS and the observation is recorded in the summary.
-    expect(screen.getByTestId("graph-legend").textContent).toBe(READ_ONLY_LEGEND)
+    // Atom 3 — ⚠ THE ATOM 200-05 SUBTRACTED, AND IT IS A DELIBERATE REVERSAL OF A PRIOR
+    // DECISION. 199-02 left the locked 019-D legend standing and recorded why, verbatim:
+    // *"it is a LOCKED SKETCH CONTRACT and it is asserted in four places … Re-opening it is a
+    // phase, not a re-presentation."* This IS that phase. `200-CHECKLIST.md`'s `BS-MNR-01`
+    // names it *"11px mono, visible at rest — the noisiest string in the product"*, and its
+    // content is machine vocabulary (`phase_index`, `skip_to_phase`, `depends_on`) printed to
+    // a business author at the top of the widest column — the same rule 199-02 spent this
+    // header's other atom under. `DEC-199-02-F` is therefore REVERSED, on the record, in this
+    // plan's SUMMARY.
+    //
+    // ⚠ THE SCAN IS OF THE RENDERED DOM, NOT THE SOURCE, and the checklist says so in
+    // capitals. The identifier is still `export`ed, so a `?raw` source scan for those words
+    // would go RED on the export while proving nothing about what a person sees — a
+    // deliberate absence must not trip its own fence.
+    expect(screen.queryByTestId("graph-legend")).not.toBeInTheDocument()
+    expect(container.textContent ?? "").not.toContain(READ_ONLY_LEGEND)
+    expect(container.textContent ?? "").not.toContain("READ-ONLY GRAPH")
+    // NON-VACUITY, TWICE OVER. First: the constant survives and is non-trivial, so the two
+    // refusals above are comparisons against a real string. Second: its REPLACEMENT renders,
+    // so the header did not simply lose a paragraph.
+    expect(READ_ONLY_LEGEND.length).toBeGreaterThan(80)
+    expect(screen.getByTestId("graph-order-sentence").textContent).toBe(SPINE_ORDER_SENTENCE)
   })
 
   it("pins the RESTING node face of every node as an exact literal", () => {
     render(<PhaseSpineGraph phases={threePhases} selectedSlug={null} onSelectNode={vi.fn()} />)
-    // Three atoms per node and no fourth: the resolved title, the RAW `phase_type` chip and
-    // the RAW `phase_index` line. There is NO description line — which is precisely the
-    // sheet element this plan refuses to import.
-    expect(faceOf("gather")).toBe("Gather sourcesllm_agentphase_index 0")
-    expect(faceOf("emit")).toBe("Produce the deliverablellm_emitphase_index 1")
-    expect(faceOf("review")).toBe("Review the findingsllm_agentphase_index 2")
+    // ⚠ RE-BASELINED BY 200-05, deliberately and exactly once. The three literals below read
+    // `"Gather sourcesllm_agentphase_index 0"` and its siblings — the resolved title, the RAW
+    // `phase_type` chip and the RAW `phase_index` line. `BS-MNR-02` and `BS-MNR-03` subtract
+    // the last two and `BS-MR-02` puts the CANVAS's word where the raw id was, so this
+    // characterization pin necessarily moves. It is re-captured ONCE, from the real render,
+    // with the reason written here — the `doorVocabulary.ts` rule for the first wave that
+    // intentionally changes a rendered word.
+    //
+    // Still THREE atoms per node and still no fourth: title, type word, and — where the config
+    // declares one — the model. There is NO description line, which remains precisely the
+    // sheet element this surface refuses to import. `threePhases` declares no model on any
+    // step, so no model atom appears: an absent model renders NOTHING rather than a default,
+    // and that is asserted as a face rather than as a prop.
+    expect(faceOf("gather")).toBe("Gather sourcesAI agent step")
+    expect(faceOf("emit")).toBe("Produce the deliverableDeliverable")
+    expect(faceOf("review")).toBe("Review the findingsAI agent step")
+  })
+
+  it("BS-MR-01 — the model renders ONLY where the config declares one", () => {
+    const withModel: PhaseSpecJSON[] = [
+      { ...threePhases[1], config: { ...threePhases[1].config, model: "gpt-5-mini" } },
+      { ...threePhases[2], config: { ...threePhases[2].config, model: "   " } },
+    ]
+    render(<PhaseSpineGraph phases={withModel} selectedSlug={null} onSelectNode={vi.fn()} />)
+    expect(
+      within(screen.getByTestId("spine-node-gather")).getByTestId("node-model").textContent,
+    ).toBe("gpt-5-mini")
+    // ⚠ A BLANK VALUE IS AN ABSENCE, NOT A NAME. An empty model means "use the run's model",
+    // and N-6 is explicit that the sketch's `GPT-4o` is placeholder text — a default printed
+    // here would be a fabricated claim about which model this step uses.
+    expect(
+      within(screen.getByTestId("spine-node-emit")).queryByTestId("node-model"),
+    ).not.toBeInTheDocument()
   })
 
   it("the branch outcome reads as WORDS, never as line-style alone (must_have)", () => {
@@ -635,5 +742,490 @@ describe("PhaseSpineGraph — 199-02 pre-change inventory (sheet c3 Col 1)", () 
     // POSITIVE CONTROL — the fence can actually find the shape it forbids, so the
     // assertion above is a measurement and not a regex that never matches anything.
     expect("Processing liability caps section (4/12)…").toMatch(DETERMINATE)
+  })
+})
+
+/**
+ * ── 200-05 Task 2 (DES-02 · `200-CHECKLIST.md` §2) — THE TWO TENSES ──────────────────────
+ *
+ * APPENDED, not woven in: everything above belongs to 103-04, 183-04, 187-09 and 199-02 and
+ * stays theirs. The assertions this plan HAD to move are re-shaped in place, each with its
+ * reason written at the assertion rather than here, where a later reader would not find it.
+ *
+ * WHAT THIS BLOCK PROVES. D-09 gives the spine a run tense through ONE optional prop, and the
+ * whole safety of that design is the absent-prop render: `199-02` refused run-time words on
+ * this component because it reads a DRAFT definition and has NO run, and that refusal is now
+ * enforced BY CONSTRUCTION rather than remembered. Two halves are needed and neither is
+ * sufficient alone —
+ *
+ *   1. ABSENT ⇒ BYTE-IDENTICAL. Compared as whole `innerHTML`, not as a handful of probes.
+ *   2. PRESENT ⇒ A DIFFERENT DOM. Copied from `PhaseFormPanel.rails.test.tsx:125`, because a
+ *      prop that changed nothing would pass (1) perfectly while being inert, and nothing else
+ *      in this file would say so.
+ */
+describe("PhaseSpineGraph — the run tense (D-09 / BS-MR-03..05 / BS-MNR-05)", () => {
+  const NOW = Date.parse("2026-08-19T14:22:00.000Z")
+
+  /** A run in which `gather` ran, `draft` was routed around, and `human-confirm` is historic. */
+  function tenseFor(over: Record<string, Record<string, unknown>> = {}): SpineRunTense {
+    const rows = [
+      {
+        slug: "gather",
+        status: "completed",
+        started_at: "2026-08-19T14:00:00.000Z",
+        completed_at: "2026-08-19T14:00:12.000Z",
+        step_count: 312,
+        step_noun: "sources",
+      },
+      { slug: "draft", status: "skipped", started_at: null, completed_at: null },
+      { slug: "human-confirm", status: "completed", started_at: null, completed_at: null },
+    ]
+    const bySlug = new Map(
+      rows.map((r) => [
+        r.slug,
+        { ...phaseRunFacts(r, "completed", NOW), ...(over[r.slug] ?? {}) },
+      ]),
+    )
+    return { factsOf: (slug: string) => bySlug.get(slug), total: "Ran 4m 12s" }
+  }
+
+  it("⚠ BS-MNR-05 — WITHOUT the prop, the render is BYTE-IDENTICAL to the authoring one", () => {
+    // The whole safety of the two-tense design, asserted as whole markup rather than probed.
+    const a = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug="gather" onSelectNode={vi.fn()} />,
+    )
+    const withoutProp = a.container.innerHTML
+    a.unmount()
+    const b = render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug="gather"
+        onSelectNode={vi.fn()}
+        runTense={undefined}
+      />,
+    )
+    expect(b.container.innerHTML).toBe(withoutProp)
+    // NON-VACUITY: it is a real spine, not an empty container.
+    expect(withoutProp.length).toBeGreaterThan(500)
+  })
+
+  it("⚠ BS-MNR-05 — the propless render carries NO duration, NO elapsed and NO run word", () => {
+    // 199-02's refusal, now enforced. Every needle below is a word this component CAN emit
+    // once the prop is supplied — which the cases further down prove — so none of them is a
+    // regex that could never match anything.
+    const { container } = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />,
+    )
+    const text = container.textContent ?? ""
+    for (const needle of [
+      OUTCOME_NEVER_RAN,
+      TIME_NOT_RECORDED,
+      BRANCH_TAKEN,
+      BRANCH_NOT_TAKEN,
+      "Ran 4m 12s",
+      "312 sources",
+      "so far",
+    ]) {
+      expect(text, `authoring mount leaked a run-tense word: ${needle}`).not.toContain(needle)
+    }
+    // A duration SHAPE, not just the specific words — `12s`, `2m 04s`, `1h 06m`.
+    expect(text).not.toMatch(/\b\d+(s|m \d{2}s|h \d{2}m)\b/)
+    // And none of the run-tense DOM hooks exists at all.
+    for (const id of [
+      "spine-total-runtime",
+      "node-run-reading",
+      "node-run-time",
+      "node-run-count",
+      "skip-edge-reading",
+    ]) {
+      expect(screen.queryAllByTestId(id)).toHaveLength(0)
+    }
+  })
+
+  it("⚠ the prop is LOAD-BEARING — the absent and present renders are NOT the same DOM", () => {
+    // `PhaseFormPanel.rails.test.tsx:125`'s assertion, copied for its reason: without it the
+    // byte-identity case above would pass just as well against a prop that did nothing.
+    const a = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />,
+    )
+    const absent = a.container.innerHTML
+    a.unmount()
+    const b = render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor()}
+      />,
+    )
+    expect(b.container.innerHTML).not.toBe(absent)
+  })
+
+  it("BS-MR-04 / BS-MR-05 — WITH the prop, a real duration and the total runtime appear", () => {
+    render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor()}
+      />,
+    )
+    expect(screen.getByTestId("spine-total-runtime").textContent).toBe("Ran 4m 12s")
+    expect(
+      within(screen.getByTestId("spine-node-gather")).getByTestId("node-run-time").textContent,
+    ).toBe("12s")
+  })
+
+  it("⚠ D-06 on the spine — `never ran` and `time not recorded` are DIFFERENT readings", () => {
+    render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor()}
+      />,
+    )
+    const routedAround = within(screen.getByTestId("spine-node-draft"))
+      .getByTestId("node-run-time")
+      .textContent
+    const historic = within(screen.getByTestId("spine-node-human-confirm"))
+      .getByTestId("node-run-time")
+      .textContent
+    expect(routedAround).toBe(OUTCOME_NEVER_RAN)
+    expect(historic).toBe(TIME_NOT_RECORDED)
+    expect(routedAround).not.toBe(historic)
+  })
+
+  it("D-07 on the spine — a declared count renders; a step that declared none renders NO slot", () => {
+    render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor()}
+      />,
+    )
+    expect(
+      within(screen.getByTestId("spine-node-gather")).getByTestId("node-run-count").textContent,
+    ).toBe("312 sources")
+    // ⚠ NOTHING AT ALL — never `0`, never a dash, never prose (D-07 / SEED-159 / N-8).
+    const draft = within(screen.getByTestId("spine-node-draft"))
+    expect(draft.queryByTestId("node-run-count")).not.toBeInTheDocument()
+    expect(draft.getByTestId("node-run-reading").textContent).not.toContain("0")
+    expect(draft.getByTestId("node-run-reading").textContent).not.toContain("—")
+  })
+
+  it("D-07 — a DECLARED `0` renders as the fact it is", () => {
+    render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor({ gather: { count: { count: 0, noun: "sources" } } })}
+      />,
+    )
+    expect(
+      within(screen.getByTestId("spine-node-gather")).getByTestId("node-run-count").textContent,
+    ).toBe("0 sources")
+  })
+
+  it("BS-MR-03 — the branch reading is a THREE-state read, not a boolean", () => {
+    const taken = render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor({ gather: { branchTaken: true } })}
+      />,
+    )
+    expect(screen.getByTestId("skip-edge-reading").textContent).toBe(BRANCH_TAKEN)
+    expect(screen.getByTestId("skip-edge-reading").getAttribute("data-branch-reading")).toBe(
+      "traversed",
+    )
+    taken.unmount()
+
+    // Not taken — a DIFFERENT reading, never the same word in a different colour.
+    const notTaken = render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor({ gather: { branchTaken: false } })}
+      />,
+    )
+    expect(screen.getByTestId("skip-edge-reading").textContent).toBe(BRANCH_NOT_TAKEN)
+    expect(screen.getByTestId("skip-edge-reading").getAttribute("data-branch-reading")).toBe(
+      "skipped",
+    )
+    notTaken.unmount()
+
+    // ⚠ ABSENT — the caller does not hold the fact, so NOTHING renders. This is the third
+    // state a boolean cannot express, and rendering `branch not taken` here would be a claim
+    // about a run nobody measured.
+    render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor()}
+      />,
+    )
+    expect(screen.queryByTestId("skip-edge-reading")).not.toBeInTheDocument()
+    // NON-VACUITY: the edge itself is still there, so the refusal is about a reading.
+    expect(screen.getAllByTestId("skip-edge")).toHaveLength(1)
+  })
+
+  it("a slug the run never mentioned renders NO run tense — absence is not a fact", () => {
+    render(
+      <PhaseSpineGraph
+        phases={threePhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={tenseFor()}
+      />,
+    )
+    // `threePhases`' slugs are gather / emit / review; the fixture run knows only `gather`.
+    expect(
+      within(screen.getByTestId("spine-node-gather")).getByTestId("node-run-reading"),
+    ).toBeInTheDocument()
+    for (const slug of ["emit", "review"]) {
+      expect(
+        within(screen.getByTestId(`spine-node-${slug}`)).queryByTestId("node-run-reading"),
+      ).not.toBeInTheDocument()
+    }
+  })
+})
+
+/**
+ * ── 200-05 Task 3 (DES-02 · `200-CHECKLIST.md` §2.2) — THE `MUST NOT RENDER` FENCE ───────
+ *
+ * ⚠ A `MUST NOT RENDER` FENCE THAT CANNOT FIRE IS NOT A FENCE, and this repo has TWO
+ * independent measurements of exactly that failure. `199-03` planted a live
+ * `<a href="/publish?force=1">Proceed to publish anyway</a>` inside a shipped hard wall and
+ * watched BOTH guards pass GREEN — a `?raw` source regex could not see a control composed
+ * from a variable, and a `queryAllByRole("button")` filter could not see a LINK. Only a
+ * role-SET scan went red. Wave 3 hit the other shape: a fence was reached and still wrote
+ * nothing, because its fixture queue was empty. So this fence:
+ *
+ *   • scans the RENDERED DOM, never the source. `BS-MNR-01` says so in capitals, and the
+ *     reason is structural: `READ_ONLY_LEGEND` is still `export`ed, so a source scan would go
+ *     RED on the export while proving nothing about what a person sees — a deliberate absence
+ *     must not trip its own fence;
+ *   • reads announced text as well as visible text (`aria-label`, `title`, `alt`,
+ *     `placeholder`), because an `aria-label` carrying a schema token would have removed the
+ *     chip from sighted readers only;
+ *   • sweeps a ROLE SET (`a[href]`, `button`, `[role]`) rather than filtering buttons, which
+ *     is the one predicate 199-03 measured as able to fire;
+ *   • carries TWO PERMANENT NON-VACUITY CONTROLS — a fixture that renders all three atoms and
+ *     is asserted to be CAUGHT, and the honest shipped render asserted CLEAN. Without the
+ *     first, every negative could pass against a predicate that matches nothing.
+ *
+ * ⚠ AND IT WAS DRIVEN AGAINST THE REAL COMPONENT. A violation was planted in
+ * `PhaseSpineGraph.tsx` itself — the legend restored to the header, the raw `phase_type` chip
+ * restored to the node face, and the `phase_index N` line restored beneath it — the fence
+ * observed RED naming all three row ids, and the source then restored byte-exactly
+ * (`git diff --numstat` → empty). A fence nobody drove is a fence nobody built. The result is
+ * recorded in `200-05-SUMMARY.md`.
+ *
+ * ⚠ SITING — A DECLARED DEVIATION. The plan lists this fence under Task 3's files, whose
+ * `<files>` names `RunReceipt.test.tsx`. It lives HERE instead, in the suite of the component
+ * it actually guards, because a fence sited in an unrelated suite is one nobody re-reads when
+ * the guarded component changes — which is how the four ledger rows this phase had to ADD
+ * went missing in the first place. Recorded in the SUMMARY rather than done quietly.
+ */
+describe("PhaseSpineGraph — the §2.2 MUST NOT RENDER fence", () => {
+  /**
+   * Everything a person can READ or HEAR from this subtree: visible text, plus the announced
+   * text a screen reader receives. ⚠ It deliberately does NOT read `data-*` attributes:
+   * `data-phase-type` and `data-branch-reading` are machine hooks this plan KEEPS on purpose,
+   * and a scan that could not tell a hook from a label would forbid the wrong thing.
+   */
+  function readableText(container: HTMLElement): string {
+    const chunks: string[] = [container.textContent ?? ""]
+    for (const el of Array.from(container.querySelectorAll("*"))) {
+      for (const attr of ["aria-label", "title", "alt", "placeholder", "aria-description"]) {
+        const v = el.getAttribute(attr)
+        if (v) chunks.push(v)
+      }
+    }
+    // ⚠ THE ROLE SET, not a button filter — 199-03's measured lesson. A violation smuggled in
+    // as a link, or as any element carrying an explicit role, is invisible to a button scan.
+    for (const el of Array.from(container.querySelectorAll("a[href], button, [role]"))) {
+      chunks.push(el.textContent ?? "", el.getAttribute("aria-label") ?? "")
+    }
+    return chunks.join("   ")
+  }
+
+  /** The seven raw `phase_type` ids — `BS-MNR-02` forbids any of them as visible text. */
+  const RAW_TYPE_IDS = [
+    "programmatic",
+    "llm_single",
+    "llm_agent",
+    "llm_batch_agents",
+    "llm_human_input",
+    "llm_emit",
+    "external_action",
+  ]
+
+  /**
+   * N-5's Material Symbols ligature names. ⚠ SPLIT INTO TWO CLASSES ON PURPOSE. The
+   * snake_case ones are unambiguous and are matched anywhere in the text. The single words
+   * (`search`, `person`, `info`, `add`, `output`, `description`, `psychology`) are ordinary
+   * English — the spine's own footer legitimately contains `person gate` — so those are
+   * matched only where an element's ENTIRE trimmed text is the ligature, which is exactly how
+   * one renders (`<span class="material-symbols">search</span>`). A needle that fired on
+   * honest prose would be worse than no needle at all.
+   */
+  const LIGATURES_SNAKE = [
+    "chat_bubble", "account_tree", "check_circle", "chevron_right", "health_and_safety",
+    "add_circle", "arrow_back", "account_circle", "priority_high", "fit_screen", "save_as",
+  ]
+  const LIGATURES_WORD = [
+    "search", "person", "info", "add", "output", "description", "psychology", "bolt",
+    "folder", "lock", "shield", "close", "error", "sync", "summarize", "widgets", "remove",
+    "warning", "menu", "settings", "check", "category", "dataset", "policy",
+  ]
+
+  /** Every §2.2 row this predicate can find, by its checklist id. */
+  function spineViolations(container: HTMLElement): string[] {
+    const text = readableText(container)
+    const found: string[] = []
+    if (/READ-ONLY GRAPH|inspect, don't drag|skip_to_phase\)|depends_on/.test(text)) {
+      found.push("BS-MNR-01")
+    }
+    // ⚠ A BARE `includes`, AND THE WORD-BOUNDARY VERSION IS THE BUG. The first draft used
+    // `(^|[^\w-])<id>([^\w-]|$)` and MISSED a real planted chip, because adjacent DOM text
+    // nodes concatenate without a separator — `<span>Gather sources</span><span>llm_agent</span>`
+    // reads as `Gather sourcesllm_agent`, so the id is preceded by a word character. These are
+    // schema tokens that appear in no product sentence, so containment is both sufficient and
+    // the only form that can actually fire. Found by the positive control, which is the whole
+    // reason it is permanent.
+    if (RAW_TYPE_IDS.some((id) => text.includes(id))) found.push("BS-MNR-02")
+    if (/phase_index\s*\d+/.test(text)) found.push("BS-MNR-03")
+    if (/Confirm the QBR before rendering|Fill the QBR template/.test(text)) {
+      found.push("BS-MNR-04")
+    }
+    if (LIGATURES_SNAKE.some((l) => text.includes(l))) found.push("BS-MNR-06")
+    else {
+      const exact = Array.from(container.querySelectorAll("*")).some((el) =>
+        el.children.length === 0 && LIGATURES_WORD.includes((el.textContent ?? "").trim()),
+      )
+      if (exact) found.push("BS-MNR-06")
+    }
+    return found
+  }
+
+  /** ⚠ PERMANENT NON-VACUITY CONTROL 1 — the predicate really finds what it forbids. */
+  it("POSITIVE CONTROL — a planted violation is CAUGHT, and all three atoms are named", () => {
+    const { container } = render(
+      <section aria-label="planted">
+        <p>{READ_ONLY_LEGEND}</p>
+        <button type="button">
+          <span>Gather sources</span>
+          <span>llm_agent</span>
+        </button>
+        <span>phase_index 3</span>
+      </section>,
+    )
+    const found = spineViolations(container)
+    expect(found).toContain("BS-MNR-01")
+    expect(found).toContain("BS-MNR-02")
+    expect(found).toContain("BS-MNR-03")
+    expect(found.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("POSITIVE CONTROL — it also catches a violation smuggled into a LINK's announced text", () => {
+    // 199-03's exact failure mode: a `queryAllByRole("button")` filter cannot see a link, and
+    // a source regex cannot see a control composed from a variable. The role SET can see both.
+    const { container } = render(
+      <section aria-label="planted-2">
+        <a href="/x" aria-label="phase_index 7 — jump">
+          jump
+        </a>
+      </section>,
+    )
+    expect(spineViolations(container)).toContain("BS-MNR-03")
+  })
+
+  it("POSITIVE CONTROL — a Material Symbols ligature is caught in BOTH of its shapes", () => {
+    const snake = render(
+      <section aria-label="planted-3">
+        <span className="material-symbols">chat_bubble</span>
+      </section>,
+    )
+    expect(spineViolations(snake.container)).toContain("BS-MNR-06")
+    snake.unmount()
+    const word = render(
+      <section aria-label="planted-4">
+        <span className="material-symbols">search</span>
+      </section>,
+    )
+    expect(spineViolations(word.container)).toContain("BS-MNR-06")
+  })
+
+  it("⚠ NEGATIVE CONTROL — the honest single word `person` in prose does NOT fire", () => {
+    // The spine's own footer reads `…, one person gate`. A needle that forbade that sentence
+    // would make this fence unusable, and an unusable fence gets loosened rather than obeyed.
+    const { container } = render(
+      <section aria-label="honest">
+        <p>3 steps, runs top to bottom, one person gate</p>
+      </section>,
+    )
+    expect(spineViolations(container)).toEqual([])
+  })
+
+  /** ⚠ PERMANENT NON-VACUITY CONTROL 2 — the honest shipped copy is CLEAN. */
+  it("the SHIPPED authoring render trips NOTHING in §2.2", () => {
+    const { container } = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug="gather" onSelectNode={vi.fn()} />,
+    )
+    expect(spineViolations(container)).toEqual([])
+    // NON-VACUITY: a real spine with three nodes and an on-fail edge, not an empty container.
+    expect(screen.getAllByTestId(/^spine-node-/)).toHaveLength(3)
+    expect(screen.getAllByTestId("skip-edge")).toHaveLength(1)
+  })
+
+  it("the shipped RUN-TENSE render trips nothing either — a second tense is a second surface", () => {
+    const NOW = Date.parse("2026-08-19T14:22:00.000Z")
+    const facts = phaseRunFacts(
+      {
+        slug: "gather",
+        status: "completed",
+        started_at: "2026-08-19T14:00:00.000Z",
+        completed_at: "2026-08-19T14:00:12.000Z",
+        step_count: 312,
+        step_noun: "sources",
+      },
+      "completed",
+      NOW,
+    )
+    const { container } = render(
+      <PhaseSpineGraph
+        phases={skipPhases}
+        selectedSlug={null}
+        onSelectNode={vi.fn()}
+        runTense={{
+          factsOf: (slug: string) => (slug === "gather" ? { ...facts, branchTaken: true } : undefined),
+          total: "Ran 4m 12s",
+        }}
+      />,
+    )
+    expect(spineViolations(container)).toEqual([])
+    // NON-VACUITY: the run tense really did render, so this is a clean READING and not a
+    // clean absence — the wave-3 failure shape (a fence reached with an empty queue).
+    expect(screen.getByTestId("spine-total-runtime").textContent).toBe("Ran 4m 12s")
+    expect(screen.getByTestId("skip-edge-reading")).toBeInTheDocument()
+  })
+
+  it("the `data-*` machine hooks are DELIBERATELY not swept — a hook is not a label", () => {
+    const { container } = render(
+      <PhaseSpineGraph phases={skipPhases} selectedSlug={null} onSelectNode={vi.fn()} />,
+    )
+    // The raw id survives where a machine needs it…
+    expect(
+      screen.getByTestId("spine-node-gather").getAttribute("data-phase-type"),
+    ).toBe("llm_agent")
+    // …and the fence is still clean, because that attribute is not text anyone reads.
+    expect(spineViolations(container)).toEqual([])
   })
 })

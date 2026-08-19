@@ -533,7 +533,45 @@ const BASELINE = {
   "TemplateNameCheck.test.tsx": 29,
   "WorkflowBuilderPage.test.tsx": 15,
   // 188-12: 14 → 20, inherited stale-low pin.
-  "PhaseSpineGraph.test.tsx": 20,
+  // ⚠ 200-05 Task 2 (DES-02 / `200-CHECKLIST.md` §2): 20 → 35, and the FIRST 4 of those 15 are
+  // DE-SLACKING, not new coverage. This file was running 24 while pinned at 20 — measured on
+  // the unmodified tree at this plan's base, where the gate printed
+  // `PhaseSpineGraph.test.tsx  20  24  +4`. **Four cases were deletable with the gate green**,
+  // and *"a pinned TOTAL rising proves nothing about the NEW cases, because slack inside an
+  // already-listed file absorbs them"* — so the slack is closed in the same commit that adds
+  // the eleven run-tense cases, rather than letting them hide inside it.
+  //
+  // ⚠ RAISING A PIN NECESSARILY DELETES A LINE, so a `grep -c '^-[^-]'` expecting 0 is WRONG
+  // for this hunk — unlike the two ADDED pins at the foot of this map, which are `+n / −0`.
+  //
+  // WHAT THE ELEVEN NEW CASES HOLD: the two halves of the optional-run-prop contract, and
+  // neither is sufficient alone. (1) ABSENT ⇒ the render is BYTE-IDENTICAL to the authoring
+  // one, compared as whole `innerHTML` rather than probed — that is 199-02's refusal (this
+  // component reads a DRAFT definition and has NO run, so a duration or a branch outcome on it
+  // is a FABRICATED claim) enforced by construction instead of remembered. (2) PRESENT ⇒ a
+  // DIFFERENT DOM, copied from `PhaseFormPanel.rails.test.tsx:125`, because a prop that changed
+  // nothing would pass (1) perfectly while being inert and nothing else would say so. Plus:
+  // `never ran (skipped)` and `time not recorded` proved DIFFERENT readings on the rendered
+  // spine; a declared `0` rendering while an ABSENT count renders no slot at all; and the
+  // branch reading as a THREE-state read whose absent arm renders nothing, because
+  // `branch not taken` would be a claim about a run nobody measured.
+  // ⚠ 200-05 Task 3: 35 → 42, the §2.2 `MUST NOT RENDER` fence. It is sited HERE rather than
+  // in `RunReceipt.test.tsx` (where that task's own file list put it) because a fence in an
+  // unrelated suite is one nobody re-reads when the guarded component changes — declared as a
+  // deviation in `200-05-SUMMARY.md`, not done quietly. It scans the RENDERED DOM plus the
+  // ANNOUNCED text and sweeps a ROLE SET, which is the only predicate `199-03` measured as
+  // able to fire (a `?raw` regex and a `queryAllByRole("button")` filter both passed GREEN
+  // against a live planted violation there). It carries FOUR permanent positive controls, a
+  // negative control proving the honest word `person gate` does not trip it, and TWO clean
+  // shipped renders — authoring AND run tense — each asserted non-vacuous, because wave 3's
+  // fence was reached and still wrote nothing on an empty queue. **It was driven against the
+  // real component**: the legend, the raw chip and the `phase_index` line were planted back
+  // into `PhaseSpineGraph.tsx`, the fence went RED naming `BS-MNR-01`, `BS-MNR-02` and
+  // `BS-MNR-03`, and the source was restored byte-exactly (md5 `f14a58d7…` before and after,
+  // `git diff --numstat` empty). ⚠ The plant also FALSIFIED the fence's own first draft: a
+  // word-boundary regex MISSED a real chip, because adjacent DOM text nodes concatenate with
+  // no separator (`Gather sourcesllm_agent`).
+  "PhaseSpineGraph.test.tsx": 42,
   // 189-13 (CONN-01 / UI-SPEC §5a): 14 → 17. An EXTENSION, not a lowering — the six
   // individual PHASE_GLYPHS key assertions were NOT collapsed into the new property, they
   // were kept and the seventh added beside them, because a property rewrite that shrank
@@ -2213,6 +2251,72 @@ const BASELINE = {
   // against REAL plants in `api.ts` first (a fourth declaration: 3 failed; one marker
   // deleted: 4 failed), each with an md5-verified restore.
   "apiRunFields.fences.test.ts": 12,
+  // ── Added in 200-05 Task 1 (DES-02 / D-06 / D-07 / D-09), in the SAME COMMIT that creates
+  //    both files, because *"an unpinned file is not a lightly-guarded one, it is an
+  //    UNGUARDED one"* (the 196-05 / 196-07 rule) and because a `BASELINE` key naming a path
+  //    that does not yet exist makes this gate ERROR (exit 2) rather than fail. ─────────────
+  //
+  // ⚠ ONE KNOB, NOT TWO, AND IT IS CHECKED RATHER THAN ASSUMED. Both files live under
+  // `src/components/workflows`, already a DIRECTORY entry in the `TARGETS` array below, so
+  // this gate EXECUTED both the moment they landed — the run that had no pin for them printed
+  // them as `— 31 new` and `— 16 new`, which is where these two numbers come from. **No
+  // `TARGETS` entry is added for either**; a second knob for a directory already covered is a
+  // duplicate, not a belt-and-braces.
+  //
+  // ⚠ BOTH FIGURES ARE READ FROM THIS SCRIPT'S OWN `actual` COLUMN — never hand-counted from
+  // `it(` literals, never quoted from a plan document. That run's verdict lines, verbatim:
+  //     phaseDuration.test.ts                         —      31     new
+  //     receiptVocabulary.test.ts                     —      16     new
+  //     total                                      4589    5047    +458
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THESE TWO PINS — the invariant each one carries:
+  //   · `phaseDuration.test.ts` (31) — D-06's NINE discriminated arms, and specifically that
+  //     `never ran (skipped)` and `time not recorded` are DIFFERENT SENTENCES. Folding an
+  //     absence together with a negative is the defect this repo has now shipped twice
+  //     (`runFacts.ts` CR-01 printed *"Never run"* about workflows that had really run;
+  //     `DecisionsList` D-20 rendered an absent readiness as a pass), and **a boolean cannot
+  //     express it** — `never ran` / `not reached` / `time not recorded` are three facts that
+  //     all have "no duration to show". It also pins IDIOM-3 (a declared `0` renders while an
+  //     ABSENT count renders nothing at all — never `0`, never a dash) with a POSITIVE CONTROL
+  //     reproducing the coalesce that destroys the distinction, and the WR-04 own-property
+  //     guard on a `constructor`-slugged phase, whose control proves the bare bracket read
+  //     really does hand back a function.
+  //   · `receiptVocabulary.test.ts` (16) — that this module IMPORTS NOTHING FROM THE LIBRARY
+  //     SUBTREE. ⚠ That is not a duplicate of the library's own 14-path fence: importing its
+  //     vocabulary from OUTSIDE the subtree would not TRIP that fence, it would BREAK its
+  //     contract (`LIBRARY_SUBTREE_PATHS` would stop describing the subtree's blast radius),
+  //     so nothing over there can catch it and only this suite can. It also pins the
+  //     zero-glyph rule, the TRUE-LEAF (zero imports) property, exact-match values for every
+  //     governed id, and the inequality against every one of `runVocabulary.ts`'s LOCKED
+  //     canvas words — asserted AFTER a non-vacuity check on that comparison set, because a
+  //     negative against an empty set passes while proving nothing.
+  "phaseDuration.test.ts": 31,
+  "receiptVocabulary.test.ts": 16,
+  // ── Added in 200-05 Task 3, in the SAME COMMIT that creates the file. Same one-knob check
+  //    as the two pins above: `src/components/workflows` is already a `TARGETS` directory
+  //    entry, so the gate RAN this suite the moment it existed and printed it as `— 20 new`.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT IT:
+  //   · D-07 REACHING THE DOM. A step that declared NO count renders NO count slot at all —
+  //     never `0`, never a dash, never prose. N-8 records that the sketch's own run surface
+  //     puts the SENTENCE `Summarized meeting notes` where the COUNT `Found 12 contracts`
+  //     goes, which is exactly the fabricated-figure failure D-07 exists to prevent, and
+  //     `199-05` called that class *"the highest-consequence lie this phase could ship."* A
+  //     DECLARED `0` is the opposite case and renders, because it is a measurement.
+  //   · D-06 reaching the DOM as TWO readings: `never ran (skipped)` and `time not recorded`
+  //     asserted DIFFERENT on both the time column and the outcome column.
+  //   · that the total runtime is derived from the PHASE TIMESTAMPS — proved by rendering the
+  //     same rows at two `now`s nine million ms apart and comparing the headers, which a
+  //     `claimed_at`- or `Date.now()`-anchored figure could not survive.
+  //   · ⚠ THAT THE COMPONENT IS MOUNTED NOWHERE. An `import.meta.glob` `?raw` sweep of
+  //     `/src/**` asserts zero importers outside its own two files, with a positive control
+  //     proving the needle finds a real mount. That is what keeps `199-02`'s refusal intact
+  //     BY CONSTRUCTION — a receipt that cannot reach the builder cannot fabricate a run-tense
+  //     claim on a draft — and `200-07` is the plan that mounts it.
+  //   · that the component spells NO user-visible string: a JSX text-position literal sweep
+  //     with its own positive control, plus the `aria-label` proved to come from the
+  //     vocabulary — an `aria-label` IS user-visible text, just not to a sighted reviewer.
+  "RunReceipt.test.tsx": 20,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

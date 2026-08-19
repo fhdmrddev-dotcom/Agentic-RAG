@@ -2448,6 +2448,134 @@ of defect as the sketch README's own `(4/12)`.
 Removed — and a repo-wide grep measured **zero** assertions on it *before* it was spent, so the
 removal could be proved rather than hoped.
 
+#### ⚠ 200-05 — the triple RE-DERIVED, and the refusal above now ENFORCED rather than remembered
+
+Re-derived with CLAUDE.md's own recipe at this plan's close: **`5 / 5 / 473`**. The row read
+`4 / 4 / 278` — stale by **1 commit / 1 phase / 195 lines**, and stale *before* this plan started,
+because `200-01` re-derived it into `200-CHECKLIST.md` §6.6 as `4 / 4 / 278` on the same day.
+**Honoured by construction (200-05); no override.**
+
+⚠ **THE PARAGRAPH ABOVE IS UNCHANGED AND STILL BINDING — what changed is that it is now a
+mechanism instead of a memory.** The component still reads a DRAFT definition and still has no run.
+CONTEXT contradicted itself on this (`<canonical_refs>`: the spine has no run; `<specifics>`: the
+slice *"clears the spine's per-step timings"*), and **D-09 is the reconciliation: one component, two
+tenses.** The run tense arrives through a single OPTIONAL `runTense` prop — this file's own
+`nameContext?` pattern, and the house pattern three times over — and **an absent prop leaves the
+authoring render BYTE-IDENTICAL**, asserted as whole `innerHTML` rather than probed. The authoring
+mount (`WorkflowBuilderPage.tsx:2136`) passes nothing and is unchanged; the run mount is `200-07`'s.
+
+⚠ **BOTH HALVES ARE NEEDED AND NEITHER IS SUFFICIENT.** *Absent ⇒ byte-identical* would pass
+perfectly against a prop that did nothing, so a second case pins that the present render is **NOT the
+same DOM** (`PhaseFormPanel.rails.test.tsx:125`'s assertion, copied for its reason).
+
+**THREE SUBTRACTIONS, each proved by an INVERTED assertion rather than a deleted one** (`192.2-05`):
+
+- **`BS-MNR-01` — the `READ_ONLY_LEGEND` no longer renders, and this DELIBERATELY REVERSES
+  `DEC-199-02-F`.** That decision kept it, in writing: *"it is a LOCKED SKETCH CONTRACT and it is
+  asserted in four places … Re-opening it is a phase, not a re-presentation."* This is that phase.
+  ⚠ **The CONSTANT stays exported and the scan is of the RENDERED DOM, never the source** — a `?raw`
+  scan would go red on the export while proving nothing about what a person sees, and a deliberate
+  absence must not trip its own fence. Its four assertion sites are **re-pointed, not deleted**: one
+  here plus three in `pages/WorkflowBuilderPage.test.tsx`, where the legend was how the graph view's
+  PRESENCE was detected. ⚠ **Two of those three were NEGATIVE probes and would have kept passing
+  against a string that no longer exists anywhere** — measuring nothing, which is the worst outcome
+  available. All three now probe the spine's landmark `aria-label`.
+- **`BS-MNR-02` — the raw `phase_type` chip, INCLUDING inside the `aria-label`.** ⚠ An `aria-label`
+  is not invisible text; leaving the schema token there would have removed the chip **from sighted
+  readers only**. Its replacement is `PHASE_TYPE_LABELS` — the canvas's own words, imported, so the
+  tree still holds ONE spelling. The raw id survives on `data-phase-type`, which is a machine hook.
+- **`BS-MNR-03` — the rendered `phase_index N` label.** ⚠ **The FIELD is untouched**: it is the
+  ordering key, and two source assertions now pin that the sort and the 1-based ordinal still read it.
+
+⚠ **THE §2.2 `MUST NOT RENDER` FENCE WAS DRIVEN, NOT WRITTEN.** The legend, the raw chip and the
+`phase_index` line were planted back into this component; the fence went **RED naming
+`BS-MNR-01`, `BS-MNR-02` and `BS-MNR-03`**; the source was restored **byte-exactly** (md5
+`f14a58d7…` before and after, `git diff --numstat` empty). ⚠ **The plant also falsified the fence's
+own first draft** — a word-boundary regex MISSED a real chip, because adjacent DOM text nodes
+concatenate with no separator (`Gather sourcesllm_agent`). It scans rendered **and announced** text
+and sweeps a **ROLE SET**, which is the only predicate `199-03` measured as able to fire.
+
+**Next seam named rather than left `honoured` with no successor:** the node face itself. The `<li>`
+now carries a glyph, a title, a type word, an optional model and an optional four-part run reading —
+five concerns in one `map` body, and the run half is entirely separable as a `SpineNodeRunLine` leaf.
+**Re-open trigger:** *the next phase that adds a sixth atom to the node face.*
+
+### frontend/src/components/workflows/phaseDuration.ts
+
+The ONE place a wire truth becomes a rendered duration fact — D-06's **nine** discriminated arms, one
+reading per row (D-09's own shape, where `1.8s` and `never ran (skipped)` occupy the SAME slot).
+Created by `200-05`; listed **below the G-5 threshold on purpose** (the `fileIcon.tsx` precedent),
+because a file escapes G-5 by not being written down.
+
+⚠ **IT IS A SEPARATE LEAF FOR A MEASURED REASON.** The other candidate home,
+`panel/phaseStatusMeta.ts`, is **UNPINNED** — no dedicated suite, exercised only transitively — and
+these are the highest-consequence arms in the phase. A new leaf is pinned in the commit that creates
+it (`196-05`/`196-07`: *"an unpinned file is not a lightly-guarded one, it is an UNGUARDED one"*).
+
+⚠ **ABSENCE GETS ITS OWN ARM, AND THIS REPO HAS NOW GOT THAT WRONG TWICE.** `never ran (skipped)`,
+`not reached` and `time not recorded` are THREE different facts that all have *"no duration to show"*,
+so a `hasDuration` bit folds all three into one answer — `runFacts.ts` shipped that once (CR-01,
+printing *"Never run"* about workflows that really had run) and `DecisionsList` shipped it once
+(D-20). ⚠ **Two arms were added by MEASUREMENT rather than by the sketch:** `active` under a TERMINAL
+run reads `did not finish` (RESEARCH §B4 — the engine only terminalizes on a cancellation, so a crash
+leaves that row and it would otherwise tick FOREVER, `BUG-260610-01`'s symptom re-created by the
+surface built to fix it), and `active` under a **PAUSED** run gets its own words — the state
+`200-03`'s `pause_run` created, and it must never be spelled *stopped*, *failed* or *waiting to start*.
+
+⚠ **`0` IS A FACT.** `typeof === "number"`, never a coalesce and never a truthiness test; the two
+forbidden shapes are reproduced ONCE, in the suite's positive control, which shows they really do
+collapse the two answers. ⚠ **The slug map is a PLAIN object literal read through `own()`**, so the
+guard is load-bearing rather than decorative — a null-prototype map would remove the hazard silently
+and leave the mitigation unfalsifiable. ⚠ **It grows no second DB-status mapping** (`phaseStatusFromDb`
+is the one) and **no fourth elapsed formatter** (`@/lib/fmtElapsed`).
+
+### frontend/src/components/workflows/receiptVocabulary.ts
+
+The run receipt's ONE string home — a TRUE leaf, zero imports, zero glyphs. Created by `200-05`;
+listed below the threshold on purpose.
+
+⚠ **D-09 SAYS THE PAST-TENSE WORDS COME FROM THE LIBRARY VOCABULARY'S REGISTER, AND THAT SENTENCE
+INVITES EXACTLY ONE WRONG READING.** It means the REGISTER — the tone — never the MODULE. That module
+is fenced to its own subtree by an explicit 14-path list, and importing it from outside would not
+**trip** that fence, it would **BREAK its contract** (`LIBRARY_SUBTREE_PATHS` would stop describing
+the subtree's blast radius) — so nothing over there could catch it, and only this module's own suite
+can. **Copy the tone, import nothing.**
+
+⚠ **THE FORBIDDEN MODULE AND DIRECTORY ARE NOT SPELLED ANYWHERE IN THE FILE**, and that is the 187-24
+rule rather than coyness: the suite counts both needles over this source, and the first draft of the
+docblock made its own guard read **3** instead of **0**. The same trap fired a second time in
+`phaseDuration.ts`, whose prose quoted the zero-coalesce its acceptance grep looks for.
+
+It duplicates **none** of `runVocabulary.ts`'s locked canvas words — different AUDIENCE (a whole PAST
+run vs one step being watched) — and the suite asserts that as an inequality **after** a non-vacuity
+check on the comparison set, because a negative against an empty set passes while proving nothing.
+⚠ `RECEIPT_KNOWN_COUNT_NOUNS` is a **documented expectation, never a render source**: the noun is
+AUTHORED at one executor site and arrives on the wire, and validating against this list would create
+the second home §5.1 forbids.
+
+### frontend/src/components/workflows/RunReceipt.tsx
+
+The past-tense spine — D-09's *"same spine re-read"*, not a third surface. Created by `200-05`; listed
+below the threshold on purpose.
+
+⚠ **IT IS MOUNTED NOWHERE AT ITS CREATING COMMIT, AND THAT IS LOAD-BEARING TWICE.**
+`WorkflowRunPage.tsx` is `200-07`'s primary file, so mounting from here would put two plans in one
+file in one wave; and a receipt that cannot reach the builder **cannot fabricate a run-tense claim on
+a draft definition**, which keeps `199-02`'s refusal intact by construction rather than by care. An
+`import.meta.glob` `?raw` sweep of `/src/**` asserts zero importers, with a positive control proving
+the needle finds a real mount.
+
+⚠ **IT SPELLS NO USER-VISIBLE STRING**, including its `aria-label` — an `aria-label` IS user-visible
+text, just not legible to a sighted reviewer, which makes it the harder drift to notice rather than
+the lesser one. It takes no run-tense decision of its own either: `declaredCount` and `phaseRunFacts`
+are the only sources, because a second `typeof step_count === "number"` here would be a second place
+to get D-07 wrong.
+
+⚠ **ROW ORDER IS THE SERVER'S** (the D-17/D-18 fence the library feeds carry) — a client-side re-sort
+is a second ordering authority, and two authorities disagree eventually. ⚠ **The deliverable is the
+CALLER's and optional:** nothing on `workflow_phases` says which file a step produced, so an absent
+answer renders nothing and a BLANK answer is an absence too.
+
 ### frontend/src/components/workflows/doorVocabulary.ts
 
 The two authoring doors' ONE string home. **Absent, and exactly at the G-5 threshold** — the
