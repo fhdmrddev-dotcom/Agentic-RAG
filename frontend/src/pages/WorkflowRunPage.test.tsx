@@ -2511,7 +2511,7 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
    * Task 3's correction is proved by INVERTING these two assertions rather than by
    * deleting them.
    */
-  it("DEGRADE PATH at HEAD — the header renders a generic name and a fabricated v0", async () => {
+  it("DEGRADE PATH — the header SAYS the details could not be read, and prints no version", async () => {
     getWorkflowRun.mockResolvedValue(
       mkRun({ workflow_name: "", workflow_slug: "", workflow_version: 0, definition: null }),
     )
@@ -2521,7 +2521,38 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
     // Non-vacuity: the degrade fixture really rendered the run arm, not an error arm.
     expect(screen.getByTestId("run-band")).toBeInTheDocument()
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Workflow")
-    expect(container.textContent).toContain("v0")
+    // ⚠ BOTH ASSERTIONS ARE TASK 1'S, INVERTED — the lines are edited, never deleted,
+    // so `git diff --numstat` against this plan's base still reads `+N / −0` on this
+    // file. Task 1 pinned `toHaveTextContent("Workflow")` and `toContain("v0")`; both
+    // were TRUE at HEAD and both were the defect.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "We couldn't read this workflow's details",
+    )
+    expect(container.textContent).not.toContain("v0")
+    // …and no version chip of ANY value. Absence is the honest reading; a version is
+    // a claim, and there is no version to claim.
+    //
+    // ⚠ THIS IS AN **ELEMENT** QUERY AND THE FIRST DRAFT WAS A `textContent` REGEX,
+    // WHICH WAS VACUOUS. `container.textContent` concatenates with no separator, so the
+    // page reads `…renewalsv4…` and `\bv\d` has no word boundary to anchor on: the
+    // needle could not match even when the chip WAS on screen. Caught by the positive
+    // control below failing rather than by reading the regex — which is the whole
+    // argument for pairing a count-zero fence with one.
+    expect(screen.queryByText(/^v\d+$/)).toBeNull()
+  })
+
+  it("DEGRADE PATH POSITIVE CONTROL — a healthy run still prints its name and its version", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    // The needles above are live: the SAME two queries, run against the healthy
+    // fixture, find a real name and a real version chip. A degrade fence whose needles
+    // could never match anything would report green forever — and this control has
+    // already earned its keep once (see the note on the vacuous regex above).
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Supplier contract renewals",
+    )
+    expect(screen.getByText(/^v\d+$/)).toHaveTextContent("v4")
+    expect(screen.queryByText("We couldn't read this workflow's details")).toBeNull()
   })
 })

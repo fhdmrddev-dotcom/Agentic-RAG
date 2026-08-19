@@ -110,6 +110,34 @@ const COPY_BROKEN_HEAD = "We couldn't load this run."
 const COPY_BROKEN_BODY = "Something went wrong on our side. Nothing about the run has changed."
 const COPY_BACK = "‹ Back to Workflows"
 const COPY_OPEN_THREAD = "Open the chat thread"
+/**
+ * ⚠ PHASE 199 PLAN 07 (sheet `c8-run-panel`, the "unknown values SAY so" rule) —
+ * THE DEGRADE PATH'S HONEST HEADLINE, AND A CORRECTION TO TWO SHIPPED CLAIMS.
+ *
+ * `WorkflowRunRead`'s docblock records the server's degrade path verbatim: *"if the
+ * definition row cannot be read, the server returns `workflow_name: ""` /
+ * `workflow_slug: ""` / `workflow_version: 0` / `definition: null` rather than
+ * 404ing. Treat an empty `workflow_name` as 'definition unavailable', **never render
+ * the empty string**."* And this file's own `specs` memo claims *"the header says so
+ * by way of the empty name."*
+ *
+ * ⚠ MEASURED AT HEAD, BOTH CLAIMS WERE FALSE, and `199-07`'s Task-1 pin recorded the
+ * readings before they were touched. The header rendered `{workflow_name || "Workflow"}`
+ * — the generic word `Workflow`, a plausible-looking DEFAULT — and beside it `v0`, a
+ * fabricated version number that looks exactly like a real one. Neither is the empty
+ * string, so the letter of the rule was kept while its whole point was lost: **a
+ * plausible wrong value is worse than a blank**, because a blank at least invites a
+ * question.
+ *
+ * The voice is this file's own (`COPY_BROKEN_HEAD` = *"We couldn't load this run."*).
+ * It is deliberately about the WORKFLOW's details and not about the run: the run is
+ * fine — it has a status, an elapsed figure and its deliverables — and only the
+ * definition it was drawn from could not be read.
+ *
+ * ⚠ THE VERSION CHIP IS OMITTED IN THIS ARM RATHER THAN REWORDED. There is no honest
+ * version to print, and absence is the honest reading; `v0` is a claim.
+ */
+const COPY_NAME_UNAVAILABLE = "We couldn't read this workflow's details"
 /** The queued reading. Used in BOTH the run band and the elapsed slot, from one
  *  constant, so the two can never word the same fact differently. */
 const WAITING_TO_START = "Waiting to start"
@@ -603,7 +631,13 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
 
   /** The definition's step specs — the version that RAN (D-188-14), read defensively:
    *  a definition the server could not load degrades to an empty spine rather than a
-   *  throw, and the header says so by way of the empty name. */
+   *  throw, and the header says so by way of the empty name.
+   *
+   *  ⚠ 199-07 — THAT LAST CLAUSE WAS FALSE WHEN WRITTEN, and it is corrected BESIDE the
+   *  original rather than over it (this project's standing rule). The header did NOT
+   *  say so: it rendered the generic word `Workflow` and a fabricated `v0`. It says so
+   *  NOW — see `COPY_NAME_UNAVAILABLE` and the header's single sentinel read — so the
+   *  sentence above is true as of this commit and was not true before it. */
   const specs = useMemo<PhaseSpecJSON[]>(() => {
     const raw = (run?.definition as { phases?: unknown } | null | undefined)?.phases
     return Array.isArray(raw) ? (raw as PhaseSpecJSON[]) : []
@@ -923,10 +957,17 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           Workflows
         </button>
         <div className="flex items-center gap-3">
+          {/* ⚠ 199-07: ONE reading of "the definition could not be read", taken from the
+                server's OWN documented sentinel (the empty name), and used for BOTH the
+                headline and the version chip. Two independent tests here would let the
+                two atoms disagree — an honest title beside a fabricated `v0` is exactly
+                the half-corrected state this fix exists to avoid. See COPY_NAME_UNAVAILABLE. */}
           <h1 className="font-headline text-xl font-semibold leading-tight text-foreground">
-            {run?.workflow_name || "Workflow"}
+            {run?.workflow_name || COPY_NAME_UNAVAILABLE}
           </h1>
-          <span className="font-mono text-xs text-muted-foreground">v{run?.workflow_version}</span>
+          {run?.workflow_name ? (
+            <span className="font-mono text-xs text-muted-foreground">v{run.workflow_version}</span>
+          ) : null}
           {/* ── THE STOP (Phase 194.1 Plan 07 / R3 / D-19) ──────────────────────────────
                 SKETCH 169-A, chosen over the sketch's OWN lean toward B, and the reason is
                 a measurement rather than taste: `isTerminal` (:604) is a component-level
