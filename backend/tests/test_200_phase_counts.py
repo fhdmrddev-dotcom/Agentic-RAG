@@ -61,6 +61,13 @@ from unittest.mock import patch
 
 import pytest
 
+# D-13 (Phase 200): ``_exec_llm_human_input`` moved to
+# ``app.services.harness.human_input``, and its module-global
+# ``subscribe_for_response`` moved WITH it — so the patch target is the new
+# home, not ``phase_types``. Patching the old module now patches a name the
+# executor no longer reads (measured: 5 failures + one HANG).
+from app.services.harness import human_input as _human_input_home
+
 
 MEASURE = "_measure"
 
@@ -319,7 +326,7 @@ async def test_llm_human_input_emits_no_measure_key():
     )
     ctx = _ctx(emit=_fake_emit, redis=object(), supabase=None)
 
-    with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+    with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
         out = await phase_types._exec_llm_human_input(phase, {}, ctx)
 
     assert MEASURE not in out, (

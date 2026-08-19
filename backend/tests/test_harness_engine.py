@@ -10,6 +10,13 @@ Every skip names the owning plan so the contract is greppable.
 from __future__ import annotations
 
 import pytest
+
+# D-13 (Phase 200): ``_exec_llm_human_input`` moved to
+# ``app.services.harness.human_input``, and its module-global
+# ``subscribe_for_response`` moved WITH it — so the patch target is the new
+# home, not ``phase_types``. Patching the old module now patches a name the
+# executor no longer reads (measured: 5 failures + one HANG).
+from app.services.harness import human_input as _human_input_home
 from pydantic import ValidationError
 
 from app.models.harness import (
@@ -733,7 +740,7 @@ class TestPhaseExecutors:
 
         phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
                         "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert out["text"] == "Which doc?"
         assert out["answer"] == "Doc B"
@@ -754,7 +761,7 @@ class TestPhaseExecutors:
 
         phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
                         "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert out["answer"] == "Doc B"
 
@@ -769,7 +776,7 @@ class TestPhaseExecutors:
 
         phase = _phase({"phase_type": "llm_human_input", "prompt": "Which doc?",
                         "options": ["Doc A", "Doc B"], "timeout_seconds": 300})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert out["answer"] == ""
 
@@ -787,7 +794,7 @@ class TestPhaseExecutors:
         # Request way above the 1800s hard cap.
         phase = _phase({"phase_type": "llm_human_input", "prompt": "?",
                         "timeout_seconds": 99999})
-        with patch.object(phase_types, "subscribe_for_response", _fake_subscribe):
+        with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
             out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert captured["timeout"] == settings.ask_user_max_timeout_seconds
         assert out["answer"] == ""  # no response on timeout

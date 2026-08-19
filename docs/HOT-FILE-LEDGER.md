@@ -290,6 +290,89 @@ one module per executor under `harness/phase_types/`, still stands and was not t
 4. **No 25th `harness_audit` kind was added and no migration ships.** `_AUDIT_EVENT_TYPES` is byte-unchanged;
    the substitution reuses `policy_applied`, which already means exactly this event.
 
+---
+
+### Phase 200 (plan `200-03`) — ⚠ **EXTRACTION TAKEN.** The named seam is opened, and its FIRST module is the one that had a bug
+
+**RE-DERIVED 2026-08-19 by plan `200-03`: `40 commits / 17 phases / 2497 L` BEFORE the cut, `2356 L` after**
+(was `39 / 16 / 2424` in the cell above, and `200-CHECKLIST.md` §6.6 row 7 published that same
+`39 / 16 / 2424` as this phase's own baseline). ⚠ **Both were stale before the plan that quotes them ran** —
+`200-02` landed on this file earlier in the SAME PHASE and moved it to `40 / 17 / 2497`. This ledger's most
+repeated finding, reproducing inside a single phase this time rather than across days. Six-digit dated
+quick-task buckets: **checked, none exist** on this file (the 17 buckets are 091 092 093 096 098 099 101
+101.1 102 104 120 141 185 189 190 196 200).
+
+**THE SEAM NAMED SINCE 2026-08-08 IS NOW OPEN.** Both prior clearances (190, 196) recorded the same
+successor verbatim — *"one module per executor under `harness/phase_types/`"* — and both declined to take
+it because the change in hand added a call-out rather than a concern. `200-03` takes it, for a reason
+neither of those phases had: **the human-input executor needed a behaviour change anyway** (D-10 /
+`BUG-260816-06` — a 300 s timeout returned `answer: ""` and the run advanced as though the person had
+approved), so the extraction is the VEHICLE for its own fix rather than a refactor competing with one.
+**ONE of the seven executors is out; SIX REMAIN**, and the seam keeps its name.
+
+**The shape: a MOVE plus an IMPORT-BACK, never a MOVE plus N edits** — the
+`app.api.threads` → `app.services.run_transport` precedent (2026-08-17), applied here to
+`backend/app/services/harness/human_input.py` (202 L). `phase_types.py`'s whole diff is
+**`+3 / -144`**, and the three additions are one blank line, one banner comment and one import;
+`git diff -U0 | grep -c '^+[^+]'` → **2**. `PHASE_TYPE_REGISTRY_ENTRIES`' `"llm_human_input"` entry is
+**character-identical** (only its line number moved), and so is `_external_action_inputs`' call to
+`_latest_phase_text`.
+
+**The four proofs, all executed rather than asserted:**
+
+1. **Byte-identical move** — driven by a script that asserted NINE pre-move line boundaries first and
+   aborts on drift, then diffed the moved text against `git show HEAD:…`'s extract:
+   `BYTE-IDENTICAL: _exec_llm_human_input (129 lines)` · `BYTE-IDENTICAL: _latest_phase_text (11 lines)`.
+2. **One object, not two** —
+   `phase_types._exec_llm_human_input is human_input._exec_llm_human_input` (and the same for
+   `_latest_phase_text`).
+3. **That identity assertion was DRIVEN RED against a real plant** — a duplicate `def` appended to
+   `human_input.py` flipped it to `False`, and a planted `from app.services.harness import phase_types`
+   flipped the no-back-edge check to a non-zero count. *An identity assertion that has never been shown
+   to fail is not evidence.* Both plants were removed.
+4. **The full `tests/unit` FAILURE SET is byte-identical in BOTH directions** — `comm` over the sorted
+   failing node ids against the pre-cut baseline: **zero newly-failing and zero newly-passing** (62 / 2350).
+
+⚠ **THE LEAF INVARIANT IS STATED AT ITS REAL STRENGTH, NOT ITS ASPIRATIONAL ONE.** The precedent's red
+line is *"the moment it imports anything from `app.`, the cycle it was created to dissolve comes back"* —
+**that is NOT achievable for this cut**, because the moved function needs `settings`,
+`subscribe_for_response` and `aexec`. So the binding invariant is the weaker, TRUE one: **`human_input.py`
+must never import `phase_types` back.** That is the cycle that actually exists.
+⚠ The naive guard for it is WRONG and was corrected on measurement: `grep -c "phase_types" human_input.py`
+returns **6**, all of them PROSE in the module docblock naming where the code came from — exactly what the
+precedent's own docblock does. The guard that means something is
+`grep -cE '^\s*(from|import)\s+.*phase_types'` → **0**, and it was driven RED. A guard that fires on a
+docblock is the `PhaseFormPanel.test.tsx` trap, and it would have forced the provenance out of the file.
+
+⚠ **`_latest_phase_text` HAS TWO CALLERS, NOT ONE — RESEARCH §B9's grep was STALE and the correction is
+the point, not a tidy-up.** §B9 measured `grep -c` → 2 (the def plus one call) and concluded *"it is used
+only here"*; at HEAD it is **3** — `_exec_llm_human_input` AND `_external_action_inputs` (the 189
+executor). Moving it is still correct (leaving it would have created the one forbidden edge), and the
+second caller keeps working through the re-import unchanged. **"Used only here" is exactly the kind of
+claim that decides an extraction's shape**, which is why the stale reading is recorded rather than
+silently replaced.
+
+⚠ **THE PATCH SURFACE MOVES WITH THE FUNCTION, AND NINE SHIPPED TEST SITES HAD TO BE REPOINTED IN THE
+SAME COMMIT.** `subscribe_for_response` is a module GLOBAL of whichever module hosts the executor, so
+`patch.object(phase_types, "subscribe_for_response", …)` after the move patches a name nothing reads.
+**Measured before repointing, never assumed:** `test_harness_engine.py` → **4 failed**,
+`test_200_phase_counts.py` → **1 failed**, and `test_dual_mode_wiring.py` → **HUNG OUTRIGHT** (the real
+block primitive against a fake redis). Repointed in `test_harness_engine.py` (×4),
+`test_200_phase_counts.py`, `test_harness_templates.py`, `test_096_ci_workflow_regression.py` (×1 patch
++ ×1 docblock) and `test_dual_mode_wiring.py`. **This is the one category the precedent's "consumers were
+deliberately not repointed" rule does NOT cover**, and the next executor cut will meet it again.
+
+⚠ **THE CHARACTERIZATION PIN PREDATES THE CUT AND PASSED WITH A NUMSTAT OF NOTHING.**
+`backend/tests/test_200_human_input_baseline.py` was committed ONE COMMIT EARLIER (`192.2-02`'s
+discipline) and is **MOVE-INVARIANT BY CONSTRUCTION**: it resolves its patch target from the executor's
+own `__module__` rather than spelling a module name, which is why it — alone among the pinning files —
+needed no edit. **A baseline taken after the edit proves the edit against itself.**
+
+**The next seam, named rather than left `satisfied` with no successor:** the remaining SIX executors,
+same shape — `llm_emit` is the strongest candidate (the fill/render path is the file's second-largest
+concern and its only one with an external template dependency).
+
+
 ⚠ **The plan's own line budget was MISSED and is recorded as a miss rather than reinterpreted:** *"fewer than
 40 changed lines"* against **39 insertions / 47 total**. The budget was computed against a site inventory that
 turned out to be wrong (invariant 1 above); the SHAPE criterion G-5 actually cares about is met.
