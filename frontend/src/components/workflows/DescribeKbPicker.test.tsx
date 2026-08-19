@@ -133,8 +133,6 @@ async function openChooser(): Promise<HTMLSelectElement> {
   return (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
 }
 
-/** The sheet's arm 2 — what a chosen knowledge base looks like now. */
-const chosenRow = () => screen.queryByTestId("describe-kb-chosen")
 
 // ── 1. The happy path: one select, "none" first, value reflects the prop ──────
 
