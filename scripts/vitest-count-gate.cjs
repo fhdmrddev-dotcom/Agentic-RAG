@@ -1072,7 +1072,27 @@ const BASELINE = {
   // observed RED — most sharply PLANT N ("the not-sent word must not be Complete"), which
   // is this phase's stated failure mode. Read from this script's own `actual` column.
   // ⚠ Moved in the SAME COMMIT as the tests (S2).
-  "PhaseTimeline.test.tsx": 17,
+  // ── RAISED IN 200-07 (DES-02, `200-CHECKLIST.md` §4): 17 → 35 ─────────────────────────
+  //
+  // ⚠ THE RAISE IS `+18` AND ONLY `+7` OF IT IS THIS PLAN'S. The other ELEVEN were ALREADY
+  // RUNNING against a pin of 17 — this gate printed `PhaseTimeline.test.tsx  17  28  +11`
+  // on the unmodified tree, an owed re-pin that has been carried since 190-12 (which
+  // recorded it at `17 / 21, +4` and deliberately did not take it). **De-slacking is closed
+  // in the SAME commit that adds the new cases**, because the gate's own §187-29 correction
+  // says why it has to be: *"a pinned TOTAL rising proves nothing about the NEW cases,
+  // because slack inside an already-listed file absorbs them."* Eleven cases were deletable
+  // with this gate green.
+  //
+  // The seven new ones are the panel half of the run surface: the durable per-step reading
+  // and the declared count rendered from the FETCHED rows, an absent row rendering NOTHING
+  // (which is not `time not recorded`), the fetch-authoritative re-read on a status
+  // transition, `did not finish` on an active row under a terminal run, `never ran` vs a
+  // historic row proved distinct IN ONE RENDER, a `constructor`-slugged phase, and the
+  // zero-re-derivation fence over both panel sources.
+  //
+  // Read from this script's own `actual` column across two agreeing runs, never hand-counted
+  // from `it(` — this suite carries `it.each` blocks whose case count is not its `it(` count.
+  "PhaseTimeline.test.tsx": 35,
   // 188 code-review fix pass (CR-06): 12 → 17. An EXTENSION, not a lowering. The five
   // added cases falsify the fail-open that survived ONE FUNCTION AWAY from the one 188-02
   // closed: the live branch's `i < current ? "done"` painted a `skipped` row Complete (or
@@ -1194,7 +1214,27 @@ const BASELINE = {
   //       (`WorkflowRunPage.test.tsx  105  108  +3`), never hand-counted from `it(`
   //       literals, and raised in the SAME COMMIT as the tests — a lagging pin is the
   //       gate going blind (the 195-03 incident, corrected again in 195-05).
-  "WorkflowRunPage.test.tsx": 108,
+  // ── RAISED IN 200-07 (DES-02, `200-CHECKLIST.md` §4): 108 → 137 ───────────────────────
+  //
+  // ⚠ `+29`, of which `+25` is this plan's and `+4` was PRE-EXISTING SLACK (`108 → 112` on
+  // the unmodified tree). Closed here, per the §187-29 correction on the two entries above.
+  //
+  // The twenty-five, by row id: the receipt MOUNTED and named by the same `nodeTitle` the
+  // canvas paints and reachable from no other surface (`RS-MR-05` ×3); the phase-derived
+  // total runtime, its `claimed_at`-null independence, its worded absence, its remount
+  // stability and its deliberate distinctness from the header figure (`RS-MR-03` ×5); D-06's
+  // arms read through the receipt (`RS-MR-02`/`RS-MR-04` ×3); fetch-authoritative over a
+  // stale live slice, and an empty durable read (×2); the count's supply line into the
+  // canvas, an absence forwarded as an absence, a declared `0`, and the noun passed verbatim
+  // (`RS-MR-01`/`RS-MNR-03` ×4); D-17 DRIVEN as a green row plus the receipt opening no
+  // file-content path (`RS-MR-06`/`RS-MNR-07` ×2); the §4.2 fence with its two PERMANENT
+  // controls and both real renders (×4); and the two REPORT rows recorded as executable
+  // cases rather than as SUMMARY prose (`RS-3b`, `RS-1` ×2).
+  //
+  // ⚠ THIS SUITE IS ONE OF `SEED-171`'s FIVE FLAKY SUITES. It read `failed 0` on every
+  // invocation across this plan and the gate never redded — recorded as an OBSERVATION, not
+  // as proof of innocence. One green sample of a flaky suite is not proof of anything.
+  "WorkflowRunPage.test.tsx": 137,
   // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
   // ── number below is this script's own printed `actual` column across TWO agreeing ────
   // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
@@ -2232,7 +2272,51 @@ const BASELINE = {
   // positive control asserting the default arm STILL catches a genuinely unknown value as
   // "Working" (+1). ⚠ That control is load-bearing: without it, a `model_fallback` riding the
   // default arm would pass the first case and this pin would be guarding nothing.
-  "PhaseCard.test.tsx": 27,
+  // ── RAISED IN 200-07 (DES-02, `200-CHECKLIST.md` §4): 27 → 41 ─────────────────────────
+  //
+  // ⚠ `+14`, of which `+9` is this plan's and `+5` was PRE-EXISTING SLACK — this gate printed
+  // `PhaseCard.test.tsx  27  32  +5` on the unmodified tree. Closed in the same commit as
+  // the new cases, per the §187-29 correction recorded on the entry above.
+  //
+  // The nine: `never ran` vs a historic row proved DIFFERENT renders (and the boolean a
+  // careless implementation would use shown to collapse them), D-06's eight arms proved
+  // eight DISTINCT readings, no ticking clock on a terminal run or on a step that never ran,
+  // an absent facts prop rendering nothing at all, the declared pair rendered verbatim, a
+  // declared `0` rendering, four undeclared shapes rendering NO element, and the shipped
+  // nine-row status-atom inventory proved BYTE-IDENTICAL with the new prop supplied.
+  //
+  // ⚠ THAT LAST ONE IS THE POINT OF THE OTHERS. This suite pins the status atom's children
+  // POSITIONALLY (`button span.ml-auto`, read by index) across all nine statuses, so the new
+  // reading was sited in the IDENTITY COLUMN instead — a characterization pin answered by
+  // moving the new thing rather than by re-baselining the old one (199-03's precedent, and
+  // 200-06's icon-well decline). The pin passed UNEDITED, and that is asserted rather than
+  // assumed.
+  "PhaseCard.test.tsx": 41,
+  // ── Added in 200-07 (DES-02, `200-CHECKLIST.md` §4), in the SAME COMMIT that creates the
+  //    file — and it needs BOTH KNOBS, which is the ELEVENTH occurrence of the two-knob trap
+  //    this script records as a rule ──────────────────────────────────────────────────────
+  //
+  // MEASURED, not assumed: `src/components/panel/` is reached by FOUR NAMED FILES only
+  // (`__tests__/PhaseReconcile.test.tsx`, `__tests__/PhaseTimeline.test.tsx`,
+  // `__tests__/FilesSection.test.tsx` and `PhaseCard.test.tsx`) — there is no directory entry
+  // for it anywhere in `TARGETS`. On the first gate run after this suite existed but before
+  // its `TARGETS` line did, this script's printed run command did NOT contain it and the file
+  // never appeared in the output at all. A pin with no `TARGETS` entry pins a suite that
+  // never executes, and a falsification that does not run has falsified nothing.
+  //
+  // WHAT IS UNGUARDED WITHOUT IT: `phaseStatusMeta.ts` shipped **UNPINNED for its entire
+  // life** while holding the panel's nine status words, the two glyphs and — the sharp part —
+  // the own-property floor that keeps an inherited key (`constructor`, `__proto__`) from
+  // resolving to a FUNCTION typed as a `StatusMeta`. Every one of those was exercised only
+  // TRANSITIVELY, through a `PhaseCard` or `PhaseTimeline` render, which is precisely the
+  // state the §187-29 correction describes: slack inside an already-listed file absorbs it.
+  // `200-04` found the EIGHTH live sink of that class in this tree, where React REFUSED the
+  // function child and the label rendered as NOTHING AT ALL.
+  //
+  // ⚠ TIMING: `ls`-confirmed before this line was written — a `TARGETS` path that does not
+  // exist makes this gate ERROR at exit 2, not fail, for every later plan. The bare filename
+  // was confirmed unique tree-wide: the `BASELINE` key space is global.
+  "phaseStatusMeta.test.ts": 8,
   // ── Added in 197-11 (Wave 7, phase close) — THE THREE SUITES PHASE 197 CREATED ────────
   //
   // ⚠ ONE KNOB, NOT TWO, AND THAT IS WHY THE FILES WERE PLACED WHERE THEY WERE. All three
@@ -3224,6 +3308,16 @@ const TARGETS = [
   // holds suites this plan does not read, and adopting them would make Phase 196
   // the owner of their future rot in a gate that requires 0 failing forever.
   "src/components/panel/PhaseCard.test.tsx",
+  // ── Added in 200-07, in the SAME COMMIT that creates the file — the ELEVENTH occurrence of
+  //    the two-knob trap. The full reason is recorded ONCE at the matching `BASELINE` entry
+  //    above (search `200-07`); in one line: without this path the gate never EXECUTES the
+  //    only direct guard on the panel's status vocabulary and on its prototype-key floor.
+  //
+  // FILE-LEVEL, deliberately NOT the bare directory `src/components/panel` — the same
+  // reasoning this script already records eight times over. That directory holds suites this
+  // plan does not read, and adopting them would make Phase 200 the owner of their future rot
+  // in a gate that requires 0 failing forever.
+  "src/components/panel/phaseStatusMeta.test.ts",
   // Added in 196-05 (AUTH-04 / D-06), in the SAME COMMIT that creates the file — the
   // NINTH occurrence of the two-knob trap this array records as a rule, and the SECOND
   // entry ever on `src/hooks/`.

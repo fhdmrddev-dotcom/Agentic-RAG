@@ -3090,3 +3090,322 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
     expect(receiptSource).toContain("receipt-row-deliverable")
   })
 })
+
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-07 Task 3 (DES-02 · `200-CHECKLIST.md` §4.2) — THE `run-surface` MUST NOT RENDER
+// FENCE.
+//
+// Covers `RS-MNR-01` (prose in the count slot — N-8), `RS-MNR-02` (a live-ticking clock on a
+// step that never ran, or on a run that has ended), `RS-MNR-03` (`0` or a dash standing in
+// for a step that declared no count) and `RS-MNR-06` (a Material Symbols ligature NAME as
+// visible text — N-5).
+//
+// ⚠ THE SHAPE IS ROLE-SET + RENDERED LEAF TEXT, AND THAT IS FOUR MEASUREMENTS OLD IN THIS
+// PHASE ALONE, not a style. Every one of them is a fence that read GREEN against a real
+// violation:
+//
+//   · `199-03` — a `?raw` SOURCE REGEX **and** a `queryAllByRole("button")` filter both passed
+//     against a live planted `<a href="/publish?force=1">Proceed to publish anyway</a>`. A
+//     source regex cannot see a control composed from a variable; a button scan cannot see a
+//     link. Only a role-SET scan went red.
+//   · wave 3 — a fence was REACHED and wrote nothing, because its fixture queue was empty.
+//   · wave 5 — a word-boundary regex MISSED a planted chip, because ADJACENT DOM TEXT NODES
+//     CONCATENATE WITH NO SEPARATOR (`<span>Gather sources</span><span>llm_agent</span>`
+//     reads as `Gather sourcesllm_agent`, so the id is preceded by a word character).
+//   · wave 6 — two fences went RED against a CORRECT tree because their own explanatory prose
+//     contained their needle (the 187-24 trap).
+//
+// So: LEAF elements (text a person actually reads as one atom), plus ANNOUNCED text
+// (`aria-label` / `title` / `alt` / `placeholder`) over the role SET, containment rather than
+// word boundaries, and needles ASSEMBLED rather than spelled where a comment could defeat
+// them.
+//
+// ⚠ AND IT WAS DRIVEN RED AGAINST A PLANT IN PRODUCTION SOURCE, not only against the
+// synthetic control below — see `200-07-SUMMARY.md` for the checksums.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+
+/** The count slots this surface renders, on BOTH halves of it. */
+const COUNT_SLOTS = '[data-testid="receipt-row-count"],[data-testid="phase-card-count"]'
+/** The one-reading-per-row time slots, on both halves. */
+const TIME_SLOTS = '[data-testid="receipt-row-time"],[data-testid="phase-card-timing"]'
+
+/**
+ * The Material Symbols ligature names measured in the rendered text of all four in-scope
+ * screens (`200-RESEARCH.md` §A2), split into two shapes because ONE SHAPE CANNOT DO BOTH.
+ *
+ * ⚠ THE SPLIT IS LOAD-BEARING, and `200-05` learned it the hard way one file over. The
+ * snake_case forms appear in no product sentence, so containment is safe. The single-word
+ * forms — `add`, `check`, `search`, `lock`, `person`, `error` — are ORDINARY ENGLISH, and a
+ * containment needle on them fires on honest copy (`Add the first step`, `no finish time
+ * recorded`). Those are matched only where an element's ENTIRE trimmed text is the ligature,
+ * which is what an icon font actually renders.
+ */
+const LIGATURES_UNDERSCORED = [
+  "check_circle", "chevron_right", "priority_high", "account_tree", "chat_bubble",
+  "add_circle", "health_and_safety", "arrow_back", "fit_screen", "save_as",
+  "account_circle",
+]
+const LIGATURES_BARE = [
+  "check", "sync", "menu", "add", "search", "close", "info", "error", "bolt", "folder",
+  "lock", "shield", "warning", "person", "output", "description", "widgets", "remove",
+  "settings", "category", "dataset", "policy", "summarize", "psychology",
+]
+
+/** Every LEAF element's own text — one atom as a person reads it. */
+function leafTexts(root: ParentNode): string[] {
+  return Array.from(root.querySelectorAll("*"))
+    .filter((el) => el.children.length === 0)
+    .map((el) => (el.textContent ?? "").trim())
+    .filter((t) => t.length > 0)
+}
+
+/**
+ * Announced text over the ROLE SET — the half a visible-text scan cannot see, and the half
+ * `199-03` measured a button-only filter walking straight past.
+ */
+function announcedTexts(root: ParentNode): string[] {
+  const ROLE_SET = 'a[href], button, [role], [aria-label], [title], [alt], [placeholder]'
+  return Array.from(root.querySelectorAll(ROLE_SET))
+    .flatMap((el) =>
+      ["aria-label", "title", "alt", "placeholder"].map((a) => (el.getAttribute(a) ?? "").trim()),
+    )
+    .filter((t) => t.length > 0)
+}
+
+/**
+ * The predicate. Returns the ROW IDS violated, so a failure names the atom rather than
+ * printing a diff of the DOM.
+ *
+ * @param terminal whether the run under test has ENDED — `RS-MNR-02`'s second half is only
+ *                 a violation on a run that is over, because a live run's `so far` is the
+ *                 honest reading and a fence that forbade it would forbid the feature.
+ */
+function runSurfaceViolations(root: ParentNode, terminal: boolean): string[] {
+  const hits = new Set<string>()
+
+  // ── RS-MNR-01 / RS-MNR-03 — the count slot holds a COUNT or it does not exist ──────────
+  // The only shape a count slot may ever hold is `{integer} {noun}`. Prose fails it (N-8),
+  // a bare `0` with no noun fails it, and every dash form fails it. ⚠ A declared `0 sources`
+  // PASSES, and must: the step searched and found nothing, which is a measurement.
+  for (const slot of Array.from(root.querySelectorAll(COUNT_SLOTS))) {
+    const text = (slot.textContent ?? "").trim()
+    if (/^-|^[—–]$|^0$|^$/.test(text)) hits.add("RS-MNR-03")
+    else if (!/^\d+\s+\S+/.test(text)) hits.add("RS-MNR-01")
+  }
+
+  // ── RS-MNR-02 — no live clock where nothing is live ───────────────────────────────────
+  // A `so far` reading is the ONLY ticking shape this surface renders, and it is legitimate
+  // on exactly one arm. Two ways it becomes a lie: on a step that never ran, and on a run
+  // that has ended (the inherited `harness_engine.py:1698-1706` residual).
+  for (const slot of Array.from(root.querySelectorAll(TIME_SLOTS))) {
+    const text = (slot.textContent ?? "").trim()
+    const ticking = /so far/.test(text)
+    if (!ticking) continue
+    if (terminal) hits.add("RS-MNR-02")
+    const kind = slot.getAttribute("data-timing-kind")
+    if (kind !== null && kind !== "running") hits.add("RS-MNR-02")
+  }
+  // …and the same reading must never sit on a row whose OUTCOME says it never ran.
+  for (const row of Array.from(root.querySelectorAll("[data-outcome]"))) {
+    const outcome = row.getAttribute("data-outcome") ?? ""
+    if (!/never ran|not reached/.test(outcome)) continue
+    if (/so far/.test(row.textContent ?? "")) hits.add("RS-MNR-02")
+  }
+
+  // ── RS-MNR-06 — no ligature NAME as text a person reads (N-5) ─────────────────────────
+  const leaves = leafTexts(root)
+  const announced = announcedTexts(root)
+  for (const text of [...leaves, ...announced]) {
+    // ⚠ CONTAINMENT for the snake_case forms — they appear in no product sentence, and a
+    // word-boundary needle would miss one that concatenated with an adjacent text node.
+    if (LIGATURES_UNDERSCORED.some((l) => text.includes(l))) hits.add("RS-MNR-06")
+  }
+  for (const text of leaves) {
+    // ⚠ WHOLE-TEXT for the bare forms, because they are ordinary English. `no finish time
+    // recorded` contains none of them as an ENTIRE leaf; an icon font's `<span>check</span>`
+    // does.
+    if (LIGATURES_BARE.includes(text.toLowerCase())) hits.add("RS-MNR-06")
+  }
+
+  return Array.from(hits).sort()
+}
+
+describe("WorkflowRunPage 200-07 — §4.2 MUST NOT RENDER, and the fence can FIRE", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    setAsks([])
+  })
+
+  it("PERMANENT POSITIVE CONTROL — a planted violation of EACH row id is found", () => {
+    // ⚠ COMMITTED PERMANENTLY, and asserted BEFORE any absence claim below. A fence that
+    // cannot fire is the artefact this phase has now shipped and caught four separate times;
+    // the only thing that distinguishes a silent fence from a satisfied one is a control
+    // that makes it speak.
+    const plant = document.createElement("div")
+    plant.innerHTML = [
+      // RS-MNR-01 — N-8's own defect, verbatim from the sketch: a SENTENCE where a COUNT goes.
+      '<span data-testid="receipt-row-count">Summarized meeting notes</span>',
+      // RS-MNR-03 — a dash, and a bare `0` with no noun, standing in for an absence.
+      '<span data-testid="phase-card-count">—</span>',
+      '<span data-testid="receipt-row-count">0</span>',
+      // RS-MNR-02 — a live tick on a step that never ran.
+      '<span data-testid="phase-card-timing" data-timing-kind="never-ran">12s so far</span>',
+      // …and on a row whose own outcome says it never ran.
+      '<li data-outcome="never ran (skipped)"><span>4s so far</span></li>',
+      // RS-MNR-06 — a ligature NAME rendered as text, in both shapes: the snake_case form
+      // inside a sentence, and the bare form as an entire leaf (what an icon font emits).
+      '<span>status check_circle</span>',
+      '<span>sync</span>',
+      // …and one smuggled into a LINK's accessible name — the exact shape `199-03` proved a
+      // button-only scan walks past.
+      '<a href="#x" aria-label="account_tree">go</a>',
+    ].join("")
+
+    const hits = runSurfaceViolations(plant, true)
+    expect(hits).toStrictEqual(["RS-MNR-01", "RS-MNR-02", "RS-MNR-03", "RS-MNR-06"])
+    expect(hits.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it("PERMANENT NEGATIVE CONTROL — the honest shipped copy does NOT fire it", () => {
+    // The other half, and it is what stops the control above from being satisfied by a
+    // predicate that simply always fires. Every string here is one this surface really
+    // renders, including two that contain a bare ligature as a WORD (`recorded` holds none,
+    // but `no finish time recorded` and `never ran (skipped)` are the sentences a naive
+    // needle set breaks on) and a declared `0`, which is a FACT and must pass.
+    const honest = document.createElement("div")
+    honest.innerHTML = [
+      '<span data-testid="receipt-row-count">0 sources</span>',
+      '<span data-testid="receipt-row-count">312 sources</span>',
+      '<span data-testid="phase-card-timing" data-timing-kind="running">12s so far</span>',
+      '<span data-testid="receipt-row-time">never ran (skipped)</span>',
+      '<span data-testid="receipt-row-time">time not recorded</span>',
+      '<li data-outcome="finished"><span>1.8s</span></li>',
+      '<span>Files in this run\'s workspace</span>',
+      '<span>What this run did, step by step</span>',
+      '<span>no finish time recorded</span>',
+      '<a href="#x" aria-label="Download renewal-letter.docx (20 KB)">go</a>',
+    ].join("")
+    // `terminal: false` — a LIVE run, where `so far` is the honest reading.
+    expect(runSurfaceViolations(honest, false)).toStrictEqual([])
+  })
+
+  it("the REAL terminal render is clean — no prose, no dash, no dead clock, no ligature", async () => {
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    setFiles([
+      {
+        id: "file-1",
+        path: "out/renewal-letter.docx",
+        size_bytes: 20480,
+        mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      } as WorkspaceFile,
+    ])
+    const { container } = renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // NON-VACUITY BEFORE CONTENTS — the render really has the slots the predicate reads, so
+    // a clean result is *nothing wrong* rather than *nothing there*. Wave 3 shipped a fence
+    // that was reached and wrote nothing because its fixture queue was empty.
+    expect(container.querySelectorAll(TIME_SLOTS).length).toBeGreaterThan(0)
+    expect(container.querySelectorAll(COUNT_SLOTS).length).toBeGreaterThan(0)
+    expect(leafTexts(container).length).toBeGreaterThan(10)
+
+    expect(runSurfaceViolations(container, true)).toStrictEqual([])
+  })
+
+  it("the REAL live render is clean too, and its ONE tick is on the running arm only", async () => {
+    getWorkflowRun.mockResolvedValue(
+      mkTimedRun({
+        status: "active",
+        phases: [
+          {
+            slug: "gather-contracts",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+            started_at: P0_START,
+            completed_at: P0_END,
+          },
+          {
+            slug: "draft-letter",
+            phase_index: 1,
+            status: "active",
+            phase_type: "llm_agent",
+            started_at: P1_START,
+          },
+          { slug: "final-check", phase_index: 2, status: "pending", phase_type: "llm_human_input" },
+        ],
+      }),
+    )
+    const { container } = renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(runSurfaceViolations(container, false)).toStrictEqual([])
+    // …and exactly ONE row is ticking. A live run with three ticking rows would pass the
+    // predicate above and still be a lie about two of them.
+    const ticking = Array.from(container.querySelectorAll(TIME_SLOTS)).filter((el) =>
+      /so far/.test(el.textContent ?? ""),
+    )
+    expect(ticking).toHaveLength(1)
+  })
+})
+
+// ═════════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-07 Task 3 B — THE REPORT REGISTER, RECORDED AS EXECUTABLE ROWS.
+//
+// `200-CHECKLIST.md` §5's rule for an atom that is not built here is **REPORT, with a NAMED
+// re-open trigger — never faked, never silently dropped**. These two cases are that record,
+// written as tests rather than as SUMMARY prose for one reason: prose in a summary is read
+// once, and a case is re-read every time the gate runs. ⚠ A later plan that finds itself
+// building one of these has grown a capability inside a phase that did not scope one — the
+// G-7 failure mode, in miniature.
+// ═════════════════════════════════════════════════════════════════════════════════════════
+describe("WorkflowRunPage 200-07 — the REPORT rows (§5), not built, not faked", () => {
+  beforeEach(() => {
+    setLiveSlice([])
+    setFiles([])
+    setAsks([])
+  })
+
+  it("RS-3b — the SUB-STEP execution trace is REPORTED, and provably absent", async () => {
+    // ⚠ DISCHARGES RESEARCH R3, WHICH IS WHY RS-3 IS SPLIT AT ALL. The sketch draws EIGHT
+    // `00:0x` trace lines for a FIVE-step run — `Connecting to Northwind CRM instance…`,
+    // `Analyzing risk factors` and the rest — and several are SUB-STEP events, while this
+    // phase's wire slice is PHASE-LEVEL only. Their substrate would be `harness_audit`
+    // events / `EmitSubStep`: a SECOND backend concern, deliberately not stacked here.
+    // Building it would have made ROADMAP SC#5's *"the extraction changes no behaviour
+    // beyond the human-gate fix"* unprovable.
+    //
+    // **Re-open trigger, verbatim from §5:** *the phase that scopes `harness_audit` /
+    // `EmitSubStep` as a client transport.*
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+    const { container } = renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // ⚠ NOT FAKED is the claim, so it is the ABSENCE that is asserted: this surface renders
+    // ONE row per PHASE and nothing finer. Three phase rows, three receipt rows — no
+    // sub-step line has been invented to fill the sketch's eight.
+    expect(screen.getByTestId("run-receipt").querySelectorAll("ol > li")).toHaveLength(3)
+    const text = container.textContent ?? ""
+    expect(text).not.toContain("Connecting to")
+    expect(text).not.toContain("Analyzing risk factors")
+    // …and no `mm:ss` trace stamp, which is the shape those eight lines carry.
+    expect(text).not.toMatch(/\b00:0\d\b/)
+  })
+
+  it("RS-1 — this screen has NO `now` capture, so its acceptance is the proposal alone", () => {
+    // ⚠ `JOURNEY["run-surface"].now` is literally `null` (N-3), and the sketch left it empty
+    // rather than drawing it from imagination. There is therefore NO SHIPPED HALF to diff
+    // against: a verifier cannot fall back on *"nothing regressed"* here, and this plan must
+    // not invent a "before" it never had.
+    //
+    // **Re-open trigger, verbatim from §5:** *a run that can be driven for capture* — i.e.
+    // after `200-02` + `200-07` land, a real 1440×900 capture pairs the screen and `now-08`
+    // joins `200-journey-now/`.
+    //
+    // Recorded as an executable row rather than a sentence in a summary, so the obligation is
+    // re-read on every gate run rather than once. There is nothing to assert about a capture
+    // that does not exist, which is exactly the point being recorded.
+    expect(true).toBe(true)
+  })
+})

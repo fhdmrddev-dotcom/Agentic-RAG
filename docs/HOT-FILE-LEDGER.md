@@ -2853,3 +2853,177 @@ cap), **`✎`** (the writes receipt, on **four** surfaces) and **`👁`** (the V
 They are **pinned in the consumer suite**, so closing the gap *inverts* an assertion rather than
 merely adding prose — which is the only reason this can be left owed without rotting. Not closed in
 this commit because the inversion is a coupled test edit, not a documentation edit.
+
+---
+
+## `frontend/src/components/panel/PhaseTimeline.tsx`
+
+**ADDED 2026-08-20 by plan `200-07` (X-16). RE-DERIVED, not copied:** `8 commits / 6 phases / 370 L`
+· **G-5 FIRES** (6 phases vs threshold 3).
+
+⚠ **THE ABSENCE IS THE FINDING, NOT THE COUNTS.** This file **had no row in `CLAUDE.md` and no
+section here, at any count, for its entire life** — so G-5 could never have fired on it, at five
+phases or at fifty. That is the identical failure `WorkflowsPage.tsx` suffered for ten phases,
+`config.py` for the project's whole life, and `api.ts` for ninety-seven. `200-CHECKLIST.md` §6.6
+caught it at wave 1 and assigned the row to this plan.
+
+**Commands, run in this plan's worktree:** `git log --oneline -- <f> | wc -l` → **8**; the numeric
+`sed` bucket recipe → `094 127 188 189 194 200` → **6**; `wc -l <f>` → **370**. **Six-digit dated
+quick-task buckets: CHECKED, NONE EXIST** — stated so a reader can tell *"checked, none exist"* from
+*"nobody checked"*, which is this ledger's own standing request. ⚠ §6.6 measured `7 / 5 / 267` hours
+earlier in this same phase; the delta is this plan's own commit, so the row is born forward-derived
+rather than born stale.
+
+### Phases touched (verbatim)
+
+094 (the original spine) / 127 (the energy connector) / 188 (the shared derivation) / 189 (the
+not-sent announcer arm) / 194 (the stopped announcer arm) / **200 (`200-07` — the durable per-step
+readings)**.
+
+### G-5 status
+
+**FIRES, and honoured BY CONSTRUCTION in `200-07`** — no override recorded. The measured reason: the
+file gained a **CONSUMER**, not a concern. Every arm it renders is resolved by
+`components/workflows/phaseDuration.ts`, which the run page reads too, so the two halves of the run
+surface provably cannot disagree about a duration. `grep -cE 'new Date\(.*\)\s*-\s*new Date\('` over
+this file returns **0**, asserted in its suite beside the mirrored presence arm (`phaseDuration` IS
+imported), so the absence reads as *"it moved"* rather than *"it vanished"*.
+
+### The invariants that bind this file
+
+1. ⚠ **SOLE PRODUCTION MOUNT: `WorkspacePanel.tsx:542`, and `WorkspacePanel` itself has exactly ONE
+   mount — `ChatLayout.tsx:673`.** **A change here lands in CHAT first.** No workflow page mounts the
+   panel at all, so **UAT driven only against a workflow surface will miss every change to this
+   file.** Recorded because `200-07` is a *run-surface* plan and this is half of that surface.
+2. **THE RECONCILE FLOOR EXISTS BECAUSE A TERMINAL RUN HAS NO STREAM.** Anything this component
+   renders must survive being read with no SSE connection at all; that is why the durable rows come
+   from `getThreadWorkflow` and never from a frame.
+3. ⚠ **THE FRAME RE-READ IS LATEST-WINS BY SEQUENCE, NOT CANCEL-ON-EVERY-TRIGGER — and that shape
+   was arrived at by MEASUREMENT.** The obvious single effect keyed on `[threadId, phaseSignature]`
+   with a per-effect `cancelled` flag **DROPPED ITS OWN RE-READ**: this component's slice is *itself*
+   fetch-derived (`usePhases` mounts `usePanelReconcile`, whose fetcher REPLACES the whole slice), so
+   a settling reconcile changes the signature and tears down the effect that is at that moment
+   waiting for the answer. **Observed: four reads issued, the frame still holding the first one's
+   payload.** A starved read here is **not a blank — it is a STALE READING**, which is the single
+   failure mode this surface exists to remove. The abort is therefore scoped to the **THREAD**;
+   staleness is settled by a monotonic sequence.
+4. **The announcer switch carries a `default:` arm**, so a widened `Phase["status"]` is NOT a
+   typecheck error here the way it is in `PhaseCard`'s `STATUS_META`. A new member announces
+   *nothing* — a screen-reader user is told a step reached a terminal by hearing silence. Both 189's
+   and 194's arms came off a written list of consumers, never off a compiler run. **The list is the
+   only thing that finds this.**
+
+**Next seam NAMED rather than left `honoured` with no successor:** the component now holds the
+announcer, the forward-only counter floor, the doing-now narration, the frame read + its
+latest-wins sequencing, and the per-step facts lookup. The **frame read** is the cleanly separable
+one — a `useRunFrame(threadId, phaseSignature)` hook. **Re-open trigger:** *the next phase that adds
+a sixth concern to this component, or that gives the frame read a second trigger.*
+
+---
+
+## `frontend/src/components/panel/phaseStatusMeta.ts`
+
+**ADDED 2026-08-20 by plan `200-07` (X-16), and listed BELOW the G-5 threshold ON PURPOSE** — the
+`fileIcon.tsx` / `libraryRow.ts` precedent. **RE-DERIVED:** `3 commits / 3 phases / 236 L` ·
+⚠ **G-5 FIRES — EXACTLY AT THRESHOLD** (3 phases vs threshold 3).
+
+⚠ **§6.6 MEASURED IT AT `2 / 2 / 206` AND CLASSIFIED IT `no (2 phases)`. IT CROSSED THE THRESHOLD IN
+THE COMMIT THAT ADDED THIS ROW** — the same thing that happened to `FlowEdge.tsx` at `200-06`, one
+wave earlier in this same phase. That is precisely why the ledger's rule is *list it below the
+threshold anyway*: **a file escapes G-5 by not being written down**, and a file one commit below the
+line escapes it for exactly one commit longer.
+
+**Commands:** `git log --oneline -- <f> | wc -l` → **3**; bucket recipe → `189 194 200` → **3**;
+`wc -l <f>` → **236**. **Quick-task buckets: CHECKED, NONE EXIST.**
+
+### Phases touched (verbatim)
+
+189 (extracted from `PhaseCard.tsx` for review finding WR-05) / 194 (the `cancelled` row) /
+**200 (`200-07` — its first dedicated suite)**.
+
+### The invariants that bind this file
+
+1. ⚠ **`statusMeta()` MUST STAY TOTAL over the nine declared members, and MUST NEVER become a
+   coalesced bracket read.** `Record<Phase["status"], StatusMeta>` makes the compiler the parity
+   guarantee for every **DECLARED** member and says **nothing whatever** about an **INHERITED** one —
+   a plain object literal inherits `constructor`, `toString`, `__proto__` and friends, and an
+   inherited member is never nullish, so the tempting one-liner's fallback **provably never fires**
+   and it hands back a **FUNCTION** typed as a `StatusMeta`. The observed value for `constructor`
+   elsewhere in this tree was literally `[Function Object]`; `200-04` found the **eighth live sink**
+   of this class, where React **REFUSED** the function child and the label rendered as **NOTHING AT
+   ALL** — worse than the predicted garbage string, because nothing appears on screen to say
+   anything went wrong. ⚠ **The forbidden expression is never SPELLED in this file's own prose**: its
+   acceptance greps this source for it, and a docblock quoting the needle makes the guard read `1`
+   instead of `0` (the 187-24 trap, which fired on five separate files across this phase).
+2. **NO WORD A PERSON READS MAY BE INTERPOLATED FROM A RAW STATUS MEMBER (WR-05).** That is the
+   defect this module was extracted to fix: `PhaseTimeline`'s doing-now line printed
+   `notify — recorded-not-sent` at a user — a kebab-case internal identifier, on the one surface
+   whose entire discipline (D-17) is that the STORED SLUG, the PANEL WORD and the CANVAS SENTENCE are
+   three deliberately different spellings.
+3. ⚠ **IT HOLDS WORDS AND NO DERIVATION, and that split is the reason the run surface cannot
+   contradict itself.** D-06's nine timing arms live in `components/workflows/phaseDuration.ts`,
+   **shared with the run page**. A second arm added here would be that disagreement's first day. Its
+   suite asserts the absence mechanically (`Date.now()` → 0, date arithmetic → 0) with a positive
+   control.
+4. **THE GLYPH-COUNT EVIDENCE LIVES HERE, NOT IN `PhaseCard.tsx`.** Two rows
+   (`recorded-not-sent`, `cancelled`) rest a shipped claim on a **rejected mark's occurrence COUNT in
+   the file the table lives in** — and that file is this one. A future reader checking the count
+   should look here rather than conclude the evidence evaporated. **Prose that spelled the rejected
+   mark would make the count unreadable**, which is why it is asserted by name in the suite instead.
+
+**It shipped UNPINNED for its entire life** — no dedicated suite, exercised only transitively through
+`PhaseCard` / `PhaseTimeline` renders — while being D-06's natural home. `200-07` gave it
+`phaseStatusMeta.test.ts` and pinned it in the same commit (the 196-05 / 196-07 rule: *"an unpinned
+file is not a lightly-guarded one, it is an UNGUARDED one"*). **No seam proposed:** a vocabulary
+table doing one thing nine times is the right shape. **Re-open trigger:** *the next phase that puts a
+DERIVATION in this module rather than a word.*
+
+---
+
+## Phase 200-07 — the triples RE-DERIVED at the phase's close
+
+⚠ **THIS PHASE HAS NOW FOUND A LEDGER CELL STALE AT EVERY SINGLE CLOSE — five waves out of five** —
+and twice it was stale in **two documents at once** (`CLAUDE.md` and `200-CHECKLIST.md` §6.6, the
+latter re-derived by `200-01` only hours earlier in the same phase). The recipe is the artefact; the
+cell is not.
+
+| File | ledger read | **re-derived 2026-08-20** | verdict |
+|---|---|---|---|
+| `frontend/src/pages/WorkflowRunPage.tsx` | `15 / 5 / 1197` | **`16 / 6 / 1329`** | FIRES — honoured by construction (`200-07`) |
+| `frontend/src/components/panel/PhaseCard.tsx` | `12 / 8 / 543` | **`13 / 9 / 623`** | FIRES — honoured by construction (`200-07`) |
+| `frontend/src/components/panel/PhaseTimeline.tsx` | ⚠ **ABSENT** | **`8 / 6 / 370`** | FIRES — row added above |
+| `frontend/src/components/panel/phaseStatusMeta.ts` | ⚠ **ABSENT** | **`3 / 3 / 236`** | ⚠ FIRES — **crossed the threshold in the commit that added its row** |
+| `frontend/src/lib/api.ts` | `174 / 99 / 6357` | **`176 / 100 / 6430`** | ⚠ still the HOTTEST file in the repository |
+
+### `frontend/src/pages/WorkflowRunPage.tsx` — what `200-07` added, and the seam that is still owed
+
+**Four of the five seams named at Phase 195 remain**; `200-07` took none of them and says so rather
+than leaving `honoured` to imply otherwise. What it added: the durable-row read (`wireRows` /
+`wireBySlug`), the receipt's title lookup, the receipt mount, and one field pair forwarded into the
+`NodeRunState` the page already builds. ⚠ **The page derives NO duration and NO span of its own** —
+`phaseDuration` is imported as a **TYPE only**, and `min(started_at) → max(completed_at)` has exactly
+one home and one call site (`RunReceipt`). **Re-open trigger, carried forward verbatim:** *the run
+read + its poll, the phase/spec join, the elapsed anchor and the canvas mount are four concerns still
+in one component.*
+
+⚠ **A CORRECTION THIS PHASE OWES OUT LOUD, recorded beside the claim rather than over it.**
+`200-07-PLAN.md` states that this page's shipped elapsed *"is anchored at component MOUNT
+(`:845-877`), which is exactly why navigating away and back restarts it"*, and instructs the plan to
+re-anchor it. **Measured, that is not what the code does.** F3 and F6 had already moved the anchor to
+`claimed_at ?? createdMs` — **both SERVER timestamps** — so the header figure was remount-stable
+before this plan touched anything. What `200-07` adds is a **second** figure (the phase-derived span),
+also server-anchored. **`BUG-260610-01`'s timer half is therefore closed structurally on BOTH figures,
+and both are asserted remount-stable rather than one asserted and one assumed.** ⚠ **Its
+duplicate-avatar half is NOT taken and the report's `status: open` is NOT flipped** — that report has
+already been mis-indexed twice in its life, and a `folded` status would hide a live defect from the
+routing scan for a third time.
+
+### `frontend/src/lib/api.ts` — the 197 decline HOLDS, and its trigger did NOT fire
+
+`200-07` adds **four optional fields to the existing `WorkflowPhaseState` interface** — the client
+mirror of transport 3, which `200-02` widened on the Python side and **not** here, so the wire had
+been sending facts the chat panel could not declare. ⚠ **A TYPE, not a runtime export**, fully erased
+at build, so `196-08`'s mock-factory failure mode (nine suites throwing at mount because a
+`vi.mock("@/lib/api")` factory did not declare a newly-added export) **measurably cannot fire.**
+Proved by grep over the real diff (D-15), never by quoting this paragraph. **Trigger carried forward
+verbatim: the next phase adding a RUNTIME export or a second concern here.**
