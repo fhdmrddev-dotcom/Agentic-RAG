@@ -21,8 +21,16 @@ import { describe, it, expect, vi } from "vitest"
 import { fireEvent, render, screen } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
-import { PhaseFormPanel } from "./PhaseFormPanel"
-import { minimalPhaseFor, PHASE_TYPE_ORDER } from "./definitionOps"
+import { PhaseFormPanel, type PhaseFormRails } from "./PhaseFormPanel"
+import {
+  ACTION_RISK_ARM_LABEL,
+  GOVERNANCE_GATE_ROW_LABEL,
+  GROUNDING_DIAL_LOOSE_LABEL,
+  GROUNDING_DIAL_STRICT_LABEL,
+  GROUNDING_LOCK_REFUSAL,
+  minimalPhaseFor,
+  PHASE_TYPE_ORDER,
+} from "./definitionOps"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
 
 function phaseOf(config: Record<string, unknown>, extra: Partial<PhaseSpecJSON> = {}): PhaseSpecJSON {
@@ -763,5 +771,262 @@ describe("PhaseFormPanel — the 196-08 picker mounts (AUTH-04 / D-20)", () => {
     expect(onChange).toHaveBeenCalledWith({ model: "kimi-k3" })
     fireEvent.blur(control)
     expect(onPersist).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-06 Task 1 (DES-01, sheet `c4-phase-form-panel`) — THE PRE-CHANGE INVENTORY.
+//
+// MEASURE BEFORE CHANGING ANYTHING. This block is committed on its own, one commit BEFORE
+// the density ceiling exists, so that "the panel got quieter" is a delta between two
+// recorded readings rather than a claim made about a tree nobody wrote down.
+//
+// It carries four things, and each answers a different question the plan asks:
+//
+//   1. `HELPERS_AT_FULL_DENSITY` — every always-visible plain-English helper sentence this
+//      panel prints today, as LITERALS, per phase type. Pinned PRESENT so that a later
+//      removal is proved by INVERTING each assertion (present → absent at the collapsed
+//      reading) rather than by deleting it. Zero assertion deletions is the target.
+//
+//   2. `FENCED_IN` — the atoms that may NEVER move behind a fold, enumerated BEFORE any
+//      decision about what moves. SEED-184's rule 3: a person may not be asked to click to
+//      find out whether their step is governed, which side of the door it is on, whether it
+//      is armed, or what it delivers. This list is the work list's complement.
+//
+//   3. A DENSITY READING for two representative phase types, as exact numbers.
+//
+//   4. ⚠ A CANNOT-EXPRESS, DEMONSTRATED RATHER THAN ASSERTED. The plan asks for the rendered
+//      HEIGHT of the panel body. jsdom implements no layout engine, so every box metric it
+//      reports is a constant zero — a "height delta" measured here would be `0 − 0` and
+//      would read as a passing measurement. The honest substitute is the VOLUME OF RENDERED
+//      PROSE, which is deterministic, is what a height is a proxy for anyway, and cannot be
+//      zero by accident. Both are asserted below: the zero, so the limitation is on the
+//      record, and the volume, so the delta that follows it is real.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** The rails at full density — a governed agent step, so every governance atom exists. */
+const FULL_RAILS: PhaseFormRails = {
+  order: { index: 2, total: 4 },
+  toolOptions: ["search_documents", "execute_code"],
+  gates: [{ label: GOVERNANCE_GATE_ROW_LABEL, locked: true }],
+  kbTools: ["search_documents"],
+}
+
+/** A step config per type, at the fullest shape each type can carry. */
+const FULL_CONFIG: Record<string, Record<string, unknown>> = {
+  programmatic: { phase_type: "programmatic", fn: "split_topic", input_keys: ["topic"] },
+  llm_single: { phase_type: "llm_single", prompt: "x", model: "gpt-5.4", temperature: 0.2, folder_scope: [], skill_ref: "s" },
+  llm_agent: { phase_type: "llm_agent", prompt: "x", model: "gpt-5.4", available_tools: ["search_documents"], max_steps: 12, wall_clock_seconds: 60, folder_scope: [], skill_ref: "s" },
+  llm_batch_agents: { phase_type: "llm_batch_agents", prompt: "x", model: "gpt-5.4", available_tools: ["search_documents"], max_parallel_agents: 5, merge_strategy: "concat", folder_scope: [] },
+  llm_human_input: { phase_type: "llm_human_input", prompt: "x", options: ["a", "b"], timeout_seconds: 300 },
+  llm_emit: { phase_type: "llm_emit", prompt: "x", emitter: "render_template", model: "gpt-5.4", citation_policy: "strict", integrity_policy: "strict", folder_scope: [], skill_ref: "s" },
+  external_action: { phase_type: "external_action", capability: "" },
+}
+
+/**
+ * EVERY always-visible helper sentence the panel prints today, per phase type, as literals.
+ *
+ * ⚠ THE LIST IS THE FLAG-OFF (rails-absent) READING — the shipped Spine surface, which is
+ * the surface most authors are actually on. The rails-present reading differs in exactly one
+ * sentence (the tool field's), and that one is inventoried separately below because it is the
+ * only helper in this panel that is NOT a restatement of its own label: it states a REFUSAL.
+ */
+const HELPERS_AT_FULL_DENSITY: Record<string, readonly string[]> = {
+  programmatic: [
+    "The registered function this step runs.",
+    "Which earlier outputs feed this function.",
+  ],
+  llm_single: [
+    "What you want the AI to do in this step.",
+    "Leave blank to use the run's model.",
+    "Higher = more varied wording; lower = more focused.",
+    "The knowledge-base folders this step may search.",
+    "A saved skill to load for this step (optional).",
+  ],
+  llm_agent: [
+    "What you want the AI to do in this step.",
+    "Leave blank to use the run's model.",
+    "How many actions the AI may take before it stops.",
+    "The tools the AI may use here.",
+    "Stop this step after this many seconds (optional).",
+    "The knowledge-base folders this step may search.",
+    "A saved skill to load for this step (optional).",
+  ],
+  llm_batch_agents: [
+    "What you want the AI to do in this step.",
+    "Leave blank to use the run's model.",
+    "How many actions the AI may take before it stops.",
+    "The tools the AI may use here.",
+    "How many copies run at once.",
+    "How the parallel results are merged.",
+    "The knowledge-base folders this step may search.",
+  ],
+  llm_human_input: [
+    "What the person is asked to review or decide here.",
+    "The options the person picks from when this pauses.",
+    "How long to wait for the person before giving up.",
+  ],
+  llm_emit: [
+    "What you want the AI to do in this step.",
+    "How the deliverable is produced (read-only).",
+    "Leave blank to use the run's model.",
+    "A saved skill to load for this step (optional).",
+    "The knowledge-base folders this step may search.",
+    "How strictly the deliverable must cite its sources.",
+    "Re-opens the produced file to confirm it's complete (coming in Phase 106).",
+  ],
+  external_action: [],
+}
+
+/**
+ * The ONE helper in this panel that is not a restatement — the tool whitelist's. It states
+ * that the control REFUSES typed input, which is a rule about what can be done, not guidance
+ * about what a field means. It is inventoried apart from the list above because it belongs in
+ * `FENCED_IN`, not in the work list.
+ */
+const TOOL_WHITELIST_REFUSAL =
+  "Pick from the tools this workspace allows — you cannot add one by typing."
+
+/**
+ * ⚠ THE FENCED-IN ATOMS — written down BEFORE any decision about what moves (SEED-184 rule 3,
+ * threat T-199-06-03). A person may never be asked to click in order to discover a DECISION:
+ * whether the step is governed, which side of the door it is on, whether it is armed, or what
+ * it delivers. Everything here is asserted PRESENT at the resting reading, today and after.
+ *
+ * Each entry is `[what it is, the testid that proves it rendered]`.
+ */
+const FENCED_IN: ReadonlyArray<readonly [string, string]> = [
+  ["the governance section itself", "rail-governance"],
+  ["the strict/loose door — the loose side", "governance-dial-loose"],
+  ["the strict/loose door — the strict side", "governance-dial-strict"],
+  ["why the step is held, when it is", "governance-why"],
+  ["the dial's visible REFUSAL", "governance-refusal"],
+  ["the tool list IS the control", "governance-tool-control"],
+  ["the gate attached to the run", "governance-attached"],
+  ["the armed-action switch", "governance-arm"],
+  ["what arming costs", "governance-armed-note"],
+  ["the checks that run on this step", "rail-gates"],
+  ["the order the step runs in", "rail-order"],
+]
+
+/** The `llm_emit`-only atoms that state what the step DELIVERS. Same fence, other type. */
+const FENCED_IN_DELIVERABLE: ReadonlyArray<readonly [string, string]> = [
+  ["the attached template", "rail-template"],
+  ["which of the template's fields the steps name", "name-check"],
+]
+
+/** A density reading. Deterministic; no layout is involved and none is claimed. */
+function densityOf(container: HTMLElement) {
+  const aside = container.querySelector("aside")
+  if (aside === null) throw new Error("no panel rendered")
+  const helps = Array.from(aside.querySelectorAll('[data-testid="field-help"]'))
+  return {
+    helpLines: helps.length,
+    helpChars: helps.reduce((n, el) => n + (el.textContent ?? "").length, 0),
+    proseChars: (aside.textContent ?? "").length,
+  }
+}
+
+function renderAtFullDensity(phase_type: string, rails?: PhaseFormRails) {
+  return render(
+    <PhaseFormPanel
+      // ⚠ `action_risk_armed` is a PhaseSpec-level field, NOT a config key, and it is set
+      // deliberately: without it the armed note never renders and "full density" would be
+      // measuring a step that has not been armed. Found by the fence below going red on
+      // `governance-armed-note` — which is the fence doing its job on its first run.
+      phase={phaseOf(FULL_CONFIG[phase_type] as Record<string, unknown>, { action_risk_armed: true })}
+      open
+      onChange={noop}
+      onPersist={noop}
+      onClose={noop}
+      modelPicker={MODEL_PICKER}
+      rails={rails}
+      onGovernanceChange={noop}
+      template={{ definitionId: "d1", filename: "Renewal_Report_v2.docx", assetId: "a1", onAttached: noop }}
+      nameCheck={{ classification: { produced: ["retrieve"], runInput: [], nowhere: ["project_name"] } }}
+    />,
+  )
+}
+
+describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-change inventory)", () => {
+  it("NON-VACUITY — the inventory covers every shipped phase type, and is not empty by accident", () => {
+    // A list keyed by a type the product no longer has would silently stop being checked.
+    expect(Object.keys(HELPERS_AT_FULL_DENSITY).sort()).toEqual([...PHASE_TYPE_ORDER].sort())
+    expect(Object.keys(FULL_CONFIG).sort()).toEqual([...PHASE_TYPE_ORDER].sort())
+    // Six of the seven really do print helper prose today; `external_action` really prints none.
+    expect(Object.values(HELPERS_AT_FULL_DENSITY).filter((v) => v.length > 0)).toHaveLength(6)
+  })
+
+  it("every helper sentence in the inventory is PRESENT today, per phase type, as a literal", () => {
+    for (const [phase_type, sentences] of Object.entries(HELPERS_AT_FULL_DENSITY)) {
+      const { unmount } = renderAtFullDensity(phase_type)
+      for (const sentence of sentences) {
+        expect(screen.getByText(sentence)).toBeInTheDocument()
+      }
+      // …and the inventory is EXHAUSTIVE: no helper renders that this list does not name.
+      const rendered = screen.queryAllByTestId("field-help").map((el) => el.textContent ?? "")
+      expect(rendered.slice().sort()).toEqual([...sentences].sort())
+      unmount()
+    }
+  })
+
+  it("the tool whitelist's helper is a REFUSAL, not guidance — inventoried apart", () => {
+    const { unmount } = renderAtFullDensity("llm_agent", FULL_RAILS)
+    expect(screen.getByText(TOOL_WHITELIST_REFUSAL)).toBeInTheDocument()
+    unmount()
+    // And it really is the rails-only reading: flag-off prints the other sentence instead.
+    renderAtFullDensity("llm_agent")
+    expect(screen.queryByText(TOOL_WHITELIST_REFUSAL)).not.toBeInTheDocument()
+    expect(screen.getByText("The tools the AI may use here.")).toBeInTheDocument()
+  })
+
+  it("FENCED IN — every governance / door / armed atom renders at the resting reading", () => {
+    // A GOVERNED agent step: a KB tool is on, so the dial is detected-and-locked and its
+    // refusal is on screen. This is the render in which every fenced atom exists at once.
+    renderAtFullDensity("llm_agent", FULL_RAILS)
+    for (const [what, marker] of FENCED_IN) {
+      expect(screen.queryByTestId(marker), what).toBeInTheDocument()
+    }
+    // The door's two sides carry their BINDING words, not a paraphrase.
+    expect(screen.getByTestId("governance-dial-loose")).toHaveTextContent(GROUNDING_DIAL_LOOSE_LABEL)
+    expect(screen.getByTestId("governance-dial-strict")).toHaveTextContent(GROUNDING_DIAL_STRICT_LABEL)
+    // The refusal is REAL DOM TEXT — what makes it a refusal and not a disablement.
+    expect(screen.getByTestId("governance-refusal")).toHaveTextContent(GROUNDING_LOCK_REFUSAL)
+    expect(screen.getByTestId("governance-arm")).toHaveTextContent(ACTION_RISK_ARM_LABEL)
+  })
+
+  it("FENCED IN — the deliverable's own atoms render at the resting reading", () => {
+    renderAtFullDensity("llm_emit", FULL_RAILS)
+    for (const [what, marker] of FENCED_IN_DELIVERABLE) {
+      expect(screen.queryByTestId(marker), what).toBeInTheDocument()
+    }
+    // The sourcing-strictness CAPTION is a consequence, not guidance: it says what the
+    // CHOSEN option does. Fenced in for the same reason the refusal is.
+    expect(
+      screen.getByText("Every claim must be cited — the deliverable fails if anything is uncited."),
+    ).toBeInTheDocument()
+  })
+
+  it("⚠ CANNOT-EXPRESS — a rendered HEIGHT is not measurable here; jsdom runs no layout", () => {
+    const { container } = renderAtFullDensity("llm_agent", FULL_RAILS)
+    const aside = container.querySelector("aside") as HTMLElement
+    // Both box metrics are a constant zero. A "height delta" computed from these would be
+    // 0 − 0 and would read as a passing measurement, which is why the plan's height figure is
+    // REPORTED as cannot-express and the prose-volume reading below is used in its place.
+    expect(aside.offsetHeight).toBe(0)
+    expect(aside.getBoundingClientRect().height).toBe(0)
+    // …and the substitute is emphatically NOT zero, so the delta it produces is real.
+    expect(densityOf(container).proseChars).toBeGreaterThan(500)
+  })
+
+  it("DENSITY BEFORE — two representative phase types, as exact numbers", () => {
+    const agent = densityOf(renderAtFullDensity("llm_agent", FULL_RAILS).container)
+    const emit = densityOf(renderAtFullDensity("llm_emit", FULL_RAILS).container)
+    // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking this literal, never by loosening it to
+    // a range — a range is what turns a characterization pin into a decoration.
+    expect({ agent, emit }).toEqual({
+      agent: { helpLines: 7, helpChars: 342, proseChars: 1632 },
+      emit: { helpLines: 7, helpChars: 339, proseChars: 1684 },
+    })
   })
 })
