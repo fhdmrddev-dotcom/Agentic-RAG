@@ -51,6 +51,15 @@ import {
 import { runReadingLabel, type NodeRunState } from "./runVocabulary"
 import type { CanvasReading } from "@/lib/phaseState"
 import { TechnicalNamesProvider } from "@/providers/TechnicalNamesProvider"
+// 199-05: the ONE fixture on the corpus that carries a RESOLVED `skip_to_phase` branch —
+// the only shipped connector that is not a plain run-order link. Added as a SEPARATE
+// statement rather than by widening the list above, so this file's whole diff is added
+// lines and "no shipped assertion was touched" is auditable by `git diff` alone
+// (`canvasModel.purity.test.ts:18-21`, the shipped statement of the rule).
+import { branching } from "./__fixtures__/canvasFixtures"
+// 199-05: the ONE frozen layout table, read so the ground-vs-node ordering below is
+// asserted against the shipped card width rather than against a re-typed number.
+import { CANVAS_LAYOUT } from "./canvasModel"
 
 // ── 188.1-01 — THE SUBTREE SOURCE, and why it names files that do not exist yet ──────
 //
@@ -1018,5 +1027,240 @@ describe("WorkflowCanvas 188-07 — the run reading joins the node's ACCESSIBLE 
     expect(researchSummarize.map((p) => nodeLabel(b.container, p.slug))).toEqual(shipped)
     // Non-vacuity: the labels are real strings, not a list of empties.
     for (const label of shipped) expect(label.length).toBeGreaterThan(0)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 199-05 Task 1 — THE RESTING PLANE INVENTORY (sketch 178, sheet `c1-canvas-plane`)
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// Every atom below is pinned PRESENT, as a literal, so a later REMOVAL is proved by
+// INVERTING an assertion from present to absent — never by deleting one. That is the
+// house rule (`199-01`'s resting-atom inventory), and it is what makes "the plane renders
+// no more at rest than before" a measurement rather than a claim.
+//
+// ⚠ THE SHEET IS DIRECTION, NOT AN ACCEPTANCE BAR (`acceptance_bar: false` in its own
+// frontmatter, and it renders ZERO shipped components). Nothing here adopts a number or a
+// colour from it; every literal below was MEASURED off the shipped rendering first.
+
+/** The one drawn stroke of an edge, by edge id. */
+function edgeStroke(container: HTMLElement, id: string): SVGPathElement {
+  const edge = container.querySelector(`.react-flow__edge[data-id="${id}"]`)
+  expect(edge).not.toBeNull()
+  const path = edge!.querySelector<SVGPathElement>(".react-flow__edge-path")
+  expect(path).not.toBeNull()
+  return path!
+}
+
+/** What a colour-blind reader still perceives about one connector. */
+function connectorShape(path: SVGPathElement) {
+  return {
+    width: path.style.strokeWidth,
+    dash: path.style.strokeDasharray,
+  }
+}
+
+async function renderPlane(phases: Parameters<typeof toCanvas>[0]) {
+  const view = renderCanvas(phases)
+  await waitFor(() => {
+    expect(view.container.querySelectorAll(".react-flow__edge").length).toBeGreaterThan(0)
+  })
+  return view
+}
+
+describe("WorkflowCanvas 199-05 — §1 the plane's GROUND", () => {
+  it("commits to a quiet DOT grid, and it is the only ground the plane draws", async () => {
+    const { container } = await renderPlane(branching)
+    const grounds = container.querySelectorAll(".react-flow__background")
+    expect(grounds).toHaveLength(1)
+
+    // The pattern is DOTS — the sheet's own commitment, and already the shipped one.
+    const dots = grounds[0].querySelectorAll(".react-flow__background-pattern.dots")
+    expect(dots.length).toBeGreaterThan(0)
+    // …drawn as circles, never as lines or crosses.
+    expect(dots[0].tagName).toBe("circle")
+  })
+
+  it("is QUIETER than a step at rest — the ordering, not a colour value", async () => {
+    const { container } = await renderPlane(branching)
+
+    // (a) SIZE. The ground's loudest mark is a sub-2px dot; a step at rest is a 248px
+    // card. The claim the sheet makes is an ORDERING, so an ordering is what is asserted.
+    const dot = container.querySelector<SVGCircleElement>(".react-flow__background-pattern.dots")
+    expect(dot).not.toBeNull()
+    const r = Number(dot!.getAttribute("r"))
+    expect(Number.isFinite(r)).toBe(true)
+    expect(r).toBeLessThanOrEqual(2)
+    expect(CANVAS_LAYOUT.NODE_WIDTH).toBeGreaterThan(r * 100) // 260 ≫ any dot
+
+    // (b) CONTENT. The ground paints a repeating dot and NOTHING else — no word, no
+    // card-sized shape, no second pattern. That is the provable half of "quiet": a ground
+    // carrying text or a large mark would compete with a step however faint its colour.
+    //
+    // ⚠ WHAT THIS DELIBERATELY DOES NOT CLAIM. The ground sits BEHIND the cards by the
+    // library stylesheet's `z-index` on `.react-flow__background`, and it is rendered
+    // AFTER the renderer in document order — measured, not assumed. jsdom resolves no
+    // stylesheet, so the STACKING half of the ordering is not provable here and is not
+    // asserted; it is owed to a driven check. Claiming it from a passing unit test would
+    // be the fail-open this project keeps catching.
+    const ground = container.querySelector(".react-flow__background")!
+    expect((ground.textContent ?? "").trim()).toBe("")
+    expect(ground.querySelectorAll("pattern")).toHaveLength(1)
+    expect(ground.querySelectorAll("circle")).toHaveLength(1)
+    expect(ground.querySelectorAll("text, image, foreignObject")).toHaveLength(0)
+
+    // (c) BUDGET. The ground spends no run colour and no governance colour — it carries
+    // one class and no inline stroke of its own.
+    expect(dot!.getAttribute("style")).toBeNull()
+  })
+})
+
+describe("WorkflowCanvas 199-05 — §2 the CONNECTION states the plane can express", () => {
+  it("draws exactly the five connectors the definition declares, by id", async () => {
+    const { container } = await renderPlane(branching)
+    const ids = Array.from(container.querySelectorAll(".react-flow__edge")).map((e) =>
+      e.getAttribute("data-id"),
+    )
+    // Pinned as an EXACT list: a sixth connector, or a lost one, is a failure here.
+    expect(ids).toEqual([
+      "seq:gather->assess",
+      "seq:assess->draft",
+      "skip:assess->escalate",
+      "seq:draft->escalate",
+      "end:escalate->__canvas__end",
+    ])
+  })
+
+  it("the branch is distinguishable from the run order WITHOUT colour — the DASH carries it", async () => {
+    const { container } = await renderPlane(branching)
+
+    const order = connectorShape(edgeStroke(container, "seq:gather->assess"))
+    const branch = connectorShape(edgeStroke(container, "skip:assess->escalate"))
+
+    // NON-VACUITY BEFORE CONTENTS.
+    expect(order.width.length).toBeGreaterThan(0)
+    expect(branch.width.length).toBeGreaterThan(0)
+
+    // Run order is SOLID; the branch is DASHED. Neither fact is a colour.
+    expect(order.dash).toBe("")
+    expect(branch.dash).toBe("5 4")
+    expect(order.width).toBe(branch.width) // …and weight is NOT the carrier here
+  })
+
+  it("the terminal connector is shape-identical to run order — the ○ CAP carries the ending", async () => {
+    // Recorded rather than fixed. `end` and `flow` are the same stroke, and that is
+    // correct: what ends the flow is the explicit end-cap NODE, not a different line.
+    // Pinning it means a future divergence has to be deliberate.
+    const { container } = await renderPlane(branching)
+    expect(connectorShape(edgeStroke(container, "end:escalate->__canvas__end"))).toEqual(
+      connectorShape(edgeStroke(container, "seq:gather->assess")),
+    )
+    expect(screen.getByTestId("canvas-end-cap")).toBeInTheDocument()
+  })
+
+  it("a BROKEN branch says so in words, on the plane — not in colour alone", async () => {
+    const { container } = await renderPlane(unresolvableSkip)
+    const stub = screen.getByTestId("canvas-unresolved-skip")
+    expect((stub.textContent ?? "").replace(/\s+/g, " ").trim()).toBe(
+      "⤳on fail → goes to nonexistent — no such step",
+    )
+    // …and the connector that reaches it is the same dashed branch shape.
+    expect(
+      connectorShape(edgeStroke(container, "skip:check->?nonexistent")).dash,
+    ).toBe("5 4")
+  })
+
+  it("NO connector carries a payload figure, a count or a percentage — measured, not assumed", async () => {
+    // The flagship CANNOT-EXPRESS, pinned as an ABSENCE so a future fabricated figure
+    // cannot arrive quietly. Nothing in this system emits a per-edge count; drawing one
+    // would be a made-up business number on the surface a business reader trusts most.
+    const { container } = await renderPlane(branching)
+    for (const edge of Array.from(container.querySelectorAll(".react-flow__edge"))) {
+      const text = (edge.textContent ?? "").trim()
+      expect(text).not.toMatch(/\d/)
+    }
+    // POSITIVE CONTROL — the matcher really does catch the sheet's own labels.
+    for (const drawn of ["312 contracts", "48 extracted findings", "12 flagged", "36 routine"]) {
+      expect(drawn).toMatch(/\d/)
+    }
+  })
+})
+
+describe("WorkflowCanvas 199-05 — §3 the FLOATING controls", () => {
+  it("offers exactly three, named as literals", async () => {
+    const { container } = await renderPlane(branching)
+    const controls = container.querySelector(".react-flow__controls")
+    expect(controls).not.toBeNull()
+    const labels = Array.from(controls!.querySelectorAll("button")).map((b) =>
+      b.getAttribute("aria-label"),
+    )
+    // EXACT — a fourth control, or a lost one, fails here.
+    expect(labels).toEqual(["Zoom In", "Zoom Out", "Fit View"])
+  })
+
+  it("shows NO zoom percentage — the sheet's `85%` has no shipped home", async () => {
+    const { container } = await renderPlane(branching)
+    const controls = container.querySelector(".react-flow__controls")!
+    expect(controls.textContent ?? "").not.toMatch(/\d+\s*%/)
+    // POSITIVE CONTROL — the matcher catches the sheet's own readout.
+    expect("85%").toMatch(/\d+\s*%/)
+  })
+})
+
+describe("WorkflowCanvas 199-05 — §4 · §5 the two EMPTY planes", () => {
+  it("the EDITABLE empty draft paints exactly two atoms, both literals", () => {
+    renderCanvas(emptyDraft, { editable: true })
+    const empty = screen.getByTestId("canvas-empty")
+    expect(
+      Array.from(empty.querySelectorAll("button, p")).map((el) =>
+        (el.textContent ?? "").replace(/\s+/g, " ").trim(),
+      ),
+    ).toEqual([
+      "＋Add your first step",
+      "Pick what it should do — you can change the details afterwards.",
+    ])
+  })
+
+  it("the READ-ONLY empty plane paints exactly two atoms, both literals", () => {
+    renderCanvas(emptyDraft)
+    const empty = screen.getByTestId("canvas-empty")
+    expect(
+      Array.from(empty.querySelectorAll("button, p")).map((el) =>
+        (el.textContent ?? "").replace(/\s+/g, " ").trim(),
+      ),
+    ).toEqual(["No steps yet", "Add a step to this workflow and it will appear here."])
+  })
+
+  it("there is exactly ONE empty-state affordance, and read-only has NONE", () => {
+    // The sheet draws a ghost node on its read-only plane. A ghost affordance on a
+    // surface that cannot act is the D-183-11 rule in miniature, so the shipped state
+    // offers no control at all — pinned so a second one cannot arrive quietly.
+    const editable = renderCanvas(emptyDraft, { editable: true })
+    expect(editable.container.querySelectorAll("button")).toHaveLength(1)
+    editable.unmount()
+
+    const readOnly = renderCanvas(emptyDraft)
+    expect(readOnly.container.querySelectorAll("button")).toHaveLength(0)
+    expect(readOnly.queryByTestId("canvas-add-first-step")).toBeNull()
+  })
+})
+
+describe("WorkflowCanvas 199-05 — the sheet's RIGHT-OVERFLOW flaw is not inherited", () => {
+  it("fits the whole flow into the plane instead of clipping it at a fixed width", async () => {
+    // The sheet's own README records that its plane overflows on the right and clips its
+    // two branch outcomes. The structural reason it cannot happen here: the plane is
+    // fluid (`h-full w-full`), never a fixed `h-[600px]` box with absolutely-positioned
+    // cards, and the library is asked to FIT the content with padding on mount.
+    expect(workflowCanvasSource).toMatch(/className="group\/canvas relative h-full w-full/)
+    expect(workflowCanvasSource).toContain("fitView")
+    expect(workflowCanvasSource).toMatch(/fitViewOptions=\{\{ padding: 0\.1, minZoom: 0\.3 \}\}/)
+    expect(workflowCanvasSource).toMatch(/minZoom=\{0\.3\}/)
+
+    // …and the far end of the flow really is rendered, on the widest fixture available:
+    // the LAST step and the end cap are both on the plane, not clipped away.
+    const { container } = await renderPlane(branching)
+    expect(screen.getByTestId("canvas-node-escalate")).toBeInTheDocument()
+    expect(screen.getByTestId("canvas-end-cap")).toBeInTheDocument()
+    expect(container.querySelectorAll(".react-flow__node")).toHaveLength(branching.length + 1)
   })
 })
