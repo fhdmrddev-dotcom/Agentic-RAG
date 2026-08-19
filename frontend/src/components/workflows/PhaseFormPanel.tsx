@@ -115,6 +115,12 @@ import { TemplateNameCheck } from "./TemplateNameCheck"
 // comment that describes a fence is counted BY it (the 187-24 trap; this very comment hit it).
 import { ModelField, type ModelFieldProps as PickerProps } from "./ModelField"
 import type { PhaseSpecJSON } from "./phaseVocabulary"
+// 200-04 (DES-02, §1 `SP-MR-01`) — the tool-phrase vocabulary, its own leaf. This panel now
+// spells NO tool phrase inline, and the reader it imports routes every lookup through
+// `own()`: the map that used to live here read `map[id] ?? id`, which is the EIGHTH live
+// WR-04 prototype-key sink in this tree, and it was observed RED against this very file (a
+// chip whose label rendered as nothing at all, because React refuses a function child).
+import { toolName } from "./toolNames"
 // TYPE-ONLY, and erased at build. The child declares its OWN props; this panel exports no
 // props type for it, exactly as it exports none for the two sections above.
 import type { TemplateNameClassification } from "./templateNameBuckets"
@@ -635,7 +641,7 @@ function ToolsField({
               title={t}
               className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[10.5px] text-foreground"
             >
-              {friendlyToolName(t)}
+              {toolName(t)}
               <span className="font-mono text-[8px] text-muted-foreground" title={t}>
                 ⓘ
               </span>
@@ -676,8 +682,10 @@ const TOOL_WHITELIST_NO_TYPING =
  * fills from `GET /workflows/grounding-bundle` and from nothing else. There is no frontend
  * list of tool ids here or anywhere upstream of here — a client-assembled whitelist would let
  * knowledge-base content whitelist itself, which is the elevation of privilege the
- * server-owned registry exists to prevent. `friendlyToolName` still LABELS the chips; a
- * display-label map is not an options source and the two must not be confused.
+ * server-owned registry exists to prevent. `toolNames.ts` still LABELS the chips; a
+ * display-label map is not an options source and the two must not be confused — and after
+ * 200-04 that distinction is structural rather than a comment: the phrase table lives in its
+ * own leaf, is read through `own()`, and an id it has no phrase for prints as itself.
  *
  * A TOOL THE DEFINITION NAMES THAT THE REGISTRY DOES NOT HAVE IS SHOWN, STRUCK THROUGH — never
  * dropped. The server already answers `unregistered_tool` for it, and hiding it here would put
@@ -730,7 +738,7 @@ function ToolWhitelistRail({
           </p>
           {tools.length > 0 && (
             <p data-testid="tools-degraded-current" className="mt-1 text-[11px] leading-snug text-muted-foreground">
-              This step currently names: {tools.map((t) => friendlyToolName(t)).join(", ")}.
+              This step currently names: {tools.map((t) => toolName(t)).join(", ")}.
             </p>
           )}
         </div>
@@ -788,7 +796,7 @@ function ToolOptionSet({
                 unregistered ? "line-through" : "",
               ].join(" ")}
             >
-              {friendlyToolName(t)}
+              {toolName(t)}
             </button>
           )
         })
@@ -868,18 +876,6 @@ function GatesRail({ gates }: { gates: PhaseGateRow[] }) {
       </p>
     </section>
   )
-}
-
-/** Map a raw tool id to a friendlier reading (best-effort; falls back to the id). */
-function friendlyToolName(id: string): string {
-  const map: Record<string, string> = {
-    search_documents: "Search documents",
-    read_document: "Read a document",
-    execute_code: "Run code",
-    fetch_url: "Fetch a web page",
-    list_folders: "List folders",
-  }
-  return map[id] ?? id
 }
 
 function asStr(v: unknown, fallback = ""): string {

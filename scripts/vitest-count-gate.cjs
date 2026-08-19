@@ -446,6 +446,28 @@ const BASELINE = {
   //
   // Read from THIS SCRIPT'S OWN `actual` column (`PhaseFormPanel.test.tsx 24 38 +14`).
   "PhaseFormPanel.test.tsx": 38,
+  // ── 200-04 Task 1 (DES-02, `200-CHECKLIST.md` §1 `SP-MR-01`) — pinned in the SAME COMMIT
+  // that creates the file, because *"an unpinned file is not a lightly-guarded one, it is an
+  // unguarded one"* and because a `BASELINE` key naming a path that does not yet exist makes
+  // this gate ERROR (exit 2) rather than fail.
+  //
+  // NO `TARGETS` EDIT ACCOMPANIES IT, and that is CHECKED rather than assumed: the file lives
+  // under `src/components/workflows`, already a DIRECTORY entry in the `TARGETS` array below,
+  // so the gate EXECUTED it the moment it existed. TARGETS decides what RUNS; BASELINE decides
+  // what is PINNED, and the two knobs are needed together only for a path outside those
+  // directory entries.
+  //
+  // What the 10 cases hold, so a later drop is visible as a loss rather than a number:
+  //   • the RED-FIRST `constructor` and `__proto__` cases — the EIGHTH live WR-04
+  //     prototype-key sink in this tree, observed RED against the shipped panel before the
+  //     module existed (React REFUSED the function child, so the chip's label rendered as
+  //     NOTHING AT ALL — worse than the predicted `[Function Object]`).
+  //   • a POSITIVE CONTROL reproducing the shipped coalesced-bracket shape and proving it
+  //     really is broken on those keys. Without it every negative could pass against a reader
+  //     that was never at risk, and the mitigation would be ceremony.
+  //   • COVERAGE as a SET DIFFERENCE against the 28 ids `get_tools(None)` offers — so a tool
+  //     added server-side fails HERE rather than reaching a business user as a schema token.
+  "toolNames.test.ts": 10,
   // 193.1-09 (AUTH-03 / SC#3) — TWO NEW FILES, pinned in the SAME COMMIT that creates them,
   // because a `BASELINE` key naming a path that does not yet exist makes this gate ERROR
   // (exit 2) rather than fail.
