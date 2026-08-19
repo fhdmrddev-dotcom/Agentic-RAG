@@ -158,6 +158,33 @@ export interface PhaseRunFacts {
   outcome: string
   /** `null` when this phase type declared no count. ⚠ `{count: 0}` is NOT null. */
   count: { count: number; noun: string } | null
+  /**
+   * Whether the run took THIS step's on-fail branch. ⚠ OPTIONAL, AND ITS ABSENCE IS A THIRD
+   * STATE: `undefined` means the caller does not hold the fact, which is not the same as
+   * `false`. `runFactsBySlug` below never sets it — the join between a definition's
+   * `skip_to_phase` and what a run actually did belongs to the PAGE, exactly as
+   * `WorkflowCanvas.runState`'s docblock requires.
+   */
+  branchTaken?: boolean
+}
+
+/**
+ * The whole run tense, in ONE optional prop.
+ *
+ * ⚠ ONE MEMBER, NOT TWO, AND THAT IS THE POINT. The spine's absent-prop render must be
+ * BYTE-IDENTICAL to its authoring render, and a component with two independent optional run
+ * props has four states to prove instead of two. Bundling the per-step lookup with the
+ * already-worded total also keeps the house rule intact: *"the PAGE owns the join, the
+ * reading and the words"* — this component derives nothing from a run it was never given.
+ */
+export interface SpineRunTense {
+  /** Per-step facts. `undefined` for a slug the run never mentioned. */
+  factsOf: (slug: string) => PhaseRunFacts | undefined
+  /**
+   * The run's total runtime, ALREADY WORDED by `receiptVocabulary.ts`. `null` when no phase
+   * row carried a readable pair — the caller then says so; this component never prints `0s`.
+   */
+  total: string | null
 }
 
 // ── Timestamp reading ───────────────────────────────────────────────────────────────────

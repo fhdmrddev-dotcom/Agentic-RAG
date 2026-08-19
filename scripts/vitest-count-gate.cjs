@@ -533,7 +533,29 @@ const BASELINE = {
   "TemplateNameCheck.test.tsx": 29,
   "WorkflowBuilderPage.test.tsx": 15,
   // 188-12: 14 → 20, inherited stale-low pin.
-  "PhaseSpineGraph.test.tsx": 20,
+  // ⚠ 200-05 Task 2 (DES-02 / `200-CHECKLIST.md` §2): 20 → 35, and the FIRST 4 of those 15 are
+  // DE-SLACKING, not new coverage. This file was running 24 while pinned at 20 — measured on
+  // the unmodified tree at this plan's base, where the gate printed
+  // `PhaseSpineGraph.test.tsx  20  24  +4`. **Four cases were deletable with the gate green**,
+  // and *"a pinned TOTAL rising proves nothing about the NEW cases, because slack inside an
+  // already-listed file absorbs them"* — so the slack is closed in the same commit that adds
+  // the eleven run-tense cases, rather than letting them hide inside it.
+  //
+  // ⚠ RAISING A PIN NECESSARILY DELETES A LINE, so a `grep -c '^-[^-]'` expecting 0 is WRONG
+  // for this hunk — unlike the two ADDED pins at the foot of this map, which are `+n / −0`.
+  //
+  // WHAT THE ELEVEN NEW CASES HOLD: the two halves of the optional-run-prop contract, and
+  // neither is sufficient alone. (1) ABSENT ⇒ the render is BYTE-IDENTICAL to the authoring
+  // one, compared as whole `innerHTML` rather than probed — that is 199-02's refusal (this
+  // component reads a DRAFT definition and has NO run, so a duration or a branch outcome on it
+  // is a FABRICATED claim) enforced by construction instead of remembered. (2) PRESENT ⇒ a
+  // DIFFERENT DOM, copied from `PhaseFormPanel.rails.test.tsx:125`, because a prop that changed
+  // nothing would pass (1) perfectly while being inert and nothing else would say so. Plus:
+  // `never ran (skipped)` and `time not recorded` proved DIFFERENT readings on the rendered
+  // spine; a declared `0` rendering while an ABSENT count renders no slot at all; and the
+  // branch reading as a THREE-state read whose absent arm renders nothing, because
+  // `branch not taken` would be a claim about a run nobody measured.
+  "PhaseSpineGraph.test.tsx": 35,
   // 189-13 (CONN-01 / UI-SPEC §5a): 14 → 17. An EXTENSION, not a lowering — the six
   // individual PHASE_GLYPHS key assertions were NOT collapsed into the new property, they
   // were kept and the seventh added beside them, because a property rewrite that shrank
