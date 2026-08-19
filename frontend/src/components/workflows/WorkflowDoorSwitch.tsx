@@ -35,7 +35,7 @@
  *  - XSS (T-124-05): the describe text + the soul-preview strings render as plain
  *    React text children (auto-escaped). NEVER `dangerouslySetInnerHTML`.
  */
-import { useState } from "react"
+import { useId, useState } from "react"
 import { WorkflowBuilderPage, type BuilderInitial } from "@/pages/WorkflowBuilderPage"
 import { DescribeKbPicker } from "@/components/workflows/DescribeKbPicker"
 // Phase 193-03 (D-05 / D-08): the govern door's header strip lives in its own module now —
@@ -62,6 +62,7 @@ import {
   CHOOSER_H1,
   CHOOSER_SUB,
   DESCRIBE_CTA,
+  DESCRIBE_CTA_REFUSED,
   DESCRIBE_H1,
   DESCRIBE_REFUSAL,
   DOOR_A_DESC,
@@ -175,6 +176,9 @@ export function WorkflowDoorSwitch({
   headerLead,
 }: WorkflowDoorSwitchProps) {
   const [door, setDoor] = useState<DoorState>(initialDoor)
+  /** Sketch 200 binds the describe heading to the box as a real `label`, which needs a
+   *  stable id. `useId` is the shipped idiom on this surface (`DraftArrivalCard`). */
+  const describeBoxId = useId()
   const [describe, setDescribe] = useState("")
   // Phase 124 CR-01 fix: the loose door's draft CTA (`DESCRIBE_CTA`) hands the typed text to
   // the govern-door Builder AND asks it to auto-run the draft. Sticky until the user
@@ -368,15 +372,31 @@ export function WorkflowDoorSwitch({
           </button>
           <span className="text-[13px] font-medium text-foreground">{STRIP_LABEL}</span>
         </div>
-        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto px-6 py-6 lg:grid-cols-[1fr_320px]">
+        {/* ── SKETCH 200 (`doors.html`) — ONE CENTRED 720px COLUMN, NOT A SPLIT ──────────
+            The sheet draws the whole describe screen as a single column of labelled
+            sections: the box, then the knowledge picker, then the template row. The shipped
+            `lg:grid-cols-[1fr_320px]` split put the soul preview in a sidebar, which is why
+            the box never reached the sheet's width and the sections never read as a sequence.
+
+            ⚠ THE SOUL PREVIEW IS KEPT AND MOVED, NOT DROPPED. The sheet has no aside — but
+            `SOUL_LABEL` and `<WorkflowSoul scale="card" />` are shipped surface carrying what
+            the workflow WILL DO, and removing the only place they render would lose it. It
+            becomes the last section of the column instead, so the sheet's composition holds
+            and nothing is lost. The `WorkflowSoul` element itself is untouched. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8">
+          <div className="mx-auto flex w-full max-w-[720px] flex-col gap-8">
           {/* The describe box (descends from WorkflowBuilderPage's empty screen). */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col items-center gap-2 text-center">
-              <span aria-hidden="true" className="text-3xl">
-                ✎
-              </span>
-              <h1 className="text-[1.4rem] font-semibold text-foreground">{DESCRIBE_H1}</h1>
-            </div>
+          <div className="flex flex-col gap-2">
+            {/* ⚠ THE HEADING IS THE BOX'S LABEL NOW, AND IT IS BOUND TO IT. The sheet draws
+                this as a left-aligned `font-data-md` label above the textarea, not as a
+                centred h1 under a decorative glyph. Dropping the ✎ is the port: the sheet
+                spends no ornament here, and the glyph named nothing. */}
+            <label
+              htmlFor={describeBoxId}
+              className="font-mono text-[14px] leading-[1.4] text-foreground"
+            >
+              {DESCRIBE_H1}
+            </label>
             {/* ── 199-08 (sheet c9 §3) — THE BOX, AND ITS ONE TONED STATE ──
                 ⚠ THE CLASS LIST IS A CONCATENATION, NEVER TWO `className` BRANCHES, and the
                 shape is `DoorHeaderStrip.tsx`'s `ml-auto` conditional copied in kind for the
@@ -393,37 +413,59 @@ export function WorkflowDoorSwitch({
                 assumed, because fifteen of this sheet's seventeen colour tokens compile to
                 nothing here and would render identically to an arm nobody painted. */}
             <textarea
+              id={describeBoxId}
               aria-label="business requirement"
               data-testid="describe-box"
               value={describe}
               onChange={(e) => setDescribe(e.target.value)}
-              placeholder="Describe the goal in plain language…"
+              placeholder="Describe the steps…"
               rows={5}
               // SPREAD-CONDITIONAL, this file's shipped idiom: with nothing refused the
               // attribute is genuinely ABSENT rather than present-and-false, so the resting
-              // markup is the markup that shipped. `aria-invalid="false"` would not be.
+              // markup carries no claim at all. `aria-invalid="false"` would not be.
               {...(refusingDescribe ? { "aria-invalid": true } : {})}
-              className={`w-full resize-none rounded-lg border ${refusingDescribe ? "border-destructive" : "border-border"} bg-card px-4 py-4 text-[15px] leading-relaxed text-foreground ${refusingDescribe ? "focus:border-destructive" : "focus:border-primary"} focus:outline-none focus:ring-1 ${refusingDescribe ? "focus:ring-destructive" : "focus:ring-primary"}`}
+              // ⚠ STILL A CONCATENATION AND NEVER TWO `className` BRANCHES — the shipped shape,
+              // kept for the shipped reason: the three refusing slots resolve to the ordinary
+              // class list character for character when nothing is refused.
+              // ⚠ `resize-y` AND `rounded` AND `focus:ring-0` COME FROM SKETCH 200: the sheet
+              // lets the author grow the box (a describe box you cannot see all of is the
+              // complaint behind the whole screen), uses the 2px radius the design system's
+              // DEFAULT token carries, and draws the focused border WITHOUT a second ring.
+              className={`w-full resize-y rounded border ${refusingDescribe ? "border-destructive" : "border-border"} bg-card p-4 text-[14px] leading-[1.5] text-foreground ${refusingDescribe ? "focus:border-destructive" : "focus:border-primary"} focus:outline-none focus:ring-0`}
+              /* ⚠ TWO TONE SLOTS NOW, NOT THREE, AND THAT IS THE SHEET'S DOING RATHER THAN A
+                 WEAKENING. Sketch 200 draws this box `focus:ring-0` — the focused state is the
+                 BORDER changing colour, with no second ring behind it — so there is no third
+                 slot left to swing. The refusal's primary carrier also got STRONGER in the same
+                 port: it is a left-accent panel with a glyph and a body-size sentence, where it
+                 used to be a 12.5px line. Tone is still never the only carrier. */
             />
-            {/* ⚠ THE REFUSAL, SAID OUT LOUD — the sheet's whole finding for this surface, and
-                the one thing a disabled button cannot do. `role="status"` rather than `alert`:
-                the author is mid-typing and this is a standing condition, not an interruption.
-                Rendered only while there is an input to refuse, so it never greets anyone. */}
+            {/* ── ⚠ THE REFUSAL, SAID OUT LOUD — and sketch 200 draws it as a BLOCK ──────────
+                The sheet gives this its own left-accent panel with a glyph: a tinted fill, a
+                hairline border, a 4px destructive rule down the left edge, and the sentence at
+                body size. The shipped treatment was a 12.5px line under the box, which is the
+                same words at the weight of a caption.
+
+                `role="status"` rather than `alert`: the author is mid-typing and this is a
+                standing condition, not an interruption. Rendered only while there is an input
+                to refuse, so it never greets anyone.
+
+                ⚠ TONE IS THE SECOND CARRIER, NEVER THE ONLY ONE (WCAG 1.4.1) — the refusal is
+                a SENTENCE first and this panel reinforces it. `destructive` is a shipped token
+                that resolves in `tailwind.config.js`, verified rather than assumed: fifteen of
+                this sheet family's colour tokens compile to nothing here and would render
+                identically to an arm nobody painted. */}
             {refusingDescribe && (
-              <p
+              <div
                 data-testid="describe-refusal"
                 role="status"
-                className="-mt-2 text-[12.5px] leading-snug text-destructive"
+                className="mt-1 flex items-start gap-2 rounded-r border border-l-4 border-destructive/30 border-l-destructive bg-destructive/10 p-4"
               >
-                {DESCRIBE_REFUSAL}
-              </p>
+                <span aria-hidden="true" className="mt-[2px] shrink-0 text-destructive">
+                  ⊘
+                </span>
+                <p className="text-[14px] leading-[1.5] text-destructive">{DESCRIBE_REFUSAL}</p>
+              </div>
             )}
-            {/* Phase 187-26 (GAP A): somewhere to say what this work is ABOUT, before the
-                AI drafts. OPTIONAL by construction — it renders nothing when there are no
-                folders to offer, it touches no enablement rule, and ignoring it gives
-                today's behaviour exactly. Its own file, so this shell gains a mount and
-                not a surface (the D-187-14 shape). */}
-            <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
             {/* ── 193.1-08 (D-24 / SC#1) — THE PRE-DRAFT ATTACH ROW, ON THE **LOOSE** DOOR ──
                 ⚠ THIS IS `WorkflowDoorSwitch.tsx`'s `door-describe` — the screen sketch 165
                 actually rendered (`build.cjs:6-7`; its anchor assertions name `switch-strip`,
@@ -440,13 +482,21 @@ export function WorkflowDoorSwitch({
                 It renders the SAME component the Builder mounts. Ignore it and this door
                 behaves exactly as it did (SC#4): no document ⇒ the reading is `idle` ⇒ no
                 request, no reading block, and `canDraft` above gains nothing. */}
-            <DescribeTemplateRow
-              state={templateRead}
-              filename={templateFile?.name}
-              onPickFile={setTemplateFile}
-              onClear={() => setTemplateFile(null)}
-            />
-            <div className="flex flex-col items-center gap-3">
+            {/* ── SKETCH 200 — THE CTA IS RIGHT-ALIGNED AND IT CARRIES ITS OWN REASON ──────
+                The sheet draws the draft control at the end of the row (`justify-end`), and —
+                this is the sheet's finding, not a restyle — draws the REFUSING state as a
+                button that SAYS WHY: a block glyph and `DESCRIBE_CTA_REFUSED` in place of the
+                verb. A greyed-out control with the unchanged label is the failure state the
+                whole screen is about; it tells an author that something is wrong and nothing
+                about what.
+
+                ⚠ IT ADDS NO RULE AND CHANGES NO ENABLEMENT. `disabled={!canDraft}` is
+                untouched and `canDraft` is untouched. `refusingDescribe` is `canDraft`'s FIRST
+                TERM read back — it is never consulted by it — so a box that is empty because a
+                template read is still in flight keeps the ordinary label, which is correct: the
+                attach row states that condition itself, and a second sentence here would be a
+                second home for one fact. */}
+            <div className="flex justify-end">
               <button
                 type="button"
                 data-testid="describe-draft"
@@ -462,47 +512,111 @@ export function WorkflowDoorSwitch({
                   setHandoffDraft(true)
                   setDoor("govern")
                 }}
-                className="rounded-md bg-primary px-5 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                className={
+                  refusingDescribe
+                    ? "flex cursor-not-allowed items-center gap-1 rounded border border-border bg-muted px-6 py-2 font-mono text-[14px] leading-[1.4] text-muted-foreground"
+                    : "rounded bg-primary px-6 py-2 text-[14px] font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-40"
+                }
               >
-                {DESCRIBE_CTA}
-              </button>
-              {/* ⚠ D-12: the hint is a SENTENCE, not a string. Only the three bold fragments
-                  are data; this component keeps the `<b>` markup AND the non-bold connective
-                  text, so no template language and no parser enter a vocabulary leaf. The
-                  `{" "}` separators are load-bearing — JSX would otherwise drop the space
-                  before each `<b>`, and the byte-exact captures in
-                  `WorkflowBuilderPage.describe.test.tsx` hold that spacing. */}
-              <p data-testid="describe-hint" className="text-center text-[13px] text-muted-foreground">
-                You describe the goal — the AI{" "}
-                <b className="font-medium text-foreground">{HINT_FRAG1}</b>,{" "}
-                <b className="font-medium text-foreground">{HINT_FRAG2}</b>, and{" "}
-                <b className="font-medium text-foreground">{HINT_FRAG3}</b>.
-              </p>
-            </div>
-            {/* D-05: nothing lost by picking fast — advanced is one click away. */}
-            <div
-              data-testid="switch-strip"
-              className="flex flex-wrap items-center gap-2 rounded-lg border border-accent-violet/30 bg-accent-violet/5 px-3 py-2 text-[12px] text-muted-foreground"
-            >
-              <span aria-hidden="true">🔧</span>
-              <span>{SWITCH_PROMPT}</span>
-              <button
-                type="button"
-                data-testid="switch-to-govern"
-                onClick={() => setDoor("govern")}
-                className="ml-auto rounded-md border border-accent-violet/40 px-2.5 py-1 text-[12px] font-medium text-accent-violet hover:bg-accent-violet/10"
-              >
-                {SWITCH_CTA}
+                {refusingDescribe && (
+                  <span aria-hidden="true" className="text-[16px] leading-none">
+                    ⊘
+                  </span>
+                )}
+                {refusingDescribe ? DESCRIBE_CTA_REFUSED : DESCRIBE_CTA}
               </button>
             </div>
+            {/* ⚠ D-12: the hint is a SENTENCE, not a string. Only the three bold fragments
+                are data; this component keeps the `<b>` markup AND the non-bold connective
+                text, so no template language and no parser enter a vocabulary leaf. The
+                `{" "}` separators are load-bearing — JSX would otherwise drop the space
+                before each `<b>`, and the byte-exact captures in
+                `WorkflowBuilderPage.describe.test.tsx` hold that spacing.
+
+                ⚠ KEPT, AND LEFT-ALIGNED. Sketch 200 draws no hint under its box — but these
+                are three governed ids saying what the AI will do to your paragraph, and this
+                is their only render site. It is demoted to a quiet line in the column's flow
+                rather than deleted (nothing in the reference may be dropped; nothing in the
+                app may be dropped silently either). */}
+            <p data-testid="describe-hint" className="text-[13px] leading-[1.5] text-muted-foreground">
+              You describe the goal — the AI{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG1}</b>,{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG2}</b>, and{" "}
+              <b className="font-medium text-foreground">{HINT_FRAG3}</b>.
+            </p>
           </div>
-          {/* The soul PREVIEW of the current draft/definition (D-05). */}
-          <aside data-testid="describe-soul-preview" className="rounded-lg border border-border bg-card/40 p-4">
+
+          {/* ⚠ SKETCH 200 DRAWS A HAIRLINE BETWEEN EVERY SECTION OF THIS COLUMN. With the
+              split gone, the rule is what tells one labelled question from the next. */}
+          <div aria-hidden="true" className="h-px w-full bg-border" />
+
+          {/* Phase 187-26 (GAP A): somewhere to say what this work is ABOUT, before the
+              AI drafts. OPTIONAL by construction — it touches no enablement rule, and
+              ignoring it gives today's behaviour exactly. Its own file, so this shell gains a
+              mount and not a surface (the D-187-14 shape).
+
+              ⚠ IT IS ITS OWN SECTION NOW, which is sketch 200's composition: the sheet gives
+              the knowledge question a labelled block of its own between two rules, rather than
+              a select wedged under the box. Its three drawn arms live in that file. */}
+          <DescribeKbPicker value={kbFolderId} onChange={setKbFolderId} />
+
+          <div aria-hidden="true" className="h-px w-full bg-border" />
+
+          {/* ── 193.1-08 (D-24 / SC#1) — THE PRE-DRAFT ATTACH ROW, ON THE **LOOSE** DOOR ──
+              ⚠ THIS IS `WorkflowDoorSwitch.tsx`'s `door-describe` — the screen sketch 165
+              actually rendered (`build.cjs:6-7`; its anchor assertions name `switch-strip`,
+              which exists only in this file). The govern door's near-identical screen lives
+              in `WorkflowBuilderPage.tsx` and carries its own mount; every assertion about
+              this mount names this file.
+
+              ⚠ ITS POSITION MOVED, AND THE MOVE IS SKETCH 200'S. The 193.1 splice put it
+              between the KB picker and the CTA group, mirroring sketch 165. Sketch 200 draws
+              the template question as the LAST section of the column, after the knowledge
+              question — which is the same relative order (knowledge, then document) with the
+              CTA lifted up into the box's own section where the sheet puts it. It renders the
+              SAME component the Builder mounts; ignore it and this door behaves exactly as it
+              did (SC#4): no document ⇒ the reading is `idle` ⇒ no request, no reading block,
+              and `canDraft` gains nothing. */}
+          <DescribeTemplateRow
+            state={templateRead}
+            filename={templateFile?.name}
+            onPickFile={setTemplateFile}
+            onClear={() => setTemplateFile(null)}
+          />
+
+          {/* D-05: nothing lost by picking fast — advanced is one click away. */}
+          <div
+            data-testid="switch-strip"
+            className="flex flex-wrap items-center gap-2 rounded border border-accent-violet/30 bg-accent-violet/5 px-3 py-2 text-[12px] text-muted-foreground"
+          >
+            <span aria-hidden="true">🔧</span>
+            <span>{SWITCH_PROMPT}</span>
+            <button
+              type="button"
+              data-testid="switch-to-govern"
+              onClick={() => setDoor("govern")}
+              className="ml-auto rounded-sm border border-accent-violet/40 px-2.5 py-1 text-[12px] font-medium text-accent-violet hover:bg-accent-violet/10"
+            >
+              {SWITCH_CTA}
+            </button>
+          </div>
+
+          {/* The soul PREVIEW of the current draft/definition (D-05).
+
+              ⚠ IT IS THE LAST SECTION OF THE COLUMN NOW RATHER THAN A 320px SIDEBAR — the
+              sheet's describe page is one column and has no aside. The element inside is
+              UNCHANGED: `<WorkflowSoul def={previewDef} scale="card" />`, byte for byte, so
+              the preview itself is moved and not re-drawn. */}
+          <aside
+            data-testid="describe-soul-preview"
+            className="rounded border border-border bg-card/40 p-4"
+          >
             <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
               {SOUL_LABEL}
             </p>
             <WorkflowSoul def={previewDef} scale="card" />
           </aside>
+          </div>
         </div>
       </div>
     )
@@ -518,57 +632,139 @@ export function WorkflowDoorSwitch({
       {inline && headerLead && (
         <div className="flex items-center gap-3 border-b border-border px-4 py-2">{headerLead}</div>
       )}
-      <div className="flex flex-col gap-1 border-b border-border px-6 py-4">
-        <h1 className="text-[18px] font-semibold text-foreground">{CHOOSER_H1}</h1>
-        <p className="text-[13px] text-muted-foreground">{CHOOSER_SUB}</p>
-      </div>
-      <div className="grid min-h-0 flex-1 content-start gap-4 overflow-y-auto px-6 py-6 md:grid-cols-2">
-        {/* Door A — the loose door (`DOOR_A_*`). */}
-        <button
-          type="button"
-          data-testid="door-card-describe"
-          onClick={() => setDoor("describe")}
-          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-primary/60"
-        >
-          <span aria-hidden="true" className="text-3xl">
-            ⚡
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {DOOR_A_TIER}
-          </span>
-          <span className="text-[16px] font-semibold text-foreground">{DOOR_A_NAME}</span>
-          <span className="text-[13px] text-muted-foreground">{DOOR_A_DESC}</span>
-          {/* `Open ›` is NOT a governed id — the build contract's COPY table does not
-              carry it, so it stays a literal here rather than travelling to the
-              vocabulary module on a guess (193-05: port the table, not the surface). */}
-          <span className="mt-1 text-[13px] font-medium text-primary">
-            Open <span aria-hidden="true">›</span>
-          </span>
-          <span className="mt-1 text-[11px] italic text-muted-foreground">{DOOR_A_NOTE}</span>
-        </button>
+      {/* ── SKETCH 200 (`doors.html`) — THE CHOOSER IS A CENTRED 720px COLUMN ────────────
+          The sheet drops the bordered header band and puts the heading in the flow of one
+          column: a 32px h1, a 16px sub-line, then the two doors as a `grid-cols-2 gap-4`.
+          The band's rule was the only thing separating a heading from the cards it belongs
+          to, and removing it is what lets the whole screen read as one page. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-8">
+        <div className="mx-auto flex w-full max-w-[720px] flex-col gap-8">
+          <header className="flex flex-col gap-1">
+            <h1 className="text-[32px] font-semibold leading-[1.2] tracking-[-0.02em] text-foreground">
+              {CHOOSER_H1}
+            </h1>
+            <p className="text-[16px] leading-[1.6] text-muted-foreground">{CHOOSER_SUB}</p>
+          </header>
 
-        {/* Door B — the strict door (`DOOR_B_*`). */}
-        <button
-          type="button"
-          data-testid="door-card-govern"
-          onClick={() => setDoor("govern")}
-          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-accent-violet/60"
-        >
-          <span aria-hidden="true" className="text-3xl">
-            🔧
-          </span>
-          <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            {DOOR_B_TIER}
-          </span>
-          <span className="text-[16px] font-semibold text-foreground">{DOOR_B_NAME}</span>
-          <span className="text-[13px] text-muted-foreground">{DOOR_B_DESC}</span>
-          <span className="mt-1 text-[13px] font-medium text-accent-violet">
-            Open <span aria-hidden="true">›</span>
-          </span>
-          <span className="mt-1 text-[11px] italic text-muted-foreground">{DOOR_B_NOTE}</span>
-        </button>
+          <section className="grid gap-4 sm:grid-cols-2">
+            {/* Door A — the loose door (`DOOR_A_*`). */}
+            <DoorCard
+              testId="door-card-describe"
+              onOpen={() => setDoor("describe")}
+              glyph="⚡"
+              name={DOOR_A_NAME}
+              tier={DOOR_A_TIER}
+              desc={DOOR_A_DESC}
+              note={DOOR_A_NOTE}
+              tone="primary"
+            />
+
+            {/* Door B — the strict door (`DOOR_B_*`). */}
+            <DoorCard
+              testId="door-card-govern"
+              onOpen={() => setDoor("govern")}
+              glyph="🔧"
+              name={DOOR_B_NAME}
+              tier={DOOR_B_TIER}
+              desc={DOOR_B_DESC}
+              note={DOOR_B_NOTE}
+              tone="violet"
+            />
+          </section>
+        </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * ── SKETCH 200 — ONE DOOR CARD, DRAWN THE SHEET'S WAY ────────────────────────────────
+ *
+ * The sheet's card is a header ROW (glyph + name on one baseline, a chip pushed to the far
+ * edge) over a description paragraph, with a 2px hover lift. The shipped card stacked five
+ * atoms vertically — glyph, tier, name, description, `Open ›`, note — which is why it read
+ * as a list rather than as a door.
+ *
+ * ⚠ THE CHIP SLOT HOLDS THE **TIER**, WHICH IS THE SHEET'S OWN SHAPE FILLED WITH A FACT WE
+ * HOLD. The sheet draws `CHOSEN` there, which is a state the chooser does not have — you are
+ * in neither door while you are looking at both, and a card marked CHOSEN at rest would be
+ * claiming a selection nobody made (the class of invention this port forbids). The tier line
+ * is what already occupied that role in the shipped card, so it moves into the slot the sheet
+ * drew for it rather than a badge being manufactured.
+ *
+ * ⚠ `Open ›` AND THE NOTE ARE REVEALED ON HOVER AND ON FOCUS, NOT DROPPED. The sheet draws
+ * neither — its card is the affordance and its body is two elements. But `DOOR_A_NOTE` /
+ * `DOOR_B_NOTE` are governed ids carrying what each door COSTS you, and deleting the only
+ * place they render would lose the information rather than declutter it. Disclosure keeps the
+ * resting card exactly as drawn and keeps the sentence one gesture away.
+ *
+ * ⚠ FOCUS, NOT ONLY HOVER — the same rule the knowledge picker's remove control follows. A
+ * `group-hover`-only reveal is invisible to an author driving the page from the keyboard, and
+ * the sheet has no opinion about that because a sheet has no keyboard.
+ */
+function DoorCard({
+  testId,
+  onOpen,
+  glyph,
+  name,
+  tier,
+  desc,
+  note,
+  tone,
+}: {
+  testId: string
+  onOpen: () => void
+  glyph: string
+  name: string
+  tier: string
+  desc: string
+  note: string
+  /** Which accent this door wears. The two doors are told apart by colour in the sheet, and
+   *  the loose/strict distinction is the one thing this shell must never blur. */
+  tone: "primary" | "violet"
+}) {
+  const accent = tone === "primary" ? "text-primary" : "text-accent-violet"
+  const chip =
+    tone === "primary"
+      ? "border-primary/20 bg-primary/10 text-primary"
+      : "border-accent-violet/20 bg-accent-violet/10 text-accent-violet"
+  const hover = tone === "primary" ? "hover:border-primary/60" : "hover:border-accent-violet/60"
+
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onOpen}
+      className={[
+        "group relative flex flex-col gap-2 overflow-hidden rounded border border-border bg-card p-4 text-left",
+        "transition-all duration-200 hover:-translate-y-[2px] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary",
+        hover,
+      ].join(" ")}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span aria-hidden="true" className={`text-[20px] leading-none ${accent}`}>
+            {glyph}
+          </span>
+          <h2 className="text-[18px] font-semibold leading-[1.4] text-foreground">{name}</h2>
+        </div>
+        <span
+          className={`shrink-0 rounded-sm border px-2 py-1 font-mono text-[12px] leading-[1.4] ${chip}`}
+        >
+          {tier}
+        </span>
+      </div>
+      <p className="text-[14px] leading-[1.5] text-muted-foreground">{desc}</p>
+      {/* The disclosure footer — nothing at rest, everything one gesture away. `Open ›` is NOT
+          a governed id (the build contract's COPY table has no row for it), so it stays a
+          literal here rather than travelling to the vocabulary module on a guess. */}
+      <span className="flex flex-col gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100 group-focus-visible:opacity-100">
+        <span className={`text-[13px] font-medium ${accent}`}>
+          Open <span aria-hidden="true">›</span>
+        </span>
+        <span className="text-[11px] italic text-muted-foreground">{note}</span>
+      </span>
+    </button>
   )
 }
 

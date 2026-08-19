@@ -107,7 +107,7 @@ const ALL_DOOR_WORDS = Object.entries(doorVocabulary) as [string, string][]
  * module's export set, and the contract case additionally asserts the new id is ABSENT from the
  * parsed contract, so the split cannot silently absorb a future id that should have been in it.
  */
-const GOVERNED_ID_COUNT = 23
+const GOVERNED_ID_COUNT = 24
 
 /** How many of those ids the GENERATED doors-copy contract governs — every one except D-28's. */
 const CONTRACT_ID_COUNT = 21
@@ -169,6 +169,13 @@ const POST_CONTRACT_COPY: Record<string, string> = {
   // is absent from the generated contract, which is what stops this object from becoming a
   // place to park an id someone did not want the generator to check.
   DESCRIBE_REFUSAL: "There is nothing here to draft from yet — describe the work in a sentence.",
+  // Sketch 200 (`doors.html`) — THE THIRD POST-CONTRACT ID, and it arrives for exactly the
+  // reason the two above did: the sheet is its acceptance bar and the generated contract has
+  // no row for it. It joins here rather than in `COLUMN_D` so the contract-parse case below
+  // keeps proving the seam is REAL — that case asserts every post-contract string is absent
+  // from `doors-copy.generated.md`, which is what stops this object from becoming a place to
+  // park an id someone did not want the generator to check.
+  DESCRIBE_CTA_REFUSED: "Too thin to draft",
 }
 
 /** Both bars together — what the module's export set must equal, exactly. */

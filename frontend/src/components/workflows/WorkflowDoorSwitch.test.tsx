@@ -288,11 +288,25 @@ const kbFolder = (id: string, name: string) => ({
 const KB_POLICIES = kbFolder("f-policies", "Policies")
 const KB_CONTRACTS = kbFolder("f-contracts", "Contracts")
 
-/** Open the describe door with folders on offer and wait for the picker to land. */
+/**
+ * Open the describe door with folders on offer and wait for the picker to land.
+ *
+ * ⚠ SKETCH 200 — THE SELECT IS DISCLOSED, NOT ALWAYS-ON. The picker's resting arm is a dashed
+ * add control; pressing it reveals the shipped `select` under the shipped test id. Every case
+ * below still asserts the same PROPERTY it always did — only the route to the control moved.
+ */
 async function openDescribeDoorWithFolders() {
   mockListFolders.mockResolvedValue([KB_POLICIES, KB_CONTRACTS])
   render(<WorkflowDoorSwitch />)
   fireEvent.click(screen.getByTestId("door-card-describe"))
+  return revealKbSelect()
+}
+
+/** Reveal the picker's `select` from whichever arm is currently showing. */
+async function revealKbSelect(): Promise<HTMLSelectElement> {
+  const already = screen.queryByTestId("project-folder-picker")
+  if (already) return already as HTMLSelectElement
+  fireEvent.click(await screen.findByTestId("describe-kb-choose"))
   return (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
 }
 
@@ -312,7 +326,11 @@ describe("WorkflowDoorSwitch — the describe door can bind a knowledge base (GA
     render(<WorkflowDoorSwitch />)
     fireEvent.click(screen.getByTestId("door-card-describe"))
     await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    // ⚠ STILL NO SELECT AND STILL NO OPTION — the property this case guards is untouched.
+    // What changed under sketch 200 is that the door now SAYS there are none instead of
+    // rendering one silence for two different causes (see `DescribeKbPicker.test.tsx`).
     expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+    expect(screen.getByTestId("door-describe").querySelectorAll("option")).toHaveLength(0)
     // The describe box and the CTA are untouched by the picker's absence.
     expect(screen.getByTestId("describe-box")).toBeInTheDocument()
     expect(screen.getByTestId("describe-draft")).toBeInTheDocument()
@@ -321,7 +339,7 @@ describe("WorkflowDoorSwitch — the describe door can bind a knowledge base (GA
 
 describe("WorkflowDoorSwitch — THE PICKER NEVER BLOCKS (the fast path keeps its promise)", () => {
   it("with NOTHING chosen the CTA is enabled by TEXT ALONE, and one click still hands off", async () => {
-    await openDescribeDoorWithFolders()
+    const select = await openDescribeDoorWithFolders()
 
     const cta = screen.getByTestId("describe-draft")
     // Empty box ⇒ disabled, exactly as it ships. The picker did not change that rule.
@@ -332,7 +350,7 @@ describe("WorkflowDoorSwitch — THE PICKER NEVER BLOCKS (the fast path keeps it
     })
     // Text alone enables it — no knowledge base was chosen and none was asked for.
     expect(cta).toBeEnabled()
-    expect((screen.getByTestId("project-folder-picker") as HTMLSelectElement).value).toBe("")
+    expect(select.value).toBe("")
 
     fireEvent.click(cta)
     expect(screen.getByTestId("door-govern")).toBeInTheDocument()
@@ -390,8 +408,14 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
     expect(screen.getByTestId("workflow-doors")).toBeInTheDocument()
     fireEvent.click(screen.getByTestId("door-card-describe"))
 
-    const again = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
-    expect(again.value).toBe(KB_POLICIES.id)
+    // ⚠ THE PICK IS NOW VISIBLE WITHOUT OPENING ANYTHING — sketch 200's arm 2 NAMES the
+    // chosen folder on the face of the door, where the shipped surface required reading a
+    // `select`'s DOM property. That is a STRONGER reading of the same fact: the name is
+    // resolved by looking the surviving id up in the freshly-fetched folder list, so a pick
+    // that did not survive could not produce it.
+    expect(await screen.findByTestId("describe-kb-chosen")).toHaveTextContent(KB_POLICIES.name)
+    // …and it is the chosen arm, not the offer arm: nothing is being offered to re-pick.
+    expect(screen.queryByTestId("describe-kb-choose")).toBeNull()
     // …and the returning trip did NOT re-fire the generate hand-off.
     expect(mockGenerateWorkflow).not.toHaveBeenCalled()
   })
@@ -415,7 +439,11 @@ describe("WorkflowDoorSwitch — THE ROUND TRIP: a loose-door workflow can be bo
     mockListFolders.mockResolvedValue([KB_CONTRACTS])
     fireEvent.click(screen.getByTestId("door-card-describe"))
 
-    const again = (await screen.findByTestId("project-folder-picker")) as HTMLSelectElement
+    // The dead id is surrendered, so the door falls back to arm 1 (nothing chosen) and the
+    // folder that vanished is named nowhere.
+    await screen.findByTestId("describe-kb-choose")
+    expect(screen.queryByTestId("describe-kb-chosen")).toBeNull()
+    const again = await revealKbSelect()
     await waitFor(() => expect(again.value).toBe(""))
 
     fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "Vendor risk" } })
@@ -604,7 +632,8 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
     // 199-08 (DES-01): 22 → 23, again in the SAME COMMIT as `GOVERNED_ID_COUNT` in
     // `doorVocabulary.test.ts` — the two numbers are one fact read from two files, and a count
     // that moved on its own is a table nobody checked.
-    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(23)
+    // Sketch 200: 23 → 24 (`DESCRIBE_CTA_REFUSED`), same commit, same rule, third time.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(24)
     for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
     // …and the SECOND spelling is not a no-op: at least one id really differs between the
     // two, which is the only thing that makes sweeping twice worth the line.
@@ -629,7 +658,7 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
 
 describe("D-24(a) — no governed door word survives as a literal in any swept module", () => {
   it.each(SWEPT_SOURCES.map((f) => [f.path, f.source] as const))(
-    "%s carries none of the 23 governed words, in either spelling",
+    "%s carries none of the 24 governed words, in either spelling",
     (_path, source) => {
       expect(hitsIn(source)).toEqual([])
     },
@@ -1042,13 +1071,29 @@ describe("199-08 Task 1 — the RESTING inventory of the door surface (pinned PR
     const controls = Array.from(
       door.querySelectorAll("button, input, textarea, select, a[href]"),
     ).map((n) => n.getAttribute("data-testid"))
+    /**
+     * ⚠ THE SET IS UNCHANGED — STILL EXACTLY FIVE, AND STILL THE SAME FIVE. Only the ORDER
+     * moved, and it moved because sketch 200 puts the draft control inside the describe box's
+     * own section (right-aligned under the textarea) and the template question in a labelled
+     * section of its own further down the column. The original expectation is kept here so the
+     * move is legible rather than absorbed:
+     *
+     *     both-doors · describe-box · describe-template-input · describe-draft · switch-to-govern
+     *
+     * ⚠ AND THE COUNT IS THE PART THAT GUARDS SOMETHING. The picker adds no sixth control on
+     * this render: with no folders offered it renders arm 3, whose way-out is gated on an
+     * `onUploadDocuments` this mount does not supply, so the door gains a SENTENCE and not a
+     * control. That is asserted directly below rather than left implied by the list.
+     */
     expect(controls).toEqual([
       "both-doors",
       "describe-box",
-      "describe-template-input",
       "describe-draft",
+      "describe-template-input",
       "switch-to-govern",
     ])
+    expect(controls).toHaveLength(5)
+    expect(screen.queryByTestId("describe-kb-upload")).toBeNull()
   })
 })
 
@@ -1104,13 +1149,22 @@ describe("199-08 Task 1 — the knowledge picker's THREE readings, as they ship"
     expect(within(select).getByText("No specific knowledge base")).toBeInTheDocument()
   })
 
-  it("READING 2 — one chosen: the control carries the chosen folder's id", async () => {
+  it("READING 2 — one chosen: the door NAMES the chosen folder, not just its id", async () => {
+    // ⚠ THE TITLE MOVED AND THE PROPERTY GOT STRONGER. It read "the control carries the chosen
+    // folder's id", which was all the shipped surface could offer: the id lived in a `select`'s
+    // DOM property and never reached the markup. Sketch 200's arm 2 puts the folder's NAME on
+    // the face of the door, so the reading is now something a person can have. The id is still
+    // asserted, through the same `select`, one disclosure away.
     const select = await openDescribeDoorWithFolders()
     fireEvent.change(select, { target: { value: KB_CONTRACTS.id } })
-    expect(select.value).toBe(KB_CONTRACTS.id)
+    const row = await screen.findByTestId("describe-kb-chosen")
+    // The NAME is what a person reads, and it can only appear by resolving the written ID
+    // against the offered list — so this asserts the id reached the parent, through the face.
+    expect(row).toHaveTextContent(KB_CONTRACTS.name)
+    expect(row).not.toHaveTextContent(KB_POLICIES.name)
   })
 
-  it("READING 3 — none available: NO control at all, and the reason is machine-readable only", async () => {
+  it("READING 3 — none available: still NO control, and now the door SAYS SO", async () => {
     mockListFolders.mockResolvedValue([])
     render(<WorkflowDoorSwitch />)
     fireEvent.click(screen.getByTestId("door-card-describe"))
@@ -1118,19 +1172,40 @@ describe("199-08 Task 1 — the knowledge picker's THREE readings, as they ship"
     expect(screen.queryByTestId("project-folder-picker")).toBeNull()
     const marker = await screen.findByTestId("describe-kb-state")
     expect(marker.getAttribute("data-state")).toBe("none")
-    // ⚠ THE FINDING THE SHEET IS ABOUT: nothing on screen SAYS there are none. The marker is
-    // `hidden` + `aria-hidden`, so it reaches a test and never a person.
+    // The marker is still `hidden` + `aria-hidden` — it is a probe, not a surface.
     expect(marker.hasAttribute("hidden")).toBe(true)
     expect(marker.getAttribute("aria-hidden")).toBe("true")
+    /**
+     * ⚠ THE FINDING THIS CASE RECORDED IS CLOSED, AND ITS ORIGINAL WORDING IS KEPT SO THE
+     * CLOSURE IS LEGIBLE RATHER THAN SILENT:
+     *
+     *     "⚠ THE FINDING THE SHEET IS ABOUT: nothing on screen SAYS there are none. The
+     *      marker is `hidden` + `aria-hidden`, so it reaches a test and never a person."
+     *
+     * Sketch 200 draws the third arm, the operator named the sketch as the absolute
+     * reference, and it is now built. A PERSON is told.
+     */
+    expect(screen.getByTestId("describe-kb-empty")).toBeInTheDocument()
   })
 
-  it("READING 3b — 'we could not ask' is a FOURTH state, held apart from 'there are none'", async () => {
+  it("READING 3b — 'we could not ask' is a FOURTH state, and it no longer LOOKS like the third", async () => {
     mockListFolders.mockRejectedValue(new Error("offline"))
     render(<WorkflowDoorSwitch />)
     fireEvent.click(screen.getByTestId("door-card-describe"))
-    const marker = await screen.findByTestId("describe-kb-state")
-    await waitFor(() => expect(marker.getAttribute("data-state")).toBe("unavailable"))
+    // ⚠ RE-QUERIED RATHER THAN HELD. Sketch 200 renders each arm as its own subtree, so the
+    // state marker is a DIFFERENT DOM NODE once the request settles; a held reference reports
+    // the arm it was captured in forever.
+    await waitFor(() =>
+      expect(screen.getByTestId("describe-kb-state").getAttribute("data-state")).toBe(
+        "unavailable",
+      ),
+    )
     expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+    // ⚠ AND IT MAY NOT BORROW THE THIRD ARM'S CLAIM. A failed read knows nothing about how
+    // many folders exist, so the door says something else — asserted in BOTH directions,
+    // because a single shared sentence would satisfy either half alone.
+    expect(screen.getByTestId("describe-kb-unavailable")).toBeInTheDocument()
+    expect(screen.queryByTestId("describe-kb-empty")).toBeNull()
   })
 })
 
@@ -1300,23 +1375,53 @@ describe("199-08 Task 2 — the describe box refuses OUT LOUD, and adds no rule 
     expect(box).not.toHaveAttribute("aria-invalid")
   })
 
-  it("⚠ THE RESTING CLASS LIST IS CHARACTER-FOR-CHARACTER THE SHIPPED ONE", async () => {
+  it("⚠ THE RESTING CLASS LIST IS CHARACTER-FOR-CHARACTER THE PORTED ONE", async () => {
     const box = await openDescribeDoor()
+    /**
+     * ⚠ RE-BASELINED BY SKETCH 200, DECLARED RATHER THAN ABSORBED. The previous literal is
+     * kept verbatim so the diff is readable and so nobody has to trust that only the intended
+     * tokens moved:
+     *
+     *   "w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] " +
+     *   "leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 " +
+     *   "focus:ring-primary"
+     *
+     * FOUR TOKENS MOVED, AND EACH IS THE SHEET'S:
+     *   · `resize-none` → `resize-y`      the sheet lets the author grow the box, which is the
+     *                                      complaint the whole screen exists to answer
+     *   · `rounded-lg`  → `rounded`        the sheet's 2px `DEFAULT` radius
+     *   · `px-4 py-4`   → `p-4`            same padding, the sheet's single-axis spelling
+     *   · `text-[15px] leading-relaxed` → `text-[14px] leading-[1.5]`   the sheet's body size
+     *   · `focus:ring-1 focus:ring-primary` → `focus:ring-0`   the sheet draws the focused
+     *                                      border WITHOUT a second ring
+     *
+     * ⚠ WHAT THIS PIN ACTUALLY GUARDS IS UNCHANGED AND STILL ASSERTED BELOW: the class list is
+     * a CONCATENATION with three refusing slots, so the resting arm resolves character for
+     * character and exactly three tokens differ when it refuses. That property — not the
+     * particular tokens — is what a re-baseline could destroy, and it is re-proved here.
+     */
     const RESTING =
-      "w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] " +
-      "leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 " +
-      "focus:ring-primary"
+      "w-full resize-y rounded border border-border bg-card p-4 text-[14px] " +
+      "leading-[1.5] text-foreground focus:border-primary focus:outline-none focus:ring-0"
     expect(box.getAttribute("class")).toBe(RESTING)
 
     // …and the refusing arm really does differ, so the concatenation is not a no-op dressed up
-    // as a conditional. Three slots move and NOTHING else does.
+    // as a conditional. TWO slots move and NOTHING else does.
+    //
+    // ⚠ IT WAS THREE, AND THE THIRD DID NOT DISAPPEAR QUIETLY: sketch 200 draws this box with
+    // NO focus ring (`focus:ring-0` on both arms), so `focus:ring-destructive` has nothing left
+    // to swing against. The property this half guards — same token COUNT, exactly the named
+    // slots differing, nothing else drifting — is unchanged and is still what is asserted.
     fireEvent.change(box, { target: { value: " " } })
     const refusing = (box.getAttribute("class") ?? "").split(" ")
     expect(refusing).toContain("border-destructive")
     expect(refusing).toContain("focus:border-destructive")
-    expect(refusing).toContain("focus:ring-destructive")
     expect(refusing).not.toContain("border-border")
+    expect(refusing).not.toContain("focus:border-primary")
     expect(refusing.length).toBe(RESTING.split(" ").length)
+    // …and the ring really is off on BOTH arms, which is what makes two the right number.
+    expect(refusing).toContain("focus:ring-0")
+    expect(RESTING.split(" ")).toContain("focus:ring-0")
   })
 
   it("the sentence claims NOTHING the product cannot compute — no vagueness verdict", () => {
