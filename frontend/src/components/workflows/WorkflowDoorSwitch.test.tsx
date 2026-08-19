@@ -601,7 +601,10 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
     // cannot shrink the sweep silently. 193.1-06 (D-21 / D-28): 21 → 22, moved in the SAME
     // COMMIT as `GOVERNED_ID_COUNT` in `doorVocabulary.test.ts`, since the two numbers are the
     // same fact read from two files.
-    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(22)
+    // 199-08 (DES-01): 22 → 23, again in the SAME COMMIT as `GOVERNED_ID_COUNT` in
+    // `doorVocabulary.test.ts` — the two numbers are one fact read from two files, and a count
+    // that moved on its own is a table nobody checked.
+    expect(new Set(NEEDLES.map((n) => n.id)).size).toBe(23)
     for (const n of NEEDLES) expect(n.text.length, `${n.id}/${n.spelling} is empty`).toBeGreaterThan(0)
     // …and the SECOND spelling is not a no-op: at least one id really differs between the
     // two, which is the only thing that makes sweeping twice worth the line.
@@ -626,7 +629,7 @@ describe("D-24(a) — SCOPE: could this fence fire at all? (T-193-18, the 192.1 
 
 describe("D-24(a) — no governed door word survives as a literal in any swept module", () => {
   it.each(SWEPT_SOURCES.map((f) => [f.path, f.source] as const))(
-    "%s carries none of the 22 governed words, in either spelling",
+    "%s carries none of the 23 governed words, in either spelling",
     (_path, source) => {
       expect(hitsIn(source)).toEqual([])
     },
@@ -943,5 +946,371 @@ describe("WorkflowDoorSwitch.tsx — the pre-draft attach row on the LOOSE door"
     expect(screen.getByTestId("describe-template-filename")).toHaveTextContent("weekly-status.docx")
     expect(within(screen.getByTestId("describe-template-fields")).getByText("project_name")).toBeInTheDocument()
     expect(mockReadPlaceholders).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 1 (DES-01 · sheet `c9-doors-describe`) — THE PRE-CHANGE RESTING
+// INVENTORY, AND THE MECHANICAL HALF OF THE RECONCILIATION.
+//
+// APPENDED, never interleaved. Not one assertion above this line moves.
+//
+// WHY AN INVENTORY AT ALL. This phase re-presents; it does not add. The only way to prove
+// "renders no MORE at rest than before" after the fact is to have written down what `before`
+// was, as LITERALS, in a commit that predates the change (the 188.1 lesson, re-used by
+// `199-03`). A subtraction is then proved by INVERTING one of these assertions from present
+// to absent — never by deleting it. Zero assertion deletions is the target for this plan.
+//
+// ⚠ THIS FILE IS ALLOWED TO SPELL GOVERNED DOOR WORDS AND THE COMPONENTS ARE NOT. The
+// D-24(a) copy fence above asserts its own exclusion of test files; that exclusion is what
+// makes an inventory pinned as LITERALS possible at all. A pin that named identifiers would
+// re-derive itself from the module and could never falsify a reword.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+const nodeFs199 = await vi.importActual<{ readFileSync(path: string, encoding: string): string }>(
+  "node:fs",
+)
+
+/** `file:///C:/…/frontend/src/components/workflows/<this file>` → `…/frontend/`. */
+const FRONTEND_ROOT_199 = (() => {
+  const here = decodeURIComponent(import.meta.url).replace(/^file:\/\/\/?/, "")
+  const marker = "/src/components/workflows/"
+  const at = here.indexOf(marker)
+  if (at === -1) throw new Error(`199-08 inventory cannot locate its own subtree in: ${here}`)
+  return `${here.slice(0, at)}/`
+})()
+
+const tailwindConfigSource199 = nodeFs199.readFileSync(
+  `${FRONTEND_ROOT_199}tailwind.config.js`,
+  "utf8",
+)
+
+/** The chooser's resting atoms, spelled out. */
+const CHOOSER_ATOMS_199 = [
+  "How do you want to start?",
+  "Both end up in the same place. You can switch between them at any time.",
+  "you write one paragraph",
+  "Draft it for me",
+  "you can open the full editor at any point — nothing is locked in",
+  "you decide every setting",
+  "Build it myself",
+  "what it must cite · required checks · per-step sources & model",
+]
+
+/** The describe door's resting atoms, spelled out. */
+const DESCRIBE_ATOMS_199 = [
+  "‹ Change how I start",
+  "⚡ Drafting it for you",
+  "What recurring work should this automate?",
+  "Write the first draft",
+  "Need to set citations, checks, or per-step sources yourself?",
+  "Build it myself ›",
+  "What this will do",
+  "Have a document to fill in?",
+  "Attach a template",
+  "Word, PowerPoint or Excel — .docx, .pptx or .xlsx, up to 10 MB.",
+]
+
+describe("199-08 Task 1 — the RESTING inventory of the door surface (pinned PRESENT)", () => {
+  it("the chooser's eight resting atoms are all on screen, as literals", () => {
+    render(<WorkflowDoorSwitch />)
+    // NON-VACUITY FIRST: the chooser really rendered, so the `getByText` list below is a claim
+    // about a surface rather than a claim about an empty container.
+    expect(screen.getByTestId("workflow-doors")).toBeInTheDocument()
+    expect(CHOOSER_ATOMS_199).toHaveLength(8)
+    for (const atom of CHOOSER_ATOMS_199) {
+      expect(screen.getByText(atom), `chooser atom missing: ${atom}`).toBeInTheDocument()
+    }
+  })
+
+  it("the describe door's ten resting atoms are all on screen, as literals", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    expect(screen.getByTestId("door-describe")).toBeInTheDocument()
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    expect(DESCRIBE_ATOMS_199).toHaveLength(10)
+    for (const atom of DESCRIBE_ATOMS_199) {
+      expect(screen.getByText(atom), `describe atom missing: ${atom}`).toBeInTheDocument()
+    }
+  })
+
+  it("the describe door's resting CONTROL set is exactly these five testids — no more", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    const door = screen.getByTestId("door-describe")
+    const controls = Array.from(
+      door.querySelectorAll("button, input, textarea, select, a[href]"),
+    ).map((n) => n.getAttribute("data-testid"))
+    expect(controls).toEqual([
+      "both-doors",
+      "describe-box",
+      "describe-template-input",
+      "describe-draft",
+      "switch-to-govern",
+    ])
+  })
+})
+
+describe("199-08 Task 1 — THE REFUSAL ROW: does a gating predicate already exist?", () => {
+  it("IT DOES — the CTA is gated on trimmed length in SOURCE, so saying so out loud is presentation", () => {
+    // The shipped rule, read off the component rather than inferred from behaviour alone.
+    expect(workflowDoorSwitchSource).toContain("describe.trim().length > 0")
+    // POSITIVE CONTROL — the source really loaded, so the `toContain` is not passing on air.
+    expect(workflowDoorSwitchSource.length).toBeGreaterThan(1000)
+  })
+
+  it("…and the predicate BEHAVES: empty refuses, whitespace-only refuses, real text passes", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    const box = screen.getByTestId("describe-box")
+    const cta = screen.getByTestId("describe-draft")
+
+    expect(cta).toBeDisabled()
+    fireEvent.change(box, { target: { value: "   \n\t  " } })
+    expect(cta).toBeDisabled()
+    fireEvent.change(box, { target: { value: "Summarise weekly vendor risk" } })
+    expect(cta).toBeEnabled()
+  })
+
+  it("⚠ IT NO LONGER REFUSES IN SILENCE — the sentence is THERE (INVERTED by Task 2, not deleted)", async () => {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    fireEvent.change(screen.getByTestId("describe-box"), { target: { value: "   " } })
+    // NON-VACUITY: the refusing state really is on screen and really is refusing.
+    expect(screen.getByTestId("describe-draft")).toBeDisabled()
+    // ⚠ THE INVERSION. Task 1 committed this same query asserting `toBeNull()` one commit
+    // earlier; the POLARITY moved and the query did not. That is what makes this a proof of
+    // the change rather than a description of it.
+    expect(screen.getByTestId("describe-refusal")).toBeInTheDocument()
+  })
+
+  it("the SECOND gating term already speaks for itself — an in-flight read says so out loud", () => {
+    // `templateRead.kind !== "loading"` is the other half of `canDraft`, and the row it comes
+    // from renders a loading sentence of its own. Recorded so the reconciliation's refusal row
+    // covers BOTH terms rather than only the one the sheet drew.
+    expect(workflowDoorSwitchSource).toContain('templateRead.kind !== "loading"')
+    expect(describeTemplateRowSource).toContain("FOOTING_LOADING")
+    expect(describeTemplateRowSource).toContain("TEMPLATE_FIELDS_LOADING")
+  })
+})
+
+describe("199-08 Task 1 — the knowledge picker's THREE readings, as they ship", () => {
+  it("READING 1 — none chosen: the control is offered and its value is the opt-out", async () => {
+    const select = await openDescribeDoorWithFolders()
+    expect(select.value).toBe("")
+    expect(within(select).getByText("No specific knowledge base")).toBeInTheDocument()
+  })
+
+  it("READING 2 — one chosen: the control carries the chosen folder's id", async () => {
+    const select = await openDescribeDoorWithFolders()
+    fireEvent.change(select, { target: { value: KB_CONTRACTS.id } })
+    expect(select.value).toBe(KB_CONTRACTS.id)
+  })
+
+  it("READING 3 — none available: NO control at all, and the reason is machine-readable only", async () => {
+    mockListFolders.mockResolvedValue([])
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+    const marker = await screen.findByTestId("describe-kb-state")
+    expect(marker.getAttribute("data-state")).toBe("none")
+    // ⚠ THE FINDING THE SHEET IS ABOUT: nothing on screen SAYS there are none. The marker is
+    // `hidden` + `aria-hidden`, so it reaches a test and never a person.
+    expect(marker.hasAttribute("hidden")).toBe(true)
+    expect(marker.getAttribute("aria-hidden")).toBe("true")
+  })
+
+  it("READING 3b — 'we could not ask' is a FOURTH state, held apart from 'there are none'", async () => {
+    mockListFolders.mockRejectedValue(new Error("offline"))
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    const marker = await screen.findByTestId("describe-kb-state")
+    await waitFor(() => expect(marker.getAttribute("data-state")).toBe("unavailable"))
+    expect(screen.queryByTestId("project-folder-picker")).toBeNull()
+  })
+})
+
+describe("199-08 Task 1 — sheet c9's COLOUR TOKENS, resolved against the shipped config", () => {
+  /**
+   * ⚠ THE PHASE-WIDE MEASUREMENT, RE-DERIVED HERE FOR THIS SHEET RATHER THAN INHERITED.
+   * A Tailwind class naming a key the config does not carry compiles to NOTHING and renders
+   * identically to an arm that is deliberately unpainted — the `bg-warning` silent no-op that
+   * shipped unguarded in 192.2. So the sheet's palette is checked BEFORE any of it is copied.
+   */
+  const SHEET_C9_TOKENS = [
+    "background",
+    "error",
+    "error-container",
+    "on-background",
+    "on-surface",
+    "on-surface-variant",
+    "outline",
+    "outline-variant",
+    "primary",
+    "primary-container",
+    "primary-fixed",
+    "surface",
+    "surface-container-high",
+    "surface-container-low",
+    "surface-container-lowest",
+    "surface-variant",
+    "tertiary-fixed-dim",
+  ]
+
+  /** A colour key really declared in the shipped Tailwind config's `colors` block. */
+  const declares = (token: string): boolean =>
+    new RegExp(`(^|\\n)\\s*(?:"|')?${token.replace(/-/g, "\\-")}(?:"|')?\\s*:`, "m").test(
+      tailwindConfigSource199,
+    )
+
+  it("the config really loaded, and the detector really detects (POSITIVE + NEGATIVE control)", () => {
+    expect(tailwindConfigSource199.length).toBeGreaterThan(1000)
+    expect(declares("background")).toBe(true)
+    expect(declares("destructive")).toBe(true)
+    expect(declares("no-such-colour-key")).toBe(false)
+  })
+
+  it("⚠ FIFTEEN of the sheet's SEVENTEEN colour tokens compile to NOTHING here", () => {
+    expect(SHEET_C9_TOKENS).toHaveLength(17)
+    const resolves = SHEET_C9_TOKENS.filter(declares)
+    expect(resolves.sort()).toEqual(["background", "primary"])
+    expect(SHEET_C9_TOKENS.length - resolves.length).toBe(15)
+  })
+
+  it("every token THIS plan spends is a shipped one that RESOLVES", () => {
+    for (const token of ["destructive", "border", "muted", "foreground", "primary", "card"]) {
+      expect(declares(token), `${token} does not resolve`).toBe(true)
+    }
+  })
+})
+
+describe("199-08 Task 1 — the 199-09 SEAM, recorded rather than assumed", () => {
+  it("there are TWO pre-draft describe boxes and this plan owns exactly one of them", () => {
+    // THIS file's box carries a testid; the Builder's pre-draft box does not, and both spell
+    // the same placeholder. That is the duplication sheet c9's header strip designs out, and
+    // it is SHIPPED — this phase neither introduces it nor closes it.
+    expect(workflowDoorSwitchSource).toContain('data-testid="describe-box"')
+    expect(builderPageSource).toContain('placeholder="Describe the goal in plain language…"')
+    expect(builderPageSource).not.toContain('data-testid="describe-box"')
+  })
+
+  it("the Builder's box is UNGATED BY ANY SENTENCE today — 199-09's inheritance, pinned", () => {
+    // Wave 3 imports the SAME refusal constant this plan lands, rather than spelling a second
+    // one. The proof that it has not already done so is here, in wave 2.
+    expect(builderPageSource).not.toContain("DESCRIBE_REFUSAL")
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 2 (DES-01 · sheet `c9-doors-describe` §3) — THE REFUSAL, SAID OUT LOUD.
+//
+// APPENDED, never interleaved. The ONE assertion this plan moves is the polarity of the
+// absence Task 1 committed a commit earlier; nothing is deleted anywhere.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("199-08 Task 2 — the describe box refuses OUT LOUD, and adds no rule doing it", () => {
+  /** The describe door, open, with the picker's request settled. */
+  async function openDescribeDoor() {
+    render(<WorkflowDoorSwitch />)
+    fireEvent.click(screen.getByTestId("door-card-describe"))
+    await waitFor(() => expect(mockListFolders).toHaveBeenCalled())
+    return screen.getByTestId("describe-box") as HTMLTextAreaElement
+  }
+
+  it("the sentence is the GOVERNED one, reached by import — never a literal in the component", async () => {
+    const box = await openDescribeDoor()
+    fireEvent.change(box, { target: { value: "  \t " } })
+    // The words come from the module. The D-24(a) fence above independently proves the
+    // component does not spell them; this proves the module's value is what renders.
+    expect(screen.getByTestId("describe-refusal")).toHaveTextContent(
+      doorVocabulary.DESCRIBE_REFUSAL,
+    )
+    // …and it announces itself as a standing condition rather than an interruption.
+    expect(screen.getByTestId("describe-refusal").getAttribute("role")).toBe("status")
+  })
+
+  it("⚠ IT NEVER GREETS ANYONE — an untouched box is refused in silence, exactly as it ships", async () => {
+    await openDescribeDoor()
+    // The SAME rule refuses an empty box, and captioning that would put a refusal on the first
+    // screen an author meets. This is the reason the trigger carries a `length > 0` term.
+    expect(screen.getByTestId("describe-draft")).toBeDisabled()
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(screen.getByTestId("describe-box")).not.toHaveAttribute("aria-invalid")
+  })
+
+  it("it CLEARS the moment there is something to draft from, and on the way back to empty", async () => {
+    const box = await openDescribeDoor()
+
+    fireEvent.change(box, { target: { value: "   " } })
+    expect(screen.getByTestId("describe-refusal")).toBeInTheDocument()
+
+    fireEvent.change(box, { target: { value: "Summarise weekly vendor risk" } })
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+    expect(screen.getByTestId("describe-draft")).toBeEnabled()
+
+    // …and clearing the box RIGHT back to empty returns it to the resting silence rather than
+    // leaving a refusal standing over a screen nobody has touched.
+    fireEvent.change(box, { target: { value: "" } })
+    expect(screen.queryByTestId("describe-refusal")).toBeNull()
+  })
+
+  it("NO RULE MOVED — enablement is byte-for-byte the shipped predicate on every arm", async () => {
+    const box = await openDescribeDoor()
+    const cta = screen.getByTestId("describe-draft")
+    for (const [value, enabled] of [
+      ["", false],
+      ["   ", false],
+      ["\n\t", false],
+      ["a", true],
+      [" a ", true],
+    ] as const) {
+      fireEvent.change(box, { target: { value } })
+      expect(cta.hasAttribute("disabled"), `enablement moved for ${JSON.stringify(value)}`).toBe(
+        !enabled,
+      )
+    }
+  })
+
+  it("the box is marked invalid ONLY while refusing — an attribute, never a colour alone", async () => {
+    const box = await openDescribeDoor()
+    fireEvent.change(box, { target: { value: " " } })
+    expect(box).toHaveAttribute("aria-invalid", "true")
+    fireEvent.change(box, { target: { value: "Summarise weekly vendor risk" } })
+    // ⚠ ABSENT, not `"false"`. A spread-conditional rather than a default is what keeps the
+    // resting markup identical to the markup three suites pin byte for byte.
+    expect(box).not.toHaveAttribute("aria-invalid")
+  })
+
+  it("⚠ THE RESTING CLASS LIST IS CHARACTER-FOR-CHARACTER THE SHIPPED ONE", async () => {
+    const box = await openDescribeDoor()
+    const RESTING =
+      "w-full resize-none rounded-lg border border-border bg-card px-4 py-4 text-[15px] " +
+      "leading-relaxed text-foreground focus:border-primary focus:outline-none focus:ring-1 " +
+      "focus:ring-primary"
+    expect(box.getAttribute("class")).toBe(RESTING)
+
+    // …and the refusing arm really does differ, so the concatenation is not a no-op dressed up
+    // as a conditional. Three slots move and NOTHING else does.
+    fireEvent.change(box, { target: { value: " " } })
+    const refusing = (box.getAttribute("class") ?? "").split(" ")
+    expect(refusing).toContain("border-destructive")
+    expect(refusing).toContain("focus:border-destructive")
+    expect(refusing).toContain("focus:ring-destructive")
+    expect(refusing).not.toContain("border-border")
+    expect(refusing.length).toBe(RESTING.split(" ").length)
+  })
+
+  it("the sentence claims NOTHING the product cannot compute — no vagueness verdict", () => {
+    // Sheet c9 captions this state with a vagueness judgement over a real sentence. No
+    // predicate in this product reads an input for vagueness, so that caption would print a
+    // verdict nothing computes. Swept over the shipped string rather than promised in prose.
+    const words = /vague|too short|too long|invalid|unclear|error|quality|specific enough/i
+    expect(words.test(doorVocabulary.DESCRIBE_REFUSAL)).toBe(false)
+    // POSITIVE CONTROL — the sweep really fires on the sheet's own caption.
+    expect(words.test("Request too vague - Needs a goal and a source.")).toBe(true)
   })
 })

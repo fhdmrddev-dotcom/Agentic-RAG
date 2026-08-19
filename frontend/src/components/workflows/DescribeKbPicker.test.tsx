@@ -509,6 +509,137 @@ describe("DescribeKbPicker — an unofferable choice is surrendered, never sent 
   })
 })
 
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 3 (DES-01 · sheet `c9-doors-describe` §4) — THE KNOWLEDGE PICKER'S
+// THREE READINGS, AND THE ONE THE SHEET ASKS FOR THAT THIS COMPONENT MAY NOT GIVE.
+//
+// APPENDED, never interleaved, and BEFORE the whole-suite network tripwire so that section
+// still runs last. Not one assertion above this line moves, and NO byte of
+// `DescribeKbPicker.tsx` is modified by this plan.
+//
+// ⚠ THE SHEET'S THIRD READING IS **REFUSED**, ON THREE INDEPENDENT GROUNDS, and this block
+// pins the shipped behaviour so the refusal is a recorded decision rather than an omission:
+//
+//   1. **A RECORDED RULING ALREADY GOVERNS IT.** Phase 187 (D-187-14 / SC#4) settled that
+//      the fast door gains a MOUNT and not a SURFACE: with nothing to offer this control
+//      renders nothing at all, and ignoring it gives today's behaviour exactly. Where the
+//      sheet and a shipped locked decision disagree, the shipped one wins.
+//   2. **THE RESTING DOM IS PINNED BYTE FOR BYTE.** The zero-folder arm is inside all six
+//      `WorkflowDoorSwitch.baseline.test.tsx` captures. A visible row here reds a
+//      characterization pin, and re-baselining one to make a red go green is forbidden.
+//   3. **THE SHEET'S CHIP CARRIES AN ACTION, NOT A SENTENCE.** Its third state ends in an
+//      upload control — a navigation capability, which is outside a presentation phase.
+//
+// ⚠ AND THE HONEST COST IS PINNED TOO: "there are none" and "we could not ask" are held
+// apart ONLY by a machine-readable marker. To a MACHINE they are two states; to a PERSON
+// they are one silence. That is the gap, and it is asserted rather than described.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * What a PERSON reads, with every `class` attribute out of the picture: the words, which row
+ * is selected, and how many controls there are. Deliberately not an HTML comparison — a
+ * `<select>`'s chosen row lives in a DOM property and never reaches the serialised markup, so
+ * an innerHTML diff would report readings 1 and 2 as identical when they plainly are not.
+ */
+function classFreeReading() {
+  const select = picker() as HTMLSelectElement | null
+  return {
+    text: (document.body.textContent ?? "").replace(/\s+/g, " ").trim(),
+    chosen: select ? (select.selectedOptions[0]?.textContent ?? null) : null,
+    controls: document.body.querySelectorAll("select, button, input, a[href], textarea").length,
+  }
+}
+
+describe("199-08 — sheet c9 §4: the three readings are distinct WITHOUT any class", () => {
+  it("READING 1 (none chosen) · READING 2 (one chosen) · READING 3 (none available) are pairwise distinct", async () => {
+    const readings: Record<string, ReturnType<typeof classFreeReading>> = {}
+
+    api.listFolders.mockResolvedValue(TWO_FOLDERS)
+    const first = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await screen.findByTestId("project-folder-picker")
+    readings.noneChosen = classFreeReading()
+    first.unmount()
+
+    api.listFolders.mockResolvedValue(TWO_FOLDERS)
+    const second = render(<DescribeKbPicker value={CONTRACTS.id} onChange={vi.fn()} />)
+    await screen.findByTestId("project-folder-picker")
+    readings.oneChosen = classFreeReading()
+    second.unmount()
+
+    api.listFolders.mockResolvedValue([])
+    const third = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await waitFor(() => expect(stateOf()).toBe("none"))
+    readings.noneAvailable = classFreeReading()
+    third.unmount()
+
+    // NON-VACUITY FIRST — the two offered readings really rendered a control and really named
+    // a row, so "distinct" below is a claim about three real surfaces.
+    expect(readings.noneChosen.controls).toBe(1)
+    expect(readings.oneChosen.controls).toBe(1)
+    expect(readings.noneChosen.chosen).toBe(DESCRIBE_KB_NONE)
+    expect(readings.oneChosen.chosen).toBe(CONTRACTS.name)
+    expect(readings.noneAvailable.controls).toBe(0)
+
+    // …and PAIRWISE DISTINCT, serialised so a failure names which pair collapsed.
+    const keys = Object.keys(readings)
+    const collisions: string[] = []
+    for (let i = 0; i < keys.length; i++) {
+      for (let j = i + 1; j < keys.length; j++) {
+        if (JSON.stringify(readings[keys[i]]) === JSON.stringify(readings[keys[j]])) {
+          collisions.push(`${keys[i]} === ${keys[j]}`)
+        }
+      }
+    }
+    expect(collisions).toEqual([])
+  })
+
+  it("⚠ THE GAP: the FOURTH state is distinct to a MACHINE and identical to a PERSON", async () => {
+    api.listFolders.mockResolvedValue([])
+    const none = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await waitFor(() => expect(stateOf()).toBe("none"))
+    const noneReading = classFreeReading()
+    none.unmount()
+
+    api.listFolders.mockRejectedValue(new Error("offline"))
+    const unavailable = render(<DescribeKbPicker value="" onChange={vi.fn()} />)
+    await waitFor(() => expect(stateOf()).toBe("unavailable"))
+    const unavailableReading = classFreeReading()
+
+    // TO A MACHINE — two states, which is the shipped Phase 187 property and stays true.
+    expect(stateOf()).toBe("unavailable")
+    // TO A PERSON — one silence. Recorded as a MEASUREMENT, so a later plan that closes this
+    // gap has to flip this assertion rather than discover the problem again.
+    expect(unavailableReading).toEqual(noneReading)
+    expect(noneReading.text).toBe("")
+    unavailable.unmount()
+  })
+
+  it("⚠ CANNOT-EXPRESS: the sheet's chosen chip states a DOCUMENT COUNT the wire never carries", async () => {
+    api.listFolders.mockResolvedValue(TWO_FOLDERS)
+    render(<DescribeKbPicker value={CONTRACTS.id} onChange={vi.fn()} />)
+    await screen.findByTestId("project-folder-picker")
+
+    // The live `Folder` row is id / user_id / name / parent_id / is_org_shared / timestamps.
+    // There is no count on it, so the sheet's `1,284 docs` could only be fabricated — and a
+    // fabricated precision beside a real name is the defect this project refuses everywhere.
+    for (const key of Object.keys(CONTRACTS)) {
+      expect(/count|docs|documents|size/i.test(key), `${key} looks like a count`).toBe(false)
+    }
+    // …and nothing on screen states one either.
+    expect(/\b\d[\d,]*\s*(docs|documents|files)\b/i.test(document.body.textContent ?? "")).toBe(
+      false,
+    )
+  })
+
+  it("199-08 modified NO byte of this component — the mount is verified, not rebuilt", () => {
+    expect(describeKbPickerSource).not.toContain("199-08")
+    expect(describeKbPickerSource.length).toBeGreaterThan(1000)
+    // …and no network symbol was added: still exactly the one shipped api import.
+    expect(describeKbPickerSource.match(/from "@\/lib\/api"/g) ?? []).toHaveLength(1)
+    expectNothingElseCalled()
+  })
+})
+
 // ── 8. The whole-suite network tripwire (must run LAST) ───────────────────────
 
 describe("DescribeKbPicker — zero real network calls across the entire suite", () => {

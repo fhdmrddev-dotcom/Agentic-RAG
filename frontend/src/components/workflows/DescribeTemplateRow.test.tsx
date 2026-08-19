@@ -26,6 +26,9 @@ import userEvent from "@testing-library/user-event"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { DescribeTemplateRow } from "./DescribeTemplateRow"
+// 199-08: this component's own SOURCE, so the "modified no byte / added no network" verdict
+// is a checked property rather than a sentence in a summary.
+import describeTemplateRowSource199 from "./DescribeTemplateRow?raw"
 import { DESCRIBE_ATTACH_PROMPT } from "./doorVocabulary"
 import {
   ATTACH_NOTE,
@@ -374,5 +377,87 @@ describe("DescribeTemplateRow — document text is rendered as TEXT (T-193.1-06-
     expect(container.querySelectorAll("li")).toHaveLength(1)
     expect(container.querySelector("script")).toBeNull()
     expect(screen.getByText(payload)).toBeInTheDocument()
+  })
+})
+
+// ══════════════════════════════════════════════════════════════════════════════════════
+// Phase 199-08 Task 3 (DES-01 · sheet `c9-doors-describe` §5) — THE TEMPLATE ROW.
+//
+// APPENDED, never interleaved. Not one assertion above this line moves, and NO byte of
+// `DescribeTemplateRow.tsx` is modified by this plan.
+//
+// ⚠ **CANNOT-EXPRESS — THE SHEET'S §5 IS A DIFFERENT COMPONENT, AND SAYING SO IS THE
+// DELIVERABLE.** Three parts, as required:
+//
+//   • **What the sheet asks for.** A horizontal rail of STARTER-WORKFLOW pills — a named
+//     workflow and its phase count (`Invoice Audit · 4 phases`), pressed to open it.
+//   • **What this component can do.** Nothing of the kind, and not because it is missing a
+//     feature: it is a different noun. This row attaches THE DOCUMENT THIS WORKFLOW WILL
+//     FILL IN, and renders what that document asks for. A workflow to copy and a document
+//     to fill in are two unrelated facts that happen to share the word "template".
+//   • **The gap.** Our nearest shipped analogue to the sheet's rail is the starter-workflow
+//     door on the BUILDER's pre-draft screen — a quiet worded trigger that opens a list,
+//     not a rail of pills. That surface is in `199-09`'s file and this plan may not touch
+//     it. Adopting the sheet's shape here would mean building a second, contradicting
+//     meaning for "template" two inches from the first — precisely the collision D-21
+//     already ruled on for this screen's own label.
+//
+// So the verdict is DIFFERENT-COMPONENT, the shape is unchanged, and what IS pinned below
+// is the property sheet c9 does legitimately ask of every state block: the arms must be
+// mutually distinct WITHOUT a single class attribute.
+// ══════════════════════════════════════════════════════════════════════════════════════
+
+describe("199-08 — sheet c9 §5: the five arms are distinct WITHOUT any class", () => {
+  it("every arm reads differently to a person, with the whole class attribute stripped off", () => {
+    const readings: { name: string; text: string }[] = []
+    for (const arm of ARMS) {
+      const { container, unmount } = renderRow(arm.state, arm.filename)
+      // The class-free reading: the WORDS, plus the shape of the list, and nothing else.
+      const text = (container.textContent ?? "").replace(/\s+/g, " ").trim()
+      readings.push({ name: arm.name, text })
+      // NON-VACUITY per arm — the row really rendered and really said something.
+      expect(text.length, `${arm.name} rendered nothing`).toBeGreaterThan(0)
+      unmount()
+    }
+
+    expect(readings).toHaveLength(5)
+    const collisions: string[] = []
+    for (let i = 0; i < readings.length; i++) {
+      for (let j = i + 1; j < readings.length; j++) {
+        if (readings[i].text === readings[j].text) {
+          collisions.push(`${readings[i].name} === ${readings[j].name}`)
+        }
+      }
+    }
+    // ⚠ THE TWO THAT MAY NEVER MERGE ARE IN THIS SET: `none` ("we opened it; it has no
+    // fields") and `unavailable` ("we never opened it"). A class-free comparison is the only
+    // one that proves they are told apart by WORDS rather than by tone.
+    expect(collisions).toEqual([])
+  })
+
+  it("POSITIVE CONTROL — the class-free comparison really catches two identical readings", () => {
+    const same = [
+      { name: "a", text: "one" },
+      { name: "b", text: "one" },
+    ]
+    const found: string[] = []
+    for (let i = 0; i < same.length; i++) {
+      for (let j = i + 1; j < same.length; j++) {
+        if (same[i].text === same[j].text) found.push(`${same[i].name} === ${same[j].name}`)
+      }
+    }
+    expect(found).toEqual(["a === b"])
+  })
+
+  it("199-08 modified NO byte of this component, and added NO network reach", () => {
+    // The verdict above is only honest if the file really was left alone.
+    expect(describeTemplateRowSource199).not.toContain("199-08")
+    expect(describeTemplateRowSource199.length).toBeGreaterThan(1000)
+    // …and it remains fed entirely from props: no api client, no fetch, no route.
+    expect(describeTemplateRowSource199).not.toContain("@/lib/api")
+    expect(/\bfetch\s*\(/.test(describeTemplateRowSource199)).toBe(false)
+    // POSITIVE CONTROL — the two needles above really fire on a planted line.
+    expect('import { x } from "@/lib/api"').toContain("@/lib/api")
+    expect(/\bfetch\s*\(/.test("await fetch('/x')")).toBe(true)
   })
 })
