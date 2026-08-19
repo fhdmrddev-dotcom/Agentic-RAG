@@ -24,6 +24,11 @@ import deriveTierSource from "./deriveTier?raw"
 // The glyph + label vocabulary, read from its ONE home rather than re-typed here — a test
 // that spelled 🔒/Strict itself would pass against a chip that had drifted from TIERS.
 import { TIERS } from "./deriveTier"
+// 199-03 Task 2: the THIRD surface that mounts this soul and pins its DOM byte for byte.
+// Read as source rather than mounted — the point is the coupling's existence, not the
+// door's behaviour, and that door already has two suites of its own.
+import doorSwitchSource from "./WorkflowDoorSwitch?raw"
+import doorBaselineSource from "./WorkflowDoorSwitch.baseline.test?raw"
 import { WorkflowSoul } from "./WorkflowSoul"
 import type { DefShape } from "./soulData"
 
@@ -137,12 +142,17 @@ describe("WorkflowSoul — the scale-keyed 5-atom soul", () => {
 // Phase 199-03 Task 1 (DES-01 · sheet 178 `c7-gauntlet-soul` §2) — THE PRE-CHANGE
 // INVENTORY at the two scales that are actually MOUNTED, and the sheet's third arm.
 //
-// ⚠ `scale="card"` is no longer a live consumer: Phase 192.2 removed
-// `<WorkflowSoul scale="card" />` from `WorkflowCard.tsx` as its D-03 subtraction, so the
-// shipped mounts are `run` (the run header) and `pub` (the publish summary). The cases
-// above still exercise `card` and are untouched — the prop still exists and must keep
-// working — but a resting inventory that claimed to measure the shipped surface at `card`
-// would be measuring a size nothing renders. Both live scales are pinned here instead.
+// ⚠ CORRECTED DURING TASK 2 — the original claim is kept here rather than overwritten,
+// because it came from the PLAN and being wrong is the finding. It read: *"`scale="card"`
+// is no longer a live consumer: Phase 192.2 removed `<WorkflowSoul scale="card" />` from
+// `WorkflowCard.tsx`, so the shipped mounts are `run` and `pub`."* That is FALSE of the
+// tree. 192.2 removed the LIBRARY CARD's mount, not the card SCALE:
+// `WorkflowDoorSwitch.tsx:451` still mounts `<WorkflowSoul scale="card" />` on the describe
+// door, and `WorkflowDoorSwitch.baseline.test.tsx` pins that door's DOM byte for byte — a
+// coupling this plan discovered only by breaking it. See the CANNOT-EXPRESS case below.
+//
+// The two describes here pin `run` and `pub` because those are the scales the plan's two
+// named surfaces use; the `card` cases above are untouched and still exercise the third.
 //
 // ⚠ AND THE SHEET DRAWS A DIFFERENT COMPONENT. Its §2 rows are `glyph + NAME + tier chip`
 // on ONE line — that is the LIBRARY CARD's identity line, not the soul. The soul's five
@@ -254,12 +264,26 @@ describe("WorkflowSoul 199-03 — the sheet's UNDETERMINED third arm is NOT adop
     expect(seen).toEqual(["STRICT", "MIDDLE", "LOOSE"])
   })
 
-  it("(subtraction/tone) the three arms carry three DISTINGUISHABLE weights — and none is colour-alone", () => {
-    // The sheet's one genuinely applicable idea for this atom: the arms should not weigh
-    // the same. Before this plan all three rendered one identical treatment, so the only
-    // separator was the word. The weighting is ADDITIVE — glyph and WORD still render on
-    // every arm, which is what keeps WCAG 1.4.1 satisfied without relying on the tone.
-    const faces = new Map<string, string>()
+  it("all three arms render glyph + WORD identically today — the sheet's WEIGHTING is a CANNOT-EXPRESS", () => {
+    // ⚠ THIS CASE PINS A REFUSAL, AND THE REFUSAL IS THE DELIVERABLE.
+    //
+    // The sheet's one genuinely applicable idea for this atom is that the arms should not
+    // weigh the same: it draws STRICT filled and bordered, LOOSE transparent and muted.
+    // Ours render ONE identical treatment, so the only separator is the word. That idea
+    // was BUILT during this plan and then WITHDRAWN, for a reason worth writing down:
+    //
+    //   the chip's class string is part of a DOM that a THIRD surface pins byte-for-byte.
+    //
+    // `WorkflowDoorSwitch.tsx` mounts `<WorkflowSoul scale="card">`, and
+    // `WorkflowDoorSwitch.baseline.test.tsx` captures that door's rendered DOM as a
+    // characterization baseline. Re-toning the chip failed two of its cases. The plan's
+    // binding rule is "never re-baseline a characterization pin to turn red green", and
+    // `WorkflowDoorSwitch` is not in this plan's scope — so the honest outcome is to
+    // report the gap rather than to widen the plan or to soften the pin.
+    //
+    // What is pinned here is TODAY's state, so a future plan that does carry the door in
+    // its scope INVERTS this case rather than discovering the coupling again.
+    const faces = new Set<string>()
     for (const [def, expected] of [
       [strictDef, "STRICT"],
       [middleDef, "MIDDLE"],
@@ -268,40 +292,35 @@ describe("WorkflowSoul 199-03 — the sheet's UNDETERMINED third arm is NOT adop
       const { unmount } = render(<WorkflowSoul def={def} scale="pub" />)
       const chip = screen.getByTestId("soul-tier")
       expect(chip).toHaveAttribute("data-tier", expected)
-      // Glyph AND word survive the re-tone, on every arm — both read from TIERS, the
-      // vocabulary's own home, so this cannot go green against a re-spelled chip.
+      // Glyph AND word on every arm — read from TIERS, the vocabulary's own home, so this
+      // cannot go green against a chip that has drifted from it. This is what carries the
+      // distinction today, and it is why an identical tone is not a WCAG 1.4.1 problem.
       expect(within(chip).getByText(TIERS[expected].glyph)).toBeInTheDocument()
       expect(chip.textContent ?? "").toContain(TIERS[expected].label)
-      faces.set(expected, chip.className)
+      faces.add(chip.className)
       unmount()
     }
-    // Three arms, three DIFFERENT class strings — a tone that collapses two arms into one
-    // treatment would leave the surface unable to say them apart without reading.
-    expect(new Set(faces.values()).size).toBe(3)
-    // STRICT is the loudest (it alone carries a filled ground); LOOSE is the quietest.
-    expect(faces.get("STRICT")).toMatch(/\bbg-muted\b/)
-    expect(faces.get("LOOSE")).toMatch(/text-muted-foreground/)
-    expect(faces.get("MIDDLE")).not.toMatch(/\bbg-muted\b/)
-    expect(faces.get("MIDDLE")).not.toMatch(/text-muted-foreground/)
+    // ONE treatment across all three arms — the measured state the sheet disagrees with.
+    expect(faces.size).toBe(1)
   })
 
-  it("(scale invariance) the tone follows the TIER, never the scale — the same tier looks the same at run and pub", () => {
-    // `scale` tunes layout and typography ONLY. A tone keyed on scale would let the run
-    // header and the publish summary disagree about how governed a workflow is.
-    const toneOf = (scale: (typeof LIVE_SCALES)[number], def: DefShape) => {
-      const { unmount } = render(<WorkflowSoul def={def} scale={scale} />)
-      const cls = screen.getByTestId("soul-tier").className
-      unmount()
-      // Drop the per-scale sizing classes; what remains is the tone.
-      return cls
-        .split(/\s+/)
-        .filter((c) => !/^(px-|py-|text-\[)/.test(c))
-        .sort()
-        .join(" ")
-    }
-    for (const def of [strictDef, middleDef, looseDef]) {
-      expect(toneOf("run", def)).toEqual(toneOf("pub", def))
-    }
+  it("(the coupling, mechanically) the soul at scale='card' IS still mounted, and its DOM is pinned by that surface", () => {
+    // ⚠ AND THIS REFUTES A CLAIM THE PLAN HANDED DOWN. `199-03-PLAN.md` states that
+    // `PhaseSpine` "no longer renders at scale='card'" because 192.2 removed
+    // `<WorkflowSoul scale="card" />` from `WorkflowCard.tsx`, leaving `run` and `pub` as
+    // the only live consumers — and instructs "verify this before assuming a card
+    // regression is possible". Verified, and it is FALSE of the tree: 192.2 removed the
+    // LIBRARY CARD's mount, not the card SCALE. A second card-scale mount survives on the
+    // describe door, and it is the one that made the tone change unshippable.
+    expect(doorSwitchSource.length).toBeGreaterThan(500) // non-vacuity: the module loaded
+    expect(doorSwitchSource).toMatch(/<WorkflowSoul[^>]*scale="card"/)
+
+    // …and that surface pins the soul's own rendered subtree, which is what turns a tone
+    // change into a cross-surface change. The ESCAPED quotes are load-bearing: they are how
+    // the captured DOM sits inside a JS string literal, so matching them proves the chip is
+    // inside the CAPTURE rather than merely mentioned in the file's prose.
+    expect(doorBaselineSource.length).toBeGreaterThan(500)
+    expect(doorBaselineSource).toContain('data-testid=\\"soul-tier\\"')
   })
 
   it("no soul module spells the sheet's word — and the sweep is NON-VACUOUS", () => {

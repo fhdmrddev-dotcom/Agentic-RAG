@@ -32,12 +32,6 @@ import {
   soulDeliverable,
   type DefShape,
 } from "@/components/workflows/soulData"
-// Phase 199-03 (DES-01): a TYPE-ONLY import, erased at compile time. It exists so the tone
-// map below is TOTAL over the tier union — a fourth tier becomes a typecheck error here
-// rather than an arm that silently renders untoned. It moves NO derivation: the runtime
-// tier still comes from `soulData.tierForDefinition`, which is the one shared home, and
-// nothing about that indirection changed.
-import type { TierId } from "@/components/workflows/deriveTier"
 import { PhaseSpine, type SoulScale } from "@/components/workflows/PhaseSpine"
 
 export interface WorkflowSoulProps {
@@ -57,43 +51,6 @@ const TIER_CLASS: Record<SoulScale, string> = {
   card: "px-2 py-0.5 text-[9.5px]",
   run: "px-2.5 py-0.5 text-[11px]",
   pub: "px-3 py-1 text-[13px]",
-}
-
-/**
- * Phase 199-03 (DES-01, sheet 178 `c7-gauntlet-soul` §2) — the chip's WEIGHT per arm.
- *
- * The shipped chip rendered all three tiers in one identical treatment, so the only thing
- * separating a locked-down workflow from a scratch draft was the word — three chips
- * shouting equally, which is the opposite of "calm". The sheet's one genuinely applicable
- * idea for this atom is that the arms should not weigh the same: it draws STRICT filled
- * and bordered, LOOSE transparent and muted. That is HONEST here rather than merely
- * pretty, because the tiers really do mean different amounts of enforcement.
- *
- * ⚠ WHAT THIS IS NOT. It is not colour-alone (WCAG 1.4.1): the glyph and the WORD render
- * on every arm at every scale, unchanged, and the weighting only adds a third signal. It
- * does not re-label anything, it does not store anything, and it adds no arm — the sheet's
- * third arm is REFUSED (see the plan's reconciliation). The sheet captions that arm with a
- * we-could-not-tell word and draws it dashed; our third band is `MIDDLE`, a REAL derived
- * band, so claiming uncertainty over a value the code CAN tell would be a false claim
- * about our own certainty. Nor does a quiet LOOSE chip mean an ungoverned workflow —
- * `judgeAlwaysOn` is `true` for every tier, and that is stated in the chip's own `title`
- * on all three.
- *
- * ⚠ THE SHEET'S WORD IS NOT SPELLED ANYWHERE IN THIS CHAIN, INCLUDING IN THIS COMMENT, AND
- * THAT IS DELIBERATE. `WorkflowSoul.test.tsx` sweeps this module, `soulData.ts` and
- * `deriveTier.ts` for it, and the sweep is blunt on purpose: it does not care whether a
- * literal is copy or a comment, because the way a banned word actually reaches a user is
- * somebody lifting it out of nearby prose. Rewording here was the cheap side of that trade
- * (the `verdictModel.ts` `not-run` precedent); exempting a shipped fence would not be.
- *
- * Tokens only, all of them already resolving in `tailwind.config.js` and already used by
- * this very component: a class that compiles to nothing renders identically to a
- * deliberately unpainted arm, which is why nothing new is invented here.
- */
-const TIER_TONE: Record<TierId, string> = {
-  STRICT: "border-border bg-muted text-foreground",
-  MIDDLE: "border-border text-foreground",
-  LOOSE: "border-border/60 text-muted-foreground",
 }
 
 export function WorkflowSoul({ def, scale }: WorkflowSoulProps) {
@@ -141,8 +98,7 @@ export function WorkflowSoul({ def, scale }: WorkflowSoulProps) {
           data-tier={tier.id}
           title={tier.description}
           className={[
-            "inline-flex items-center gap-1 rounded-full border font-mono font-semibold uppercase tracking-wide",
-            TIER_TONE[tier.id],
+            "inline-flex items-center gap-1 rounded-full border border-border font-mono font-semibold uppercase tracking-wide text-foreground",
             TIER_CLASS[scale],
           ].join(" ")}
         >
