@@ -16,7 +16,10 @@
  *     run is terminal/done.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { render, screen, cleanup, within } from "@testing-library/react"
+// Phase 200-07 widened this line with `act` and `waitFor`: the fetch-authoritative case
+// drives a store write and then waits for the RE-READ it triggers, which is an async edge
+// this suite had no reason to reach before the readings depended on the durable rows.
+import { render, screen, cleanup, within, act, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { axe } from "vitest-axe"
 import {
@@ -72,6 +75,15 @@ import { PhaseTimeline } from "../PhaseTimeline"
 // the `canvasModel.purity.test.ts:18-21` rule, so this plan's diff reads as ADDED lines.
 import { PhaseCard } from "../PhaseCard"
 import type { Phase } from "@/types"
+// Phase 200-07: the two panel sources, read for the zero-re-derivation fence. Their own
+// import lines — the same ADDED-lines rule the two imports above record.
+import timelineSource from "../PhaseTimeline?raw"
+import cardSource from "../PhaseCard?raw"
+// Phase 200-07: the provider whose MOUNT registers the store's real action bodies
+// (`streamsStore.ts:477` declares them all as no-op stubs until then). `replayHarness`
+// mounts it for the same reason; the two cases below that drive a live transition need it
+// directly, and must not inherit a mount from whichever earlier test happened to run first.
+import { StreamsProvider } from "@/providers/StreamsProvider"
 
 const THREAD = "thread-tl"
 
@@ -705,5 +717,304 @@ describe("panel/PhaseTimeline 194-04 — the announcer states the stopped termin
     // the member and the DB slug happen to be spelled the same, so this one assertion
     // covers both — which is a property of the word, not a relaxation of D-17.
     expect(text).not.toContain("— cancelled")
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// Phase 200-07 Task 1 (DES-02 · `200-CHECKLIST.md` §4) — THE PANEL HALF READS THE DURABLE
+// TIMINGS, AND IT READS THEM FROM THE FETCH.
+//
+// ⚠ THE JOIN THIS BLOCK PROVES IS THE ONE `200-02` BOUGHT AND NOBODY HAD CONSUMED. The live
+// slice's `Phase` carries NO timestamps at all (`types/index.ts:1018-1082`) — it never has —
+// so the per-step readings can only come from `GET /threads/{id}/workflow`'s durable rows.
+// That is the FETCH, which is exactly where the project rule puts the truth: *"Realtime is a
+// best-effort hint, not a source of truth — always reconcile via fetch"* (D-v2.5-03). A
+// terminal run has no stream at all, which is why this component already has a reconcile
+// floor and why a stream-fed reading would go blank on precisely the runs a person re-opens.
+//
+// ⚠ AND THE CLIENT MIRROR OF THAT TRANSPORT WAS MISSING FOUR FIELDS UNTIL THIS PLAN. The
+// Python model (`models/thread.py:122-125`) has carried them since `200-02`; `api.ts`'s
+// `WorkflowPhaseState` had not, so the wire was sending facts the panel could not declare.
+// Measured against the two models, not inferred from a plan's prose.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+describe("panel/PhaseTimeline 200-07 — the durable per-step readings", () => {
+  const T0 = "2026-08-20T12:00:00Z"
+  const T12 = "2026-08-20T12:00:12Z"
+
+  /**
+   * Seed the live slice.
+   *
+   * ⚠ MEASURED WHILE WRITING THIS BLOCK, and worth recording rather than working around
+   * silently: **`usePhases` mounts `usePanelReconcile`, whose fetcher is `reconcilePhases`
+   * — which calls `getThreadWorkflow` and then REPLACES the whole slice.** So on this
+   * surface the live slice is itself fetch-derived, and a seed written before render is
+   * overwritten by the mount reconcile. That is the shipped design (the reconcile floor),
+   * not a defect — but it means a case that seeds and then asserts is, by default, asserting
+   * against the MOCK's rows rather than its own seed. Two of the cases below therefore write
+   * the slice AFTER the reconcile has settled, through a mounted provider (below).
+   */
+  function seedSlice(rows: { slug: string; status: Phase["status"] }[]) {
+    resetStore()
+    useStreamsStore.getState().actions.replacePhasesForThread(THREAD, rows.map(toPhase))
+  }
+
+  function toPhase(r: { slug: string; status: Phase["status"] }, i: number): Phase {
+    return {
+      slug: r.slug,
+      phaseIndex: i,
+      phaseType: "llm_agent",
+      status: r.status,
+      subAgents: [],
+      pendingAsk: null,
+    }
+  }
+
+  /**
+   * Mount the timeline INSIDE a real `StreamsProvider`.
+   *
+   * ⚠ REQUIRED, NOT DECORATIVE. `streamsStore.ts:477` declares every action as a no-op stub
+   * and the REAL bodies are registered by `StreamsProvider`'s mount effect
+   * (`StreamsProvider.tsx:1541`). Without a mounted provider,
+   * `actions.replacePhasesForThread` silently does nothing — so a case that "drives a live
+   * transition" drives nothing at all and passes against the mock's rows. `replayHarness`
+   * mounts the provider for exactly this reason; the cases below that write the slice
+   * mid-test do the same rather than inheriting a mount from an earlier test in the file.
+   */
+  function renderWithProvider() {
+    return render(
+      <StreamsProvider>
+        <PhaseTimeline threadId={THREAD} />
+      </StreamsProvider>,
+    )
+  }
+
+  it("renders a real per-step duration and a real declared count, from the FETCHED rows", async () => {
+    seedSlice([{ slug: "gather", status: "done" }])
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "completed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [
+        {
+          slug: "gather",
+          phase_index: 0,
+          status: "completed",
+          started_at: T0,
+          completed_at: T12,
+          step_count: 312,
+          step_noun: "sources",
+        },
+      ],
+    })
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    // `findBy*` because the reading only exists once the fetch resolves — which is the whole
+    // point: nothing here is derived from the live slice.
+    const timing = await screen.findByTestId("phase-card-timing")
+    expect(timing.textContent).toBe("12s")
+    expect(container.querySelector('[data-testid="phase-card-count"]')?.textContent).toBe(
+      "312 sources",
+    )
+  })
+
+  it("a step the FETCH has not mentioned renders NO reading — an absence is not `not recorded`", async () => {
+    // A live SSE event can add a row the durable read has not caught up with. The honest
+    // render of "I hold no row for this slug" is NOTHING — emphatically not `time not
+    // recorded`, which claims a row exists whose timestamps are empty. Two different facts.
+    resetStore()
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "active",
+      current_phase_index: 0,
+      total_phases: 2,
+      phases: [
+        { slug: "gather", phase_index: 0, status: "completed", started_at: T0, completed_at: T12 },
+      ],
+    })
+    const { container } = renderWithProvider()
+    await screen.findByTestId("phase-card-timing")
+
+    // ⚠ THE SECOND ROW IS ADDED AFTER THE RECONCILE SETTLES, through the REAL action — a
+    // seed written before render would have been replaced by the mount reconcile and this
+    // case would then be asserting `1 === 1` about a list that only ever had one row.
+    await act(async () => {
+      useStreamsStore
+        .getState()
+        .actions.replacePhasesForThread(THREAD, [
+          toPhase({ slug: "gather", status: "done" }, 0),
+          toPhase({ slug: "draft", status: "pending" }, 1),
+        ])
+    })
+
+    // NON-VACUITY: two rows really are rendered…
+    await waitFor(() => {
+      expect(container.querySelectorAll("ol > li")).toHaveLength(2)
+    })
+    // …and exactly ONE of them carries a reading. The other is silent.
+    expect(container.querySelectorAll('[data-testid="phase-card-timing"]')).toHaveLength(1)
+    expect(container.textContent ?? "").not.toContain("time not recorded")
+  })
+
+  it("FETCH IS AUTHORITATIVE: a status transition re-reads the durable rows (D-v2.5-03)", async () => {
+    // ⚠ WITHOUT THIS THE READING FREEZES AT MOUNT. The timestamps live on the fetched rows
+    // and this component fetched exactly once, so a step that STARTS after mount would have
+    // its `started_at` arrive on the SSE frame — which drives the slice, not the readings —
+    // and the row would sit blank while a person watched. `196` measured the same shape one
+    // surface over: a gate with no fetch reconcile HID a shipped control.
+    resetStore()
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "active",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [{ slug: "gather", phase_index: 0, status: "pending" }],
+    })
+    renderWithProvider()
+    // Settle the mount, then write the slice EXPLICITLY through the real action. ⚠ Driving
+    // it here rather than leaning on the mount reconcile is deliberate: the reconcile's
+    // `replace` is captured from the store at first render, when it is still the stub, so
+    // whether it populates on the first pass is a timing detail — and a case whose SETUP is
+    // a race proves nothing about the behaviour under it.
+    await act(async () => {
+      await Promise.resolve()
+    })
+    await act(async () => {
+      useStreamsStore
+        .getState()
+        .actions.replacePhasesForThread(THREAD, [toPhase({ slug: "gather", status: "pending" }, 0)])
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId("phase-card-timing").getAttribute("data-timing-kind")).toBe(
+        "not-started",
+      )
+    })
+
+    // The step starts. The slice moves first (the hint); the fetch must follow (the truth).
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "active",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [{ slug: "gather", phase_index: 0, status: "active", started_at: T0 }],
+    })
+    await act(async () => {
+      useStreamsStore
+        .getState()
+        .actions.replacePhasesForThread(THREAD, [toPhase({ slug: "gather", status: "running" }, 0)])
+    })
+
+    // ⚠ THE ASSERTION IS THE RENDERED READING, NOT A CALL COUNT, and that is deliberate. A
+    // call count would pass against a component that re-fetched and then ignored the answer;
+    // the reading can only move if the durable rows were re-read AND consumed. It is also
+    // the thing a person actually sees change.
+    await waitFor(() => {
+      expect(screen.getByTestId("phase-card-timing").getAttribute("data-timing-kind")).toBe(
+        "running",
+      )
+    })
+    // …and it now carries a real figure, anchored on the SERVER's `started_at`.
+    expect(screen.getByTestId("phase-card-timing").textContent).toMatch(/\d/)
+  })
+
+  it("RS-MNR-02: an `active` row under a TERMINAL run reads `did not finish`, never a clock", async () => {
+    // The residual is INHERITED, not introduced here: `harness_engine.py:1698-1706` only
+    // terminalizes the interrupted phase on a cancellation, so a crash leaves an `active`
+    // row under a `failed` run. Rendered as a tick it would run forever — `BUG-260610-01`'s
+    // symptom, on the surface built to remove it.
+    seedSlice([{ slug: "gather", status: "running" }])
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "failed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [{ slug: "gather", phase_index: 0, status: "active", started_at: T0 }],
+    })
+    render(<PhaseTimeline threadId={THREAD} />)
+
+    const timing = await screen.findByTestId("phase-card-timing")
+    expect(timing.getAttribute("data-timing-kind")).toBe("unfinished")
+    expect(timing.textContent).not.toMatch(/\d/)
+  })
+
+  it("`skipped` and a HISTORIC row are two different readings in ONE render", async () => {
+    // ⚠ ASSERTED IN ONE RENDER RATHER THAN TWO, deliberately. Two separate renders can both
+    // be "correct" while a single list still collapses them — and a list is what a person
+    // actually reads.
+    seedSlice([
+      { slug: "gather", status: "skipped" },
+      { slug: "draft", status: "done" },
+    ])
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "completed",
+      current_phase_index: 1,
+      total_phases: 2,
+      phases: [
+        { slug: "gather", phase_index: 0, status: "skipped" },
+        // Terminal with BOTH timestamps null — a row written before migration 121 existed.
+        { slug: "draft", phase_index: 1, status: "completed", started_at: null, completed_at: null },
+      ],
+    })
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    await waitFor(() => {
+      expect(container.querySelectorAll('[data-testid="phase-card-timing"]')).toHaveLength(2)
+    })
+    const readings = Array.from(
+      container.querySelectorAll('[data-testid="phase-card-timing"]'),
+    ).map((el) => el.textContent ?? "")
+    expect(readings[0].length).toBeGreaterThan(0)
+    expect(readings[1].length).toBeGreaterThan(0)
+    expect(readings[0]).not.toBe(readings[1])
+  })
+
+  it("a `constructor`-slugged phase renders no function and does not blank the row", async () => {
+    // ⚠ LIVE, NOT THEORETICAL. `workflow_phases.slug` is unconstrained `text` (migration 121
+    // declined `SEED-143`'s CHECK with a recorded trigger), and `200-04` found the eighth
+    // live sink of this class in this tree — where React REFUSED the function child and the
+    // label rendered as NOTHING AT ALL, which is worse than the predicted garbage string
+    // because nothing appears on screen to say anything went wrong.
+    seedSlice([{ slug: "constructor", status: "done" }])
+    mockGetThreadWorkflow.mockResolvedValue({
+      mode: "harness",
+      definition_name: "X",
+      run_status: "completed",
+      current_phase_index: 0,
+      total_phases: 1,
+      phases: [
+        { slug: "constructor", phase_index: 0, status: "completed", started_at: T0, completed_at: T12 },
+      ],
+    })
+    const { container } = render(<PhaseTimeline threadId={THREAD} />)
+
+    const timing = await screen.findByTestId("phase-card-timing")
+    expect(timing.textContent).toBe("12s")
+    // The row itself still renders its identity — the blank-row failure mode, asserted.
+    expect(container.textContent ?? "").toContain("constructor")
+  })
+
+  it("holds NO duration derivation of its own — both panel files read the ONE resolver", () => {
+    // Req-8's shape, one surface along: the panel and the run page must not be able to
+    // disagree about a duration, and the only mechanical guarantee of that is that neither
+    // subtracts a timestamp. A second derivation here would look like a small convenience
+    // and would be the disagreement's first day.
+    const DATE_MATH = /new Date\([^)]*\)\s*[-+]\s*new Date\(/
+    expect(timelineSource.length).toBeGreaterThan(1000)
+    expect(cardSource.length).toBeGreaterThan(1000)
+    expect(timelineSource).not.toMatch(DATE_MATH)
+    expect(cardSource).not.toMatch(DATE_MATH)
+    // …and each really does import the shared resolver, so the absence above is "it moved"
+    // rather than "it vanished".
+    expect(timelineSource).toContain("phaseDuration")
+    expect(cardSource).toContain("phaseDuration")
+    // POSITIVE CONTROL — the needle finds the shape it forbids.
+    expect("const ms = new Date(b) - new Date(a)").toMatch(DATE_MATH)
   })
 })

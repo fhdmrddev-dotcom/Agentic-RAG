@@ -17,6 +17,10 @@ import { describe, it, expect, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import type { EmitFailure, EmitSubStep, Phase } from "@/types"
 import { PhaseCard } from "./PhaseCard"
+// Phase 200-07 — the ONE resolver, driven for real rather than stubbed. Its own import line
+// rather than a widening of the one above: the `canvasModel.purity.test.ts:18-21` rule, so
+// this plan's diff reads as ADDED lines.
+import { phaseRunFacts, type PhaseTimingRow } from "@/components/workflows/phaseDuration"
 
 afterEach(() => cleanup())
 
@@ -450,5 +454,291 @@ describe("PhaseCard — 199-02 pre-change inventory (sheet c3 Col 2)", () => {
     const failed = render(<PhaseCard phase={fillPhase({ status: "failed" })} position={0} />)
     expect(rootOf(failed.container).className).toContain("border-[hsl(var(--destructive)/0.55)]")
     failed.unmount()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────────────────
+// Phase 200-07 Task 1 (DES-02 · `200-CHECKLIST.md` §4) — D-06's ARMS AND D-07's COUNT ON
+// THE PANEL HALF OF THE RUN SURFACE.
+//
+// The atoms these cases carry, by row id: `RS-MR-01` (a per-step count, only where the type
+// declared one), `RS-MR-02` (the per-step reading, from the durable timestamps), `RS-MR-04`
+// (six distinct renders, plus the two arms measurement added), `RS-MNR-02` (no live clock on
+// a step that never ran or on a run that ended) and `RS-MNR-03` (no `0` and no dash standing
+// in for an absent count).
+//
+// ⚠ EVERY FIXTURE BELOW IS A WIRE ROW DRIVEN THROUGH THE REAL RESOLVER, never a hand-built
+// facts object. A hand-built one would let this suite pass while `phaseDuration.ts` and this
+// card disagreed about which arm a row is on — precisely the class of defect a shared
+// resolver exists to make impossible. The card is the RENDERER; the arms are its.
+//
+// ⚠ AND THE PANEL IS A CROSS-SURFACE SHELL. `WorkspacePanel` has exactly ONE production
+// mount — `ChatLayout.tsx:673` — and NO workflow page mounts it, so everything asserted here
+// lands in CHAT first. A UAT run against a workflow surface alone will not see it.
+// ─────────────────────────────────────────────────────────────────────────────────────────
+
+/** A fixed instant, injected — no clock mock, and no case that drifts with the wall time. */
+const FIXED_NOW = Date.parse("2026-08-20T12:00:30Z")
+const T0 = "2026-08-20T12:00:00Z"
+const T12 = "2026-08-20T12:00:12Z"
+
+/** One durable `workflow_phases` row, in the shape `GET /threads/{id}/workflow` sends. */
+function wireRow(over: Partial<PhaseTimingRow> = {}): PhaseTimingRow {
+  return { slug: "fill", status: "completed", ...over }
+}
+
+/** The card's timing prop, resolved the way production resolves it. */
+function facts(row: Partial<PhaseTimingRow>, runStatus?: string | null, now = FIXED_NOW) {
+  return phaseRunFacts(wireRow(row), runStatus, now)
+}
+
+function timingTextOf(container: HTMLElement): string {
+  return container.querySelector('[data-testid="phase-card-timing"]')?.textContent ?? ""
+}
+function timingKindOf(container: HTMLElement): string {
+  return (
+    container.querySelector('[data-testid="phase-card-timing"]')?.getAttribute("data-timing-kind") ??
+    ""
+  )
+}
+function countNodeOf(container: HTMLElement): Element | null {
+  return container.querySelector('[data-testid="phase-card-count"]')
+}
+
+describe("PhaseCard — D-06's arms (RS-MR-02 / RS-MR-04)  [owner: 200-07]", () => {
+  it("RS-MNR-04: `never ran` and `time not recorded` are PROVABLY DIFFERENT renders", () => {
+    // ⚠ THE HEADLINE OF THIS WHOLE SCREEN, and the lesson this repo has now learned three
+    // times. `library/runFacts.ts` needed a FOURTH arm after CR-01 because folding an absence
+    // together with a negative printed "Never run" about workflows that really had run;
+    // `DecisionsList` needed a THIRD under D-20 because an absent readiness rendered as a
+    // pass. Here the twin cases are a step the run ROUTED AROUND (an affirmative fact) and a
+    // HISTORIC row whose time was never written (we hold no fact at all).
+    const skipped = render(
+      <PhaseCard
+        phase={fillPhase({ status: "skipped" })}
+        position={0}
+        timing={facts({ status: "skipped" })}
+      />,
+    )
+    const skippedText = timingTextOf(skipped.container)
+    const skippedKind = timingKindOf(skipped.container)
+    skipped.unmount()
+
+    // Terminal, BOTH timestamps null — a row written before migration 121 existed.
+    const historic = render(
+      <PhaseCard
+        phase={fillPhase({ status: "done" })}
+        position={0}
+        timing={facts({ status: "completed", started_at: null, completed_at: null })}
+      />,
+    )
+    const historicText = timingTextOf(historic.container)
+    const historicKind = timingKindOf(historic.container)
+    historic.unmount()
+
+    // Both are non-empty — an absence rendered as a blank would make them "different" in the
+    // uselessly-true way, so non-vacuity is asserted BEFORE the difference.
+    expect(skippedText.length).toBeGreaterThan(0)
+    expect(historicText.length).toBeGreaterThan(0)
+    expect(skippedText).not.toBe(historicText)
+    expect(skippedKind).not.toBe(historicKind)
+
+    // ⚠ AND THE BOOLEAN A CARELESS IMPLEMENTATION WOULD USE COLLAPSES THEM. Driven rather
+    // than argued: it answers the same for both, so a card keyed on it would print one thing
+    // for two different facts.
+    const hasDuration = (t: string) => /\d/.test(t) && !/not recorded/.test(t)
+    expect(hasDuration(skippedText)).toBe(hasDuration(historicText))
+  })
+
+  it("RS-MR-04: the six arms plus the two measurement added are EIGHT distinct readings", () => {
+    // `pending` (not reached) · `skipped` (never ran) · `active` (a live tick) · `completed`
+    // (a duration) · `cancelled` (ran Ns, interrupted) · historic (time not recorded) · plus
+    // `active` under a TERMINAL run (did not finish) and `active` under a PAUSED one.
+    const cases: [string, Partial<PhaseTimingRow>, string | null][] = [
+      ["pending", { status: "pending" }, "active"],
+      ["skipped", { status: "skipped" }, "active"],
+      ["running", { status: "active", started_at: T0 }, "active"],
+      ["completed", { status: "completed", started_at: T0, completed_at: T12 }, "completed"],
+      ["cancelled", { status: "cancelled", started_at: T0, completed_at: T12 }, "cancelled"],
+      ["historic", { status: "completed" }, "completed"],
+      ["unfinished", { status: "active", started_at: T0 }, "failed"],
+      ["paused", { status: "active", started_at: T0 }, "paused"],
+    ]
+    const readings = cases.map(([, row, runStatus]) => {
+      const r = render(
+        <PhaseCard
+          phase={fillPhase({ status: "done" })}
+          position={0}
+          timing={facts(row, runStatus)}
+        />,
+      )
+      const text = timingTextOf(r.container)
+      r.unmount()
+      return text
+    })
+    // EIGHT readings, EIGHT distinct strings — the property a per-arm loop cannot show, and
+    // the one that fails the instant two arms are folded.
+    expect(readings).toHaveLength(8)
+    expect(new Set(readings).size).toBe(8)
+    for (const reading of readings) expect(reading.length).toBeGreaterThan(0)
+  })
+
+  it("RS-MNR-02: an `active` step under a TERMINAL run does NOT render a ticking clock", () => {
+    // ⚠ THE ARM MEASUREMENT ADDED. `harness_engine.py:1698-1706` only terminalizes the
+    // interrupted phase on a CANCELLATION, so a crash leaves an `active` row under a `failed`
+    // run. Without this arm that row ticks forever — `BUG-260610-01`'s symptom re-created on
+    // the very surface built to remove it.
+    const live = render(
+      <PhaseCard
+        phase={fillPhase({ status: "running" })}
+        position={0}
+        timing={facts({ status: "active", started_at: T0 }, "active")}
+      />,
+    )
+    const liveText = timingTextOf(live.container)
+    const liveKind = timingKindOf(live.container)
+    live.unmount()
+
+    const dead = render(
+      <PhaseCard
+        phase={fillPhase({ status: "running" })}
+        position={0}
+        timing={facts({ status: "active", started_at: T0 }, "failed")}
+      />,
+    )
+    const deadText = timingTextOf(dead.container)
+    const deadKind = timingKindOf(dead.container)
+    dead.unmount()
+
+    // The LIVE row really does tick — the positive control, without which the negative below
+    // could pass against a card that renders no clock in any state at all.
+    expect(liveKind).toBe("running")
+    expect(liveText).toMatch(/\d/)
+    // The DEAD row carries no digit and is on a different arm.
+    expect(deadKind).not.toBe("running")
+    expect(deadText).not.toMatch(/\d/)
+  })
+
+  it("RS-MNR-02: a step that NEVER RAN carries no clock either", () => {
+    for (const [status, runStatus] of [
+      ["skipped", "completed"],
+      ["pending", "active"],
+    ] as const) {
+      const r = render(
+        <PhaseCard
+          phase={fillPhase({ status: "skipped" })}
+          position={0}
+          timing={facts({ status }, runStatus)}
+        />,
+      )
+      expect(timingTextOf(r.container), `${status} rendered a figure`).not.toMatch(/\d/)
+      expect(timingKindOf(r.container)).not.toBe("running")
+      r.unmount()
+    }
+  })
+
+  it("renders NOTHING at all when the caller holds no durable row — an absence is not a claim", () => {
+    // ⚠ `undefined` is a THIRD state: the caller has no row for this slug (a live-only
+    // skeleton, or a mount before the first reconcile). Rendering `time not recorded` there
+    // would assert that a row exists and its timestamps are empty, which is a different
+    // statement and one nothing measured.
+    const { container } = render(<PhaseCard phase={fillPhase({ status: "running" })} position={0} />)
+    expect(container.querySelector('[data-testid="phase-card-timing"]')).toBeNull()
+    expect(countNodeOf(container)).toBeNull()
+  })
+})
+
+describe("PhaseCard — D-07's count (RS-MR-01 / RS-MNR-03)  [owner: 200-07]", () => {
+  it("renders the declared pair VERBATIM — the number and the step's OWN noun", () => {
+    const { container } = render(
+      <PhaseCard
+        phase={fillPhase({ status: "done" })}
+        position={0}
+        timing={facts({
+          status: "completed",
+          started_at: T0,
+          completed_at: T12,
+          step_count: 312,
+          step_noun: "sources",
+        })}
+      />,
+    )
+    expect(countNodeOf(container)?.textContent).toBe("312 sources")
+  })
+
+  it("a DECLARED `0` renders — it is a measurement, not an absence", () => {
+    // `source_refs: []` is the step saying *we looked and found nothing*. Suppressing it
+    // would delete a real finding, which is the mirror-image error of inventing one.
+    const { container } = render(
+      <PhaseCard
+        phase={fillPhase({ status: "done" })}
+        position={0}
+        timing={facts({
+          status: "completed",
+          started_at: T0,
+          completed_at: T12,
+          step_count: 0,
+          step_noun: "sources",
+        })}
+      />,
+    )
+    expect(countNodeOf(container)?.textContent).toBe("0 sources")
+  })
+
+  it("RS-MNR-03: a step that DECLARED NO COUNT renders no element — never `0`, never a dash", () => {
+    // Four of the seven phase types declare nothing: `programmatic`, `llm_single`,
+    // `llm_human_input`, `external_action`. The absent case must render NO SLOT — an empty
+    // element is still a rendered slot, which is why this asserts the node is null rather
+    // than asserting its text is empty.
+    const rows: Partial<PhaseTimingRow>[] = [
+      { step_count: null, step_noun: null },
+      { step_count: undefined, step_noun: undefined },
+      // A number with no noun is a figure with no subject — worse than silence.
+      { step_count: 12, step_noun: null },
+      { step_count: 12, step_noun: "   " },
+    ]
+    for (const row of rows) {
+      const r = render(
+        <PhaseCard
+          phase={fillPhase({ status: "done" })}
+          position={0}
+          timing={facts({ status: "completed", started_at: T0, completed_at: T12, ...row })}
+        />,
+      )
+      expect(countNodeOf(r.container), `${JSON.stringify(row)} rendered a count slot`).toBeNull()
+      // ...and no dash leaked into the reading beside it either.
+      expect(timingTextOf(r.container)).not.toMatch(/[—–]/)
+      r.unmount()
+    }
+  })
+
+  it("the SHIPPED PINS are unmoved — the status atom is byte-identical with a timing prop", () => {
+    // ⚠ THE REASON THE READING IS SITED IN THE IDENTITY COLUMN. `statusAtomOf` reads
+    // `button span.ml-auto`'s children POSITIONALLY, and the nine-row inventory above pins
+    // them as exact literals. This proves the new atoms did not enter that element — i.e.
+    // that a characterization pin was answered by moving the NEW thing, not by re-baselining
+    // the old one (the 199-03 precedent, and 200-06's icon-well decline).
+    const withTiming = render(
+      <PhaseCard
+        phase={fillPhase({ status: "done" })}
+        position={0}
+        timing={facts({
+          status: "completed",
+          started_at: T0,
+          completed_at: T12,
+          step_count: 3,
+          step_noun: "fields",
+        })}
+      />,
+    )
+    const pairWith = statusAtomOf(withTiming.container)
+    withTiming.unmount()
+
+    const without = render(<PhaseCard phase={fillPhase({ status: "done" })} position={0} />)
+    const pairWithout = statusAtomOf(without.container)
+    without.unmount()
+
+    expect(pairWith).toStrictEqual(pairWithout)
+    expect(pairWith).toStrictEqual(["✓", "Complete"])
   })
 })
