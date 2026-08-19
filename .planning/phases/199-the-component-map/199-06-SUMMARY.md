@@ -306,3 +306,10 @@ None. No network endpoint, auth path, file access pattern or schema changed. The
 mitigations the plan registered (`T-199-06-01`, `T-199-06-02`) are driven by tests named in
 this summary; `T-199-06-03` is discharged by the `FENCED_IN` list being committed one commit
 before anything moved.
+
+## Self-Check: PASSED
+
+- `frontend/src/components/workflows/FieldGuidance.tsx` — FOUND
+- `.planning/phases/199-the-component-map/199-06-SUMMARY.md` — FOUND
+- `d19a8b9b` · `ffa95d74` · `6264097e` — all FOUND in `a648029..HEAD`
+- `git diff --stat a648029 HEAD -- backend supabase .planning/STATE.md .planning/ROADMAP.md` — EMPTY
