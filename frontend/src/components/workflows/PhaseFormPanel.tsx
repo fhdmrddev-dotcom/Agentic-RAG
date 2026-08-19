@@ -76,6 +76,22 @@ import { ExternalActionSection } from "./ExternalActionSection"
 import { FieldGuidance } from "./FieldGuidance"
 import { useFieldGuidance } from "./fieldGuidanceContext"
 import { GovernanceSection } from "./GovernanceSection"
+// 200-04 (DES-02, §1 `SP-MR-02`/`SP-MR-03`/`SP-MR-04`) — sheet c4's card shell and the words
+// it wears, split across a component and a leaf for the reason `FieldGuidance` is: a component
+// file may not export shared non-component values (`react-refresh/only-export-components`;
+// 27 files in this tree answer that with a leaf, and zero eslint disables exist). ⚠ THE SHELL
+// HOLDS NO STATE — this file's own suite pins its hook count at an ABSOLUTE ZERO, and these
+// cards frame DECISIONS (what a step can reach, what it changes outside), which SEED-184's
+// rule 3 forbids folding behind a click anyway.
+import { StepCardSection } from "./StepCardSection"
+import {
+  outsideChangeSentence,
+  STEP_CARD_MODEL_TITLE,
+  STEP_CARD_NEEDS_ARMING,
+  STEP_CARD_OUTSIDE_SENTENCE,
+  STEP_CARD_OUTSIDE_TITLE,
+  STEP_CARD_REACH_TITLE,
+} from "./stepCardSectionContext"
 import { TemplateAttachSection } from "./TemplateAttachSection"
 import { TemplateNameCheck } from "./TemplateNameCheck"
 // 196-08 (AUTH-04) — the registry-backed picker. ONE import, and the arrow points ONE WAY:
@@ -601,6 +617,32 @@ function FolderScopeField({
   )
 }
 
+/**
+ * 200-04 (§1 `SP-MR-04`) — the ONE line stating what this step will actually change outside
+ * the run, resolved from the capability the author chose.
+ *
+ * ⚠ NOTHING RENDERS WHEN NOTHING IS CHOSEN, and that is the honest direction rather than the
+ * tidy one. `outsideChangeSentence` returns `undefined` for a capability the closed set does
+ * not carry — including the empty string a fresh step holds — and this renders nothing at
+ * all, never a placeholder. A card that printed a blank consequence row would be
+ * byte-indistinguishable from one whose lookup failed, and on a governance surface those two
+ * readings are opposite.
+ *
+ * ⚠ NO ID REACHES THE DOM. The author reads a sentence; the capability name is a wire value.
+ * `PhaseFormPanel.rails.test.tsx` asserts no capability NAME appears anywhere in this panel,
+ * over the DEGRADED read too, because the strike-through hazard 189-04 closed was exactly a
+ * capability painted as an author-facing chip.
+ */
+function OutsideChangeLine({ capability }: { capability: string }) {
+  const sentence = outsideChangeSentence(capability)
+  if (sentence === undefined) return null
+  return (
+    <p data-testid="outside-change" className="col-span-2 text-[11px] leading-snug text-foreground">
+      {sentence}
+    </p>
+  )
+}
+
 /** Render available_tools as friendly chips (the raw tool ids reachable via ⓘ).
  *  Editing stays a comma field below the chips (so the field is still editable +
  *  testable via the label), and the chips are a read-friendly preview above it.
@@ -1020,7 +1062,16 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
+              {/* 200-04 (§1 `SP-MR-02`) — sheet c4's MODEL card. The gate is `modelPicker`
+                  so an absent registry answer renders no empty card, and the mount line
+                  inside is byte-identical to the shipped one: this file's own fence reads
+                  the four mounts as a sorted SET of their `pt ===` guards, and a card that
+                  changed one would fail it. */}
+              {modelPicker && (
+                <StepCardSection title={STEP_CARD_MODEL_TITLE} testId="card-model">
               {modelPicker && pt === "llm_single" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
+                </StepCardSection>
+              )}
               <TextField
                 label="Creativity"
                 hint="temperature — 0 is focused and repeatable, higher is more varied."
@@ -1030,7 +1081,9 @@ export function PhaseFormPanel({
                 onPersist={onPersist}
                 type="number"
               />
-              <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
+                <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              </StepCardSection>
               <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
             </>
           )}
@@ -1048,7 +1101,11 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
+              {modelPicker && (
+                <StepCardSection title={STEP_CARD_MODEL_TITLE} testId="card-model">
               {modelPicker && pt === "llm_agent" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
+                </StepCardSection>
+              )}
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions the AI may take before it must stop."
@@ -1074,7 +1131,9 @@ export function PhaseFormPanel({
                 onPersist={onPersist}
                 type="number"
               />
-              <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
+                <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              </StepCardSection>
               <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
             </>
           )}
@@ -1092,7 +1151,11 @@ export function PhaseFormPanel({
                 textarea
                 full
               />
+              {modelPicker && (
+                <StepCardSection title={STEP_CARD_MODEL_TITLE} testId="card-model">
               {modelPicker && pt === "llm_batch_agents" && <ModelField {...modelPicker} value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
+                </StepCardSection>
+              )}
               <TextField
                 label="Max steps"
                 hint="max_steps — how many actions each worker may take before it must stop."
@@ -1126,7 +1189,9 @@ export function PhaseFormPanel({
                 onChange={set("merge_strategy")}
                 onPersist={onPersist}
               />
-              <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
+                <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              </StepCardSection>
             </>
           )}
 
@@ -1189,9 +1254,15 @@ export function PhaseFormPanel({
               {/* D-12 — the fitness flag rides THIS mount and no other: on the three step
                   types above the emission tier predicts nothing about the outcome, and a
                   warning that predicts nothing trains people to ignore the ones that do. */}
+              {modelPicker && (
+                <StepCardSection title={STEP_CARD_MODEL_TITLE} testId="card-model">
               {modelPicker && pt === "llm_emit" && <ModelField {...modelPicker} showFitness value={asStr(cfg.model)} onChange={set("model")} onPersist={onPersist} />}
+                </StepCardSection>
+              )}
               <SkillField name={skillRefName} rawId={skillRefId} onChange={set("skill_ref")} onPersist={onPersist} />
-              <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              <StepCardSection title={STEP_CARD_REACH_TITLE} testId="card-reach">
+                <FolderScopeField ids={folderIds} folderNames={folderNames} fallbackName={folderName} />
+              </StepCardSection>
               <SelectField
                 label="Sourcing strictness"
                 hint="citation_policy — how strictly claims in the deliverable must be backed by sources."
@@ -1221,7 +1292,25 @@ export function PhaseFormPanel({
 
           {/* ── external_action: the capability picker — its OWN component, ONE gated line (189 / §7a) ── */}
           {pt === "external_action" && (
-            <ExternalActionSection capability={asStr(cfg.capability)} onChange={set("capability")} onPersist={onPersist} />
+            /* 200-04 (§1 `SP-MR-04`) — sheet c4's `WHAT IT CHANGES OUTSIDE THIS WORKFLOW`
+               card, composed around the shipped picker rather than replacing it.
+               ⚠ THE MARK IS TRUE BY CONSTRUCTION, NOT BY A SECOND COPY OF A LIST. D-04 pins
+               the action-risk switch ON and unmovable for this step type, and the ONE home
+               for that decision is `ARM_PINNED_TYPES` in `GovernanceSection.tsx`. This card
+               renders only on that list's sole member, and this file's suite asserts the list
+               still reads exactly `["external_action"]`, so the two cannot drift silently.
+               ⚠ NO CONSEQUENCE FIGURE IS COMPUTED HERE. `Will overwrite 1,200 records` is
+               `SP-5` — REPORTED, never built (§5): no row count exists anywhere in this
+               product, and inventing one is the fabricated business figure `199-05` refused. */
+            <StepCardSection
+              title={STEP_CARD_OUTSIDE_TITLE}
+              testId="card-outside"
+              mark={STEP_CARD_NEEDS_ARMING}
+              note={STEP_CARD_OUTSIDE_SENTENCE}
+            >
+              <OutsideChangeLine capability={asStr(cfg.capability)} />
+              <ExternalActionSection capability={asStr(cfg.capability)} onChange={set("capability")} onPersist={onPersist} />
+            </StepCardSection>
           )}
         </div>
 

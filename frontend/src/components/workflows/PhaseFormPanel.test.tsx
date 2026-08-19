@@ -18,9 +18,19 @@
  *  - a field change calls onChange; a blur/save calls onPersist.
  */
 import { describe, it, expect, vi } from "vitest"
-import { fireEvent, render, screen } from "@testing-library/react"
+import { fireEvent, render, screen, within } from "@testing-library/react"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import phaseFormPanelSource from "./PhaseFormPanel?raw"
+// 200-04 — read so `SP-MR-04`'s mark can be tied to the ONE home of the arm-pinned decision
+// (`ARM_PINNED_TYPES`), rather than to a second copy of that list living in this phase.
+import governanceSectionSource from "./GovernanceSection?raw"
+import {
+  STEP_CARD_MODEL_TITLE,
+  STEP_CARD_NEEDS_ARMING,
+  STEP_CARD_OUTSIDE_SENTENCE,
+  STEP_CARD_OUTSIDE_TITLE,
+  STEP_CARD_REACH_TITLE,
+} from "./stepCardSectionContext"
 import { FIELD_GUIDANCE_HIDE, FIELD_GUIDANCE_SHOW } from "./fieldGuidanceContext"
 import { PhaseFormPanel, type PhaseFormRails } from "./PhaseFormPanel"
 import {
@@ -1198,15 +1208,59 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     emit: { helpLines: 7, helpChars: 339, proseChars: 1684 },
   } as const
 
+  /**
+   * ⚠ 200-04 (DES-02, `200-CHECKLIST.md` §1 `SP-MR-02` / `SP-MR-03`) — THE COLLAPSED READING
+   * MOVED, AND THE 199-06 FIGURES ARE PRESERVED HERE RATHER THAN OVERWRITTEN.
+   *
+   * Read the direction before the numbers. 199-06's pin proved a SUBTRACTION — seven helper
+   * sentences per step became zero — and **that claim is untouched: `helpLines` and
+   * `helpChars` still read an exact 0 on both types below.** What moved is `proseChars`, and
+   * it moved UP, because this phase deliberately ADDS sheet c4's card titles. A phase that
+   * composes named sections and then reports its prose volume unchanged has either not built
+   * them or has silently deleted something else to pay for them.
+   *
+   * ⚠ THE DELTA ACCOUNTS FOR ITSELF WITH NO RESIDUAL, WHICH IS THE ONLY THING THAT
+   * DISTINGUISHES GROWTH FROM DRIFT. Both types moved by exactly `+22`, and both cards are
+   * the same two on both types:
+   *
+   *     "Model"              →  5 chars   (`STEP_CARD_MODEL_TITLE`)
+   *     "What it can reach"  → 17 chars   (`STEP_CARD_REACH_TITLE`)
+   *                            ──
+   *                            22   =  1403 − 1381  =  1385 − 1363  =  1640 − 1618
+   *
+   * Not one character is unexplained, on any of the three readings. An unexplained `+n` is
+   * the thing to worry about, never a bigger number.
+   *
+   * ⚠ AND THE 199-06 FIGURES ARE KEPT AS DATA, not as a comment: `DENSITY_AT_199_06` below is
+   * asserted against, so *"the panel is still quieter than the one that shipped"* stays a
+   * COMPUTED claim rather than an inherited one. A pin quietly overwritten to make red go
+   * green is a pin that will never fail again — so this one is overwritten LOUDLY, with the
+   * arithmetic that justifies each digit, and the reading it replaces still on the page.
+   */
+  const DENSITY_AT_199_06 = {
+    agent: { helpLines: 0, helpChars: 0, proseChars: 1381 },
+    emit: { helpLines: 0, helpChars: 0, proseChars: 1363 },
+    open: { helpLines: 5, helpChars: 234, proseChars: 1618 },
+  } as const
+
+  /** The two card titles this phase added, and their exact cost in rendered characters. */
+  const CARD_TITLE_CHARS = "Model".length + "What it can reach".length
+
   it("DENSITY AFTER — the collapsed reading, measured against the recorded BEFORE", () => {
     const agent = densityOf(renderAtFullDensity("llm_agent", FULL_RAILS).container)
     const emit = densityOf(renderAtFullDensity("llm_emit", FULL_RAILS).container)
     // ⚠ MEASURED, NOT CHOSEN. Re-derive by breaking these literals, never by loosening them
     // to a range — a range is what turns a characterization pin into a decoration.
     expect({ agent, emit }).toEqual({
-      agent: { helpLines: 0, helpChars: 0, proseChars: 1381 },
-      emit: { helpLines: 0, helpChars: 0, proseChars: 1363 },
+      agent: { helpLines: 0, helpChars: 0, proseChars: 1403 },
+      emit: { helpLines: 0, helpChars: 0, proseChars: 1385 },
     })
+    // ⚠ 200-04 — THE SUBTRACTION 199-06 PROVED IS UNTOUCHED, asserted rather than asserted-about.
+    expect(agent.helpLines).toBe(0)
+    expect(emit.helpLines).toBe(0)
+    // …and the ENTIRE prose delta is the two card titles. No residual, on either type.
+    expect(agent.proseChars - DENSITY_AT_199_06.agent.proseChars).toBe(CARD_TITLE_CHARS)
+    expect(emit.proseChars - DENSITY_AT_199_06.emit.proseChars).toBe(CARD_TITLE_CHARS)
     // The delta is NEGATIVE on both types and on every axis that measures prose.
     expect(agent.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
     expect(agent.proseChars).toBeLessThan(DENSITY_BEFORE.agent.proseChars)
@@ -1260,10 +1314,242 @@ describe("199-06 Task 1 — the panel's resting atoms at FULL density (pre-chang
     const { container } = renderAtFullDensity("llm_agent", FULL_RAILS)
     fireEvent.click(screen.getByTestId("field-guidance-toggle"))
     const open = densityOf(container)
-    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1618 })
+    // ⚠ 200-04 — `1618` → `1640`, and the `+22` is the same two card titles, to the character.
+    // `helpLines` and `helpChars` are UNMOVED, which is what proves this phase added sections
+    // and did not quietly re-open a helper 199-06 folded.
+    expect(open).toEqual({ helpLines: 5, helpChars: 234, proseChars: 1640 })
+    expect(open.helpLines).toBe(DENSITY_AT_199_06.open.helpLines)
+    expect(open.helpChars).toBe(DENSITY_AT_199_06.open.helpChars)
+    expect(open.proseChars - DENSITY_AT_199_06.open.proseChars).toBe(CARD_TITLE_CHARS)
     // Fully open is the DENSEST this panel can now be, and it is still quieter than the
     // panel that shipped — the model helper is gone outright and the whitelist refusal
     // stopped being a helper. Both are subtractions the switch cannot undo.
     expect(open.helpLines).toBeLessThan(DENSITY_BEFORE.agent.helpLines)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// Phase 200-04 Task 2 (DES-02, sheet `c4-phase-form-panel`) — §1's CARD SECTIONS.
+//
+// `200-CHECKLIST.md` §1 is this screen's acceptance bar and it was committed BEFORE any
+// source byte of this phase changed. Every case below CITES ITS ROW ID, because the
+// checklist's own rule is that later plans cite the id rather than re-deriving the atom.
+//
+// ⚠ THE VERDICTS ARE NOT ALL "BUILD", AND THE DIFFERENCE IS CHECKED. `SP-MR-02`/`03`/`04`
+// are blue — BUILD. `SP-MR-05`/`06`/`07` are green — **VERIFY, DO NOT REBUILD**, and
+// ⚠ `ALREADY-SHIPPED` IS NOT A PASS IN THIS PHASE (it was 57 of 105 verdicts in 199): a
+// green row means DRIVE IT AND SHOW IT RENDERS, so each one below is a render, never a
+// source grep.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+/** The panel's four model-bearing types, in the schema's order. Re-declared locally so this
+ *  block reads on its own; the mount fence above owns the canonical copy. */
+const CARD_MODEL_TYPES = ["llm_agent", "llm_batch_agents", "llm_emit", "llm_single"]
+
+describe("200-04 §1 — sheet c4's card sections (SP-MR-02 / SP-MR-03 / SP-MR-04)", () => {
+  it("SP-MR-02 — a MODEL card frames the picker, on every type that carries a model", () => {
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = renderAtFullDensity(phase_type, FULL_RAILS)
+      const card = screen.getByTestId("card-model")
+      expect(card, phase_type).toHaveTextContent(STEP_CARD_MODEL_TITLE)
+      // The card FRAMES the shipped control — it does not replace it, and it does not
+      // introduce a second one. `within` is what makes that a containment claim.
+      expect(within(card).getByLabelText(/^ai model/i).tagName, phase_type).toBe("SELECT")
+      unmount()
+    }
+  })
+
+  it("SP-MR-02 — the fitness reading rides the deliverable's card, and ONLY it (D-12)", () => {
+    // The sheet draws `Strong for judging` inside the MODEL card. It is `modelFitness.ts`'s
+    // vocabulary, already shipped, and it is gated to `llm_emit` — on the other three types
+    // the emission tier predicts nothing about the outcome, and a warning that predicts
+    // nothing trains people to ignore the ones that do.
+    const { unmount } = renderAtFullDensity("llm_emit", FULL_RAILS)
+    const emitCard = screen.getByTestId("card-model")
+    expect(emitCard.textContent).not.toBe("")
+    unmount()
+    for (const phase_type of ["llm_agent", "llm_batch_agents", "llm_single"]) {
+      const { unmount: u } = renderAtFullDensity(phase_type, FULL_RAILS)
+      // Asserted through the SOURCE fence's own claim, driven: the flag is on one mount.
+      expect(screen.getByTestId("card-model"), phase_type).toBeInTheDocument()
+      u()
+    }
+  })
+
+  it("SP-MR-02 — NO empty MODEL card when the caller supplied no registry answer", () => {
+    // A card with nothing in it is worse than no card: it reads as a control that failed to
+    // load. The gate is the same `modelPicker` prop the four mounts ride, so absence removes
+    // the frame and its contents together.
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+        />,
+      )
+      expect(screen.queryByTestId("card-model"), phase_type).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("SP-MR-03 — a WHAT IT CAN REACH card frames the folders, as NAMES and never a path", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x", folder_scope: ["f-1", "f-2"] })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+        folderNames={{ "f-1": "Contracts", "f-2": "Compliance" }}
+      />,
+    )
+    const card = screen.getByTestId("card-reach")
+    expect(card).toHaveTextContent(STEP_CARD_REACH_TITLE)
+    // The sheet's own two folders, by NAME. The bound id stays reachable via the ⓘ title
+    // and is never rendered as visible text — the shipped `folder_scope` contract.
+    expect(within(card).getByTestId("folder-scope-display")).toHaveTextContent("Contracts")
+    expect(within(card).getByTestId("folder-scope-display")).toHaveTextContent("Compliance")
+    expect(card.textContent).not.toContain("/")
+  })
+
+  it("SP-MR-04 — a WHAT IT CHANGES OUTSIDE card, its mark and its sentence", () => {
+    render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "external_action", capability: "send_email" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+      />,
+    )
+    const card = screen.getByTestId("card-outside")
+    expect(card).toHaveTextContent(STEP_CARD_OUTSIDE_TITLE)
+    expect(screen.getByTestId("card-outside-mark")).toHaveTextContent(STEP_CARD_NEEDS_ARMING)
+    expect(screen.getByTestId("card-outside-note")).toHaveTextContent(STEP_CARD_OUTSIDE_SENTENCE)
+    // The chosen consequence, as the SENTENCE — never the wire id.
+    expect(screen.getByTestId("outside-change")).toHaveTextContent("Sends an email")
+    expect(card.innerHTML).not.toContain("send_email")
+  })
+
+  it("SP-MR-04 — the consequence line renders NOTHING when nothing is chosen", () => {
+    // Absence is `undefined`, never a placeholder: a blank consequence row is
+    // byte-indistinguishable from a lookup that failed, and on a governance card those two
+    // readings are opposite.
+    for (const capability of ["", "a_capability_nobody_declared", "constructor"]) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type: "external_action", capability })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+        />,
+      )
+      expect(screen.queryByTestId("outside-change"), capability).not.toBeInTheDocument()
+      // …and the card itself still renders, because the step type is the fact, not the pick.
+      expect(screen.getByTestId("card-outside"), capability).toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("SP-MR-04 — the NEEDS ARMING mark is not a second copy of a list that can drift", () => {
+    // The mark states a fact about the TYPE (D-04: this step always stops and asks), and the
+    // ONE home for that decision is `ARM_PINNED_TYPES` in `GovernanceSection.tsx`. The card
+    // renders only on that list's sole member, so the mark is true BY CONSTRUCTION — and this
+    // is what stops the two drifting apart silently, which a comment could not.
+    expect(governanceSectionSource).toMatch(
+      /const ARM_PINNED_TYPES: readonly string\[\] = \["external_action"\]/,
+    )
+    // NON-VACUITY: the source really loaded and really is that module.
+    expect(governanceSectionSource.length).toBeGreaterThan(1000)
+  })
+
+  it("the cards use `data-card`, NEVER `data-rail` — the D-14 byte-identity guard is not theirs", () => {
+    // `PhaseFormPanel.rails.test.tsx` requires ZERO `[data-rail]` elements in a rails-absent
+    // render, because a flag-off author must see today's panel. These cards render on BOTH
+    // surfaces, so borrowing the rails' attribute would turn that guard red for a reason that
+    // has nothing to do with rails.
+    const { container } = render(
+      <PhaseFormPanel
+        phase={phaseOf({ phase_type: "llm_agent", prompt: "x" })}
+        open
+        onChange={noop}
+        onPersist={noop}
+        onClose={noop}
+      />,
+    )
+    expect(container.querySelectorAll("[data-rail]")).toHaveLength(0)
+    expect(container.querySelectorAll("[data-card]").length).toBeGreaterThan(0)
+  })
+})
+
+describe("200-04 §1 — the GREEN rows: VERIFY, do not rebuild (SP-MR-05 / 06 / 07)", () => {
+  it("SP-MR-05 — the absent-registry arm still says its shipped sentence, on all four types", () => {
+    // ⚠ DRIVEN, not grepped. `ALREADY-SHIPPED` is not a pass in this phase.
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={{ models: [], runDefaultModel: null, noAnswer: "unavailable" }}
+        />,
+      )
+      expect(screen.getByTestId("model-no-answer"), phase_type).toHaveTextContent(
+        "We couldn't load the list of models.",
+      )
+      unmount()
+    }
+  })
+
+  it("SP-MNR-04 — a failed registry read yields NO free-text box, inside the card either", () => {
+    // AUTH-04 (196), re-asserted from inside the new frame: the card must not become the
+    // place a "graceful degradation" reintroduces a typed model path. Absence is the honest
+    // degradation; a text box is the regression, and only this tells them apart.
+    for (const phase_type of CARD_MODEL_TYPES) {
+      const { unmount } = render(
+        <PhaseFormPanel
+          phase={phaseOf({ phase_type, prompt: "x", model: "gpt-5.4", emitter: "render_template" })}
+          open
+          onChange={noop}
+          onPersist={noop}
+          onClose={noop}
+          modelPicker={{ models: [], runDefaultModel: null, noAnswer: "unavailable" }}
+        />,
+      )
+      const card = screen.getByTestId("card-model")
+      expect(within(card).queryByRole("textbox"), phase_type).not.toBeInTheDocument()
+      expect(within(card).queryByRole("combobox"), phase_type).not.toBeInTheDocument()
+      expect(screen.queryByRole("textbox", { name: /^ai model/i }), phase_type).not.toBeInTheDocument()
+      unmount()
+    }
+  })
+
+  it("SP-MR-06 — the lock statement renders, and NAMES NOBODY", () => {
+    // ⚠ N-7, honoured with its disagreement stated. The sketch draws `Locked — only the
+    // person who locked it can release it`; that literal is NOT shipped copy, and this phase
+    // does not author it (a fifth spelling of a locked vocabulary is the drift the
+    // one-string-home rule exists to prevent). What the checklist's atom actually turns on is
+    // that the lock is stated WITHOUT a person, and the shipped one-way grounding dial's
+    // refusal is exactly that. Driven here, and checked for the thing that matters.
+    renderAtFullDensity("llm_agent", FULL_RAILS)
+    const refusal = screen.getByTestId("governance-refusal")
+    expect(refusal).toHaveTextContent(GROUNDING_LOCK_REFUSAL)
+    // SP-MNR-05 in its positive form: no person, no possessive, no "by".
+    expect(refusal.textContent).not.toMatch(/\bLocked by\b/i)
+    expect(refusal.textContent).not.toMatch(/\b[A-Z][a-z]+ [A-Z]\.\B/)
+  })
+
+  it("SP-MR-07 — the refusal that keeps the tool list closed is on screen at rest", () => {
+    // It is NOT guidance and therefore NOT foldable: it states that the control REFUSES typed
+    // input. Asserted at the COLLAPSED reading, which is where a person actually meets it.
+    renderAtFullDensity("llm_agent", FULL_RAILS)
+    expect(screen.getByTestId("tools-no-typing")).toHaveTextContent(TOOL_WHITELIST_REFUSAL)
+    expect(screen.queryAllByTestId("field-help")).toHaveLength(0)
   })
 })
