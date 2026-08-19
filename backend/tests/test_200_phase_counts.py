@@ -318,7 +318,13 @@ async def test_llm_human_input_emits_no_measure_key():
         return None
 
     async def _fake_subscribe(redis, run_id, tool_call_id, timeout):
-        return None  # timeout -> no answer; the output shape is what this case reads
+        # ⚠ THIS RETURNED ``None`` (a TIMEOUT) UNTIL PHASE 200 / D-10, and the change is
+        # recorded rather than made quietly: a timeout no longer PRODUCES an output at
+        # all — the executor raises ``HumanInputTimeout`` and the engine pauses the run
+        # (``BUG-260816-06``: the empty answer used to advance the workflow as though the
+        # person had approved). This case is about the count key, not about the timeout,
+        # so it now takes the ANSWERED path — the one that really does return a dict.
+        return {"kind": "response", "response_text": "yes", "choice_index": None}
 
     phase = _spec(
         {"phase_type": "llm_human_input", "prompt": "Confirm?", "timeout_seconds": 1},

@@ -782,7 +782,26 @@ class TestPhaseExecutors:
 
     @pytest.mark.asyncio
     async def test_human_input_clamps_timeout_to_hard_cap(self):
+        """The 1800s clamp, plus — since Phase 200 / D-10 — the pause it now ends in.
+
+        ⚠ THIS CASE WAS DELIBERATELY RED-FLIPPED BY `200-03`, AND THE ORIGINAL
+        ASSERTION IS QUOTED HERE RATHER THAN DELETED. It read, verbatim:
+
+            assert out["answer"] == ""  # no response on timeout
+
+        That line PINNED `BUG-260816-06`: a 300s (default) human gate elapsing with
+        nobody's answer returned normally with an empty answer, `_run_phase_with_gates`
+        wrapped it as `PhaseOutcome("completed", ...)`, and the NEXT phase received `""`
+        AS THE HUMAN'S ANSWER — four of five real runs of `doc_qa_scoped_098uat`
+        completed their approval step that way at exactly the five-minute mark. **A
+        human gate that fails OPEN.** The executor now raises `HumanInputTimeout` and the
+        engine's `pause_run` arm leaves the phase `active` and the run `paused`.
+
+        The CLAMP half is unchanged and is what this case is named for: it pins the
+        ARGUMENT handed to the block primitive, which D-10 does not touch.
+        """
         from app.services.harness import phase_types
+        from app.services.harness.human_input import HumanInputTimeout
         from app.config import settings
 
         captured = {}
@@ -795,9 +814,9 @@ class TestPhaseExecutors:
         phase = _phase({"phase_type": "llm_human_input", "prompt": "?",
                         "timeout_seconds": 99999})
         with patch.object(_human_input_home, "subscribe_for_response", _fake_subscribe):
-            out = await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
+            with pytest.raises(HumanInputTimeout):
+                await phase_types._exec_llm_human_input(phase, {}, _exec_ctx())
         assert captured["timeout"] == settings.ask_user_max_timeout_seconds
-        assert out["answer"] == ""  # no response on timeout
 
 
 # ═══════════════════════════════════════════════════════════════════════

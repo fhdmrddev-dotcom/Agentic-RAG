@@ -25,9 +25,11 @@ below pins the DEFECT — ``BUG-260816-06`` — on purpose:
   * ``test_shutdown_branch_raises_cancelled_error`` — GREEN parity. This is the
         precedent that ALREADY does the right thing: it raises specifically so the
         phase stays ``active`` and the durable prompt row stays pending (096-09).
-  * ``test_timeout_returns_empty_answer_THE_DEFECT`` — ⚠ **THE ONE CASE THAT IS
-        EXPECTED TO RED-FLIP IN THE D-10 COMMIT, AND THE ONLY CASE THAT MAY.**
-        See its own docblock.
+  * ``test_timeout_pauses_instead_of_returning_empty_answer`` — ⚠ **THE ONE CASE
+        THAT RED-FLIPPED IN THE D-10 COMMIT, AND THE ONLY CASE THAT DID.** It was
+        authored as ``test_timeout_returns_empty_answer_THE_DEFECT``, pinning the
+        defect; it was REWRITTEN there rather than deleted, and its docblock carries
+        the before/after. See it.
   * ``test_timeout_clamps_to_hard_cap``          — GREEN parity on the clamp; it
         pins the argument handed to the block primitive, not the return value, so
         it survives D-10 unchanged.
@@ -240,39 +242,48 @@ async def test_timeout_clamps_to_hard_cap():
 
 
 @pytest.mark.asyncio
-async def test_timeout_returns_empty_answer_THE_DEFECT():
-    """⚠ CHARACTERIZATION OF ``BUG-260816-06`` — **THIS CASE IS EXPECTED TO RED-FLIP
-    IN THE D-10 COMMIT, AND IT IS THE ONLY CASE IN THIS FILE THAT MAY.**
+async def test_timeout_pauses_instead_of_returning_empty_answer():
+    """⚠ **THE ONE CASE THAT RED-FLIPPED IN THE D-10 COMMIT — REWRITTEN, NOT DELETED.**
 
-    It is pinned as a DEFECT, deliberately, not as a contract. Measured today:
+    It was authored as a characterization of ``BUG-260816-06`` and committed one commit
+    before the D-13 extraction; it stayed GREEN across the extraction (the pin file's
+    ``git diff --numstat`` there was EMPTY), then went RED on the D-10 commit — alone,
+    while the five cases above stayed green and UNEDITED. **That split is the proof that
+    the extraction changed nothing and the fix changed one thing** (SC#5's whole claim),
+    so the before/after is recorded here rather than in a commit message that a reader
+    of this file would never see.
 
-      1. ``subscribe_for_response(...)`` returns ``None`` (nobody answered inside
-         ``HumanInputConfig.timeout_seconds``, which DEFAULTS TO 300 —
-         ``models/harness.py:135``).
-      2. The shutdown branch does not fire (``payload`` is falsy).
-      3. ``answer`` stays ``""``; the ``kind == "response"`` branch does not fire.
-      4. The executor **returns normally**.
-      5. ``_run_phase_with_gates`` wraps that in ``PhaseOutcome("completed", ...)``.
-      6. ``run_workflow`` calls ``complete_phase`` — the human step reads
-         ``completed`` and the NEXT phase receives ``""`` as the human's answer.
+    **BEFORE (the defect it pinned, measured):** ``subscribe_for_response`` returns
+    ``None`` → the shutdown branch does not fire → ``answer`` stays ``""`` → the executor
+    **returns normally** → ``PhaseOutcome("completed", …)`` → ``complete_phase`` → the
+    next phase receives ``""`` AS THE HUMAN'S ANSWER. With
+    ``HumanInputConfig.timeout_seconds`` defaulting to **300**, four of five real runs of
+    ``doc_qa_scoped_098uat`` completed their approval step with ``answer: ""`` at exactly
+    the five-minute mark. **A human gate that fails OPEN.**
 
-    ⇒ **A HUMAN GATE THAT FAILS OPEN.** Four of five real runs of
-    ``doc_qa_scoped_098uat`` completed their approval step with ``answer: ""`` at
-    exactly the five-minute mark.
+    **AFTER:** the executor raises ``HumanInputTimeout`` and returns nothing at all.
 
-    When D-10 lands, this case is REWRITTEN (not deleted) to assert the pause. The
-    split — five cases untouched, this one rewritten — is what proves *"the
-    extraction changed nothing; the fix changed one thing"*.
+    ⚠ The assertion below is on the TYPE, and specifically on it **not** being an
+    ``asyncio.CancelledError``. That is not pedantry: a ``CancelledError`` here would
+    reach ``run_workflow``'s escape handler, which expires the pending prompt and cancels
+    the phase — a pause that destroys the question it is pausing for. The two raises in
+    this executor look alike and mean opposite things, and only the type tells them
+    apart, so only the type is asserted.
     """
+
+    from app.services.harness.human_input import HumanInputTimeout
 
     async def _fake_subscribe(redis, run_id, tool_call_id, timeout_seconds):
         return None  # nobody answered
 
     phase = _human_phase(options=["Approve", "Reject"])
     with patch.object(_home(), "subscribe_for_response", _fake_subscribe):
-        out = await _executor()(phase, {}, _ctx())
+        with pytest.raises(HumanInputTimeout) as exc:
+            await _executor()(phase, {}, _ctx())
 
-    # The defect, stated as an assertion so its removal is a visible event.
-    assert out["answer"] == ""
-    assert out["text"] == "Which doc?"
-    assert isinstance(out["tool_call_id"], str)
+    # NOT a CancelledError — the shutdown branch's raise means the opposite thing.
+    assert not isinstance(exc.value, asyncio.CancelledError)
+    # The gate identifies the prompt it is still waiting on, so the pause is
+    # actionable rather than merely reported.
+    assert isinstance(exc.value.tool_call_id, str) and exc.value.tool_call_id
+    assert exc.value.timeout_seconds == 300

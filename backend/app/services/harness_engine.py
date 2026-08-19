@@ -61,6 +61,7 @@ from app.db.workflows import (
     get_pending_ask_user,
     load_run_phases,
     mark_phase_active,
+    pause_run,
     record_phase_not_sent,
     skip_phase,
     write_audit,
@@ -597,6 +598,11 @@ async def _execute_phase(phase, accumulated_outputs: dict, ctx) -> dict:
 #   kind == "completed"  → output is durable-ready; advance to the next phase.
 #   kind == "skip_to"    → jump to target_slug (D-09); this phase is `skipped`.
 #   kind == "fail_run"   → the run is `failed`; stop cleanly keeping partials (D-07).
+#   kind == "pause_run"  → NEW (Phase 200 / D-10). A human gate elapsed with no answer:
+#                          the phase stays `active`, the run reads `paused`, the durable
+#                          prompt is NOT expired and `finish_run` is NOT called — so the
+#                          run stays resumable by BOTH the boot sweep and the
+#                          answer-triggered re-drive. Stop and return; nothing terminal.
 PhaseOutcome = namedtuple("PhaseOutcome", ["kind", "output", "target_slug", "reason"])
 
 # on_failure dispositions (ValidatorSpec.on_failure). UNKNOWN values route to
@@ -917,6 +923,13 @@ async def _run_phase_with_gates(
 
     attempt = 0
     last_output = None
+    # 200 (D-10): bound ONCE here rather than per-attempt, and LAZILY — a top-level
+    # import of anything under ``app.services.harness`` runs that package's __init__ →
+    # ``phase_types.register_all()`` → imports back from THIS module before the registry
+    # is bound (the cycle the whole package documents). At call time the package is fully
+    # loaded. The name is needed as an ``except`` clause target, which is why it cannot
+    # stay inside the helper that raises it.
+    from app.services.harness.human_input import HumanInputTimeout  # noqa: PLC0415
     while True:
         # Execute under the wall-clock cap. A hanging phase fails cleanly at the
         # timeout and drives the SAME on_failure routing as a gate failure (D-12).
@@ -925,6 +938,26 @@ async def _run_phase_with_gates(
                 _execute_phase(phase, accumulated_outputs, ctx),
                 timeout=wall_clock,
             )
+        except HumanInputTimeout as _pause:
+            # ── 200 (D-10) — THE HUMAN GATE FAILED CLOSED ────────────────────────
+            #
+            # ⚠ CAUGHT **HERE**, DELIBERATELY, AND NOT LEFT TO PROPAGATE. Escaping this
+            # helper would reach ``run_workflow``'s escape handler, which expires the
+            # pending prompt and cancels the phase — the two things a pause must never
+            # do. Catching it converts a control-flow signal into a first-class outcome
+            # BEFORE any handler that treats an escape as a failure can see it.
+            #
+            # ⚠ IT IS **NOT** ROUTED THROUGH ``_route_on_failure``. Nothing failed: no
+            # validator ran, no gate was exhausted, no retry would help. Routing it as a
+            # gate failure would let an author's ``on_failure`` disposition decide what
+            # happens when a PERSON steps away, which is a decision no workflow
+            # definition is entitled to make. No ``gate_failed`` audit row, no
+            # ``gate_failed`` emit — waiting is not failing.
+            logger.info(
+                "phase %s paused on the human gate for run %s: %s",
+                phase.slug, run_id, _pause,
+            )
+            return PhaseOutcome("pause_run", None, None, str(_pause))
         except asyncio.TimeoutError:
             gate_error = f"wall_clock_timeout after {wall_clock}s"
             # Treat the timeout as a terminal gate failure: audit + emit, then route.
@@ -1749,6 +1782,69 @@ async def run_workflow(
                             phase_id,
                         )
             raise
+
+        # ── pause_run: a human gate elapsed unanswered (200 / D-10) ─────────────
+        #
+        # ⚠ THIS ARM IS DEFINED AS MUCH BY WHAT IT MUST **NOT** DO AS BY WHAT IT DOES,
+        # and each prohibition was measured rather than reasoned about:
+        #
+        #   1. It must NOT raise ``asyncio.CancelledError``. The escape handler above
+        #      then calls ``_expire_pending_ask_user`` — killing the very prompt the
+        #      person is meant to answer — and ``cancel_phase``, flipping the step to
+        #      ``cancelled``. *A paused run whose spine shows the human step as Stopped*
+        #      is the warning sign. (That is why the pause arrives as a PhaseOutcome.)
+        #   2. It must NOT call ``finish_run``. ``finish_run`` clears
+        #      ``threads.active_workflow_run_id`` in the same transaction (092 SC#2), and
+        #      ``find_resumable_runs`` REQUIRES that anchor — the run would become
+        #      permanently unresumable and the boot sweep would find nothing, forever.
+        #   3. It must NOT leave the phase ``completed`` — ``find_resumable_runs`` also
+        #      requires an ``active`` phase row. So this arm writes NO ``workflow_phases``
+        #      row at all: ``mark_phase_active`` already set it and it simply stays there.
+        #      The absence of a phase write IS the mechanism, which is why there is
+        #      nothing here to read as an omission.
+        #
+        # WRITE-before-EMIT, as everywhere in this loop: the durable ``paused`` flip and
+        # the audit row land before the frame, so nothing announces a fact the database
+        # does not yet carry. The prompt is deliberately left PENDING — /pending keeps
+        # serving it, and it is what the person comes back to.
+        #
+        # ⚠ THE AUDIT ROW REUSES ``policy_applied`` AND DOES **NOT** ADD A 25TH KIND —
+        # a deliberate deviation from the plan, which specified a dedicated run-paused
+        # audit kind. Taken on measurement. ``_AUDIT_EVENT_TYPES`` (``db/workflows.py:230``) must stay in
+        # LOCKSTEP with the ``harness_audit.event_type`` Postgres CHECK, and
+        # ``tests/unit/test_audit_event_registration.py`` pins the two EQUAL in both
+        # directions — so a new kind is a MIGRATION (122) plus a live-DB apply, and this
+        # plan ships none (121 belongs to ``200-02``, which runs alone against real
+        # Postgres). Registering the kind in code alone would MOVE the failure from a
+        # ValueError to a Postgres 23514 mid-run, which is precisely what that set exists
+        # to prevent (BUG-260731-02). ``policy_applied`` is the recorded precedent for
+        # this exact situation (Phase 196: *"No 25th harness_audit kind was added and no
+        # migration ships"*), and it is honest here: D-10 IS a policy — an unanswered
+        # gate never approves. ``policy`` names it explicitly so the row is unambiguous
+        # in the ledger and a later migration can promote it without re-deriving intent.
+        #
+        # ⚠ AND THE PARAGRAPH ABOVE DELIBERATELY DOES NOT SPELL THE KIND IT DECLINES TO
+        # ADD. ``tests/unit/test_audit_event_registration.py``'s G1 extractor scans this
+        # module's SOURCE — comments included — for ``event_type=`` literals, so writing
+        # the rejected kind out as a keyword argument, even inside a comment explaining
+        # why it was rejected, turns that guard RED. Measured here, not reasoned about:
+        # the first draft of this comment did exactly that and G1 named this file. It is
+        # the ``PhaseFormPanel.test.tsx`` trap (RESEARCH Pitfall 6), on the backend.
+        if outcome.kind == "pause_run":
+            await pause_run(pool, run_id)
+            await write_audit(
+                pool, run_id, user_id=_audit_user_id,
+                event_type="policy_applied",
+                metadata={
+                    "policy": "human_gate_pause",
+                    "phase": phase.slug,
+                    "reason": outcome.reason,
+                },
+            )
+            await _emit(redis, stream_run_id, "run_paused",
+                phase=phase.slug, reason=outcome.reason,
+            )
+            return  # stop — resumable, not terminal
 
         # ── fail_run: keep completed phases' outputs, stop cleanly, plain reason ─
         if outcome.kind == "fail_run":

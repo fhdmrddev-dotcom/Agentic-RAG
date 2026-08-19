@@ -54,7 +54,60 @@ from app.services.ask_user_service import subscribe_for_response
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["_exec_llm_human_input", "_latest_phase_text"]
+__all__ = ["HumanInputTimeout", "_exec_llm_human_input", "_latest_phase_text"]
+
+
+class HumanInputTimeout(Exception):
+    """The human gate's wait elapsed with NO answer — the run must PAUSE (D-10).
+
+    ⚠ IT IS DELIBERATELY **NOT** AN ``asyncio.CancelledError``, AND THAT IS THE WHOLE
+    DESIGN. The shutdown branch below raises ``CancelledError`` on purpose, but outside a
+    graceful shutdown that same raise reaches ``run_workflow``'s escape handler, which
+    (i) calls ``_expire_pending_ask_user`` — **killing the very prompt the person is
+    meant to answer** — and (ii) calls ``cancel_phase``, flipping the step to
+    ``cancelled``. A paused run whose spine shows the human step as *Stopped* is the
+    warning sign. Both are exactly wrong for a pause, so this needs its own type and its
+    own arm.
+
+    It is caught in ``_run_phase_with_gates`` — **BEFORE** the escape handler can see it
+    — and mapped to ``PhaseOutcome("pause_run", …)``.
+
+    ⚠ ``fail_phase`` WAS OFFERED AND REJECTED (D-10): it discards completed upstream
+    work, so stepping away for six minutes would mean losing the run rather than
+    resuming it.
+    """
+
+    def __init__(self, *, tool_call_id: str, timeout_seconds) -> None:
+        self.tool_call_id = tool_call_id
+        self.timeout_seconds = timeout_seconds
+        super().__init__(
+            f"no answer after {timeout_seconds}s — the run is paused and stays "
+            f"resumable (tool_call_id={tool_call_id})"
+        )
+
+
+def _resolve_answer_text(response_text, choice_index, options) -> str:
+    """Resolve a durable answer payload to the text the workflow advances on.
+
+    ⚠ A DELIBERATE STRUCTURAL MIRROR OF THE SHIPPED BLOCK INSIDE THE EXECUTOR, NOT A
+    REPLACEMENT FOR IT. The BUG-260607-01 defense below (a choice-click arrives as
+    ``{response_text: "", choice_index: N}`` and must resolve ``options[N]``) is pinned
+    both by ``tests/test_200_human_input_baseline.py`` and by
+    ``tests/unit/test_185_engine_attachment.py``'s CRITERION 20, which asserts the
+    literal ``answer = ""`` still appears in ``_exec_llm_human_input``'s own source.
+    Folding the live path into this helper would move that line out of the function and
+    turn a shipped fence red for a refactor, so the live block stays byte-identical and
+    this serves the RESUME path only.
+    """
+    answer = (response_text or "").strip()
+    if not answer and options:
+        try:
+            _ci = int(choice_index)
+            if 0 <= _ci < len(options):
+                answer = str(options[_ci])
+        except (TypeError, ValueError):
+            pass
+    return answer
 
 
 
@@ -75,6 +128,52 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
     timeout_seconds = min(
         phase.config.timeout_seconds, settings.ask_user_max_timeout_seconds
     )
+
+    # ── 200 (D-10) — A RE-DRIVE CONSUMES THE DURABLE ANSWER; IT DOES NOT RE-ASK ──
+    #
+    # ⚠ WITHOUT THIS BRANCH THE ANSWER-TRIGGERED RE-DRIVE WOULD ASK THE QUESTION AGAIN,
+    # and D-10's own sentence ("Answering later still resumes; nothing is discarded")
+    # would be false in a NEW way rather than a fixed one. This executor mints a fresh
+    # ``uuid4().hex`` on every entry (above) and blocks on that brand-new channel, so a
+    # re-run of an already-answered phase inserts a SECOND prompt row and waits again.
+    # ``resume_stranded_workflows``' docstring already claimed the opposite —
+    # *"let run_workflow re-run the phase, which re-reads the durable answer"* — and
+    # nothing re-read it; this is the re-read.
+    #
+    # ⚠ IT IS SINGLE-USE AND EXPLICITLY KEYED, NEVER A "LATEST PROMPT" LOOKUP. The flag
+    # carries the tool_call_id the ANSWER ROUTE just persisted, so the consume can only
+    # ever resolve the question that was actually answered. Clearing it before the read
+    # means a run with a SECOND llm_human_input phase asks its own question normally
+    # instead of inheriting the first one's answer — the silent auto-approval this whole
+    # plan exists to remove, re-introduced by a convenience lookup.
+    #
+    # ⚠ THE BOOT SWEEP DOES NOT SET IT, so the 096-09 restart contract is untouched:
+    # ``resume_pending_prompt`` still re-subscribes and re-emits the SAME prompt there.
+    _resume_tcid = getattr(ctx, "resume_answered_tool_call_id", None)
+    if _resume_tcid:
+        try:
+            ctx.resume_answered_tool_call_id = None
+        except Exception:  # noqa: BLE001 — a frozen ctx must not sink the phase
+            logger.debug("llm_human_input: could not clear the resume flag", exc_info=True)
+        _pool = getattr(ctx, "pool", None)
+        if _pool is not None:
+            from app.db.workflows import get_ask_user_response  # noqa: PLC0415
+
+            _durable = await get_ask_user_response(_pool, run_id, str(_resume_tcid))
+            if _durable is not None:
+                _answer = _resolve_answer_text(
+                    _durable.get("response_text"), _durable.get("choice_index"), options
+                )
+                logger.info(
+                    "llm_human_input: consumed the durable answer on re-drive "
+                    "run=%s tcid=%s", run_id, _resume_tcid,
+                )
+                return {
+                    "text": prompt,
+                    "answer": _answer,
+                    "tool_call_id": str(_resume_tcid),
+                }
+
     # D-12: the prior phase's text is the DRAFT the user is being asked to confirm
     # (the doc_qa_human flow's `draft` phase produces {"text": <answer>}). Carry it
     # through the durable prompt row + the SSE event + the /pending replay so the
@@ -168,6 +267,28 @@ async def _exec_llm_human_input(phase, accumulated_outputs: dict, ctx) -> dict:
         raise asyncio.CancelledError(
             "llm_human_input interrupted by server shutdown — phase left active "
             "for the boot-time resume sweep (096-09)"
+        )
+
+    # ── 200 (D-10 / BUG-260816-06) — THE GATE FAILS **CLOSED** ───────────────────
+    #
+    # ``subscribe_for_response`` returns ``None`` on timeout, and until this line the
+    # executor fell straight through to a NORMAL RETURN with ``answer: ""``:
+    # ``_run_phase_with_gates`` wrapped that in ``PhaseOutcome("completed", …)``,
+    # ``run_workflow`` called ``complete_phase``, and the next phase received the empty
+    # string AS THE HUMAN'S ANSWER. With ``HumanInputConfig.timeout_seconds`` defaulting
+    # to **300**, four of five real runs of ``doc_qa_scoped_098uat`` completed their
+    # approval step with ``answer: ""`` at exactly the five-minute mark.
+    #
+    # **A human gate that fails OPEN is the one defect on this surface that no amount of
+    # re-presentation can excuse.** Nobody answered, so nothing was approved.
+    #
+    # ⚠ GATED STRICTLY ON ``payload is None``, never on falsiness. A ``cancel`` payload
+    # is a DIFFERENT disposition that already falls through to the shipped block below,
+    # and widening this to ``if not payload`` would quietly convert a cancellation into a
+    # pause — the same class of substitution this fix removes.
+    if payload is None:
+        raise HumanInputTimeout(
+            tool_call_id=tool_call_id, timeout_seconds=timeout_seconds
         )
 
     answer = ""
