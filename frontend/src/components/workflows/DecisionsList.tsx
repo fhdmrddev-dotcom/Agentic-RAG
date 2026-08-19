@@ -110,6 +110,18 @@
  * by the CALLER — the shipped `requirementIsAiProposed` idiom — so these are what the
  * definition says NOW, not what the generation said.
  *
+ * ── 199-04 · ONE PRESENTATION ROW ADDED, AND NOTHING ELSE (DES-01) ──
+ * Sketch 178's sheet `c5-draft-arrival` was reconciled against this component element by
+ * element. Almost all of it is REFUSED and the refusals are the deliverable: the sheet
+ * draws a per-row status badge — an affirmative word on a satisfied row, a "we need you"
+ * word on a failing one, a grey caption on an unknown one — and that shape is exactly what
+ * the three-arm contract above exists to forbid, because an affirmative badge on a PRESENT
+ * readiness makes the present arm distinguishable from the ABSENT one. The sheet also
+ * invents its own five row subjects and its own colour palette, neither of which is this
+ * application's. The one thing the sheet asked for that this surface could express and did
+ * not is the ROW WASH — see `ROW_HOVER_CLASS` below. Full reconciliation:
+ * `.planning/phases/199-the-component-map/199-04-SUMMARY.md`.
+ *
  * ⚠ NAME IDENTIFIERS, NEVER FORBIDDEN SPELLINGS, IN EVERY COMMENT HERE. The suite's fences
  * read this file's RAW source, and `196-08` tripped that trap four times — once inside the
  * comment written to explain the first three.
@@ -164,6 +176,30 @@ export interface DecisionsListProps {
 
 const ROW_ACTION_CLASS =
   "shrink-0 rounded px-1.5 py-px text-[11.5px] text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+
+/**
+ * ── 199-04 · THE ROW WASH — the one row of sheet `c5-draft-arrival` this surface could
+ * express and did not (DES-01) ────────────────────────────────────────────────────────
+ *
+ * MEASURED ABSENT BEFORE THE CHANGE: `grep -n "hover:"` over this file returned exactly
+ * ONE line, and it was the action control's own `text` change. The ROW carried no response
+ * at all — on a list whose every control is an 11.5px dotted-underline word, which is a
+ * small target beside a long answer. A wash is what tells a reader which row the control
+ * they are about to click belongs to.
+ *
+ * ⚠ FILL ONLY, AND NO GEOMETRY. It emits no padding, no margin, no radius and no
+ * transform, so the list's declared vertical box is byte-identical before and after — the
+ * `SEED-184` complaint is about hierarchy, and answering it by growing the surface would
+ * be answering a different question. It is also NOT applied to every row: see below.
+ *
+ * ⚠ THE COLOUR IS A THEME TOKEN THAT RESOLVES, AND THAT WAS CHECKED RATHER THAN ASSUMED.
+ * Sheet c5 draws this wash in a Material-3 palette (`surface-variant`), and **not one of
+ * that palette's tokens exists in `tailwind.config.js`** — measured: 15 of the sheet's 18
+ * colour candidates resolve to nothing, which is the `bg-warning` failure `192.2` shipped
+ * unguarded. `accent` is the shipped Deep Midnight token, already used at this exact
+ * opacity by `DraftArrivalCard`, `BuilderSaveRegion` and `GovernanceSection`.
+ */
+const ROW_HOVER_CLASS = "transition-colors duration-150 hover:bg-accent/30"
 
 export function DecisionsList({
   folderName,
@@ -324,12 +360,24 @@ export function DecisionsList({
             }
           }
 
+          // ── 199-04 · IS THERE ANYTHING HERE FOR THE CURSOR TO REACH? ──────────────
+          // DERIVED from what the switch above already produced, never re-decided. Rows 2
+          // and 5 render NO jump when there is no producing step, and a row that lit up
+          // under the cursor there would promise an interaction that does not exist — the
+          // `199-01` argument for suppressing the canvas node's hover in run mode, applied
+          // to a row. Row 4 is the second term and not an oversight: D-17 makes its FIELD
+          // its action, so it carries no sibling control for `action !== null` to see.
+          const interactive = action !== null || key === "name"
+
           return (
             <li
               key={key}
               data-testid={`decision-row-${key}`}
               data-row-key={key}
-              className="py-[5px] text-[12.5px]"
+              // Published so the rule above is checkable from the DOM rather than from a
+              // class-string grep — the sibling attribute sweep demands a query for it.
+              data-row-interactive={interactive}
+              className={cn("py-[5px] text-[12.5px]", interactive && ROW_HOVER_CLASS)}
             >
               <div className="flex items-baseline gap-2">
                 <span className="w-[128px] shrink-0 text-muted-foreground">
