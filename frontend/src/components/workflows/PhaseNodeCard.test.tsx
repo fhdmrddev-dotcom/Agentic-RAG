@@ -76,6 +76,12 @@ import { RUN_READING_WORD, runReadingLabel } from "./runVocabulary"
 // cast. Its own import statement rather than a widening of the 184-08 line above — the
 // `canvasModel.purity.test.ts:18-21` rule, so this plan's whole diff reads as ADDED lines.
 import type { VerdictMarkKind } from "./nodePresentation"
+// 199-01 Task 1: the REAL 3D mark resolver, so the resting inventory below pins the atoms
+// the shipped adapter paints rather than the atoms a fixture glyph paints. `renderCard`'s
+// `◆` probe is a test fixture and contributes a text node the real card never has; an
+// inventory taken through it would pin a string that does not ship. Its own import
+// statement, the `canvasModel.purity.test.ts:18-21` convention this file already follows.
+import { renderPhaseMark } from "./nodePresentation"
 
 // ── 188.2-01 — THE SUBTREE SOURCE, and why it names five files that do not exist yet ──
 //
@@ -2679,6 +2685,83 @@ function cardHtml(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>>
  * deletions on the destination side is therefore expected and is not evidence of drift; a
  * diff against the strings below is.
  */
+// ── 199-01 Task 2 — THE ONE DECLARED DELTA AGAINST THE 188.2-03 CAPTURES ──────────────
+//
+// ⚠ NOT ONE CHARACTER OF THE THREE 188.2-03 LITERALS BELOW IS EDITED, AND THAT IS THE WHOLE
+// DESIGN OF THIS BLOCK. Their own header says a diff against them "IS A BEHAVIOUR CHANGE …
+// AND NOT A TEST TO UPDATE", and re-capturing them would "delete the only evidence anybody
+// has that the card still renders what it rendered". 199-01 makes a behaviour change on
+// purpose — the sheet-c2 §3 hover lift — so the honest move is neither to re-capture nor to
+// abandon the change: it is to keep the capture VERBATIM and declare the delta as a NAMED,
+// SINGULAR, machine-checked transformation of it. The originals stay readable; the
+// amendment sits beside them, never over them (this project's standing habit).
+//
+// THE ARITHMETIC CLOSES WITH NO RESIDUAL, which is what separates a declared change from
+// drift: shipped == captured + exactly this term, at exactly one position, on exactly the
+// Builder-mode rows. Every one of those four words is asserted below rather than asserted
+// in prose.
+//
+// ⚠ THE RUN-MODE ROWS ARE UNTOUCHED, AND THEY ARE THE PROOF THE SUPPRESSION WORKS.
+// `MAXIMAL_RUNNING` and `MAXIMAL_WAITING` went GREEN against the unamended capture on the
+// first run after the source change (measured — the only red rows were the three
+// Builder-mode ones). A hover lift that had leaked onto the run surface would have reddened
+// them, so their silence is evidence and not an absence of coverage.
+const HOVER_TERM_199 = "transition-colors duration-150 hover:bg-card/45"
+
+/**
+ * The captured class list as it reads AFTER 199-01, computed from the verbatim capture
+ * rather than re-typed.
+ *
+ * ⚠ THE ANCHOR IS THE BORDER UTILITY, AND THAT WAS MEASURED RATHER THAN REASONED. The first
+ * attempt anchored on the base box-shadow, on the assumption that `cn` emits its arguments in
+ * source order — and it threw on the `selected` branch, which is exactly what it was written
+ * to do. `cn` runs tailwind-merge, and the selected branch's own `shadow-[…]` REPLACES the
+ * base shadow rather than following it, so that capture reads `… backdrop-blur-sm
+ * border-primary shadow-[0_0_0_1px_…]` with no base-shadow token at all. Measured on all
+ * four branches, the term lands immediately BEFORE the border-colour utility every time —
+ * `border-primary`, `border-[hsl(220_30%_100%/0.34)]`, `border-border/50` — and that is the
+ * one anchor which holds across the merge.
+ *
+ * It THROWS rather than silently no-opping. A splice helper that quietly returned its input
+ * would turn every assertion using it into a comparison of the baseline with itself, which
+ * is the vacuous-fence failure this file has now met five times.
+ */
+function classWithHoverLift199(capturedClass: string): string {
+  const tokens = capturedClass.split(" ")
+  const at = tokens.findIndex((t) => t.startsWith("border-"))
+  if (at === -1) {
+    throw new Error(
+      "199-01 splice anchor found 0 times, expected exactly 1 — the capture moved",
+    )
+  }
+  return [...tokens.slice(0, at), HOVER_TERM_199, ...tokens.slice(at)].join(" ")
+}
+
+/** The same delta applied to a captured `innerHTML` string. The card div is located by its
+ *  own opening class list, which occurs exactly once in every Builder-mode capture; anything
+ *  else throws rather than passing a comparison of the baseline with itself. */
+function withHoverLift199(capturedHtml: string): string {
+  const match = capturedHtml.match(/<div class="(mx-auto[^"]*)"/)
+  if (match === null) {
+    throw new Error(
+      "199-01 splice anchor found 0 times, expected exactly 1 — the capture moved",
+    )
+  }
+  return capturedHtml.replace(match[1], classWithHoverLift199(match[1]))
+}
+
+/** The same delta applied to a captured SHAPE array: only the card div's `class` carries it,
+ *  because only the card div holds the className the term was added to. */
+function shapeWithHoverLift199<T extends { key: string; class: string | null }>(
+  captured: readonly T[],
+): T[] {
+  return captured.map((entry) =>
+    entry.key === CARD_DIV_KEY && entry.class !== null
+      ? { ...entry, class: classWithHoverLift199(entry.class) }
+      : entry,
+  )
+}
+
 const CARD_HTML_BASELINE: Record<string, string> = {
   MAXIMAL_RUNNING:
     "<div data-testid=\"canvas-node-summarize\" data-slug=\"summarize\" data-phase-type=\"llm_single\" data-selected=\"true\" class=\"relative\" style=\"width: 260px; min-height: 120px;\"><div class=\"mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center bg-card/30 backdrop-blur-sm shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)] border-primary\" style=\"min-height: 120px;\"><p class=\"truncate font-headline text-[14px] font-semibold leading-tight text-foreground\">Summarise the findings</p><p class=\"mt-1 text-[11px] leading-snug text-muted-foreground\">Writes one paragraph</p><p data-testid=\"canvas-node-run-line\" data-reading=\"running\" class=\"mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90\">Running</p><p data-testid=\"canvas-node-technical-line\" class=\"mt-1 truncate font-mono text-[10px] leading-snug text-muted-foreground\">llm_single · summarize</p><div class=\"mt-2 flex flex-wrap items-center gap-1.5\"><span data-grounding=\"strict\"><span data-testid=\"canvas-grounding\" data-tone=\"success\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-success/30 bg-success/10 text-success\"><span aria-hidden=\"true\" class=\"mr-1\">🔒</span>Grounded in your files</span></span><span data-waits-for-you=\"true\"><span data-testid=\"canvas-waits-for-you\" data-tone=\"primary\" class=\"inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium border-primary/30 bg-primary/10 text-primary\">Waits for you</span></span></div></div><span data-testid=\"canvas-node-verdict\" data-verdict=\"error\" class=\"pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px] place-items-center rounded-full text-[11px] font-bold leading-none border border-destructive/70 bg-destructive/15 text-destructive\"><span aria-hidden=\"true\">✕</span><span class=\"sr-only\">Has a problem</span></span><span data-testid=\"canvas-node-seal\" data-grounded=\"true\" class=\"pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px] place-items-center rounded-full text-[11px] leading-none border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground\"><span aria-hidden=\"true\">⛨</span><span class=\"sr-only\">Must prove it</span></span><span aria-hidden=\"true\" data-testid=\"canvas-node-ring\" data-reading=\"running\" class=\"pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2\"><svg viewBox=\"0 0 72 72\" class=\"block h-full w-full overflow-visible\"><circle cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"2.5\" stroke=\"hsl(var(--muted-foreground) / 0.35)\"></circle><circle data-testid=\"canvas-node-ring-arc\" cx=\"36\" cy=\"36\" r=\"34\" fill=\"none\" stroke-width=\"3.5\" stroke-linecap=\"round\" stroke=\"hsl(var(--primary))\" stroke-dasharray=\"55.543 158.085\" stroke-dashoffset=\"0\" class=\"canvas-ring-spin\"></circle></svg></span><span aria-hidden=\"true\" class=\"pointer-events-none absolute left-1/2 top-[-26px] grid h-[62px] w-[62px] -translate-x-1/2 place-items-center\"><span class=\"absolute inset-0 rounded-full\" style=\"background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 68%);\"></span><span class=\"absolute inset-1 rounded-full bg-foreground/10\" style=\"filter: blur(2px);\"></span><span class=\"absolute bottom-0 left-1/2 h-2 w-9 -translate-x-1/2 rounded-[50%] bg-black/50\" style=\"filter: blur(5px);\"></span><span class=\"relative grid place-items-center text-[20px] leading-none text-foreground drop-shadow-[0_9px_13px_rgba(0,0,0,0.8)]\"><span data-testid=\"probe-icon\">◆</span></span></span></div>",
@@ -2694,7 +2777,15 @@ describe("PhaseNodeCard 188.2-03 — the pre-move rendered DOM, byte for byte", 
       // NON-VACUITY, first: a `toBe` against an empty string would pass forever if the row
       // ever stopped rendering and the baseline were ever re-captured from that silence.
       expect(CARD_HTML_BASELINE[row].length).toBeGreaterThan(0)
-      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(CARD_HTML_BASELINE[row])
+      // 199-01: the Builder-mode rows carry the ONE declared delta; the run-mode rows are
+      // compared against the verbatim capture, unchanged, because the hover lift is
+      // suppressed the moment a reading is supplied. The predicate reads the ROW's own
+      // props rather than a hand-kept list of row names.
+      const builderMode = CARD_HTML_ROWS[row].status === undefined
+      const expected = builderMode
+        ? withHoverLift199(CARD_HTML_BASELINE[row])
+        : CARD_HTML_BASELINE[row]
+      expect(cardHtml(CARD_HTML_ROWS[row])).toBe(expected)
     })
   }
 
@@ -4068,7 +4159,9 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     for (const verdict of ALL_VERDICTS) {
       const captured = cardShapeOf({ verdict })
       expect(captured.some((e) => e.key === VERDICT_TEST_ID)).toBe(true)
-      expect(captured).toEqual(CARD_VERDICT_SHAPES[verdict])
+      // 199-01: every verdict row is Builder-mode (no `status` is passed), so every one
+      // carries the declared hover delta — see `withHoverLift199`.
+      expect(captured).toEqual(shapeWithHoverLift199(CARD_VERDICT_SHAPES[verdict]))
     }
   })
 
@@ -4076,7 +4169,15 @@ describe("PhaseNodeCard 188.2-03 — the pre-move geometry matrix", () => {
     for (const branch of Object.keys(CARD_BORDER_ROWS)) {
       const captured = cardShapeOf(CARD_BORDER_ROWS[branch])
       expect(captured.some((e) => e.key === CARD_DIV_KEY)).toBe(true)
-      expect(captured).toEqual(CARD_BORDER_SHAPES[branch])
+      // 199-01: three of the four branches are Builder-mode and carry the declared hover
+      // delta; the `run` branch passes a `status`, so it is compared against the verbatim
+      // 188.2-03 capture. That asymmetry is the suppression rule, read off the row's props.
+      const builderMode = CARD_BORDER_ROWS[branch].status === undefined
+      expect(captured).toEqual(
+        builderMode
+          ? shapeWithHoverLift199(CARD_BORDER_SHAPES[branch])
+          : CARD_BORDER_SHAPES[branch],
+      )
     }
   })
 
@@ -4150,5 +4251,477 @@ describe("PhaseNodeCard 188.2-03 — the geometry matrix, under its contract nam
     expect(Object.keys(CARD_SHAPE_BASELINE.borders).sort()).toEqual(
       Object.keys(CARD_BORDER_ROWS).sort(),
     )
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 199-01 Task 1 (DES-01) — THE RESTING-ATOM INVENTORY AND THE MECHANISM SWEEP
+//
+// Sheet `c2-phase-node` of sketch 178 is DIRECTION, not an acceptance bar: it renders
+// zero shipped components and draws its node in the SUPERSEDED 137-D language (a 16rem
+// horizontal row with a left icon well). Before any of it can be reconciled against the
+// shipped 137-B card, what the shipped card actually PAINTS has to be written down as
+// literals — because the phase's headline claim is *"the node renders no MORE at rest
+// than it did before"*, and a claim of that shape is only checkable against a list that
+// predates the change.
+//
+// THE METHOD IS `192.2-05`'s, FOLLOWED EXACTLY. An atom is asserted PRESENT here so that
+// a later REMOVAL is proved by INVERTING the assertion to ABSENT — never by deleting it.
+// A deleted assertion and a satisfied one are indistinguishable in a green run, which is
+// the whole reason this file has never re-baselined a pin to make red go green.
+// ════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Every non-empty text node under the node box, IN DOCUMENT ORDER.
+ *
+ * `sr-only` text is DELIBERATELY INCLUDED. An identifier hidden inside an accessible
+ * label is still printed to a person — it is read aloud rather than drawn — so a sweep
+ * that skipped it would leave the one channel a screen-reader user has unguarded. The
+ * verdict mark and the governance seal both carry a visible glyph plus an `sr-only`
+ * label, and both halves are pinned below.
+ */
+function nodeTextAtoms(root: HTMLElement): string[] {
+  const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  const out: string[] = []
+  for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+    const text = (n.textContent ?? "").trim()
+    if (text) out.push(text)
+  }
+  return out
+}
+
+/**
+ * The Builder's card, rendered through the REAL mark resolver.
+ *
+ * The strings are a real 5-step procurement flow's third step, not lorem: sketch 178's
+ * own re-run named its steps as business work, and a fixture worded *"Phase 1"* would let
+ * a mechanism sweep pass by having nothing to say.
+ */
+const RESTING_SLUG = "weigh-each-contract"
+const RESTING_TITLE = "Weigh each contract against our risk policy"
+const RESTING_SUBTITLE = "Searches and decides its own next move"
+
+function renderRestingCard(overrides: Partial<React.ComponentProps<typeof PhaseNodeCard>> = {}) {
+  return render(
+    <PhaseNodeCard
+      slug={RESTING_SLUG}
+      phaseType="llm_agent"
+      icon={renderPhaseMark("llm_agent")}
+      title={RESTING_TITLE}
+      subtitle={RESTING_SUBTITLE}
+      tint={ICON_TINT.llm_agent}
+      {...overrides}
+    />,
+  )
+}
+
+describe("199-01 — the RESTING inventory (sheet c2 section 3, the AT REST specimen)", () => {
+  it("paints EXACTLY TWO text atoms at rest, and both are literals", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+
+    // LITERALS, NOT SHAPES. `[expect.any(String), expect.any(String)]` would pass on a
+    // card that had silently started printing its own phase type, which is the exact
+    // failure sheet 178 was built to fix.
+    expect(nodeTextAtoms(box)).toEqual([
+      "Weigh each contract against our risk policy",
+      "Searches and decides its own next move",
+    ])
+  })
+
+  it("pins the resting DATA-ATTRIBUTE atoms — three, and no fourth", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    expect(box.getAttribute("data-slug")).toBe("weigh-each-contract")
+    expect(box.getAttribute("data-phase-type")).toBe("llm_agent")
+    expect(box.getAttribute("data-selected")).toBe("false")
+  })
+
+  it("pins the resting MARK inventory: the 3D well only — no ring, seal, verdict or chip", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+
+    // PRESENT, so a later removal inverts rather than deletes.
+    expect(box.querySelector("svg")).not.toBeNull()
+
+    // ABSENT, each named individually: a single "no extra elements" count would pass on
+    // a substitution, and this file's own 188.2 block records why that is not enough.
+    expect(screen.queryByTestId(RING_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(ARC_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(RUN_LINE_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(PAUSE_CHIP_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId(SEAL_TEST_ID)).toBeNull()
+    expect(screen.queryByTestId("canvas-node-verdict")).toBeNull()
+    expect(screen.queryByTestId("canvas-node-technical-line")).toBeNull()
+  })
+
+  it("the FULLY DRESSED design-time card pins eight atoms, in document order", () => {
+    // Everything the Builder can put on one face at once: a verdict, both badge slots and
+    // the governance seal. The ORDER is the card's own child order — body, then corner
+    // marks — and it is pinned because the marks are absolutely positioned and their paint
+    // order IS their document order (`PhaseNodeCard.tsx`'s own note on the 188.2 cut).
+    renderRestingCard({
+      verdict: "error",
+      grounded: true,
+      badges: [
+        { testId: "canvas-not-connected", tone: "muted", label: "Not connected" },
+        { testId: "canvas-waits-for-you", tone: "primary", label: "Waits for you" },
+      ],
+    })
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+
+    expect(nodeTextAtoms(box)).toEqual([
+      "Weigh each contract against our risk policy",
+      "Searches and decides its own next move",
+      "Not connected",
+      "Waits for you",
+      VERDICT_MARK.error.glyph,
+      VERDICT_MARK.error.label,
+      "⛨",
+      GOVERNANCE_SEAL_LABEL,
+    ])
+  })
+})
+
+/**
+ * THE RUN-MODE FACE, one literal per reading.
+ *
+ * Written out rather than computed from `runReadingLabel`, and that is the point of a
+ * characterization pin: a table derived from the function under observation moves WITH it
+ * and can never report that it moved. The suite already asserts elsewhere that the card
+ * calls that one function; this asserts what the function currently SAYS.
+ *
+ * It is keyed `Record<CanvasReading, string>`, so a tenth reading is a TYPECHECK ERROR
+ * here rather than a silently-uncovered face — the mechanism this file has now watched
+ * fire twice (189's eighth reading, 194's ninth).
+ */
+const RUN_LINE_LITERAL_AT_199: Record<CanvasReading, string> = {
+  "not-started": "Not started",
+  running: "Running",
+  done: "Complete",
+  failed: "Failed — this step did not finish",
+  skipped: "Skipped — the run took a different path",
+  "waiting-for-you": "Paused for your answer — it needs your reply before it can continue",
+  unknown: "State unknown — we can't tell what happened to this step",
+  "recorded-not-sent": "Not sent — recorded",
+  cancelled: "Stopped by you — you ended the run while this step was still working",
+}
+
+describe("199-01 — the RUN-MODE inventory (sheet c2 section 4, all NINE readings)", () => {
+  it("pins the run line as a LITERAL at every reading — and the sheet draws only six of nine", () => {
+    for (const reading of ALL_READINGS) {
+      const { unmount } = renderRestingCard({ status: reading })
+      expect(screen.getByTestId(RUN_LINE_TEST_ID).textContent).toBe(
+        RUN_LINE_LITERAL_AT_199[reading],
+      )
+      unmount()
+    }
+
+    // THE SHEET UNDER-COVERS THE SHIPPED SET, and that is recorded as a measurement rather
+    // than left to be noticed. c2 section 4 draws six run states; the card ships NINE. A
+    // sheet that draws six teaches that there are six.
+    expect(ALL_READINGS.length).toBe(9)
+  })
+
+  it("the run-mode face adds ONE atom to the resting two, and nothing else", () => {
+    for (const reading of ALL_READINGS) {
+      const { unmount } = renderRestingCard({ status: reading })
+      const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+      expect(nodeTextAtoms(box)).toEqual([
+        "Weigh each contract against our risk policy",
+        "Searches and decides its own next move",
+        RUN_LINE_LITERAL_AT_199[reading],
+      ])
+      unmount()
+    }
+  })
+})
+
+// ── THE MECHANISM-ABSENCE SWEEP ────────────────────────────────────────────────
+//
+// Sketch 177 printed *"Author name" / "Derived name" / "Type description"* into node
+// subtitles — the fallback RULE, shown to the person the rule exists to protect. Sketch
+// 178 fixed it by captioning the three name cases only by their TEXT LENGTH, and the fix
+// went into the design system's `designMd` as *"never name the mechanism to the user"*.
+// This is that rule as something a machine checks on the shipped card.
+//
+// NON-VACUITY IS ASSERTED FIRST, and it is not ceremony. This project has measured THREE
+// fences that swept the empty string and passed green defending nothing (`192.1`'s three,
+// and `gutterTokens.fences.test.ts`'s `?raw`-cannot-read-CSS finding). A sweep over a card
+// that failed to render would be the same defect wearing this file's name, so every sweep
+// below proves it has something to read BEFORE it reads it.
+
+/**
+ * The vocabulary a node face may never print. Anchored on word boundaries rather than
+ * bare `includes`, because a substring test bans *"gateway"* by banning *"gate"* and a
+ * fence that fires on innocent copy gets loosened rather than obeyed.
+ *
+ * Five families, each traceable to something this project has actually shipped or drawn:
+ *   1. the fallback RULE — sketch 177's literal defect
+ *   2. the LADDER's rungs — `nodeTitle`'s four tiers, which must stay invisible
+ *   3. the raw phase-type discriminators — `PHASE_GLYPHS`' own keys
+ *   4. the definition's machine keys — `phase_type`, `phase_index`, `skip_to_phase`
+ *   5. the gate / validator identifiers — the closed set `validator_kinds` names
+ */
+const MECHANISM_PATTERNS: readonly RegExp[] = [
+  /\bfallback\b/i,
+  /\bauthor name\b/i,
+  /\bderived name\b/i,
+  /\btype description\b/i,
+  /\bdefault name\b/i,
+  /\bladder\b/i,
+  /\brung\b/i,
+  /\btier\b/i,
+  /\bderivation\b/i,
+  /\bdiscriminator\b/i,
+  /\bphase_type\b/i,
+  /\bphase_index\b/i,
+  /\bskip_to_phase\b/i,
+  /\bcitations_required\b/i,
+  /\boutput_file_valid\b/i,
+  /\bllm_[a-z_]+\b/i,
+  /\bprogrammatic\b/i,
+  /\bexternal_action\b/i,
+  /\bcitation gate\b/i,
+  /\bvalidator\b/i,
+]
+
+/** Every pattern that FIRES on the given text. Returns the matched sources, so a red run
+ *  names WHICH rule was printed rather than only that one was. */
+function mechanismHits(text: string): string[] {
+  return MECHANISM_PATTERNS.filter((re) => re.test(text)).map((re) => re.source)
+}
+
+describe("199-01 — the mechanism-absence sweep is FALSIFIABLE (the positive controls)", () => {
+  it("fires on sketch 177's ACTUAL defect — the three subtitles it printed", () => {
+    expect(mechanismHits("Author name")).not.toEqual([])
+    expect(mechanismHits("Derived name")).not.toEqual([])
+    expect(mechanismHits("Type description")).not.toEqual([])
+  })
+
+  it("fires on a raw discriminator and on a definition key", () => {
+    expect(mechanismHits("llm_agent")).not.toEqual([])
+    expect(mechanismHits("phase_index 3")).not.toEqual([])
+    expect(mechanismHits("skip_to_phase:publish")).not.toEqual([])
+  })
+
+  it("does NOT fire on any shipped word the card really renders (no false positive)", () => {
+    // Every business string on this surface, swept: if the fence fired on one of these it
+    // would be loosened rather than obeyed, and a loosened fence defends nothing.
+    const shipped = [
+      RESTING_TITLE,
+      RESTING_SUBTITLE,
+      ...Object.values(RUN_LINE_LITERAL_AT_199),
+      ...Object.values(RUN_READING_WORD),
+      GOVERNANCE_SEAL_LABEL,
+      VERDICT_MARK.error.label,
+      VERDICT_MARK.incomplete.label,
+      VERDICT_MARK.unknown.label,
+      "Waits for you",
+      "Not connected",
+    ]
+    for (const s of shipped) expect(mechanismHits(s)).toEqual([])
+  })
+})
+
+describe("199-01 — the node face NEVER prints the mechanism (SC#4)", () => {
+  it("prints none of it at rest, at every run reading, or fully dressed", () => {
+    const cases: Array<Partial<React.ComponentProps<typeof PhaseNodeCard>>> = [
+      {},
+      { verdict: "error", grounded: true },
+      { verdict: "incomplete" },
+      { verdict: "unknown" },
+      {
+        grounded: true,
+        badges: [
+          { testId: "canvas-not-connected", tone: "muted", label: "Not connected" },
+          { testId: "canvas-waits-for-you", tone: "primary", label: "Waits for you" },
+        ],
+      },
+      ...ALL_READINGS.map((reading) => ({ status: reading })),
+    ]
+
+    for (const overrides of cases) {
+      const { unmount } = renderRestingCard(overrides)
+      const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+      const swept = nodeTextAtoms(box).join("   ")
+
+      // NON-VACUITY BEFORE CONTENTS. A card that rendered nothing would satisfy every
+      // assertion below by having nothing to fail on.
+      expect(swept.length).toBeGreaterThan(0)
+      expect(swept).toContain(RESTING_TITLE)
+
+      expect(mechanismHits(swept)).toEqual([])
+      unmount()
+    }
+  })
+
+  it("prints no SLUG either — the one technical token, and it lives behind the reveal", () => {
+    // `nodeTitle`'s own floor (`phaseVocabulary.ts`): the slug NEVER appears in the default
+    // face. The card is handed a resolved title, so this asserts the surface rather than
+    // the resolver — which is the only thing a card-level fence can honestly claim.
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    const swept = nodeTextAtoms(box).join(" ")
+    expect(swept.length).toBeGreaterThan(0)
+    expect(swept).not.toContain(RESTING_SLUG)
+  })
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 199-01 Task 2 (DES-01) — THE HOVER LIFT, AND THE FOUR INVARIANTS IT KEEPS
+//
+// Sheet c2 section 3 draws six interaction states. Five of them reconcile to
+// ALREADY-SHIPPED or to a CANNOT-EXPRESS with a named reason (the SUMMARY carries all
+// six rows in full). HOVERED is the one row the shipped card could express and did not:
+// measured before the change, `hover:` appeared ZERO times across all five files of the
+// node subtree. This block is the whole of the phase's build on this atom, plus the four
+// shipped invariants a hover treatment is most likely to break.
+// ════════════════════════════════════════════════════════════════════════════════
+
+/** The node subtree, read as SOURCE — the same six paths every negative fence in this
+ *  file already reads, reused rather than re-listed. */
+const HOVER_SUBTREE_SOURCE = cardSubtreeSource
+
+describe("199-01 — the hover lift (sheet c2 section 3, HOVERED)", () => {
+  it("the Builder's card carries the term, and it is the ONE spelled home of it", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    const card = box.querySelector(":scope > div")
+    expect(card).not.toBeNull()
+
+    // NON-VACUITY BEFORE CONTENTS: an element with no class attribute would satisfy a
+    // `not.toContain` forever.
+    const classes = card?.getAttribute("class") ?? ""
+    expect(classes.length).toBeGreaterThan(0)
+    expect(classes).toContain("hover:bg-card/45")
+    expect(classes).toContain(HOVER_TERM_199)
+  })
+
+  it("is SUPPRESSED at every one of the nine run readings — no false affordance", () => {
+    for (const reading of ALL_READINGS) {
+      const { unmount } = renderRestingCard({ status: reading })
+      const card = screen
+        .getByTestId(`canvas-node-${RESTING_SLUG}`)
+        .querySelector(":scope > div")
+      const classes = card?.getAttribute("class") ?? ""
+      expect(classes.length).toBeGreaterThan(0)
+      expect(classes).not.toContain("hover:")
+      expect(classes).not.toContain("transition-")
+      unmount()
+    }
+  })
+
+  it("the ONE hover utility in the whole subtree is a FILL — never a border", () => {
+    // The sheet's own hover rule changes `border-color`. Taking it would put a fifth
+    // colour utility into a four-branch ternary whose entire argument is that exactly one
+    // border-colour utility is emitted per state. This is that decision, as a fence.
+    expect(HOVER_SUBTREE_SOURCE.length).toBeGreaterThan(0)
+    const hoverUtilities = HOVER_SUBTREE_SOURCE.match(/hover:[a-z0-9:[\]/._-]+/gi) ?? []
+    expect(hoverUtilities).toEqual(["hover:bg-card/45"])
+  })
+
+  it("the four border branches still emit exactly ONE border-colour utility each", () => {
+    for (const branch of Object.keys(CARD_BORDER_ROWS)) {
+      const { unmount } = renderRestingCard(CARD_BORDER_ROWS[branch])
+      const card = screen
+        .getByTestId(`canvas-node-${RESTING_SLUG}`)
+        .querySelector(":scope > div")
+      const classes = card?.getAttribute("class") ?? ""
+      expect(classes.length).toBeGreaterThan(0)
+
+      // `border-` prefixed COLOUR utilities only — the bare structural `border` and the
+      // `border-border/50` default both count, and a second one would mean two
+      // same-specificity colour classes racing.
+      const borderColours = (classes.match(/(?:^|\s)border-\S+/g) ?? []).map((s) => s.trim())
+      expect(borderColours.length).toBe(1)
+      unmount()
+    }
+  })
+
+  it("MOTION still keys off RUN STATE — the card emits no animation and no transform", () => {
+    // The run channel's motion is the ring's infinite `canvas-ring-spin`. A colour ease is
+    // not that, and this asserts the distinction rather than arguing it.
+    renderRestingCard()
+    const card = screen
+      .getByTestId(`canvas-node-${RESTING_SLUG}`)
+      .querySelector(":scope > div")
+    const classes = card?.getAttribute("class") ?? ""
+    expect(classes.length).toBeGreaterThan(0)
+    expect(classes).not.toContain("animate-")
+    expect(classes).not.toContain("canvas-ring-spin")
+    expect(classes).not.toMatch(/(?:^|\s)(?:scale|rotate|translate|skew)-/)
+    expect(classes).not.toMatch(/hover:(?:scale|rotate|translate|skew)-/)
+
+    // POSITIVE CONTROL: the spin utility really is the shipped motion carrier, so the
+    // negative above is a statement about the CARD and not about a token that never
+    // appears anywhere.
+    expect(HOVER_SUBTREE_SOURCE).toContain("canvas-ring-spin")
+  })
+
+  it("adds NO focusable control and NO handler — one tab stop per node survives", () => {
+    renderRestingCard()
+    const box = screen.getByTestId(`canvas-node-${RESTING_SLUG}`)
+    expect(
+      box.querySelectorAll("a, button, input, select, textarea, [tabindex], [role='button']")
+        .length,
+    ).toBe(0)
+    // A hover treatment implemented in JS would need one of these; this one is CSS.
+    expect(HOVER_SUBTREE_SOURCE).not.toMatch(/onMouseEnter|onMouseLeave|onPointerEnter/)
+  })
+
+  it("adds NO slot — `phaseNodeCardContract.ts` is not in this plan's file envelope", () => {
+    // The suppression is derived from `status`, a slot the card ALREADY holds. If a later
+    // author reaches for a dedicated `hovered` or `interactive` prop, this goes red and the
+    // decision has to be taken deliberately rather than drifted into.
+    const contract = CARD_MODULES["./phaseNodeCardContract.ts"] ?? ""
+    expect(contract.length).toBeGreaterThan(0)
+    expect(contract).not.toMatch(/\bhovered\b|\binteractive\b|\bdragging\b/)
+  })
+})
+
+describe("199-01 — the declared delta against the 188.2-03 captures is EXACT", () => {
+  it("the splice adds the term ONCE, at one position, and changes nothing else", () => {
+    const before = CARD_HTML_BASELINE.MINIMAL_BUILDER
+    const after = withHoverLift199(before)
+
+    expect(before.length).toBeGreaterThan(0)
+    expect(after).not.toBe(before)
+
+    // THE ARITHMETIC, CLOSED: after minus the term (and its one separating space) IS the
+    // verbatim capture. No residual, so nothing else can have been smuggled in.
+    expect(after.replace(`${HOVER_TERM_199} `, "")).toBe(before)
+    expect(after.split(HOVER_TERM_199).length - 1).toBe(1)
+  })
+
+  it("REFUSES to no-op — a capture whose anchor moved throws rather than passing", () => {
+    // The falsification control for the helper itself. A splice that silently returned its
+    // input would turn all three amended assertions into comparisons of the baseline with
+    // itself, which is the vacuous-fence failure this file has met four times.
+    expect(() => withHoverLift199("<div class=\"nothing-like-a-card\"></div>")).toThrow(
+      /expected exactly 1/,
+    )
+    // …and the class-level helper refuses the same way, on a list with no border utility.
+    expect(() => classWithHoverLift199("mx-auto block bg-card/30")).toThrow(
+      /expected exactly 1/,
+    )
+  })
+
+  it("the SELECTED branch is why the anchor is the border and not the shadow", () => {
+    // The measurement that corrected this helper, kept as a test rather than as a claim:
+    // tailwind-merge REPLACES the base shadow on the selected branch, so a shadow-anchored
+    // splice threw there. This pins the shape that forced the correction.
+    const selected = CARD_BORDER_SHAPES.selected.find((e) => e.key === CARD_DIV_KEY)
+    expect(selected).not.toBeUndefined()
+    expect(selected?.class ?? "").toContain("shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]")
+    expect(selected?.class ?? "").not.toContain("rgba(0,0,0,0.95)")
+  })
+
+  it("the run-mode captures are compared VERBATIM — the delta never reaches them", () => {
+    for (const row of ["MAXIMAL_RUNNING", "MAXIMAL_WAITING"]) {
+      expect(CARD_HTML_ROWS[row].status).not.toBeUndefined()
+      expect(CARD_HTML_BASELINE[row]).not.toContain("hover:")
+      expect(cardHtml(CARD_HTML_ROWS[row])).not.toContain("hover:")
+    }
   })
 })

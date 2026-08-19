@@ -941,3 +941,48 @@ describe("PhaseNode 189-15 — badge slot 1 is SPENT on 'Not connected' (D-12 / 
     expect(`if (data.phaseType === "${EXTERNAL_TYPE}")`).toContain(EXTERNAL_TYPE)
   })
 })
+
+// ════════════════════════════════════════════════════════════════════════════════
+// Phase 199-01 Task 2 (DES-01) — THE ADAPTER'S SHARE OF THE HOVER LIFT: NOTHING
+//
+// Sheet c2 section 3's HOVERED row is built in `PhaseNodeCard.tsx` and nowhere else, and
+// the adapter is the file most likely to grow a second copy of it — it is where every
+// other per-state decision on this canvas is resolved (the tint, the verdict, the badge
+// tuple, the reading). These fences say the decision did NOT land here, so a later author
+// adding a hover treatment to the adapter turns them red instead of shipping two homes for
+// one state.
+//
+// The whole 199-01 diff on THIS file is this block. `PhaseNode.tsx` itself is byte-unchanged
+// by the plan, which is the intended shape: a presentation change to the card face should
+// not need its graph-library adapter to know about it.
+// ════════════════════════════════════════════════════════════════════════════════
+
+describe("199-01 — the hover lift has ONE home, and it is not the adapter", () => {
+  it("PhaseNode.tsx names no hover utility, in any form", () => {
+    // NON-VACUITY FIRST: a `?raw` import that returned the empty string would satisfy every
+    // negative below forever. This file has recorded that failure mode; it is asserted, not
+    // assumed.
+    expect(phaseNodeSource.length).toBeGreaterThan(0)
+    expect(phaseNodeSource).toContain("PhaseNodeCard")
+
+    expect(phaseNodeSource).not.toMatch(/hover:/)
+    expect(phaseNodeSource).not.toMatch(/onMouseEnter|onMouseLeave|onPointerEnter/)
+  })
+
+  it("the adapter passes no hover, dragging or interactive prop to the card", () => {
+    // The suppression rule reads `status`, a slot the card already holds. If a later phase
+    // reaches for a dedicated prop, the contract grows a slot and this goes red — which is
+    // the decision being forced into the open rather than drifted into.
+    expect(phaseNodeSource).not.toMatch(/\bhovered=/)
+    expect(phaseNodeSource).not.toMatch(/\bdragging=/)
+    expect(phaseNodeSource).not.toMatch(/\binteractive=/)
+  })
+
+  it("the POSITIVE CONTROL: the adapter really does pass the slots it is claimed to pass", () => {
+    // Without this, the three negatives above would be equally satisfied by a file that had
+    // stopped passing anything at all.
+    for (const slot of ["slug=", "phaseType=", "title=", "subtitle=", "status=", "selected="]) {
+      expect(phaseNodeSource).toContain(slot)
+    }
+  })
+})
