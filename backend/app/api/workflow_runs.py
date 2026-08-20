@@ -66,7 +66,13 @@ from app.dependencies import (
 # 200 (D-07) — the ONE home for the `_measure` read side, shared with the SECOND wire
 # model for these same rows (`WorkflowPhaseState`, the chat panel's). A local copy here
 # is how the run page and the chat panel come to disagree about the same phase row.
-from app.models.thread import declared_phase_measure
+#
+# 200.1 (D-200.1-01) — `phase_output_object` is that same home's READ-SIDE UNWRAP, and the
+# serializer below parses each row ONCE through it. `output` is a jsonb STRING SCALAR on
+# 484 of 484 `completed` rows, so a second `isinstance(raw, dict)` test anywhere in this
+# module would be dead on every row that matters — silently, because the absent arm renders
+# honestly. There is one door; this module reads through it and never beside it.
+from app.models.thread import declared_phase_measure, phase_output_object
 from app.utils.db import aexec
 
 logger = logging.getLogger(__name__)
@@ -150,6 +156,75 @@ class WorkflowRunPhaseRead(BaseModel):
             "must never substitute a domain word of its own."
         ),
     )
+
+    # ── 200.1 (RUN-04) — the deliverable, when the deliverable was WORDS ──────
+    # ⚠ THIS FIELD JOINS THE LOCKSTEP ABOVE. The projection already selects `output`
+    # (nothing new is asked for); the model and the serializer are what move here.
+    #
+    # ⚠ READ EXACTLY ONE KEY BY NAME. The serializer takes `obj.get("text")` and nothing
+    # else — never an iteration over the object's keys, never a filtered copy, never a
+    # deny-list. The bound is an ALLOW-LIST and the reason is measured, not stylistic: a
+    # census of all 588 non-null `output` values on 2026-08-20 found NINETEEN distinct
+    # keys, EIGHT of which (`answer`, `retrieved_ids`, `placeholder_keys`, `sub_questions`,
+    # `sub_run_ids`, `failure`, `recorded_intent`, `_surfaced`) appear in no design
+    # document at all. A deny-list of the keys anyone thought to name is already incomplete
+    # on today's data, and this project recorded at Phase 185's security audit that such a
+    # list cannot be made fail-closed. `tests/unit/test_200_1_deliverable_text.py` proves
+    # the bound as a SET EQUALITY over the real response body, with a planted key that
+    # exists nowhere in the product as the positive control.
+    deliverable_text: str | None = Field(
+        default=None,
+        description=(
+            "This phase's own `output[\"text\"]` — the answer the step produced, verbatim. "
+            "`null` means this step wrote no text: the key was absent, the output was not "
+            "an object, or the text was empty. ⚠ AN EMPTY STRING IS NEVER SHIPPED — an "
+            "empty answer and no answer are not two facts worth distinguishing on a "
+            "surface whose job is to say what was produced, and a client branching on "
+            "truthiness would fold them anyway. The name is `deliverable_text` and NOT "
+            "`output_text` on purpose: it argues against a future `output_*` family, "
+            "because every other key on that jsonb is internal by default."
+        ),
+    )
+
+
+# ─── D-200.1-02-A — THE SECOND WIRE MODEL IS DELIBERATELY NOT WIDENED ────────────────────
+#
+# `models/thread.py`'s `WorkflowPhaseState` carries a lockstep rule in writing: it and
+# `WorkflowRunPhaseRead` are "the two halves of one contract", to be widened in the SAME
+# commit. `deliverable_text` is the recorded EXCEPTION, and the exception is written in BOTH
+# places so a reader of the rule finds it where the rule is.
+#
+# The rule's own stated purpose is to prevent "the same facts, two surfaces, silently
+# disagreeing". That does not apply here, because **the chat surface already renders this
+# text — it is the assistant's message.** Adding the field there would put a SECOND rendering
+# of the same words on the same screen, which is exactly the duplication `RunTranscript`'s
+# reason 2 removed from the run page. Timestamps and counts were different: NEITHER surface
+# had them, so widening only one would have been a real disagreement.
+#
+# It is also strictly the narrower door. `GET /threads/{id}/workflow` — the route that serves
+# `WorkflowPhaseState` — carries no `require_canvas`; this one does. Declining the widening
+# keeps this phase's new exposure behind the gated read (T-200.1-11).
+#
+# ⚠ RE-OPEN TRIGGER, NAMED SO IT IS NOT A SILENCE: a chat-surface affordance that needs the
+# deliverable INDEPENDENTLY of the message stream.
+#
+# ─── D-200.1-02-B — THE TEXT SHIPS WHOLE, ON EVERY ROW THAT HAS ONE, UNCLAMPED ───────────
+#
+# Measured over the same census: max 38,935 characters on one row, mean 3,871, p95 15,431 —
+# so a five-step run typically ships ~19 KB and a worst case ~195 KB, the same order as the
+# `definition` this route already ships whole in ONE payload.
+#
+# The two alternatives were both rejected for the same reason: they are invisible on the wire.
+#   · Populating only the FINAL row is a serializer rule a client cannot see — the "green DB
+#     test beside an unchanged UI" shape this module's own comments warn about, and it would
+#     silently defeat the client's "last row with text" derivation the moment a run's closing
+#     step emits a file.
+#   · Clamping without a second signalling field is a SILENT TRUNCATION, and this surface
+#     does not lie by omission.
+#
+# ⚠ RE-OPEN TRIGGER: the first surface that reads this field for a LIST of runs rather than
+# for one run (T-200.1-13 is ACCEPTED on exactly that condition).
+# ─────────────────────────────────────────────────────────────────────────────────────────
 
 
 class WorkflowRunRead(BaseModel):
@@ -624,13 +699,30 @@ async def read_workflow_run(
     # changed 404 body — and NO SCOPE WIDENS. A `.select("*")` would also "work" and
     # would WEAKEN the read by shipping whatever columns the table grows next; reject it.
     #
-    # ⚠ `output` IS SELECTED BUT NEVER PUT ON THE WIRE. `_persist_output` stores each
-    # executor's dict FULL AND INLINE, so this jsonb carries field_map, citations and
-    # prompts. The SERIALIZER below extracts ONLY `_measure.count` / `_measure.noun` into
-    # `step_count` / `step_noun`, and `WorkflowRunPhaseRead` declares no `output` field —
-    # so `response_model`'s drop behaviour is what keeps the payload narrow. That is the
-    # answer to RESEARCH's open question A7 with no second migration: the carrier stays
-    # the jsonb, the exposure stays bounded, and the client never sees a prompt.
+    # ⚠ THE ORIGINAL COMMENT IS KEPT VERBATIM BECAUSE IT IS STILL THE ARGUMENT, AND ONE
+    # CLAUSE OF IT IS NO LONGER TRUE. It read:
+    #
+    #     "`output` IS SELECTED BUT NEVER PUT ON THE WIRE. `_persist_output` stores each
+    #      executor's dict FULL AND INLINE, so this jsonb carries field_map, citations and
+    #      prompts. The SERIALIZER below extracts ONLY `_measure.count` / `_measure.noun`
+    #      into `step_count` / `step_noun`, and `WorkflowRunPhaseRead` declares no `output`
+    #      field — so `response_model`'s drop behaviour is what keeps the payload narrow.
+    #      That is the answer to RESEARCH's open question A7 with no second migration: the
+    #      carrier stays the jsonb, the exposure stays bounded, and the client never sees a
+    #      prompt."
+    #
+    # ⚠ 200.1 (RUN-04) AMENDS EXACTLY ONE CLAUSE: the serializer now extracts a THIRD fact,
+    # `output["text"]`, into `deliverable_text`. Everything else stands unchanged and is
+    # what makes the widening safe — `WorkflowRunPhaseRead` still declares NO `output`
+    # field, `response_model` still drops every key the model does not name, and the
+    # exposure is still bounded by reading named keys rather than by filtering an object.
+    # The client still never sees a prompt; it sees the answer the run produced, which is
+    # the one thing on that jsonb the run's owner is entitled to read back.
+    #
+    # ⚠ THE `.select()` STRING BELOW IS BYTE-UNCHANGED BY 200.1 and must stay so — `output`
+    # was ALREADY selected, so the deliverable arm asks the database for nothing new. A
+    # `.select("*")` would also "work" and would WEAKEN the read; reject it (asserted at
+    # zero occurrences by this module's suite).
     phases_resp = await aexec(
         supabase.table("workflow_phases")
         .select("slug, phase_index, status, started_at, completed_at, output")
@@ -642,7 +734,18 @@ async def read_workflow_run(
     slug_to_type = _slug_to_phase_type(definition)
     phases = []
     for row in phase_rows:
-        count, noun = declared_phase_measure(row.get("output"))
+        # ── 200.1 (RUN-04) — ONE parse per row, feeding BOTH reads ──
+        # `phase_output_object` tolerates the jsonb string scalar AND the object shape;
+        # a dict passes straight through `declared_phase_measure`'s own call to the same
+        # helper, so handing it `obj` rather than the raw value changes no behaviour and
+        # keeps the parse count at one. One parse, one home, two facts.
+        obj = phase_output_object(row.get("output"))
+        count, noun = declared_phase_measure(obj)
+        # ⚠ EXACTLY ONE KEY, BY NAME — see `deliverable_text`'s comment on the model.
+        # An empty string is not shipped (D-200.1-02-B's sibling rule): `None` and `""`
+        # are one fact on this surface.
+        raw_text = obj.get("text") if isinstance(obj, dict) else None
+        deliverable_text = raw_text if isinstance(raw_text, str) and raw_text else None
         phases.append(
             WorkflowRunPhaseRead(
                 slug=row["slug"],
@@ -653,6 +756,7 @@ async def read_workflow_run(
                 completed_at=row.get("completed_at"),
                 step_count=count,
                 step_noun=noun,
+                deliverable_text=deliverable_text,
             )
         )
 

@@ -3273,3 +3273,291 @@ on the callback's PRESENCE.
 **Seam:** not proposed yet. The honest first step for a file that has been invisible for twenty-one
 phases is a row and a re-derivation, which is what this is; the obvious candidate when one is taken is
 the `ActiveView` mount switch, which is ~150 lines of branch and owns none of the state around it.
+
+## Phase 200.1 wave 2 (`200.1-02`, RUN-04) — the triples RE-DERIVED for every file the phase touched
+
+**Six non-test source files were touched by Phase 200.1 across its three plans.** All eight triples
+below were re-derived in ONE scripted pass with `CLAUDE.md`'s own recipe at this plan's HEAD, with the
+six-digit dated quick-task buckets subtracted. **Two of the eight rows were ALREADY STALE before the
+phase began, and neither of those files was touched by it** — so the correction was reachable only by
+re-deriving every file the phase's blast radius NAMED, not every file it EDITED.
+
+| File | row read | re-derived | touched by 200.1? |
+|---|---|---|---|
+| `backend/app/models/thread.py` | `13 / 9 / 295` | **`14 / 9 / 319`** | yes (waves 1 + 2) |
+| `backend/app/db/workflows.py` | `43 / 21 / 2194` | **`43 / 21 / 2194`** — CURRENT | wave 1 only |
+| `backend/app/api/workflow_runs.py` | `6 / 4 / 672` | **`7 / 5 / 776`** | yes (wave 2) |
+| `frontend/src/lib/api.ts` | `177 / 100 / 6521` | **`178 / 101 / 6547`** | yes (wave 2) |
+| `frontend/src/pages/WorkflowRunPage.tsx` | `23 / 6 / 1683` | **`24 / 7 / 1830`** | yes (wave 2) |
+| `frontend/src/components/workflows/RunTranscript.tsx` | `4 / 1 / 514` | **`6 / 2 / 644`** | yes (wave 1) |
+| `frontend/src/components/workflows/transcriptVocabulary.ts` | `1 / 1 / 105` | **`3 / 1 / 131`** | ⚠ **NO — stale before the phase** |
+| `frontend/src/components/workflows/phaseDuration.ts` | `3 / 1 / 493` | **`5 / 1 / 525`** | ⚠ **NO — stale before the phase** |
+
+### ⚠ A STALENESS REPORT IN THE PLAN WAS ITSELF WRONG, AND THE MECHANISM MATTERS MORE THAN THE NUMBER
+
+`200.1-02-PLAN.md` states that **two** rows were stale at the base, naming `transcriptVocabulary.ts`
+(`1 / 1 / 105` against a measured `3 / 1 / 131`) and `frontend/src/lib/api.ts` (`177 / 100 / 6521`
+against a measured `177 / 102 / 6521` — *"the PHASE count was wrong by two before this phase started"*).
+
+**The first is confirmed. The second is REFUTED by re-measurement, and the original claim is recorded
+here rather than quietly dropped.** At `e0c57ef4` — the very commit the plan measured at —
+`frontend/src/lib/api.ts` derives **`177 commits / 100 phases / 6521 lines`**, exactly what the row
+said. Reproduce:
+
+```bash
+git log --format=%s e0c57ef4 -- frontend/src/lib/api.ts \
+  | sed -E 's/^[a-z]+\(([^)]+)\).*/\1/' | sed -E 's/-.*//' \
+  | grep -E '^[0-9]+(\.[0-9]+)?$' | sort -u | grep -vE '^[0-9]{6}$' | wc -l   # → 100
+```
+
+Drop the final `grep -vE '^[0-9]{6}$'` and the same command prints **102**. The two extra buckets are
+`260405` and `260814` — **dated quick tasks, which `CLAUDE.md`'s recipe explicitly requires be
+subtracted**, and which the plan-time measurement did not subtract.
+
+⚠ **A FALSE STALENESS REPORT ENDS AN AUDIT WITH A WRONG NUMBER EXACTLY AS A STALE ROW DOES, and it is
+arguably the more corrosive of the two.** This ledger's headline warns that a row which is present and
+WRONG answers the auditor with `satisfied` and stops the audit. A row that is present and RIGHT, reported
+as wrong, gets *edited to a wrong value by a plan trying to be diligent*. The subtraction step is not
+optional bookkeeping; it is what makes the recipe reproducible between two people.
+
+### `backend/app/api/workflow_runs.py` — `7 / 5 / 776`, and the NEW invariant it now carries
+
+**G-5 fires at 5 phases. Honoured BY CONSTRUCTION, no override requested.** The named test — *does this
+add a genuinely SECOND concern?* — is answered by the measured shape: **ONE optional field on the one
+existing phase model, and three lines in the one existing serializer loop.** The `.select()` projection
+was **not touched at all** (`output` was already selected — asserted byte-identical against `3a14fc08`),
+so unlike Phase 200's widening this one asks the database for nothing new. `+113 / −9`, of which the
+overwhelming majority is comment.
+
+**⚠ THE NEW BINDING INVARIANT: READ EXACTLY ONE KEY BY NAME.** `workflow_phases.output` now has one key
+on the wire (`output["text"]` → `deliverable_text`). The bound is an **ALLOW-LIST**, and the reason is
+measured rather than stylistic. A census of all **588** non-null `output` values on the live local DB
+(2026-08-20) found **NINETEEN distinct keys**:
+
+```
+text 479 · source_refs 314 · citations 314 · similarity_scores 254 · sub_run_id 239 · field_map 66 ·
+output_file 60 · path 60 · retrieved_ids 52 · placeholder_keys 52 · _failure_reason 38 · answer 34 ·
+tool_call_id 34 · sub_questions 15 · sub_run_ids 15 · failure 15 · _measure 13 · _surfaced 5 ·
+recorded_intent 5
+```
+
+**EIGHT of those — `answer`, `retrieved_ids`, `placeholder_keys`, `sub_questions`, `sub_run_ids`,
+`failure`, `recorded_intent`, `_surfaced` — appear in no design document for this work at all.** So a
+deny-list of the six keys anyone thought to name was **already incomplete on live data before it could
+have been written**, which is Phase 185's recorded security finding that a deny-list cannot be made
+fail-closed. Therefore: never iterate the unwrapped object's keys, never build a filtered copy, never
+`.select("*")`, never declare `output` on a model.
+
+**The fence is a SET EQUALITY over the real `response.json()`**, not a list of per-key absences —
+`set(body["phases"][0].keys())` must equal exactly the nine declared fields. A set equality fails on a
+key invented tomorrow; a deny-list does not. Per-key absence assertions are kept ALONGSIDE it so a
+failure NAMES the leaked key. **Every leak assertion is preceded by a positive control** asserting the
+planted keys WERE on the row before serialization, and one planted key (`quantum_provenance_ledger_v9`)
+exists nowhere in the product — it stands in for the key invented after this plan ships. The prompt
+sentinel is additionally asserted absent from the **whole response text**, not merely from the key set,
+because a leak nested inside `definition` or echoed in an error body would evade a key-set check.
+
+**⚠ THE PLAN'S OWN `select("*")` CRITERION WAS UNSATISFIABLE AT ITS OWN BASE COMMIT.** It asked that
+`grep -c 'select("\*")' backend/app/api/workflow_runs.py` return `0`. It returns **2**, and **both are
+comments** — one of them the argument SHIPPED at the base commit (*"A `.select("*")` would also 'work'
+and would WEAKEN the read; reject it"*). A whole-file text match cannot tell a refusal from an
+adoption: the **187-24 trap**, now on its **fifth** recorded firing in this tree. The remedy is the
+recorded one — fence the CODE with an **AST walk** and leave the prose free to name what it rejects.
+The AST fence is strictly stronger than the grep would have been, because a `select` argument composed
+from a variable is visible to it as a non-`"*"` constant. It carries a positive control on both sides:
+a planted real `.select("*")` scores 1, and the comment-bearing real source scores 0.
+
+**⚠ THE STRING-SCALAR SHAPE IS SERVED, AND THAT IS ASSERTED RATHER THAN ASSUMED.** `jsonb_typeof(output)`
+is `'string'` on **484 of 484** `completed` rows, so the serializer reads through
+`models/thread.py::phase_output_object` (wave 1's door) and never beside it. **The counterfactual was
+DRIVEN, not reasoned:** replacing that call with a local `isinstance(raw, dict)` test turns exactly four
+cases RED — the two string-scalar cases and both halves of the one-key AST fence — and leaves the
+twenty-one others green, which is what proves the door is load-bearing rather than decorative.
+
+**Seam:** still none proposed, and still a verdict rather than an omission — the module is one route
+whose bulk is its own reasoning. The inherited seam when one IS taken is unchanged: *the read* versus
+*the access posture*. It inherits `7 / 5 / 776`.
+
+### `backend/app/models/thread.py` — `14 / 9 / 319`, and the FIRST EXCEPTION to its own rule
+
+Wave 1 gave this file its first-ever row and section (`13 / 9 / 295`, correct at that commit). Wave 2
+moved it again — `+16 / −0`, comment only — and the content of those sixteen lines is the point.
+
+**`WorkflowPhaseState` carries a lockstep rule in writing:** it and `api/workflow_runs.py`'s
+`WorkflowRunPhaseRead` are *"the two halves of one contract, not a model and its copy"*, to be widened
+in the SAME commit, because otherwise you ship *"the same facts, two surfaces, silently disagreeing"*.
+
+**`D-200.1-02-A` is the first recorded exception, and it is written HERE — beside the rule — as well as
+beside the field it excepts.** A rule whose exception lives only in the other file is a rule whose next
+reader will apply it and be wrong.
+
+The reason the rule does not bite: **the chat surface ALREADY renders this text — it is the assistant's
+message.** Adding `deliverable_text` to the chat panel's model would put a SECOND rendering of the same
+words on the same screen, which is precisely the duplication `RunTranscript` removed from the run page.
+The four fields Phase 200 added were different in kind — **neither** surface had them, so widening one
+alone would have been a genuine disagreement. Declining is also strictly the narrower door:
+`GET /threads/{id}/workflow`, which serves this model, carries **no `require_canvas`**; the run read
+does (T-200.1-11). ⚠ **Re-open trigger, named:** *a chat-surface affordance that needs the deliverable
+independently of the message stream.* The non-widening is asserted on the MODEL rather than on a diff
+(`"deliverable_text" not in WorkflowPhaseState.model_fields`), so it keeps holding after this phase
+closes.
+
+**G-5 verdict: honoured by construction, again** — a comment recording a decision adds no concern. The
+inherited seam is unchanged: *the thread models* versus *the `workflow_phases` read*. It inherits
+`14 / 9 / 319`.
+
+### `backend/app/db/workflows.py` — `43 / 21 / 2194`, RE-DERIVED AND FOUND CURRENT
+
+**Wave 2 did not touch this file** (`git diff --numstat 3a14fc08 HEAD -- backend/app/db/workflows.py` is
+EMPTY), and its triple is byte-for-byte what wave 1 recorded. **A measured non-touch is a stronger
+statement than silence** — a reader asking *"did 200.1's wave 2 grow the hottest backend module by
+phase?"* gets *"no, and here is the command"* instead of an absence they must re-derive. Every invariant
+in this file's own section stands unchanged, including the one that matters most: the terminal phase
+writers hand the pool's jsonb codec a plain dict, and **the fix is to stop pre-encoding, NEVER to add a
+cast.** It inherits `43 / 21 / 2194`.
+
+### `frontend/src/lib/api.ts` — `178 / 101 / 6547`, and the 197 decline holds for the THIRD time
+
+**Still the hottest file in the repository**, and still declining its extraction on the recorded basis.
+Phase 197 declined the seam because its change was type-only, with the trigger *"the next phase adding a
+RUNTIME export or a second concern here"*. 192.2 re-confirmed it; 200 re-confirmed it; **200.1 makes it
+three**, and it is measured over the real diff rather than quoted:
+
+```bash
+git diff 3a14fc08 -- frontend/src/lib/api.ts | grep -cE '^\+export (const|function|class|let|var) '   # → 0
+git diff --numstat 3a14fc08 -- frontend/src/lib/api.ts                                                # → 26  0
+```
+
+`+26 / −0`, **zero new runtime exports** — one optional field (`deliverable_text`) on the existing
+`WorkflowRunPhase` interface plus its docblock. That is what keeps `196-08`'s failure mode (nine suites
+throwing at mount because a `vi.mock("@/lib/api")` factory did not declare a newly-added export)
+structurally unable to fire, rather than merely unlikely to. **Trigger carried forward VERBATIM.**
+
+⚠ The field's docblock deliberately does NOT spell React's raw-HTML escape hatch, even though naming it
+would be the clearest guidance: `WorkflowRunPage.tsx` sweeps its own RAW source for that identifier at
+zero occurrences, and this tree has now recorded **six** times that a comment naming a forbidden token
+satisfies the grep meant to forbid it. It inherits `178 / 101 / 6547`.
+
+### `frontend/src/pages/WorkflowRunPage.tsx` — `24 / 7 / 1830`, four renders where there was one
+
+`+162 / −15`. The deliverable region was **file-only**: it headed *"Files in this run's workspace"* and,
+on a terminal empty run, said *"This run produced no files."* Both sentences are TRUE and USELESS about a
+run whose deliverable was a text answer — **and that is the common case: 479 phase rows carry
+`output.text` against 60 carrying a file, eight to one.** A run measured with the operator watching
+(`13691156-…`, 3 steps, 4m47s) rendered *"This run produced no files."* while its steps carried **4,411**
+and **517** characters of answer.
+
+**THE FOUR RENDERS, AND WHY NONE MAY BE FOLDED.** Folding *"no files"* into *"nothing at all"* prints
+*"nothing happened"* about a run that produced an answer — the `runFacts.ts` CR-01 / `DecisionsList` D-20
+/ `phaseDuration.ts` / `transcriptVocabulary.ts` finding, **for the fifth time in this tree**. The gate
+is one condition: **the file block renders whenever there is no answer**, which is what keeps the
+file-only and live-and-empty arms character-identical to what shipped rather than reimplementing them
+under a new gate. The suite asserts the four arms produce four DISTINCT `textContent` values by set size,
+with a positive control proving the set really collapses when two readings coincide — that is the
+criterion that catches a fold DIRECTLY rather than by inference.
+
+**⚠ THE FILE-ONLY ARM IS PROVED BYTE-IDENTICAL TO THE BASE COMMIT.** `FILE_ONLY_HTML_BASELINE` was
+CAPTURED by checking out `3a14fc08`'s own `WorkflowRunPage.tsx`, rendering it against this suite's
+existing `DELIVERABLE` fixture, and writing the region's whole `innerHTML` out — **before any of this
+plan's page edits were applied.** A capture re-taken from the NEW code would only record what the code
+now does; this one can still fail. The `PhaseNodeCard.tsx` `CARD_HTML_BASELINE` precedent, applied to a
+page rather than to a card.
+
+**⚠ THE ANSWER IS THE LAST SERVER-ORDERED ROW WITH A NON-EMPTY `deliverable_text` — three rules were
+available and two of them are wrong.** *The final row* fails on a run whose closing step emits a FILE
+while the step before it wrote the prose: that run would be reported as having produced no answer, on the
+one surface whose job is to say what it produced. *Any row with text* fails harder — **a `confirm` step
+carries `text` too, and it is a QUESTION.** Measured on real local data, verbatim: *"Does this draft
+answer your question? Add any corrections."* A first-row-wins rule prints the machine's question back at
+the person as the run's deliverable. Both wrong rules have their own pinned case.
+
+**⚠ THIS HEADING MAY CLAIM AUTHORSHIP AND THE FILE HEADING MAY NOT — the asymmetry is deliberate and is
+recorded at the constant.** Phase 195's D-02 removed *"What this run produced"* from the file heading
+because the file list is read **THREAD-scoped**: a thread can hold files this run did not write. The
+answer is different in kind — it comes from this run's OWN `workflow_phases` rows, joined by
+`workflow_run_id`, and nothing else can put a row there. So *"The answer this run wrote"* is a claim the
+read actually supports, and declining to make it would be a different kind of dishonesty: vagueness about
+a fact we hold. ⚠ The region still refuses to say WHICH step made what — no slug leaves the derivation,
+and the shipped refusal to pass a `deliverableOf` is untouched.
+
+**⚠ THE SUPERSEDED SENTENCE IS QUOTED, NOT ERASED, AND ALL FOUR REFERENCE SITES MOVED IN ONE COMMIT.**
+*"This run produced no files."* → *"This run produced no file and no written answer."* The old string
+survives verbatim in the page's copy docblock and under an explicit `SUPERSEDED` marker in the suite, so
+`git log -S "This run produced no files."` still finds the thread. Its four sites were the const, two
+prose sites, and the source fence. **⚠ THE FENCE'S OWN READING MODE WAS CHECKED BEFORE ANY PROSE WAS
+WRITTEN**: it reads `codeOf(pageSource)` — comment-STRIPPED — so the docblock quotations added on both
+sides cannot change its count. Had it read raw `?raw` source, adding the quotation would have turned the
+fence red. The suite additionally asserts the old string is at **zero** occurrences in stripped code, so
+a half-finished rename that left both strings live cannot pass.
+
+**⚠ THE 187-24 TRAP FIRED HERE, OBSERVED RED, ON ITS SIXTH RECORDED FIRING IN THIS TREE.** The first
+draft of the answer block's docblock spelled React's raw-HTML escape hatch while explaining that the
+page refuses it — and the shipped fence at this file's `:2259` sweeps **RAW** `pageSource` for exactly
+that identifier at zero occurrences. **A whole-file grep cannot tell a refusal from an adoption.** Fixed
+in the PROSE, never by relaxing the guard: the prop is described and not named, and the reason is
+recorded in the file so the next reader does not helpfully re-add it. Note the contrast with the
+empty-state fence two paragraphs up — **two fences on the same file, one comment-stripped and one raw,
+and only reading each one's source told you which prose was safe.**
+
+**⚠ `deliverable_text` IS READ OFF `run.phases`, NOT OFF `wireRows`.** `wireRows` is typed as
+`phaseDuration.ts`'s `PhaseTimingRow`, which is that leaf's DURATION read shape. Text is not a duration,
+and widening a shared read shape to reach one field on one page is how a leaf stops being a leaf. Same
+array, correct type, and `phaseDuration.ts` diffs to nothing.
+
+**⚠ THE FOUR SEAMS NAMED AT PHASE 195 REMAIN, AND NONE WAS TAKEN HERE.** Stated rather than left implied
+by *honoured by construction* — the file grew 147 lines and is now **1,830**, among the largest pages in
+the tree. The region itself is the obvious candidate at ~150 lines with its own copy block; its re-open
+trigger is unchanged. It inherits `24 / 7 / 1830`.
+
+### `frontend/src/components/workflows/RunTranscript.tsx` — `6 / 2 / 644`, one phase below the threshold
+
+Wave 1's plan `200.1-03` deliberately left `CLAUDE.md` and this file's row byte-unchanged (two concurrent
+worktrees editing the 150,000-character gate file is a race on the one file whose silent breakage
+disables every project rule at once), and named wave 2 as the owner of this obligation. Discharged here.
+
+`4 / 1 / 514` → **`6 / 2 / 644`**, `+132 / −2`. **G-5 does NOT fire at 2 phases** — it is one phase below
+the threshold, which is the `FlowEdge.tsx` / `phaseStatusMeta.ts` state one wave earlier in this same
+phase, where a file crossed in the very commit that gave it a row. **It owes a `docs/` section of its own
+on the NEXT phase that touches it**, and this paragraph is the placeholder that makes that owed rather
+than forgotten.
+
+What wave 1 added: the sheet's gutter and its live treatment, ported. **Both shipped refusals were
+asserted as STILL HOLDING — one against a test that passed UNEDITED**, which is the only kind of pin
+evidence this ledger treats as strong. Two findings were recorded in the file rather than smoothed over:
+its docblock's claim *"the sheet marks the attention line and the active line with two icons; this
+surface renders neither"* became false, and the original is **kept and amended beside it** (only one
+clause moved — the mark is a CSS ring, not an import, so the glyph BUDGET really is unchanged); and **the
+187-24 trap fired there too**, when the spinner's docblock QUOTED the sheet's glyph class while
+explaining the refusal, turning its own zero-expecting whole-file guard red. Fixed in the prose.
+
+### The two rows that were stale before the phase began — `transcriptVocabulary.ts` and `phaseDuration.ts`
+
+Neither file was modified by Phase 200.1. Both rows were wrong at `e0c57ef4`, the phase's own base:
+`1 / 1 / 105` against a measured `3 / 1 / 131`, and `3 / 1 / 493` against a measured `5 / 1 / 525`. Both
+old figures are kept beside the new ones in `CLAUDE.md`.
+
+**The mechanism is the useful part, and it is not carelessness.** A row goes stale on ANY commit that
+touches its file, but the only person the guardrail ever prompts to look is that file's **next editor**.
+Both of these files were edited by Phase 200 in commits that did not update their rows, and no plan
+since has named either — so nothing in the workflow was ever going to surface them. `WorkflowsPage.tsx`
+escaped G-5 for ten phases by exactly this route, and `libraryFilter.ts` was found *"by diffing the
+phase"* rather than by any plan naming it. **The countermeasure that actually worked here was
+re-deriving every file the phase's blast radius NAMED, not every file it EDITED** — which cost one
+scripted pass over eight paths.
+
+### Phase 200.1 — the guardrail record, and one figure the next phase must watch
+
+- **G-5 fires on four of the eight files** (`db/workflows.py` 21, `lib/api.ts` 101,
+  `models/thread.py` 9, `api/workflow_runs.py` 5, `WorkflowRunPage.tsx` 7 — five, in fact). **Every one
+  is `honoured by construction` with a measured reason and none reads a bare `satisfied` with no
+  successor named.** No override was requested at any point in the phase.
+- **No migration.** `git diff --stat e0c57ef4..HEAD -- supabase/migrations` is EMPTY and the directory's
+  file count is unchanged. ⚠ **Migration `123_repair_definition_snapshot_string_scalars.sql` remains
+  WRITTEN BUT NOT APPLIED**; this phase neither applied nor renumbered it, and the silence here is
+  deliberate rather than an oversight.
+- ⚠ **`CLAUDE.md` MEASURES 116,387 CHARACTERS AT THIS COMMIT — 3,613 BELOW THE 120,000 WARN BAND.** The
+  gate exits `0`, but the margin is now the smallest it has been since the `a882777b` split, and this
+  plan alone added ~5,600. **The next phase that writes rows on this scale trips the warn band**, at
+  which point CLAUDE.md's own rule says the split is *scheduled, not scrambled*. Narrative already goes
+  here by convention; what remains in the table is the scan list and the verdicts, which must stay
+  complete. Re-derive with `node scripts/check-claude-md-size.cjs`.

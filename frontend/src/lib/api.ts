@@ -4242,6 +4242,32 @@ export interface WorkflowRunPhase {
    *  word of your own** — "312 docs matched" is a claim about the customer's domain that
    *  nothing measured. */
   step_noun?: string | null
+  /** Phase 200.1 (RUN-04) — this step's own `output["text"]`: the answer it produced,
+   *  verbatim and unclamped.
+   *
+   *  ⚠ **`null` MEANS THIS STEP WROTE NO TEXT, AND AN EMPTY STRING IS NEVER SENT.** The
+   *  server collapses "no `text` key", "output was not an object" and `text === ""` into
+   *  one `null`, deliberately: an empty answer and no answer are not two facts worth
+   *  distinguishing on a surface whose job is to say what was produced. So `=== null` and
+   *  a truthiness test agree here, which is the point.
+   *
+   *  ⚠ **IT IS NOT SAFE TO CALL THE LAST ROW'S TEXT "THE RUN'S ANSWER".** A `confirm`
+   *  step carries `text` too, and it is a QUESTION — measured on real data:
+   *  *"Does this draft answer your question? Add any corrections."* The run's answer is
+   *  **the LAST server-ordered row carrying a non-empty `deliverable_text`**, which is a
+   *  different rule and the one `WorkflowRunPage` applies.
+   *
+   *  ⚠ **UNCLAMPED, ON EVERY ROW THAT HAS ONE** (`D-200.1-02-B`). Measured max 38,935
+   *  characters on one row, mean 3,871, p95 15,431 — a five-step run typically ~19 KB.
+   *  A clamp without a second signalling field would be a silent truncation, and a
+   *  populate-only-the-final-row rule would be invisible on the wire. Re-open trigger: the
+   *  first surface reading this for a LIST of runs rather than for one run.
+   *
+   *  ⚠ **MODEL-AUTHORED CONTENT — render it as a text node**, never through React's raw-HTML
+   *  escape hatch. ⚠ That prop is not SPELLED here on purpose: `WorkflowRunPage.tsx` carries a
+   *  fence sweeping its own RAW source for it at zero occurrences, and this tree has recorded
+   *  six times that a comment naming a forbidden token satisfies the grep meant to forbid it. */
+  deliverable_text?: string | null
 }
 
 /**

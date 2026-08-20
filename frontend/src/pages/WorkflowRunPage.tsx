@@ -212,10 +212,48 @@ const WAITING_TO_START = "Waiting to start"
  *  "This run produced no files." looks like the same overclaim and is not: a run is a
  *  subset of its thread, so an EMPTY thread-scoped list entails the run produced
  *  nothing. The overclaim only bites in the NON-empty direction. D-15 ships both
- *  strings byte-identical, and a source fence pins each at exactly one occurrence. */
+ *  strings byte-identical, and a source fence pins each at exactly one occurrence.
+ *
+ *  ── ⚠ PHASE 200.1 (RUN-04) — ONE OF THOSE TWO STRINGS IS SUPERSEDED, AND THE
+ *     PARAGRAPH ABOVE IS KEPT VERBATIM BECAUSE ITS ARGUMENT STILL STANDS. ───────────
+ *
+ *  It read, verbatim:  "This run produced no files."
+ *
+ *  Nothing about the overclaim reasoning changed — that sentence was and is honest
+ *  about FILES. What changed is that files stopped being the only thing a run can
+ *  produce on this surface. **479 phase rows carry `output.text` against 60 carrying a
+ *  file — eight to one** — so on the common case the old sentence was TRUE and USELESS:
+ *  it reported the absence of the rarer deliverable while saying nothing about the one
+ *  the run actually made. It now reads "This run produced no file and no written
+ *  answer.", which is the SAME claim widened to cover both, and it renders ONLY when
+ *  both are genuinely absent.
+ *
+ *  ⚠ IT IS SUPERSEDED, NOT DELETED. `git log -S "This run produced no files."` still
+ *  finds the thread through this quotation and through the `SUPERSEDED` block in
+ *  `WorkflowRunPage.test.tsx`. */
 const COPY_DELIVERABLE_HEADING = "Files in this run's workspace"
+/** The ANSWER region's identity — the run's written deliverable.
+ *
+ *  ⚠ **THIS ONE MAY CLAIM AUTHORSHIP AND THE FILE HEADING MAY NOT, AND THE ASYMMETRY IS
+ *  THE INTERESTING PART.** D-02 (above) removed "What this run produced" from the file
+ *  heading because the file list is read THREAD-scoped: a thread can hold files this run
+ *  did not write, so the read cannot prove authorship. The answer is different in kind —
+ *  it comes from this run's OWN `workflow_phases` rows, on the run read, joined by
+ *  `workflow_run_id`. Nothing else can put a row there. So "this run wrote" is a claim
+ *  the read actually supports, and declining to make it would be a different kind of
+ *  dishonesty: vagueness about a fact we hold.
+ *
+ *  ⚠ IT IS THE RUN'S ANSWER AND NEVER A STEP'S. This region has always refused to say
+ *  WHICH step made what (it passes no `deliverableOf`), and that refusal is unchanged —
+ *  the answer is presented as the run's, with no step named beside it. */
+const COPY_ANSWER_HEADING = "The answer this run wrote"
+/** ⚠ DELIBERATELY UNCHANGED BY 200.1, and the reason is recorded so the next reader does
+ *  not "finish the job". The ROADMAP names only the TERMINAL arm, and this is the live
+ *  one: a run that is still going may yet write a file OR an answer, so "nothing has been
+ *  written YET" is already true of both and re-wording it would be a change nobody asked
+ *  for on a sentence that is not wrong. */
 const COPY_NO_FILES_LIVE = "No files yet — this run hasn't written anything."
-const COPY_NO_FILES_TERMINAL = "This run produced no files."
+const COPY_NO_FILES_TERMINAL = "This run produced no file and no written answer."
 const COPY_DOWNLOAD_FAILED = "Download failed — try again."
 /* ⚠ `COPY_RECEIPT_HEADING` LIVED HERE AND IS GONE WITH THE REGION IT NAMED. It read:
  *
@@ -766,6 +804,49 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * through the ONE `phaseDuration.ts`. Two surfaces, one derivation, one vocabulary.
    */
   const wireRows = useMemo<PhaseTimingRow[]>(() => run?.phases ?? [], [run])
+
+  /**
+   * Phase 200.1 (RUN-04) — THE RUN'S WRITTEN ANSWER: **the LAST server-ordered row
+   * carrying a non-empty `deliverable_text`**, or `null`.
+   *
+   * ⚠ **NOT STRICTLY THE FINAL ROW, AND THE DIFFERENCE IS A REAL RUN SHAPE, NOT A
+   * HYPOTHETICAL.** A run whose closing step emits a FILE while the step before it wrote
+   * the prose would, under a final-row rule, be reported as having produced no answer —
+   * on a surface whose entire job is to say what the run produced. Reading backwards for
+   * the last row that has one costs nothing and is right in both shapes.
+   *
+   * ⚠ **AND IT CANNOT BE "ANY ROW WITH TEXT".** A `confirm` step carries `text` too, and
+   * it is a QUESTION — measured on real local data, verbatim: *"Does this draft answer
+   * your question? Add any corrections."* A first-row-wins or a concatenating rule would
+   * print the machine's question back at the person as the run's deliverable. Last wins,
+   * because the run's own ordering is the argument: whatever was written LAST is what the
+   * run finished by saying.
+   *
+   * ⚠ **PRESENTED AS THE RUN'S ANSWER, NEVER AS A STEP'S.** No slug is carried out of this
+   * memo, deliberately — this region has always refused to claim which step made what
+   * (it passes no `deliverableOf`), and that refusal is unchanged.
+   *
+   * ⚠ **THE SERVER SENDS THE TEXT ON EVERY ROW THAT HAS ONE, ON PURPOSE** (D-200.1-02-B).
+   * Populating only the final row server-side would have been a serializer rule INVISIBLE
+   * on the wire, and it would have defeated exactly the case above. The selection lives
+   * here, where it is visible and testable.
+   *
+   * ⚠ `deliverable_text` is read off `run.phases` and NOT off `wireRows`: `wireRows` is
+   * typed as `phaseDuration.ts`'s `PhaseTimingRow`, which is that leaf's DURATION read
+   * shape. Text is not a duration, and widening a shared read shape to reach one field on
+   * one page is how a leaf stops being a leaf. Same array, correct type.
+   */
+  const runAnswer = useMemo<string | null>(() => {
+    const rows = run?.phases ?? []
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      const text = rows[i].deliverable_text
+      // ⚠ The server already collapses `""` into `null`, so this test is belt-and-braces
+      // rather than the contract — a client that trusted only the null would still be
+      // correct today and would break the day anything else populates this field.
+      if (typeof text === "string" && text.length > 0) return text
+    }
+    return null
+  }, [run])
 
   /** slug → the durable row. The join for the count the canvas paints on a connection. */
   const wireBySlug = useMemo(() => {
@@ -1579,18 +1660,55 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         data-testid="run-deliverables"
         className="shrink-0 overflow-auto border-t border-border/10 px-6 py-4 md:max-h-[220px]"
       >
-        <h2 className="text-xs font-semibold text-foreground">{COPY_DELIVERABLE_HEADING}</h2>
-        {files.length === 0 ? (
-          // No heading on the empty state, and the two copies differ because the truths
-          // differ: a live run may still write something; a terminal one never will.
-          // While the very first read is still in flight we claim NEITHER — asserting
-          // "produced no files" before the answer arrives is a lie with a short lifetime.
-          filesLoading ? null : (
-            <p className="mt-2 text-sm text-muted-foreground" data-testid="run-deliverables-empty">
-              {isTerminal ? COPY_NO_FILES_TERMINAL : COPY_NO_FILES_LIVE}
-            </p>
-          )
-        ) : (
+        {/* ── 200.1 (RUN-04) — FOUR RENDERS, AND NONE MAY BE FOLDED INTO ANOTHER ──────
+              The gate below is the whole design, so it is stated plainly:
+
+                files present, no answer  → TODAY'S RENDER, byte-identical (the `<h2>`
+                                            plus the `<ul>` below, untouched)
+                no files, an answer       → the ANSWER block ALONE. ⚠ The file heading and
+                                            the "produced no…" sentence must NOT render
+                                            here — that sentence is true and useless beside
+                                            an answer, and printing it is exactly the fold
+                                            this design forbids
+                files AND an answer       → both, FILE LIST FIRST (it is the artefact)
+                terminal, neither         → the file block's empty paragraph, now worded
+                                            about BOTH kinds of deliverable
+
+              ⚠ THE FILE BLOCK RENDERS WHENEVER THERE IS NO ANSWER — that single condition
+              is what keeps the file-only and the live-and-empty arms character-identical to
+              what shipped, rather than reimplementing them under a new gate. Folding "no
+              files" into "nothing at all" would print *"nothing happened"* about a run that
+              produced an answer: the `runFacts` / `DecisionsList` / `phaseDuration` /
+              `transcriptVocabulary` finding, for the FIFTH time in this tree. */}
+        {runAnswer === null ? (
+          <>
+            <h2 className="text-xs font-semibold text-foreground">{COPY_DELIVERABLE_HEADING}</h2>
+            {files.length === 0 ? (
+              // No heading on the empty state, and the two copies differ because the truths
+              // differ: a live run may still write something; a terminal one never will.
+              // While the very first read is still in flight we claim NEITHER — asserting
+              // an absence before the answer arrives is a lie with a short lifetime.
+              filesLoading ? null : (
+                <p
+                  className="mt-2 text-sm text-muted-foreground"
+                  data-testid="run-deliverables-empty"
+                >
+                  {isTerminal ? COPY_NO_FILES_TERMINAL : COPY_NO_FILES_LIVE}
+                </p>
+              )
+            ) : null}
+          </>
+        ) : null}
+        {files.length > 0 ? (
+          <>
+            {runAnswer !== null ? (
+              // The BOTH arm: the file list needs its own heading back, because the
+              // fragment above did not render one. Same constant, same element, same
+              // classes — one heading string with one home.
+              <h2 className="text-xs font-semibold text-foreground">
+                {COPY_DELIVERABLE_HEADING}
+              </h2>
+            ) : null}
           <ul role="list" className="mt-2 flex flex-col gap-0.5">
             {orderedFiles.map((file) => {
               // The VISIBLE label is the basename; the full path lives in `title=`. Both
@@ -1652,7 +1770,36 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
               )
             })}
           </ul>
-        )}
+          </>
+        ) : null}
+        {/* ── THE ANSWER, when the run wrote one. LAST in DOM order on purpose: in the
+               BOTH arm the file is the artefact and leads, and that ordering is asserted
+               by DOM position rather than read off this source.
+
+               ⚠ **A REACT TEXT NODE.** This is MODEL-AUTHORED CONTENT, so it is handed to
+               React as a child and never through React's raw-HTML escape hatch — that prop
+               appears nowhere on this page and a shipped fence sweeps this file's RAW source
+               for it at zero occurrences. ⚠ **THE PROP IS THEREFORE NOT SPELLED IN THIS
+               COMMENT, DELIBERATELY**: the fence reads unstripped source, so naming the thing
+               being refused turns the guard red — a whole-file grep cannot tell a refusal from
+               an adoption. Observed RED while writing this block; the 187-24 trap, and the
+               SIXTH recorded firing in this tree.
+               `whitespace-pre-wrap` keeps the run's own line breaks, `break-words` stops a
+               long unbroken token from widening the column, and the region's existing
+               `md:max-h-[220px] overflow-auto` already scrolls a long answer. Measured max
+               is 38,935 characters, so scrolling is the common case, not the edge. */}
+        {runAnswer !== null ? (
+          <div data-testid="run-deliverable-answer">
+            <h2
+              className={`text-xs font-semibold text-foreground${files.length > 0 ? " mt-4" : ""}`}
+            >
+              {COPY_ANSWER_HEADING}
+            </h2>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">
+              {runAnswer}
+            </p>
+          </div>
+        ) : null}
         {downloadError ? (
           <p className="mt-2 text-xs text-[hsl(0_80%_80%)]" data-testid="run-download-error">
             {downloadError}

@@ -201,6 +201,22 @@ class WorkflowPhaseState(BaseModel):
     # The two models must be widened in the SAME commit; they are the two halves of one
     # contract, not a model and its copy.
     #
+    # ⚠ **D-200.1-02-A — THE FIRST RECORDED EXCEPTION TO THE RULE ABOVE, written HERE so a
+    # reader of the rule finds the exception where the rule is.** Phase 200.1 (RUN-04) added
+    # `deliverable_text` to `WorkflowRunPhaseRead` and DELIBERATELY did not add it here.
+    # The rule's own stated purpose — "the same facts, two surfaces, silently disagreeing" —
+    # does not apply, because **the chat surface ALREADY renders this text: it is the
+    # assistant's message.** Adding the field here would put a SECOND rendering of the same
+    # words on the same screen, the exact duplication `RunTranscript` removed from the run
+    # page. The four fields above were different in kind: NEITHER surface had them, so
+    # widening one alone would have been a real disagreement.
+    # Declining also keeps the new exposure behind the narrower door — `GET
+    # /threads/{id}/workflow`, which serves this model, carries no canvas gate; the run read
+    # does (T-200.1-11).
+    # ⚠ RE-OPEN TRIGGER: a chat-surface affordance that needs the deliverable INDEPENDENTLY
+    # of the message stream. The full argument, with its payload sibling `D-200.1-02-B`,
+    # is recorded beside the field in `api/workflow_runs.py`.
+    #
     # Semantics are identical and are stated once, in `WorkflowRunPhaseRead`'s field
     # descriptions. The two that matter most: a NULL timestamp means TIME NOT RECORDED
     # (there is no backfill — D-06), and `step_count` distinguishes `0` (a real measurement
