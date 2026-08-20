@@ -1970,9 +1970,22 @@ def test_v20_an_external_action_workflow_publishes(mock_asyncpg_pool):
         f"workflow_phases writes: "
         f"{[s for s, _ in mock_asyncpg_pool.calls if 'UPDATE workflow_phases' in s]!r}"
     )
-    import json as _json
+    # ⚠ 200.1 / D-200.1-01(b) — THIS ASSERTION USED TO `json.loads` THE BOUND PARAMETER, AND
+    # THAT ONLY WORKED BECAUSE THE WRITER PRE-ENCODED IT. The pre-encode was the defect: the
+    # pool already installs a jsonb codec with `encoder=json.dumps`, so every value landed as
+    # a jsonb STRING SCALAR (484 of 484 `completed` rows). `record_phase_not_sent` now hands
+    # the codec a plain dict, so the parameter IS the payload and `json.loads` raises on it.
+    # ⚠ Read it through the SHIPPED read-side unwrap rather than re-typing a shape check here:
+    # `phase_output_object` accepts BOTH shapes, so this stays an assertion about the CONTENT
+    # and cannot be broken again by the transport. A test that re-states the encoding is a
+    # test that pins the encoding — which is how this one came to defend the defect.
+    from app.models.thread import phase_output_object
 
-    persisted = _json.loads(recorded[0][1][1])
+    persisted = phase_output_object(recorded[0][1][1])
+    assert persisted is not None, (
+        f"the recorded_not_sent payload was neither a dict nor JSON text: "
+        f"{recorded[0][1][1]!r}"
+    )
     assert persisted["recorded_intent"]["capability"] == "send_email"
     assert "NOT SENT" in persisted["text"], (
         f"the recorded body must read as NOT SENT, never as a receipt: {persisted['text']!r}"

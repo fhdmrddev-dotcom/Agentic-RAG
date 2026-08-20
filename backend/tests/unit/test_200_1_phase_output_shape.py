@@ -18,14 +18,22 @@ the defect shipped, so this file's job is to hold the two halves of the repair:
 Asserting against the shipped function post-fix would assert the fix against itself.
 """
 
+import ast
+import asyncio
 import inspect
 import json
+import os
 import re
 import subprocess
+import textwrap
 from pathlib import Path
 
+import asyncpg
 import pytest
+import pytest_asyncio
 
+from app.db.workflows import complete_phase, create_workflow_run, fail_phase, record_phase_not_sent
+from app.dependencies import _init_pg_connection
 from app.models.thread import declared_phase_measure, phase_output_object
 
 # The commit this plan was dispatched against. The SQL byte-identity fences below diff the
@@ -247,3 +255,300 @@ def test_the_decision_is_recorded_in_the_source():
     assert "WRITE path" in doc
     # the no-migration decision and ITS re-open trigger
     assert "queryable IN SQL" in doc
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+# 4. THE WRITER FENCE (Task 2) — the three terminal `workflow_phases` writers
+# ═══════════════════════════════════════════════════════════════════════════════════════
+#
+# `db/workflows.py`'s terminal phase writers bound `json.dumps(...)` into a `$2::jsonb`
+# parameter on a pool that ALREADY registers a jsonb codec with `encoder=json.dumps`. The
+# fix is to STOP PRE-ENCODING, never to add a cast — `create_workflow_run`'s own docstring
+# proves the pattern for `definition_snapshot`, one column over. These fences hold three
+# separate properties: the fix landed, the SQL did not move, the siblings were left alone.
+
+TERMINAL_PHASE_WRITERS = (complete_phase, fail_phase, record_phase_not_sent)
+
+DB_WORKFLOWS = "backend/app/db/workflows.py"
+
+
+def _json_dumps_calls(func) -> int:
+    """Count REAL `json.dumps(...)` calls in a function — comments and docstrings excluded.
+
+    ⚠ AST, NOT A REGEX STRIPPER. These docstrings legitimately DISCUSS `json.dumps` at
+    length (that discussion IS the recorded root cause), and a naive `src.count(...)` reads
+    that prose as live code — the 187-24 trap, which this repo has recorded firing three
+    times. An `ast` walk cannot see a comment or a docstring at all, so the exclusion is
+    structural rather than a stripper that has to be trusted.
+    """
+    tree = ast.parse(textwrap.dedent(inspect.getsource(func)))
+    return sum(
+        1
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "dumps"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "json"
+    )
+
+
+@pytest.mark.parametrize("writer", TERMINAL_PHASE_WRITERS, ids=lambda f: f.__name__)
+def test_terminal_writers_hand_the_codec_a_plain_dict(writer):
+    """THE FIX. Zero pre-encodes; the pool's jsonb codec performs the ONE encode."""
+    assert _json_dumps_calls(writer) == 0
+
+
+def test_positive_control_the_ast_counter_still_finds_a_real_call():
+    """⚠ WITHOUT THIS, THE THREE ZEROES ABOVE PROVE NOTHING.
+
+    A counter that always returns 0 — a typo'd attribute name, a walk over the wrong tree —
+    passes every assertion above. `create_workflow_run` still pre-encodes `inputs` (the
+    honoured sibling deferral), so it is the natural LIVE control.
+    """
+    assert _json_dumps_calls(create_workflow_run) >= 1
+
+
+def _sql_literals(source: str, func_name: str) -> list[str]:
+    """Every string constant naming an UPDATE on `workflow_phases` inside one function."""
+    module = ast.parse(source)
+    for node in ast.walk(module):
+        if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef)) and node.name == func_name:
+            return [
+                c.value
+                for c in ast.walk(node)
+                if isinstance(c, ast.Constant)
+                and isinstance(c.value, str)
+                and c.value.startswith("UPDATE workflow_phases")
+            ]
+    raise AssertionError(f"{func_name} not found")
+
+
+@pytest.mark.parametrize("writer", TERMINAL_PHASE_WRITERS, ids=lambda f: f.__name__)
+def test_the_sql_literal_is_byte_identical_to_the_base_commit(writer):
+    """⚠ ONLY THE PARAMETER MOVED — asserted against `git show`, never claimed.
+
+    The `IS DISTINCT FROM 'cancelled'` fence is SECURITY-BEARING (T-200.1-03): these writers
+    run on a service-role pool that BYPASSES RLS, so the `WHERE` predicate IS the access
+    boundary. `RETURNING completed_at`, `updated_at=now()` and `completed_at = now()` are
+    each load-bearing contracts of their own. None of them may drift on a parameter change.
+    """
+    now = (REPO_ROOT / DB_WORKFLOWS).read_text(encoding="utf-8")
+    base = _blob_at_base(DB_WORKFLOWS)
+
+    now_sql = _sql_literals(now, writer.__name__)
+    base_sql = _sql_literals(base, writer.__name__)
+
+    # non-vacuity BEFORE contents — two empty lists compare equal and prove nothing
+    assert len(base_sql) == 1, f"expected one UPDATE literal at base, got {len(base_sql)}"
+    assert now_sql == base_sql
+
+
+@pytest.mark.parametrize("writer", TERMINAL_PHASE_WRITERS, ids=lambda f: f.__name__)
+def test_the_cast_and_the_cancelled_fence_both_survived(writer):
+    """The cast was never what was wrong; the fence is the access boundary."""
+    (sql,) = _sql_literals((REPO_ROOT / DB_WORKFLOWS).read_text(encoding="utf-8"), writer.__name__)
+    assert "output=$2::jsonb" in sql
+    assert "status IS DISTINCT FROM 'cancelled'" in sql
+
+
+def test_complete_phase_still_returns_the_timestamp_the_database_wrote():
+    """`RETURNING completed_at` composes with the fence: refused write ⇒ no row ⇒ `None`."""
+    (sql,) = _sql_literals((REPO_ROOT / DB_WORKFLOWS).read_text(encoding="utf-8"), "complete_phase")
+    assert sql.endswith("RETURNING completed_at")
+
+
+# ── the honoured sibling deferral, proved rather than promised ──────────────────────────
+
+def test_the_inputs_column_was_left_alone():
+    """`workflow_runs.inputs` is 230-of-230 string and stays that way — D-200.1-01."""
+    assert "json.dumps(inputs)" in inspect.getsource(create_workflow_run)
+
+
+def test_the_definition_writes_were_left_alone():
+    """The `definition` writes keep the old shape; the count must not have moved."""
+    needle = "json.dumps(definition.model_dump"
+    now = (REPO_ROOT / DB_WORKFLOWS).read_text(encoding="utf-8")
+    base = _blob_at_base(DB_WORKFLOWS)
+    assert base.count(needle) > 0, "positive control: the needle must match at the base commit"
+    assert now.count(needle) == base.count(needle)
+
+
+def test_this_plan_wrote_no_migration():
+    """D-200.1-01 chose the read repair over a data migration, and proves it."""
+    migrations = sorted(p.name for p in (REPO_ROOT / "supabase/migrations").glob("*.sql"))
+    listing = subprocess.run(
+        ["git", "ls-tree", "--name-only", PLAN_BASE_SHA, "supabase/migrations/"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.split()
+    base_names = sorted(Path(p).name for p in listing if p.endswith(".sql"))
+    assert base_names, "positive control: the base commit must list migrations"
+    assert migrations == base_names
+
+
+# ── the resume-path finding is RECORDED, not silently fixed and not dropped ─────────────
+
+def test_the_resume_path_finding_is_recorded_with_a_trigger():
+    """A finding that lives nowhere is a finding that was deleted.
+
+    `load_run_phases` SELECTs `output`; `harness_engine.py`'s F7 resume re-fold reads
+    `r.get("output") or {}` into a `dict[str, dict]`. On a string-scalar row the codec hands
+    back a Python `str`, so the resumed run's grounding re-fold has been folding STRINGS —
+    the same degradation in a THIRD consumer. (b) repairs NEW rows only; the 527 historical
+    ones are outside RUN-04's scope.
+    """
+    doc = complete_phase.__doc__ or ""
+    assert "resume" in doc.lower()
+    assert "527" in doc
+    assert "Re-open trigger" in doc
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+# 5. THE WRITER, DRIVEN AGAINST A REAL DATABASE — with its counterfactual beside it
+# ═══════════════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ EVERYTHING BELOW RUNS INSIDE A TRANSACTION THAT IS ROLLED BACK. Nothing is committed to
+# the operator's local database (CLAUDE.md rule 4 — worktrees isolate files, not Postgres).
+# The throwaway run borrows an EXISTING thread/definition/org by SELECT purely to satisfy the
+# foreign keys; the INSERTs never survive the rollback.
+#
+# ⚠ A `Connection` IS PASSED WHERE A `Pool` IS ANNOTATED, DELIBERATELY. Each writer's whole
+# body is one `fetchval`/`execute` call, which `Connection` provides with the same signature —
+# so this drives the SHIPPED function verbatim while keeping the write inside a transaction a
+# pool cannot give us. A re-typed copy of the UPDATE would prove nothing about the writer.
+
+_POSTGRES_TEST_DSN = os.environ.get(
+    "POSTGRES_DSN", "postgresql://postgres:postgres@127.0.0.1:54322/postgres"
+)
+
+
+def _pg_available() -> bool:
+    async def _probe() -> bool:
+        try:
+            conn = await asyncio.wait_for(asyncpg.connect(_POSTGRES_TEST_DSN), timeout=2.0)
+            await conn.close()
+            return True
+        except Exception:
+            return False
+
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(_probe())
+    except Exception:
+        return False
+    finally:
+        loop.close()
+
+
+PG_AVAILABLE = _pg_available()
+
+live_db = pytest.mark.skipif(
+    not PG_AVAILABLE,
+    reason=(
+        f"Local Postgres on {_POSTGRES_TEST_DSN} not reachable — no live DB to drive the "
+        "writer against. ⚠ A GREEN SKIP IS NOT A PASSING FENCE."
+    ),
+)
+
+
+@pytest_asyncio.fixture
+async def live_conn():
+    """A real connection carrying the SHIPPED `_init_pg_connection` codec.
+
+    ⚠ The codec is IMPORTED, never re-typed. A locally re-declared `set_type_codec` would
+    test a COPY of the encoder and could not detect the shipped one drifting — and the
+    shipped encoder is the entire mechanism under test here.
+    """
+    conn = await asyncpg.connect(_POSTGRES_TEST_DSN)
+    await _init_pg_connection(conn)
+    try:
+        yield conn
+    finally:
+        await conn.close()
+
+
+@live_db
+@pytest.mark.asyncio
+async def test_complete_phase_stores_an_object_and_the_counterfactual_stores_a_string(live_conn):
+    """⚠ THE REPAIR AND THE DEFECT, BOTH DRIVEN, ON ONE CONNECTION, IN ONE TRANSACTION.
+
+    The counterfactual is the load-bearing half: the pre-encoded write stores a jsonb STRING
+    SCALAR and `output -> '_measure'` then returns SQL **NULL without erroring**, which is
+    exactly why this defect stayed invisible for four months.
+    """
+    tr = live_conn.transaction()
+    await tr.start()
+    try:
+        anchor = await live_conn.fetchrow(
+            "SELECT thread_id, definition_id, org_id FROM workflow_runs LIMIT 1"
+        )
+        assert anchor is not None, "positive control: the local DB must hold at least one run"
+
+        run_id = await live_conn.fetchval(
+            "INSERT INTO workflow_runs (thread_id, definition_id, org_id) "
+            "VALUES ($1, $2, $3) RETURNING id",
+            anchor["thread_id"],
+            anchor["definition_id"],
+            anchor["org_id"],
+        )
+
+        async def _throwaway_phase(slug: str):
+            return await live_conn.fetchval(
+                "INSERT INTO workflow_phases (workflow_run_id, phase_index, slug, org_id) "
+                "VALUES ($1, 0, $2, $3) RETURNING id",
+                run_id,
+                slug,
+                anchor["org_id"],
+            )
+
+        payload = {"_measure": {"count": 15, "noun": "sources"}, "text": "…"}
+
+        # ── THE REPAIR: the SHIPPED writer, handed a plain dict ──────────────────────
+        repaired = await _throwaway_phase("200-1-repaired")
+        completed_at = await complete_phase(live_conn, repaired, payload)
+        assert completed_at is not None, "the RETURNING contract still yields the DB's timestamp"
+
+        shape, noun, count = await live_conn.fetchrow(
+            "SELECT jsonb_typeof(output), output -> '_measure' ->> 'noun', "
+            "output -> '_measure' ->> 'count' FROM workflow_phases WHERE id = $1",
+            repaired,
+        )
+        assert shape == "object"
+        assert noun == "sources"
+        assert count == "15"
+
+        # ── THE COUNTERFACTUAL: the same write, pre-encoded, exactly as it shipped ───
+        broken = await _throwaway_phase("200-1-counterfactual")
+        await live_conn.execute(
+            "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now(), "
+            "completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
+            broken,
+            json.dumps(payload),  # ⚠ the defect, on purpose
+        )
+        bad_shape, bad_measure = await live_conn.fetchrow(
+            "SELECT jsonb_typeof(output), output -> '_measure' FROM workflow_phases WHERE id = $1",
+            broken,
+        )
+        assert bad_shape == "string"
+        # ⚠ SQL NULL, AND NO ERROR. The silence is the finding.
+        assert bad_measure is None
+
+        # ── and the READ side reaches through it anyway, which is (a) ────────────────
+        raw = await live_conn.fetchval("SELECT output FROM workflow_phases WHERE id = $1", broken)
+        assert isinstance(raw, str), "the codec decodes a string scalar to a Python str"
+        assert declared_phase_measure(raw) == (15, "sources")
+    finally:
+        await tr.rollback()
+
+
+@live_db
+@pytest.mark.asyncio
+async def test_the_rollback_left_nothing_behind(live_conn):
+    """⚠ THE TEST ABOVE MUTATES A REAL DATABASE. This proves the rollback held."""
+    leaked = await live_conn.fetchval(
+        "SELECT count(*) FROM workflow_phases WHERE slug LIKE '200-1-%'"
+    )
+    assert leaked == 0

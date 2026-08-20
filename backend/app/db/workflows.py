@@ -1573,6 +1573,36 @@ async def complete_phase(
     already cancelled this phase — the L-01 residue) NO row is returned, so this yields
     ``None`` and the caller emits no completion timestamp for a step that was never
     completed. The guard and the return value agree by construction.
+
+    ── 200.1 / D-200.1-01(b): THIS WRITER STOPPED PRE-ENCODING ──────────────
+    This function, ``fail_phase`` and ``record_phase_not_sent`` each bound
+    ``json.dumps(...)`` into their ``$2::jsonb`` parameter on a pool that ALREADY installs a
+    jsonb codec with ``encoder=json.dumps`` (``dependencies._init_pg_connection``, D-073-06).
+    Encoded twice, every value landed as a jsonb **STRING SCALAR** — measured at **527 of 588**
+    non-null ``output`` values, including **484 of 484** ``completed`` rows. That is migration
+    122's root cause one column over, and the full narrative is in ``create_workflow_run``'s
+    docstring above. **The fix is to stop pre-encoding, not to add a cast:** ``$2::jsonb`` is
+    fine and is unchanged, and so is every other byte of the SQL.
+
+    ⚠ **A FINDING THIS PLAN MEASURED AND IS DELIBERATELY *NOT* FIXING — recorded here because
+    a finding that lives nowhere is a finding that was deleted.** ``load_run_phases`` SELECTs
+    ``output``, and ``harness_engine.py``'s F7 resume re-fold reads ``r.get("output") or {}``
+    into an ``accumulated_outputs: dict[str, dict]``. On a string-scalar row the pool codec
+    decodes to a Python **``str``**, so **the resumed run's grounding re-fold has been folding
+    STRINGS** — the same silent degradation as ``declared_phase_measure``, in a THIRD consumer,
+    and the reason ``isinstance`` guards downstream (``_is_llm_human_input``,
+    ``_active_tool_call_id``) have been quietly falling through. **(b) repairs this for NEW rows
+    and does NOT repair it for the 527 historical ones.** That is outside RUN-04's scope — the
+    fix belongs with an audit of the resume path's own shape assumptions, not with a parameter
+    change. ⚠ **Re-open trigger, named rather than left silent: the next phase that touches the
+    resume path or the startup sweep.**
+
+    ⚠ **THE SIBLING COLUMNS ARE UNTOUCHED AND THAT IS A DECISION.** ``json.dumps(inputs)`` in
+    ``create_workflow_run`` and the four ``definition`` writes elsewhere in this file keep the
+    old shape; their re-open trigger is carried forward VERBATIM from migration 123's header
+    (the next phase that touches either on the WRITE path). ``output`` is repairable now
+    precisely because it ALREADY has two shapes in it — 527 string against 61 object — and
+    because ``models/thread.py::phase_output_object`` now accepts both.
     """
     return await pool.fetchval(
         # ── L-01 RESIDUE AT THE PHASE LEVEL (added 2026-08-16) ───────────────
@@ -1605,7 +1635,12 @@ async def complete_phase(
         # today, and `<>` would silently stop matching if that ever changed.
         "UPDATE workflow_phases SET status='completed', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled' RETURNING completed_at",
         phase_id,
-        json.dumps(output),
+        # ⚠ THE PLAIN DICT, NOT A PRE-DUMPED STRING — 200.1 / D-200.1-01(b). See the
+        # migration-122 paragraph in `create_workflow_run` above for the full root cause:
+        # the POOL installs a jsonb codec with `encoder=json.dumps`, so a pre-encoded string
+        # is encoded a SECOND time and lands as a jsonb STRING SCALAR. The `$2::jsonb` cast
+        # is fine and stays; the PARAMETER is what was wrong.
+        output,
     )
 
 
@@ -1627,7 +1662,10 @@ async def fail_phase(
     await pool.execute(
         "UPDATE workflow_phases SET status='failed', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
-        json.dumps(payload),
+        # ⚠ THE PLAIN DICT — 200.1 / D-200.1-01(b), see `complete_phase`. `payload` is still
+        # composed here and `_failure_reason` still wins on a key collision; only the encode
+        # moved to the pool's codec.
+        payload,
     )
 
 
@@ -1680,7 +1718,9 @@ async def record_phase_not_sent(pool: asyncpg.Pool, phase_id: UUID, output: dict
     await pool.execute(
         "UPDATE workflow_phases SET status='recorded_not_sent', output=$2::jsonb, updated_at=now(), completed_at = now() WHERE id = $1 AND status IS DISTINCT FROM 'cancelled'",
         phase_id,
-        json.dumps(output),
+        # ⚠ THE PLAIN DICT — 200.1 / D-200.1-01(b), see `complete_phase`. This writer copies
+        # `complete_phase` and that includes how it binds its parameter.
+        output,
     )
 
 
