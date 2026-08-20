@@ -424,9 +424,63 @@ export function RunTranscript({
                   {/* ⚠ THE GUTTER IS ALWAYS PRESENT AND SOMETIMES EMPTY. An untimed row keeps
                       its column so the timed rows above it stay aligned, and it holds nothing
                       rather than a placeholder — a dash in a clock column is a reading. */}
+                  {/* ─────────────────────────────────────────────────────────────────────────
+                      THE WIDTH AND THE TYPE SCALE ARE THE SHEET'S. THE COLOUR IS NOT, AND THAT
+                      IS `D-200.1-03-A` — THE ONE PLACE THIS PORT DEVIATES.
+                      ─────────────────────────────────────────────────────────────────────────
+
+                      `run-surface.html`'s Transcript Region draws every settled gutter as
+
+                          w-16 font-data-sm text-data-sm flex-shrink-0 text-[#464651]
+
+                      and its inline config defines `data-sm` as 12px / line-height 1.4 /
+                      weight 500 / JetBrains Mono. The width, the size, the weight and the
+                      leading are all adopted verbatim; `font-mono` is this tree's analogue of
+                      that data family and `tabular-nums` is what makes a clock column align at
+                      all, so both stay.
+
+                      ⚠ THE SHEET'S `#464651` IS DECLINED, AND IT IS DECLINED ON A MEASUREMENT
+                      RATHER THAN ON TASTE. Both drawings sit on the same near-black ground, so
+                      the two are directly comparable: this tree's dark `--background`
+                      (216 45% 4%) and the sheet's `body { background-color: #060A0F }`. On that
+                      ground `#464651` reads **2.16:1** — below even the 3:1 GRAPHICAL floor,
+                      let alone text — while the shipped `text-muted-foreground/60` composites
+                      to about `#5D6572` = **3.43:1**. Adopting the literal would make the clock
+                      column materially harder to read while LOOKING like fidelity, which is the
+                      worst shape a port can take. So the sheet's value is quoted here, where a
+                      future reader can see exactly what was declined, and not rendered.
+
+                      ⚠ THE FOUR FIGURES ABOVE ARE THE PLAN'S, AND RE-DERIVING THEM MOVED THREE
+                      OF THEM — recorded BESIDE the originals, never over them, because a
+                      measurement quietly replaced reads as though it had never been wrong.
+                      Converting the tokens by hand (sRGB → relative luminance → WCAG 2.x
+                      contrast) gives:
+
+                        · `--background` 216 45% 4%  → `#06090F`, NOT `#060A0F`. It is one step
+                          off the sheet's ground in GREEN, so the two grounds are near-identical
+                          but not byte-identical, and the "byte-for-byte" claim is withdrawn.
+                        · `--primary` 239 100% 82%   → `#A3A5FF` — EXACTLY `.text-indigo`. This
+                          one is confirmed: a token match, not an approximation. 8.91:1 on our
+                          ground (8.87:1 on the sheet's), comfortably clear of AA.
+                        · the sheet's `#464651`      → **2.14:1** on our ground (2.13:1 on the
+                          sheet's), against the 2.16 quoted above.
+                        · `text-muted-foreground/60` → `#5D6472` at **3.35:1** on our ground
+                          (3.37:1 on the sheet's), against the `#5D6572` / 3.43 quoted above.
+
+                      Every VERDICT survives the correction unchanged, which is why the decision
+                      stands: the declined literal is still under the 3:1 graphical floor, the
+                      kept value is still materially better, and the indigo is still an exact
+                      token match.
+
+                      ⚠ AND AN OBSERVATION THIS PLAN DOES NOT FIX: **neither** figure clears the
+                      4.5:1 AA floor for 12px body text. That is a property of the shipped muted
+                      tone across this whole tree, not of this column, and raising it here would
+                      re-tone one gutter into disagreement with every other muted reading in the
+                      app. Re-open trigger: **the next phase that re-tones this tree's muted
+                      readings.** */}
                   <span
                     data-testid="transcript-clock"
-                    className="w-14 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/60"
+                    className="w-16 shrink-0 font-mono text-[12px] font-medium leading-[1.4] tabular-nums text-muted-foreground/60"
                   >
                     {entry.offsetMs === null ? "" : runClock(entry.offsetMs)}
                   </span>

@@ -555,3 +555,88 @@ describe("RunTranscript — a step that has not run is QUIETER than one that has
     expect(tones[0]).toContain("text-foreground")
   })
 })
+
+// ── 6. THE GUTTER, PORTED FROM THE SHEET'S OWN MARKUP ───────────────────────────────────
+//
+// `run-surface.html` draws every settled gutter as
+//
+//     w-16 font-data-sm text-data-sm flex-shrink-0 text-[#464651]
+//
+// and its inline config defines `data-sm` as 12px / line-height 1.4 / weight 500. The width
+// and the type scale are adopted; the COLOUR is not, and that single deviation is
+// `D-200.1-03-A` — recorded in the component's own docblock with both measured contrast
+// ratios, and asserted below as a KEPT value rather than left as a silent omission.
+
+function clockClassOf(slug: string): string {
+  const row = screen.getByTestId(`transcript-row-${slug}`)
+  return within(row).getByTestId("transcript-clock").className
+}
+
+function rowClassOf(slug: string): string {
+  return screen.getByTestId(`transcript-row-${slug}`).className
+}
+
+/** The shipped settled-row flow, re-typed here ON PURPOSE so a future edit to the component
+ *  cannot quietly re-flow the settled rows while claiming to have touched only the gutter. */
+const SETTLED_ROW_CLASS = "flex min-w-0 items-baseline gap-4 text-sm leading-relaxed"
+
+describe("RunTranscript — the settled gutter carries the sheet's width and type scale", () => {
+  it("is the sheet's `w-16` at the sheet's 12px/500 data scale", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    const cls = screen.getAllByTestId("transcript-clock")[0].className
+    expect(cls).toContain("w-16")
+    expect(cls).toContain("text-[12px]")
+    expect(cls).toContain("font-medium")
+    expect(cls).toContain("leading-[1.4]")
+    // ⚠ THE OLD VALUES ARE ASSERTED ABSENT, not merely the new ones present. A class list is
+    // additive, so `toContain("w-16")` passes perfectly well beside a surviving `w-14`, and
+    // tailwind's last-wins emission would then make the rendered width a coin flip.
+    expect(cls).not.toContain("w-14")
+    expect(cls).not.toContain("text-[11px]")
+  })
+
+  it("KEEPS the three values the port did not change — the deviation is asserted, not omitted", () => {
+    // ⚠ `text-muted-foreground/60` IS THE DELIBERATE DEVIATION (`D-200.1-03-A`). The sheet's
+    // `#464651` measures ~2.1:1 on the ground both drawings share, below even the 3:1 graphical
+    // floor; the shipped value composites to ~3.4:1. Pinning it here means a later "finish the
+    // port" edit has to argue with a test rather than quietly adopt the darker literal.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    const cls = screen.getAllByTestId("transcript-clock")[0].className
+    expect(cls).toContain("font-mono")
+    expect(cls).toContain("tabular-nums")
+    expect(cls).toContain("text-muted-foreground/60")
+  })
+
+  it("the DECLINED literal reaches the render nowhere", () => {
+    // The other half of the decision: the sheet's colour is quoted in a comment (so the
+    // declined value stays findable) and is rendered by nothing. Comments are stripped first —
+    // otherwise this sweep would count the very docblock that records the refusal (the 187-24
+    // trap, which has fired repeatedly in this tree).
+    const stripped = RunTranscriptSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")
+    expect(stripped).not.toContain("#464651")
+    // POSITIVE CONTROL — the literal really is present in the file, inside the comment that
+    // declines it, so the assertion above is a scope test rather than a vacuous one.
+    expect(RunTranscriptSource).toContain("#464651")
+  })
+
+  it("the settled row's own flow is BYTE-IDENTICAL to the shipped string", () => {
+    // ⚠ THE FENCE THAT MAKES THE GUTTER CHANGE SAFE. `items-baseline` and `gap-4` are already
+    // the sheet's rhythm (`space-x-4`), so this port had no business touching them — and an
+    // equality test, not a `toContain`, is what stops a class being added or dropped here while
+    // the diff reads as "the gutter".
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    for (const slug of ["gather", "draft", "check"]) {
+      expect(rowClassOf(slug)).toBe(SETTLED_ROW_CLASS)
+    }
+  })
+
+  it("every row's gutter is ported, not just the first", () => {
+    // Including the UNTIMED one, whose column survives holding nothing — a narrower port that
+    // only styled rows with a clock would leave that column a different width.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    for (const slug of ["gather", "draft", "check"]) {
+      expect(clockClassOf(slug)).toContain("w-16")
+      expect(clockClassOf(slug)).toContain("text-[12px]")
+    }
+  })
+})
