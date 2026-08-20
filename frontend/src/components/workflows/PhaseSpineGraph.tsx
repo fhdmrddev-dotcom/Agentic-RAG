@@ -18,6 +18,32 @@
  * add-node control anywhere in the DOM. Selection NEVER reorders — clicking a
  * node only fires `onSelectNode(slug)`.
  *
+ * ── ⚠ PHASE 200 — TWO OF SKETCH 200'S SPINE ATOMS ARE DECLINED, AND BOTH REASONS WERE
+ *      RE-MEASURED RATHER THAN INHERITED ────────────────────────────────────────────────
+ *
+ * The `builder-spine` sheet draws both, and the 200 audit buckets both as FE-WIRING — the
+ * SEAMS really do ship, which is what makes them worth stating rather than passing over:
+ *
+ *   · **`＋ Add Step` at the foot of the spine.** The insert seam exists on the CANVAS
+ *     (`PlaneEditingLayer.tsx` `data-testid="canvas-insert-N"` → `StepTypePicker`), so this is
+ *     a mount decision and not a capability. It is declined because mounting it here would
+ *     re-open the locked read-only contract stated two paragraphs above, and that contract is
+ *     not documentation — it is MECHANICALLY ENFORCED by this component's own REQ-4
+ *     acceptance-c case (*"STATIC drag-free DOM: … no add-node control"*, which scans every
+ *     button's label and every `[data-add-node]`). Re-opening it is a phase's decision to
+ *     take, with that fence re-baselined deliberately; it is not an FE-wiring pass's.
+ *   · **`Approve` / `Send back` in a step card.** The answer seam ships end to end
+ *     (`api.ts` `answerAskUser`, driven by `PendingAskCard.tsx`), and the author-side choices
+ *     are authored in `PhaseFormPanel`. But this component reads a DRAFT definition: there is
+ *     no run, therefore no `tool_call_id`, therefore nothing for either button to send. They
+ *     would be controls that cannot act, drawn on the surface whose whole promise is that
+ *     what it shows is true of the workflow in front of you. The honest mount is the RUN
+ *     spine — the `runTense` prop below, whose caller really does hold a run.
+ *
+ * ⚠ THE SECOND IS THE SAME CLASS OF SHEET DEFECT `199-02` CAUGHT, not a new judgement: a
+ * run-tense atom drawn on an authoring surface. It is recorded here so the next reader of the
+ * sheet does not re-derive it as an omission.
+ *
  * Phase 183-04 (D-183-06 / D-183-08 / D-183-13) — THE HARD CUT. This file used to
  * carry its OWN phase-glyph map (the flat text marks Phase 127 retired), its own
  * type-label map, its own definition read shapes, its own on-fail parse and its own
@@ -115,6 +141,21 @@ import {
 import { phaseGlyph } from "@/lib/phaseGlyph"
 import { branchReading, type SpineRunTense } from "@/components/workflows/phaseDuration"
 import { countDeclared } from "@/components/workflows/receiptVocabulary"
+// Phase 200 (FE-WIRING) — the effect banner, from the ONE home the canvas card already
+// reads. Before this import `grep -rn "effectBannerFor" frontend/src` returned exactly two
+// consumers, BOTH in `PhaseNodeCard.tsx`, so the same `external_action` step wore
+// `CHANGES SOMETHING OUTSIDE` on the canvas and nothing at all one toggle away. That is the
+// two-views-two-languages defect `BS-2` exists to close, and the fix is an import rather
+// than a second predicate: a re-spelled banner here would agree with the canvas only until
+// one of them was edited. Its `ONLY READS` sibling stays DECLINED — no wire field can
+// resolve a step to it — and the decline plus its dated re-open trigger live in that module.
+import { effectBannerFor } from "@/components/workflows/nodeEffectBanner"
+// Phase 200 (FE-WIRING) — the selected row's two detail lines, string home + worded scale.
+import {
+  literalReading,
+  SPINE_DETAIL_LITERAL_LABEL,
+  SPINE_DETAIL_PROMPT_LABEL,
+} from "@/components/workflows/spineDetailVocabulary"
 
 /**
  * The verbatim read-only legend (locked contract — sketch 019-D / 103-PLAN).
@@ -197,6 +238,22 @@ export function PhaseSpineGraph({
   // Sort by phase_index (strict run order). The input array order is irrelevant.
   const ordered = [...phases].sort((a, b) => a.phase_index - b.phase_index)
   const slugSet = new Set(ordered.map((p) => p.slug))
+  /**
+   * Phase 200 (FE-WIRING) — slug → the phase itself, so a skip edge can name its TARGET.
+   *
+   * ⚠ THE CANVAS HAS RESOLVED THIS ALL ALONG AND THE SPINE PRINTED THE RAW SLUG.
+   * `canvasModel.ts:424` hands `branchConditionOf` a `resolveName` closure built over the
+   * same definition and renders the destination's `nodeTitle`; this component rendered
+   * `<span className="font-mono">{edge.toSlug}</span>` — a schema token, in a mono face, to
+   * a non-technical author, three centimetres from the same fact spelled properly one
+   * toggle away. Same map, same resolver, so the two views cannot disagree.
+   *
+   * A `Map` and not an object literal: the keys are author-supplied slugs off the
+   * definition JSONB, and a slug spelled `constructor` or `__proto__` is a WR-04 prototype
+   * sink on a plain object (the measured `[Function Object]` React child of 188.1-04).
+   * `Map.get` has no prototype chain to fall through to.
+   */
+  const bySlug = new Map(ordered.map((p) => [p.slug, p]))
 
   // Resolve the dashed on-fail edges: one per validator declaring a
   // `skip_to_phase:<slug>` whose target resolves to a real node (the only
@@ -329,6 +386,32 @@ export function PhaseSpineGraph({
           // (`PHASE_TYPE_SUBTITLES`), the same map the node cards use, so the spine and the
           // canvas keep saying one thing about a step rather than two.
           const subtitle = PHASE_TYPE_SUBTITLES[phase.config.phase_type]
+          // Phase 200 (FE-WIRING) — the effect banner, resolved by the SHARED total function
+          // over the phase TYPE (never the capability: reaching outside is the type's one
+          // invariant fact, true even of a step whose capability is unset or is a name this
+          // client does not recognise — see `nodeEffectBanner.ts`). An unrecognised
+          // forward-compat discriminator yields `null` and no element renders at all.
+          //
+          // ⚠ IT IS NOT RUN TENSE and needs no run prop: "this step changes something
+          // outside" is true of the DRAFT, before anything has ever executed. That is what
+          // separates it from the duration, the outcome and the branch reading on this same
+          // card, all three of which stay behind `runTense`.
+          const effectBanner = effectBannerFor(phase.config.phase_type)
+          // Phase 200 (FE-WIRING) — the sheet's two detail lines, rendered ONLY on the
+          // selected row (the sheet draws them under a dashed divider on its Step 3 card,
+          // which is its selected one). Both are what the AUTHOR wrote, read back: the
+          // prompt they typed and a word for the number they set. Neither is a run fact.
+          //
+          // ⚠ EACH IS INDEPENDENTLY ABSENT-ABLE, and the block itself disappears when both
+          // are. A step with no prompt renders no prompt line — never an empty value, never
+          // an em dash — because the readiness checklist is the surface that says a prompt is
+          // MISSING, and a blank line beside a label says it twice in a weaker voice.
+          const rawPrompt = phase.config.prompt
+          const detailPrompt =
+            isSelected && typeof rawPrompt === "string" && rawPrompt.trim().length > 0
+              ? rawPrompt.trim()
+              : null
+          const detailLiteral = isSelected ? literalReading(phase.config.temperature) : null
           // ⚠ RUN TENSE ONLY. `undefined` on the authoring mount, and `undefined` for a slug
           // this run never mentioned — two absences that render identically because both mean
           // "we hold no run fact about this step", which is not a fact about the step.
@@ -420,8 +503,31 @@ export function PhaseSpineGraph({
                   )}
 
                   {/* BS-MR-02 — the canvas's word, uppercased by CSS rather than by a second
-                      string, so there is still exactly ONE spelling of this label in the tree. */}
-                  {typeWord && (
+                      string, so there is still exactly ONE spelling of this label in the tree.
+
+                      Phase 200 (FE-WIRING) — THE BANNER TAKES THIS SLOT WHEN IT FIRES, and the
+                      type chip stands down rather than sitting beside it. That is the sheet's
+                      own composition (`builder-spine.html:420-427` draws its two connector rows
+                      with the warning chip and NO type chip), and it is right for a reason the
+                      sheet does not have to state: `PHASE_TYPE_LABELS.external_action` reads
+                      `External action`, so the two chips side by side would spell one fact
+                      twice — in two registers, in the same 10px face, on the same line. This
+                      tree calls that the defect, repeatedly and by name.
+
+                      ⚠ NOTHING IS LOST TO A SCREEN READER. The node's `aria-label` carries the
+                      type word unconditionally, one element up, so the swap is a VISIBLE-chip
+                      swap and not a subtraction from the accessible name. And `data-phase-type`
+                      still carries the raw id for a machine, as it always has. */}
+                  {effectBanner ? (
+                    <span className="flex items-center">
+                      <span
+                        data-testid="node-effect-banner"
+                        className="rounded border border-warning/20 bg-warning/10 px-2 py-0.5 font-mono text-[10px] tracking-widest text-warning"
+                      >
+                        {effectBanner}
+                      </span>
+                    </span>
+                  ) : typeWord ? (
                     <span className="flex items-center">
                       <span
                         data-testid="node-type-word"
@@ -430,7 +536,7 @@ export function PhaseSpineGraph({
                         {typeWord}
                       </span>
                     </span>
-                  )}
+                  ) : null}
                   {/* BS-MR-04 — the per-step reading. ⚠ RUN TENSE ONLY: absent prop ⇒ absent
                       node. ONE reading per row (D-09's own shape), and a step that declared no
                       count renders no count slot AT ALL — never `0`, never a dash, never prose
@@ -449,11 +555,103 @@ export function PhaseSpineGraph({
                       )}
                     </span>
                   )}
+
+                  {/* Phase 200 (FE-WIRING) — THE SELECTED ROW'S DETAIL BLOCK, under the
+                      sheet's dashed divider (`builder-spine.html:329-339`).
+
+                      ⚠ IT IS AUTHORING TENSE, NOT RUN TENSE, and that is why it needs no run
+                      prop and is not gated behind one. Both lines are what the AUTHOR wrote,
+                      read back to them: the prompt they typed, and a word for the number they
+                      set. `199-02` refused run-tense atoms on this surface — a duration, an
+                      outcome, a branch verdict — because a draft has no run to make them true
+                      of. A prompt is true of the draft.
+
+                      ⚠ SELECTED ONLY. The sheet draws it on ONE card of eight, its selected
+                      one. Rendering a prompt on every row would turn a spine of eight steps
+                      into eight paragraphs and destroy the scan the whole component is for —
+                      and it would put the panel's own content on the panel's own anchor.
+
+                      ⚠ EACH LINE IS INDEPENDENTLY ABSENT, and the block itself does not render
+                      when both are. A step with no prompt gets NO prompt line — never a blank
+                      value, never an em dash, never `Not set`. The readiness checklist
+                      (`stepReadinessContext.stepGaps`) is the surface licensed to say a prompt
+                      is MISSING; a labelled empty line says the same thing in a weaker voice
+                      and in a second place.
+
+                      NOT A CONTROL: two `<span>`s in a `<div>`-free column. One tab stop per
+                      node is this component's invariant and the detail block is not an
+                      exception to it — the card is already a `<button>` and this renders
+                      inside it, so an interactive child would be a nested-interactive DOM
+                      error as well as a second tab stop. */}
+                  {(detailPrompt || detailLiteral) && (
+                    <span
+                      data-testid="node-detail"
+                      className="mt-1 flex flex-col gap-3 border-t border-dashed border-border pt-3"
+                    >
+                      {detailPrompt && (
+                        <span className="flex flex-col gap-1">
+                          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                            {SPINE_DETAIL_PROMPT_LABEL}
+                          </span>
+                          <span
+                            data-testid="node-detail-prompt"
+                            className="line-clamp-3 text-[12px] leading-relaxed text-foreground"
+                          >
+                            {detailPrompt}
+                          </span>
+                        </span>
+                      )}
+                      {detailLiteral && (
+                        <span className="flex flex-col gap-1">
+                          <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                            {SPINE_DETAIL_LITERAL_LABEL}
+                          </span>
+                          <span
+                            data-testid="node-detail-literal"
+                            className="text-[12px] leading-relaxed text-foreground"
+                          >
+                            {detailLiteral}
+                          </span>
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </span>
               </button>
 
               {/* The dashed on-fail skip branch label(s). The ONLY non-linear edge. */}
-              {outgoingSkips.map((edge) => (
+              {outgoingSkips.map((edge) => {
+                /**
+                 * Phase 200 (FE-WIRING) — THE TARGET'S NAME, not its slug.
+                 *
+                 * The resolver has shipped since 187 and the CANVAS has used it all along
+                 * (`canvasModel.ts:424` → `branchConditionOf(phase, resolveName)` → the
+                 * destination's `nodeTitle`). This row printed `edge.toSlug` in a mono face:
+                 * a schema token, to a non-technical author, naming the same step the canvas
+                 * names properly one toggle away. Same map, same resolver, so the two views
+                 * cannot now disagree about where a branch goes.
+                 *
+                 * ⚠ THE SLUG IS THE FALLBACK, AND IT IS NOT A FABRICATION. `nodeTitle` is
+                 * total but its floor is `PHASE_TYPE_SENTENCES[type] ?? type`, which is the
+                 * EMPTY STRING for a phase carrying neither a name, nor a derivable face, nor
+                 * a recognised type. An empty destination would read `on fail → skip to `,
+                 * which says less than the slug does. So an empty resolution keeps today's
+                 * behaviour rather than degrading past it — the slug is real stored data, not
+                 * an invented value, and `data-target-slug` carries it for a machine either
+                 * way.
+                 *
+                 * ⚠ AND THE FALLBACK KEEPS THE MONO FACE while a resolved NAME does not. A
+                 * mono face is how this tree marks a machine identifier; painting a person's
+                 * own words in it would say "this is a token" about a sentence they wrote.
+                 */
+                const targetTitle = (() => {
+                  const target = bySlug.get(edge.toSlug)
+                  if (target === undefined) return null
+                  const resolved = nodeTitle(target, nameContext)
+                  return resolved.length > 0 ? resolved : null
+                })()
+
+                return (
                 <div
                   key={`${edge.fromSlug}->${edge.toSlug}`}
                   data-testid="skip-edge"
@@ -463,7 +661,14 @@ export function PhaseSpineGraph({
                 >
                   <span aria-hidden="true">⤳</span>
                   <span>
-                    on fail → skip to <span className="font-mono font-medium">{edge.toSlug}</span>
+                    on fail → skip to{" "}
+                    {targetTitle === null ? (
+                      <span className="font-mono font-medium">{edge.toSlug}</span>
+                    ) : (
+                      <span data-testid="skip-edge-target" className="font-medium">
+                        {targetTitle}
+                      </span>
+                    )}
                   </span>
                   {/* BS-MR-03 — the branch reading. ⚠ RUN TENSE ONLY, and it is a THREE-state
                       read, not a boolean: `undefined` means the caller does not hold the fact
@@ -483,7 +688,8 @@ export function PhaseSpineGraph({
                     </span>
                   )}
                 </div>
-              ))}
+                )
+              })}
             </li>
           )
         })}

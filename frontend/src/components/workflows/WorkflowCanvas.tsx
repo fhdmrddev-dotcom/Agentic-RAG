@@ -208,6 +208,9 @@ import {
 // shared OBJECT constant (`react-refresh/only-export-components`). The bare-string
 // `BRANCH_CONNECTOR_WORD` below is exempt under the same rule and deliberately stays here.
 import { BACKGROUND_GROUND } from "./canvasGround"
+// Phase 200 (FE-WIRING) — the zoom readout, in its own leaf so this G-5 hot file gains a JSX
+// child and no new hook. It subscribes to the viewport, which nothing in this body does.
+import { CanvasZoomReadout } from "@/components/workflows/CanvasZoomReadout"
 import { TechnicalNamesToggle } from "@/components/admin/TechnicalNamesToggle"
 import {
   CANVAS_EDGE_KINDS,
@@ -1594,8 +1597,50 @@ export function WorkflowCanvas({
             size={BACKGROUND_GROUND.size}
           />
           {/* The prop below removes the interactivity padlock — see the docblock;
-              without it read-only is two clicks deep. */}
-          <Controls showInteractive={false} />
+              without it read-only is two clicks deep.
+
+              ── ⚠ Phase 200 (FE-WIRING) — SKETCH 200's `Lock canvas` IS DECLINED, AND THE
+                 NARROWING THAT WOULD HAVE ALLOWED IT WAS BUILT, MEASURED AND WITHDRAWN.
+
+              `builder-canvas.html:391` draws a `title="Lock canvas"` padlock in this cluster,
+              and the 200 audit correctly notes the library ships one — so this reads as a
+              one-word prop flip. It is not, and the reasoning is recorded because the
+              attractive version of it is wrong for a reason a reader cannot see from here.
+
+              THE NARROWING THAT WAS TRIED: `showInteractive={editable}`, so the read-only
+              canvas keeps `false` — every word of the argument above is stated about the
+              read-only surface and still holds — while the Builder's editable plane, which is
+              ALREADY draggable and connectable, gains a control whose only transition is
+              editable → LOCKED. That framing is sound as far as it goes: on an editable plane
+              the padlock cannot GRANT a capability, only withhold one.
+
+              ⚠ WHY IT WAS WITHDRAWN ANYWAY, and this is the fact the audit flagged as *"the
+              sheet's separate lock semantics would need a decision"*: xyflow's handler sets
+              `nodesDraggable`, `nodesConnectable` AND `elementsSelectable` — all three. The
+              third is not a layout concern. On THIS surface selecting a node is what opens the
+              step panel, so the library's "lock" would also remove the author's ability to
+              INSPECT a step. The sheet's padlock protects an arrangement; this one would
+              additionally make the workflow unreadable while engaged, which is a different
+              control wearing the same glyph. Choosing what a locked canvas should still permit
+              is a product decision, not a wiring one.
+
+              ⚠ RE-OPEN TRIGGER, dated rather than permanent: a phase that scopes canvas view
+              controls as a feature and decides what `Lock canvas` means here. The likely shape
+              is a lock that suppresses drag and connect while LEAVING selection alive — which
+              is not `showInteractive` at all, but the three underlying props set
+              independently. That is a build, and it is why this is not one. */}
+          <Controls showInteractive={false}>
+            {/* Phase 200 (FE-WIRING) — the sheet's `100%`. It renders INSIDE the shipped
+                cluster rather than as a second floating panel, so the plane still has exactly
+                one control affordance in its bottom-left corner.
+
+                ⚠ THE SHEET PUTS IT BETWEEN `−` AND `+` AND THIS APPENDS IT AFTER THE
+                BUTTONS, because `<Controls>` renders its children after its own and
+                interleaving them means rebuilding the cluster by hand — trading a real
+                dependency on the library's zoom handlers for a pixel match. The atom the sheet
+                is asking for is *"the plane says how far in it is"*, and it now does. */}
+            <CanvasZoomReadout />
+          </Controls>
           {/* 200-06 (BC-MR-02) — THE LEGEND STRIP, the sketch's own bottom-right panel.
               It is what makes the four states legible rather than merely distinct: a line
               that changes weight under the pointer says nothing until the plane has said

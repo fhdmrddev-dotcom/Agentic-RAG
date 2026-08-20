@@ -583,10 +583,29 @@ describe("PhaseSpineGraph — the injected name context (D-187-05)", () => {
     // hypothetical — the first draft of this assertion counted 5 where it expected 3,
     // and all five were honest: two declarations, one call and two explanations.)
     expect(phaseSpineGraphSource).toMatch(/nodeTitle\(phase, nameContext\)/)
-    expect((phaseSpineGraphSource.match(/nameContext\)/g) ?? []).length).toBe(1)
-    // …declared exactly once on the props, and resolved by exactly one `nodeTitle` call.
+    // ⚠ RE-BASELINED 1 → 2 AT THE PHASE 200 FE-WIRING PASS, AND THE OLD WORDING IS KEPT
+    // ABOVE RATHER THAN OVERWRITTEN — it read *"The context reaches `nodeTitle` and NOTHING
+    // else"*, with both counts pinned at 1.
+    //
+    // WHAT CHANGED AND WHY IT IS NOT A LOOSENING. The spine's dashed on-fail row printed its
+    // target as a RAW SLUG (`<span className="font-mono">{edge.toSlug}</span>`) while the
+    // canvas resolved the identical target to a NAME (`canvasModel.ts` →
+    // `branchConditionOf(phase, resolveName)` → the destination's `nodeTitle`). The two views
+    // are one toggle apart and disagreed about the same branch, which is the
+    // two-views-two-languages defect `BS-2` exists to close. Closing it needs a SECOND
+    // `nodeTitle` call — over the TARGET phase, not this one — so the honest baseline is 2.
+    //
+    // ⚠ WHAT THIS PIN STILL GUARDS, unchanged, is the property it was written for: the
+    // context reaches `nodeTitle` AND NOTHING ELSE. A third consumer, or a `nameContext` read
+    // by anything that is not a title resolution, still reddens this line. The two calls are
+    // NAMED below so the count cannot silently absorb a different second consumer — a bare
+    // `toBe(2)` would pass for any pair.
+    expect(phaseSpineGraphSource).toMatch(/nodeTitle\(target, nameContext\)/)
+    expect((phaseSpineGraphSource.match(/nameContext\)/g) ?? []).length).toBe(2)
+    // …declared exactly once on the props, and resolved by exactly two `nodeTitle` calls —
+    // the node's own face and its branch target's.
     expect((phaseSpineGraphSource.match(/nameContext\?: NameContext/g) ?? []).length).toBe(1)
-    expect((phaseSpineGraphSource.match(/nodeTitle\(/g) ?? []).length).toBe(1)
+    expect((phaseSpineGraphSource.match(/nodeTitle\(/g) ?? []).length).toBe(2)
     // The type read is still declared here — the fence is not passing because the markup it
     // guards disappeared. ⚠ `phase.config.phase_type` now feeds `data-phase-type` and the
     // canvas-word lookup rather than a visible chip, which is BS-MNR-02's whole point: the id
@@ -739,7 +758,21 @@ describe("PhaseSpineGraph — 199-02 pre-change inventory (sheet c3 Col 1)", () 
     // The shipped edge already carries its meaning in words. The sheet's own requirement —
     // "a branch reads as a word, not colour alone" — is therefore ALREADY-SHIPPED here, and
     // pinning it is what stops a later re-skin quietly reducing it to a dashed amber rule.
-    expect((edge.textContent ?? "").trim()).toBe("⤳on fail → skip to human-confirm")
+    // ⚠ RE-BASELINED AT THE PHASE 200 FE-WIRING PASS, AND THE OLD WORDING IS KEPT HERE
+    // RATHER THAN OVERWRITTEN: it read `"⤳on fail → skip to human-confirm"` — the target's
+    // raw SLUG, in a mono face, printed at a non-technical author.
+    //
+    // ⚠ THIS IS NOT A REGRESSION BEING HIDDEN; IT IS THE DEFECT BEING FIXED. The canvas has
+    // resolved the identical target to its NAME since 187 (`canvasModel.ts` →
+    // `branchConditionOf(phase, resolveName)`), so the two graph views — one toggle apart —
+    // named the same branch destination two different ways, one of them a schema token. The
+    // fixture's `human-confirm` phase is named `Confirm`, so the resolved face is `Confirm`.
+    //
+    // ⚠ WHAT THE PIN STILL GUARDS IS UNCHANGED and is the reason it exists: the branch reads
+    // as WORDS, never as a dashed amber rule alone. The non-vacuity check below is untouched.
+    // The SLUG has not been lost — it survives on `data-target-slug`, asserted by its own case
+    // above, which is where a machine reads it and where a person does not.
+    expect((edge.textContent ?? "").trim()).toBe("⤳on fail → skip to Confirm")
     // Non-vacuity: the words survive with every class attribute stripped, so the claim is
     // about text and not about a colour that happens to spell one.
     const stripped = edge.cloneNode(true) as HTMLElement

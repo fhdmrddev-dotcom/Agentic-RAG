@@ -229,6 +229,40 @@ export interface PhaseNodeCardProps {
    *  only ever selects between three fixed sentences. The detailed reason stays in the
    *  developer timeline, one click away through "Open the chat thread". */
   emitFailure?: EmitFailure | null
+  /**
+   * Phase 200 (FE-WIRING) — THE STEP'S OWN ELAPSED, ALREADY WORDED BY THE CALLER.
+   *
+   * `screens/node-identity.html:265` draws `00:15` in the bottom-right corner of its RUNNING
+   * node, and it was the one atom on that sheet whose every part already shipped one surface
+   * over: `started_at` / `completed_at` are on the wire (`backend/app/api/workflow_runs.py`,
+   * migration `121_workflow_phases_timings.sql`, applied), `phaseDuration.ts` formats them
+   * through `fmtElapsed`, and the SPINE consumes them as `node-run-time`. Only this card had
+   * no slot — `grep -n "elapsed\|duration" PhaseNodeCard.tsx phaseNodeCardContract.ts` → 0.
+   *
+   * ⚠ **A STRING, NOT A TIMESTAMP AND NOT A NUMBER.** The card formats no duration and
+   * decides nothing about what an unrecorded one reads as — the identical discipline as
+   * `label` and `noun` on `NodeRunState`, and as `runTense.total` on the spine. A card doing
+   * its own wall-clock arithmetic would be a SECOND clock beside the page's, free to disagree
+   * with the run band directly above it about the same run.
+   *
+   * ⚠ AND THE CLOCK CALL IS NOT NAMED HERE, DELIBERATELY. This file is inside
+   * `CARD_SUBTREE_PATHS`, whose scope fence (`PhaseNodeCard.test.tsx` — *"the card reads no
+   * DOM, no clock and no randomness"*) is a `?raw` SOURCE regex and cannot tell a mention in a
+   * comment from a live call. Spelling the API in the sentence explaining why the card must
+   * not call it turns that fence RED — which is exactly the trap `196-08` fell into four
+   * times, once inside the comment written to explain the first three.
+   *
+   * ⚠ **ABSENT ⇒ NO ELEMENT AT ALL — never `00:00`, never `—`, never a spinner.** A step the
+   * page holds no timing for is not a step that has run for zero seconds. This is the same
+   * three-state discipline `count` carries on `NodeRunState` and the same floor
+   * `runFacts.ts`'s four-arm correction records the cost of folding.
+   *
+   * ⚠ **RUN TENSE, SO IT IS UNREACHABLE FROM THE BUILDER BY CONSTRUCTION.** It rides
+   * `NodeRunState`, which only a surface holding a real run supplies. An authoring canvas
+   * passes no `runState` at all, so a draft cannot render an elapsed — which is exactly what
+   * `199-02` refused, and the refusal now holds by shape rather than by care.
+   */
+  elapsed?: string | null
   /** The server's verdict mark (VALID-03), rendered by 184-08 and relocated to the
    *  card's LEFT edge by 185-01 (D-185-17 — top-right is CLAIMED for the governance
    *  seal). **Every value here is SERVER-DERIVED** — the caller reads it off
