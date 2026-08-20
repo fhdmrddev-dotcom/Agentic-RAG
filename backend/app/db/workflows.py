@@ -334,16 +334,57 @@ async def create_workflow_run(
     until this column that promise was protected against the SLUG moving and not against
     the ROW moving.
 
-    ⚠ ``json.dumps`` + ``$N::jsonb``, matching ``inputs`` one line above — this file does
-    NOT install a pool JSONB codec. ``mode="json"`` is REQUIRED, not stylistic: the model
-    holds ``UUID`` and ``datetime`` members that the plain dict form leaves as Python
-    objects, which ``json.dumps`` then refuses outright.
+    ⚠⚠ THE ORIGINAL PARAGRAPH HERE WAS **WRONG ON ITS CENTRAL FACT**, IT SHIPPED, AND THE
+    FIRST TWO REAL RUNS PROVED IT. It is quoted in full rather than deleted, because the
+    false clause is the whole lesson:
 
-    ⚠ AND IT MUST LAND AS A JSONB **OBJECT**, never a JSON string scalar. The older
-    ``workflow_definitions.definition`` column is ``jsonb`` holding a STRING for most rows,
-    which makes ``definition->'phases'`` return SQL NULL instead of erroring — a shape that
-    has now produced a confident, vacuous ``0`` in two separate investigations.
-    ``backend/tests/test_migration_122.py`` asserts ``jsonb_typeof`` on every stored value.
+        "⚠ ``json.dumps`` + ``$N::jsonb``, matching ``inputs`` one line above — **this file
+         does NOT install a pool JSONB codec.** ``mode="json"`` is REQUIRED, not stylistic
+         … ⚠ AND IT MUST LAND AS A JSONB OBJECT, never a JSON string scalar."
+
+    **The file does not install a codec. THE POOL DOES**, and the pool is what this function
+    acquires from. ``dependencies._init_pg_connection`` registers a ``jsonb`` codec with
+    ``encoder=json.dumps`` on EVERY connection the pool creates (Phase 073 / D-073-06), and
+    its own docblock says why: *"Registering here lets call sites pass plain Python
+    dicts/lists."* So a call site that hands over an ALREADY-DUMPED STRING gets it dumped a
+    SECOND time, and what lands is a jsonb STRING SCALAR containing the JSON text.
+
+    ⚠ MEASURED, NOT REASONED ABOUT (2026-08-20, against the live local database):
+
+      · ``jsonb_typeof(definition_snapshot)`` = ``string`` on **2 of 2** rows written since
+        migration 122 — i.e. every row the column has ever held.
+      · ``jsonb_typeof(inputs)`` = ``string`` on **230 of 230** rows.
+      · ``jsonb_typeof(workflow_definitions.definition)`` = ``string`` on **261 of 291**.
+      · Driven directly against asyncpg: with the pool's codec installed, a pre-dumped string
+        stores as ``string`` and ``-> 'phases'`` returns ``None``; the plain dict stores as
+        ``object`` and ``-> 'phases'`` returns the array. Without the codec BOTH forms store
+        as ``object`` — which is exactly why a probe on a bare connection exonerates this code
+        and a probe through the pool convicts it.
+
+    **This is the root cause of the recorded "jsonb string-scalar trap"** — the shape that
+    makes ``definition->'phases'`` return SQL NULL instead of erroring, and that has now
+    produced a confident, vacuous ``0`` in two separate investigations plus a RED
+    ``test_migration_122``.
+
+    ⚠ THE FIX IS TO STOP PRE-ENCODING, NOT TO ADD A CAST. ``$7::jsonb`` is fine; the parameter
+    is what was wrong. ``mode="json"`` is STILL REQUIRED and for the original reason: the model
+    holds ``UUID`` and ``datetime`` members, and the codec's ``json.dumps`` refuses them just
+    as the manual one did. So the value handed over is ``model_dump(mode="json")`` — a plain
+    dict of JSON-safe primitives — and the codec does the one encode.
+
+    ⚠ SCOPE, STATED SO THE SILENCE IS NOT MISTAKEN FOR AN OVERSIGHT. **Only this column is
+    fixed here.** ``inputs`` on the line above, and the four ``definition`` writes elsewhere in
+    this file, have the identical defect and are DELIBERATELY LEFT: they have 230 and 261
+    rows respectively written in the old shape, and flipping the writer would make new rows
+    objects while old rows stay strings — every reader of those columns then needs an audit,
+    which is a change with its own blast radius and its own migration question. ``definition_snapshot``
+    is fixable alone because it has TWO rows, both from today, and its one reader
+    (``api/workflow_runs.py:_coerce_definition``) already accepts BOTH shapes by design. Re-open
+    trigger: the next phase that touches ``inputs`` or ``workflow_definitions.definition`` on
+    the write path — see ``SEED-190``'s sibling note and ``.planning/STATE.md``.
+
+    ``backend/tests/test_migration_122.py`` asserts ``jsonb_typeof`` on every stored value; it
+    went RED on the first two real runs, which is the pin working exactly as written.
 
     Returns the new workflow_run id.
     """
@@ -361,7 +402,11 @@ async def create_workflow_run(
                 model,
                 user_id,
                 is_golden_run,
-                json.dumps(definition.model_dump(mode="json")),
+                # ⚠ THE PLAIN DICT, NOT A PRE-DUMPED STRING — see the migration-122 paragraph
+                # in this function's docstring. The pool's jsonb codec (`_init_pg_connection`)
+                # encodes it; handing over a string gets it encoded TWICE and stores a jsonb
+                # STRING SCALAR, which is what the first two real runs did.
+                definition.model_dump(mode="json"),
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(

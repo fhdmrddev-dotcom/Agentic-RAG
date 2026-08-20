@@ -275,3 +275,93 @@ async def test_a_populated_snapshot_carries_phases_reachable_without_unwrapping(
             "returns NULL here instead of raising"
         )
         assert isinstance(phases, list), type(phases)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════════════
+# THE WRITER, AND THE MECHANISM THAT BROKE IT (added 2026-08-20, after the two tests above
+# went RED on the first two real runs)
+# ═══════════════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ THE TWO ASSERTIONS ABOVE FIRED EXACTLY AS DESIGNED AND THE COLUMN'S OWN HEADER PREDICTED
+# THE SHAPE — it says a string scalar would make the column *"look present and answer
+# nothing"*, and that is precisely what shipped. What neither of them could say is WHY, or
+# whether a fix works, because both read the live table: they stay red until the bad ROWS are
+# repaired, and they would go green again on a repair even if the WRITER were still broken.
+#
+# These three cases separate the two. They assert the MECHANISM and the CALL SITE, so the
+# writer fix has its own falsifiable proof that does not depend on any row existing.
+
+
+@pytest.mark.asyncio
+async def test_the_pool_codec_double_encodes_a_pre_dumped_string(pg_pool):
+    """THE ROOT CAUSE, DRIVEN — not reasoned about.
+
+    ``dependencies._init_pg_connection`` registers a jsonb codec with ``encoder=json.dumps``
+    on every pooled connection (Phase 073 / D-073-06), and this fixture's pool installs the
+    identical one. So a call site handing over an ALREADY-DUMPED string gets it dumped twice.
+
+    ⚠ THE CONTROL IN THE OTHER DIRECTION IS WHAT MAKES THIS A DIAGNOSIS RATHER THAN A
+    CURIOSITY: on a BARE connection with NO codec, both forms store as ``object``. That is why
+    a probe outside the pool exonerates the writer and a probe through the pool convicts it —
+    and it is the single fact that made this defect survive a code read.
+    """
+    payload = {"slug": "x", "version": 1, "name": "X", "phases": [{"slug": "a"}]}
+
+    async with pg_pool.acquire() as conn:
+        # THE BUG, reproduced.
+        assert await conn.fetchval("SELECT jsonb_typeof($1::jsonb)", json.dumps(payload)) == "string"
+        # …and the consequence a reader meets: SQL NULL rather than an error.
+        assert await conn.fetchval("SELECT ($1::jsonb) -> 'phases'", json.dumps(payload)) is None
+
+        # THE FIX, reproduced: hand over the dict and let the codec do the one encode.
+        assert await conn.fetchval("SELECT jsonb_typeof($1::jsonb)", payload) == "object"
+        assert await conn.fetchval("SELECT ($1::jsonb) -> 'phases'", payload) is not None
+
+
+@pytest.mark.asyncio
+async def test_the_bare_connection_control_shows_why_the_pool_is_the_variable():
+    """The counterfactual, so the diagnosis above cannot be a coincidence.
+
+    With NO codec registered, asyncpg sends the Python ``str`` as text and ``::jsonb`` parses
+    it — so BOTH forms land as objects and nothing looks wrong. The codec is the variable.
+    """
+    conn = await asyncpg.connect(_POSTGRES_TEST_DSN)
+    try:
+        payload = {"slug": "x", "phases": [{"slug": "a"}]}
+        assert await conn.fetchval("SELECT jsonb_typeof($1::jsonb)", json.dumps(payload)) == "object"
+    finally:
+        await conn.close()
+
+
+def test_the_writer_hands_the_codec_a_dict_not_a_dumped_string():
+    """THE CALL SITE, pinned at the source.
+
+    ⚠ SOURCE-LEVEL BECAUSE THE ALTERNATIVE IS A LIVE RUN. ``create_workflow_run`` opens a
+    transaction, writes three tables and commits; driving it here would need a real thread, a
+    real definition and a cleanup that can fail. What it must not do is one line long, and it
+    is asserted directly: the ``definition_snapshot`` parameter is the model dump, NOT a
+    ``json.dumps`` of it.
+
+    Falsifiable: restore ``json.dumps(definition.model_dump(mode="json"))`` on that argument
+    and this goes red — which is the state the column shipped in.
+
+    ⚠ ``mode="json"`` IS STILL REQUIRED and is asserted too. The model holds ``UUID`` and
+    ``datetime`` members, and the codec's ``json.dumps`` refuses them exactly as a manual one
+    did — so removing the mode swaps a silent wrong shape for a loud runtime failure, which is
+    better but still broken.
+    """
+    import inspect
+
+    from app.db import workflows as db_workflows
+
+    source = inspect.getsource(db_workflows.create_workflow_run)
+    # The INSERT's own argument list, not the docstring — the docstring quotes the old form
+    # deliberately, so a naive substring search over the whole function would read the
+    # paragraph that documents the bug and call it the bug (the 187-24 trap).
+    body = source.split('"""', 2)[-1]
+
+    assert 'definition.model_dump(mode="json"),' in body, body[-800:]
+    assert 'json.dumps(definition.model_dump(mode="json"))' not in body, (
+        "create_workflow_run is pre-encoding the snapshot again — the pool's jsonb codec "
+        "will dump it a second time and store a string scalar"
+    )
