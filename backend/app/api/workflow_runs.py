@@ -251,7 +251,10 @@ async def read_workflow_run(
     # separately-failing) path than a nonexistent one, which is a probe channel.
     run_resp = await aexec(
         supabase.table("workflow_runs")
-        .select("id, thread_id, definition_id, status, created_at, updated_at, claimed_at")
+        .select(
+            "id, thread_id, definition_id, status, created_at, updated_at, claimed_at, "
+            "definition_snapshot"
+        )
         .eq("id", str(workflow_run_id))
         .eq("user_id", current_user["id"])
         .maybe_single()
@@ -261,9 +264,33 @@ async def read_workflow_run(
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
-    # ── Step 2: the definition VERSION THAT RAN, by definition_id (D-188-14) ──
-    # Never by slug: a slug resolves to the CURRENT published version, so re-opening an old
-    # run would draw it against a definition it never executed.
+    # ── Step 2: the definition VERSION THAT RAN ──
+    #
+    # ⚠ THE ORIGINAL COMMENT IS KEPT BECAUSE IT IS STILL TRUE AND WAS STILL INCOMPLETE:
+    #
+    #     "by definition_id (D-188-14). Never by slug: a slug resolves to the CURRENT
+    #      published version, so re-opening an old run would draw it against a definition it
+    #      never executed."
+    #
+    # That protects against the SLUG moving. Nothing protected against the ROW moving —
+    # `workflow_definitions.definition` is MUTABLE while `status = 'draft'`, so a draft can be
+    # rewritten under a run that already has its `workflow_phases` rows. Measured on the local
+    # database 2026-08-20: **21 of 228 runs point at a draft, 14 of those drafts were edited
+    # after their run, and on 2 the phase ORDER changed** — at which point this page's
+    # `phase_index` join (D-188-01) renders each step's state as its NEIGHBOUR's. Observed in a
+    # browser as "Produce the deliverable · Not started" on a step that had FAILED. Published
+    # definitions are immutable and versioned, and show ZERO crossings.
+    #
+    # Migration 122 stores the definition the run actually executed, serialized in
+    # `create_workflow_run` from the SAME in-memory object that wrote this run's phase rows,
+    # in the SAME transaction — so the snapshot and the phase rows cannot disagree.
+    #
+    # ⚠ THE DEFINITION ROW IS STILL READ, AND STILL NEEDED. `name` / `slug` / `version` are the
+    # run header's IDENTITY and deliberately still come from the live row — re-sourcing them
+    # from the snapshot would be more coherent and is NOT taken here, because that identity is
+    # Phase 197's `identityLabel` decision (D-19) and changing it quietly inside a correctness
+    # fix is the kind of widening this project records as a defect. Re-open trigger: the next
+    # phase that touches the run header's identity.
     def_resp = await aexec(
         supabase.table("workflow_definitions")
         .select("slug, version, name, definition")
@@ -271,7 +298,20 @@ async def read_workflow_run(
         .maybe_single()
     )
     definition_row = (def_resp.data if def_resp is not None else None) or {}
-    definition = _coerce_definition(definition_row.get("definition"))
+
+    # ⚠ THE FALLBACK IS THE OLD BEHAVIOUR, INCLUDING ITS RISK, AND SAYING SO IS THE POINT.
+    # Migration 122 is NOT backfilled (see its header), so every run created before it keeps a
+    # NULL snapshot and resolves exactly as it did — crossing and all. This is a strict
+    # improvement going forward that repairs nothing retroactively.
+    #
+    # ⚠ `is None`, NOT a truthiness test. An empty dict is a definition that was RECORDED and
+    # found to hold nothing, which is a different fact from never having been recorded; a
+    # falsy check would send the first case down the fallback and silently substitute a
+    # document the run did not execute — the exact failure this column exists to end.
+    snapshot = _coerce_definition(run.get("definition_snapshot"))
+    definition = (
+        snapshot if snapshot is not None else _coerce_definition(definition_row.get("definition"))
+    )
 
     # ── Step 3: the durable phase spine, ORDER BY phase_index ──
     # ── 200 (DES-02): the projection, widened in LOCKSTEP with the model + serializer ──

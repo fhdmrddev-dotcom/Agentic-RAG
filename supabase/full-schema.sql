@@ -2027,6 +2027,7 @@ CREATE TABLE public.workflow_runs (
     continues_used integer DEFAULT 0 NOT NULL,
     user_id uuid,
     is_golden_run boolean DEFAULT false,
+    definition_snapshot jsonb,
     CONSTRAINT workflow_runs_status_check CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'cap_paused'::text, 'completed'::text, 'failed'::text, 'cancelled'::text])))
 );
 
@@ -2079,6 +2080,13 @@ COMMENT ON COLUMN public.workflow_runs.user_id IS '092-05 F1: run-owner (server-
 --
 
 COMMENT ON COLUMN public.workflow_runs.is_golden_run IS 'Phase 102 QUAL-01 (D-05). True = a publish-time validation run (real engine, real KB, judge-graded). Excluded from ordinary run history/listings. Default false (every pre-102 + ordinary run byte-identical).';
+
+
+--
+-- Name: COLUMN workflow_runs.definition_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.workflow_runs.definition_snapshot IS 'Phase 200 follow-on: the WorkflowDefinition this run actually executed, serialized from the same in-memory object that produced this run''s workflow_phases rows, in the same transaction (backend/app/db/workflows.py:create_workflow_run). It exists because workflow_definitions.definition is MUTABLE while status = ''draft'': measured 2026-08-20, 21 of 228 runs point at a draft, 14 of those drafts were edited after their run, and on 2 the phase ORDER changed so the run page''s phase_index join reported each step''s state as its neighbour''s. NULLABLE and NOT BACKFILLED: a pre-122 run keeps NULL and the read path falls back to the live definition row, which is the current behaviour including its crossing risk. A backfill would store a document the run never executed for exactly the rows that motivated the column. Stored as a jsonb OBJECT, never a JSON string scalar - the shape workflow_definitions.definition has, which makes ->''phases'' return NULL instead of erroring.';
 
 
 --

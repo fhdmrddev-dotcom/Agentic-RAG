@@ -1,0 +1,137 @@
+-- 122_workflow_runs_definition_snapshot.sql
+-- Phase 200 (follow-on to the run-log commit `01e58298`) — give workflow_runs the definition it
+-- actually RAN, so "the version that ran" stops being a claim and becomes a stored fact.
+--
+-- ── WHY THIS IS OWED, AND IT WAS MEASURED, NOT REASONED ─────────────────────────────────────
+--
+-- `backend/app/api/workflow_runs.py:get_workflow_run` opens with the sentence *"one workflow run,
+-- the definition version that RAN"*, and resolves it by `definition_id` with a comment saying
+-- *"Never by slug: a slug resolves to the CURRENT published version, so re-opening an old run
+-- would draw it against a definition it never executed"* (D-188-14). That reasoning is correct
+-- and it is INCOMPLETE: it protects against the slug moving, and nothing protects against the
+-- ROW moving. `workflow_definitions.definition` is mutable while `status = 'draft'`, and a draft
+-- can be edited under a run that already has its `workflow_phases` rows.
+--
+-- Measured on the local database 2026-08-20:
+--
+--   * **2 of 228 runs** have `workflow_phases.phase_index` values that no longer agree with their
+--     definition's own phase ordering. **Both point at a `draft` definition, and BOTH definitions
+--     were edited AFTER the run was created** — one **7 seconds** later (mid-run), one 5 days later.
+--   * **21 runs point at a draft definition at all; 14 of those definitions have been edited since.**
+--     Two happen to have had their phase ORDER changed. Any reorder, insert or delete re-crosses it.
+--   * **Published definitions show ZERO crossings**, which is the control: they are immutable and
+--     versioned, so the existing `definition_id` resolution is already correct for them.
+--
+-- The user-visible consequence, observed in a browser before this migration was written: the run
+-- surface's log printed *"Produce the deliverable · Not started"* about a step that had FAILED,
+-- and *"Work out how to do it · Failed"* about one that never ran. The page joins the definition's
+-- steps onto the run's rows BY `phase_index` (D-188-01 — sound, because the live reconcile
+-- skeleton emits placeholder SLUGS, so a slug join is the one that cannot be trusted), and when
+-- the two sequences disagree that join reports each step's state as its NEIGHBOUR's.
+--
+-- ⚠ THE FIX IS NOT THE JOIN. Re-keying on slug would overturn D-188-01 on the strength of two
+-- rows. The fix is that the run should never have been reading a document that can change under
+-- it. This column is that.
+--
+-- ── WHY THE SNAPSHOT CANNOT DISAGREE WITH THE PHASE ROWS ────────────────────────────────────
+--
+-- ⚠ THIS IS THE PROPERTY THAT MAKES THE COLUMN WORTH A MIGRATION, and it is structural rather
+-- than careful. `create_workflow_run` (`backend/app/db/workflows.py:268`) ALREADY receives the
+-- resolved `definition: WorkflowDefinition` object — it is the very thing it iterates to write
+-- the `workflow_phases` rows:
+--
+--     for ps in sorted(definition.phases, key=lambda p: p.phase_index):
+--         INSERT INTO workflow_phases (workflow_run_id, phase_index, slug, status) ...
+--
+-- The snapshot is serialized from THAT SAME OBJECT, in THAT SAME TRANSACTION, in the same INSERT
+-- that creates the run. So the stored definition and the phase rows are two projections of one
+-- in-memory value: they cannot drift, and no second read, no second query and no re-resolution
+-- is involved. A copy taken anywhere else would be a second source and would need its own proof.
+--
+-- ── NO BACKFILL — A DECISION (the migration-121 rule, met again) ─────────────────────────────
+--
+-- ⚠ Every run that predates this migration keeps `definition_snapshot` NULL, forever, and the
+-- read path falls back to the live `workflow_definitions` row exactly as it does today. That
+-- fallback is the CURRENT behaviour, including its crossing risk — this migration is a strict
+-- improvement going forward and repairs nothing retroactively, which is stated plainly here
+-- rather than left to be discovered.
+--
+-- A backfill from the live definition row was offered and REJECTED for the reason the column
+-- exists: for a run whose draft was never edited it would store the right document, and for the
+-- 14 whose draft WAS edited it would store a document the run never executed — with nothing on
+-- the row to say which. That is the same shape as migration 121's rejected `updated_at` backfill:
+-- **a wrong value with total confidence is worse than an honest absence.** A NULL here says "we
+-- did not record what this run ran"; a backfilled value says "this is what it ran" and is a lie
+-- for precisely the rows that motivated the change.
+--
+-- ⚠ NO `DEFAULT` CLAUSE, for the same reason and by the same mechanism: a default would populate
+-- every existing row at ALTER time in Postgres 11+, which is a backfill by accident. The column
+-- is NULLABLE, and the nullability is part of the proof rather than a convenience — a `not null`
+-- column could not have been added without one.
+--
+-- ── WHAT THIS MIGRATION DOES NOT DO ─────────────────────────────────────────────────────────
+--
+-- 1. **IT DOES NOT MAKE DRAFT DEFINITIONS IMMUTABLE.** Editing a draft while a run is in flight
+--    stays legal, and it should: the draft is the thing being iterated on. What changes is that
+--    the RUN stops being affected by it. ⚠ A different, LARGER question is deliberately left
+--    open — whether a run should be startable against a mutable draft at all. **Re-open trigger:
+--    the first phase that touches run creation or the draft-run door.**
+--
+-- 2. **IT DOES NOT MOVE `workflow_name` / `workflow_slug` / `workflow_version`.** Those three
+--    still come from the live `workflow_definitions` row on the read path, so a renamed draft
+--    still retitles its past runs. The snapshot CONTAINS all three and sourcing them from it
+--    would be more coherent — but the run header's identity is Phase 197's `identityLabel`
+--    decision (D-19) and re-sourcing it silently inside a correctness fix is exactly the kind of
+--    quiet widening this project records as a defect. **Re-open trigger: the next phase that
+--    touches the run header's identity.** The crossing is a phase-ORDER fault and the phases are
+--    what this migration moves.
+--
+-- 3. **NO RLS WORK IS OWED, and a reviewer will ask, so it is answered here.** The
+--    `workflow_runs` policies are predicate-only and name no column list, so `ADD COLUMN` touches
+--    no policy: the new column inherits the same access rule as every existing one, with no
+--    policy created, dropped or altered. `backend/tests/test_migration_122.py` reads
+--    `information_schema.columns` rather than probing with an INSERT, so it cannot mutate the
+--    operator's live dev data and cannot confuse "the column is absent" with "something else
+--    rejected the row".
+--
+-- 4. **THE `updated_at` TRIGGER IS INERT HERE** — `public.set_updated_at()` writes only
+--    `NEW.updated_at` and is registered `BEFORE UPDATE`, not INSERT. The snapshot is written once,
+--    at INSERT, and is never updated.
+--
+-- ⚠ THE COLUMN IS `jsonb` AND IS STORED AS A REAL OBJECT, NOT AS A JSON STRING SCALAR. The
+-- existing `workflow_definitions.definition` column is `jsonb` whose value is a STRING for most
+-- rows (`jsonb_typeof(definition)` → `'string'` on 194 of 222), which makes `definition->'phases'`
+-- return SQL NULL instead of erroring and has now produced a confident, vacuous `0` in two
+-- separate investigations. This column must never acquire that shape: the writer passes
+-- `$N::jsonb` over `json.dumps(model_dump)` of the object itself, and
+-- `backend/tests/test_migration_122.py` asserts `jsonb_typeof` is `'object'` for every non-null
+-- value it finds, so a regression into the string-scalar shape fails a test rather than becoming
+-- another silent zero.
+--
+-- ── HOW THIS IS APPLIED ─────────────────────────────────────────────────────────────────────
+--
+-- Apply by pasting the ENTIRE file into the Supabase SQL editor — ⚠ NEVER `supabase db push` /
+-- `supabase db reset` (both wipe local dev data; CLAUDE.md forbids them outright). Then run
+-- `bash scripts/regenerate-full-schema.sh` with **NO `--reset`**, and commit the regenerated
+-- artifact. Never hand-edit `supabase/full-schema.sql`.
+--
+-- BEGIN/COMMIT wrapping per migration 115's review finding WR-01. `IF NOT EXISTS` makes a re-paste
+-- safe. `ADD COLUMN` with no default is a CATALOG-ONLY operation — it rewrites no rows and holds
+-- its ACCESS EXCLUSIVE lock for microseconds.
+--
+-- ⚠ CLOUD PARITY (for the eventual operator-triggered promotion, NOT now): this migration must be
+-- pasted into the CLOUD Supabase SQL editor in the SAME operation that deploys this backend, or
+-- the widened INSERT in `backend/app/db/workflows.py` writes a column the cloud DB does not have
+-- and EVERY RUN CREATION FAILS. ⚠ That is a harder failure than migration 121's, whose widened
+-- `.select()` only broke a read — this one is on the write path of the one function that starts
+-- a run, so the two halves must ship together or not at all.
+
+BEGIN;
+
+ALTER TABLE public.workflow_runs
+    ADD COLUMN IF NOT EXISTS definition_snapshot jsonb;
+
+COMMENT ON COLUMN public.workflow_runs.definition_snapshot IS
+  'Phase 200 follow-on: the WorkflowDefinition this run actually executed, serialized from the same in-memory object that produced this run''s workflow_phases rows, in the same transaction (backend/app/db/workflows.py:create_workflow_run). It exists because workflow_definitions.definition is MUTABLE while status = ''draft'': measured 2026-08-20, 21 of 228 runs point at a draft, 14 of those drafts were edited after their run, and on 2 the phase ORDER changed so the run page''s phase_index join reported each step''s state as its neighbour''s. NULLABLE and NOT BACKFILLED: a pre-122 run keeps NULL and the read path falls back to the live definition row, which is the current behaviour including its crossing risk. A backfill would store a document the run never executed for exactly the rows that motivated the column. Stored as a jsonb OBJECT, never a JSON string scalar - the shape workflow_definitions.definition has, which makes ->''phases'' return NULL instead of erroring.';
+
+COMMIT;

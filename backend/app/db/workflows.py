@@ -312,14 +312,47 @@ async def create_workflow_run(
     only marks the row so the receipt VIEW (Phase 107) can distinguish "what good
     looked like at publish approval" from a normal run.
 
+    ── Migration 122 — THE DEFINITION SNAPSHOT, AND WHY IT IS WRITTEN *HERE* ────────────
+
+    ``workflow_runs.definition_snapshot`` is written in the INSERT below, serialized from
+    the ``definition`` parameter this function already receives.
+
+    ⚠ THE SITE IS THE WHOLE POINT, not a convenience. The very next statement iterates
+    ``definition.phases`` to write this run's ``workflow_phases`` rows, so the snapshot and
+    the phase rows are two projections of ONE in-memory object inside ONE transaction. They
+    cannot drift apart, and no second read, second query or re-resolution is involved. A
+    snapshot taken anywhere else would be a second source and would owe its own proof that
+    it matches.
+
+    ⚠ WHAT IT FIXES, measured rather than argued: ``workflow_definitions.definition`` is
+    MUTABLE while ``status = 'draft'``, and a draft can be rewritten under a run that
+    already has phase rows. On the local database 2026-08-20, **21 of 228 runs point at a
+    draft, 14 of those drafts have been edited since, and on 2 the phase ORDER changed** —
+    at which point the run surface's ``phase_index`` join (D-188-01) reports each step's
+    state as its NEIGHBOUR's. Published definitions are immutable and show zero crossings.
+    ``get_workflow_run``'s docstring already promised *"the definition version that RAN"*;
+    until this column that promise was protected against the SLUG moving and not against
+    the ROW moving.
+
+    ⚠ ``json.dumps`` + ``$N::jsonb``, matching ``inputs`` one line above — this file does
+    NOT install a pool JSONB codec. ``mode="json"`` is REQUIRED, not stylistic: the model
+    holds ``UUID`` and ``datetime`` members that the plain dict form leaves as Python
+    objects, which ``json.dumps`` then refuses outright.
+
+    ⚠ AND IT MUST LAND AS A JSONB **OBJECT**, never a JSON string scalar. The older
+    ``workflow_definitions.definition`` column is ``jsonb`` holding a STRING for most rows,
+    which makes ``definition->'phases'`` return SQL NULL instead of erroring — a shape that
+    has now produced a confident, vacuous ``0`` in two separate investigations.
+    ``backend/tests/test_migration_122.py`` asserts ``jsonb_typeof`` on every stored value.
+
     Returns the new workflow_run id.
     """
     async with pool.acquire() as con:
         async with con.transaction():
             run_id = await con.fetchval(
                 """
-                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run)
-                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6)
+                INSERT INTO workflow_runs (thread_id, definition_id, status, inputs, model, user_id, is_golden_run, definition_snapshot)
+                VALUES ($1, $2, 'active', $3::jsonb, $4, $5, $6, $7::jsonb)
                 RETURNING id
                 """,
                 thread_id,
@@ -328,6 +361,7 @@ async def create_workflow_run(
                 model,
                 user_id,
                 is_golden_run,
+                json.dumps(definition.model_dump(mode="json")),
             )
             for ps in sorted(definition.phases, key=lambda p: p.phase_index):
                 await con.execute(
