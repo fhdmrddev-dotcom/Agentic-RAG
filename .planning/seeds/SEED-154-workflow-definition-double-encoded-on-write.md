@@ -142,3 +142,25 @@ above; the 83/20 split; zero `phases` on the string rows; both defensive read un
 ## Related
 
 [[SEED-085]] · Phase 192.1 / LIB-05 (adjacent discovery, unrelated cause)
+
+
+---
+
+## Routing at `/gsd:plan-phase 200.1` (2026-08-20) — LEFT OPEN, and the trigger did NOT fire
+
+Phase 200.1 measured the **identical defect on a THIRD column** — `workflow_phases.output` is a jsonb
+STRING SCALAR on **527 of 588** rows and on **484 of 484 `completed`** ones, from the identical cause
+(`json.dumps` handed to a `$N::jsonb` parameter on a pool whose `_init_pg_connection` already registers
+`encoder=json.dumps`). There, the phase takes **both** repairs — a shared read-side unwrap AND the
+writer fix at the three terminal `workflow_phases` writers — with **no migration** (`D-200.1-01`).
+
+⚠ **This seed is NOT folded and its status is unchanged, deliberately.** Phase 200.1 does not touch
+`workflow_definitions.definition` or `workflow_runs.inputs` on the write path, and its plan `200.1-01`
+asserts that by fence (`json.dumps(inputs)` and the four `json.dumps(definition.model_dump(...))` sites
+are proved byte-unchanged). The deferral recorded in `STATE.md` and in migration 123's header —
+*"flipping a writer alone gives a table with two shapes in it"* — is **honoured in writing**.
+
+**What is worth carrying forward when this seed IS taken:** 200.1's argument for why `output` could be
+repaired alone is migration 123's own stated condition — *one reader that already accepts BOTH shapes*.
+That is the precondition to create for `definition` too, and it is cheaper than a migration. Trigger
+unchanged: **the next phase that touches these columns on the WRITE path.**
