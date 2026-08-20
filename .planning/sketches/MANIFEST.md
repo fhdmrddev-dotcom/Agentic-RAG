@@ -2315,3 +2315,18 @@ So the one-card shape is not merely a merge — **it makes that content foldable
 today**, and tab 3 versus tab 1 is an honest before/after of the CURRENT screen rather than a
 comparison of two proposals. Carry into planning: the fold improves the arrival moment even setting
 the five decisions aside.
+
+### Phase 200.1 session — the run surface's centre column (2026-08-21)
+
+| # | Name | Design Question | Winner | Tags |
+|---|------|----------------|--------|------|
+| 201 | what-the-run-column-says | The centre column duplicates the right panel character-for-character. If it stops being a second list, what is it instead — and what fills its top slot when the run produced nothing? | _pending_ | run-surface, seed-191, stitch-derived, empty-state |
+
+⚠ **A LANGUAGE sketch, not the acceptance bar** — it does not render `RunTranscript` /
+`WorkflowRunPage`. A rendered sketch is owed before planning (`SEED-155`).
+
+⚠ **The operator's question reshaped the decision and is recorded in the README:** *"if I selected B,
+what happens if the workflow does not produce the file?"* — **A and B are not rival designs**, they
+are ONE hero slot filled by whatever the run made, and the four arms already ship (`200.1-02`). The
+real choice is **hero + ledger** vs **C, one spine**, and tab **D** (the *neither* arm) is the
+tie-breaker: a hero slot that looks wrong when empty argues for C, which has no slot to leave empty.

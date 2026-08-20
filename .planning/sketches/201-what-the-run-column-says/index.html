@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Sketch 201 — what the run column says</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@600;700;800&display=swap">
+<style>
+:root{
+  /* Deep Midnight, as measured in the shipped app + the Stitch design system */
+  --bg:#06090F; --c-lowest:#0B0F16; --c-low:#0D1117; --c:#151B24; --c-high:#1B2230;
+  --line:#212631; --fg:#F3F5FC; --fg-var:#97A1B4;
+  --primary:#A3A5FF; --on-primary:#242478; --ok:#21C45D; --tertiary:#E5C74C;
+  --mono:"JetBrains Mono",ui-monospace,monospace; --sans:Inter,system-ui,sans-serif; --head:Manrope,var(--sans);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
+.material-symbols-outlined{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;
+  line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;
+  word-wrap:normal;direction:ltr;font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24}
+.bar{position:sticky;top:0;z-index:9;display:flex;gap:2px;padding:10px 16px;background:#04060A;border-bottom:1px solid var(--line)}
+.bar button{font:500 12px/1 var(--sans);color:var(--fg-var);background:transparent;border:0;padding:9px 13px;border-radius:4px;cursor:pointer}
+.bar button:hover{color:var(--fg);background:var(--c)}
+.bar button[aria-selected=true]{color:var(--on-primary);background:var(--primary);font-weight:700}
+.note{padding:11px 16px;font-size:12px;color:var(--fg-var);border-bottom:1px solid var(--line);background:#080B12;line-height:1.5}
+.note b{color:var(--fg)}
+.wrap{display:grid;grid-template-columns:1fr 340px;min-height:80vh}
+.main{padding:28px;overflow-y:auto}
+.stack{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.side{padding:24px 20px;background:var(--c-low);border-left:1px solid var(--line)}
+
+/* ── the reference's card ── */
+.card{background:var(--c-lowest);border:1px solid var(--line);border-radius:4px;padding:24px}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:18px;gap:16px}
+h1{font:700 30px/1.2 var(--head);letter-spacing:-.02em;margin:0 0 8px}
+h2{font:600 18px/1.4 var(--head);margin:0 0 4px}
+.meta{display:flex;align-items:center;gap:14px;color:var(--fg-var);font-family:var(--mono);font-size:12px;font-weight:500;flex-wrap:wrap}
+.meta span.i{display:flex;align-items:center;gap:5px}
+.meta .material-symbols-outlined{font-size:16px}
+.dot{width:4px;height:4px;border-radius:50%;background:var(--line)}
+/* chip — the reference's provenance tag */
+.chip{display:inline-flex;align-items:center;gap:5px;color:var(--primary);background:rgba(163,165,255,.10);
+      padding:4px 9px;border-radius:2px;font-family:var(--mono);font-size:11px;font-weight:500}
+.chip .material-symbols-outlined{font-size:14px}
+.chip.ok{color:var(--ok);background:rgba(33,196,93,.10)}
+.chip.warm{color:var(--tertiary);background:rgba(229,199,76,.10)}
+/* filled action, the reference's primary button */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 15px;background:var(--primary);
+     color:var(--on-primary);font-family:var(--mono);font-size:13px;font-weight:500;border:0;
+     border-radius:2px;cursor:pointer;white-space:nowrap}
+.btn:hover{opacity:.9}
+.btn.ghost{background:transparent;color:var(--fg);border:1px solid var(--line)}
+/* prose in the reference's left-rule block */
+.prose{border-left:2px solid var(--line);padding-left:18px;max-width:72ch;
+       font-size:16px;line-height:1.7;color:var(--fg-var)}
+.prose p{margin:0 0 14px}.prose p:last-child{margin:0}
+.prose strong{color:var(--fg);font-weight:600}
+.prose blockquote{margin:12px 0;padding-left:14px;border-left:2px solid var(--c-high);color:var(--fg-var);font-style:italic}
+
+/* ── step cards ── */
+.steps{display:flex;flex-direction:column;gap:10px}
+.step-card{background:var(--c-low);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.step-head{display:flex;align-items:center;justify-content:space-between;padding:15px 17px;cursor:pointer;gap:14px}
+.step-head:hover{background:var(--c-high)}
+.step-l{display:flex;align-items:center;gap:14px;min-width:0}
+.step-l>.material-symbols-outlined{color:var(--primary);font-size:22px;flex:0 0 auto}
+.step-name{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--fg)}
+.step-yield{font-size:13px;color:var(--fg-var);margin-top:2px}
+.step-r{display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;color:var(--fg-var);flex:0 0 auto}
+.step-body{padding:16px 17px;border-top:1px solid var(--line);background:var(--c-lowest)}
+.codeblock{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--fg-var);padding:12px 14px;
+           background:var(--c);border:1px solid var(--line);border-radius:2px;white-space:pre-wrap}
+/* the reference's horizontal source-card strip */
+.srcstrip{display:flex;gap:10px;overflow-x:auto;padding-bottom:6px;margin-top:12px}
+.srccard{flex:0 0 auto;width:210px;padding:12px;border:1px solid var(--line);background:var(--c);
+         border-radius:2px;display:flex;flex-direction:column;gap:6px}
+.srccard .material-symbols-outlined{color:var(--primary);font-size:20px}
+.srccard .fn{font-family:var(--mono);font-size:12px;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srccard .ex{font-size:12px;color:var(--fg-var);line-height:1.45;
+             display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* file hero */
+.filerow{display:flex;align-items:center;gap:14px;padding:16px;background:var(--c);border:1px solid var(--line);border-radius:2px}
+.filerow .material-symbols-outlined{color:var(--tertiary);font-size:26px}
+.fname{font-family:var(--mono);font-size:14px;font-weight:500}
+.fmeta{font-family:var(--mono);font-size:11px;color:var(--fg-var);margin-top:3px}
+.sechead{font:600 11px/1 var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--fg-var);margin:0 0 12px}
+
+/* right panel (the control — unchanged in every tab) */
+.p-step{display:flex;gap:11px;align-items:flex-start;padding:8px 0}
+.tick{width:21px;height:21px;border-radius:50%;border:1px solid var(--ok);color:var(--ok);
+      display:grid;place-items:center;font-size:12px;flex:0 0 auto}
+.p-step .nm{font-size:13px;line-height:1.35}
+.p-step .mz{font-family:var(--mono);font-size:11px;color:var(--fg-var);margin-top:2px}
+.dur{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--fg-var)}
+.hidden{display:none}
+.dim{opacity:.6}
+</style></head><body>
+
+<div class="bar" role="tablist">
+  <button role="tab" aria-selected="true" onclick="pick(0,this)">Today (the problem)</button>
+  <button role="tab" aria-selected="false" onclick="pick(1,this)">A — Answer card leads</button>
+  <button role="tab" aria-selected="false" onclick="pick(2,this)">B — Deliverable hero</button>
+  <button role="tab" aria-selected="false" onclick="pick(3,this)">C — One spine of cards</button>
+  <button role="tab" aria-selected="false" onclick="pick(4,this)">D — the "neither" arm ⚠</button>
+</div>
+<div class="note" id="note"></div>
+
+<!-- 0 · TODAY -->
+<section class="wrap v" data-v="0"><div class="main"><div class="stack">
+  <div><h1>Doc Q&amp;A (098 UAT)</h1><div class="meta"><span>✓ Complete</span><span class="dot"></span><span>Ran 4m 47s</span><span class="dot"></span><span>3 steps</span></div></div>
+  <div style="display:flex;flex-direction:column;gap:9px;font-size:14px">
+    <div style="display:flex;gap:26px"><span style="font-family:var(--mono);font-size:12px;color:rgba(151,161,180,.6)">00:00</span><span>Work out how to do it</span></div>
+    <div style="display:flex;gap:26px"><span style="font-family:var(--mono);font-size:12px;color:rgba(151,161,180,.6)">00:42</span><span>Wait for your approval</span></div>
+    <div style="display:flex;gap:26px"><span style="font-family:var(--mono);font-size:12px;color:rgba(151,161,180,.6)">03:50</span><span>Write it up</span></div>
+  </div>
+  <div style="height:280px"></div>
+  <div><div class="sechead">Files in this run's workspace</div>
+  <div style="font-size:13px;color:var(--fg-var)">This run produced no file and no written answer.</div></div>
+</div></div><div class="side" id="side0"></div></section>
+
+<!-- A -->
+<section class="wrap v hidden" data-v="1"><div class="main"><div class="stack">
+  <div class="card">
+    <div class="card-head">
+      <div><h1>The answer</h1>
+        <div class="meta">
+          <span class="i"><span class="material-symbols-outlined">schedule</span>Completed in 4m 47s</span>
+          <span class="dot"></span><span class="chip"><span class="material-symbols-outlined">source</span>38 sources</span>
+        </div></div>
+      <button class="btn"><span class="material-symbols-outlined" style="font-size:18px">open_in_new</span>Open full text</button>
+    </div>
+    <div class="prose">
+      <p>Approved with <strong>one correction</strong> before finalising:</p>
+      <p><strong>Section 1 — Executive Summary.</strong> Change</p>
+      <blockquote>“API Gateway rate limiting shipped two weeks early”</blockquote>
+      <p>to</p>
+      <blockquote>“API Gateway rate limiting middleware was deployed to staging two weeks early”</blockquote>
+      <p>This aligns Section 1 with Section 3, which correctly specifies the item was deployed to
+      staging rather than shipped to production.</p>
+    </div>
+  </div>
+  <div><h2>What each step yielded</h2><div class="sechead">3 steps · 4m 47s</div>
+  <div class="steps" id="stepsA"></div></div>
+</div></div><div class="side" id="side1"></div></section>
+
+<!-- B -->
+<section class="wrap v hidden" data-v="2"><div class="main"><div class="stack">
+  <div class="card">
+    <div class="card-head">
+      <div><h1>What this run produced</h1>
+        <div class="meta"><span class="i"><span class="material-symbols-outlined">schedule</span>Completed in 2m 39s</span>
+          <span class="dot"></span><span class="chip ok"><span class="material-symbols-outlined">check_circle</span>5 of 5 steps</span></div></div>
+    </div>
+    <div class="filerow">
+      <span class="material-symbols-outlined">description</span>
+      <div><div class="fname">Northwind-QBR-Template.docx</div><div class="fmeta">38.3 KB · 2 fields filled · just now</div></div>
+      <button class="btn" style="margin-left:auto"><span class="material-symbols-outlined" style="font-size:18px">download</span>Download</button>
+    </div>
+    <div style="margin-top:16px"><div class="sechead">and it wrote</div>
+      <div class="prose" style="font-size:15px"><p>Produced the filled deliverable covering Q3 usage,
+      support history and commercial position for Northwind Logistics.</p></div></div>
+  </div>
+  <div><h2>How it got there</h2><div class="sechead">5 steps</div><div class="steps dim" id="stepsB"></div></div>
+</div></div><div class="side" id="side2"></div></section>
+
+<!-- C -->
+<section class="wrap v hidden" data-v="3"><div class="main"><div class="stack">
+  <div><h1>Doc Q&amp;A (098 UAT)</h1>
+    <div class="meta"><span class="i"><span class="material-symbols-outlined">schedule</span>4m 47s</span>
+      <span class="dot"></span><span class="chip"><span class="material-symbols-outlined">source</span>38 sources</span>
+      <span class="dot"></span><span class="chip warm"><span class="material-symbols-outlined">how_to_reg</span>1 approval</span></div></div>
+  <div class="steps" id="stepsC"></div>
+</div></div><div class="side" id="side3"></div></section>
+
+<!-- D · the "neither" arm — the state the hero slot must survive -->
+<section class="wrap v hidden" data-v="4"><div class="main"><div class="stack">
+
+  <div><div class="sechead" style="color:var(--tertiary)">d1 · the bare sentence, as it ships today</div>
+  <div class="card">
+    <div class="card-head"><div><h1>Quarterly Business Review</h1>
+      <div class="meta"><span class="i"><span class="material-symbols-outlined">block</span>Stopped</span>
+      <span class="dot"></span><span>5 steps</span></div></div></div>
+    <div style="font-size:13px;color:var(--fg-var)">This run produced no file and no written answer.</div>
+  </div>
+  <div style="font-size:12px;color:var(--fg-var);margin-top:8px;line-height:1.55;max-width:70ch">
+    ⚠ In a page of cards this reads as <b style="color:var(--fg)">something failed to load</b>, not as an
+    honest statement. And it says "produced nothing" about a run that read
+    <b style="color:var(--fg)">35 sources across three steps</b> before it was stopped — true, and useless.</div></div>
+
+  <div style="margin-top:26px"><div class="sechead" style="color:var(--primary)">d2 · the same fact, given a shape</div>
+  <div class="card">
+    <div class="card-head">
+      <div><h1>Quarterly Business Review</h1>
+        <div class="meta"><span class="i"><span class="material-symbols-outlined">block</span>Stopped after 1m 12s</span>
+          <span class="dot"></span><span class="chip"><span class="material-symbols-outlined">source</span>35 sources read</span>
+          <span class="dot"></span><span class="chip warm"><span class="material-symbols-outlined">pending</span>stopped at step 3 of 5</span></div></div>
+      <button class="btn ghost"><span class="material-symbols-outlined" style="font-size:18px">replay</span>Run again</button>
+    </div>
+    <div class="filerow" style="background:transparent;border-style:dashed">
+      <span class="material-symbols-outlined" style="color:var(--fg-var)">draft</span>
+      <div><div class="fname" style="color:var(--fg-var)">Nothing was produced</div>
+        <div class="fmeta">No file was written and no answer was recorded. The work below still happened.</div></div>
+    </div>
+  </div></div>
+
+  <div style="margin-top:26px"><h2>What it managed before it stopped</h2>
+  <div class="sechead">3 of 5 steps</div><div class="steps" id="stepsD"></div></div>
+</div></div><div class="side" id="side4"></div></section>
+
+<script>
+const PANEL_QA=[["Work out how to do it","38 sources","42s"],["Wait for your approval","","3m 07s"],["Write it up","","57s"]];
+const PANEL_QBR=[["Pull usage and adoption data","15 sources","26s"],["Pull support history","20 sources","23s"],
+ ["Pull commercial position…","20 sources","38s"],["Synthesize the QBR narrative","","31s"],["Fill the QBR template","2 fields","39s"]];
+function panel(rows){return `<div class="sechead">Workflow progress</div>`+rows.map(([n,m,d])=>
+ `<div class="p-step"><span class="tick">✓</span><div><div class="nm">${n}</div>${m?`<div class="mz">${m}</div>`:""}</div><span class="dur">${d}</span></div>`).join("");}
+const PANEL_STOP=[["Pull usage and adoption data","15 sources","26s"],["Pull support history","20 sources","23s"],
+ ["Pull commercial position…","","23s"]];
+[0,1,2,3,4].forEach(i=>document.getElementById("side"+i).innerHTML=
+  panel(i===2?PANEL_QBR:i===4?PANEL_STOP:PANEL_QA));
+
+const SRC=`<div class="srcstrip">
+ <div class="srccard"><span class="material-symbols-outlined">description</span><div class="fn">weekly_report_structure.md</div>
+  <div class="ex">“# Weekly Report Template Structure ## Placeholders Reference HEADER TABLE: {{report_subtitle}} {{report_period}}…”</div></div>
+ <div class="srccard"><span class="material-symbols-outlined">description</span><div class="fn">metrics_week_apr07.md</div>
+  <div class="ex">“Product Metrics (Week-over-Week) — activation, weekly actives, and the API gateway rollout note…”</div></div>
+ <div class="srccard"><span class="material-symbols-outlined">description</span><div class="fn">support_summary_q3.md</div>
+  <div class="ex">“Ticket volume by severity, first-response time, and the two escalations opened this period…”</div></div>
+</div>`;
+function card(icon,name,yield_,meta,body,open){return `<div class="step-card"><div class="step-head" onclick="tog(this)">
+ <div class="step-l"><span class="material-symbols-outlined">${icon}</span>
+  <div><div class="step-name">${name}</div><div class="step-yield">${yield_}</div></div></div>
+ <div class="step-r"><span>${meta}</span><span class="material-symbols-outlined">${open?"expand_less":"expand_more"}</span></div></div>
+ <div class="step-body${open?"":" hidden"}">${body}</div></div>`;}
+
+document.getElementById("stepsA").innerHTML=
+ card("check_circle","Work out how to do it","Read 38 sources from Weekly-Reports","42s",
+   `<div class="codeblock">38 passages retrieved · 3 shown</div>${SRC}`)+
+ card("how_to_reg","Wait for your approval","You approved it","3m 07s",
+   `<div class="codeblock">“Does this draft answer your question? Add any corrections.”\n→ Looks good</div>`)+
+ card("check_circle","Write it up","Wrote 517 characters","57s",
+   `<div class="codeblock">This step's output is the answer shown at the top of this column.</div>`);
+
+document.getElementById("stepsB").innerHTML=
+ card("check_circle","Pull usage and adoption data","Read 15 sources","26s",`<div class="codeblock">15 passages retrieved</div>`)+
+ card("check_circle","Pull support history","Read 20 sources","23s",`<div class="codeblock">20 passages retrieved</div>`)+
+ card("check_circle","Pull commercial position and meeting notes","Read 20 sources","38s",`<div class="codeblock">20 passages retrieved</div>`)+
+ card("check_circle","Synthesize the QBR narrative","","31s",`<div class="codeblock">This step recorded no count.</div>`)+
+ card("check_circle","Fill the QBR template","Filled 2 fields","39s",`<div class="codeblock">2 fields written into the template.</div>`);
+
+document.getElementById("stepsC").innerHTML=
+ card("check_circle","Work out how to do it","Read 38 sources from Weekly-Reports","00:00 · 42s",
+   `<div class="codeblock">38 passages retrieved · 3 shown</div>${SRC}`)+
+ card("how_to_reg","Wait for your approval","You approved it","00:42 · 3m 07s",
+   `<div class="codeblock">“Does this draft answer your question? Add any corrections.”\n→ Looks good</div>`)+
+ card("check_circle","Write it up","Wrote 517 characters — the run's answer","03:50 · 57s",
+   `<div class="prose" style="border:0;padding:0">
+      <p>Approved with <strong>one correction</strong> before finalising:</p>
+      <blockquote>“API Gateway rate limiting middleware was deployed to staging two weeks early”</blockquote>
+      <p>This aligns Section 1 with Section 3.</p></div>
+    <button class="btn ghost" style="margin-top:14px"><span class="material-symbols-outlined" style="font-size:18px">open_in_new</span>Open full text</button>`,true);
+
+const NOTES=[
+ "<b>TODAY.</b> Three step names character-identical to the right panel, clocks that are its durations summed, ~780px empty, and one sentence about output that only mentions files. Two greys and white — no cards, no chips, no icons.",
+ "<b>A — Answer card leads.</b> The reference's shape: the answer is a bordered card with an icon meta row, a <b>38 sources</b> chip and a filled <i>Open full text</i>. Steps below are cards with a primary icon, a plain-English yield, and a horizontal strip of the <b>real citation passages</b>.",
+ "<b>B — Deliverable hero.</b> Your buried-file point: the artifact is the hero inside the card, amber icon, own Download. Steps drop to a dimmed card ledger. Note <i>Synthesize</i> honestly shows no count.",
+ "<b>C — One spine of cards.</b> No separate answer region — the answer is the last step, already open. Kills the duplication hardest, keeps the clock the panel doesn't have, and the run's totals move up into chips beside the title.",
+ "<b>D — the arm A and B share.</b> A and B are NOT rival designs: they are one hero slot filled by whatever the run made. This is the state that slot must survive — <b>neither</b>. <b>d1</b> is what ships today: in a page of cards a bare grey sentence reads as a loading failure. <b>d2</b> gives the same fact a shape — a dashed placeholder that says nothing was produced, chips that keep the work honest (<b>35 sources read</b>, <b>stopped at step 3 of 5</b>), and a way out. ⚠ The ledger below stays: a run that produced nothing still DID something, and hiding that is the fifth repeat of this project's fold-two-facts-into-one defect."
+];
+function pick(i,btn){document.querySelectorAll('.v').forEach((s,n)=>s.classList.toggle('hidden',n!==i));
+ document.querySelectorAll('.bar button').forEach(b=>b.setAttribute('aria-selected','false'));
+ btn.setAttribute('aria-selected','true');document.getElementById('note').innerHTML=NOTES[i];}
+function tog(h){const b=h.parentElement.querySelector('.step-body');if(!b)return;b.classList.toggle('hidden');
+ const c=h.querySelector('.step-r .material-symbols-outlined');if(c)c.textContent=b.classList.contains('hidden')?'expand_more':'expand_less';}
+document.getElementById("stepsD").innerHTML=
+ card("check_circle","Pull usage and adoption data","Read 15 sources","26s",`<div class="codeblock">15 passages retrieved</div>`)+
+ card("check_circle","Pull support history","Read 20 sources","23s",`<div class="codeblock">20 passages retrieved</div>`)+
+ card("block","Pull commercial position and meeting notes","Stopped part-way through","23s",
+   `<div class="codeblock">The run was stopped here. Nothing was recorded for this step.</div>`);
+document.getElementById('note').innerHTML=NOTES[0];
+</script></body></html>
