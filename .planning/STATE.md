@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-21T00:15:00.000Z"
+last_updated: "2026-08-20T19:59:08.824Z"
 last_activity: 2026-08-20
 progress:
   total_phases: 23
-  completed_phases: 20
-  total_plans: 139
-  completed_plans: 133
-  percent: 87
+  completed_phases: 13
+  total_plans: 136
+  completed_plans: 135
+  percent: 57
 ---
 
 # Project State
@@ -31,14 +31,14 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 200.1 — the-run-says-what-it-produced (INSERTED 2026-08-20 by the v3.7 close audit; 200 and the six phases before it are closed)
+**Current focus:** Phase 200.1 — the-run-says-what-it-produced-insert
 
 ## Current Position
 
-Phase: **v3.7 CLOSE AUDIT — RUN 2026-08-20 at `e0c57ef4` on `develop`. Eight phases closed in one
+Phase: 200.1 (the-run-says-what-it-produced-insert) — EXECUTING
 pass; Phase 200.1 inserted.** The prior Position block (Phase 200's finishing pass) is preserved
 verbatim below the audit, because its findings are still the record of that work.
-Plan: **Phase 200.1 — 3 plans, PLANNED 2026-08-20. Ready to execute.** `200.1-01` + `200.1-03` are
+Plan: 1 of 3
 wave 1 (parallel worktrees, zero `files_modified` overlap); `200.1-02` is wave 2. Plan-checker returned
 **VERIFICATION PASSED — no blockers**, two warnings, both handled below. Next command:
 `/gsd:execute-phase 200.1`.
@@ -57,18 +57,23 @@ AND its blocking operator checkpoint are both driven against the live DB at `:54
   written**, which is the SEED-185 "a deny-list can't be made fail-closed" finding one column over.
   `200.1-02`'s bound is therefore an **allow-list SET-EQUALITY** over the real `TestClient` body —
   it also fails on a key invented tomorrow. Verified by the checker as implemented, not asserted.
+
 - ⚠ **`backend/app/models/thread.py` measures `12 / 8 / 217` and had NO `CLAUDE.md` row and NO
   `docs/HOT-FILE-LEDGER.md` section** — G-5 firing at EIGHT phases, invisible to its own guardrail for
   its entire life. This is the `config.py` / `ChatLayout.tsx` finding a third time. `200.1-01` gives it
   both, in one commit.
+
 - ⚠ **Two ledger rows were ALREADY STALE before this phase began**: `lib/api.ts` reads `177 / 100` and
   measures `177 / 102`; `transcriptVocabulary.ts` reads `1 / 1 / 105` and measures `3 / 1 / 131`.
+
 - ⚠ **A THIRD silent consumer of the same double-encode defect**: `harness_engine.py`'s F7 resume
   re-fold reads `load_run_phases`' `output` into a `dict[str, dict]` and has been folding **strings**.
   Out of RUN-04's scope — recorded in `complete_phase`'s docstring with a trigger, **not fixed quietly
   and not dropped**.
+
 - **All four deliverable arms are fixture-free**, not only the text one: both 63 · text-only 120 ·
   file-only 3 · nothing 46. Named runs sit in each plan.
+
 - **The sheet's `text-indigo` `#A3A5FF` is byte-identical to this tree's dark `--primary`** on the same
   `#060A0F` ground — a token match, not an approximation. The sheet's `#464651` gutter measures
   **2.16:1** there against the shipped **3.43:1** and is **DECLINED in writing**, with the operator
@@ -90,6 +95,7 @@ shapes"* — which is exactly what (a) creates. No migration; re-open trigger is
    `execute-phase` uses for wave conflict detection**, so a false one is not a documentation nit. All
    three are corrected, with the original claim preserved beside the correction in both documents. **No
    race ever existed** — `200.1-03`, the other wave-1 plan, touches neither file.
+
 2. `200.1-02` self-reports a **~60% context estimate** against this repo's ~50% target, because the
    phase-wide ledger sync (Task 3, 8 files) shares a plan with the deliverable feature work. Disclosed
    with a documented escape hatch: stop after Task 2, commit, run Task 3 in a fresh context.
@@ -128,6 +134,7 @@ verdict is written into its checklist line rather than summarised here.
 
 **Gates re-derived during the audit, not inherited:** count gate **`OK — total 5365 · failed 0 ·
 pinned 5004 · 110/110`** (identical to the handover baseline — zero drift) · `test_migration_122.py`
+
 + `test_seed190_run_log.py` **27 passed**.
 
 ✅ **THREE THINGS STATE.md LISTED AS OWED ARE CLOSED, and two of its own claims were STALE.**
@@ -136,6 +143,7 @@ pinned 5004 · 110/110`** (identical to the handover baseline — zero drift) ·
    `workflow_runs.definition_snapshot` is `jsonb_typeof = 'object'` on **4 of 4** rows — **zero
    string scalars remain** — and `test_migration_122.py` reads **8 passed** where two cases were RED
    against data the bug wrote.
+
 2. ⚠ **THE CANVAS RUN MODE HAS A MOUNT AFTER ALL.** The block below says
    *"`grep -rn "runState=" frontend/src` outside tests now returns nothing, so the canvas's whole RUN
    MODE has no mount"*, and names three things as unreachable. **That was true when written and the
@@ -145,6 +153,7 @@ pinned 5004 · 110/110`** (identical to the handover baseline — zero drift) ·
    states **do have a mount** — behind a toggle that defaults to `log`. ⚠ **The re-open trigger
    recorded for them (branching becoming representable) is therefore NOT the only route back, and
    should not be relied on as if it were.**
+
 3. ⚠ **Migration 121's clock: `18 of 588` phase rows now carry `started_at`** (the block below says
    10 of 580). Growing, as expected — quoted so the next reader re-derives rather than inherits.
 
@@ -198,6 +207,7 @@ Carries the two things the operator named, plus the defect above as its plan 1.
    no migration. ⚠ **Only `text` may ship** — the same jsonb carries `citations` (314),
    `source_refs` (314), `similarity_scores` (254), `sub_run_id` (239), `field_map` (66),
    `tool_call_id` (34) and prompts.
+
 2. **The run log's live line looks live** — ported from `screens/run-surface.html` markup directly,
    never from a change-log. The sheet's live row has `text-indigo animate-pulse` on the clock and an
    `animate-spin` glyph beside the text; **shipped has neither.** ⚠ `RunTranscript`'s two shipped
@@ -227,7 +237,6 @@ inside a 195 closure round is the *"closure rounds smuggle in features"* mechani
 `rowIdentity.ts`, not in the card).
 
 ---
-
 
 ### ⚠ THE PRIOR CURRENT POSITION, PRESERVED VERBATIM — Phase 200's finishing pass, 2026-08-20
 
@@ -315,8 +324,10 @@ fourth surface.
    against data the bug wrote.** The WRITER's own fix has three falsifiable tests that do not depend on
    any row existing, and they pass. It was NOT applied without asking because it MUTATES the operator's
    dev data; 121 and 122 were applied under explicit authorisation and that does not carry forward.
+
 2. **Cloud parity for 121, 122 AND 123**, all in the SAME operation that deploys this backend. 122 and
    123 are on the WRITE path of the one function that starts a run.
+
 3. **Two seeded fixtures still in the local DB**: `zz-200-06-fixture-constructor`,
    `zz-200-06-fixture-harmless`.
 
@@ -325,11 +336,13 @@ fourth surface.
 - **Migration 121's clock has rendered against live data.** This file said `0 of 570`; measured
   2026-08-20 it is **10 of 580 phase rows** across 3 runs, and the run page draws real per-step
   durations (`35s · 33s · 23s · 39s · 45s`, header `Ran 2m 57s · 5 steps · finished 20:31`).
+
 - **Migration 122's writer is proven end to end** — outside a rolled-back probe, on a real run.
 - **The count-gate pins Phase 200 withheld are paid**: `RunSpine.test.tsx` 11 ·
   `RunTranscript.test.tsx` 19→28 · `RunReceipt.test.tsx` 20→26 · `WorkflowRunPage.test.tsx` 137→148 ·
   `StepPanelPort.test.tsx` 25 · `WorkflowCard.baseline.test.tsx` 29. ⚠ The last three are BYTE-UNCHANGED
   by the pass that raised them (checked with `git diff --numstat` first).
+
 - **The hot-file ledger is re-derived for every file this pass touched** (16 files, one batch), and
   **TWO FILES THAT FIRE G-5 HAD NEVER BEEN IN THE TABLE AT ALL**: `canvasModel.ts` (6 phases) and
   **`ChatLayout.tsx` (21 phases — invisible to its own guardrail for the project's entire life)**. Both
@@ -358,7 +371,9 @@ real CSS (`.planning/sketches/200-journey-interactive/screens/*.html`; `index.ht
 that iframes them). The loop is: **open the sheet, port its markup directly, look at both in the
 browser.** No atoms, no plans. The spine took ~20 minutes that way. **Six screens were re-ported
 on that loop** — spine, library, step panel, doors + draft arrival, canvas, publish + run dialog
+
 + fork/delete — each verified live in the browser by the orchestrator, not accepted from a
+
 summary.
 
 **ALL 13 SHEETS ARE NOW AUDITED ELEMENT BY ELEMENT** (`AUDIT-*.md`, ~455 rows, each with a
@@ -366,15 +381,18 @@ summary.
 Wiring passes then closed **28 of the 45** rows.
 
 ⚠ **THREE CORRECTIONS THE AUDIT FORCED, all measured:**
+
 1. **Neither builder sheet draws a per-step timing.** A duration regex over all four builder
    sheets returns one row. **The amber ledger entries that justified building the timestamp
    slice were change-log claims the drawings do not support** — the third independent
    confirmation of the same root failure. (The slice is still useful; it was not what those
    sheets asked for.)
+
 2. **A shipped refusal rested on a false premise.** `RunModal.tsx:514` declined the sheet's
    wording because *"there is no authored per-key label anywhere on the wire"* —
    `InputFieldSpec.label` ships at `models/harness.py:504` and `soulData.ts:72` discarded it.
    **Fixed, with the original wording kept above the corrected one.**
+
 3. **Three sheet rows are DEFECTS, not criteria** — run-tense atoms on two *authoring* surfaces
    (a marching `running` label on a draft canvas; `Approve`/`Send back` on a draft spine), and
    the publish sheet drawing **9 stages where the server runs 10**. Matching that last one would
@@ -473,21 +491,27 @@ log carry the rows. Also seen in the browser and left alone: the receipt prints 
 as **`finished`**, which D-07 says must be distinct at every surface.
 
 **THE REMAINING BACKLOG IS SIX FOUNDATIONS** (24 BE-NEEDED + 63 NEW collapse into these):
+
 1. **Connections** (~18 rows) — **a milestone, not a screen.** No MCP client
    (`grep -rni "mcp" backend/app` → **0**), no OAuth/token store, no approval model. Every
    shipped capability is a WRITE, so the sheet's read-heavy list has no wire, and its
    *"works in chat too"* caption is **currently false**.
+
 2. **Branching in the definition** (~6) — *"branching is not representable in the definition at
    all"* (`PhaseFormPanel`'s own rail). Best value per unit of work.
+
 3. **External-action capabilities** (~4) — `harness.py:251` is a closed `Literal` of three, all
    writes, so `ONLY READS` cannot be rendered honestly.
+
 4. **Per-folder governance** (~3) — `folder_scope` is bare UUIDs; `FolderRead` has no document
    count (blocks `Legal · 1,284 documents`). ⚠ Also blocks `+ Add a source`:
    `_folder_scope_requires_project` (`harness.py:584-595`) raises on a workflow with no
    `project_folder_id`, leaving a permanently unsaveable draft.
+
 5. **Run history that survives a reload** (~3) — `ToolCall.startedAt`/`endedAt` are client
    `Date.now()` and *"Undefined for tool calls loaded from DB"*; an ask carries no `answered_at`
    and no assignee.
+
 6. **Two small ones** — one template per step (sheet shows three); no judge **step kind** (the
    shipped judge is a *validator on* a step).
 
@@ -2430,7 +2454,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Ready to execute
+**Status:** Executing Phase 200.1
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
@@ -3178,7 +3202,7 @@ plain. Do not verify a behaviour that does not exist.
 
 **Next action:** `/gsd:verify-work 192` when you want the owed rows driven — or proceed knowing they
 are owed. Downstream MUST read `192-CONTEXT.md` (**18** decisions) and `192-RESEARCH.md`, which **corrects six CONTEXT.md line numbers** measured at `HEAD = a0795512` — re-derive every line number, HEAD has moved.
-**Last activity:** 2026-08-19
+**Last activity:** 2026-08-20
 
 **Prior activity:** 2026-08-10 — **Phase 192 wave 1 executed and merged** (`5178100e`). `192-01`: five `WorkflowsPage`-covering suites adopted into BOTH count-gate knobs (pinned files 51 → 56, pinned total 2838 → 2910), zero source changed. `192-02`: D-04 ownership — `is_mine` + `is_system_global` computed server-side on `/published` and `/starters`, raw `created_by` fenced off the wire. Post-merge gate green: `tsc -p tsconfig.app.json` unmoved at **33**, count gate exit 0 / `failed 0`, new backend suite 17/17.
 
