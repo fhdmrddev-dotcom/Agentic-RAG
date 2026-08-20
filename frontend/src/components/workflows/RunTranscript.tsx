@@ -143,6 +143,19 @@
  * and is never signalled by colour alone. The live state is therefore carried by the page's
  * already-worded label, with tone reinforcing it rather than replacing it.
  *
+ * ⚠ AMENDED 2026-08-21 — THE LIVE ROW NOW CARRIES A MARK, AND THE ORIGINAL IS KEPT ABOVE
+ * RATHER THAN OVERWRITTEN because only ONE of its two clauses moved. What is amended is the
+ * clause "this surface renders neither": the ACTIVE line now carries a spinner, ported from
+ * the sheet's own Active Log markup. What still holds, and is the reason the amendment is
+ * safe, is the SENTENCE AFTER IT — the state is still carried in REAL TEXT by the page's
+ * already-worded label, and the spinner reinforces that word rather than replacing it.
+ *
+ * The glyph BUDGET is also unchanged, which is the part worth not misreading: the mark is a
+ * CSS ring (`BuilderSaveRegion.tsx`'s shipped shape), not an icon import, so this file still
+ * renders zero glyphs and still takes no dependency on a glyph library. The sheet's ATTENTION
+ * icon (`priority_high`) is still declined — that line is already named in words and in the
+ * violet tone, and a second mark there would be the second telling this file removed.
+ *
  * ⚠ `--panel-*` TOKENS ARE FORBIDDEN HERE. This region renders on `--background`, not inside
  * the panel shell; `phaseStatusMeta.ts` states that boundary in as many words.
  *
@@ -419,17 +432,134 @@ export function RunTranscript({
                   // measured crossing from something a person has to notice into something a
                   // test — or a console — can ask about directly.
                   data-source-conflict={held != null && live == null ? "true" : undefined}
-                  className="flex min-w-0 items-baseline gap-4 text-sm leading-relaxed"
+                  // ⚠ `items-center` ON THE LIVE ROW ONLY, and the scoping is the point. The
+                  // sheet's Active Log row is the one row it draws `items-center`; its settled
+                  // rows are not, and this component's settled flow is pinned by EQUALITY to
+                  // the shipped string. A 16px ring on a baseline-aligned row sits visibly low,
+                  // so the alignment travels with the spinner rather than being applied to all.
+                  className={cn(
+                    "flex min-w-0 items-baseline gap-4 text-sm leading-relaxed",
+                    isLive && "items-center",
+                  )}
                 >
                   {/* ⚠ THE GUTTER IS ALWAYS PRESENT AND SOMETIMES EMPTY. An untimed row keeps
                       its column so the timed rows above it stay aligned, and it holds nothing
                       rather than a placeholder — a dash in a clock column is a reading. */}
+                  {/* ─────────────────────────────────────────────────────────────────────────
+                      THE WIDTH AND THE TYPE SCALE ARE THE SHEET'S. THE COLOUR IS NOT, AND THAT
+                      IS `D-200.1-03-A` — THE ONE PLACE THIS PORT DEVIATES.
+                      ─────────────────────────────────────────────────────────────────────────
+
+                      `run-surface.html`'s Transcript Region draws every settled gutter as
+
+                          w-16 font-data-sm text-data-sm flex-shrink-0 text-[#464651]
+
+                      and its inline config defines `data-sm` as 12px / line-height 1.4 /
+                      weight 500 / JetBrains Mono. The width, the size, the weight and the
+                      leading are all adopted verbatim; `font-mono` is this tree's analogue of
+                      that data family and `tabular-nums` is what makes a clock column align at
+                      all, so both stay.
+
+                      ⚠ THE SHEET'S `#464651` IS DECLINED, AND IT IS DECLINED ON A MEASUREMENT
+                      RATHER THAN ON TASTE. Both drawings sit on the same near-black ground, so
+                      the two are directly comparable: this tree's dark `--background`
+                      (216 45% 4%) and the sheet's `body { background-color: #060A0F }`. On that
+                      ground `#464651` reads **2.16:1** — below even the 3:1 GRAPHICAL floor,
+                      let alone text — while the shipped `text-muted-foreground/60` composites
+                      to about `#5D6572` = **3.43:1**. Adopting the literal would make the clock
+                      column materially harder to read while LOOKING like fidelity, which is the
+                      worst shape a port can take. So the sheet's value is quoted here, where a
+                      future reader can see exactly what was declined, and not rendered.
+
+                      ⚠ THE FOUR FIGURES ABOVE ARE THE PLAN'S, AND RE-DERIVING THEM MOVED THREE
+                      OF THEM — recorded BESIDE the originals, never over them, because a
+                      measurement quietly replaced reads as though it had never been wrong.
+                      Converting the tokens by hand (sRGB → relative luminance → WCAG 2.x
+                      contrast) gives:
+
+                        · `--background` 216 45% 4%  → `#06090F`, NOT `#060A0F`. It is one step
+                          off the sheet's ground in GREEN, so the two grounds are near-identical
+                          but not byte-identical, and the "byte-for-byte" claim is withdrawn.
+                        · `--primary` 239 100% 82%   → `#A3A5FF` — EXACTLY `.text-indigo`. This
+                          one is confirmed: a token match, not an approximation. 8.91:1 on our
+                          ground (8.87:1 on the sheet's), comfortably clear of AA.
+                        · the sheet's `#464651`      → **2.14:1** on our ground (2.13:1 on the
+                          sheet's), against the 2.16 quoted above.
+                        · `text-muted-foreground/60` → `#5D6472` at **3.35:1** on our ground
+                          (3.37:1 on the sheet's), against the `#5D6572` / 3.43 quoted above.
+
+                      Every VERDICT survives the correction unchanged, which is why the decision
+                      stands: the declined literal is still under the 3:1 graphical floor, the
+                      kept value is still materially better, and the indigo is still an exact
+                      token match.
+
+                      ⚠ AND AN OBSERVATION THIS PLAN DOES NOT FIX: **neither** figure clears the
+                      4.5:1 AA floor for 12px body text. That is a property of the shipped muted
+                      tone across this whole tree, not of this column, and raising it here would
+                      re-tone one gutter into disagreement with every other muted reading in the
+                      app. Re-open trigger: **the next phase that re-tones this tree's muted
+                      readings.** */}
+                  {/* ⚠ THE LIVE CLOCK IS COMPOSED WITH `cn`, NOT CONCATENATED, BECAUSE THE TWO
+                      TONES MUST NOT BOTH LAND. A class list carrying `text-muted-foreground/60`
+                      AND `text-primary` at once is a coin flip on emission order; `cn`'s merge
+                      resolves the conflict deterministically in favour of the later one, which
+                      is why the live arm can simply state its colour rather than having to
+                      remember to remove the settled one. */}
                   <span
                     data-testid="transcript-clock"
-                    className="w-14 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/60"
+                    className={cn(
+                      "w-16 shrink-0 font-mono text-[12px] font-medium leading-[1.4] tabular-nums",
+                      isLive ? "animate-pulse text-primary" : "text-muted-foreground/60",
+                    )}
                   >
                     {entry.offsetMs === null ? "" : runClock(entry.offsetMs)}
                   </span>
+                  {/* ─────────────────────────────────────────────────────────────────────────
+                      THE SPINNER — AND WHY IT IS NOT THE NARRATION BEING RE-OPENED
+                      ─────────────────────────────────────────────────────────────────────────
+
+                      This file's own refusal, quoted rather than restated: the sheet's two
+                      lines per step carry two different sentences — *"Connecting to Northwind
+                      CRM instance…"* then *"Extracted vendor list"* — and that narration is
+                      "authored copy this product does not have and must not invent". It was
+                      built and WITHDRAWN on that measurement, and nothing here reverses it.
+
+                      A spinner is not narration. It states THIS IS HAPPENING NOW, which is a
+                      fact this product holds — it is the same fact `data-live` already carries
+                      and the same one the spine's mark already pulses on. What narration would
+                      add is a claim about WHAT is happening, which we cannot source. So the
+                      ring is deliberately textless: no children, `aria-hidden`, and an asserted
+                      empty `textContent`, with the row's total text pinned to the title plus
+                      the one state word the component already computes.
+
+                      ⚠ A CSS RING, NOT AN ICON. The sheet reaches for a named glyph from an
+                      icon font that is not this tree's glyph vocabulary; this component renders
+                      zero glyphs, and importing a library to draw a circle would spend a
+                      dependency to break both. `BuilderSaveRegion.tsx` is the shipped precedent
+                      for exactly this shape.
+
+                      ⚠ AND THE SHEET'S CLASS NAME IS DELIBERATELY NOT SPELLED IN THIS FILE,
+                      WHICH IS NOT FASTIDIOUSNESS — IT WAS MEASURED. The guard on this decision
+                      is a whole-file grep for the forbidden icon-library tokens expecting ZERO,
+                      and a whole-file grep cannot tell a refusal from an adoption. The first
+                      draft of this very comment quoted the sheet's glyph class to explain why
+                      it was declined, and turned its own guard RED — the 187-24 trap, which has
+                      now fired in `receiptVocabulary.ts`, in `toolNames.ts` and here. The name
+                      stays quoted in the SHEET and in this file's test, where nothing greps for
+                      it; naming it here would defeat the only thing defending the decision.
+
+                      ⚠ IT IS BOUND TO `isLive`, WHICH IS ALREADY GATED BY THE TENSE RULE
+                      (T-200.1-05). A spinner on a row that is not live claims work is in
+                      progress when it is not, so it derives nothing of its own: the same
+                      boolean that drives `data-live` drives this, and `pageAgreesWithWire`
+                      already refuses a stale slice that would animate a finished step. */}
+                  {isLive && (
+                    <span
+                      aria-hidden="true"
+                      data-testid="transcript-spinner"
+                      className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+                    />
+                  )}
                   {/* ⚠ THE LIVE LINE STAYS FULL-STRENGTH, AND THAT REFUSAL IS UNCHANGED. It
                       read, and still reads: "An earlier draft dimmed the running step,
                       borrowed from the sheet, where the dim lines are IN-FLIGHT NARRATION
