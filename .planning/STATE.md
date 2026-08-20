@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-20T18:40:00.000Z"
+last_updated: "2026-08-21T00:15:00.000Z"
 last_activity: 2026-08-20
 progress:
-  total_phases: 22
-  completed_phases: 12
-  total_plans: 133
-  completed_plans: 128
-  percent: 55
+  total_phases: 23
+  completed_phases: 20
+  total_plans: 139
+  completed_plans: 133
+  percent: 87
 ---
 
 # Project State
@@ -31,9 +31,205 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 200 — the-workflow-journey
+**Current focus:** Phase 200.1 — the-run-says-what-it-produced (INSERTED 2026-08-20 by the v3.7 close audit; 200 and the six phases before it are closed)
 
 ## Current Position
+
+Phase: **v3.7 CLOSE AUDIT — RUN 2026-08-20 at `e0c57ef4` on `develop`. Eight phases closed in one
+pass; Phase 200.1 inserted.** The prior Position block (Phase 200's finishing pass) is preserved
+verbatim below the audit, because its findings are still the record of that work.
+Plan: **Phase 200.1 — 3 plans, PLANNED 2026-08-20. Ready to execute.** `200.1-01` + `200.1-03` are
+wave 1 (parallel worktrees, zero `files_modified` overlap); `200.1-02` is wave 2. Plan-checker returned
+**VERIFICATION PASSED — no blockers**, two warnings, both handled below. Next command:
+`/gsd:execute-phase 200.1`.
+Next action: **`/gsd:execute-phase 200.1`.** ⚠ Bring local infra up FIRST
+(`powershell -ExecutionPolicy Bypass -File scripts/start-local-infra.ps1`) — `200.1-01`'s counterfactual
+AND its blocking operator checkpoint are both driven against the live DB at `:54322`.
+
+#### Phase 200.1 planning pass, 2026-08-20 — what it measured beyond the ROADMAP
+
+**Every ROADMAP figure was re-derived against the live DB and matched EXACTLY** (588 / 527 /
+484-of-484 / 13 / 0 / 479), so the audit's diagnosis stands unamended. What the pass added:
+
+- ⚠ **The ROADMAP's key census of six is INCOMPLETE ON TODAY'S DATA — eight more live keys exist**:
+  `answer` 34 · `retrieved_ids` 52 · `placeholder_keys` 52 · `sub_questions` 15 · `sub_run_ids` 15 ·
+  `failure` 15 · `recorded_intent` 5 · `_surfaced` 5. **A deny-list was already wrong before it was
+  written**, which is the SEED-185 "a deny-list can't be made fail-closed" finding one column over.
+  `200.1-02`'s bound is therefore an **allow-list SET-EQUALITY** over the real `TestClient` body —
+  it also fails on a key invented tomorrow. Verified by the checker as implemented, not asserted.
+- ⚠ **`backend/app/models/thread.py` measures `12 / 8 / 217` and had NO `CLAUDE.md` row and NO
+  `docs/HOT-FILE-LEDGER.md` section** — G-5 firing at EIGHT phases, invisible to its own guardrail for
+  its entire life. This is the `config.py` / `ChatLayout.tsx` finding a third time. `200.1-01` gives it
+  both, in one commit.
+- ⚠ **Two ledger rows were ALREADY STALE before this phase began**: `lib/api.ts` reads `177 / 100` and
+  measures `177 / 102`; `transcriptVocabulary.ts` reads `1 / 1 / 105` and measures `3 / 1 / 131`.
+- ⚠ **A THIRD silent consumer of the same double-encode defect**: `harness_engine.py`'s F7 resume
+  re-fold reads `load_run_phases`' `output` into a `dict[str, dict]` and has been folding **strings**.
+  Out of RUN-04's scope — recorded in `complete_phase`'s docstring with a trigger, **not fixed quietly
+  and not dropped**.
+- **All four deliverable arms are fixture-free**, not only the text one: both 63 · text-only 120 ·
+  file-only 3 · nothing 46. Named runs sit in each plan.
+- **The sheet's `text-indigo` `#A3A5FF` is byte-identical to this tree's dark `--primary`** on the same
+  `#060A0F` ground — a token match, not an approximation. The sheet's `#464651` gutter measures
+  **2.16:1** there against the shipped **3.43:1** and is **DECLINED in writing**, with the operator
+  asked to rule on it at `200.1-03`'s checkpoint.
+
+**Decision `D-200.1-01` — BOTH (a) and (b), no migration.** (a) the shared read-side unwrap is the only
+repair reaching the 484 historical `completed` rows plan 2 needs; (b) dropping `json.dumps` at the three
+`$N::jsonb` bind sites stops ~3 new bad rows per run. **The `inputs` / `workflow_definitions.definition`
+deferral is HONOURED**, with the reason it does not transfer: `output` already has two shapes, and
+migration 123's own condition for repairing a column alone is *"one reader that already accepts both
+shapes"* — which is exactly what (a) creates. No migration; re-open trigger is **the first phase needing
+`output` queryable IN SQL**.
+
+**Two plan-check warnings, both fixed at the plan-check rather than deferred:**
+
+1. ⚠ **`200.1-01`'s `files_modified` OMITTED `CLAUDE.md` and `docs/HOT-FILE-LEDGER.md`** while two of its
+   tasks wrote and committed both — and the ROADMAP wave note plus `200.1-02`'s objective each asserted
+   in writing that *"NEITHER wave-1 plan touches `CLAUDE.md`"*. **`files_modified` is the field
+   `execute-phase` uses for wave conflict detection**, so a false one is not a documentation nit. All
+   three are corrected, with the original claim preserved beside the correction in both documents. **No
+   race ever existed** — `200.1-03`, the other wave-1 plan, touches neither file.
+2. `200.1-02` self-reports a **~60% context estimate** against this repo's ~50% target, because the
+   phase-wide ledger sync (Task 3, 8 files) shares a plan with the deliverable feature work. Disclosed
+   with a documented escape hatch: stop after Task 2, commit, run Task 3 in a fresh context.
+
+⚠ **Migration `123` remains WRITTEN BUT NOT APPLIED.** No plan in this phase applies, renumbers or
+depends on it; `200.1-02` T3 says so in the summary rather than leaving the silence to be misread.
+
+**Planned WITHOUT CONTEXT.md / RESEARCH.md / VALIDATION.md / UI-SPEC.md — a recorded operator decision,
+not an omission.** The ROADMAP § 200.1 block is the locked-decisions document (it carries the measured
+tables, the four-arm contract and the sheet-vs-shipped diff); sketch 200 (`run-surface.html`,
+`acceptance_bar: true`) is the design contract, so G-2 does not fire and deriving a SECOND acceptance bar
+was refused — that derivation is the instrument failure that cost Phase 200 its first pass. **Consequence
+carried forward: no Nyquist VALIDATION.md exists for this phase, so plans carry no Dimension-8 artifact.**
+
+---
+
+### ⚠ THE v3.7 CLOSE AUDIT, 2026-08-20 — eight phases answered, one defect found
+
+**This was the v3.6 close pattern again and it was caught before it cost a day.** Seven phases had
+shipped — 37–78 commits each, 7–15 verification artifacts each — and were still unticked in
+`ROADMAP.md`'s Phase Checklist; the v3.6 close lost a day to exactly five such stale checkboxes.
+**Each phase was audited against the TREE at `e0c57ef4`, never against its own SUMMARY**, and every
+verdict is written into its checklist line rather than summarised here.
+
+| Phase | Verdict | The one thing worth knowing |
+|---|---|---|
+| **192.2** | ✅ **5/5** | `runFacts`' four arms, the shared lateral + `has_any_run`, `cardFace.ts` (G-5 DISCHARGED), the six cut atoms pinned absent. **Teardown paid** — `frontend/src/dev/` is gone. 10 UAT rows owed. |
+| **193** | ⚠ **1/3 — CLOSED WITH A NAMED RESIDUAL** | SC#3 driven and passed. **SC#1/SC#2 are not merely owed UAT: `SEED-156` is still measurably TRUE.** |
+| **194** | ✅ **3/3 — and its recorded FAILURE is repaired** | `194-VERIFICATION.md` failed SC#2 (*"the user pressed Stop … and the run reports `completed`"*). At HEAD the terminal-status guard ships. **Two residuals: L-01 and WR-04.** |
+| **195** | ✅ **3/3** | Re-verified surviving Phase 200's run-surface re-port. SC#3 still proved by test and unexercised live (no run has ever produced 2+ files). |
+| **196** | ✅ (already ticked) | — |
+| **197** | ✅ **3/3 in code** | 9 G-4 rows: 4 PASS · 2 PARTIAL · 5 NOT DRIVEN. **Drive U4 first** (anthropic + openai). |
+| **198** | ✅ **ANSWERED — SHIPS NOTHING** | Never ran and does not need to. **SC#1's count is `0`.** |
+| **199** | ⚠ **5/5, SUPERSEDED IN PART BY 200** | Its criteria stand; its *outcome* is carried by 200's direct re-port of six of its screens. 6 UAT rows owed. |
+| **200** | ⚠ **4/5 — SC#3 DOES NOT HOLD** | See the defect below. Everything else verified against the tree AND the live DB. |
+
+**Gates re-derived during the audit, not inherited:** count gate **`OK — total 5365 · failed 0 ·
+pinned 5004 · 110/110`** (identical to the handover baseline — zero drift) · `test_migration_122.py`
++ `test_seed190_run_log.py` **27 passed**.
+
+✅ **THREE THINGS STATE.md LISTED AS OWED ARE CLOSED, and two of its own claims were STALE.**
+
+1. ✅ **MIGRATION 123 IS APPLIED.** The OWED block below still says it is not. Measured:
+   `workflow_runs.definition_snapshot` is `jsonb_typeof = 'object'` on **4 of 4** rows — **zero
+   string scalars remain** — and `test_migration_122.py` reads **8 passed** where two cases were RED
+   against data the bug wrote.
+2. ⚠ **THE CANVAS RUN MODE HAS A MOUNT AFTER ALL.** The block below says
+   *"`grep -rn "runState=" frontend/src` outside tests now returns nothing, so the canvas's whole RUN
+   MODE has no mount"*, and names three things as unreachable. **That was true when written and the
+   finishing pass changed it**: `WorkflowRunPage.tsx` gained a log↔canvas centre switch
+   (`:933` state, `:1277` control, `:1444` branch) and passes `runState` to `WorkflowCanvas` at
+   `:1455`. `BC-MR-01`'s payload label, the marching `live` connector and the run-tense connection
+   states **do have a mount** — behind a toggle that defaults to `log`. ⚠ **The re-open trigger
+   recorded for them (branching becoming representable) is therefore NOT the only route back, and
+   should not be relied on as if it were.**
+3. ⚠ **Migration 121's clock: `18 of 588` phase rows now carry `started_at`** (the block below says
+   10 of 580). Growing, as expected — quoted so the next reader re-derives rather than inherits.
+
+---
+
+### ⚠ THE DEFECT THE AUDIT FOUND — Phase 200's SC#3 is BUILT, GATED, GREEN AND REACHES NOBODY
+
+**Found by measuring rather than by reading**, which is the only reason it was found at all: every
+artifact about it is correct.
+
+> SC#3: *"A per-step count appears only where the phase type declared one from a fact in its own
+> output … and the canvas edge label is the same declared count, not a second mechanism."*
+
+The **mechanism** is exactly right — `step_count`/`step_noun` are on both wire models, and
+`FlowEdge.tsx:336` renders the same declared count through `payloadLabel`. **The count reaches
+nobody.**
+
+`complete_phase` (`db/workflows.py:1606`) binds `json.dumps(output)` into a `$2::jsonb` parameter, on
+a pool where `_init_pg_connection` already registers a jsonb codec with `encoder=json.dumps`
+(D-073-06). **This is migration 122's root cause, one column over.** Encoded twice ⇒ the column holds
+a jsonb STRING SCALAR ⇒ `declared_phase_measure` (`models/thread.py:48`) opens with
+`if not isinstance(raw, dict): return None, None` and degrades **silently**.
+
+**Measured 2026-08-20 — the split is TOTAL, not partial:**
+
+| | |
+|---|---|
+| `output._measure` present **through the unwrap** | **13** |
+| `output._measure` reachable **without** it | **0** |
+| `completed` rows that are `string` | **484 of 484 — every one** |
+| the `object` rows | `pending` 45 · `cancelled` 12 · `skipped` 1 · `failed` 3 — a path that binds the dict directly |
+
+⚠ **`completed` is exactly the status that can carry a measure, so the failure rate is 100%.**
+⚠ **Nothing renders dishonestly** — D-07's absent arm prints nothing, never a `0`, never a dash —
+**which is precisely why no test and no eye caught it.** Built, gated, green, unreachable: the
+Phase-118 lesson with a live mechanism. `fail_phase` and `record_phase_not_sent` bind the same way.
+
+**Routed to Phase 200.1 plan 1**, ahead of the operator's own two items, because the text arm reads
+`output` through the same door.
+
+---
+
+### ⚠ PHASE 200.1 IS INSERTED — *The Run Says What It Produced* (RUN-04, 3 plans)
+
+Carries the two things the operator named, plus the defect above as its plan 1.
+
+1. **The run surface names its deliverable BY TYPE** — four arms (file / text only / both /
+   genuinely nothing), none folded into another. Today the region is file-only, so a run whose
+   output was a text answer renders `This run produced no files.` **Measured: 479 phase rows carry
+   `output.text` against 60 carrying a file — 8×.** One narrow declared field on an existing route,
+   no migration. ⚠ **Only `text` may ship** — the same jsonb carries `citations` (314),
+   `source_refs` (314), `similarity_scores` (254), `sub_run_id` (239), `field_map` (66),
+   `tool_call_id` (34) and prompts.
+2. **The run log's live line looks live** — ported from `screens/run-surface.html` markup directly,
+   never from a change-log. The sheet's live row has `text-indigo animate-pulse` on the clock and an
+   `animate-spin` glyph beside the text; **shipped has neither.** ⚠ `RunTranscript`'s two shipped
+   REFUSALS survive: the live line is not dimmed, and no authored narration is invented — **a spinner
+   is not narration.**
+
+⚠ **This is NOT a Phase 195 gap and NOT a gap-closure round.** 195's goal is verbatim *"a workflow
+that produces a FILE shows it"* and all three of its criteria are about files. Building a text arm
+inside a 195 closure round is the *"closure rounds smuggle in features"* mechanism from `CLAUDE.md`
+§ G-7 that turned Phase 187 from 15 plans into 29.
+
+---
+
+### ⚠ RESIDUALS CARRIED OUT OF THE AUDIT — named, not hidden by a tick
+
+| # | Residual | Where it goes |
+|---|---|---|
+| 1 | **`SEED-156` is still TRUE at HEAD** — re-measured from Phase 193's own committed captures: `GOVERN_STANDALONE` still renders the describe screen (same heading, same `describe-template-row`, same `describe-hint`, same `Write the first draft`). **The govern door's promise appears nowhere on the govern door's first screen.** 197, 199 and 200 all touched this surface; none took it. | `status: open`. The next authoring phase, or a chooser sketch. **193's SC#1/SC#2 cannot be claimed until it moves.** |
+| 2 | **194 L-01** — the far-worker producer KEEPS RUNNING. The run now REPORTS honestly; the work does not STOP. Needs a Redis cancel channel or an in-loop `workflow_runs.status` re-read. `finish_run`'s own comment says so in place. | Owed a phase. ⚠ **Do not let a ticked RUN-01 be read as *"the work stops"*.** |
+| 3 | **194 WR-04** — three non-owner callers (operator Kill, disable-user sweep, delete cascade) drive `_cancel_run_internals`, so `runVocabulary.ts` says **"Stopped by you"** about a stop the reader did not make. | Next phase touching run vocabulary or the operator Kill path. |
+| 4 | **Owed human-UAT: 192.2 `0/10` · 197 `5 of 9 not driven` · 199 `0/6`.** Closed as a DECISION under the G-7 rule that owed manual rows are legitimate — **never as a claim they ran.** | **Drive 197 U4 first** (the requirement row on anthropic + openai — the measured 0/5 vs 5/5 contrast). |
+| 5 | **Phase 200's own backlog** — 17 of 45 FE-WIRING rows still open, plus 24 BE-NEEDED + 63 NEW. | The six foundations below. **Two of them are 200.1.** |
+| 6 | **Two seeded fixtures still in the local DB**: `zz-200-06-fixture-constructor`, `zz-200-06-fixture-harmless`. | Delete when convenient; excluded from every audit figure. |
+| 7 | **Cloud parity for migrations 121, 122 AND 123**, all in the SAME operation that deploys this backend. 122 and 123 are on the WRITE path of the one function that starts a run — a half-deploy fails **every run creation**. | The next deploy. Operator-gated. |
+
+⚠ **`BUG-260819-01` stays `open`** and folds into the next library phase (one decision in
+`rowIdentity.ts`, not in the card).
+
+---
+
+
+### ⚠ THE PRIOR CURRENT POSITION, PRESERVED VERBATIM — Phase 200's finishing pass, 2026-08-20
 
 Phase: 200 (the-workflow-journey) — **EXECUTED, RE-PORTED FROM THE SKETCHES, THEN FINISHED AGAINST THE
 OPERATOR'S SCREENSHOT 2026-08-20 (four commits, `8df97383` → `5a487762`).**
@@ -112,7 +308,8 @@ fourth surface.
 
 ### ⚠ OWED, AND EACH ONE IS ONE ACTION
 
-1. ⚠ **MIGRATION 123 IS WRITTEN AND NOT APPLIED.** It repairs the two double-encoded snapshots in place
+1. ~~⚠ **MIGRATION 123 IS WRITTEN AND NOT APPLIED.**~~ ✅ **APPLIED 2026-08-20 — struck through rather than deleted, because the figure is the record of when it was true.** Verified by the close audit: `definition_snapshot` is `object` on **4 of 4** rows, zero string scalars, and `test_migration_122.py` reads **8 passed**. The original text follows.
+   ⚠ **MIGRATION 123 IS WRITTEN AND NOT APPLIED.** It repairs the two double-encoded snapshots in place
    (`(definition_snapshot #>> '{}')::jsonb` — lossless, guarded, idempotent, with a post-condition that
    aborts rather than half-committing). **Until it is applied, two `test_migration_122` cases stay RED
    against data the bug wrote.** The WRITER's own fix has three falsifiable tests that do not depend on

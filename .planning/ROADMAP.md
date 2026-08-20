@@ -1125,8 +1125,12 @@ not show.
 **Plans**: 3 plans in 2 waves — planned 2026-08-20
 
 **Waves.** Wave 1 runs `200.1-01` and `200.1-03` in PARALLEL (zero `files_modified` overlap — one is
-backend-only, the other frontend-only, and NEITHER touches `CLAUDE.md`, so two concurrent worktrees
-cannot race on the 150,000-character gate file). Wave 2 runs `200.1-02`, which depends on `200.1-01`
+backend-only, the other frontend-only, and only `200.1-01` touches `CLAUDE.md` / `docs/HOT-FILE-LEDGER.md`
+— `200.1-03` touches neither, so two concurrent worktrees still cannot race on the 150,000-character
+gate file. ⚠ **CORRECTED 2026-08-20 at the plan-check**: this note originally read *"NEITHER touches
+`CLAUDE.md`"*, which was FALSE — `200.1-01` gives `backend/app/models/thread.py` its first-ever ledger
+row and section, and `200.1-01`'s `files_modified` omitted both files. The conclusion survives because
+the OTHER wave-1 plan is the one that had to be clean, and it is). Wave 2 runs `200.1-02`, which depends on `200.1-01`
 because it reads `output` through the door that plan repairs, **and on `200.1-03` because the phase's
 hot-file ledger triples cannot be derived until every source edit has landed.**
 
