@@ -35,10 +35,117 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 200 (the-workflow-journey) — **EXECUTED, THEN RE-PORTED FROM THE SKETCHES 2026-08-20.**
-Plan: 7 of 7 plans + 6 sketch ports + 4 wiring passes, all merged to `develop`, HEAD `13107cc5`
-Next action: **the six foundations** — the run page's centre is decided and shipped (see below). Nearest
-unblocked value: **branching in the definition** (~6 rows), which also re-earns the run canvas.
+Phase: 200 (the-workflow-journey) — **EXECUTED, RE-PORTED FROM THE SKETCHES, THEN FINISHED AGAINST THE
+OPERATOR'S SCREENSHOT 2026-08-20 (four commits, `8df97383` → `5a487762`).**
+Plan: 7 of 7 plans + 6 sketch ports + 4 wiring passes + this finishing pass, all on `develop`
+Next action: **apply migration 123** (one paste — see the OWED block below), then **the six
+foundations**. Nearest unblocked value: **branching in the definition** (~6 rows), which also re-earns
+the run canvas; and **SEED-190's remaining half** — marking a workflow-run thread in the chat sidebar,
+which is where the operator's complaint actually started.
+
+---
+
+### ⚠ THE FINISHING PASS, 2026-08-20 — four commits, and what each one turned out to be
+
+**1 · `8df97383` — THE NODE CARD IS 137-B AGAIN. The port was reverted, not fixed.**
+The operator saw BOTH faces rendered and chose the earlier one, naming the ring around the mark and the
+card silhouette. `NodeIconWell.tsx` is restored VERBATIM; `NodeCornerMarks` / `NodeRunOverlay` /
+`canvasModel`'s two constants go back with it, because every mark and offset had moved only because the
+card did. ⚠ **THE PROOF IS THAT NOTHING WAS RE-BASELINED**: `PhaseNodeCard.test.tsx`,
+`canvasModel.test.ts`, `FlowEdge.test.tsx` and `WorkflowCanvas.editing.test.tsx` were restored from
+`cd6f7b1d` UNEDITED and PASS — three `CARD_HTML_BASELINE` byte-captures and the twelve editing
+affordances, none re-typed. That is also why `NodeIconWell` came back WITHOUT the port's
+`canvas-icon-well` test id: dropping it makes the DOM byte-identical, and a pin that still holds against
+a capture nobody re-typed is evidence where a re-captured pin is only a record. **The port's three
+CONTENT slots survive** — effect banner, branch condition, elapsed — because those are capabilities and
+not silhouette.
+
+**2 · `3f94a02e` — MIGRATION 122's SNAPSHOT WAS DOUBLE-ENCODED, AND THIS IS THE ROOT CAUSE OF THE
+RECORDED "jsonb string-scalar trap".**
+`test_migration_122.py` went RED on the first two real runs, on exactly the assertion it was written for.
+`create_workflow_run` passed `json.dumps(...)` into a `$N::jsonb` parameter — and
+`dependencies._init_pg_connection` registers a jsonb codec with `encoder=json.dumps` on EVERY pooled
+connection (D-073-06). Encoded twice ⇒ a jsonb STRING SCALAR ⇒ `-> 'phases'` returns SQL NULL instead of
+raising. ⚠ **The function's own docblock asserted the opposite** (*"this file does NOT install a pool
+JSONB codec"*) — the FILE does not; THE POOL DOES, and the pool is what it acquires from.
+⚠ **MEASURED:** `definition_snapshot` string on **2 of 2** · `inputs` string on **230 of 230** ·
+`workflow_definitions.definition` string on **261 of 291**. The counterfactual is what makes it a
+diagnosis: on a BARE connection with no codec, BOTH forms store as `object` — which is why a code read
+exonerates the writer and only a probe through the pool convicts it. Both directions are pinned.
+✅ **RED→GREEN PROVEN ON LIVE DATA**: the run driven later that evening stored `object`; the two pre-fix
+runs are `string`.
+⚠ **`inputs` and `definition` are DELIBERATELY NOT FIXED** — 230 and 261 rows in the old shape, and
+flipping a writer alone gives a table with two shapes in it. Re-open trigger: the next phase touching
+either on the write path.
+
+**3 · `b03a1fba` — SEED-190's RUN LOG SHIPPED, AND THE SEED WAS RESCOPED BY THE OPERATOR.**
+The seed asked for a PER-WORKFLOW history; what ships is ONE LOG OF EVERY RUN, which the card's door
+filters. A per-workflow list answers *"I cannot tell a workflow run from a chat"* only if you already
+know which workflow to look inside. `GET /workflow-runs` (owner-scoped in the query, optional `?slug=`,
+paged, canvas-gated in the same commit) + `history/RunLogPanel.tsx` + two doors (the Workflows header
+for the whole log, each card's `⋯` for one workflow).
+⚠ **THE FILTER IS BY SLUG, ACROSS VERSIONS** — verified live: `pm-weekly-status-report` returns **21
+runs across 3 definition rows**, which is exactly what a `definition_id` filter would have got wrong
+while looking right. An UNKNOWN slug returns an EMPTY log, never an unfiltered one.
+⚠ **NOTHING IS RE-DERIVED**: the outcome word is `runFacts`' (the same sentence the card prints,
+asserted by comparison and never by a copied literal), the bands are `relativeChanged`'s, the duration
+is `runSpan`'s — fed the pair the backend pre-reduces with the SAME definition.
+⚠ **`api.ts`'s 197 DECLINE TRIGGER HAS FIRED** (a runtime export) and is recorded as fired, not
+discharged. The next phase touching that file owes the extraction.
+
+**4 · `5a487762` — THE RUN SURFACE, FINISHED — AND DRIVING IT FOUND A LIE.**
+The panel header is level with the page header (a two-cell header BAND; `RunSpine`'s `h-[72px]` strip
+could not match a height it cannot see — measured 112 vs 72, so its heading sat 90px low). The rail is
+visible (`bg-border` computes to `rgb(33, 38, 49)` on that panel — in the DOM, invisible on screen). The
+log has contrast on the axis where it is TRUE: a step the run never reached dims; **the running line
+stays bright**, because the sheet's dim lines are in-flight NARRATION between bright RESULT lines and
+with one line per step that mapping inverts.
+✅ **THE APPROVAL CARD RENDERS — DRIVEN, FOR THE FIRST TIME EVER.** A published human-input workflow ran
+end to end; the card appears inside the spine at its own step, in violet, with the STEP'S OWN AUTHORED
+CHOICES (never a fixed Approve/Send back), and answering it resumed the run to completion.
+⚠ **AND IT EXPOSED A DEFECT NO TEST COULD HAVE CAUGHT.** With the run PAUSED, the summary strip read
+*"Ran 42s · 3 steps · finished 22:15"* beside a spine visibly waiting and a header saying `Running`.
+Both FIGURES were honest; the SENTENCES asserted a stop that had not happened. **Every case in
+`RunReceipt.test.tsx` passed throughout, because every one of them rendered a TERMINAL run** — the
+defect lived entirely in a state the suite never built. That is the argument for G-4, restated by a
+fourth surface.
+
+### ⚠ OWED, AND EACH ONE IS ONE ACTION
+
+1. ⚠ **MIGRATION 123 IS WRITTEN AND NOT APPLIED.** It repairs the two double-encoded snapshots in place
+   (`(definition_snapshot #>> '{}')::jsonb` — lossless, guarded, idempotent, with a post-condition that
+   aborts rather than half-committing). **Until it is applied, two `test_migration_122` cases stay RED
+   against data the bug wrote.** The WRITER's own fix has three falsifiable tests that do not depend on
+   any row existing, and they pass. It was NOT applied without asking because it MUTATES the operator's
+   dev data; 121 and 122 were applied under explicit authorisation and that does not carry forward.
+2. **Cloud parity for 121, 122 AND 123**, all in the SAME operation that deploys this backend. 122 and
+   123 are on the WRITE path of the one function that starts a run.
+3. **Two seeded fixtures still in the local DB**: `zz-200-06-fixture-constructor`,
+   `zz-200-06-fixture-harmless`.
+
+### ✅ CLOSED BY THIS PASS — three things STATE.md listed as owed
+
+- **Migration 121's clock has rendered against live data.** This file said `0 of 570`; measured
+  2026-08-20 it is **10 of 580 phase rows** across 3 runs, and the run page draws real per-step
+  durations (`35s · 33s · 23s · 39s · 45s`, header `Ran 2m 57s · 5 steps · finished 20:31`).
+- **Migration 122's writer is proven end to end** — outside a rolled-back probe, on a real run.
+- **The count-gate pins Phase 200 withheld are paid**: `RunSpine.test.tsx` 11 ·
+  `RunTranscript.test.tsx` 19→28 · `RunReceipt.test.tsx` 20→26 · `WorkflowRunPage.test.tsx` 137→148 ·
+  `StepPanelPort.test.tsx` 25 · `WorkflowCard.baseline.test.tsx` 29. ⚠ The last three are BYTE-UNCHANGED
+  by the pass that raised them (checked with `git diff --numstat` first).
+- **The hot-file ledger is re-derived for every file this pass touched** (16 files, one batch), and
+  **TWO FILES THAT FIRE G-5 HAD NEVER BEEN IN THE TABLE AT ALL**: `canvasModel.ts` (6 phases) and
+  **`ChatLayout.tsx` (21 phases — invisible to its own guardrail for the project's entire life)**. Both
+  gained rows AND detail sections in the same commit.
+
+**Gates at this pass's close, re-derived on `develop`:** count gate **`OK — total 5365 · failed 0 ·
+pinned total 5004 · 110/110`** · `tsc -p tsconfig.app.json --noEmit` **33 errors / 19 files, the
+pre-existing baseline, none in any file this pass touched** · `backend/tests/test_seed190_run_log.py`
+19 passed · `test_188_workflow_run_read.py` 12 passed. ⚠ `WorkflowRunPage.test.tsx` failed ONCE mid-pass
+on its own documented flake (the `visibilitychange` reconcile, *"measured failing 1 run in 6"*),
+byte-unchanged and green on re-run — filenames captured BEFORE re-running, per SEED-171.
+
+---
 
 ⚠ **THE PHASE PASSED ITS OWN CHECKLIST AND FAILED THE OPERATOR — AGAIN, AND THE CAUSE IS
 STRUCTURAL.** 47/49 atoms were reported built and every gate was green; the operator's verdict
@@ -151,7 +258,8 @@ count still reaches a person on the log and the receipt. **Re-open trigger: bran
 representable (foundation 2).** `useGroundingBundle` was removed from the page with the canvas that
 was its only consumer; F7's fix still reads verbatim from `WorkflowBuilderPage.tsx`.
 
-⚠ **OWED — the log's clock has NEVER rendered against live data.**
+⚠ ~~**OWED — the log's clock has NEVER rendered against live data.**~~ **CLOSED 2026-08-20 — struck
+through rather than deleted, because the figure is the record of when it was true.** It read:
 `select count(*) from workflow_phases where started_at is not null` → **0 of 570**: no run has
 executed since migration 121 landed. The writer exists and is wired (`db/workflows.py:1466` →
 `harness_engine.py:1638`). **One UAT row closes it: run any published workflow once and open its run

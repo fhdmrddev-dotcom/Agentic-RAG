@@ -3160,3 +3160,77 @@ at build, so `196-08`'s mock-factory failure mode (nine suites throwing at mount
 `vi.mock("@/lib/api")` factory did not declare a newly-added export) **measurably cannot fire.**
 Proved by grep over the real diff (D-15), never by quoting this paragraph. **Trigger carried forward
 verbatim: the next phase adding a RUNTIME export or a second concern here.**
+
+---
+
+### `frontend/src/components/workflows/canvasModel.ts`
+
+**Re-derived 2026-08-20 (the Phase 200 node-card revert): `13 commits / 6 phases / 752 L`** · six-digit
+dated quick-task buckets: **checked, none exist** · **G-5 FIRES** (6 phases vs threshold 3).
+
+⚠ **IT WAS ABSENT FROM BOTH DOCUMENTS AT SIX PHASES**, and it was found the way this ledger's own
+correction note prescribes: by re-deriving the triples of everything a session touched, rather than by
+reading the table. This is the `ChatLayout.tsx` finding one file over and the `config.py` finding one
+layer up — the audit reads a table, and a file that is not in the table is invisible at any count.
+
+**What it holds.** `CANVAS_LAYOUT`, the ONE frozen constants table every placement number on the plane
+reads from, plus the node/edge type vocabulary the graph library's `nodeTypes` map must match exactly.
+Plan 183-06's CSS agrees with the SAME table, so a stray literal cannot creep into either half.
+
+⚠ **ITS CONSTANTS ARE NOT INDEPENDENT, AND THAT IS THE INVARIANT A FUTURE EDITOR NEEDS.**
+`NODE_MIN_HEIGHT` and `EDGE_ANCHOR_Y` are one decision about the CARD, and `PhaseNodeCard.tsx`'s own
+`RUN_MODE_NODE_MIN_HEIGHT` is the third place that decision lives. The Phase 200 canvas port moved all
+three (104→72, 28→36, 120→84) and the 2026-08-20 revert moved all three back in one commit; reverting
+any two of the three leaves the connectors entering the cards at the wrong height. Three pinned suites
+say so out loud when it happens — `canvasModel.test.ts` (the frozen table), `FlowEdge.test.tsx` (the
+DETOUR transcription, valid only at a known baseline) and `WorkflowCanvas.editing.test.tsx` (twelve
+affordance positions).
+
+⚠ **`EDGE_ANCHOR_Y` IS MEASURED FROM THE NODE TOP AND NEVER AT 50%** — D-183-12 — so a taller card keeps
+its baseline. Every re-derivation of that number has to start from where the card's content begins, not
+from its centre.
+
+⚠ **THE PORT'S RE-BASELINE CARRIED A FINDING WORTH KEEPING even though the port is reverted**: the delta
+across the twelve editing affordances was NOT uniform. The seven insert marks sit on the connector and
+move with `EDGE_ANCHOR_Y`; the five remove marks hang off the card's bottom and move with
+`NODE_MIN_HEIGHT`. A blanket single-term edit made half the rows right and half wrong by 40.
+
+**Seam:** none proposed. A frozen constants table doing one thing many times is the right shape, and
+splitting it would put the plane's geometry in two files that must agree.
+
+---
+
+### `frontend/src/components/layout/ChatLayout.tsx`
+
+**Re-derived 2026-08-20 (SEED-190's run log): `40 commits / 21 phases / 815 L`** · six-digit dated
+quick-task buckets: **checked, none exist** · **G-5 FIRES** (21 phases vs threshold 3).
+
+⚠ **IT WAS ABSENT FROM BOTH DOCUMENTS AT TWENTY-ONE PHASES — invisible to its own guardrail for the
+project's entire life.** That is the `backend/app/config.py` headline repeated at the frontend's own
+junction box, and it is the sixth file this ledger has caught in the same state
+(`WorkflowsPage.tsx` ten, `WorkflowDoorSwitch.tsx` six, `db/workflows.py` seventeen, `api.ts` a hundred,
+`config.py` forty-two).
+
+**What it holds** — and the list is the argument for the row: `openRunSurface` (the ONLY door to
+`WorkflowRunPage` before SEED-190 added two more), `doRun` (the launch path every Run control on the
+library routes through), the lifted panel state machine, the chat thread singleton, the ⌘. keybinding,
+and the whole `ActiveView` mount switch.
+
+⚠ **THE MOUNT SWITCH'S TRAILING ELEMENT IS A POSITIONAL FALLBACK, NOT A `default:` THAT THROWS.** An
+`ActiveView` member with no branch of its own silently renders Knowledge Health. That is the Phase-118
+built-but-unreachable lesson with a live mechanism behind it, and it is why every new home's branch is
+placed IMMEDIATELY BEFORE that trailing element and why the reachability triad (the `App.tsx` union
+member + the mount here + a navigator) is owned in the phase that adds it.
+
+⚠ **A CHANGE HERE LANDS IN CHAT FIRST.** This file is the sole production mount of `WorkspacePanel` and
+therefore of `PanelEmpty` and `PhaseTimeline`, so UAT driven only on a workflow surface will miss it.
+`PhaseTimeline.tsx`'s and `PanelEmpty.tsx`'s rows both say the same thing from the other end.
+
+⚠ **CANVAS-GATED CALLBACKS ARE PASSED AS `undefined`, NOT AS NO-OPS.** `onOpenRun` / `onOpenRun`-shaped
+props are handed down as `canvasEnabled ? fn : undefined` precisely so a consumer can render a row that
+is not a control at all — a dead button is worse than an absent one, and the receiving surfaces branch
+on the callback's PRESENCE.
+
+**Seam:** not proposed yet. The honest first step for a file that has been invisible for twenty-one
+phases is a row and a re-derivation, which is what this is; the obvious candidate when one is taken is
+the `ActiveView` mount switch, which is ~150 lines of branch and owns none of the state around it.
