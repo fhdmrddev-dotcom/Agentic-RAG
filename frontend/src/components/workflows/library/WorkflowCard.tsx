@@ -272,6 +272,9 @@ import {
   SquarePen,
   Trash2,
   User,
+  // 200-WIRE — the house's `build`: the sheet leads its draft status line with Material
+  // Symbols' `build`, which the icon convention forbids. See the fourth arm at `row-answer`.
+  Wrench,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
@@ -1048,7 +1051,26 @@ export function WorkflowCard({
       data-card="workflow-card"
       data-provenance={row.provenance}
       className={
-        CARD_CLASSES + (row.provenance === "draft" ? " border-dashed border-border" : " border-border")
+        CARD_CLASSES +
+        (row.provenance === "draft" ? " border-dashed border-border" : " border-border") +
+        // ⚠ 200-WIRE — THE SHEET'S DRAFT DIM (`opacity-80` on card 6's root, `library.html:360`).
+        // `runnable` was ALREADY resolved on this card and nothing consumed it for the card's
+        // own weight; `grep -c "opacity-"` over this file returned 2, both on the delete-confirm
+        // buttons, and neither on the root. A draft is the one row you cannot act on, and the
+        // sheet spends weight rather than a fourth word to say so.
+        //
+        // ⚠ KEYED ON `runnable`, NOT ON `provenance`, AND THAT IS THE POINT. `face.runnable` is
+        // `cardFace`'s single derivation of *"can this be launched"*; keying the dim off it means
+        // the card's weight can never disagree with the Run control's own enabled state. A second
+        // `provenance === "draft"` test here would be a second derivation of one fact — the
+        // neighbouring border test above is the shipped precedent and is deliberately left alone
+        // rather than joined, because THAT one is about lifecycle shape (a dashed edge = a thing
+        // still being drawn) and this one is about actionability.
+        //
+        // ⚠ IT IS THE ROOT'S OPACITY, SO IT DIMS THE GUTTER TOO — which is correct: a draft's
+        // gutter is the `unknown` tone, and a full-strength ruler tick beside dimmed content
+        // would read as a run outcome the row does not have.
+        (runnable ? "" : " opacity-80")
       }
     >
       {/* ── D-01 SLOT 1 — THE GUTTER ─────────────────────────────────────────────────
@@ -1107,8 +1129,30 @@ export function WorkflowCard({
                 see `ANSWER_DOT_CLASSES` / `ANSWER_GLYPH_CLASSES` for why each is what it is.
                 `data-run` repeats the gutter's key so a test can prove the two marks track ONE
                 derivation rather than asserting a colour class. */}
+            {/* ⚠ 200-WIRE — A FOURTH ARM, AND IT IS THE FIRST THING ON THIS LINE KEYED ON
+                `face.mark` RATHER THAN ON `gutter`. The sheet leads its draft card's status
+                line with a `build` glyph (`library.html:372`); the three shipped arms are all
+                keyed on the RUN axis, so a draft fell through to the dot — or, on an `unknown`
+                gutter, to nothing at all. `face.mark` / `face.state` were already on this very
+                line and nothing consumed either for a mark.
+                ⚠ `Wrench` IS THE HOUSE'S `build`. The sheet draws Material Symbols, which the
+                icon convention forbids; `lucide-react` is the chrome set this file is already
+                made of (§ `MARK_ICON`'s docblock — a library row's PROVENANCE is neither a
+                provider nor a phase type, so neither single-source map applies). Before this,
+                `grep -n "Wrench\|Hammer\|Construction"` over this file returned 0.
+                ⚠ IT SITS AFTER `not-by-you` DELIBERATELY. Ownership is a fact about who ran it
+                and outranks lifecycle on a line whose first word is the run truth; a row cannot
+                in practice be both, and ordering it this way means no shipped arm changes
+                behaviour for any row that reached it before.
+                ⚠ THE CARD NOW CARRIES TWO MARKS FOR A DRAFT — `row-mark` on the name row and
+                this one — and that is the card's existing two-question split, not a duplication:
+                line 1 answers *what kind of row is this*, line 2 answers *does this one work*.
+                The sheet can spend one glyph because it draws no name-row mark at all; removing
+                ours would change all three provenances and is not this row's scope. */}
             {gutter === "not-by-you" ? (
               <User data-testid="row-answer-glyph" className={ANSWER_GLYPH_CLASSES} aria-hidden="true" />
+            ) : face.mark === "building" ? (
+              <Wrench data-testid="row-answer-glyph" className={ANSWER_GLYPH_CLASSES} aria-hidden="true" />
             ) : gutter === "unknown" ? null : (
               <span
                 data-testid="row-answer-dot"

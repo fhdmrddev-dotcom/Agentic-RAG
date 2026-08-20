@@ -57,7 +57,7 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { Upload, Check, X, ChevronDown, Info } from "lucide-react"
 
 import { cn } from "@/lib/utils"
-import { entryInputKeys, templateAdmission, type DefShape } from "@/components/workflows/soulData"
+import { entryInputFields, templateAdmission, type DefShape } from "@/components/workflows/soulData"
 import { RUN_TEMPLATE_LABEL } from "./libraryVocabulary"
 import { useCanvasGate } from "@/pages/WorkflowBuilderPage"
 import type { PublishedWorkflow } from "@/lib/api"
@@ -89,7 +89,12 @@ export function RunModal({
   onRun: (extras: { templateFile: File | null; folderId: string | null }) => void | Promise<void>
 }) {
   const def = wf.definition as DefShape | undefined
-  const keys = entryInputKeys(def)
+  // 200-WIRE: the entry inputs WITH their authored labels. `entryInputFields` is the same
+  // resolver `entryInputKeys` is now derived from, so the key list and its order are
+  // unchanged — see the hint line below for why the unlabelled arm stays character-identical.
+  const inputFields = entryInputFields(def)
+  const keys = inputFields.map((f) => f.key)
+  const anyAuthoredLabel = inputFields.some((f) => !!f.label)
   // ── Phase 193-07 (AUTH-03 / D-17 / D-20): does this workflow get the template control? ──
   //
   // HIDE ONLY ON A POSITIVE NO. `templateAdmission` is THREE-state and this comparison is
@@ -511,19 +516,68 @@ export function RunModal({
               `RunModal.test.tsx` reads its `innerHTML` and is untouched by this port,
               which is the mechanical proof that only the container changed.
 
-              ⚠ AND THE SHEET'S OWN WORDING FOR THE FIRST LINE IS REFUSED, ON PURPOSE.
-              It draws *"This workflow needs a starting instruction."* — a humanised
-              reading of the declared entry keys. There is no authored per-key label
-              anywhere on the wire (`entryInputKeys` returns the raw JSONB key strings), so
-              rendering that sentence would mean INVENTING the label for every key that is
-              not `kickoff_prompt`. The keys render as the facts they are. */}
+              ⚠ THE REFUSAL BELOW WAS BUILT ON A PREMISE THAT IS MEASURABLY FALSE, AND THE
+              ORIGINAL IS KEPT VERBATIM RATHER THAN DELETED — a refusal that turns out to be
+              wrong is evidence about how this surface was reasoned about, and quietly
+              removing it would erase the only record that the gap was ever mis-stated.
+
+              ── AS SHIPPED (200-WIRE corrects the second sentence, not the verdict) ──
+              > ⚠ AND THE SHEET'S OWN WORDING FOR THE FIRST LINE IS REFUSED, ON PURPOSE.
+              > It draws *"This workflow needs a starting instruction."* — a humanised
+              > reading of the declared entry keys. There is no authored per-key label
+              > anywhere on the wire (`entryInputKeys` returns the raw JSONB key strings), so
+              > rendering that sentence would mean INVENTING the label for every key that is
+              > not `kickoff_prompt`. The keys render as the facts they are.
+
+              ⚠ *"There is no authored per-key label anywhere on the wire"* IS WRONG.
+              `InputFieldSpec.label` is a REQUIRED `str` on the backend model
+              (`backend/app/models/harness.py:504`) and it travels to this client inside
+              `WorkflowDefinition.inputs` (`:532`). What was actually true is narrower and
+              lived one file away: the FRONTEND READ-SHAPE threw the label away —
+              `soulData.ts` declared `inputs?: Array<{ key?: string }>`, with no `label`
+              member — so `entryInputKeys` never had one to return and the sentence above
+              generalised a frontend omission into a claim about the wire.
+
+              ── THE REAL, NARROWER GAP ──
+              A definition that authors `inputs[]` HAS a label and this line now renders it.
+              A definition that declares only the bare `PhaseSpecJSON.input_keys`
+              (`backend/app/models/harness.py:73` — a plain `list[str]`) with no `inputs[]`
+              carries NO label anywhere, on the wire or off it. That subset stays unlabelled
+              and is OUT OF SCOPE: the key is the only true thing there is to print for it,
+              and a friendly sentence would be an invented author's word.
+
+              ⚠ THE SHEET'S EXACT SENTENCE IS STILL NOT RENDERED, for what is left of the
+              original reason. *"This workflow needs a starting instruction."* is a claim
+              about ONE specific key; the honest general form is the authored label the
+              author actually wrote. The unlabelled arm below is CHARACTER-IDENTICAL to what
+              shipped, which is what keeps `RunModal.test.tsx`'s six whole-`innerHTML`
+              captures green without re-capturing them. */}
           <div className="flex flex-col gap-2">
             {/* Declared input_keys → a HINT line only (never fake structured fields). */}
             <p data-testid="run-hint" className="flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
               <Info className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
-              <span>
-                This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
-              </span>
+              {anyAuthoredLabel ? (
+                <span>
+                  This workflow expects:{" "}
+                  {inputFields.map((f, i) => (
+                    <span key={`${f.key}-${i}`}>
+                      {i > 0 && ", "}
+                      {/* An AUTHORED label is prose a human wrote → body face. A key with no
+                          label keeps the mono face it has always had. Two arms, never three:
+                          absence renders the key, never a fabricated friendly name. */}
+                      {f.label ? (
+                        <span className="text-foreground">{f.label}</span>
+                      ) : (
+                        <span className="font-mono text-foreground">{f.key}</span>
+                      )}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <span>
+                  This workflow expects: <span className="font-mono text-foreground">{keys.join(", ")}</span>
+                </span>
+              )}
             </p>
             {/* F4 (UAT 2026-08-05) — this line promised a destination the launch had stopped
                 going to. 188-09 retargeted `doRun` to the run surface, and the modal still

@@ -47,6 +47,7 @@ import { DoorHeaderStrip } from "@/components/workflows/DoorHeaderStrip"
 // two implementations of one control is how the two doors would start answering differently
 // to the same document.
 import { DescribeTemplateRow } from "@/components/workflows/DescribeTemplateRow"
+import { StarterTemplatePicker } from "@/components/workflows/StarterTemplatePicker"
 import {
   useTemplateRead,
   type TemplateReadAnswer,
@@ -583,6 +584,47 @@ export function WorkflowDoorSwitch({
             onPickFile={setTemplateFile}
             onClear={() => setTemplateFile(null)}
           />
+
+          <div aria-hidden="true" className="h-px w-full bg-border" />
+
+          {/* ── 200-WIRE — THE STARTER SHELF, WHICH THE PORT SILENTLY OMITTED ─────────────
+              ⚠ `doors.html:307-319` draws a whole labelled section here — *"Start from
+              something that already works"* over a row reading `Invoice audit · 4 steps ·
+              Use this` — and NOTHING on this door rendered it. It was not one of the port's
+              seven recorded refusals either; it was simply missing, which is the failure mode
+              a written refusal exists to prevent.
+
+              ⚠ THE PORT MISREAD WHICH SECTION WAS WHICH, and that is worth writing down
+              because it is how the omission survived review. The comment on `DescribeTemplateRow`
+              above says sketch 200 draws *"the template question as the LAST section of the
+              column"* — but the sheet's section labelled `<!-- Template Row -->` is THIS one,
+              the starter shelf. The attach-a-document row is a shipped capability the sheet
+              does not draw at all. One sheet section was mapped onto a different shipped one,
+              so the count came out right and the surface came out short. Both now render; the
+              attach row keeps its shipped position and this arrives after it.
+
+              ⚠ IT IS PURE WIRING. `GET /workflows/starters` ships (`backend/app/api/workflows.py:49`),
+              its client is `listStarterWorkflows` (`frontend/src/lib/api.ts`), the library
+              already renders a `Starters` filter chip over the same rows, and this exact
+              component was ALREADY MOUNTED on the govern door's describe screen
+              (`WorkflowBuilderPage.tsx`, behind `canvasEnabled`). The loose door — the one a
+              fast-door author actually lands on — had zero mounts. Nothing new is built here.
+
+              ⚠ IT IS **NOT** GATED ON `canvasEnabled`, unlike the Builder's mount. That gate
+              belongs to the Builder's own screen for a flag-era reason; this door is the fast
+              path and its starter shelf is not a canvas feature. The picker holds no flag of
+              its own (187-05 put the gate on the mount deliberately), so the choice is made
+              here, in the open.
+
+              ⚠ IT SEEDS THE BOX AND FORKS NOTHING — `onChoose` hands back the starter's own
+              `business_requirement` and the caller decides where it lands. Writing it into
+              `describe` keeps the single forward path the picker's docblock guards: the text
+              stays editable, nothing is created, and the CTA's `canDraft` rule is untouched
+              (a seeded box is a typed box as far as it is concerned).
+
+              ⚠ IT ADDS A SIXTH CONTROL TO THIS DOOR, and `WorkflowDoorSwitch.test.tsx`'s
+              resting-control pin is re-baselined for it with the reason recorded there. */}
+          <StarterTemplatePicker onChoose={setDescribe} />
 
           {/* D-05: nothing lost by picking fast — advanced is one click away. */}
           <div

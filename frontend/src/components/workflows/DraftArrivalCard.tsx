@@ -95,6 +95,7 @@ import {
   ARRIVAL_SOURCE_ACTION,
   ARRIVAL_SOURCE_LEAD,
   DECISIONS_FOLD_ACTION,
+  DECISIONS_HEADING,
   DECISION_ROW_ORDER,
   GROUNDING_FOLD_ACTION,
   decisionsFoldSummary,
@@ -543,9 +544,19 @@ export function DraftArrivalCard({
           className="flex flex-col gap-4 border-t border-border px-6 py-5 pl-8"
         >
           {/* The sheet's own heading over the list, in its `data-md` uppercase register.
-              The rows themselves belong to `DecisionsList` and are untouched here. */}
+              The rows themselves belong to `DecisionsList` and are untouched here.
+
+              ⚠ 200-WIRE — IT NOW RENDERS THE SHEET'S HEADING RATHER THAN THE FOLD SUMMARY,
+              and the comment above was already describing the intended thing while the slot
+              spent the wrong string. `decisionsSummary` is what the fold's TRIGGER renders,
+              nine lines up (`:468-471`) — so an OPENED fold printed the same count twice and
+              never once said what the list was. `grep -rn "What I decided" frontend/src`
+              returned a single hit, inside a comment in this very file: the heading the sheet
+              draws existed nowhere. It is `DECISIONS_HEADING` now, imported from the one
+              vocabulary home like every other word on this card. The summary is not lost —
+              it is on the trigger you pressed to get here. */}
           <h3 className="font-mono text-[12px] uppercase tracking-widest text-muted-foreground">
-            {decisionsSummary}
+            {DECISIONS_HEADING}
           </h3>
           <div className="rounded border border-border bg-accent/20 p-2">
             <DecisionsList {...decisions} />

@@ -5,7 +5,7 @@
  * identity-carrying atoms every soul size (card / run / pub) shows, in the LOCKED
  * 046-A order with PURPOSE as the hero at every size:
  *   (1) purpose   — business_requirement (the hero headline)
- *   (2) needs     — entryInputKeys, joined
+ *   (2) needs     — entryInputFields, joined (authored label where one exists, key otherwise)
  *   (3) spine     — the glyph-dot PhaseSpine
  *   (4) tier      — ONE chip (glyph + WORD) derived via tierForDefinition
  *   (5) output    — the honest deliverable line
@@ -28,7 +28,7 @@
  */
 import {
   tierForDefinition,
-  entryInputKeys,
+  entryInputFields,
   soulDeliverable,
   type DefShape,
 } from "@/components/workflows/soulData"
@@ -59,7 +59,12 @@ const TIER_CLASS: Record<SoulScale, string> = {
 
 export function WorkflowSoul({ def, scale }: WorkflowSoulProps) {
   const tier = tierForDefinition(def)
-  const needs = entryInputKeys(def)
+  // 200-WIRE: the AUTHORED label when the definition carries one, the raw key when it does
+  // not. `entryInputFields` is `entryInputKeys`'s own resolver with the label kept, so the
+  // key list and its order are unchanged — a definition with no `inputs[]` (every draft, and
+  // the `card`-scale DOM `WorkflowDoorSwitch.baseline.test.tsx` pins byte-for-byte) renders
+  // exactly what it rendered before, in the same mono treatment.
+  const needs = entryInputFields(def)
   const deliverable = soulDeliverable(def)
   const purpose = def?.business_requirement?.trim()
 
@@ -78,12 +83,22 @@ export function WorkflowSoul({ def, scale }: WorkflowSoulProps) {
       <p data-testid="soul-needs" className="text-[11px] text-muted-foreground">
         <span className="font-medium">needs</span>{" "}
         {needs.length > 0 ? (
-          needs.map((k, i) => (
+          needs.map((f, i) => (
             // WR-02: input_keys can carry duplicates (authored JSONB, not de-duped),
             // so the key string alone collides — suffix the index for a stable key.
-            <span key={`${k}-${i}`}>
+            <span key={`${f.key}-${i}`}>
               {i > 0 && <span className="text-muted-foreground">, </span>}
-              <span className="font-mono text-foreground/80">{k}</span>
+              {/* ⚠ TWO ARMS, AND THE TREATMENT IS PART OF THE CLAIM. An AUTHORED label is
+                  prose a human wrote, so it is set in the body face; a raw key is an
+                  identifier, so it keeps the mono face it has always had. Collapsing the
+                  two into one treatment would make a key look like a sentence somebody
+                  chose. There is no third arm: absence renders the key, never a
+                  fabricated friendly name. */}
+              {f.label ? (
+                <span className="text-foreground/80">{f.label}</span>
+              ) : (
+                <span className="font-mono text-foreground/80">{f.key}</span>
+              )}
             </span>
           ))
         ) : (
