@@ -35,9 +35,104 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 ## Current Position
 
-Phase: 200 (the-workflow-journey) — **EXECUTED 2026-08-20, 7/7 plans. NOT YET VERIFIED.**
-Plan: 7 of 7 (all merged to `develop`, HEAD `84f7c156`)
-Next action: **`/gsd:verify-work 200`** — then drive the eight owed UAT rows listed in `200-07-SUMMARY.md`.
+Phase: 200 (the-workflow-journey) — **EXECUTED, THEN RE-PORTED FROM THE SKETCHES 2026-08-20.**
+Plan: 7 of 7 plans + 6 sketch ports + 3 wiring passes, all merged to `develop`, HEAD `e56b821a`
+Next action: **operator decision on the run page's centre** (see below), then the six foundations.
+
+⚠ **THE PHASE PASSED ITS OWN CHECKLIST AND FAILED THE OPERATOR — AGAIN, AND THE CAUSE IS
+STRUCTURAL.** 47/49 atoms were reported built and every gate was green; the operator's verdict
+was that the screens *"are not close to what we drafted."* **Root cause, measured:** `200-01`
+derived the acceptance checklist from the sketch's `JOURNEY` array — the ledger of *what
+differs* — instead of from the screens. Every spine atom traces to a `BS-n` ledger row; **not
+one traces to the screen as drawn.** Anything the sheet drew that the ledger did not flag as a
+*change* was invisible to the checklist, never became an atom, and was never built. **This is
+199's failure one level up: 199's charter was wrong, 200's instrument was wrong.**
+
+**THE REMEDY THAT WORKED — delete the derivation layer.** The sketch screens are real HTML with
+real CSS (`.planning/sketches/200-journey-interactive/screens/*.html`; `index.html` is a viewer
+that iframes them). The loop is: **open the sheet, port its markup directly, look at both in the
+browser.** No atoms, no plans. The spine took ~20 minutes that way. **Six screens were re-ported
+on that loop** — spine, library, step panel, doors + draft arrival, canvas, publish + run dialog
++ fork/delete — each verified live in the browser by the orchestrator, not accepted from a
+summary.
+
+**ALL 13 SHEETS ARE NOW AUDITED ELEMENT BY ELEMENT** (`AUDIT-*.md`, ~455 rows, each with a
+`file:line` or a grep result): **SHIPS 323 (71%) · FE-WIRING 45 · BE-NEEDED 24 · NEW 63.**
+Wiring passes then closed **28 of the 45** rows.
+
+⚠ **THREE CORRECTIONS THE AUDIT FORCED, all measured:**
+1. **Neither builder sheet draws a per-step timing.** A duration regex over all four builder
+   sheets returns one row. **The amber ledger entries that justified building the timestamp
+   slice were change-log claims the drawings do not support** — the third independent
+   confirmation of the same root failure. (The slice is still useful; it was not what those
+   sheets asked for.)
+2. **A shipped refusal rested on a false premise.** `RunModal.tsx:514` declined the sheet's
+   wording because *"there is no authored per-key label anywhere on the wire"* —
+   `InputFieldSpec.label` ships at `models/harness.py:504` and `soulData.ts:72` discarded it.
+   **Fixed, with the original wording kept above the corrected one.**
+3. **Three sheet rows are DEFECTS, not criteria** — run-tense atoms on two *authoring* surfaces
+   (a marching `running` label on a draft canvas; `Approve`/`Send back` on a draft spine), and
+   the publish sheet drawing **9 stages where the server runs 10**. Matching that last one would
+   have deleted a real check. **The reference governs presentation; it does not overrule a fact
+   the product knows.**
+
+⚠ **HOW THE OVERCLAIMING WORKED, and it is worth not repeating:** a port mapped the sheet's
+`<!-- Template Row -->` onto the shipped *attach-a-document* row — a different capability the
+sheet never draws — so **the section count came out right and the surface came out short**. It
+matched by position, not by meaning, and reported COMPLETE. The fix that caught it: every report
+must enumerate each row as `DONE` / `BLOCKED` / `NOT TAKEN`; **a row in none of the three is a
+failure, not an omission.**
+
+**⏸ ONE OPERATOR DECISION IS BLOCKING** — *what belongs in the CENTRE of the run page?* The
+sheet puts a **transcript** in the slot the canvas was ported into during this same phase.
+Shipping both gives the page **four readings of one run** (canvas + transcript + `RunReceipt` +
+deliverables), and this surface already had a status-shown-twice defect reported once. Its
+`mm:ss` gutter is backend-gated regardless. Options: canvas stays / transcript replaces it /
+they share a toggle.
+
+**THE REMAINING BACKLOG IS SIX FOUNDATIONS** (24 BE-NEEDED + 63 NEW collapse into these):
+1. **Connections** (~18 rows) — **a milestone, not a screen.** No MCP client
+   (`grep -rni "mcp" backend/app` → **0**), no OAuth/token store, no approval model. Every
+   shipped capability is a WRITE, so the sheet's read-heavy list has no wire, and its
+   *"works in chat too"* caption is **currently false**.
+2. **Branching in the definition** (~6) — *"branching is not representable in the definition at
+   all"* (`PhaseFormPanel`'s own rail). Best value per unit of work.
+3. **External-action capabilities** (~4) — `harness.py:251` is a closed `Literal` of three, all
+   writes, so `ONLY READS` cannot be rendered honestly.
+4. **Per-folder governance** (~3) — `folder_scope` is bare UUIDs; `FolderRead` has no document
+   count (blocks `Legal · 1,284 documents`). ⚠ Also blocks `+ Add a source`:
+   `_folder_scope_requires_project` (`harness.py:584-595`) raises on a workflow with no
+   `project_folder_id`, leaving a permanently unsaveable draft.
+5. **Run history that survives a reload** (~3) — `ToolCall.startedAt`/`endedAt` are client
+   `Date.now()` and *"Undefined for tool calls loaded from DB"*; an ask carries no `answered_at`
+   and no assignee.
+6. **Two small ones** — one template per step (sheet shows three); no judge **step kind** (the
+   shipped judge is a *validator on* a step).
+
+⚠ **DEBT I DELIBERATELY DEFERRED — the hot-file ledger and the count-gate pins were withheld
+from EVERY agent so they could run in parallel instead of serialising on those three files.**
+That is what made this fast, and it is now owed. **Stale rows:** `WorkflowCard.tsx` ·
+`WorkflowsPage.tsx` · `LibraryToolbar.tsx` · `RunModal.tsx` · `WorkflowDoorSwitch.tsx` ·
+`soulData.ts` · `WorkflowRunPage.tsx` · `PendingAskCard.tsx` · `PhaseTimeline.tsx` ·
+`FileRow.tsx` / `fileRowUtils.ts`. ⚠ **Two need more than a triple refresh:**
+`PhaseTimeline.tsx`'s row says *"a change here lands in CHAT first"* — **it now has a SECOND
+mount and was not edited to get one**; and `fileRowUtils.ts` is **no longer a true leaf** (it
+imports `relativeBand` from the library subtree).
+
+**Gates at close, re-derived on the merged tree:** count gate `total 5245 · failed 0 · pinned
+4824 · 102/102` · `tsc -p tsconfig.app.json` **33 errors / 19 files, the pre-existing baseline,
+none in any file this work touched** · backend `tests/unit` **62 failed / 2350 passed**,
+byte-identical to baseline.
+
+⚠ **`WorkspacePanel` WAS NOT MOUNTED ON THE RUN PAGE, and the reason is a finding.** It resolves
+its thread from the global chat singleton, and `WorkflowRunPage`'s own docblock refuses to write
+chat state (*"opening a run writes no chat state"*). **The two PARTS were mounted instead**
+(`PhaseTimeline`, `PendingAskCard`), which also kept the no-previewer fence intact **by
+construction** — `FilesSection` never mounts, so `FilePreview` cannot arrive.
+
+⚠ **The wrong-base worktree fork fired on ALL TEN dispatches** — `merge-base` returned
+`3781a3fe` every time, never the dispatched base. **Never dispatch a worktree executor without
+the HEAD assertion.**
 
 ⚠ **THE SHAPE GREW FROM SIX PLANS TO SEVEN, and the reason is measured.** RESEARCH found that
 `workflow_runs.status = 'paused'` has **ZERO writers** in the entire backend (seven grep hits, all
