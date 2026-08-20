@@ -23,17 +23,26 @@
  * chip. `phaseNodeCardContract.ts`: every slot on these props, including the max-2 badge
  * tuple. `ownProperty.ts`: the WR-04 own-guard both mark modules read.
  *
- * ⚠ THE FOURTH DESTINATION IS GONE. This list named `NodeIconWell.tsx`: the 3D mark above
- * the top edge. The Phase 200 canvas port DELETED that module — sketch 200 draws the step's
- * mark INSIDE the card, in a 24px left gutter, so a module whose whole subject was a 62px
- * disc floating above the card's top edge had no consumer left. Its responsibility, and the
- * no-clipping rule its docblock carried, came back here into the card's inline icon-well
- * comment. Nothing else in the tree imported it (measured: `grep -rn "NodeIconWell"
- * frontend/src` returns prose only), and the suite's own destination-count pin was moved
- * 5 → 4 deliberately rather than allowed to drift.
+ * `NodeIconWell.tsx`: the 3D mark above the top edge.
  *
- * STILL HERE: the node box, `{anchors}`, the card div and its four-branch border, the inline
- * icon well, the title, the subtitle, the effect banner, the RUN LINE, the badge row.
+ * ⚠ THAT FOURTH DESTINATION WAS DELETED AND IS NOW RESTORED, and both moves are recorded
+ * because the second one is a REVERSAL and not a discovery. The Phase 200 canvas port cut
+ * `NodeIconWell.tsx` on the ground that sketch 200 draws the step's mark INSIDE the card in
+ * a 24px left gutter, so a module whose whole subject was a 62px disc floating above the
+ * card's top edge had no consumer left. **The operator has since seen both faces rendered
+ * and chosen the earlier one** — naming the ring around the mark and the card silhouette
+ * specifically — so the module is restored from `cd6f7b1d` VERBATIM and the card renders
+ * `<NodeIconWell>` again at its original JSX position. The port's own destination-count pin
+ * moves 4 → 5, back where it was, deliberately rather than by drift.
+ *
+ * ⚠ THIS IS NOT A CLAIM THAT THE PORT WAS WRONG TO PORT. Sketch 200 really does draw the
+ * compact row, and a port that reproduced it was doing its job. What changed is the
+ * JUDGEMENT: two faces were built, both were looked at in a browser, and the older one won.
+ * The sheet governs presentation only while the operator agrees with the sheet.
+ *
+ * STILL HERE: the node box, `{anchors}`, the 137-B card div and its four-branch border, the
+ * title, the subtitle, the effect banner, the branch condition, the RUN LINE, the elapsed,
+ * the badge row.
  *
  * THE TREE GOT BIGGER WHILE THE FILE GOT SMALLER, and a phase headlined "the file shrank"
  * owes that out loud. Measured at the cut: this file 274 L against 797 before it, and
@@ -68,24 +77,30 @@
  * in isolation. It is also what forces the ✕-delete and ＋-insert affordances onto
  * the lane rather than into the card (184-12).
  *
- * ⚠ THE LOOK IS SKETCH 200, AND THIS PARAGRAPH REPLACED ITS PREDECESSOR RATHER THAN
- * BEING EDITED AROUND IT. It read, for five phases: "THE LOOK IS SKETCH 137-B, the locked
- * acceptance bar: a frosted-glass card that stays NEUTRAL — 248px wide, centre-aligned
- * inside the 260px node box — with one plain-language title, one supporting line and at
- * most two word-badges centred beneath it. … `pt-[42px]` and `NODE_MIN_HEIGHT: 104` are
- * D-185-17's amendments to a theme carrying 34 and 96."
+ * THE LOOK IS SKETCH 137-B, the locked acceptance bar: a frosted-glass card that stays
+ * NEUTRAL — 248px wide, centre-aligned inside the 260px node box — with one plain-language
+ * title, one supporting line and at most two word-badges centred beneath it, and the 62px
+ * 3D mark floating above its top edge. `pt-[42px]` and `NODE_MIN_HEIGHT: 104` are
+ * D-185-17's amendments to a theme carrying 34 and 96.
  *
- * WHAT IS TRUE NOW: the face is `screens/builder-canvas.html`'s, ported from its markup
- * rather than derived from a change-log. A COMPACT HORIZONTAL ROW — 240px wide, a small
- * radius, a solid card fill, 16px of padding — carrying a 24px icon well on the LEFT and
- * then a left-aligned column: a 13px title, an 11px supporting line, and (only where the
- * step reaches beyond this workspace) a 9px wide-tracked effect banner. The floor is the
- * sheet's own 72px and the card still grows downward from it, which is how the run line,
- * the branch condition and the badges keep their homes on a card half the height.
+ * ⚠ THE PARAGRAPH ABOVE WAS REPLACED BY THE PHASE 200 CANVAS PORT AND IS RESTORED, and the
+ * port's own wording is kept here rather than deleted, because a reversal that erased what
+ * it reversed would leave the next editor to rediscover both faces from scratch. The port
+ * read: "WHAT IS TRUE NOW: the face is `screens/builder-canvas.html`'s, ported from its
+ * markup rather than derived from a change-log. A COMPACT HORIZONTAL ROW — 240px wide, a
+ * small radius, a solid card fill, 16px of padding — carrying a 24px icon well on the LEFT
+ * and then a left-aligned column: a 13px title, an 11px supporting line, and (only where
+ * the step reaches beyond this workspace) a 9px wide-tracked effect banner. The floor is
+ * the sheet's own 72px and the card still grows downward from it."
  *
- * The 137-D class names 185-01 rebuilt the old card from are still NOT quoted here: the
- * greps assert they are gone, and a docblock spelling them would make its own guard
- * vacuous.
+ * ⚠ WHAT THE REVERSAL KEEPS, said plainly so it is not mistaken for an incomplete revert.
+ * The port added three CONTENT slots the 137-B card never had — the effect banner, the
+ * branch condition and the elapsed — and those are CAPABILITIES, not silhouette. They stay,
+ * re-composed centre-aligned. Only the geometry goes back: the box, the radius, the fill,
+ * the alignment, the padding, the hover, and the mark's return to the top edge.
+ *
+ * The 137-D class names 185-01 rebuilt this card from are NOT quoted here: the greps assert
+ * they are gone, and a docblock spelling them would make its own guard vacuous.
  *
  * TOTALITY: an unrecognised `phaseType` is a data attribute here, never a lookup —
  * the adapter resolves the tint (falling back to `nodePresentation.DEFAULT_TINT`) and
@@ -107,6 +122,7 @@ import { CANVAS_LAYOUT } from "@/components/workflows/canvasModel"
 // rendered at the byte-identical JSX position its block occupied inline — these elements
 // are absolutely positioned and their paint order IS their document order.
 import { NodeCornerMarks } from "@/components/workflows/NodeCornerMarks"
+import { NodeIconWell } from "@/components/workflows/NodeIconWell"
 import { NodeRunOverlay } from "@/components/workflows/NodeRunOverlay"
 // Phase 200 (canvas port) — the sheet's third body line and its ONE string home. The
 // module is a true leaf (it imports nothing), and its docblock carries the reason the
@@ -121,24 +137,26 @@ import { runReadingBorder, runReadingLabel } from "@/components/workflows/runVoc
 import { cn } from "@/lib/utils"
 
 /**
- * The card's minimum height IN RUN MODE.
+ * The card's minimum height IN RUN MODE, 104 → 120.
  *
- * ⚠ 120 → 84 AT THE PHASE 200 CANVAS PORT, and the original reasoning is kept because it
- * is UNCHANGED — only its inputs moved. It read: "One 11px `leading-snug` line (≈15px)
- * plus its 4px top margin is 19px, and 120 is the next 4px step that clears it." The same
- * arithmetic now starts from the sheet's 72px floor rather than 137-B's 104, and lands on
- * 84 — which is, independently, the exact height `screens/builder-canvas.html` gives its
- * OWN three-line nodes. Two routes to one number is why it is written down.
- *
- * The floor is still raised for the WHOLE run view rather than per-reading, for the
- * original reason: the run line renders at every reading, so a card that grew only when
- * its step finished would reflow the plane live, on the exact surface a non-technical
+ * One 11px `leading-snug` line (≈15px) plus its 4px top margin is 19px, and 120 is the
+ * next 4px step that clears it. The floor is raised for the WHOLE run view rather than
+ * per-reading, because the run line renders at every reading: a card that grew only when
+ * its step finished would reflow the spine live, on the exact surface a non-technical
  * person is watching it.
  *
- * `CANVAS_LAYOUT.EDGE_ANCHOR_Y` is still measured from the node TOP, so edges are
- * unaffected by this floor either way — precisely what D-183-12 exists for.
+ * ⚠ 120 → 84 AT THE PHASE 200 CANVAS PORT AND BACK TO 120 HERE. The port's arithmetic was
+ * sound and is kept: "The same arithmetic now starts from the sheet's 72px floor rather
+ * than 137-B's 104, and lands on 84." Its INPUT was the sheet's 72px card, and that card is
+ * reverted, so the input is 104 again and the output is 120 again. ⚠ THE THREE CONSTANTS
+ * MOVE TOGETHER OR THE CONNECTORS DETACH: `CANVAS_LAYOUT.NODE_MIN_HEIGHT` goes 72 → 104 in
+ * the same commit and `CANVAS_LAYOUT.EDGE_ANCHOR_Y` 36 → 28 with it, because the anchor is
+ * measured from the node TOP and the mark now overhangs that top edge again.
+ *
+ * `CANVAS_LAYOUT.EDGE_ANCHOR_Y` is measured from the node TOP, so edges are unaffected by
+ * this floor itself either way — precisely what D-183-12 exists for.
  */
-const RUN_MODE_NODE_MIN_HEIGHT = 84
+const RUN_MODE_NODE_MIN_HEIGHT = 120
 
 // ── The card ────────────────────────────────────────────────────────────────────
 
@@ -198,34 +216,25 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     >
       {anchors}
 
-      {/* ── THE CARD, PORTED DIRECTLY FROM `screens/builder-canvas.html` ──────────────
-          Phase 200 (canvas port). The sheet's own node markup, structure for structure:
+      {/* The frosted card. Neutral by construction — no per-type wash anywhere.
+          137-B geometry (`themes/canvas-184.css` `body.card-b .node`): a 248px
+          centre-aligned BLOCK card, horizontally centred inside the 260px node box,
+          `border-radius: 22px`, padding `42px 20px 20px`. The top padding is the one
+          number that does NOT come from the sketch theme — D-185-17 raises it 34 → 42
+          so the mark floating above the top edge clears the title by 11px.
 
-            w-[240px] h-[72px] bg-card border border-border-color rounded
-            flex items-center p-md  (+ a hover border change) transition-colors
+          ⚠ THIS GEOMETRY WAS REPLACED BY THE PHASE 200 CANVAS PORT AND IS RESTORED HERE.
+          The port made the card `screens/builder-canvas.html`'s: 240px wide, a small
+          radius, a solid fill, 16px of padding, a horizontal row with the mark inside a
+          24px LEFT gutter and the text left-aligned. It was a faithful port and it was
+          judged in a browser against this one; **the operator chose this one**, naming the
+          ring around the mark and the card silhouette. The port's face survives in this
+          file's git history at `901b25ff`.
 
-          ⚠ The sheet's hover token is described above rather than QUOTED, deliberately: a
-          fence in this card's suite pins the exact SET of hover utilities spelled anywhere
-          in this subtree's source, and a docblock quoting one verbatim would add a phantom
-          member and turn a shipped guard red against prose.
-
-          — a COMPACT HORIZONTAL ROW: a 24px icon well on the LEFT, then a left-aligned
-          content column of a 13px title over an 11px supporting line. Ten of the sheet's
-          ten canvas nodes are that shape and no other.
-
-          ⚠ WHAT THIS REPLACED, SAID PLAINLY RATHER THAN QUIETLY SWAPPED. Until this commit
-          the card was 137-B's: a 248px frosted block, `rounded-[22px]`, CENTRE aligned,
-          padded `42px 20px 20px` to clear a 62px 3D mark floating above its top edge. That
-          shape was a locked acceptance bar for five phases and it is not being called a
-          mistake — it is REPLACED because the operator has named sketch 200 the absolute
-          reference and 200 draws a different card. The 137-B geometry survives in this
-          file's git history and in the three `CARD_HTML_BASELINE` captures, which are
-          re-baselined in this same commit with the reason written INSIDE the pin.
-
-          THE HEIGHT IS A FLOOR, NOT A FIXED SIZE, and the sheet agrees: its two-line nodes
-          are 72px and its three-line nodes (the ones carrying an effect banner) are 84px.
-          The card still grows DOWNWARD from the floor, so a run reading or a branch
-          condition adds a line rather than being hidden.
+          THE HEIGHT IS A FLOOR, NOT A FIXED SIZE. The card grows DOWNWARD from it, so a run
+          reading, a branch condition or an effect banner adds a line rather than being
+          hidden — which is what lets the three content slots the port added keep their
+          homes on a card that is no longer the port's shape.
 
           THE SEALED EDGE (185-09, sketch 143-A) is the third branch of the border
           ternary: a grounded step's border is lifted to `hsl(220 30% 100% / .34)`. It
@@ -239,10 +248,8 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           order Tailwind happens to emit two same-specificity colour classes in. */}
       <div
         className={cn(
-          // THE SHEET'S BOX: 240 wide, small radius, solid card fill, 16px pad, a
-          // horizontal row aligned to its top so a grown card keeps the icon beside the
-          // TITLE rather than drifting to the vertical centre of five lines.
-          "mx-auto flex w-[240px] items-start gap-2 rounded border bg-card p-4 text-left",
+          "mx-auto block w-[248px] rounded-[22px] border pb-5 pt-[42px] px-5 text-center",
+          "bg-card/30 backdrop-blur-sm",
           "shadow-[0_1px_0_hsl(var(--foreground)/0.06)_inset,0_18px_36px_-22px_rgba(0,0,0,0.95)]",
           // ── THE HOVER LIFT (199-01 · DES-01 · sheet `c2-phase-node` §3 "HOVERED") ────
           //
@@ -252,32 +259,25 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           // ALREADY-SHIPPED or to a CANNOT-EXPRESS with a named reason (199-01's SUMMARY
           // carries all six rows); this is the whole of the phase's build on this atom.
           //
-          // ⚠ CORRECTED BY THE PHASE 200 PORT, AND THE ORIGINAL REFUSAL IS PRESERVED
-          // DIRECTLY BELOW RATHER THAN DELETED. 199-01 shipped a FILL change only and
-          // recorded, verbatim: "IT DELIBERATELY DOES NOT TOUCH THE BORDER, and the
-          // sheet's own hover rule does (`border-color: #464651`). Taking that would put a
-          // fifth colour utility into a four-branch ternary whose entire argument is that
-          // exactly ONE border-colour utility is emitted per state … A hover border would
-          // make that sentence false for the one state a person is looking at while they
-          // decide whether to click. The fill is the calm carrier and it composes with all
-          // four branches instead of racing them."
+          // IT DELIBERATELY DOES NOT TOUCH THE BORDER, and the sheet's own hover rule does
+          // (`border-color: #464651`). Taking that would put a fifth colour utility into a
+          // four-branch ternary whose entire argument is that exactly ONE border-colour
+          // utility is emitted per state, "so nothing depends on which order Tailwind
+          // happens to emit two same-specificity colour classes in" — the paragraph
+          // directly below. A hover border would make that sentence false for the one
+          // state a person is looking at while they decide whether to click. The fill is
+          // the calm carrier and it composes with all four branches instead of racing them.
           //
-          // That refusal was correct ON ITS OWN TERMS and it is OVERRULED on the
-          // operator's: the sketch is the absolute reference, and `node-identity.html`
-          // §"Interaction States" draws HOVERED as two simultaneous changes — a lifted
-          // border AND `-translate-y-1`. 199-01 shipped neither.
-          //
-          // THE TAILWIND-MERGE CONCERN IT RAISED DOES NOT ACTUALLY BIND HERE, which is the
-          // measurable part of the correction rather than a matter of taste. A hover-variant
-          // border utility and a BASE border utility are DIFFERENT VARIANTS, so they never
-          // contend for the same tailwind-merge slot; the "exactly one border-colour utility
-          // per state" invariant is about the RESTING class list and is untouched.
-          // The re-baselined captures below are the evidence: every one still carries
-          // exactly one unprefixed border-colour token.
-          //
-          // THE LIFT IS MOTION, and this canvas's standing rule is that motion keys off RUN
-          // STATE. The rule is honoured by the suppression below, not broken by the lift:
-          // it renders ONLY in Builder mode, where there is no run for it to compete with.
+          // ⚠ THE PHASE 200 PORT OVERRULED THAT REFUSAL AND THIS COMMIT RESTORES IT, and
+          // the port's argument is kept rather than deleted because part of it was
+          // MEASURED and stays true: a hover-variant border utility and a BASE border
+          // utility are different variants, so they never contend for the same
+          // tailwind-merge slot. That is why the port's border hover was safe. It is
+          // reverted anyway, with the rest of the port's face, because its whole warrant
+          // was "the sketch is the absolute reference" — and that premise is the one the
+          // operator has now withdrawn for this card. The port also shipped a
+          // `-translate-y-1` lift; motion on this canvas keys off RUN STATE, and the fill
+          // is what 199-01 chose for exactly that reason.
           //
           // IT IS SUPPRESSED IN RUN MODE, from state the card ALREADY HOLDS. `reading` is
           // the run-mode boolean this whole component hangs off; no slot is added and
@@ -294,9 +294,7 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
           // no scale, no loop, no `animate-` utility. `duration-150` is below the threshold
           // at which a colour change reads as liveness. The suite asserts the absence of an
           // animation utility on this element rather than trusting this paragraph.
-          reading === null
-            ? "transition-[transform,border-color] duration-150 hover:-translate-y-1 hover:border-muted-foreground"
-            : undefined,
+          reading === null ? "transition-colors duration-150 hover:bg-card/45" : undefined,
           // 188-06 prepends ONE branch, so precedence reads:
           //   run state (when supplied) > selected > grounded > default.
           // It can never actually contend with the branch below it, and that is by
@@ -314,129 +312,60 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
               ? "border-primary shadow-[0_0_0_1px_hsl(var(--primary)/0.4)]"
               : grounded
                 ? "border-[hsl(220_30%_100%/0.34)]"
-                : "border-border",
+                : "border-border/50",
         )}
         style={{ minHeight }}
       >
-        {/* THE ICON WELL, INLINE AND ON THE LEFT — the sheet's
-            `w-6 h-6 mr-sm flex-shrink-0 … flex items-center justify-center` gutter, with
-            its glyph at the sheet's own `text-[18px]`.
+        <p className="truncate font-headline text-[14px] font-semibold leading-tight text-foreground">
+          {title}
+        </p>
 
-            ⚠ IT USED TO FLOAT ABOVE THE CARD, and the rule that fact carried has MOVED HERE
-            rather than died with it. `NodeIconWell` rendered this mark at `top-[-26px]`,
-            62px across, horizontally centred and overhanging the node box; the sheet puts it
-            INSIDE the card, so THIS element no longer overhangs and that module is deleted.
+        {/* THE SUPPORTING LINE. It WRAPS — no truncation — and that is the 137-B form
+            restored. The Phase 200 port truncated it to fit the sheet's 72px row, keeping a
+            `break-words` escape for the one case that could not survive truncation: 187-09
+            moved the ⌥ Technical-names reveal into this slot precisely because the TITLE
+            slot truncates and clipped the slug (`AI agent step · find-renewal-t…`). On a
+            card that grows downward there is nothing to escape from, so both arms wrap and
+            the shipped 187-09 fix is safe by shape rather than by branch.
 
-            THE NO-CLIPPING RULE STILL BINDS, because the verdict mark still overhangs — it
-            straddles the card's left border at `left-[-1px]`, one pixel outside the node box.
-            So: nothing in this subtree — this wrapper, the card, the node box, or the node
-            wrapper the graph library puts around it — may ever take `overflow-hidden`. It is
-            a property of the whole ancestor chain and not of the one element that overhangs.
-
-            ⚠ THIS IS THE TREE'S ONLY MENTION OF THAT UTILITY AND THE COUNT IS PINNED AT
-            EXACTLY ONE (`PhaseNodeCard.test.tsx`, the 188-06 no-clipping block), so the rule
-            cannot be deleted as easily as the utility cannot be added. Do not add a second
-            mention anywhere in this subtree. It used to live in `NodeIconWell.tsx` and the
-            port had to re-home it deliberately — a naive deletion took the count to ZERO and
-            turned the pin red, which is exactly the alarm it was built to raise.
-
-            THE PER-TYPE TINT SURVIVES THE MOVE, and it remains the only per-step-type
-            colour on the whole face — the colour budget 137-D banked and 188 spends on run
-            state. It is a soft disc BEHIND the mark, inset negatively so it reads as a
-            glow around a 24px glyph rather than as a filled chip. `tint` arrives already
-            resolved by the adapter (own-property guarded there, WR-04 site 1) and reaches
-            an inline style object, never markup — so this element renders no authored
-            string into an HTML sink.
-
-            `aria-hidden`, no control, no tab index: one tab stop per node is a
-            canvas-level invariant and the node's own accessible name states the type. */}
-        <span
-          aria-hidden="true"
-          // ⚠ THE `canvas-icon-well` NAME IS LOAD-BEARING AND THE `canvas-node-` PREFIX IS
-          // RESERVED. Several suites enumerate the plane's node ROOTS with a test-id prefix
-          // selector, and that works only because every OTHER element wearing that prefix
-          // (the run ring, the run line, the verdict mark, the governance seal) is
-          // CONDITIONAL and therefore absent from a resting Builder card. This well renders
-          // ALWAYS, so a prefixed name would have inflated every one of those counts.
-          // Measured, not reasoned about: `PhaseNode.test.tsx`'s one-tab-stop walk read 6
-          // nodes where 3 exist, and `WorkflowCanvas.test.tsx`'s roster read 8 where 7 do.
-          //
-          // ⚠ AND THE SIBLING NAMES ARE DESCRIBED, NEVER SPELLED, in this comment. A source
-          // fence in the card's suite carves the seal's JSX block by finding the FIRST
-          // occurrence of its test id across the joined subtree source — and this file is
-          // joined first — so a docblock quoting that id verbatim silently steals the anchor
-          // and the fence dies with "could not carve". That happened once while writing this
-          // very comment; the guard is fine, the prose was not.
-          data-testid="canvas-icon-well"
-          className="relative grid h-6 w-6 shrink-0 place-items-center"
-        >
-          <span
-            className="absolute inset-[-5px] rounded-full"
-            style={{ background: `radial-gradient(circle, ${tint}, transparent 68%)` }}
-          />
-          <span className="relative grid place-items-center text-[18px] leading-none text-muted-foreground">
-            {icon}
-          </span>
-        </span>
-
-        {/* THE CONTENT COLUMN — the sheet's `flex-grow min-w-0`. Left aligned, which is the
-            change that makes ten cards on a plane read as one column of steps rather than
-            as ten independent posters. */}
-        <div className="min-w-0 flex-1">
-          {/* No `data-testid` on the title or the supporting line, deliberately — they had
-              none before the port and adding one would widen every `CARD_SHAPE` capture in
-              this card's suite for no assertion that wants it. The icon well and the effect
-              banner DO carry one, because a fence and a behaviour test respectively ask for
-              them by name. */}
-          <p className="truncate text-[13px] font-medium leading-tight text-foreground">
-            {title}
+            `data-identifier` survives the revert: it is the only thing that marks this line
+            as carrying a machine identifier rather than a sentence, and `break-words` is
+            still the right treatment for an unbroken slug in a 208px column. */}
+        {subtitle ? (
+          <p
+            data-identifier={subtitleIsIdentifier ? "true" : undefined}
+            className={cn(
+              "mt-1 text-[11px] leading-snug text-muted-foreground",
+              subtitleIsIdentifier ? "break-words" : undefined,
+            )}
+          >
+            {subtitle}
           </p>
+        ) : null}
 
-          {/* THE SUPPORTING LINE. The sheet truncates it on all ten of its nodes and that
-              is the default here — but NOT when the line is carrying a machine identifier.
-              187-09 moved the ⌥ Technical-names reveal into this slot precisely because the
-              title slot truncates and clipped the slug (`AI agent step · find-renewal-t…`),
-              so re-truncating it here would have silently undone a shipped fix. The whole
-              argument, and why this is a DATA slot rather than a layout branch, is on
-              `subtitleIsIdentifier` in `phaseNodeCardContract.ts`.
+        {/* THE EFFECT BANNER — a Phase 200 slot that SURVIVES the revert of the Phase 200
+            face, because it is a capability and not a silhouette: it states that a step
+            reaches beyond this workspace, which nothing else on the card says.
 
-              Every card on a default Builder canvas takes the truncating arm, which is the
-              sheet's exact 72px composition. */}
-          {subtitle ? (
-            <p
-              data-identifier={subtitleIsIdentifier ? "true" : undefined}
-              className={cn(
-                "mt-1 text-[11px] leading-snug text-muted-foreground",
-                subtitleIsIdentifier ? "break-words" : "truncate",
-              )}
-            >
-              {subtitle}
-            </p>
-          ) : null}
-
-          {/* THE EFFECT BANNER — the sheet's third line, on the four of its ten nodes that
-              reach beyond this workspace:
-              `text-status-warning text-[9px] font-bold mt-1 tracking-wider`.
-
-              ⚠ THE SHEET DRAWS TWO BANNERS AND ONLY ONE IS ON THE WIRE. `ONLY READS` is
-              DECLINED, not approximated — every external capability this client recognises
-              is a WRITE, so nothing could resolve a step to it without the model choosing
-              which steps "only read". The whole argument, and its dated re-open trigger,
-              lives in `nodeEffectBanner.ts`; the word itself has exactly one home there. */}
-          {effectBanner ? (
-            <p
-              // `canvas-effect-banner`, NOT `canvas-node-effect-banner` — the same
-              // root-enumeration hazard the icon well above documents. This line renders on a
-              // RESTING Builder card (any `external_action` step), so a `canvas-node-` name
-              // would be counted as a node by every suite that enumerates the plane with
-              // `getAllByTestId(/^canvas-node-/)`. Measured: `WorkflowCanvas.test.tsx`'s
-              // seven-type roster read 8 nodes.
-              data-testid="canvas-effect-banner"
-              className="mt-1 text-[9px] font-bold leading-snug tracking-wider text-warning"
-            >
-              {effectBanner}
-            </p>
-          ) : null}
+            ⚠ THE SHEET DRAWS TWO BANNERS AND ONLY ONE IS ON THE WIRE. `ONLY READS` is
+            DECLINED, not approximated — every external capability this client recognises
+            is a WRITE, so nothing could resolve a step to it without the model choosing
+            which steps "only read". The whole argument, and its dated re-open trigger,
+            lives in `nodeEffectBanner.ts`; the word itself has exactly one home there. */}
+        {effectBanner ? (
+          <p
+            // `canvas-effect-banner`, NOT `canvas-node-effect-banner`. Several suites
+            // enumerate the plane's node ROOTS with a `canvas-node-` test-id prefix
+            // selector, and that works only because every other element wearing that prefix
+            // is CONDITIONAL and absent from a resting Builder card. This line renders on a
+            // RESTING card (any `external_action` step), so a prefixed name would be counted
+            // as a node. Measured: `WorkflowCanvas.test.tsx`'s seven-type roster read 8.
+            data-testid="canvas-effect-banner"
+            className="mt-1 text-[9px] font-bold leading-snug tracking-wider text-warning"
+          >
+            {effectBanner}
+          </p>
+        ) : null}
 
         {/* THE BRANCH CONDITION (200-06 · BC-MR-03 · ledger row `BC-3`).
             The step's own condition, in business words, resolved to the target step's
@@ -491,9 +420,16 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
         ) : null}
 
         {/* THE ELAPSED (Phase 200 · `screens/node-identity.html:265`).
-            The sheet puts it bottom-right of the running node, in the accent, at 10px — and
-            it is deliberately positioned as a sibling of the run line rather than absolutely,
-            so it can never overlap the status ring `NodeRunOverlay` paints above the card.
+            A Phase 200 slot that SURVIVES the revert of the Phase 200 face, for the same
+            reason as the effect banner: it is a capability — the only place a step's own
+            clock reaches the plane — and not a silhouette. It is a sibling of the run line
+            rather than an absolutely-positioned element, so it can never overlap the status
+            ring `NodeRunOverlay` paints above the card.
+
+            ⚠ ITS ONE ALIGNMENT UTILITY WAS DROPPED WITH THE REVERT. The sheet put it
+            bottom-RIGHT of a left-aligned row; this card is `text-center`, so a `text-right`
+            override would have been the single element on the face pulling against the
+            card's own alignment. It inherits instead.
 
             ⚠ TWO CONDITIONS, AND BOTH ARE LOAD-BEARING. `reading !== null` is what makes this
             unreachable on an authoring canvas — a draft supplies no run state, so it supplies
@@ -508,7 +444,7 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
         {reading !== null && typeof elapsed === "string" && elapsed.length > 0 ? (
           <p
             data-testid="canvas-node-elapsed"
-            className="mt-1 text-right font-mono text-[10px] leading-none text-primary"
+            className="mt-1 font-mono text-[10px] leading-none text-primary"
           >
             {elapsed}
           </p>
@@ -525,28 +461,29 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
 
         {/* At most TWO word-badges (D-183-07), and the type says so. No tool chips,
             no gate identifiers, no phase_index on the face. */}
-          {badges && badges.length > 0 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {badges.map((badge) => (
-                <span key={badge.testId} {...badge.dataAttr}>
-                  <StatusChip tone={badge.tone} testId={badge.testId}>
-                    {badge.glyph ? (
-                      <span aria-hidden="true" className="mr-1">
-                        {badge.glyph}
-                      </span>
-                    ) : null}
-                    {badge.label}
-                  </StatusChip>
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {badges && badges.length > 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            {badges.map((badge) => (
+              <span key={badge.testId} {...badge.dataAttr}>
+                <StatusChip tone={badge.tone} testId={badge.testId}>
+                  {badge.glyph ? (
+                    <span aria-hidden="true" className="mr-1">
+                      {badge.glyph}
+                    </span>
+                  ) : null}
+                  {badge.label}
+                </StatusChip>
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <NodeCornerMarks verdict={verdict} grounded={grounded} />
 
       <NodeRunOverlay reading={reading} />
+
+      <NodeIconWell icon={icon} tint={tint} />
     </div>
   )
 }

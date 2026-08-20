@@ -72,15 +72,21 @@ export const CANVAS_LAYOUT = {
   NODE_WIDTH: 260,
   /** The floor a card may not shrink below; it grows DOWNWARD from here.
    *
-   *  ⚠ 104 → 72 AT THE PHASE 200 CANVAS PORT, and the prior reason is kept rather than
-   *  overwritten: 104 was D-185-17's 137-B floor — "the height at which the mark floating
-   *  above the card's top edge clears the title line by 11px rather than the 3px the
-   *  sketch theme's own `padding-top: 34` left". That mark no longer floats above the
-   *  card; sketch 200 puts it INSIDE, on the left, so the clearance the 104 bought is not
-   *  a constraint any more. 72 is `screens/builder-canvas.html`'s own node height, on ten
-   *  of its ten nodes. The floor is still a FLOOR — the sheet's own three-line nodes are
-   *  84px, and this card still grows downward to meet a run line or a condition. */
-  NODE_MIN_HEIGHT: 72,
+   *  104 is D-185-17's 137-B floor: the height at which the mark floating above the card's
+   *  top edge clears the title line by 11px rather than the 3px the sketch theme's own
+   *  `padding-top: 34` left.
+   *
+   *  ⚠ 104 → 72 AT THE PHASE 200 CANVAS PORT AND BACK TO 104 HERE, and the port's reason is
+   *  kept rather than erased because it was correct FOR ITS CARD: "That mark no longer
+   *  floats above the card; sketch 200 puts it INSIDE, on the left, so the clearance the
+   *  104 bought is not a constraint any more. 72 is `screens/builder-canvas.html`'s own
+   *  node height." The operator has since chosen the 137-B face, the mark floats above the
+   *  top edge again, and the clearance IS a constraint again — so the number goes back with
+   *  the card that needs it. ⚠ IT MOVES WITH `EDGE_ANCHOR_Y` OR THE CONNECTORS DETACH: both
+   *  constants and `PhaseNodeCard`'s own `RUN_MODE_NODE_MIN_HEIGHT` are one decision in
+   *  three places, and reverting any two of the three leaves the lines entering the cards
+   *  at the wrong height. */
+  NODE_MIN_HEIGHT: 104,
   /** Horizontal distance between two adjacent phase columns. */
   PITCH_X: 320,
   /** The single spine lane every phase node sits on. */
@@ -89,13 +95,15 @@ export const CANVAS_LAYOUT = {
   SKIP_LANE_Y: 200,
   /** Handle offset from the node TOP (never 50%) — a taller card keeps its baseline.
    *
-   *  ⚠ 28 → 36 AT THE PHASE 200 CANVAS PORT. It is still a FIXED offset from the top and
-   *  D-183-12 is untouched — what changed is which fixed offset the sheet draws. Measured
-   *  off `screens/builder-canvas.html` rather than chosen: its nodes sit at `top: 64px`
-   *  with a height of 72, and every connector into and out of them is drawn at `y = 100`.
-   *  `100 − 64 = 36`, i.e. the vertical centre of the sheet's 72px card. At the old 28 the
-   *  lines would enter a 72px card a third of the way down its left edge. */
-  EDGE_ANCHOR_Y: 36,
+   *  ⚠ 28 → 36 AT THE PHASE 200 CANVAS PORT AND BACK TO 28 HERE. The port's measurement is
+   *  kept because it was real and it is the record of what 36 meant: "its nodes sit at
+   *  `top: 64px` with a height of 72, and every connector into and out of them is drawn at
+   *  `y = 100`. `100 − 64 = 36`, i.e. the vertical centre of the sheet's 72px card." That
+   *  is the right anchor for a 72px card and the wrong one for a 104px card whose first
+   *  42px are padding under a floating mark — at 36 the lines would enter the restored card
+   *  above its title. D-183-12 is untouched either way: this is a FIXED offset from the top,
+   *  never 50%, so a taller card keeps its baseline. */
+  EDGE_ANCHOR_Y: 28,
   /** The ○ end cap's square size. */
   END_CAP_SIZE: 40,
 } as const satisfies Record<string, number>

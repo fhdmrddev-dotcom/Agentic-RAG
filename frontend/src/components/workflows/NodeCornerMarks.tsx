@@ -1,4 +1,23 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — THIS FILE WAS RE-SITED BY THE PHASE 200
+ * CANVAS PORT AND THE PORT IS REVERTED. The port replaced the node card's 137-B face (a
+ * 248px centre-aligned frosted block with a 62px 3D mark floating above its top edge) with
+ * sketch 200's compact 240x72 row carrying a 24px mark inside a left gutter, and every mark
+ * this module places had to move with it. **The operator has since seen both faces rendered
+ * and chosen the 137-B one**, naming the ring around the mark and the card silhouette, so
+ * the geometry here goes back with the card it is placed against.
+ *
+ * ⚠ THE PORT'S ARITHMETIC IS NOT LOST AND IS NOT REPEATED HERE. It was correct for the card
+ * it was solving — it re-derived every offset from a 240px card rather than guessing — and
+ * it reads in full at `901b25ff` and `c4463d92`. Reverting it is a judgement about which
+ * card ships, never a claim that the port measured wrong.
+ *
+ * ⚠ THE MARKS MOVE AS A SET OR THEY COLLIDE. This module, `NodeRunOverlay.tsx` and
+ * `PhaseNodeCard.tsx`'s own card div are one geometry, and criterion 23's zero-overlap
+ * check is what fails when only some of them move. Reverting any one alone is what the
+ * occupancy table exists to catch.
+ */
+/**
  * Phase 188.2-05 Task 1 (D-04) — NodeCornerMarks.
  *
  * THE TWO CORNER MARKS, AND WHY THEY SHARE ONE MODULE. The server's verdict mark on the
@@ -212,31 +231,7 @@ export function NodeCornerMarks({ verdict, grounded }: NodeCornerMarksProps) {
           data-testid="canvas-node-verdict"
           data-verdict={verdict}
           className={cn(
-            // ⚠ `-left-2 top-1.5` → `left-[-1px] top-[50px]` AT THE PHASE 200 CANVAS PORT,
-            // and BOTH axes moved for reasons worth separating.
-            //
-            // THE X IS THE SAME DECISION RE-DERIVED. The mark STRADDLES the card's left
-            // border, so it is centred ON that border. The border used to sit 6px in from
-            // the node box ((260 − 248) / 2) and a 22px mark centred there started at
-            // 6 − 11 = −5, which `-left-2` (−8) approximated. The card is now 240 wide, so
-            // the border sits at 10 and the mark starts at 10 − 11 = −1. Spelled exactly
-            // rather than rounded to a spacing step, because the whole point of the mark is
-            // WHICH LINE it straddles.
-            //
-            // ⚠ THE Y MOVED BECAUSE THE TOP-LEFT CORNER IS NO LONGER FREE, and this was
-            // found by the occupancy check rather than by eye. Sketch 200 puts the step's
-            // mark INSIDE the card in a left gutter, and the run ring is now drawn around
-            // it at 11…45 on both axes. A verdict left at `top-1.5` (6…28) would have
-            // overlapped that ring by 10×17px — a real collision between two rendered
-            // marks, which is exactly what criterion 23 forbids and what the zero-overlap
-            // assertion caught. 50 puts it clear below the ring (45) in the same gutter,
-            // still straddling the same border, still nowhere near the top-right corner
-            // SPEC Req 6 claims for governance.
-            //
-            // It overhangs the Builder card's 72px floor by 0px and the run card's 84px
-            // floor not at all (50 + 22 = 72), which is the tightest of the three fits and
-            // is why the number is 50 and not 52.
-            "pointer-events-none absolute left-[-1px] top-[50px] z-[8] grid h-[22px] w-[22px]",
+            "pointer-events-none absolute -left-2 top-1.5 z-[8] grid h-[22px] w-[22px]",
             "place-items-center rounded-full text-[11px] font-bold leading-none",
             mark.className,
           )}
@@ -272,30 +267,15 @@ export function NodeCornerMarks({ verdict, grounded }: NodeCornerMarksProps) {
           four-value render asserting the seal's class list and text are IDENTICAL
           across every run state.
 
-          THE OFFSET, AND WHY BOTH NUMBERS CHANGED AT THE PHASE 200 PORT. The previous
-          reasoning is kept verbatim because the METHOD is unchanged and only its inputs
-          moved: "Sketch 143-A places the seal `top: 11px; right: 11px` inside the 248px
-          CARD. This element is a sibling of the verdict mark, so its containing block is
-          the 260px NODE BOX, whose right edge sits 6px outside the card's border
-          ((260 − 248) / 2). 11 + 6 = 17 keeps the sketch's 11px clearance from the border
-          the reader actually sees … `top-[11px]` needs no such correction: the card's top
-          edge IS the node box's top edge."
-
-          BOTH INPUTS MOVED. The card is now 240px wide (sketch 200's own node width), so
-          the node box overhangs it by (260 − 240) / 2 = 10 per side rather than 6. And
-          sketch 200 places its own corner mark at a 4px inset (`top-xs right-xs`) rather
-          than 143-A's 11px, on a card less than a third as tall. So: 4 + 10 = 14 for the
-          right, and 4 flat for the top, which still needs no correction because the card's
-          top edge is still the node box's top edge. The test asserts the CLEARANCE FROM
-          THE CARD'S RIGHT BORDER rather than the composite, exactly as before, so this
-          arithmetic cannot drift away from the number the sheet locked.
-
-          ⚠ THE MARK ITSELF IS UNCHANGED — still a 21px ringed ⛨ with its own border and
-          its own background, not sketch 200's bare 14px glyph. That is deliberate: 185's
-          whole argument for this shape is that the seal must SURVIVE the border being
-          overwritten by selection or by run state, and it survives precisely because it
-          carries its own two carriers. A bare glyph would degrade to one. The sheet moved
-          the mark; it did not re-argue what governance costs.
+          THE 17px. Sketch 143-A places the seal `top: 11px; right: 11px` inside the
+          248px CARD. This element is a sibling of the verdict mark, so its containing
+          block is the 260px NODE BOX, whose right edge sits 6px outside the card's
+          border ((260 − 248) / 2). 11 + 6 = 17 keeps the sketch's 11px clearance from
+          the border the reader actually sees — `right-[11px]` here would leave 5px and
+          crowd the card's 22px corner radius. `top-[11px]` needs no such correction:
+          the card's top edge IS the node box's top edge. The test asserts the 11px
+          clearance from the card's right border rather than the 17, so this composite
+          cannot drift away from the number the sketch locked.
 
           THE DOCUMENTED FALLBACK is sketch 143-B — a stitched rail outside the card's
           border, which survives run status intact rather than degrading to one
@@ -311,7 +291,7 @@ export function NodeCornerMarks({ verdict, grounded }: NodeCornerMarksProps) {
           data-testid="canvas-node-seal"
           data-grounded="true"
           className={cn(
-            "pointer-events-none absolute right-[14px] top-[4px] z-[6] grid h-[21px] w-[21px]",
+            "pointer-events-none absolute right-[17px] top-[11px] z-[6] grid h-[21px] w-[21px]",
             "place-items-center rounded-full text-[11px] leading-none",
             "border border-[hsl(220_30%_100%/0.34)] bg-[hsl(220_30%_100%/0.1)] text-foreground",
           )}

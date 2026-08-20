@@ -1,4 +1,26 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — the Phase 200 canvas port re-baselined the
+ * captures in this file, and the port is reverted.
+ *
+ * WHAT MOVED AND WHY IT MOVED BACK. The port replaced the node card's 137-B face (248px,
+ * centre-aligned, a 62px 3D mark floating above its top edge) with sketch 200's compact
+ * 240x72 row, and `CANVAS_LAYOUT.NODE_MIN_HEIGHT` (104 -> 72) and `EDGE_ANCHOR_Y` (28 -> 36)
+ * moved with it. **The operator has since seen both faces rendered and chosen the 137-B
+ * one**, so both constants go back and so do the captures derived from them.
+ *
+ * ⚠ THE CAPTURES HERE ARE THE PRE-PORT ONES, RE-INSTATED UNEDITED RATHER THAN RE-CAPTURED,
+ * and they PASS. That is the strongest statement available: a pin nobody re-typed still
+ * holds, so the revert reproduces the pre-port tree rather than merely satisfying a fresh
+ * reading of itself.
+ *
+ * ⚠ THE PORT'S OWN RE-BASELINE WAS CAREFUL AND ITS RECORD IS AT `c4463d92`, not lost. Its
+ * headline finding is worth carrying forward for whoever moves these constants next: the
+ * delta across the twelve editing affordances was NOT uniform — the seven insert marks sit
+ * on the connector and moved with `EDGE_ANCHOR_Y`, while the five remove marks hang off the
+ * card's bottom and moved with `NODE_MIN_HEIGHT`. A blanket single-term edit made half the
+ * rows right and half wrong by 40, and the suite said so immediately.
+ */
+/**
  * Phase 185-10 Task 3 (GOVERN-03, SPEC Req 8, D-185-18, criterion 24) — FlowEdge tests.
  *
  * THE MECHANICAL HALF. The FULL visual claim is the manual row in `185-VALIDATION.md`
@@ -495,28 +517,18 @@ describe("FlowEdge — DETOUR is the same gap EDIT_AFFORDANCE describes", () => 
 
   it("holds the box size the verbatim transcription is only valid at", () => {
     // ARC's interior control points (14, 16, 30, 44, 46) are the sketch's literals, so
-    // the transcription is correct ONLY while the box is 60 wide with the line at a known
-    // baseline. Pinning that here is what makes "transcribed, not re-derived" a safe
-    // instruction.
-    //
-    // ⚠ THE BASELINE MOVED 28 → 36 AT THE PHASE 200 CANVAS PORT, AND THIS PIN IS WHAT
-    // CAUGHT IT — which is the pin working, not the pin being in the way. `INSERT_Y` is
-    // `LANE_Y + EDGE_ANCHOR_Y`, and that anchor moved because sketch 200's card is 72px
-    // tall and every connector on the sheet enters at its vertical centre (its nodes sit
-    // at `top: 64` and its paths are drawn at `y = 100`).
-    //
-    // ⚠ THE TRANSCRIPTION IS STILL VALID, and that is the part worth stating rather than
-    // assuming. `ARC` is a TEMPLATE built from `DETOUR.INSERT_Y` and `DETOUR.DIP`, so the
-    // whole curve TRANSLATED DOWN 8px and its shape is unchanged: every horizontal literal
-    // (14, 16, 30, 44, 46 and the 60 width) is untouched, because `PITCH_X` and
-    // `NODE_WIDTH` did not move. The dip is still 34 below the line. So the sketch's mark
-    // is the same mark, drawn 8px lower on a shorter card.
+    // the transcription is correct ONLY while the box is 60 wide with the line at 28.
+    // Pinning that here is what makes "transcribed, not re-derived" a safe instruction.
     expect(DETOUR.GAP).toBe(60)
-    expect(DETOUR.INSERT_Y).toBe(36)
-    expect(ARC).toBe("M0,36 C14,36 16,70 30,70 C44,70 46,36 60,36")
-    expect(LINE).toBe("M0,36 L60,36")
-    // The dip, asserted as a RELATIVE fact so it cannot silently absorb a future baseline
-    // move the way the absolute strings above just did.
+    expect(DETOUR.INSERT_Y).toBe(28)
+    expect(ARC).toBe("M0,28 C14,28 16,62 30,62 C44,62 46,28 60,28")
+    expect(LINE).toBe("M0,28 L60,28")
+    // ⚠ KEPT FROM THE PHASE 200 PORT, which is otherwise reverted here. The port moved
+    // `INSERT_Y` and the three absolute assertions above ABSORBED the move — they were
+    // re-baselined and said nothing about whether the SHAPE had survived. It had: `ARC` is
+    // a template over `INSERT_Y` and `DIP`, so the whole curve translated and every
+    // horizontal literal stayed put. This states the dip as a RELATIVE fact so a future
+    // baseline move cannot silently take the shape with it.
     expect(DETOUR.INSERT_Y + DETOUR.DIP - DETOUR.INSERT_Y).toBe(34)
   })
 })

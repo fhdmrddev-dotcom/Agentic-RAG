@@ -1,4 +1,23 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — THIS FILE WAS RE-SITED BY THE PHASE 200
+ * CANVAS PORT AND THE PORT IS REVERTED. The port replaced the node card's 137-B face (a
+ * 248px centre-aligned frosted block with a 62px 3D mark floating above its top edge) with
+ * sketch 200's compact 240x72 row carrying a 24px mark inside a left gutter, and every mark
+ * this module places had to move with it. **The operator has since seen both faces rendered
+ * and chosen the 137-B one**, naming the ring around the mark and the card silhouette, so
+ * the geometry here goes back with the card it is placed against.
+ *
+ * ⚠ THE PORT'S ARITHMETIC IS NOT LOST AND IS NOT REPEATED HERE. It was correct for the card
+ * it was solving — it re-derived every offset from a 240px card rather than guessing — and
+ * it reads in full at `901b25ff` and `c4463d92`. Reverting it is a judgement about which
+ * card ships, never a claim that the port measured wrong.
+ *
+ * ⚠ THE MARKS MOVE AS A SET OR THEY COLLIDE. This module, `NodeRunOverlay.tsx` and
+ * `PhaseNodeCard.tsx`'s own card div are one geometry, and criterion 23's zero-overlap
+ * check is what fails when only some of them move. Reverting any one alone is what the
+ * occupancy table exists to catch.
+ */
+/**
  * Phase 188.2-05 Task 2 (D-04) — NodeRunOverlay.
  *
  * PHASE 188'S RUN STATE, DRAWN AROUND THE CARD. The status ring that turns the 62px icon
@@ -111,39 +130,8 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 /** The ring's own box, concentric with the 62px well: `(72 − 62) / 2 = 5`, and the well
  *  floats at `−26`, so the ring floats at `−31`. Not a spacing choice and not roundable. */
-//
-//  ⚠ RE-SITED BY THE PHASE 200 CANVAS PORT. The docblock directly above is the PREVIOUS
-//  geometry's reasoning, kept verbatim rather than rewritten, because its arithmetic was
-//  correct and it is only its INPUT that disappeared: sketch 200 puts the step's mark
-//  INSIDE the card — a 24px well in a 16px-padded left gutter — so there is no longer a
-//  62px disc floating above the top edge for a 72px ring to be concentric with. A ring left
-//  where it was would encircle empty plane above a 72px card, which is worse than not
-//  drawing one at all.
-//
-//  THE NEW NUMBERS ARE DERIVED THE SAME WAY, from the card's own box rather than chosen —
-//  and ⚠ THE X AND THE Y ARE NOT THE SAME NUMBER, which is the trap this comment exists to
-//  stop the next reader falling into. This element's containing block is the 260px NODE
-//  BOX, not the card, and the 240px card is inset 10px inside it. So:
-//
-//    · y — the card's top edge IS the node box's top edge, so the well's centre is just the
-//      padding plus half the well: `16 + 12 = 28`, and a 34px ring centred there starts at
-//      `28 − 17 = 11`.
-//    · x — the card's left edge is at 10, so the well's centre is `10 + 16 + 12 = 38`, and
-//      the ring starts at `38 − 17 = 21`. Using 11 here (the y value) puts the ring 10px
-//      left of the mark it is supposed to encircle; that was the first draft, and the
-//      concentricity assertion in `PhaseNodeCard.test.tsx` is what caught it.
-//
-//  The ring's right edge therefore lands at 55, and the content column starts at
-//  `10 + 16 + 24 + 8 = 58` — so it clears the title by 3px, the same clearance the old
-//  geometry gave the mark, arrived at independently.
-//
-//  ⚠ NOTHING ELSE IN THIS MODULE CHANGED, AND THAT IS THE POINT. The `viewBox` stays
-//  `0 0 72 72` and `RING_RADIUS` stays 34, so every arc, dasharray and dashoffset below is
-//  byte-identical and simply renders at half scale. Sketch 153-A's acceptance test is that
-//  the NINE readings stay distinguishable by ARC SHAPE with colour switched off; re-drawing
-//  the ring would have risked that to gain nothing.
 const RING_BOX_CLASSES =
-  "pointer-events-none absolute left-[21px] top-[11px] z-[5] h-[34px] w-[34px]"
+  "pointer-events-none absolute left-1/2 top-[-31px] z-[5] h-[72px] w-[72px] -translate-x-1/2"
 
 /**
  * The arc's stroke per reading. **Colour REINFORCES; it never carries.**
@@ -344,32 +332,13 @@ export function NodeRunOverlay({ reading }: NodeRunOverlayProps) {
 
           A SIBLING of the ring rather than a child of it: these coordinates are measured
           against the node box, and nesting them inside the ring's own absolute wrapper
-          would re-anchor them to it.
-
-          ⚠ RE-SITED WITH THE RING BY THE PHASE 200 CANVAS PORT. It sat at `left-1/2
-          top-[-37px] -translate-x-1/2` — the ring's 12-o'clock gap, back when the ring was
-          a 72px disc floating above the card. The ring is now 34px inside the card's left
-          gutter, so the chip follows it there rather than being left hovering over the
-          plane on its own. It is placed BELOW the ring in the same gutter (`left-[13px]
-          top-[46px]`) rather than at the smaller ring's 12 o'clock, because at 34px that
-          gap is 11px tall and this chip is 15px — it would have straddled the mark it is
-          meant to sit beside. The gutter below the well is empty on every reading, and the
-          run-mode floor is 84px, so the chip's 46…61 band is inside the card at every
-          height the card can take.
-
-          ⚠ THE X IS 31 AND NOT THE GUTTER'S LEFT EDGE, and the occupancy check is what
-          chose it. The verdict mark also moved into this gutter at the port (it straddles
-          the card's left border at 50…72), and a pause chip at the gutter's left edge
-          overlapped it. 31 starts the chip clear of the verdict's right edge (21) while
-          keeping it under the ring it belongs to. Two rendered marks may not overlap —
-          criterion 23 — and both of these render at once on a step that is waiting for a
-          person AND carries a server verdict. */}
+          would re-anchor them to it. */}
       {reading === "waiting-for-you" ? (
         <span
           aria-hidden="true"
           data-testid="canvas-node-pause-chip"
           className={cn(
-            "pointer-events-none absolute left-[31px] top-[46px] z-[9] flex",
+            "pointer-events-none absolute left-1/2 top-[-37px] z-[9] flex -translate-x-1/2",
             "gap-[3px] rounded border border-[hsl(var(--warning))] bg-background px-[5px] py-[3px]",
           )}
         >

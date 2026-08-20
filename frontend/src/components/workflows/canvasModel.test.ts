@@ -1,4 +1,26 @@
 /**
+ * ⚠ RESTORED FROM `cd6f7b1d` ON 2026-08-20 — the Phase 200 canvas port re-baselined the
+ * captures in this file, and the port is reverted.
+ *
+ * WHAT MOVED AND WHY IT MOVED BACK. The port replaced the node card's 137-B face (248px,
+ * centre-aligned, a 62px 3D mark floating above its top edge) with sketch 200's compact
+ * 240x72 row, and `CANVAS_LAYOUT.NODE_MIN_HEIGHT` (104 -> 72) and `EDGE_ANCHOR_Y` (28 -> 36)
+ * moved with it. **The operator has since seen both faces rendered and chosen the 137-B
+ * one**, so both constants go back and so do the captures derived from them.
+ *
+ * ⚠ THE CAPTURES HERE ARE THE PRE-PORT ONES, RE-INSTATED UNEDITED RATHER THAN RE-CAPTURED,
+ * and they PASS. That is the strongest statement available: a pin nobody re-typed still
+ * holds, so the revert reproduces the pre-port tree rather than merely satisfying a fresh
+ * reading of itself.
+ *
+ * ⚠ THE PORT'S OWN RE-BASELINE WAS CAREFUL AND ITS RECORD IS AT `c4463d92`, not lost. Its
+ * headline finding is worth carrying forward for whoever moves these constants next: the
+ * delta across the twelve editing affordances was NOT uniform — the seven insert marks sit
+ * on the connector and moved with `EDGE_ANCHOR_Y`, while the five remove marks hang off the
+ * card's bottom and moved with `NODE_MIN_HEIGHT`. A blanket single-term edit made half the
+ * rows right and half wrong by 40, and the suite said so immediately.
+ */
+/**
  * Phase 183-05 Task 1 (CANVAS-01, D-183-10 / D-183-11 / D-183-12, correction C-2) —
  * canvasModel behaviour spec.
  *
@@ -108,23 +130,15 @@ describe("canvasModel.CANVAS_LAYOUT — the ONE frozen constants table", () => {
   it("carries the locked layout values (183-06's CSS reads these, not literals)", () => {
     expect(CANVAS_LAYOUT).toEqual({
       NODE_WIDTH: 260,
-      // ⚠ 104 → 72 AT THE PHASE 200 CANVAS PORT, and the prior reason is preserved:
-      // "185-01 (D-185-17): raised 96 → 104 with the 137-B card rebuild. 104 is the
+      // 185-01 (D-185-17): raised 96 → 104 with the 137-B card rebuild. 104 is the
       // floor at which the mark floating above the card's top edge clears the title
-      // by 11px." That mark no longer floats — sketch 200 renders it inside the card —
-      // so the clearance the 104 bought is not a constraint any more. 72 is
-      // `screens/builder-canvas.html`'s own node height, on ten of its ten nodes.
-      // `NODE_WIDTH` is unchanged and is still the NODE BOX; the card inside it is now
-      // 240px rather than 248.
-      NODE_MIN_HEIGHT: 72,
+      // by 11px. `NODE_WIDTH` is unchanged and is the NODE BOX — the 137-B card is
+      // 248px INSIDE it.
+      NODE_MIN_HEIGHT: 104,
       PITCH_X: 320,
       LANE_Y: 0,
       SKIP_LANE_Y: 200,
-      // ⚠ 28 → 36 AT THE SAME PORT. Still a FIXED offset from the node TOP (D-183-12 is
-      // untouched); only which offset changed. Measured off the sheet rather than chosen:
-      // its nodes sit at `top: 64` with height 72 and every connector is drawn at `y = 100`,
-      // so `100 − 64 = 36` — the vertical centre of the sheet's card.
-      EDGE_ANCHOR_Y: 36,
+      EDGE_ANCHOR_Y: 28,
       END_CAP_SIZE: 40,
     })
   })
