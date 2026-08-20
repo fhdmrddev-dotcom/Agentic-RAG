@@ -110,6 +110,20 @@ import { StopControl } from "@/components/chat/StopControl"
 //    `RunSpine.tsx`'s docblock for the screenshot-level diff against the sheet. It remains the
 //    right component in CHAT and is untouched there; this page no longer imports it.
 import { RunSpine } from "@/components/workflows/RunSpine"
+// ── THE CANVAS IS BACK ON THIS PAGE, BEHIND A SWITCH — an operator decision, 2026-08-20 ──
+//    It was removed outright for four measured reasons (still recorded in `RunTranscript.tsx`),
+//    and the strongest of them — that a linear chain drawn as a graph shows nothing a list does
+//    not — is an argument about the DEFAULT, not about availability. The default is the log; the
+//    shape is one click away. ⚠ This also un-strands the canvas's whole RUN MODE, which had no
+//    mount anywhere in the product between those two commits: `BC-MR-01`'s per-connection
+//    declared-count label, `PORT-canvas.md`'s marching `live` connector and the run-tense
+//    connection states are reachable again.
+import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
+import {
+  CENTRE_CANVAS_LABEL,
+  CENTRE_LOG_LABEL,
+  CENTRE_SWITCH_LABEL,
+} from "@/components/workflows/transcriptVocabulary"
 import { PendingAskCard } from "@/components/panel/PendingAskCard"
 import {
   useAskUserPrompt,
@@ -117,6 +131,7 @@ import {
   useStreamActions,
   useWorkspaceFiles,
 } from "@/providers/StreamsProvider"
+import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import type { Phase, WorkspaceFile } from "@/types"
 
@@ -603,8 +618,13 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * unconditional either way. R11: the list is the SERVER's; this page authors none of it.
    */
   /**
-   * ⚠ SUPERSEDED BY PHASE 200's CENTRE DECISION — THE DOCBLOCK ABOVE IS KEPT, THE CODE IS
-   * GONE, AND NEITHER HALF OF THAT IS AN ACCIDENT.
+   * ⚠ RESTORED 2026-08-20 WITH THE CANVAS IT FEEDS. The note below recorded its removal and
+   * named the re-open trigger as *"the next time anything on THIS page renders per-step
+   * governance"*. Putting the canvas back behind a switch is exactly that, so the subscription
+   * returns rather than the canvas rendering an ungoverned view. The removal note is kept
+   * underneath because it is the reason this hook is here at all.
+   *
+   * ⚠ SUPERSEDED-THEN-RESTORED — THE ORIGINAL REMOVAL NOTE, KEPT VERBATIM:
    *
    * F7's fix existed to feed `kbTools` to THE CANVAS, whose `toCanvas` resolves `grounded`
    * through `isGrounded(phase, kbTools)`. This page no longer mounts a canvas, so the two
@@ -620,6 +640,11 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * time anything on THIS page renders per-step governance, it takes the list back — from
    * the same hook, by the same rule — and this comment is what tells it where the rule is.
    */
+  const bundle = useGroundingBundle(true)
+  const kbTools = useMemo<readonly string[]>(
+    () => (bundle.kind === "ready" || bundle.kind === "unavailable" ? bundle.kbTools : []),
+    [bundle],
+  )
 
   /**
    * ⚠ CR-02 — SOMETHING HAS TO OPEN THE RUN'S STREAM, and after the retarget nothing did.
@@ -890,6 +915,20 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * So: the waiting step if there is one, else the step that is running, else the last row. The
    * control is always reachable, and it is beside the right step in the case that matters.
    */
+  /**
+   * WHICH reading of the run occupies the centre.
+   *
+   * ⚠ THE DEFAULT IS THE LOG, AND THE DEFAULT IS THE ARGUMENT. `WorkflowDefinition.phases` is a
+   * flat list with no branch construct, so a run's canvas is a straight chain — the shape shows
+   * nothing the log does not until branching exists. That reasoning bounds which view opens
+   * FIRST; it was never a reason to make the other unreachable, which is what removing it did.
+   *
+   * ⚠ IT IS COMPONENT STATE, NOT PERSISTED, and that is deliberate for now: a stored preference
+   * is a settings decision with its own home (`user_settings`), and inventing a key here would
+   * be a second place for it to live. Re-open trigger: an operator asking for it to stick.
+   */
+  const [centreView, setCentreView] = useState<"log" | "canvas">("log")
+
   const askAnchorSlug = useMemo(() => {
     const waiting = wireRows.find((r) => runStateBySlug.get(r.slug)?.reading === "waiting-for-you")
     if (waiting) return waiting.slug
@@ -1199,6 +1238,37 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                 (its own `ml-auto` is inert inside a shrink-wrapped group), so no shipped
                 class string was edited to make room. ── */}
           <div className="ml-auto flex items-center gap-3">
+            {/* ⚠ A TWO-OPTION RADIOGROUP, NOT TWO BUTTONS. These are two readings of ONE run and
+                exactly one is showing, which is what a radiogroup means and what a pair of
+                buttons does not — a screen-reader user otherwise hears two unrelated controls
+                and cannot tell which view they are in. */}
+            <div
+              role="radiogroup"
+              aria-label={CENTRE_SWITCH_LABEL}
+              data-testid="run-centre-switch"
+              className="flex items-center gap-0.5 rounded-md border border-border/40 p-0.5"
+            >
+              {([["log", CENTRE_LOG_LABEL], ["canvas", CENTRE_CANVAS_LABEL]] as const).map(
+                ([view, label]) => (
+                  <button
+                    key={view}
+                    type="button"
+                    role="radio"
+                    aria-checked={centreView === view}
+                    data-testid={`run-centre-${view}`}
+                    onClick={() => setCentreView(view)}
+                    className={cn(
+                      "rounded px-2 py-0.5 text-[11px] font-medium transition-colors",
+                      centreView === view
+                        ? "bg-muted text-foreground"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ),
+              )}
+            </div>
             {!isTerminal ? <StopControl threadId={run?.thread_id ?? null} variant="page" /> : null}
             <button
               type="button"
@@ -1328,22 +1398,40 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
               `Ran 57s · 5 steps · finished 19:55` is the page's ONLY statement about the run as
               a whole derived from the steps that really ran. The page header's figure measures
               something else (`created → updated`) and says so in words. */}
-          <div className="mx-auto mb-6 w-full max-w-3xl">
-            <RunReceipt
-              phases={wireRows}
-              titleOf={titleOf}
-              runStatus={runStatus}
-              now={nowMs}
-              variant="summary"
+          {centreView === "canvas" ? (
+            /* ⚠ THE SUMMARY STRIP DOES NOT COME WITH IT. It is the LOG's header — the sentence
+               that summarises the column beneath it — and the canvas is not that column. A strip
+               floating over a graph would be a third statement of the run's total on a page that
+               already carries a labelled one in its header. */
+            <WorkflowCanvas
+              phases={specs}
+              selectedSlug={null}
+              onSelectNode={noop}
+              onClearSelection={noop}
+              editable={false}
+              runState={runState}
+              kbTools={kbTools}
             />
-          </div>
-          <RunTranscript
-            phases={wireRows}
-            titleOf={titleOf}
-            liveOf={runState}
-            runStatus={runStatus}
-            now={nowMs}
-          />
+          ) : (
+            <>
+              <div className="mx-auto mb-6 w-full max-w-3xl">
+                <RunReceipt
+                  phases={wireRows}
+                  titleOf={titleOf}
+                  runStatus={runStatus}
+                  now={nowMs}
+                  variant="summary"
+                />
+              </div>
+              <RunTranscript
+                phases={wireRows}
+                titleOf={titleOf}
+                liveOf={runState}
+                runStatus={runStatus}
+                now={nowMs}
+              />
+            </>
+          )}
         </section>
 
         <aside
@@ -1526,7 +1614,15 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   )
 }
 
-/* ⚠ `noop` LIVED HERE AND IS GONE WITH THE CANVAS IT EXISTED FOR. Its docblock read:
+/** The canvas requires both selection callbacks; this surface has no selection at all
+ *  (`selectedSlug` is permanently null), so they are inert by construction rather than by
+ *  discipline. Module-scope, so the identity is stable across renders.
+ *
+ *  ⚠ RESTORED with the canvas on 2026-08-20. The note recording its removal is kept below,
+ *  because the reason it left and the reason it came back are both worth finding here. */
+function noop() {}
+
+/* ⚠ `noop` WAS REMOVED WITH THE CANVAS ON THE SAME DAY IT RETURNED. That note read:
  *
  *     "The canvas requires both selection callbacks; this surface has no selection at all
  *      (`selectedSlug` is permanently null), so they are inert by construction rather than

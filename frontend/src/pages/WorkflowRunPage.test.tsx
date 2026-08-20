@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 // row" is a statement about that region and not about the page.
 import { render, screen, cleanup, fireEvent, waitFor, act, within } from "@testing-library/react"
 import type { Phase, WorkspaceFile } from "@/types"
+import { CENTRE_SWITCH_LABEL } from "@/components/workflows/transcriptVocabulary"
 import type { PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 
 // ── The api surface. `ApiError` is declared INSIDE the factory (never imported from
@@ -128,7 +129,54 @@ vi.mock("@/providers/StreamsProvider", () => ({
 
 // ── The canvas leaf-stub: it renders what the page HANDED it and nothing else, so a
 //    reading in this DOM is a reading the page computed. ──
-/* ⚠ `WorkflowCanvas` IS NO LONGER MOCKED HERE BECAUSE IT IS NO LONGER MOUNTED HERE.
+/**
+ * ⚠ `WorkflowCanvas` IS MOCKED AGAIN, BECAUSE IT IS MOUNTED AGAIN — behind the centre switch,
+ * by operator decision on 2026-08-20. The stub is not a convenience: the real component is
+ * React Flow, which needs a `ResizeObserver` jsdom does not provide, and mounting it took every
+ * switch case down with `ReferenceError: ResizeObserver is not defined`.
+ *
+ * It renders the values the PAGE hands down, so a test reads the hand-off rather than anything
+ * the canvas invented. ⚠ `String(...)` on `count` / `noun` / `live` for the reason the original
+ * stub gave: a declared `0` and an ABSENT count are two different facts, and a bare child would
+ * render both as nothing at all.
+ *
+ * The note recording its removal is kept below, because the surface changed twice in one day and
+ * both movements are worth finding here.
+ */
+vi.mock("@/components/workflows/WorkflowCanvas", () => ({
+  WorkflowCanvas: ({
+    phases,
+    runState,
+    editable,
+    selectedSlug,
+    kbTools,
+  }: {
+    phases: PhaseSpecJSON[]
+    runState?: (
+      slug: string,
+    ) => { reading: string; label: string; count?: number | null; noun?: string | null; live?: boolean } | undefined
+    editable?: boolean
+    selectedSlug: string | null
+    kbTools?: readonly string[]
+  }) => (
+    <div
+      data-testid="canvas-stub"
+      data-editable={String(editable)}
+      data-selected={String(selectedSlug)}
+      data-kbtools={(kbTools ?? []).join(",")}
+    >
+      {phases.map((p) => (
+        <div key={p.slug} data-testid={`node-${p.slug}`}>
+          <span data-testid={`reading-${p.slug}`}>{runState?.(p.slug)?.reading ?? "NONE"}</span>
+          <span data-testid={`count-${p.slug}`}>{String(runState?.(p.slug)?.count)}</span>
+          <span data-testid={`live-${p.slug}`}>{String(runState?.(p.slug)?.live)}</span>
+        </div>
+      ))}
+    </div>
+  ),
+}))
+
+/* ⚠ THE REMOVAL NOTE, KEPT — `WorkflowCanvas` was unmocked here for part of 2026-08-20.
  *
  * Phase 200 replaced this page's centre region with the run log (`RunTranscript`), for the
  * four measured reasons recorded in that component's own docblock. The stub that used to
@@ -2250,14 +2298,17 @@ describe("WorkflowRunPage — the live elapsed figure actually advances (F6)", (
  * that literal must never appear in this page's source whether or not a canvas is mounted.
  */
 describe("WorkflowRunPage 200 — the governance input left with the canvas (F7 superseded)", () => {
-  it("no longer subscribes to the grounding bundle, because nothing here reads it", async () => {
+  it("subscribes to the grounding bundle again, because the canvas is reachable again", async () => {
+    // ⚠ THIS CASE HAS NOW BEEN WRITTEN THREE WAYS AND EACH WAS TRUE WHEN WRITTEN, which is why
+    // the history is stated rather than overwritten. F7 asserted the server's kb-tool list
+    // reached THE CANVAS. When the canvas came off this page the list had no reader, so a live
+    // subscription was a request made for nothing and the case became a guard on its ABSENCE.
+    // The canvas is now reachable behind the centre switch, so the absence guard would be
+    // guarding a defect: a canvas rendered with no `kbTools` resolves `available_tools ∩ ∅` and
+    // every detected-grounded step paints as ungoverned — F7's original bug exactly.
     renderPage()
     await screen.findByTestId("run-transcript")
-    expect(useGroundingBundle).not.toHaveBeenCalled()
-    // ...and the hook is genuinely absent from the source, not merely unreached at runtime.
-    expect(codeOf(pageSource)).not.toMatch(/useGroundingBundle\(/)
-    // POSITIVE CONTROL — the needle really does match a live call.
-    expect("const b = useGroundingBundle(true)").toMatch(/useGroundingBundle\(/)
+    expect(useGroundingBundle).toHaveBeenCalled()
   })
 
   it("R11 holds regardless: the page authors no kb-tool list of its own", async () => {
@@ -2445,8 +2496,16 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
     // which is what pins its right edge — if a later edit appends the Stop after
     // it, the seam link moves every time the run goes terminal and G-4 row 2's
     // "the row twitches" failure is back.
+    // ⚠ THE INVARIANT IS THE SEAM LINK BEING LAST, AND THAT IS UNCHANGED. It carries `ml-auto`,
+    // so anything appended AFTER it would shove it leftward every time the run went terminal —
+    // G-4 row 2's "the row twitches" failure. The Stop is no longer FIRST in the group because
+    // the centre switch was added ahead of it on 2026-08-20; the switch is present on every
+    // state, so it cannot cause the twitch the ordering guards against. What still must hold is
+    // that the Stop sits BEFORE the seam link and the seam link ends the group.
     expect(group!.lastElementChild).toBe(seam)
-    expect(group!.firstElementChild).toBe(slot)
+    const order = Array.from(group!.children)
+    expect(order.indexOf(slot)).toBeGreaterThanOrEqual(0)
+    expect(order.indexOf(slot)).toBeLessThan(order.indexOf(seam))
   })
 
   /**
@@ -3710,6 +3769,62 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
     expect(screen.queryByTestId("ask-stub-call-1")).toBeNull()
     // The spine is still there: the absence is the ask's, not the panel's.
     expect(screen.getByTestId("spine-step-draft-letter")).toBeInTheDocument()
+  })
+})
+
+describe("WorkflowRunPage 200 — the centre switch (operator decision, 2026-08-20)", () => {
+  beforeEach(() => {
+    setFiles([])
+    setAsks([])
+    setLiveSlice([])
+    getWorkflowRun.mockResolvedValue(mkTimedRun())
+  })
+
+  it("opens on the LOG, and the canvas is not rendered until it is asked for", async () => {
+    // ⚠ THE DEFAULT IS THE ARGUMENT. The definition is a flat list with no branch construct, so
+    // a run's canvas is a straight chain and shows nothing the log does not — which bounds
+    // which view opens FIRST and was never a reason to make the other unreachable.
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.getByTestId("run-centre-log").getAttribute("aria-checked")).toBe("true")
+    expect(screen.getByTestId("run-centre-canvas").getAttribute("aria-checked")).toBe("false")
+    expect(screen.queryByTestId("run-transcript")).toBeInTheDocument()
+  })
+
+  it("swaps the centre — and swaps it BACK, so neither view is a one-way door", async () => {
+    renderPage()
+    await screen.findByTestId("run-transcript")
+
+    fireEvent.click(screen.getByTestId("run-centre-canvas"))
+    expect(screen.queryByTestId("run-transcript")).toBeNull()
+    expect(screen.getByTestId("run-centre-canvas").getAttribute("aria-checked")).toBe("true")
+    // ⚠ AND THE SUMMARY STRIP GOES WITH THE LOG. It is that column's header sentence, not the
+    // page's; leaving it over a graph would be a third statement of the run's total.
+    expect(screen.queryByTestId("run-receipt")).toBeNull()
+
+    fireEvent.click(screen.getByTestId("run-centre-log"))
+    expect(screen.getByTestId("run-transcript")).toBeInTheDocument()
+    expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
+  })
+
+  it("the SPINE survives both views — it is not part of the thing being switched", async () => {
+    // The switch chooses how to read the run's CENTRE. What needs your attention stays put.
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    expect(screen.getByTestId("run-panel")).toBeInTheDocument()
+    fireEvent.click(screen.getByTestId("run-centre-canvas"))
+    expect(screen.getByTestId("run-panel")).toBeInTheDocument()
+    expect(screen.getByTestId("spine-step-gather-contracts")).toBeInTheDocument()
+  })
+
+  it("is a radiogroup, because exactly one of two readings is showing", async () => {
+    // Two plain buttons announce two unrelated controls and never say which view you are in.
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    const group = screen.getByTestId("run-centre-switch")
+    expect(group.getAttribute("role")).toBe("radiogroup")
+    expect(group.getAttribute("aria-label")).toBe(CENTRE_SWITCH_LABEL)
+    expect(within(group).getAllByRole("radio")).toHaveLength(2)
   })
 })
 

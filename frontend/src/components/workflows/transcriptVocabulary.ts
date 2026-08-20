@@ -2,12 +2,13 @@
  * Phase 200 · the run transcript's WORDS (sketch `run-surface.html`, WIRE rows 1 + 2).
  *
  * EVERY GOVERNED USER-FACING STRING THE TRANSCRIPT SPELLS OF ITS OWN, IN ONE HOME: the
- * landmark, the spine's heading and the two honest-absence headlines. That is the WHOLE
+ * landmark, the spine's heading, the two honest-absence headlines and the centre switch's
+ * three words. That is the WHOLE
  * table and not a subset of it — the `doorVocabulary.ts` rule, kept for its mechanical
  * reason rather than a tidy one: a module holding a SUBSET means the next reader cannot
  * tell which strings are governed.
  *
- * ── ⚠ WHY IT IS FOUR STRINGS AND NOT FORTY ────────────────────────────────────────────
+ * ── ⚠ WHY IT IS SEVEN STRINGS AND NOT FORTY ────────────────────────────────────────────
  *
  * The transcript renders three kinds of text and AUTHORS only one of them:
  *
@@ -70,6 +71,21 @@ export const TRANSCRIPT_LANDMARK_LABEL = "Run log"
  * make each file's "this is the WHOLE table" claim narrower than the screen it describes.
  */
 export const SPINE_HEADING = "Workflow progress"
+
+// ── The centre switch ───────────────────────────────────────────────────────────────────
+
+/**
+ * `centre.log` / `centre.canvas` — the two readings of the run's centre.
+ *
+ * ⚠ THEY NAME WHAT YOU GET, NOT WHAT THE THING IS BUILT FROM. "Canvas" is a drawing tool's
+ * word; a person opening a run wants to know whether they are about to read a list of what
+ * happened or look at the shape it happened in. The switch is labelled for that question.
+ */
+export const CENTRE_LOG_LABEL = "What happened"
+export const CENTRE_CANVAS_LABEL = "Shape"
+
+/** The switch's own accessible name — it is a choice between two views of ONE run. */
+export const CENTRE_SWITCH_LABEL = "How to view this run"
 
 // ── The two absences, which are two DIFFERENT statements ────────────────────────────────
 
