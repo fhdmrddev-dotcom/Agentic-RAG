@@ -2304,7 +2304,7 @@ numeric `sed` bucket recipe; `wc -l <f>`), not carried forward:
 | File | at this commit | previously in `CLAUDE.md` |
 |---|---|---|
 | `frontend/src/pages/WorkflowRunPage.tsx` | **19 / 6 / 1474** | `16 / 6 / 1329` — stale by 3 commits / 145 L |
-| `frontend/src/components/workflows/phaseDuration.ts` | **4 / 1 / 493** | `3 / 1 / 412` |
+| `frontend/src/components/workflows/phaseDuration.ts` | **3 / 1 / 493** | `3 / 1 / 412` — ⚠ the COMMIT count was already right and only the LINES moved; a first draft of this table wrote `4` by adding one to the row instead of re-deriving, and the check below caught it
 | `frontend/src/components/workflows/RunTranscript.tsx` | **1 / 1 / 428** | ABSENT (created here) |
 | `frontend/src/components/workflows/transcriptVocabulary.ts` | **1 / 1 / 105** | ABSENT (created here) |
 
