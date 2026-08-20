@@ -265,6 +265,7 @@ import {
   ExternalLink,
   FileText,
   Folder,
+  History,
   Loader2,
   MoreHorizontal,
   Play,
@@ -334,6 +335,20 @@ const OPEN_LABEL = "Open"
  * really is there — the victim-naming Sheet.
  */
 const DELETE_WORKFLOW_LABEL = "Delete workflow…"
+
+/**
+ * SEED-190 — the read-only door's word.
+ *
+ * ⚠ NO ELLIPSIS, and the asymmetry with `DELETE_WORKFLOW_LABEL` directly above is the same
+ * one `DELETE_DRAFT_LABEL` documents: an ellipsis in this codebase promises a further STEP
+ * before anything happens. This item navigates immediately and asks nothing, so it earns none.
+ *
+ * ⚠ IT IS A NOUN, NOT A VERB, and every other item in this menu is a verb. That is deliberate:
+ * the verbs here fork and delete, and a person scanning the menu should be able to see at a
+ * glance that this one does neither. It also matches what the destination calls itself, so
+ * clicking it lands on a screen whose heading is the word you clicked.
+ */
+const RUN_LOG_LABEL = "Run log"
 
 /**
  * D-18's word for a draft. NO ellipsis, and the asymmetry is the point: this guard is one
@@ -732,6 +747,17 @@ export interface WorkflowCardProps {
   row: LibraryRow
   /** The project folder's display name, resolved by the page. `null` = unbound. */
   folderName?: string | null
+  /**
+   * SEED-190 — open the RUN LOG filtered to this workflow. Absent = the door is not offered,
+   * which is how this card behaves anywhere the log has no host.
+   *
+   * ⚠ IT HANDS UP THE SLUG AND THE NAME, NOT A ROW ID AND NOT A DEFINITION ID. A workflow's
+   * runs span its published VERSIONS, and each version is its own `workflow_definitions` row
+   * — so a definition-scoped door would open "this VERSION's runs" under the workflow's name.
+   * The slug is the identity that survives a publish. The name rides along because the log
+   * has to SAY what it is filtered to and a slug is a machine name.
+   */
+  onRunLog?: (scope: { slug: string; name: string }) => void
   /** Launch a runnable row (the Phase-121 one-click launch, unchanged). */
   onRun: (row: LibraryRow) => void
   /** Open a draft in the Builder (edit-in-place; saves PATCH the same row). */
@@ -845,6 +871,7 @@ export function WorkflowCard({
   row,
   folderName = null,
   onRun,
+  onRunLog,
   onOpen,
   onForkNewVersion,
   onForkStarter,
@@ -1287,6 +1314,34 @@ export function WorkflowCard({
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
+                {/* ── SEED-190 — THE DOOR TO THIS WORKFLOW'S RUNS ───────────────────
+                    FIRST in the menu, and above every other item, because it is the only
+                    item here that READS. Everything below it forks or deletes; a
+                    read-only door sitting under two delete grades reads as though it
+                    belonged to them.
+
+                    ⚠ IT IS OFFERED ON EVERY ROW STATE, INCLUDING DRAFTS, and that is a
+                    decision rather than an oversight. D-09's "a draft reaches no Run
+                    affordance anywhere on this card" is about STARTING a run — this
+                    starts nothing. A draft CAN have runs (measured 2026-08-20: 21 of 230
+                    runs point at a draft definition), so hiding the door there would hide
+                    real history behind a rule written about a different verb.
+
+                    ⚠ IT IS A `DropdownMenuItem`, WHICH IS WHAT KEEPS WR-03 GREEN.
+                    `aria-required-children` permits only menuitem / menuitemradio /
+                    menuitemcheckbox / group / separator as direct children of
+                    `role="menu"`, and this card's suite sweeps exactly those five roles
+                    over the open menu's element children. */}
+                {onRunLog && (
+                  <DropdownMenuItem
+                    data-testid="workflow-run-log"
+                    onClick={() => onRunLog({ slug: row.slug, name: row.name })}
+                  >
+                    <History className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                    {RUN_LOG_LABEL}
+                  </DropdownMenuItem>
+                )}
+
                 {/* ── The fork: ONE WORD, TWO FUNCTIONS (D-12) ──────────────────────
                     Both items carry the same label and route to DIFFERENT handlers.
                     Exactly one of them is reachable on any given row. */}

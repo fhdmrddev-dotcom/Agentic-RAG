@@ -1,21 +1,24 @@
 ---
 seed_id: SEED-190
-title: A workflow has no run history — you cannot see a workflow's past runs from anywhere, and chat cannot tell a workflow run from a normal conversation
+title: A run has no door except its own chat thread — there is nowhere to see the runs, and chat cannot tell a workflow run from a conversation
 created: 2026-08-20
 planted_during: Phase 200 run-surface re-port (operator, watching a run open from the chat thread list)
-status: planted
-priority: high
+status: shipped-in-part
+shipped: 2026-08-20
 surface: Agentic-RAG
 relates_to:
   - SEED-185 — the app has no URL router, so a run cannot be deep-linked and every route to one
-    goes through a click path. Any history surface has to open a run the same way.
-  - Phase 200 — built the run SURFACE (`WorkflowRunPage`). This is the missing DOOR to it.
-  - `docs/HOT-FILE-LEDGER.md` → `frontend/src/pages/WorkflowsPage.tsx` / `library/WorkflowCard.tsx`
-    — the card that would carry the affordance; both FIRE G-5.
+    goes through a click path. The log opens a run the same way.
+  - Phase 200 — built the run SURFACE (`WorkflowRunPage`). This was the missing DOOR to it.
+  - `docs/HOT-FILE-LEDGER.md` → `frontend/src/pages/WorkflowsPage.tsx` /
+    `library/WorkflowCard.tsx` / `frontend/src/lib/api.ts` — the three hot files the shipped
+    half touched; all three FIRE G-5.
 trigger_when: >
-  The next phase that touches the workflow library card, the run surface's entry points, or the
-  chat thread list — whichever comes first. It is ALSO unblocked on its own: nothing about it
-  depends on branching, connections or any other foundation.
+  ⚠ THE FIRST HALF SHIPPED 2026-08-20 (`GET /workflow-runs` + the run log surface + two
+  doors). What remains is the SECOND half named at the foot of this file — marking a
+  workflow-run thread in the chat sidebar — which is unblocked, cheap, and where the
+  operator's complaint actually started. Re-open on the next phase that touches the chat
+  thread list, `ThreadRunLine.tsx`, or `threads.active_workflow_run_id`.
 ---
 
 ## The complaint, in the operator's words
@@ -25,56 +28,79 @@ trigger_when: >
 > between any regular chat or any workflow run. We should have one place to see, on workflow
 > level, the history of the runs and view it."*
 
-## Why it is real, and measured
+## ⚠ THE SCOPE WAS WRONG WHEN THIS WAS PLANTED, AND THE CORRECTION IS THE POINT
 
-**There is exactly one door to a run today, and it is in the wrong place.** `WorkflowRunPage`
-is entered through `ChatLayout`'s `openRunSurface`, whose only production caller is the
-workspace panel's run seam — i.e. **you must already be inside the run's chat thread** to open
-its run page. To get there you pick a thread out of the chat history list.
+This seed was planted as **a per-workflow history**, reachable from a workflow card. When it
+came to be built the operator corrected it to **one log of every run**, which the card's door
+then filters. The original framing is kept above rather than rewritten, because the reason it
+was wrong is reusable:
 
-⚠ **And that list does not mark them.** A workflow run creates an ordinary thread; in the
-sidebar it sits among "New Chat" and "generate weekly report" with nothing to say it was a run.
-Measured on the local database: **228 workflow runs**, every one of them anchored to a thread
-that the chat list renders exactly like any other conversation.
+**A per-workflow list answers the complaint only if you already know which workflow to look
+inside.** The sentence underneath the request is *"in the chat area I cannot distinguish
+between any regular chat or any workflow run"* — that is a question about **all** runs, asked
+by somebody who has lost one. Scoping the answer to a workflow they would have to name first
+returns them to the problem.
 
-⚠ **The library card knows a run happened and cannot show you it.** `db/workflows.py`'s library
-feeds already carry a per-workflow `LEFT JOIN LATERAL … LIMIT 1` for the LAST run — which is
-what paints *"Worked 2 min ago"* / *"Failed 5 days ago"* / *"Never run"* on the card
-(`library/runFacts.ts`'s four arms). So the card states a fact about a run it offers no way to
-open, and knows nothing about the run before it.
+The seed also read the operator's own words too literally: *"on workflow level"* describes
+where the DOOR is, not what is behind it. A card-level door onto a filtered view of one log is
+both things at once; a card-level door onto a per-card surface is only the smaller one.
 
-## What it would take
+## What shipped, 2026-08-20
 
-Smaller than it sounds, because the surface it opens already exists:
+| Piece | Where |
+|---|---|
+| `GET /workflow-runs` — owner-scoped list, optional `?slug=`, `limit`/`offset`, `count=exact` | `backend/app/api/workflow_runs.py` |
+| The path registered in the canvas gate (same commit) | `backend/app/middleware/canvas_gate.py` |
+| `listWorkflowRuns` + `WorkflowRunListItem` | `frontend/src/lib/api.ts` |
+| The log surface | `frontend/src/components/workflows/history/RunLogPanel.tsx` |
+| Its wire→facts resolver, its strings, its tone mirror | `history/runLogRow.ts` · `runLogVocabulary.ts` · `runLogTone.ts` |
+| Door 1 — the whole log, from the Workflows header | `frontend/src/pages/WorkflowsPage.tsx` |
+| Door 2 — one workflow's runs, from the card's `⋯` | `library/WorkflowCard.tsx` |
 
-1. **A read**: runs for one definition — `workflow_runs` already carries `definition_id`,
-   `status`, `created_at`, `updated_at`, and since migration 121 the per-step timings that make
-   an honest duration derivable. ⚠ The existing lateral returns ONE run; this needs a list, and
-   it must be **owner-scoped in the query** the way `get_workflow_run` is (these feeds bypass
-   RLS — `db/workflows.py` records `r.user_id = $1` as security-bearing).
-2. **A door on the card** — the natural place, and the one the operator named.
-3. **A list surface** reusing what Phase 200 built: `runFacts.ts`'s arms for the outcome word,
-   `phaseDuration`'s resolver for the duration, `relativeChanged.ts`'s nine bands for the age.
-   Each row opens `WorkflowRunPage` through the callback that already exists.
+**Nothing was re-derived.** The outcome word is `library/runFacts.ts`' — the same sentence the
+card prints about the same run, asserted by comparison rather than by a copied literal. The age
+bands are `relativeChanged.ts`'. The duration is `phaseDuration.runSpan`'s, fed the same
+`min(started_at) → max(completed_at)` pair the backend pre-reduces, so the log and the run page
+cannot disagree about how long a run took.
 
-## The traps this will hit, named now
+## The traps, and what each one turned out to be
 
-- ⚠ **`versions`, not `version`.** A workflow's runs span its published versions, and
-  `workflow_runs.definition_id` points at ONE version row. "This workflow's history" means
-  every definition sharing the slug, not the current one — a naive `definition_id` filter shows
-  the history of a *version* and calls it the workflow's.
-- ⚠ **`never run` vs `not by you` is already a solved four-arm problem** (`runFacts.ts`, CR-01):
-  the lateral is owner-scoped, so an empty list means *"no runs of yours"*, which is NOT
-  *"never run"*. Re-deriving that distinction here would be the fifth time this repo gets it
-  wrong.
-- ⚠ **No URL router** (`SEED-185`), so this is a click path and cannot be linked or bookmarked.
-- ⚠ **A run belongs to a thread, and deleting the workflow does not delete the thread**
-  (`WorkflowDeleteSheet` says so: *"chat threads become normal chats"*). A history list must
-  survive its workflow being deleted, or say honestly that it cannot.
+- ✅ **`versions`, not `version`.** Confirmed live, not merely anticipated: filtering
+  `pm-weekly-status-report` returns **21 runs across 3 definition rows**. The wire takes a
+  **slug** and resolves every definition sharing it. A `definition_id` filter would have shown
+  a version's history under the workflow's name.
+- ✅ **An unknown slug must be an EMPTY log, not an unfiltered one.** The route early-returns
+  on zero resolved ids. Without it the `in` filter is skipped and the caller is handed every
+  run under the name of a workflow that does not exist — the failure a `if ids:` guard invites.
+- ✅ **`never run` vs `not by you`** — sidestepped rather than re-derived. Every row of the log
+  IS a run of the caller's, so only `runFacts`' `ran` and `unknown` arms are reachable and the
+  four-arm problem does not arise a fifth time.
+- ✅ **A run survives its workflow.** Deleting a workflow does not delete its runs; the row
+  renders as *"Deleted workflow"* and stays openable. Asserted at both tiers.
+- ✅ **The span is the PHASES', never the run row's.** `created_at` is when the row was
+  inserted. Measured: **10 of 580** phase rows carry both instants (migration 121, no
+  backfill), so most rows honestly read *"time not recorded"* — and never `0s`.
+- ⚠ **No URL router** (`SEED-185`), so this is a click path: the log cannot be linked or
+  bookmarked, and a browser reload returns to Chat. Unchanged, and recorded rather than
+  worked around.
 
-## The adjacent half the operator also named
+## ⚠ WHAT DID **NOT** SHIP — the half the complaint actually started with
 
-*"I cannot distinguish between any regular chat or any workflow run"* is a **separate, smaller
-fix on the chat side**: the thread list has the information (`threads.active_workflow_run_id`,
-and the run rows themselves) and spends none of it. Marking a workflow-run thread in the
-sidebar is worth doing whether or not the history surface ships, and it is the cheaper half.
+> *"in the chat area I cannot distinguish between any regular chat or any workflow run"*
+
+**Still true.** A workflow run creates an ordinary thread and the sidebar renders it exactly
+like a conversation. Measured: **230 runs, 226 threads, none of them marked.** The information
+is already there — `threads.active_workflow_run_id`, and the run rows themselves — and the
+thread list spends none of it.
+
+This is the cheaper half and it is now the *only* remaining half. It is also strictly better
+than the log at the specific thing the operator described, because it fixes the surface they
+were looking at when they said it.
+
+## Two smaller things noticed while building this, neither taken
+
+1. **No index on `workflow_runs.definition_id`.** 230 rows today; the recorded re-open trigger
+   for every unindexed read in this area is ~10k runs. `_LAST_RUN_LATERAL_SQL`'s docblock says
+   the same thing about the same column.
+2. **The log has no filter of its own** — no outcome chip, no date range, no search. At 230
+   rows with a 50-row page that is livable; it is the first thing to want at 1,000.

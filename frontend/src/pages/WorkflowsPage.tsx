@@ -134,6 +134,7 @@ import type { ChipId, LibraryRow, Provenance } from "@/components/workflows/libr
 // Phase 192-10 (D-02 / D-09): the two surfaces this page now COMPOSES rather than declares.
 // One persistent toolbar over one flat list of one card — the page owns fetching, filter
 // state and layout, and declares no card, no filter item and no modal of its own.
+import { RunLogPanel } from "@/components/workflows/history/RunLogPanel"
 import { LibraryToolbar } from "@/components/workflows/library/LibraryToolbar"
 import { WorkflowCard } from "@/components/workflows/library/WorkflowCard"
 // Phase 192.1-06 (LIB-05 / D-05 / D-34): the identity resolver, reached rather than written.
@@ -221,9 +222,30 @@ interface WorkflowsPageProps {
     kickoff: string,
     opts?: { templateFile?: File | null; folderId?: string | null },
   ) => Promise<void>
+  /**
+   * SEED-190 — open a run's own surface. This is `ChatLayout.openRunSurface`, the SAME
+   * callback the workspace panel's run seam already uses, threaded down so the run log adds a
+   * DOOR to the existing room rather than a second room.
+   *
+   * ⚠ ABSENT WHEN THE CANVAS LAYER IS OFF, and the log renders its rows as plain text in that
+   * case rather than as controls that go nowhere. The page passes it through untouched — it
+   * constructs no run route of its own, exactly as it constructs no launch route of its own.
+   */
+  onOpenRun?: (runId: string) => void
 }
 
-type PageView = "library" | "builder"
+/**
+ * ⚠ THE THIRD MEMBER IS SEED-190's RUN LOG, AND IT LIVES HERE RATHER THAN IN `ActiveView`.
+ *
+ * The app has no router (`SEED-185`); navigation is a `useState` switch, and there are two
+ * levels of it — `App.tsx`'s `ActiveView` (the top-level homes) and this page's own
+ * `PageView` (library ↔ builder). The log is a sub-surface of the Workflows home, in the same
+ * sense the Builder is: you reach it FROM the library, you go back TO the library, and it has
+ * no nav-rail entry of its own. Adding an `ActiveView` member instead would have meant a
+ * fourth top-level home, a `visibleNavItems` audience decision and an edit to the NAV_ITEMS
+ * byte-identity lock — three changes to say "and also this page has a second screen".
+ */
+type PageView = "library" | "builder" | "run-log"
 
 /**
  * 192-10 (D-16) — each feed's own answer, TRI-STATE and never boolean.
@@ -241,12 +263,30 @@ type PageView = "library" | "builder"
  */
 type SourceState = "pending" | "ok" | "failed"
 
-export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
+export function WorkflowsPage({ folders, onLaunch, onOpenRun }: WorkflowsPageProps) {
   // Phase 184.1-01: does this page host the Builder's chrome, or has the Builder taken it?
   // Fail-closed and read through the shared rule — see `useCanvasGate`'s docblock for why
   // an ancestor has to ask at all (the three bands are contributed at three nesting levels).
   const canvasEnabled = useCanvasGate()
   const [pageView, setPageView] = useState<PageView>("library")
+  /**
+   * SEED-190 — which workflow the run log is filtered to, or `null` for the whole log.
+   *
+   * ⚠ IT IS A SLUG AND A NAME, NEVER A ROW ID. A workflow's runs span its published versions
+   * and each version is its own `workflow_definitions` row, so a definition-scoped filter
+   * would show a VERSION's history under the workflow's name. Measured on the dev database:
+   * `pm-weekly-status-report` has 21 runs across 3 definition rows.
+   *
+   * ⚠ IT IS SET AND CLEARED ALONGSIDE `pageView`, never inferred from it. "The log, filtered"
+   * and "the log, whole" are two screens, and the door from the header opens the second while
+   * the door on a card opens the first — so the scope has to be part of the navigation rather
+   * than a leftover from the last visit.
+   */
+  const [runLogScope, setRunLogScope] = useState<{ slug: string; name: string } | null>(null)
+  const openRunLog = useCallback((scope: { slug: string; name: string } | null) => {
+    setRunLogScope(scope)
+    setPageView("run-log")
+  }, [])
   // null = "All projects"; "__unbound__" = unbound; else a folder id.
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
   // 192-10 (D-06 / D-03): the always-on search text and the pressed chips. Both live HERE,
@@ -746,6 +786,42 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
     [refetchPublished, refetchDrafts],
   )
 
+  // ── RUN LOG host (SEED-190 — the library's second screen, three-homes, no router). ──
+  //
+  // ⚠ IT MOUNTS BEFORE THE BUILDER'S BRANCH AND BEFORE THE LIBRARY'S RETURN, which is what
+  // makes it reachable at all. This page's render is a chain of early returns ending in the
+  // library, so a branch placed after that return is code nobody executes — the Phase-118
+  // built-but-unreachable lesson, which this repository has now paid for twice.
+  if (pageView === "run-log") {
+    return (
+      <div className="flex h-full flex-col bg-background">
+        <div className="flex items-center gap-3 border-b border-border px-4 py-2">
+          <button
+            type="button"
+            data-testid="run-log-back"
+            onClick={() => {
+              setRunLogScope(null)
+              setPageView("library")
+            }}
+            className="rounded-md border border-border px-2.5 py-1 text-[13px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            ← Workflows
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          <RunLogPanel
+            scope={runLogScope}
+            // ⚠ ONLY OFFERED WHEN THERE IS A FILTER TO DROP. A "Show all runs" control on the
+            // unfiltered log is a control that does nothing, which this codebase treats as
+            // worse than an absent one.
+            onClearScope={runLogScope === null ? undefined : () => setRunLogScope(null)}
+            onOpenRun={onOpenRun}
+          />
+        </div>
+      </div>
+    )
+  }
+
   // ── BUILDER host (the Build-card / Open / Tweak destination — three-homes, no router). ──
   if (pageView === "builder") {
     /**
@@ -898,13 +974,38 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
           there, which the Run modal also states at its own footer — and adopting the sheet's
           wording would delete it. The sheet is the reference for STRUCTURE; it is not a licence
           to drop a true statement it had no way of knowing. */}
-      <header className="flex flex-col gap-1 border-b border-border px-6 pb-4 pt-6">
-        <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] text-foreground">
-          Workflows
-        </h1>
-        <p className="text-[14px] leading-normal text-muted-foreground">
-          Repeatable, locked automations — author, publish, and Run into a thread.
-        </p>
+      {/* ⚠ SEED-190 — THE HEADER GAINS A SECOND DOOR, AND IT IS THE ONLY WAY TO THE WHOLE LOG.
+          The card's ⋯ opens the log FILTERED to one workflow; nothing else on this page opens
+          it whole, which is the screen the operator's complaint was actually about ("one place
+          to see the history of the runs").
+
+          ⚠ IT IS IN THE HEADER AND NOT IN THE TOOLBAR, deliberately. The toolbar is a strip of
+          FILTERS over the list below it — its create control is the documented exception and
+          `LibraryToolbar`'s own D-02 fence asserts that control is first in DOM order. A
+          navigation door added there would sit inside a group whose contract is "these change
+          what you see below", which this does not. The header is where the page says what it
+          IS, and a second screen of the same home belongs beside that.
+
+          ⚠ IT IS NOT A PRIMARY CONTROL and is not painted as one: the page has exactly one
+          filled affordance (Build a workflow, in the toolbar) and a second would compete with
+          it for the same glance. */}
+      <header className="flex items-start justify-between gap-4 border-b border-border px-6 pb-4 pt-6">
+        <div className="flex min-w-0 flex-col gap-1">
+          <h1 className="text-[24px] font-semibold leading-tight tracking-[-0.02em] text-foreground">
+            Workflows
+          </h1>
+          <p className="text-[14px] leading-normal text-muted-foreground">
+            Repeatable, locked automations — author, publish, and Run into a thread.
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="open-run-log"
+          onClick={() => openRunLog(null)}
+          className="mt-1 flex-none rounded-md border border-border px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:border-muted-foreground hover:text-foreground"
+        >
+          Run log
+        </button>
       </header>
 
       {/* ── 192-10 (D-11) — THE D14 HONESTY BANNER WAS REMOVED, AND IT WAS REMOVED BECAUSE
@@ -1100,6 +1201,10 @@ export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {
                 row={row}
                 folderName={folderName(row.def?.project_folder_id)}
                 onRun={handleRun}
+                /* SEED-190 — the per-workflow door. The card hands up the SLUG (the identity
+                   that survives a publish) and the name; this page turns that into the log's
+                   scope. See `runLogScope`'s docblock for why it is not a definition id. */
+                onRunLog={openRunLog}
                 onOpen={handleOpen}
                 onForkNewVersion={onForkNewVersion}
                 onForkStarter={onForkStarter}

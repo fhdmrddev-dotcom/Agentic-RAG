@@ -89,6 +89,14 @@ CANVAS_GATED_PATHS: frozenset[str] = frozenset(
         # Phase 188 (RUNVIZ-03 / D-188-16) — the run read. TEMPLATE form: OpenAPI-half only
         # (see the asymmetry note above); its request-path 404 comes from require_canvas.
         "/workflow-runs/{workflow_run_id}",
+        # SEED-190 — the run LOG (the list). Registered in the SAME commit that mounts it,
+        # which is what this constant's header asks for. ⚠ IT IS A BARE PREFIX AND THAT IS
+        # NOT A TYPO: the route is `@router.get("")` on a router whose prefix is
+        # `/workflow-runs`, so its absolute path has no trailing segment. It carries no
+        # `{param}`, so `_compile_gated_pattern` anchors it exactly — it matches
+        # `/workflow-runs` and NOT `/workflow-runs/<uuid>`, which the member above already
+        # owns. Two members, two shapes, neither shadowing the other.
+        "/workflow-runs",
     }
 )
 

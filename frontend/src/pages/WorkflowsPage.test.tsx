@@ -2019,14 +2019,41 @@ describe("WorkflowsPage — LIB-04 / SC#4: create LEADS, at 200 workflows", () =
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeFalsy()
 
-    // …and it is the FIRST interactive element on the surface, so keyboard and screen-reader
-    // order agree with the DOM order asserted above.
+    // …and keyboard order agrees with the DOM order asserted above.
+    //
+    // ⚠ THIS CLAUSE WAS AMENDED BY SEED-190, AND ITS ORIGINAL IS QUOTED RATHER THAN QUIETLY
+    // LOOSENED. It read `expect(focusables[0]).toBe(create)` over the WHOLE container, with
+    // the comment "it is the FIRST interactive element on the surface". That was true when
+    // written and it is STRICTER than the contract it restates: `LibraryToolbar.tsx`'s own
+    // D-02 paragraph says this control "is index 0 of every focusable node IN THE TOOLBAR",
+    // and `LibraryToolbar.test.tsx:127` asserts exactly that, unedited and still green.
+    //
+    // SEED-190 put ONE page-level navigation control in the header — the door to the run log
+    // — which precedes the toolbar in document order because the header does. That is the
+    // ordinary shape of a page (nav before content; this app's own nav rail precedes every
+    // page), and it costs a keyboard user one tab.
+    //
+    // ⚠ THE GUARD KEEPS ITS TEETH: the exception is a NAMED ALLOW-LIST of one, so any OTHER
+    // control appearing before create still fails here — which is the drift D-02 exists to
+    // catch. Falsified below by asserting the list is exhausted, so an allow-list that
+    // silently grew a second member cannot pass unnoticed.
     const focusables = Array.from(
       container.querySelectorAll(
         "button, a[href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
       ),
     )
-    expect(focusables[0]).toBe(create)
+    const before = focusables.slice(0, focusables.indexOf(create))
+    expect(before.map((el) => el.getAttribute("data-testid"))).toEqual(["open-run-log"])
+    // …and create still leads everything from the toolbar onward, which is the half of the
+    // original claim that was never about page-level navigation.
+    const toolbar = screen.getByTestId("library-toolbar")
+    const fromToolbarOn = focusables.filter(
+      (el) =>
+        el === toolbar ||
+        toolbar.contains(el) ||
+        Boolean(toolbar.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING),
+    )
+    expect(fromToolbarOn[0]).toBe(create)
   }, 60000)
 })
 

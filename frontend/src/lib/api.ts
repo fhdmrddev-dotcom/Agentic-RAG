@@ -4352,6 +4352,97 @@ export async function getWorkflowRun(
   return (await res.json()) as WorkflowRunRead
 }
 
+// ── SEED-190 — THE RUN LOG ──────────────────────────────────────────────────────────
+//
+// ⚠ THIS FIRES THE 197 DECLINE'S OWN RE-OPEN TRIGGER AND THE TRIGGER IS BEING HONOURED
+// RATHER THAN STEPPED AROUND. `docs/HOT-FILE-LEDGER.md` records this file as the hottest in
+// the repository (176 commits / 100 phases / 6430 lines) with a standing DECLINE to extract,
+// whose trigger reads: *"the next phase adding a RUNTIME export or a second concern here"*.
+// `listWorkflowRuns` below IS a runtime export. It is added here anyway, and the reason is
+// that it is not a second CONCERN: it sits directly beneath `getWorkflowRun`, hits the same
+// router, shares its `ApiError` convention and its encode discipline, and an extraction that
+// moved one without the other would split a two-function surface across two files. **The
+// trigger is not thereby discharged** — it is recorded as fired, with the next phase touching
+// this file owing the extraction rather than another paragraph explaining why not.
+
+/**
+ * One row of the run log (backend `WorkflowRunListItem`).
+ *
+ * ⚠ IT IS A PROJECTION OF `WorkflowRunRead`, NOT A SECOND VOCABULARY. Every field is the
+ * same field under the same name; what is ABSENT is `definition` (a log draws no spine) and
+ * the per-phase rows (the span is pre-reduced server-side). A client that starts deriving
+ * something here that `WorkflowRunRead` derives differently is the defect this note exists
+ * to name in advance.
+ */
+export interface WorkflowRunListItem {
+  /** ⚠ A `workflow_runs.id` — the SAME id space `getWorkflowRun` takes, and NOT a `runs.id`.
+   *  The id trap is documented in full on `WorkflowRunRead` above. */
+  id: string
+  thread_id: string
+  definition_id: string
+  /** ⚠ EMPTY STRING when the definition row is gone. Deleting a workflow does not delete its
+   *  runs, so an orphaned run reaches the log with no name and the surface says so in words.
+   *  It is never `null` — the backend normalises, so the client has one case, not two. */
+  workflow_name: string
+  workflow_slug: string
+  workflow_version: number
+  /** The DB-native status. The sentence a person reads comes from `runFacts` (D-17). */
+  status: string
+  created_at: string | null
+  /** Phase rows this run created — a fact about the RUN, not about the definition today. */
+  step_total: number
+  /** `min(started_at)` across the run's phases. ⚠ NULL on every pre-migration-121 run, and
+   *  that is "not recorded", never zero. */
+  started_at: string | null
+  /** `max(completed_at)` across the run's phases. NULL while a run is still going. */
+  completed_at: string | null
+}
+
+/** One page of the run log (backend `WorkflowRunListRead`). `total` is the count UNDER THE
+ *  SAME FILTER — the number the surface says "showing N of" against. */
+export interface WorkflowRunListPage {
+  runs: WorkflowRunListItem[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * GET /workflow-runs — this caller's runs, newest first.
+ *
+ * Owner-scoped in the query server-side; there is no "everyone" mode to ask for. An empty
+ * page is a 200 with no rows, never a 404 — "you have no runs" is an answer.
+ *
+ * @param slug restrict to ONE workflow, across every version sharing the slug. ⚠ NOT a
+ *   `definition_id`: a workflow's runs span its published versions, so a definition filter
+ *   would show a VERSION's history under the workflow's name. Measured on the dev database:
+ *   `pm-weekly-status-report` has 21 runs across 3 definition rows.
+ *
+ * Throws the status-carrying `ApiError`, matching `getWorkflowRun` directly above, because
+ * the log has to word a canvas-off 404 differently from a 5xx.
+ */
+export async function listWorkflowRuns(
+  options: { slug?: string; limit?: number; offset?: number; signal?: AbortSignal } = {},
+): Promise<WorkflowRunListPage> {
+  const headers = await getAuthHeaders()
+  // `URLSearchParams` rather than template interpolation — a slug is server-supplied today
+  // but reaches here as a plain string, and `&` / `#` are STRUCTURAL in a query string. Same
+  // defensive-construction rule as `getWorkflowRun`'s path encode (WR-07), one component over.
+  const params = new URLSearchParams()
+  if (options.slug !== undefined) params.set("slug", options.slug)
+  if (options.limit !== undefined) params.set("limit", String(options.limit))
+  if (options.offset !== undefined) params.set("offset", String(options.offset))
+  const query = params.toString()
+  const res = await fetch(`${API_BASE}/workflow-runs${query ? `?${query}` : ""}`, {
+    headers,
+    signal: options.signal,
+  })
+  if (!res.ok) {
+    throw new ApiError(`Failed to load the run log (status ${res.status})`, res.status)
+  }
+  return (await res.json()) as WorkflowRunListPage
+}
+
 // ── Phase 152-04 (WFIN-03 / D-LOCK-03/04/05) — the published-workflow safe DELETE
 //    cascade + its server-sourced victim-naming counts. These hit DISTINCT routes on
 //    api/workflows.py (Plan 02, D-08) — NEVER the draft `DELETE /workflows/{id}` above

@@ -211,7 +211,24 @@ function ownOutcome(status: string): RunOutcome | undefined {
  * @param row the normalized library row. Only its ~~two~~ THREE run fields are read.
  * @param now the instant to measure recency against — hoist one per render (P-1).
  */
-export function runFacts(row: LibraryRow, now: number = Date.now()): RunFact {
+/**
+ * The THREE fields `runFacts` reads, as a type rather than as a sentence.
+ *
+ * ⚠ IT EXISTS BECAUSE A SECOND SURFACE NEEDED THE SAME RESOLUTION AND IS NOT A LIBRARY ROW.
+ * SEED-190's run log holds `workflow_runs` rows, which carry a status and an instant and no
+ * card, and its outcome word must be the SAME word the card prints — *"Worked 2 min ago"* on
+ * a card and something else in the log would be two vocabularies for one fact. The
+ * alternative was to build the row a fake `LibraryRow`, which is how a shape acquires
+ * required fields nobody reads.
+ *
+ * ⚠ THIS IS A WIDENING, NOT A CHANGE. `LibraryRow` still satisfies it — every existing caller
+ * passes one and typechecks unedited — and the docblock below already claimed *"Only its
+ * THREE run fields are read"*. That claim is now enforced by the compiler instead of by the
+ * sentence: a fourth field read here would not compile.
+ */
+export type RunFactsInput = Pick<LibraryRow, "lastRunAt" | "lastRunStatus" | "hasAnyRun">
+
+export function runFacts(row: RunFactsInput, now: number = Date.now()): RunFact {
   const status = row.lastRunStatus
 
   // (1) the wire did not say — the key is absent from the payload entirely.

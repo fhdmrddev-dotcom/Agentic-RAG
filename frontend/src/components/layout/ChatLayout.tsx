@@ -701,7 +701,16 @@ export function ChatLayout({ onSignOut, activeView, onNavigate, navItems, isOper
             // documents/skills/settings render paths are untouched). It hosts the
             // Builder + the publish gauntlet as intra-view state (three-homes, no
             // router); onLaunch = doRun (the existing-kickoff launcher).
-            <WorkflowsPage folders={folders} onLaunch={doRun} />
+            // SEED-190 — `onOpenRun` is the SAME `openRunSurface` the workspace panel's run
+            // seam already uses, threaded down so the run log opens the existing run room
+            // rather than a second one. Canvas-gated exactly as the panel's seam is: with the
+            // layer off the log renders rows that are not controls, because the room they
+            // would open does not exist.
+            <WorkflowsPage
+              folders={folders}
+              onLaunch={doRun}
+              onOpenRun={canvasEnabled ? openRunSurface : undefined}
+            />
           ) : activeView === "classification-rules" ? (
             // Phase 118 gap-closure (CLASS-01 reachability): the rules-authoring
             // page mounts here as a top-level home (the Plan-04 ActiveView seam +

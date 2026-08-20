@@ -108,9 +108,17 @@ def _flipped_on(monkeypatch):
 class _FakeQuery:
     """A supabase-py query builder that really applies the filters it is handed.
 
-    Only the surface the run read chains is implemented: ``select`` / ``eq`` / ``order`` /
-    ``maybe_single`` / ``execute``. ``execute`` is SYNC because ``aexec`` runs it through
-    ``run_in_threadpool`` exactly as it would the real blocking client.
+    Only the surface the two run routes chain is implemented: ``select`` / ``eq`` / ``in_`` /
+    ``order`` / ``range`` / ``maybe_single`` / ``execute``. ``execute`` is SYNC because
+    ``aexec`` runs it through ``run_in_threadpool`` exactly as it would the real blocking
+    client.
+
+    ⚠ ``in_`` / ``range`` / ``count="exact"`` ARRIVED WITH SEED-190's RUN LOG, and they were
+    added HERE rather than re-implemented in that route's own test file. The reason is the
+    paragraph directly below: this fake models PROJECTION honestly, and a second fake built
+    beside it would have started life without that property — which is how the discarded
+    column list got shipped the first time. One fake, both routes; ``tests/test_seed190_run_log.py``
+    imports it.
 
     ⚠ **``select`` REALLY PROJECTS, as of Phase 200 — and the version it replaces is quoted
     here because the defect it carried is the exact kind this file exists to catch.** It
@@ -141,6 +149,10 @@ class _FakeQuery:
         self._order_by: str | None = None
         self._single = False
         self._columns: list[str] | None = None
+        self._in: dict[str, set[str]] = {}
+        self._orders: list[tuple[str, bool]] = []
+        self._range: tuple[int, int] | None = None
+        self._count: str | None = None
 
     def select(self, *columns, **_kwargs):
         """Record the requested columns so ``execute`` can PROJECT to them.
@@ -153,6 +165,11 @@ class _FakeQuery:
         for chunk in columns:
             requested.extend(part.strip() for part in str(chunk).split(",") if part.strip())
         self._columns = None if "*" in requested else requested
+        # ⚠ ``count="exact"`` IS A KWARG ON ``select``, not a chained call. Recording it is
+        # what lets ``execute`` answer a total that is the count UNDER THE FILTERS but BEFORE
+        # the range — the property a paged surface's "N of M" line depends on, and the one a
+        # fake that counted the returned page would silently get wrong.
+        self._count = _kwargs.get("count")
         # Recorded so a case can assert WHICH columns the handler asked for — the one
         # member of the three-place lockstep that no type checker can see.
         self._store.calls.append(("select", self._table, list(requested)))
@@ -162,9 +179,30 @@ class _FakeQuery:
         self._filters[column] = str(value)
         return self
 
-    def order(self, column, **_kwargs):
+    def in_(self, column, values):
+        """PostgREST's ``?col=in.(a,b,c)`` — membership, applied for real.
+
+        ⚠ AN EMPTY LIST MATCHES NOTHING, which is PostgREST's own behaviour and is the case
+        SEED-190's slug filter turns on: an unknown slug resolves to zero definition ids, and
+        an ``in_`` that quietly matched EVERYTHING there would hand the caller the whole log
+        under the name of a workflow that does not exist. The route early-returns before it
+        gets here; this fake would still catch a future edit that removed that return.
+        """
+        self._in[column] = {str(v) for v in values}
+        return self
+
+    def order(self, column, **kwargs):
+        # ⚠ ``desc`` IS RECORDED AND APPLIED. The run log orders ``created_at DESC, id DESC``
+        # and a fake that ignored the flag would let a route ship ASCENDING — an oldest-first
+        # log, which reads as a truncation of the newest rows rather than as a wrong sort.
+        self._orders.append((column, bool(kwargs.get("desc"))))
         self._order_by = column
         self._store.calls.append(("order", self._table, column))
+        return self
+
+    def range(self, start, end):
+        """PostgREST's inclusive ``range(start, end)`` — the paging window."""
+        self._range = (int(start), int(end))
         return self
 
     def maybe_single(self):
@@ -176,9 +214,20 @@ class _FakeQuery:
             row
             for row in self._store.rows.get(self._table, [])
             if all(str(row.get(col)) == val for col, val in self._filters.items())
+            and all(str(row.get(col)) in allowed for col, allowed in self._in.items())
         ]
-        if self._order_by is not None:
+        if self._orders:
+            # Applied LAST key first, so the first `.order()` call is the primary key —
+            # PostgREST's own precedence.
+            for column, desc in reversed(self._orders):
+                rows = sorted(rows, key=lambda r: (r.get(column) is None, r.get(column)), reverse=desc)
+        elif self._order_by is not None:
             rows = sorted(rows, key=lambda r: r[self._order_by])
+        # The total is counted HERE — after the filters, BEFORE the range. See ``select``.
+        total = len(rows)
+        if self._range is not None:
+            start, end = self._range
+            rows = rows[start : end + 1]
         # ⚠ THE PROJECTION, applied the way PostgREST applies it: a column the handler did
         # not ASK FOR is not in the row it gets back, however happily it sits in the store.
         # Ordering/filtering above run against the FULL row (as they do server-side), so a
@@ -188,7 +237,11 @@ class _FakeQuery:
         self._store.calls.append(("execute", self._table, dict(self._filters)))
         if self._single:
             return SimpleNamespace(data=rows[0] if rows else None)
-        return SimpleNamespace(data=rows)
+        # ⚠ ``count`` IS ``None`` UNLESS THE CALLER ASKED FOR IT. supabase-py exposes the
+        # attribute either way, and a fake that always answered a number would let a route
+        # forget ``count="exact"`` and still read a correct total — from the fake, not from
+        # the database.
+        return SimpleNamespace(data=rows, count=total if self._count == "exact" else None)
 
 
 class _FakeSupabase:

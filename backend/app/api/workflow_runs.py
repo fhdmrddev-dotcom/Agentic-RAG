@@ -54,7 +54,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from supabase import Client
 
@@ -198,6 +198,25 @@ def _coerce_definition(raw: object) -> dict[str, Any] | None:
     return None
 
 
+def _parse_instant(raw: object) -> datetime | None:
+    """One ``timestamptz`` from the wire, as a comparable ``datetime`` — or ``None``.
+
+    ⚠ ``None`` FOR ANYTHING UNREADABLE, NEVER A DEFAULT. A phase whose instant cannot be
+    parsed contributes nothing to its run's span, so the run reports the span of the steps
+    that DID record one, or no span at all. A fallback of ``datetime.min`` or of the run's
+    ``created_at`` would manufacture a duration out of a missing measurement, which is the
+    exact thing migration 121's no-backfill rule exists to prevent.
+    """
+    if isinstance(raw, datetime):
+        return raw
+    if isinstance(raw, str):
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+    return None
+
+
 def _slug_to_phase_type(definition: dict[str, Any] | None) -> dict[str, str]:
     """Derive ``slug -> phase_type`` from the definition JSON (threads.py:1204-1226).
 
@@ -215,6 +234,289 @@ def _slug_to_phase_type(definition: dict[str, Any] | None) -> dict[str, str]:
         if slug and phase_type:
             mapping[slug] = phase_type
     return mapping
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# SEED-190 — THE RUN LOG. Every run this caller has, newest first, in ONE place.
+# ══════════════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ IT IS NOT THE PER-WORKFLOW HISTORY SEED-190 ORIGINALLY ASKED FOR, and the difference is
+# the operator's correction rather than a simplification. The seed was scoped *"the run
+# history of that specific workflow"*; what is built is **one log of every run**, which the
+# card's own door then FILTERS. Two reasons, both measurable on this database:
+#
+#   1. A workflow's runs span its published VERSIONS. ``workflow_runs.definition_id`` points
+#      at ONE version row, so a naive per-definition list is a VERSION's history wearing a
+#      workflow's name. Measured 2026-08-20: ``pm-weekly-status-report`` has **3 definition
+#      rows and 21 runs**, and four more slugs span 2-3 versions each. The filter below is
+#      therefore BY SLUG — it resolves every definition sharing the slug and lists runs
+#      across all of them.
+#   2. The complaint underneath the seed was *"in the chat area I cannot distinguish between
+#      any regular chat or any workflow run"* — which is a question about ALL runs, not about
+#      one workflow's. A per-workflow list answers it only if you already know which workflow
+#      to look inside.
+#
+# ⚠ OWNER-SCOPED IN THE QUERY, exactly as the read above is, and for the same reason: the
+# library feeds in ``db/workflows.py`` bypass RLS and record ``r.user_id = $1`` as
+# SECURITY-BEARING. This route does not bypass RLS — it runs on the user-JWT client — but the
+# ``user_id`` predicate is still written on the SAME select as everything else rather than
+# left to the policy, so the read is correct on its own terms and RLS is the belt to its
+# braces. There is no "all users" mode and no operator escape hatch here; adding one would be
+# a cross-tenant disclosure, not a feature.
+#
+# ⚠ THE DEFINITION JSON IS NEVER ON THIS WIRE. The single-run read ships
+# ``definition`` (or its migration-122 snapshot) because the run SURFACE has to draw a spine
+# from it. A log draws no spine. Shipping it here would put 230 workflow documents on one
+# response for a list of names and times — so the projection carries identity and timings and
+# stops.
+#
+# ⚠ THE DURATION IS DERIVED FROM THE PHASE ROWS, NOT FROM ``workflow_runs``. ``created_at`` is
+# when the row was INSERTED and ``updated_at`` is the last write of any kind; neither is the
+# span of the work. ``min(started_at) → max(completed_at)`` across the run's phases IS that
+# span, and it is the SAME reduction ``phaseDuration.runSpan`` performs on the client for the
+# single-run surface — pre-computed here so the log does not have to ship every phase row.
+# ⚠ Both are NULL for every run written before migration 121, and there is NO BACKFILL. The
+# client has an arm for that (``PhaseTiming.not-recorded``); it must never print a zero.
+# Measured 2026-08-20: **10 of 580** phase rows carry the pair, on 2 of 230 runs.
+
+
+class WorkflowRunListItem(BaseModel):
+    """One row of the run log: who ran, when, how it went, how long it took.
+
+    ⚠ EVERY FIELD HERE IS ALSO ON ``WorkflowRunRead`` OR DERIVED FROM ITS PHASES. This is a
+    narrower PROJECTION of the same facts, never a second vocabulary for them — a log that
+    invented its own status words or its own duration would be the second home this project
+    keeps recording as the defect.
+    """
+
+    id: UUID
+    thread_id: UUID
+    definition_id: UUID
+    workflow_name: str
+    workflow_slug: str
+    workflow_version: int
+    status: str = Field(
+        description=(
+            "active | paused | cap_paused | completed | failed | cancelled — the DB-native "
+            "vocabulary, identical to the single-run read's. The sentence a person reads is "
+            "rendered by the client's vocabulary layer (D-17)."
+        )
+    )
+    created_at: datetime | None = None
+    step_total: int = Field(
+        default=0,
+        description=(
+            "How many ``workflow_phases`` rows this run has. ⚠ This is the number of STEPS "
+            "THE RUN CREATED, which is a fact about the run; it is NOT the definition's "
+            "current step count, which can have moved. `0` means the run has no phase rows "
+            "at all."
+        ),
+    )
+    started_at: datetime | None = Field(
+        default=None,
+        description=(
+            "``min(started_at)`` across this run's phases — the run's ZERO. NULL means no "
+            "phase of this run recorded a start: it was written before migration 121, or "
+            "every step was routed around. ⚠ NEVER substitute ``created_at``: that is when "
+            "the row was inserted, which is a different fact."
+        ),
+    )
+    completed_at: datetime | None = Field(
+        default=None,
+        description=(
+            "``max(completed_at)`` across this run's phases — the last step to finish. NULL "
+            "on a run still going and on every pre-migration-121 row. Paired with "
+            "``started_at`` this is the run's measured span; alone it is not a duration."
+        ),
+    )
+
+
+class WorkflowRunListRead(BaseModel):
+    """One page of the run log.
+
+    ⚠ ``total`` IS THE COUNT UNDER THE SAME FILTER, not the caller's grand total. A log
+    showing 50 of 230 and a log showing 50 of 50 are different screens, and the client cannot
+    tell them apart from a page of rows alone.
+    """
+
+    runs: list[WorkflowRunListItem] = Field(default_factory=list)
+    total: int = 0
+    limit: int = 0
+    offset: int = 0
+
+
+@router.get(
+    "",
+    response_model=WorkflowRunListRead,
+    # D-182-05 / D-188-16 — require_canvas ALONE, exactly as the single-run read above. The
+    # 403-raising visibility gate must never join it; a 403 admits the route exists.
+    dependencies=[Depends(require_canvas())],
+)
+async def list_workflow_runs(
+    slug: str | None = Query(
+        default=None,
+        max_length=200,
+        description=(
+            "Restrict to one workflow, BY SLUG — every published and draft version sharing "
+            "it. ⚠ Deliberately not a ``definition_id``: a workflow's runs span its "
+            "versions, so a definition filter answers about a VERSION and calls it the "
+            "workflow. Omit for the whole log."
+        ),
+    ),
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: dict = Depends(canvas_caller),
+    supabase: Client = Depends(get_user_supabase_client),
+) -> WorkflowRunListRead:
+    """PURE READ — this caller's runs, newest first, with the identity and span of each.
+
+    Four queries and no joins the client has to reassemble:
+
+      1. (only when ``slug`` is given) the definition ids sharing that slug;
+      2. the page of ``workflow_runs``, owner-scoped, ``created_at DESC, id DESC``;
+      3. the identity (``name`` / ``slug`` / ``version``) of the definitions on that page;
+      4. the phase timings for the runs on that page, reduced to one span each.
+
+    NEVER writes. An empty page is an empty page — it is never a 404, because "you have no
+    runs" is a true answer and not a missing resource.
+    """
+    # ── Step 1: the slug filter, resolved to definition ids ACROSS VERSIONS ──
+    #
+    # ⚠ THE DEFINITION LOOKUP IS NOT OWNER-SCOPED AND DOES NOT NEED TO BE. It reads only
+    # ``id`` for rows matching a slug the caller supplied, and its output is used ONLY as an
+    # ``in`` list on a select that is ALSO filtered by ``user_id``. A definition the caller
+    # cannot see contributes ids that match none of their runs, so the intersection is empty
+    # rather than leaky. Scoping it would additionally BREAK the honest case: shared/global
+    # starter definitions are owned by somebody else and the caller's runs of them are still
+    # the caller's runs.
+    definition_ids: list[str] | None = None
+    if slug is not None:
+        slug_resp = await aexec(
+            supabase.table("workflow_definitions").select("id").eq("slug", slug)
+        )
+        definition_ids = [
+            str(row["id"]) for row in ((slug_resp.data if slug_resp is not None else None) or [])
+        ]
+        # ⚠ AN UNKNOWN SLUG IS AN EMPTY LOG, NOT AN UNFILTERED ONE. Without this early return
+        # the ``in`` filter below would be skipped for an empty list and the caller would be
+        # handed EVERY run under the name of a workflow that does not exist — the failure mode
+        # a `if ids:` guard invites and the reason this returns rather than falls through.
+        if not definition_ids:
+            return WorkflowRunListRead(runs=[], total=0, limit=limit, offset=offset)
+
+    # ── Step 2: the page of runs ──
+    #
+    # ⚠ ``count="exact"`` COSTS A SECOND SCAN AND IS WORTH IT HERE. Without it the client
+    # cannot say "50 of 230" and would have to infer the end of the log from a short page,
+    # which is wrong on the exact boundary where the last page is full. 230 rows today; the
+    # recorded re-open trigger for every unindexed read in this area is ~10k runs.
+    #
+    # ⚠ THE ORDER IS ``created_at DESC, id DESC`` — the SAME total order
+    # ``_LAST_RUN_LATERAL_SQL`` uses, and the tiebreaker is not decorative. ``now()`` is
+    # transaction-scoped, so two runs started in one transaction share an instant; the primary
+    # key is what makes the order total and the pagination stable.
+    runs_query = (
+        supabase.table("workflow_runs")
+        .select(
+            "id, thread_id, definition_id, status, created_at",
+            count="exact",
+        )
+        .eq("user_id", current_user["id"])
+    )
+    if definition_ids is not None:
+        runs_query = runs_query.in_("definition_id", definition_ids)
+    runs_resp = await aexec(
+        runs_query.order("created_at", desc=True)
+        .order("id", desc=True)
+        .range(offset, offset + limit - 1)
+    )
+    run_rows = (runs_resp.data if runs_resp is not None else None) or []
+    total = getattr(runs_resp, "count", None) if runs_resp is not None else None
+
+    if not run_rows:
+        return WorkflowRunListRead(runs=[], total=total or 0, limit=limit, offset=offset)
+
+    # ── Step 3: the identity of the definitions on this page ──
+    # One query for the page's distinct definition ids, never one per row.
+    page_definition_ids = sorted({str(row["definition_id"]) for row in run_rows})
+    defs_resp = await aexec(
+        supabase.table("workflow_definitions")
+        .select("id, name, slug, version")
+        .in_("id", page_definition_ids)
+    )
+    identity: dict[str, dict[str, Any]] = {
+        str(row["id"]): row
+        for row in ((defs_resp.data if defs_resp is not None else None) or [])
+    }
+
+    # ── Step 4: the span of each run, reduced from its phase rows ──
+    #
+    # ⚠ THE REDUCTION IS ``min(started_at) → max(completed_at)``, WHICH IS
+    # ``phaseDuration.runSpan``'S OWN DEFINITION. Pre-computing it here is what lets the log
+    # avoid shipping ~5 phase rows per run; it is NOT a second way of measuring a run, and it
+    # must not become one. If the client's definition ever moves, this moves with it.
+    #
+    # ⚠ THE INSTANTS ARE PARSED BEFORE THEY ARE COMPARED, AND THE SHORTCUT THAT WAS
+    # REJECTED IS RECORDED SO NOBODY RE-INTRODUCES IT. PostgREST renders ``timestamptz`` as
+    # ISO-8601 in UTC (verified against this database: ``2026-08-20T15:54:03.220627+00:00``,
+    # ``SHOW timezone`` = UTC), so comparing the raw STRINGS gives the right answer almost
+    # always — and "almost" is the problem. **Postgres trims trailing zeros from the
+    # fractional seconds**, so ``.22+00:00`` and ``.220627+00:00`` are different WIDTHS, and
+    # a lexicographic ``min`` is then comparing ``+`` (0x2B) against a digit. It happens to
+    # come out right because ``+`` sorts below every digit and a trimmed fraction is the
+    # earlier instant — an accident, resting on two facts about ASCII and Postgres that
+    # nothing here enforces. Parsing ~580 strings costs nothing measurable and needs no such
+    # argument. ``fromisoformat`` handles the ``+00:00`` offset natively on 3.11+; an
+    # unparseable value is DROPPED rather than defaulted, because a run with an unreadable
+    # instant has no span and must say so, not claim one.
+    run_ids = [str(row["id"]) for row in run_rows]
+    phases_resp = await aexec(
+        supabase.table("workflow_phases")
+        .select("workflow_run_id, started_at, completed_at")
+        .in_("workflow_run_id", run_ids)
+    )
+    spans: dict[str, dict[str, Any]] = {}
+    for row in (phases_resp.data if phases_resp is not None else None) or []:
+        key = str(row["workflow_run_id"])
+        span = spans.setdefault(key, {"steps": 0, "started_at": None, "completed_at": None})
+        span["steps"] += 1
+        started = _parse_instant(row.get("started_at"))
+        if started is not None and (span["started_at"] is None or started < span["started_at"]):
+            span["started_at"] = started
+        completed = _parse_instant(row.get("completed_at"))
+        if completed is not None and (
+            span["completed_at"] is None or completed > span["completed_at"]
+        ):
+            span["completed_at"] = completed
+
+    runs = []
+    for row in run_rows:
+        # ⚠ A DEFINITION ROW CAN BE MISSING AND THE LOG STILL OWES YOU THE RUN. Deleting a
+        # workflow does not delete the runs (``WorkflowDeleteSheet`` says the threads become
+        # normal chats), so an orphaned run must render as a run with no name rather than
+        # disappear — the client decides what to say about an empty name, and it has a word
+        # for it. `.get` with a default, never a `[]` that would 500 the whole page.
+        meta = identity.get(str(row["definition_id"]), {})
+        span = spans.get(str(row["id"]), {})
+        runs.append(
+            WorkflowRunListItem(
+                id=row["id"],
+                thread_id=row["thread_id"],
+                definition_id=row["definition_id"],
+                workflow_name=meta.get("name") or "",
+                workflow_slug=meta.get("slug") or "",
+                workflow_version=meta.get("version") or 0,
+                status=row["status"],
+                created_at=row.get("created_at"),
+                step_total=span.get("steps", 0),
+                started_at=span.get("started_at"),
+                completed_at=span.get("completed_at"),
+            )
+        )
+
+    return WorkflowRunListRead(
+        runs=runs, total=total if total is not None else len(runs), limit=limit, offset=offset
+    )
 
 
 @router.get(
