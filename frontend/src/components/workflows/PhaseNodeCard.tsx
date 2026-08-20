@@ -170,6 +170,7 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
     badges,
     status,
     emitFailure,
+    elapsed,
     verdict,
     grounded,
     selected,
@@ -486,6 +487,30 @@ export function PhaseNodeCard(props: PhaseNodeCardProps) {
             className="mt-1 line-clamp-2 text-[11px] leading-snug text-foreground/90"
           >
             {runReadingLabel(reading, emitFailure)}
+          </p>
+        ) : null}
+
+        {/* THE ELAPSED (Phase 200 · `screens/node-identity.html:265`).
+            The sheet puts it bottom-right of the running node, in the accent, at 10px — and
+            it is deliberately positioned as a sibling of the run line rather than absolutely,
+            so it can never overlap the status ring `NodeRunOverlay` paints above the card.
+
+            ⚠ TWO CONDITIONS, AND BOTH ARE LOAD-BEARING. `reading !== null` is what makes this
+            unreachable on an authoring canvas — a draft supplies no run state, so it supplies
+            no elapsed and this whole subtree is structurally out of reach (the `199-02`
+            refusal, held by shape). The non-empty string test is the second: a step the page
+            holds no timing for renders NO element, never `00:00` and never a dash.
+
+            ⚠ IT DOES NOT RAISE THE RUN-MODE FLOOR. `RUN_MODE_NODE_MIN_HEIGHT` already clears
+            the run line, and this sits on the same baseline row rather than under it, so a
+            step that acquires a timing mid-run does not reflow the plane a person is watching
+            — the constant-height argument the floor exists for. */}
+        {reading !== null && typeof elapsed === "string" && elapsed.length > 0 ? (
+          <p
+            data-testid="canvas-node-elapsed"
+            className="mt-1 text-right font-mono text-[10px] leading-none text-primary"
+          >
+            {elapsed}
           </p>
         ) : null}
 

@@ -137,6 +137,12 @@ const WIRE = vi.hoisted(() => {
     },
     listFolders: () => Promise.resolve(FOLDERS),
     listSkills: () => Promise.resolve([]),
+    // Phase 200 (FE-WIRING) — the page's mount effect now reads the connector connections
+    // too. DECLARED rather than left undefined (`196-08`: a whole-module factory mock that
+    // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
+    // absence — every external face renders its destination-free sentence, so this
+    // BASELINE file's captures are unmoved.
+    listConnectorConnections: () => Promise.resolve([]),
     createWorkflowDraft: () => Promise.reject(new Error("no row is created before a draft exists")),
     updateWorkflowDraft: () => Promise.reject(new Error("no row is updated before a draft exists")),
     validateWorkflow: () => Promise.resolve({ ok: true, verdicts: [] }),

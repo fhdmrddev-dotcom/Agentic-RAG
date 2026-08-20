@@ -345,6 +345,11 @@ function PhaseNodeImpl({ data, selected }: NodeProps<PhaseCanvasNode>) {
       badges={badges}
       status={run?.reading}
       emitFailure={run?.emitFailure}
+      // Phase 200 (FE-WIRING) — the elapsed, PASSED THROUGH UNTOUCHED, exactly as `label` and
+      // `emitFailure` are. This component words nothing, formats nothing and times nothing:
+      // an absent `run` yields `undefined` and the card renders no element, which is the whole
+      // Builder — the surface that supplies no `runState` at all.
+      elapsed={run?.elapsed}
       verdict={verdict}
       grounded={data.grounded}
       selected={selected}

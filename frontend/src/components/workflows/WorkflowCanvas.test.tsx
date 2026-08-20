@@ -1320,12 +1320,43 @@ describe("WorkflowCanvas 199-05 — §3 the FLOATING controls", () => {
     expect(labels).toEqual(["Zoom In", "Zoom Out", "Fit View"])
   })
 
-  it("shows NO zoom percentage — the sheet's `85%` has no shipped home", async () => {
+  it("SHOWS the zoom percentage — 199-05's refusal is spent, and its re-open trigger fired", async () => {
+    // ⚠ INVERTED AT THE PHASE 200 FE-WIRING PASS, AND THE OLD CASE IS QUOTED HERE RATHER
+    // THAN DELETED. It read:
+    //
+    //     it("shows NO zoom percentage — the sheet's `85%` has no shipped home", …)
+    //       expect(controls.textContent ?? "").not.toMatch(/\d+\s*%/)
+    //       expect("85%").toMatch(/\d+\s*%/)          // positive control
+    //
+    // ⚠ BOTH HALVES OF THAT REFUSAL ARE SPENT, AND THEY ARE SPENT FOR DIFFERENT REASONS —
+    // which is why the inversion is recorded rather than performed quietly:
+    //
+    //   1. **THE SCOPE HALF EXPIRED ON ITS OWN TERMS.** `199-05-SUMMARY.md` §3 refuses this
+    //      "as out of scope" for a plan whose fence forbade new user-facing capability, and
+    //      names its own re-open trigger: *"the first phase whose scope includes canvas view
+    //      controls as a feature."* Phase 200's canvas port is that phase, and this row is on
+    //      its sheet. A refusal that dated itself and then had its date arrive is not being
+    //      overridden; it is being honoured.
+    //   2. **THE FACTUAL HALF IS REFUTED BY MEASUREMENT.** The same summary calls it *"the one
+    //      control in the sheet's cluster with no shipped counterpart"*. `useViewport()` is a
+    //      shipped, reactive read of exactly this number, and the plane already clamps it
+    //      (`minZoom` / `maxZoom` below), so the counterpart existed the whole time. That
+    //      sentence is preserved above rather than corrected in place, because a claim that
+    //      was true-sounding and wrong is the thing worth being able to find again.
+    //
+    // ⚠ THE PIN IS NOT WEAKENED, IT IS POINTED THE OTHER WAY. The absence was asserted so the
+    // readout could not arrive without a diff; the presence is asserted so it cannot LEAVE
+    // without one, which is the same guard with the same strength.
     const { container } = await renderPlane(branching)
     const controls = container.querySelector(".react-flow__controls")!
-    expect(controls.textContent ?? "").not.toMatch(/\d+\s*%/)
-    // POSITIVE CONTROL — the matcher catches the sheet's own readout.
-    expect("85%").toMatch(/\d+\s*%/)
+    expect(controls.textContent ?? "").toMatch(/\d+\s*%/)
+    // …and it is the leaf's element, not stray text that happens to contain a percent sign.
+    const readout = container.querySelector('[data-testid="canvas-zoom-readout"]')
+    expect(readout).not.toBeNull()
+    expect(readout!.textContent ?? "").toMatch(/^\d+%$/)
+    // NEGATIVE CONTROL — the matcher does not fire on a cluster with no readout in it, so the
+    // assertion above is about this element and not about the regex being unfalsifiable.
+    expect("Zoom In Zoom Out Fit View").not.toMatch(/\d+\s*%/)
   })
 })
 

@@ -146,7 +146,7 @@
  */
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useStore } from "zustand"
-import { listFolders, listSkills } from "@/lib/api"
+import { listConnectorConnections, listFolders, listSkills } from "@/lib/api"
 // 193.1-05 (D-01) — the pre-draft describe→generate concern, cut out of this page under G-5.
 import { useTemplateFirstDraft } from "@/components/workflows/useTemplateFirstDraft"
 import type { TemplateReadAnswer } from "@/components/workflows/useTemplateFirstDraft"
@@ -758,6 +758,12 @@ export function WorkflowBuilderPage({
   const [folderNames, setFolderNames] = useState<IdNameMap>({})
   const [folderOptions, setFolderOptions] = useState<Array<{ id: string; name: string }>>([])
   const [skillNames, setSkillNames] = useState<IdNameMap>({})
+  // Phase 200 (FE-WIRING): connection id→name, so an `external_action` step's face names its
+  // destination. Same lifecycle and same failure mode as the two maps above — fetched once on
+  // mount, best-effort, and an empty map is the SHIPPED state (the destination-free sentence),
+  // never a degraded one. ⚠ NAMES ONLY: nothing from `ConnectorConnection.config` is read here,
+  // so no host, port or credential can reach the canvas (CONN-03 SC#4).
+  const [connectionNames, setConnectionNames] = useState<IdNameMap>({})
   // The persisted draft id as a RENDERED value (null until the first save on a fresh build;
   // pre-seeded for Open/Tweak). The write loop keeps its own synchronous mirror — that is
   // what collapses the first save to exactly one create — and reports the id it minted here
@@ -825,8 +831,20 @@ export function WorkflowBuilderPage({
   }, [meta])
 
   const nameContext = useMemo<NameContext>(
-    () => ({ folderNames, skillNames, templateFilename: templateAsset?.filename }),
-    [folderNames, skillNames, templateAsset],
+    () => ({
+      folderNames,
+      skillNames,
+      templateFilename: templateAsset?.filename,
+      // Phase 200 (FE-WIRING) — the connection id→name map, so an `external_action` step's face
+      // can name where it sends (`Posts a message to Slack`) instead of stopping at the verb.
+      // It rides the SAME memo as the other two because it is the same class of value and has
+      // the same failure mode: PITFALL 1 accepted — the map lands asynchronously, so those faces
+      // SETTLE when the mount fetch resolves, exactly as the folder and skill tiers already do.
+      // Rejected, for the third time and the same reason: holding the tier until the map is
+      // non-empty. Never: a placeholder destination.
+      connectionNames,
+    }),
+    [folderNames, skillNames, templateAsset, connectionNames],
   )
 
   /**
@@ -1520,6 +1538,26 @@ export function WorkflowBuilderPage({
         setSkillNames(map)
       } catch {
         /* non-fatal */
+      }
+      // Phase 200 (FE-WIRING) — the connection names, third and last of the mount's id→name
+      // reads. UNNARROWED (no `capability` argument): the map is joined on `connection_id`,
+      // and a step's capability can be edited without re-fetching, so narrowing the fetch would
+      // make the face go blank on exactly the edit that changed it.
+      //
+      // ⚠ ITS OWN `try`, deliberately, rather than joining the block above. This route is the
+      // NEWEST of the three and the only one that can refuse for a reason unrelated to the
+      // author (`no_encryption_key` — an operator-level configuration state, `ConnectorApiError`).
+      // A shared `catch` would let a connectors refusal swallow the skill map that had already
+      // resolved beside it, and every derived skill face would silently drop to its type
+      // sentence on an installation that simply has no connectors configured.
+      try {
+        const connections = await listConnectorConnections()
+        if (cancelled) return
+        const map: IdNameMap = {}
+        for (const c of connections) map[c.id] = c.name
+        setConnectionNames(map)
+      } catch {
+        /* non-fatal — every external face falls back to its destination-free sentence */
       }
     })()
     return () => {
@@ -2647,6 +2685,37 @@ export function WorkflowBuilderPage({
         </p>
       )}
 
+      {/* ── Phase 200 (FE-WIRING) — THE GRAPH TRACK IS NOT DIMMED WHILE THE PANEL IS OPEN,
+             AND THE REFUSAL IS RECORDED HERE BECAUSE THIS IS WHERE IT WOULD LIVE.
+
+          `screens/step-panel.html:202` gives its `<main>` `opacity-60 pointer-events-none`
+          behind the open aside, and the 200 audit enumerates it as an FE-WIRING row (this
+          grid is the seam — nothing here dims or inerts the plane). It is DECLINED, on both
+          halves, and the halves fail for different reasons:
+
+            · `pointer-events-none` STRANDS THE AUTHOR. `panelOpen === selectedSlug !== null`,
+              so the panel is open exactly while a step is selected, and the graph is the ONLY
+              way to select a different one. Inerting it means every step-to-step move becomes
+              close-then-reopen, and the ONE remaining exit is `Escape` or the ✕. That is not
+              a focus effect; it is a dead end, and this tree's own word for a control that
+              leads nowhere is on `stepReadinessContext.ts`.
+            · `opacity-60` MUTES THE ONE THING THAT TIES THE TWO TRACKS TOGETHER. The selected
+              node's highlight lives in the dimmed track, so the sheet's own composition would
+              fade the anchor the panel is anchored TO — and it would do it for the whole
+              authoring session, since selecting a step is what opens the panel in the first
+              place.
+
+          ⚠ IT IS A MOCKUP FOCUS DEVICE, WHICH IS A REAL CLASS ON THIS SHEET RATHER THAN AN
+          EXCUSE. The sheet draws its plane as ten static illustrative nodes, and the audit's
+          own next row records a second divergence in the same layout: the sheet shows an open
+          400px panel AND the 44px collapsed strip simultaneously, which in the product is the
+          same grid track and therefore an unreachable state. A sheet may draw an arrangement
+          the live surface cannot hold; where it does, the live surface is the constraint.
+
+          ⚠ RE-OPEN TRIGGER, so this is dated rather than permanent: a step panel that becomes
+          MODAL — one the author cannot navigate past — would make the dim honest, because the
+          plane behind it really would be unreachable and saying so would be a statement rather
+          than a suggestion. The grid below is what makes that false today. */}
       <div
         data-testid="builder-grid"
         className="grid min-h-0 min-w-0 flex-1 overflow-hidden motion-safe:transition-[grid-template-columns] motion-safe:duration-300"

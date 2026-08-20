@@ -322,6 +322,28 @@ export interface NodeRunState {
    * spells no noun of its own — it renders the one the server declared, or nothing.
    */
   noun?: string | null
+  /**
+   * Phase 200 (FE-WIRING) — THE STEP'S OWN ELAPSED, ALREADY WORDED BY THE PAGE.
+   *
+   * `screens/node-identity.html:265` draws `00:15` on its running node. Every piece of it
+   * shipped one surface over before this field existed: `started_at` / `completed_at` are on
+   * the wire (`backend/app/api/workflow_runs.py`, migration `121_workflow_phases_timings.sql`),
+   * `phaseDuration.ts` formats them via `fmtElapsed`, and the SPINE renders the result as
+   * `node-run-time`. The canvas card had no slot and no supply line; this is the supply line.
+   *
+   * ⚠ **A STRING, LIKE `label` AND `noun` BESIDE IT, AND FOR THEIR REASON.** The page owns the
+   * clock. A card that formatted its own elapsed would be a second clock beside the run band's
+   * on the same screen, free to disagree with it about the same run by a tick.
+   *
+   * ⚠ **ABSENT ⇒ THE CARD RENDERS NO ELEMENT.** `undefined` / `null` is "we hold no timing for
+   * this step", which is emphatically not "this step has run for zero seconds". Never `00:00`,
+   * never a dash, never an empty slot — the `count` field above carries the same three-state
+   * discipline for the same reason.
+   *
+   * ⚠ **THE CANVAS TIMES NOTHING.** This rides the seam that already exists; there is no second
+   * clock, no interval and no fetch anywhere in the card subtree.
+   */
+  elapsed?: string | null
 }
 
 /**

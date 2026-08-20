@@ -100,6 +100,11 @@ vi.mock("@/lib/api", () => {
     updateWorkflowDraft: mockUpdate,
     listFolders: mockListFolders,
     listSkills: mockListSkills,
+    // Phase 200 (FE-WIRING) — the page's mount effect now reads the connector connections
+    // too. DECLARED rather than left undefined (`196-08`: a whole-module factory mock that
+    // omits a reachable symbol fails far from its cause). An empty list is the SHIPPED
+    // absence — every external face renders its destination-free sentence.
+    listConnectorConnections: () => Promise.resolve([]),
     validateWorkflow: mockValidate,
     getGroundingBundle: mockBundle,
     // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page

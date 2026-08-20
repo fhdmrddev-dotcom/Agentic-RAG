@@ -29,6 +29,31 @@
  * `GPT-4o`. What is ported is the CARD, its position and its behaviour; what is not ported is
  * two example rows that would be false against this product's own semantics.
  *
+ * ── ⚠ BOTH REFUSALS WERE RE-MEASURED AT THE 200 FE-WIRING PASS AND BOTH STILL HOLD ──────
+ *
+ * They are re-stated rather than assumed, because a refusal whose reason has quietly gone
+ * false is exactly how a stale guard survives — and this project has measured that happening.
+ * The two reasons above were checked against the live tree on 2026-08-20, not against this
+ * docblock:
+ *
+ *   · **`Choose a model` — STILL A CORRECT STATE, and the panel now says so out loud.** A
+ *     blank `model` does not merely fail to be an error: `PhaseFormPanel` renders it as a
+ *     NAMED leading option reading *"Use the run's model (…)"*, pinned by
+ *     `PhaseFormPanel.test.tsx`'s *"A BLANK stored model — the case 239 of 257 real phases are
+ *     in"*. A checklist row would therefore accuse the author of omitting something the
+ *     control beside it presents as a deliberate choice, on 93% of the phases that exist.
+ *   · **`Connect a knowledge source` — STILL A DEAD END, on both halves.** `folder_scope` is
+ *     still a READ-ONLY display in this panel (`PhaseFormPanel.tsx` — no `set("folder_scope")`
+ *     anywhere), and the write it would need is still refused upstream:
+ *     `WorkflowDefinition._folder_scope_requires_project` (`backend/app/models/harness.py`)
+ *     still raises when a phase declares `folder_scope` on a workflow with no
+ *     `project_folder_id`, which under D-186-04 leaves a permanently unsaveable draft.
+ *
+ * ⚠ RE-OPEN TRIGGER for the second one, dated rather than permanent: the phase that gives
+ * this panel a `folder_scope` write seam AND resolves the 422 — at that point the row stops
+ * being a chevron pointing at nothing and becomes owed. The first has no trigger short of the
+ * product deciding a blank model is an error, which would be a change to what a workflow IS.
+ *
  * ⚠ AND WHEN NOTHING IS MISSING, NOTHING RENDERS. Never `0 things still missing`, never a
  * green "all set" — a zero-state congratulation is a claim that the step is COMPLETE, which
  * is a much stronger statement than "none of the four fields we can check is blank", and the

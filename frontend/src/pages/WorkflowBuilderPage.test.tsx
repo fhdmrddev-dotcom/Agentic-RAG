@@ -29,6 +29,12 @@ vi.mock("@/lib/api", () => ({
   updateWorkflowDraft: mockUpdate,
   listFolders: mockListFolders,
   listSkills: mockListSkills,
+  // Phase 200 (FE-WIRING) — the page's mount effect now reads the connector connections too,
+  // so an `external_action` step's face can name where it sends. DECLARED HERE rather than
+  // left undefined, for the reason `196-08` measured the hard way: a whole-module factory mock
+  // that omits a symbol the composed tree can reach fails far from its cause. An empty list is
+  // the SHIPPED absence — every external face renders its destination-free sentence.
+  listConnectorConnections: () => Promise.resolve([]),
   // 196-08 (AUTH-04) — see the note in `WorkflowBuilderPage.describe.test.tsx`: the page
   // reads the author model registry at mount and this factory must declare it.
   getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
