@@ -484,6 +484,29 @@ const CLOCK = new Intl.DateTimeFormat("en-GB", {
   hour12: false,
 })
 
+/**
+ * The RUN CLOCK — a position in a run, as `mm:ss` (or `h:mm:ss` past an hour).
+ *
+ * ⚠ IT IS NOT A FOURTH `fmtElapsed`, AND THE DISTINCTION IS THE CONTRACT RATHER THAN THE OUTPUT.
+ * `lib/fmtElapsed.ts` renders a HUMAN DURATION PHRASE — `12s`, `4m 12s`, `1h 06m` — and its own
+ * docblock names a fourth one as *"the thing NOT to write"*. This renders a FIXED-WIDTH CLOCK
+ * POSITION for a gutter, where every row must occupy the same columns and read as a stopwatch:
+ * `00:00`, `00:42`, `01:15`. A duration phrase cannot do that (`0s` and `1m 10s` are different
+ * widths and different shapes), and a clock cannot do what a duration phrase does (`00:12` beside
+ * a step reads as a time of day, not as "it took twelve seconds").
+ *
+ * Two formatters for two contracts. The rule `fmtElapsed` states is against a second way of
+ * saying the SAME thing, and this says a different thing — so every DURATION on this surface
+ * still goes through `fmtElapsed`, and only the gutter goes through here.
+ */
+export function runClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const seconds = String(total % 60).padStart(2, "0")
+  const minutes = Math.floor(total / 60)
+  if (minutes < 60) return `${String(minutes).padStart(2, "0")}:${seconds}`
+  return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}:${seconds}`
+}
+
 export function clockTime(ms: number): string {
   return CLOCK.format(new Date(ms))
 }

@@ -490,9 +490,16 @@ function labels(): Record<string, string> {
  * of the two the row carries — which is what a person sees.
  */
 function logTimes(): string[] {
+  // ⚠ RETARGETED A SECOND TIME, at the operator's screenshot. The log's lines are now a gutter
+  // and a sentence and nothing else — the sheet's shape — so a DURATION lives in the spine's
+  // time column and a WORDED reading (`never ran (skipped)`, `time not recorded`, `did not
+  // finish`) stays on the log line. The honest reader takes whichever of the two the step
+  // carries, which is what a person sees.
   return Array.from(document.querySelectorAll('[data-testid^="transcript-row-"]')).map((row) => {
-    const time = row.querySelector('[data-testid="transcript-time"]')?.textContent
-    if (time) return time
+    const slug = (row.getAttribute("data-testid") ?? "").replace("transcript-row-", "")
+    const spine = document.querySelector(`[data-testid="spine-step-${slug}"]`)
+    const duration = spine?.querySelector('[data-testid="spine-duration"]')?.textContent
+    if (duration) return duration
     return row.querySelector('[data-testid="transcript-state"]')?.textContent ?? ""
   })
 }
@@ -3052,7 +3059,12 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     expect(times[1]).toBe("48s")
     // ⚠ The skipped row is an AFFIRMATIVE fact, not a blank — and it is a DIFFERENT string
     // from the historic row's, which is `RS-MNR-04`.
-    expect(times[2]).toBe("never ran (skipped)")
+    // ⚠ THE PAGE'S WORD, NOT THE RECEIPT'S, and D-06's claim is unchanged: a routed-around
+    // step and a step whose time was never recorded must read DIFFERENTLY. Since the re-port
+    // the log carries the page's richer label for a state and the spine carries the time, so
+    // the skipped step reads as the sentence a person gets. The inequality below is the arm.
+    expect(times[2]).toContain("Skipped")
+    expect(times[2]).not.toContain("time not recorded")
   })
 
   it("RS-MNR-04: a historic row reads `time not recorded`, never the skipped sentence", async () => {
@@ -3070,7 +3082,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
 
     const times = logTimes()
     expect(times[0]).toBe("time not recorded")
-    expect(times[1]).toBe("never ran (skipped)")
+    expect(times[1]).toContain("Skipped")
     expect(times[0]).not.toBe(times[1])
   })
 
@@ -3148,8 +3160,14 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     // receipt gives, from the same durable row.
     const logRow = screen.getByTestId("transcript-row-gather-contracts")
     expect(logRow.getAttribute("data-source-conflict")).toBe("true")
-    expect(within(logRow).getByTestId("transcript-time").textContent).toBe("12s")
     expect(within(logRow).getByTestId("transcript-state").textContent).not.toBe("Running")
+    // ⚠ AND THE SPINE AGREES WITH THE LOG. The duration moved there when the log line was
+    // reduced to the sheet's gutter-and-sentence; both columns take the wire's answer, so one
+    // screen cannot say the step is running and finished at the same time.
+    expect(
+      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-duration")
+        .textContent,
+    ).toBe("12s")
   })
 
   it("the receipt survives a run with NO durable rows at all — nothing claimed, nothing crashed", async () => {
@@ -3194,8 +3212,8 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const row = screen.getByTestId("transcript-row-gather-contracts")
-    expect(within(row).getByTestId("transcript-count").textContent).toBe("312 sources")
+    const row = screen.getByTestId("spine-step-gather-contracts")
+    expect(within(row).getByTestId("spine-count").textContent).toBe("312 sources")
     // ⚠ The receipt below is a SUMMARY STRIP now and carries no rows, so there is no second
     // rendering of the pair to compare against on this page. `RunReceipt.test.tsx` still
     // asserts the full variant's row directly.
@@ -3210,13 +3228,13 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     // the seven phase types declare no count, and printing `0 sources` under one of them is a
     // claim about a measurement that was never taken.
     for (const slug of ["draft-letter", "final-check"]) {
-      const row = screen.getByTestId(`transcript-row-${slug}`)
-      expect(within(row).queryByTestId("transcript-count")).toBeNull()
+      const row = screen.getByTestId(`spine-step-${slug}`)
+      expect(within(row).queryByTestId("spine-count")).toBeNull()
     }
     // NON-VACUITY: a row in the same render DOES carry one, so the two nulls above are the
     // absence of a count rather than the absence of the whole log.
     expect(
-      within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count"),
+      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-count"),
     ).toBeInTheDocument()
   })
 
@@ -3243,7 +3261,7 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     // ⚠ A DECLARED `0` RENDERS. The step searched and found nothing, which is a measurement
     // and not an absence — the distinction `declaredCount`'s `typeof` test exists to keep.
     expect(
-      within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count")
+      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-count")
         .textContent,
     ).toBe("0 sources")
     // (the receipt below is a summary strip and carries no rows — see the count block's
@@ -3274,7 +3292,7 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     renderPage()
     await screen.findByTestId("run-transcript")
     expect(
-      within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count")
+      within(screen.getByTestId("spine-step-gather-contracts")).getByTestId("spine-count")
         .textContent,
     ).toBe("7 zzqx")
     // (the receipt below is a summary strip and carries no rows)

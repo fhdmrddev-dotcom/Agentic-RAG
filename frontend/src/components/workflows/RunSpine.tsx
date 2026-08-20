@@ -65,6 +65,7 @@ import { fmtElapsed } from "@/lib/fmtElapsed"
 import { own } from "@/components/workflows/ownProperty"
 import {
   declaredCount,
+  phaseTiming,
   readInstant,
   type PhaseTimingRow,
 } from "@/components/workflows/phaseDuration"
@@ -94,19 +95,85 @@ export interface SpineLiveReading {
  * index into an object literal returns an inherited member for a prototype key — the WR-04
  * sink this tree has measured at nine sites, one of them in the run log beside this file.
  */
-const READING_FACE: Record<string, { glyph: string; tone: string; dim?: boolean }> = {
-  done: { glyph: "✓", tone: "text-[hsl(var(--success))]" },
-  failed: { glyph: "✕", tone: "text-[hsl(0_80%_80%)]" },
-  running: { glyph: "●", tone: "text-primary" },
-  "waiting-for-you": { glyph: "!", tone: "text-accent-violet-text" },
-  "not-started": { glyph: "○", tone: "text-muted-foreground", dim: true },
-  skipped: { glyph: "⤳", tone: "text-muted-foreground", dim: true },
-  "recorded-not-sent": { glyph: "↛", tone: "text-muted-foreground" },
-  cancelled: { glyph: "⏹", tone: "text-muted-foreground" },
-  unknown: { glyph: "?", tone: "text-muted-foreground" },
+interface Face {
+  glyph: string
+  /** The glyph's own colour. */
+  tone: string
+  /** The ring: a tinted border and a tinted fill, per the sheet's 28px status node. */
+  ring: string
+  dim?: boolean
 }
 
-const FALLBACK_FACE = { glyph: "?", tone: "text-muted-foreground", dim: false }
+const READING_FACE: Record<string, Face> = {
+  done: {
+    glyph: "✓",
+    tone: "text-[hsl(var(--success))]",
+    ring: "border-[hsl(var(--success)/0.45)] bg-[hsl(var(--success)/0.10)]",
+  },
+  failed: {
+    glyph: "✕",
+    tone: "text-[hsl(0_80%_80%)]",
+    ring: "border-[hsl(0_80%_80%/0.45)] bg-[hsl(0_80%_80%/0.10)]",
+  },
+  running: {
+    glyph: "●",
+    tone: "text-accent-violet-text",
+    ring: "border-accent-violet bg-accent-violet/15",
+  },
+  "waiting-for-you": {
+    glyph: "!",
+    tone: "text-accent-violet-text",
+    ring: "border-accent-violet bg-accent-violet/15",
+  },
+  "not-started": {
+    glyph: "○",
+    tone: "text-muted-foreground/60",
+    ring: "border-border/40 bg-transparent",
+    dim: true,
+  },
+  skipped: {
+    glyph: "⤳",
+    tone: "text-muted-foreground",
+    ring: "border-border/40 bg-transparent",
+    dim: true,
+  },
+  "recorded-not-sent": {
+    glyph: "↛",
+    tone: "text-muted-foreground",
+    ring: "border-border/40 bg-transparent",
+  },
+  cancelled: {
+    glyph: "⏹",
+    tone: "text-muted-foreground",
+    ring: "border-border/40 bg-transparent",
+  },
+  unknown: {
+    glyph: "?",
+    tone: "text-muted-foreground",
+    ring: "border-border/40 bg-transparent",
+  },
+}
+
+/**
+ * The `PhaseTiming` arms that are a statement about TIME and therefore belong in a time column.
+ *
+ * ⚠ `not-recorded` IS ONE OF THEM. *"time not recorded"* is a fact about a missing time, which
+ * is exactly what this column is for; leaving it out is how a historic row ended up saying
+ * nothing about its duration anywhere on the page.
+ */
+const TIME_SHAPED_KINDS: ReadonlySet<string> = new Set([
+  "ran",
+  "interrupted",
+  "not-recorded",
+  "paused",
+])
+
+const FALLBACK_FACE: Face = {
+  glyph: "?",
+  tone: "text-muted-foreground",
+  ring: "border-border/40 bg-transparent",
+  dim: false,
+}
 
 export interface RunSpineProps {
   /** The run's durable phase rows, IN THE ORDER THE SERVER GAVE THEM. */
@@ -121,17 +188,33 @@ export interface RunSpineProps {
    * waiting; a stack floating above a spine says only that something is.
    */
   renderAsk?: (slug: string) => React.ReactNode
+  /**
+   * The WORKFLOW RUN's status. ⚠ It is what separates a live tick from `did not finish` from
+   * `paused, waiting on a person`, and none of the three is derivable from a phase row alone.
+   */
+  runStatus?: string | null
   /** The instant to tick the running step against — hoist ONE per render (P-1). */
   now?: number
 }
 
-export function RunSpine({ phases, titleOf, liveOf, renderAsk, now = Date.now() }: RunSpineProps) {
+export function RunSpine({
+  phases,
+  titleOf,
+  liveOf,
+  renderAsk,
+  runStatus,
+  now = Date.now(),
+}: RunSpineProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-[52px] shrink-0 items-center border-b border-border/10 px-5">
-        <h2 className="text-[13px] font-semibold text-foreground">{SPINE_HEADING}</h2>
+      {/* ⚠ THE HEADER MATCHES THE PAGE HEADER'S HEIGHT AND CARRIES THE SAME BORDER, which is
+          what makes the two columns read as ONE screen split in two rather than as a list that
+          happens to sit beside a page. The operator's screenshot shows the divider running from
+          the very top; a panel whose header floats below the page header breaks that line. */}
+      <div className="flex h-[72px] shrink-0 items-center border-b border-border px-6">
+        <h2 className="text-base font-semibold text-foreground">{SPINE_HEADING}</h2>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {/* ⚠ THE CONNECTING LINE IS WHAT MAKES THIS READ AS A SPINE rather than a list, and it
             is the sheet's own device (`absolute left-3.5 top-4 bottom-4 w-px`). It sits BEHIND
             the rings — hence the z-ordering — so each ring punches through it. */}
@@ -139,16 +222,36 @@ export function RunSpine({ phases, titleOf, liveOf, renderAsk, now = Date.now() 
           <div
             aria-hidden="true"
             data-testid="spine-rail"
-            className="absolute bottom-4 left-[13px] top-4 z-0 w-px bg-border/60"
+            className="absolute bottom-4 left-[13px] top-4 z-0 w-px bg-border"
           />
           <ol className="relative z-10 flex flex-col gap-5">
             {phases.map((row) => {
               const live = liveOf?.(row.slug)
+              const timing = phaseTiming(row, runStatus, now)
               const face = (live ? own(READING_FACE, live.reading) : undefined) ?? FALLBACK_FACE
-              const isRunning = live?.reading === "running"
+              // ⚠ BOTH SOURCES, NOT JUST THE SLICE — the same rule `RunTranscript` keeps, and a
+              // test caught the spine breaking it. A stale slice still calling a finished step
+              // `running` would pulse its mark and swap its settled duration for a live tick,
+              // so the two columns of one screen would disagree about whether the step had
+              // ended. The reading supplies the FACE; the wire decides whether it is in flight.
+              const isRunning =
+                live?.reading === "running" && TIME_SHAPED_KINDS.has(timing.kind) === false
               const waiting = live?.reading === "waiting-for-you"
               const count = declaredCount(row)
               const startedAt = readInstant(row.started_at)
+              // The settled duration, or null when the row does not hold both anchors. ⚠ It is
+              // NOT re-derived: `phaseTiming`'s `ran` arm is the ONE place a pair of instants
+              // becomes a duration, and this reads its result rather than subtracting again.
+              // ⚠ THE WHOLE READING FROM THE ONE RESOLVER, NOT A SUBTRACTION HERE. An earlier
+              // draft computed `completed - started` locally, which produced a duration for the
+              // rows that HAVE both instants and NOTHING for the rows that do not — so a
+              // historic row (terminal, both timestamps null) lost D-06's `time not recorded`
+              // arm entirely and the page said nothing at all about its time. A test caught it.
+              //
+              // ⚠ ONLY THE TIME-SHAPED ARMS RENDER HERE. `never ran (skipped)` and `not reached`
+              // are STATE facts, not time facts — the log's word already carries them, and
+              // repeating them in a time column is the duplication this surface keeps removing.
+              const settled = TIME_SHAPED_KINDS.has(timing.kind) ? timing.reading : null
               const ask = renderAsk?.(row.slug)
 
               return (
@@ -162,8 +265,8 @@ export function RunSpine({ phases, titleOf, liveOf, renderAsk, now = Date.now() 
                     aria-hidden="true"
                     data-testid="spine-mark"
                     className={cn(
-                      "grid h-7 w-7 shrink-0 place-items-center rounded-full border bg-background text-[13px] leading-none",
-                      waiting ? "border-accent-violet" : "border-border/40",
+                      "grid h-7 w-7 shrink-0 place-items-center rounded-full border text-[13px] leading-none",
+                      face.ring,
                       face.tone,
                       isRunning && "animate-pulse",
                     )}
@@ -192,6 +295,22 @@ export function RunSpine({ phases, titleOf, liveOf, renderAsk, now = Date.now() 
                           rule is that a status is never signalled by treatment alone. It is the
                           shipped vocabulary's phrase, so the live tick is worded the same here
                           as everywhere else it appears. */}
+                      {/* ⚠ THE ONE DELIBERATE DEVIATION FROM THE SHEET, AND IT IS RECORDED AS
+                          ONE. The sheet prints a time on the ACTIVE row only. A finished step's
+                          duration is the whole point of migration 121, and after the log line was
+                          reduced to the sheet's gutter-and-sentence there is nowhere else on the
+                          screen for it — so it renders HERE, in the sheet's own time slot, in the
+                          quiet muted tone rather than the active accent. Removing it would have
+                          discarded a shipped measurement to match a drawing; putting it anywhere
+                          else would have invented a slot the drawing does not have. */}
+                      {!isRunning && settled !== null && (
+                        <span
+                          data-testid="spine-duration"
+                          className="shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70"
+                        >
+                          {settled}
+                        </span>
+                      )}
                       {isRunning && startedAt !== null && (
                         <span
                           data-testid="spine-elapsed"

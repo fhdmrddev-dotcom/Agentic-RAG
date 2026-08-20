@@ -123,8 +123,8 @@ describe("RunTranscript — where a step sits on the clock", () => {
     // first step starts AT the anchor, so a completion stamp printed the same string as its own
     // duration (`11s · … · 11s`), which is what the browser showed.
     render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
-    expect(clockOf("gather")).toBe("0s")
-    expect(clockOf("draft")).toBe("14s")
+    expect(clockOf("gather")).toBe("00:00")
+    expect(clockOf("draft")).toBe("00:14")
   })
 
   it("the stamp and the duration are DIFFERENT facts on the same line", () => {
@@ -132,10 +132,14 @@ describe("RunTranscript — where a step sits on the clock", () => {
     render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
     const row = screen.getByTestId("transcript-row-gather")
     const stamp = within(row).getByTestId("transcript-clock").textContent
-    const duration = within(row).getByTestId("transcript-time").textContent
-    expect(stamp).toBe("0s")
-    expect(duration).toBe("12s")
-    expect(stamp).not.toBe(duration)
+    const duration = within(row).queryByTestId("transcript-time")?.textContent
+    // ⚠ THE GUTTER IS A CLOCK POSITION (`mm:ss`), NOT A DURATION PHRASE. Two formatters for
+    // two contracts — see `runClock`'s docblock. The duration moved to the spine when the log
+    // line was reduced to the sheet's gutter-and-sentence, so what this pins now is the gutter's
+    // SHAPE, which is what made the two numbers confusable in the first place.
+    expect(stamp).toBe("00:00")
+    expect(stamp).toMatch(/^\d{2}:\d{2}$/)
+    expect(duration).toBeUndefined()
   })
 
   it("orders by the clock, and appends the untimed rows after every timed one", () => {
@@ -233,9 +237,6 @@ describe("RunTranscript — the state word and the duration cannot contradict ea
       />,
     )
     expect(stateOf("gather")).toBe(OUTCOME_FINISHED)
-    expect(
-      within(screen.getByTestId("transcript-row-gather")).getByTestId("transcript-time").textContent,
-    ).toBe("12s")
   })
 
   it("a slice ahead of the wire is a disagreement too — the mirror case", () => {
@@ -320,8 +321,11 @@ describe("RunTranscript — the state word and the duration cannot contradict ea
     const row = screen.getByTestId("transcript-row-gather")
     expect(within(row).queryByTestId("transcript-state")).toBeNull()
     // ...and the facts it DOES carry are all still there.
-    expect(within(row).getByTestId("transcript-time").textContent).toBe("12s")
-    expect(within(row).getByTestId("transcript-count").textContent).toBe("312 sources")
+    // ⚠ THE DURATION AND THE COUNT ARE NOT ON THIS LINE ANY MORE — they moved to the spine
+    // when the log was reduced to the sheet's gutter-and-sentence. What this case still pins is
+    // the SILENCE, which is the rule the browser forced.
+    expect(within(row).queryByTestId("transcript-time")).toBeNull()
+    expect(within(row).queryByTestId("transcript-count")).toBeNull()
     // NON-VACUITY: a step that is NOT an ordinary completion still speaks, in the same render.
     expect(stateOf("check")).toBe(OUTCOME_NOT_REACHED)
   })
@@ -360,21 +364,6 @@ describe("RunTranscript — the state word and the duration cannot contradict ea
     expect(stateOf("check")).toBe(OUTCOME_NOT_REACHED)
   })
 
-  it("never prints the same string twice on one line", () => {
-    // ⚠ FOUND IN THE BROWSER, on a real run. A `pending` row resolves BOTH its outcome word
-    // and its timing reading to the same constant, and the line read `not reached · not
-    // reached` — which is not two facts, it is one fact and a surface that has lost track of
-    // what it is saying.
-    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
-    const row = screen.getByTestId("transcript-row-check")
-    expect(stateOf("check")).toBe(OUTCOME_NOT_REACHED)
-    expect(within(row).queryByTestId("transcript-time")).toBeNull()
-    // NON-VACUITY: a row whose duration DOES add something still prints it.
-    expect(
-      within(screen.getByTestId("transcript-row-gather")).getByTestId("transcript-time").textContent,
-    ).toBe("12s")
-  })
-
   it("a skipped step reads NEVER RAN, which is not the same as a time we do not hold", () => {
     // The D-06 split, met at this surface: `never ran` is an affirmative fact.
     const skipped: PhaseTimingRow[] = [{ slug: "check", status: "skipped" }]
@@ -385,37 +374,10 @@ describe("RunTranscript — the state word and the duration cannot contradict ea
 
 // ── 4. The count: `0` is a fact, absence is not ─────────────────────────────────────
 
-describe("RunTranscript — the declared count", () => {
-  it("renders the wire's pair VERBATIM, substituting no word of its own", () => {
-    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
-    expect(
-      within(screen.getByTestId("transcript-row-gather")).getByTestId("transcript-count").textContent,
-    ).toBe("312 sources")
-  })
-
-  it("a step that declared NO count renders NO element — never a `0`, never a dash", () => {
-    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
-    expect(within(screen.getByTestId("transcript-row-draft")).queryByTestId("transcript-count"))
-      .toBeNull()
-  })
-
-  it("a declared `0` renders, because the step searched and found nothing", () => {
-    const zero: PhaseTimingRow[] = [
-      {
-        slug: "gather",
-        status: "completed",
-        started_at: s(0),
-        completed_at: s(12),
-        step_count: 0,
-        step_noun: "sources",
-      },
-    ]
-    render(<RunTranscript phases={zero} titleOf={titleOf} now={T0} />)
-    expect(
-      within(screen.getByTestId("transcript-row-gather")).getByTestId("transcript-count").textContent,
-    ).toBe("0 sources")
-  })
-})
+/* ⚠ THE COUNT CASES MOVED TO `RunSpine.test.tsx`. The declared count is the SPINE's sub-line
+   since the log line was reduced to the sheet's gutter-and-sentence; D-07's rule (a declared
+   `0` renders, an ABSENT count renders no element) is unchanged and is asserted there, against
+   the surface that now shows it. Recorded rather than deleted so the rule's home is findable. */
 
 // ── 5. The source sweep ─────────────────────────────────────────────────────────────
 
@@ -444,6 +406,8 @@ describe("RunTranscript — it spells nothing", () => {
 
   it("imports every word it renders from a vocabulary module", () => {
     expect(code).toMatch(/from "@\/components\/workflows\/transcriptVocabulary"/)
-    expect(code).toMatch(/from "@\/components\/workflows\/receiptVocabulary"/)
+    // ⚠ `receiptVocabulary` is reached INDIRECTLY now, through `phaseRunFacts` — the log line
+    // renders a state word and a gutter and imports no phrase of its own beyond its own module.
+    expect(code).toMatch(/from "@\/components\/workflows\/phaseDuration"/)
   })
 })

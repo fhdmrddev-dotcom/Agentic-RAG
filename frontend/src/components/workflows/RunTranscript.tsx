@@ -167,18 +167,16 @@
  * ORDER. There is no client-side re-sort by anything else — the D-17/D-18 fence the library
  * feeds carry, met one surface along.
  */
-import { fmtElapsed } from "@/lib/fmtElapsed"
 import { phaseStatusFromDb } from "@/lib/phaseState"
 import { cn } from "@/lib/utils"
 import {
-  declaredCount,
   phaseRunFacts,
+  runClock,
   runAnchorMs,
   transcriptEntries,
   type PhaseTimingRow,
 } from "@/components/workflows/phaseDuration"
 import { own } from "@/components/workflows/ownProperty"
-import { countDeclared } from "@/components/workflows/receiptVocabulary"
 import {
   TRANSCRIPT_LANDMARK_LABEL,
   TRANSCRIPT_NO_STEPS,
@@ -370,11 +368,6 @@ export function RunTranscript({
               // The duration belongs to a step that has stopped. When the page's label is in
               // use and says the step is live, there is no duration to show yet; otherwise the
               // wire's own reading is internally consistent and renders as it is.
-              const showPast = !isLive
-              // ⚠ READ FROM THE RESOLVER, NOT RE-TESTED HERE. `declaredCount` is the ONE arm
-              // that knows a declared `0` from an absence, and a second `typeof` check at
-              // this call site would be a second place to get it wrong.
-              const count = showPast ? declaredCount(row) : null
               // The word this line ends up carrying, resolved ONCE so the duplicate check
               // below and the rendered span can never disagree about what it is.
               const word = live != null ? live.label : facts.outcome
@@ -383,12 +376,6 @@ export function RunTranscript({
               // READING rather than against the word, so re-wording the vocabulary cannot
               // silently re-open the noise.
               const speaks = live?.reading !== "done"
-              // ⚠ A TIMING READING THAT IS THE SAME STRING AS THE STATE WORD IS NOT A SECOND
-              // FACT. `pending` resolves both to the same constant, and printing it twice
-              // ("not reached · not reached") reads as a surface that has lost track of what
-              // it is saying. Compared by VALUE rather than by arm, so it holds for any future
-              // pair that happens to collide.
-              const timeAddsSomething = facts.timing.reading !== word
 
               return (
                 <li
@@ -413,9 +400,9 @@ export function RunTranscript({
                       rather than a placeholder — a dash in a clock column is a reading. */}
                   <span
                     data-testid="transcript-clock"
-                    className="w-16 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70"
+                    className="w-14 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/60"
                   >
-                    {entry.offsetMs === null ? "" : fmtElapsed(entry.offsetMs)}
+                    {entry.offsetMs === null ? "" : runClock(entry.offsetMs)}
                   </span>
                   {/* ⚠ THE TITLE IS FULL-STRENGTH ON EVERY LINE, INCLUDING THE LIVE ONE.
                       An earlier draft dimmed the running step, borrowed from the sheet, where
@@ -454,26 +441,11 @@ export function RunTranscript({
                       {word}
                     </span>
                   )}
-                  {showPast && (
-                    <>
-                      {timeAddsSomething && (
-                        <span
-                          data-testid="transcript-time"
-                          className="shrink-0 tabular-nums text-muted-foreground"
-                        >
-                          {facts.timing.reading}
-                        </span>
-                      )}
-                      {count && (
-                        <span
-                          data-testid="transcript-count"
-                          className="shrink-0 text-muted-foreground"
-                        >
-                          {countDeclared(count.count, count.noun)}
-                        </span>
-                      )}
-                    </>
-                  )}
+                  {/* ⚠ THE DURATION AND THE COUNT ARE NOT ON THIS LINE ANY MORE — they moved
+                      to the SPINE, which is where the sheet puts a time. The sheet's log lines
+                      are a gutter and a sentence and nothing else; carrying atoms here is what
+                      made five rows read as a table. Neither fact was dropped: the count is the
+                      spine's sub-line and the duration is its right-hand column. */}
                   {/* The slack. It exists so the atoms above stay beside the title instead of
                       being spread across the column, and it renders nothing. */}
                   <span aria-hidden="true" className="min-w-0 flex-1" />

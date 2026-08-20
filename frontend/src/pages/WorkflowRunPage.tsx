@@ -1389,7 +1389,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         <section
           aria-busy={!isTerminal}
           data-testid="run-transcript-region"
-          className="flex min-h-0 min-h-[320px] flex-1 flex-col px-6"
+          className="flex min-h-0 min-h-[320px] flex-1 flex-col overflow-hidden px-6"
         >
           {/* ⚠ THE RUN'S TOTAL SITS ABOVE THE LOG IT SUMMARISES, AS A STRIP.
               It used to be the header of a separate region below, whose ROWS repeated the log's
@@ -1440,7 +1440,12 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           // ⚠ 380px AND NO PADDING OF ITS OWN — both are the sheet's. The spine owns its
           // header strip and its own inset, so an outer padding here would double it and
           // break the header's alignment with the page header beside it.
-          className="hidden w-[380px] shrink-0 flex-col overflow-hidden border-l border-border/10 lg:flex"
+          // ⚠ A REAL BORDER AND ITS OWN SURFACE — the operator's words were "it's not clear the
+          // boundaries between the side panel and the run itself". It was `border-border/10`,
+          // which at 10% opacity is invisible on this ground. The screenshot shows a divider
+          // running the full height AND a panel sitting on a distinct surface, which is what
+          // makes the two columns read as one screen split in two.
+          className="hidden w-[380px] shrink-0 flex-col overflow-hidden border-l border-border bg-card/40 lg:flex"
         >
           {/* The ask stack, newest first — the same ordering rule `PendingAskStack` keeps,
               re-derived here rather than imported because the stack resolves its own thread
@@ -1462,6 +1467,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
             phases={wireRows}
             titleOf={titleOf}
             liveOf={runState}
+            runStatus={runStatus}
             now={nowMs}
             renderAsk={(slug) =>
               slug === askAnchorSlug && asks.length > 0
