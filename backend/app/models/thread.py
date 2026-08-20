@@ -117,7 +117,23 @@ def phase_output_object(raw: object) -> dict | None:
     if isinstance(raw, str):
         try:
             decoded = json.loads(raw)
-        except (ValueError, TypeError):
+        # ⚠ `RecursionError` IS NOT A `ValueError`, AND THIS FUNCTION'S CONTRACT SAYS IT NEVER
+        # RAISES. `json.loads` recurses per nesting level, so a deeply-nested payload —
+        # `"[[[[...]]]]"` — blows the interpreter's stack and escapes a `(ValueError, TypeError)`
+        # catch entirely. Reproduced against this repo's own Python by the phase's code review;
+        # the docblock above and this module's test suite both assert "must never raise", so the
+        # narrow catch was contradicting a promise made two paragraphs up.
+        #
+        # This matters because the input is MODEL-INFLUENCED: executor output is persisted
+        # verbatim into `workflow_phases.output`. Both call sites are reachable — the run read
+        # (`api/workflow_runs.py`) and the thread reconcile (`api/threads.py`), the latter with
+        # no enclosing try/except at the call site.
+        #
+        # `RecursionError` inherits from `RuntimeError`, not `ValueError`, so it must be named.
+        # Returning `None` is the right answer rather than re-raising: an unreadable payload is
+        # exactly the "not an object" case this function already reports as `None`, and the
+        # absent arm downstream renders honestly (no count, no answer) rather than blanking a page.
+        except (ValueError, TypeError, RecursionError):
             return None
         return decoded if isinstance(decoded, dict) else None
     return None

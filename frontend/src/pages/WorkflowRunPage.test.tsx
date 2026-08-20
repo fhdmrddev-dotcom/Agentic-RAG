@@ -1606,15 +1606,28 @@ function runWithAnswer(overrides: Partial<RunLike> = {}): RunLike {
   return mkRun({
     status: "completed",
     thread_id: RUN_THREAD_ID,
+    /* ⚠ THE ANSWER MOVED OFF THE HUMAN-INPUT STEP (CR-02, phase 200.1 code review).
+       This helper used to hang `RUN_ANSWER` on `final-check`, an `llm_human_input` phase —
+       so the fixture every "answer" test runs against WAS the defect shape. A human-input
+       step's text is the machine's own QUESTION ("Does this draft answer your question?"),
+       measured on a real local run, and rendering it under "The answer this run wrote" is
+       the surface calling the machine's prompt the deliverable. The whole suite was green
+       against it because it only ever covered confirm-FIRST, never confirm-LAST.
+       The answer now sits on the step that actually wrote it. */
     phases: [
       { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
-      { slug: "draft-letter", phase_index: 1, status: "completed", phase_type: "llm_agent" },
+      {
+        slug: "draft-letter",
+        phase_index: 1,
+        status: "completed",
+        phase_type: "llm_agent",
+        deliverable_text: RUN_ANSWER,
+      },
       {
         slug: "final-check",
         phase_index: 2,
         status: "completed",
         phase_type: "llm_human_input",
-        deliverable_text: RUN_ANSWER,
       },
     ],
     ...overrides,
@@ -1827,21 +1840,106 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
     expect(region.textContent).toContain(COPY_EMPTY_TERMINAL)
   })
 
-  it("renders the answer as TEXT and keeps its line breaks", async () => {
+  /* ⚠ THESE TWO TESTS REPLACE A PAIR SHIPPED ONE DAY EARLIER BY `200.1-02`, and they are
+     REWRITTEN rather than deleted. The originals pinned the answer as inert text
+     (`querySelectorAll("*") === 0`, a hostile `<b>` arriving as literal characters). That
+     mechanism is gone — the answer now renders through the shipped `MarkdownRenderer`, the
+     same DOMPurify-sanitised path chat uses for the same class of model output — but the
+     PROPERTY the originals defended is unchanged and is asserted harder below: model-authored
+     content still cannot execute. A guard that changes shape must still be a guard. */
+
+  it("the answer renders as sanitised markdown, with its own line breaks kept", async () => {
     const region = await regionFor(runWithAnswer(), [])
-    const block = region.querySelector('[data-testid="run-deliverable-answer"] p')
+    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
     expect(block).not.toBeNull()
-    // The run's own newlines survive into the DOM, and the class that makes them visible
-    // is on the element that holds them.
-    expect(block!.textContent).toBe(RUN_ANSWER)
-    expect(block!.className).toContain("whitespace-pre-wrap")
+    // The run's own words all survive the round trip through marked + DOMPurify.
+    for (const line of RUN_ANSWER.split("\n").filter((l) => l.trim())) {
+      expect(block!.textContent).toContain(line.trim())
+    }
+    // The measure is capped so prose does not run to ~208 characters per line.
+    expect(block!.className).toContain("max-w-[72ch]")
     expect(block!.className).toContain("break-words")
-    // ⚠ MODEL-AUTHORED CONTENT CANNOT BECOME MARKUP. A `<b>` in the answer arrives as text.
-    expect(block!.querySelectorAll("*")).toHaveLength(0)
   })
 
-  it("model-authored markup in the answer is rendered as text, never as DOM", async () => {
-    const HOSTILE = '<img src=x onerror="alert(1)"> and <b>bold</b>'
+  it("a confirm step's QUESTION is never mistaken for the run's answer (CR-02)", async () => {
+    // The shape the code review found, and the one the shipped suite never covered: the
+    // LAST phase is a human-input gate that carries the machine's own prompt in the same
+    // field the answer arrives in. Measured verbatim on a real local run.
+    const MACHINE_QUESTION = "Does this draft answer your question? Add any corrections."
+    const region = await regionFor(
+      runWithAnswer({
+        phases: [
+          {
+            slug: "draft-letter",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+            deliverable_text: RUN_ANSWER,
+          },
+          {
+            slug: "final-check",
+            phase_index: 1,
+            status: "completed",
+            phase_type: "llm_human_input",
+            deliverable_text: MACHINE_QUESTION,
+          },
+        ],
+      }),
+      [],
+    )
+    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
+    expect(block).not.toBeNull()
+    // ⚠ The later row wins ONLY among rows that actually wrote something.
+    expect(block!.textContent).not.toContain("Does this draft answer your question")
+    expect(block!.textContent).toContain(RUN_ANSWER.split("\n")[0].trim())
+  })
+
+  it("a run whose ONLY text is a confirm question shows no answer at all (CR-02)", async () => {
+    // The absent arm must survive the skip: skipping the gate must not fall back to it.
+    const region = await regionFor(
+      runWithAnswer({
+        phases: [
+          {
+            slug: "final-check",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_human_input",
+            deliverable_text: "Does this draft answer your question? Add any corrections.",
+          },
+        ],
+      }),
+      [],
+    )
+    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+    expect(region.textContent).not.toContain("Does this draft answer your question")
+  })
+
+  it("markdown in the answer becomes real formatting, not literal asterisks", async () => {
+    const region = await regionFor(
+      runWithAnswer({
+        phases: [
+          {
+            slug: "draft-letter",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+            deliverable_text: "Approved with **one correction** before finalising.",
+          },
+        ],
+      }),
+      [],
+    )
+    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
+    // The whole point of the change: emphasis is emphasis, and the markers are gone.
+    expect(block!.querySelector("strong")).not.toBeNull()
+    expect(block!.querySelector("strong")!.textContent).toBe("one correction")
+    expect(block!.textContent).not.toContain("**")
+  })
+
+  it("model-authored markup in the answer cannot execute — the refusal, re-asserted", async () => {
+    const HOSTILE =
+      '<img src=x onerror="alert(1)"> and <script>alert(2)</script> and ' +
+      '<a href="javascript:alert(3)">link</a> and <b>bold</b>'
     const region = await regionFor(
       runWithAnswer({
         phases: [
@@ -1856,10 +1954,18 @@ describe("WorkflowRunPage — the four deliverable renders", () => {
       }),
       [],
     )
-    const block = region.querySelector('[data-testid="run-deliverable-answer"] p')
-    expect(block!.textContent).toBe(HOSTILE)
-    expect(block!.querySelector("img")).toBeNull()
-    expect(block!.querySelector("b")).toBeNull()
+    const block = region.querySelector('[data-testid="run-deliverable-answer"] .markdown')
+    expect(block).not.toBeNull()
+    // ⚠ THE PROPERTY THAT MATTERS: nothing here can run.
+    expect(block!.querySelector("script")).toBeNull()
+    for (const el of Array.from(block!.querySelectorAll("*"))) {
+      for (const attr of Array.from(el.attributes)) {
+        expect(attr.name.toLowerCase().startsWith("on")).toBe(false)
+        expect(attr.value.toLowerCase().replace(/\s/g, "")).not.toContain("javascript:")
+      }
+    }
+    // The benign half is allowed to be markup now — that is the deliberate change.
+    expect(block!.querySelector("b")).not.toBeNull()
   })
 
   it("adds NO focus stop — the answer is prose, not a control", async () => {

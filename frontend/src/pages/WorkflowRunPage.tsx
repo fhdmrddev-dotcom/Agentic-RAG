@@ -134,6 +134,7 @@ import {
   useStreamActions,
   useWorkspaceFiles,
 } from "@/providers/StreamsProvider"
+import { MarkdownRenderer } from "@/components/chat/MarkdownRenderer"
 import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
 import type { Phase, WorkspaceFile } from "@/types"
@@ -839,7 +840,24 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   const runAnswer = useMemo<string | null>(() => {
     const rows = run?.phases ?? []
     for (let i = rows.length - 1; i >= 0; i -= 1) {
-      const text = rows[i].deliverable_text
+      const row = rows[i]
+      // ⚠ A HUMAN-INPUT STEP'S `text` IS THE MACHINE'S OWN QUESTION, NOT THE RUN'S ANSWER.
+      // Measured on a real local run: an `llm_human_input` phase carries
+      // `"Does this draft answer your question? Add any corrections."` in the SAME field the
+      // answer arrives in. Without this skip, a workflow whose LAST step is a confirm gate
+      // renders that prompt under the heading "The answer this run wrote" — the surface
+      // stating, in its own voice, that the machine's question is the deliverable.
+      //
+      // The shipped tests covered confirm-FIRST and never confirm-LAST, so the whole suite
+      // was green against a shape that is documented in this file's own test comments as an
+      // OBSERVED live run (`gather-contracts → draft-letter → final-check[llm_human_input]`).
+      // Found by the phase's code review, not by a test.
+      //
+      // `phase_type` was already on the wire and simply was not consulted — no backend
+      // change, no new field. Skipping is correct rather than falling back to the whole row:
+      // the answer is the last step that WROTE something, and a gate did not write anything.
+      if (row.phase_type === "llm_human_input") continue
+      const text = row.deliverable_text
       // ⚠ The server already collapses `""` into `null`, so this test is belt-and-braces
       // rather than the contract — a client that trusted only the null would still be
       // correct today and would break the day anything else populates this field.
@@ -1795,9 +1813,42 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
             >
               {COPY_ANSWER_HEADING}
             </h2>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground">
-              {runAnswer}
-            </p>
+            {/* ⚠ THIS RENDERS MODEL-AUTHORED MARKDOWN, REVERSING A REFUSAL THIS FILE SHIPPED
+                ONE DAY EARLIER (200.1-02), and the reversal is deliberate rather than a drift.
+
+                What shipped: `{runAnswer}` inside a `<p>`, pinned at `querySelectorAll("*")
+                === 0` so a `<b>` in the answer arrived as literal text. That was SAFE and it
+                was also UNREADABLE — measured on a real run, the answer rendered at ~208
+                characters per line (1454px at 14px) against the 45–75 that prose wants, with
+                its `**bold**` and `>` markers printed raw. The operator read that measure as
+                the region being cramped; both halves are fixed here.
+
+                Why reversing it is correct rather than a loosening: CHAT ALREADY RENDERS THIS
+                EXACT CLASS OF CONTENT THE SAME WAY. `MarkdownRenderer` is the shipped path
+                behind seven call sites across the chat surface and the workspace panel, and it
+                pipes `marked.parse` through `DOMPurify.sanitize` on every content change. The
+                run page being stricter than chat about the same model output was an
+                inconsistency, not a considered stance.
+
+                ⚠ The call sites are described rather than NAMED on purpose: this file carries
+                a `?raw` source fence forbidding one of those component names, and spelling it
+                here turns that fence red. Naming a forbidden token inside your own prose is
+                the 187-24 trap, and it fired on the first draft of this very comment.
+
+                ⚠ THE REFUSAL'S INTENT IS PRESERVED AND RE-ASSERTED, only its mechanism moved:
+                hostile markup still cannot execute. The two shipped tests were REWRITTEN to
+                assert the sanitised property (`onerror` stripped, no `<script>`, no handler
+                attribute) rather than deleted — a guard that changes shape must still be a
+                guard. See `WorkflowRunPage.test.tsx` § "the answer renders as sanitised
+                markdown".
+
+                `max-w-[72ch]` is the measure, not a width: it caps the LINE at roughly 72
+                characters and lets the column stay as wide as it likes. `break-words` still
+                stops one long unbroken token from blowing the cap. */}
+            <MarkdownRenderer
+              content={runAnswer}
+              className="mt-2 max-w-[72ch] break-words"
+            />
           </div>
         ) : null}
         {downloadError ? (

@@ -552,3 +552,38 @@ async def test_the_rollback_left_nothing_behind(live_conn):
         "SELECT count(*) FROM workflow_phases WHERE slug LIKE '200-1-%'"
     )
     assert leaked == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────────────────
+# CR-01 (phase 200.1 code review, Critical): `phase_output_object`'s docblock and this
+# suite both assert it MUST NEVER RAISE — and it caught only `(ValueError, TypeError)`.
+# `json.loads` recurses per nesting level, so a deeply-nested string raises `RecursionError`,
+# which inherits from `RuntimeError` and escaped that catch. The input is MODEL-INFLUENCED
+# (executor output is persisted verbatim), and one of the two call sites has no enclosing
+# try/except. Driven RED before the fix: this test raised rather than failed.
+# ─────────────────────────────────────────────────────────────────────────────────────────
+
+
+def test_deeply_nested_payload_returns_none_and_never_raises():
+    from app.models.thread import phase_output_object
+
+    # Deep enough to exceed CPython's default recursion limit inside json.loads.
+    hostile = "[" * 100_000 + "]" * 100_000
+    assert phase_output_object(hostile) is None
+
+
+def test_deeply_nested_payload_does_not_raise_through_declared_phase_measure():
+    from app.models.thread import declared_phase_measure
+
+    hostile = "[" * 100_000 + "]" * 100_000
+    assert declared_phase_measure(hostile) == (None, None)
+
+
+def test_ordinary_shapes_still_work_after_the_recursion_guard():
+    """POSITIVE CONTROL — the widened except must not have swallowed real parsing."""
+    from app.models.thread import phase_output_object
+
+    assert phase_output_object({"text": "hi"}) == {"text": "hi"}
+    assert phase_output_object('{"text": "hi"}') == {"text": "hi"}
+    assert phase_output_object('"just a string"') is None
+    assert phase_output_object("not json at all") is None
