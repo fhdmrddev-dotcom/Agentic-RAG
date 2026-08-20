@@ -61,7 +61,7 @@ import { cn } from "@/lib/utils"
 // The eight lucide file-glyph imports that used to sit above are GONE with the local
 // mapping they fed; the glyph now resolves once, inside the shared row.
 import { FileRow } from "@/components/files/FileRow"
-import { baseName, byNewestFirst, formatBytes } from "@/components/files/fileRowUtils"
+import { baseName, byNewestFirst, fileAgeLabel, formatBytes } from "@/components/files/fileRowUtils"
 // Phase 194.1 Plan 06 — the elapsed formatter, hoisted out of this file VERBATIM so the
 // chat run line consumes the shipped one instead of becoming a fourth copy. See the
 // docblock where it used to live (search `fmtElapsed NO LONGER LIVES HERE`).
@@ -529,6 +529,21 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * it, and this ordering is scoped to the run surface deliberately.
    */
   const orderedFiles = useMemo(() => [...files].sort(byNewestFirst), [files])
+
+  /**
+   * ⚠ Phase 200 — ONE INSTANT FOR THE WHOLE DELIVERABLE LIST, hoisted here rather than
+   * taken per row from `fileAgeLabel`'s `Date.now()` default. Two rows stamped a
+   * millisecond apart can otherwise land either side of a band boundary and read a band
+   * apart, which is a difference a person notices and cannot explain. It is deliberately
+   * NOT memoised: the value must be re-read on every render, or the list would keep
+   * reporting the age it had when the page first painted.
+   *
+   * ⚠ NO LIVE TICK, and that is inherited rather than decided here — `relativeBand`'s own
+   * docblock accepts it: a row reading `just now` can still read `just now` a while later,
+   * and the value refreshes when something else re-renders. This surface re-renders on
+   * every poll and on every stream frame, so in practice it moves.
+   */
+  const filesNow = Date.now()
 
   /**
    * ⚠ F5 (UAT 2026-08-05) — THE RUN-TIME WAITING READING WAS UNREACHABLE ON THIS SURFACE.
@@ -1375,6 +1390,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                       // mime type and NO extension falls to the default glyph.
                       mimeType={file.mime_type}
                       sizeBytes={file.size_bytes}
+                      age={fileAgeLabel(file.created_at, filesNow)}
                       trailing="download"
                     >
                       <button
@@ -1399,7 +1415,7 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                     // choice. Turning the affordance into a control would red it, and the
                     // gate on a download is the early return inside `onDownload` — the
                     // code — never the visual state.
-                    <FileRow asChild density="run" name={name} mimeType={file.mime_type} sizeBytes={file.size_bytes} trailing="dead">
+                    <FileRow asChild density="run" name={name} mimeType={file.mime_type} sizeBytes={file.size_bytes} age={fileAgeLabel(file.created_at, filesNow)} trailing="dead">
                       <div title={file.path} className="w-full rounded-md px-2 py-2 text-left" />
                     </FileRow>
                   )}

@@ -3,7 +3,7 @@ import { Slot, Slottable } from "@radix-ui/react-slot"
 import { Download, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { fileIcon } from "@/lib/fileIcon"
-import { formatBytes } from "./fileRowUtils"
+import { formatBytes, TIME_UNKNOWN } from "./fileRowUtils"
 
 /**
  * FileRow — the ONE file-row markup (Phase 195, RUN-03).
@@ -158,6 +158,22 @@ export interface FileRowProps {
   sizeBytes?: number
   /** Appended inside the size cell, e.g. `" · v2"` (the panel's version meta). */
   metaSuffix?: string
+  /**
+   * Phase 200 (sketch `run-panel-parts.html`) — THE ALREADY-WORDED AGE PHRASE.
+   *
+   * ⚠ **CALLER-DERIVED, exactly like `name`** — this component words nothing. The
+   * caller hoists ONE `Date.now()` per render and calls `fileAgeLabel(created_at,
+   * now)`, so every row in a list agrees about what time it is and two rows
+   * stamped a millisecond apart cannot straddle a band boundary.
+   *
+   * ⚠ **OMITTED RENDERS NO TIME CELL AT ALL.** That is what keeps every caller
+   * that existed before this prop byte-identical, and it is a THIRD state
+   * distinct from the two the sheet draws: `undefined` = this surface does not
+   * show a time; a phrase = the instant, worded; `TIME_UNKNOWN` = the wire
+   * carried no instant, rendered dimmed. Folding the first into the third would
+   * put "time unknown" onto surfaces that never asked for a clock.
+   */
+  age?: string
   /** D-08's "Replaces: …" subline (BUG-260523-03's UI side). */
   supersedes?: string
   /** Chat's in-row error line. `null` renders nothing. ⚠ The RUN page's error
@@ -183,6 +199,7 @@ export const FileRow = forwardRef<HTMLElement, FileRowProps>(function FileRow(
     mimeType,
     sizeBytes,
     metaSuffix,
+    age,
     supersedes,
     errorText,
     trailing = "none",
@@ -248,6 +265,19 @@ export const FileRow = forwardRef<HTMLElement, FileRowProps>(function FileRow(
         <span className={d.sizeClass}>
           {formatBytes(sizeBytes)}
           {metaSuffix ?? ""}
+        </span>
+      )}
+      {/* Phase 200 — the age cell, AFTER the size, which is the sheet's order.
+             ⚠ The dimmed arm is selected by comparing against the SHARED constant, never
+             by re-testing the caller's input: this component is handed a finished phrase
+             and must not re-derive the fact behind it, or the row and the sort could
+             disagree about whether an instant was present. */}
+      {age != null && (
+        <span
+          data-testid="file-row-age"
+          className={cn(d.sizeClass, age === TIME_UNKNOWN && "opacity-60")}
+        >
+          {age}
         </span>
       )}
       {trailing === "download" && <Download className={d.trailingClass} aria-hidden="true" />}

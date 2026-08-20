@@ -15,7 +15,7 @@
  *    two-row positive control whose sorted and unsorted orders differ.
  */
 import { describe, it, expect } from "vitest"
-import { formatBytes, baseName, byNewestFirst } from "../fileRowUtils"
+import { formatBytes, baseName, byNewestFirst, fileAgeLabel, TIME_UNKNOWN } from "../fileRowUtils"
 // @ts-ignore — Vite `?raw` import, typed by vite/client at build time only.
 import utilsSource from "../fileRowUtils.ts?raw"
 
@@ -190,5 +190,51 @@ describe("byNewestFirst — applied through [...list].sort()", () => {
     expect(input).toEqual(inputCopy)
     // and the sort really did something (so the purity case is not vacuous)
     expect(sorted.map((f) => f.path)).not.toEqual(input.map((f) => f.path))
+  })
+})
+
+
+describe("fileAgeLabel — Phase 200, the row's clock", () => {
+  /** A fixed instant, so nothing here needs a clock mock (the P-1 rule `relativeBand`
+   *  states for itself: a test that passes at one instant and flakes at another). */
+  const NOW = Date.parse("2026-08-20T12:00:00Z")
+
+  it("words a present instant through the SHARED band engine — no fourth spelling", () => {
+    // ⚠ THE POINT OF THESE THREE IS THE ENGINE, NOT THE ARITHMETIC. The phrases are
+    // `relativeBand`'s nine bands verbatim; if this module ever grew bands of its own they
+    // would drift from the library card's, and "last week" would mean two different things
+    // on two surfaces of the same app.
+    expect(fileAgeLabel("2026-08-20T11:58:00Z", NOW)).toBe("2 min ago")
+    expect(fileAgeLabel("2026-08-20T09:00:00Z", NOW)).toBe("3 hours ago")
+    expect(fileAgeLabel("2026-08-19T12:00:00Z", NOW)).toBe("yesterday")
+  })
+
+  it("names the ABSENCE rather than inventing a time", () => {
+    // ⚠ THE ARM THIS FUNCTION EXISTS FOR. `undefined` is the LIVE (SSE) regime — the
+    // just-produced deliverable carries no `created_at` at all — and `byNewestFirst` sorts
+    // exactly that row to the TOP, so it is the first row a person reads during a live run.
+    // `just now` would be a fabricated figure about the one row most likely to be looked at.
+    expect(fileAgeLabel(undefined, NOW)).toBe(TIME_UNKNOWN)
+    expect(fileAgeLabel(null, NOW)).toBe(TIME_UNKNOWN)
+    // An UNPARSEABLE instant is the same fact — the wire said something and it meant nothing.
+    expect(fileAgeLabel("not-a-date", NOW)).toBe(TIME_UNKNOWN)
+  })
+
+  it("the absence word NAMES the absence — it is not a dash and not an empty string", () => {
+    // ⚠ A dash or an empty cell would read as "this file has no age", which is a different
+    // and false claim. The panel already ships this exact distinction one field along:
+    // the word is `expiry unknown`, never `no expiry`.
+    expect(TIME_UNKNOWN).toBe("time unknown")
+    expect(TIME_UNKNOWN).not.toBe("")
+    expect(TIME_UNKNOWN).not.toMatch(/^[-—–]$/)
+  })
+
+  it("is a pure function of its two arguments — the same inputs word the same phrase", () => {
+    const a = fileAgeLabel("2026-08-20T11:58:00Z", NOW)
+    const b = fileAgeLabel("2026-08-20T11:58:00Z", NOW)
+    expect(a).toBe(b)
+    // NON-VACUITY: `now` really is the measuring stick, so a caller that forgot to hoist it
+    // would be measuring against a different clock rather than against nothing.
+    expect(fileAgeLabel("2026-08-20T11:58:00Z", NOW + 3 * 3_600_000)).not.toBe(a)
   })
 })
