@@ -16,6 +16,7 @@
  * G-5 RED LINE: this is a sibling component; it MUST NOT import or touch the
  * run-surface live phase-timeline / phase-card.
  */
+import { PHASE_TYPE_SENTENCES } from "@/components/workflows/phaseVocabulary"
 import { PHASE_GLYPHS, type DefShape } from "@/components/workflows/soulData"
 import { phaseGlyph } from "@/lib/phaseGlyph"
 
@@ -59,7 +60,22 @@ export function PhaseSpine({ def, scale }: PhaseSpineProps) {
         const type = p.config?.phase_type ?? "?"
         const Glyph = phaseGlyph(type)
         const isEmit = type === "llm_emit"
-        const name = p.name?.trim() || p.slug || ""
+        // ── 200-WIRE (sketch 200 `publish.html`) — THE SPINE REACHES THE LADDER'S FLOOR ──
+        // ⚠ WHAT SHIPPED: `p.name` alone, so a phase with no authored name and no slug got
+        // a bare glyph and NOTHING legible beside it. `grep -n "phaseVocabulary"` over this
+        // file returned **0** — the shipped type vocabulary was one import away and unused.
+        // The 187 node-face LADDER is author name → config-derived → type sentence; this
+        // spine only ever reached rung one. It now falls through to the same honest floor
+        // every other surface uses, so an unnamed step says what KIND of step it is.
+        //
+        // ⚠ THE SHEET'S OWN WORDS ARE NOT PORTED, AND THE REASON IS THAT THEY DO NOT EXIST.
+        // `publish.html` draws uppercase type words — `SEARCH` · `REASON` · `EMIT` — and
+        // NEITHER shipped map yields them: `PHASE_TYPE_SENTENCES` gives "Work out how to do
+        // it", `PHASE_TYPE_LABELS` gives "AI agent step" and is reserved by its own docblock
+        // for the ⌥ Technical-names reveal ("NOT the default node face"). Inventing a third
+        // type vocabulary to match three drawn words would be a new concept, not wiring, so
+        // the FLOOR is spent instead and the sheet's exact words are declined here.
+        const name = p.name?.trim() || p.slug || PHASE_TYPE_SENTENCES[type] || ""
 
         return (
           <span key={p.slug ?? i} className="flex items-center gap-2">

@@ -284,6 +284,22 @@ export const ARRIVAL_SOURCE_ACTION = "See what I asked for"
  */
 export const APPLIED_HEADING = "What I applied"
 
+/**
+ * 200-WIRE — the heading over the DECISIONS list.
+ *
+ * ⚠ IT DID NOT EXIST, AND THE SLOT DID. `draft-arrival.html` draws a `What I decided for you`
+ * heading over this list; `grep -rn "What I decided" frontend/src` returned exactly ONE hit and
+ * it was inside a comment. The fold's body already rendered an `<h3>` in the right register —
+ * it was spending `decisionsFoldSummary` on it, which is the string the fold's TRIGGER already
+ * shows one element up, so an opened fold repeated its own count and never said what the list
+ * was. This is the heading that slot was reaching for.
+ *
+ * ⚠ IT NAMES NO CONSEQUENCE — the same rule 2 constraint `APPLIED_HEADING` above records. It
+ * says a model made choices; it does not say they are good, durable or correct, and it makes no
+ * claim about a publish gate (only row 3 may make one, and it makes it from the wire).
+ */
+export const DECISIONS_HEADING = "What I decided for you"
+
 /** The model pair's label. Rendered only where every step agrees — see `DraftArrivalCard.tsx`. */
 export const APPLIED_MODEL_LABEL = "Model"
 

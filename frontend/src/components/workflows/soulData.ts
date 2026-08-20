@@ -69,7 +69,16 @@ export interface DefShape {
   name?: string | null
   business_requirement?: string | null
   project_folder_id?: string | null
-  inputs?: Array<{ key?: string }> | null
+  // ── 200-WIRE (sketch 200 `publish.html` + `run-dialog.html`) — THE AUTHORED LABEL ─────
+  // ⚠ `label` WAS ALWAYS ON THE WIRE AND THIS READ-SHAPE THREW IT AWAY. The backend's
+  // `InputFieldSpec` declares `label: str` (`backend/app/models/harness.py:504`) and it
+  // travels to the client inside `WorkflowDefinition.inputs` (`:532`) — but this member
+  // read `Array<{ key?: string }>`, so every consumer downstream of `entryInputKeys` could
+  // only ever print the raw JSONB key. Two shipped surfaces said so in writing and one of
+  // them (`RunModal.tsx`) turned it into a documented refusal built on a premise that was
+  // measurably false. Widening the member is the whole fix; see `entryInputFields` below
+  // for the one subset it genuinely does not cover.
+  inputs?: Array<{ key?: string; label?: string | null }> | null
   input_keys?: string[] | null
   phases?: Array<{
     slug?: string
@@ -144,14 +153,57 @@ export function tierForDefinition(def: DefShape | null | undefined) {
   return deriveTier(citationPolicy, kinds)
 }
 
-/** The entry input_keys the soul surfaces ("needs <keys>"). */
-export function entryInputKeys(def: DefShape | null | undefined): string[] {
+/**
+ * One entry input as the surfaces need to SAY it: the key it is addressed by, plus the
+ * author's own label when the definition carries one.
+ *
+ * ⚠ `label` IS OPTIONAL BECAUSE THE GAP IS REAL, JUST NARROWER THAN IT WAS WRITTEN DOWN.
+ * A definition that authors `inputs[]` carries `InputFieldSpec.label` (a REQUIRED `str`
+ * on the backend model, `harness.py:504`) and this resolver hands it over. A definition
+ * that declares only the bare `PhaseSpecJSON.input_keys` (`harness.py:73` — a plain
+ * `list[str]`) has NO label anywhere, on the wire or off it, and that subset stays
+ * unlabelled: the key is the only true thing there is to print. Inventing a friendly
+ * sentence for it would be fabricating an author's words.
+ */
+export interface EntryInputField {
+  key: string
+  /** The author's own label. ABSENT means the definition has none — never a default. */
+  label?: string
+}
+
+/**
+ * The entry inputs the soul and the run dialog surface, WITH their authored labels.
+ *
+ * The precedence is `entryInputKeys`'s, unchanged: bare `input_keys` wins when present
+ * (those rows can carry no label), then `inputs[]`, then the wire kickoff fallback.
+ */
+export function entryInputFields(def: DefShape | null | undefined): EntryInputField[] {
   if (!def) return []
-  if (Array.isArray(def.input_keys) && def.input_keys.length > 0) return def.input_keys
-  const fromInputs = (def.inputs ?? []).map((i) => i?.key).filter((k): k is string => !!k)
+  if (Array.isArray(def.input_keys) && def.input_keys.length > 0) {
+    return def.input_keys.map((key) => ({ key }))
+  }
+  const fromInputs = (def.inputs ?? [])
+    .filter((i): i is { key?: string; label?: string | null } => !!i)
+    .map((i) => {
+      const label = typeof i.label === "string" ? i.label.trim() : ""
+      // An empty or whitespace-only label is an ABSENCE, not a value to print.
+      return label ? { key: i.key ?? "", label } : { key: i.key ?? "" }
+    })
+    .filter((f) => !!f.key)
   if (fromInputs.length > 0) return fromInputs
   // The wire kickoff is always content-only → kickoff_prompt (D-103-CONF-1).
-  return ["kickoff_prompt"]
+  return [{ key: "kickoff_prompt" }]
+}
+
+/**
+ * The entry input_keys the soul surfaces ("needs <keys>").
+ *
+ * DERIVED from `entryInputFields` rather than re-implemented — one home for the
+ * precedence rule, so a change to it cannot land on one surface and miss the other.
+ * Behaviour is byte-identical to the pre-200 implementation.
+ */
+export function entryInputKeys(def: DefShape | null | undefined): string[] {
+  return entryInputFields(def).map((f) => f.key)
 }
 
 /**

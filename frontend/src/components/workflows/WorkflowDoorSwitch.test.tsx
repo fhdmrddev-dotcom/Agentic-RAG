@@ -1084,15 +1084,42 @@ describe("199-08 Task 1 — the RESTING inventory of the door surface (pinned PR
      * this render: with no folders offered it renders arm 3, whose way-out is gated on an
      * `onUploadDocuments` this mount does not supply, so the door gains a SENTENCE and not a
      * control. That is asserted directly below rather than left implied by the list.
+     *
+     * ── ⚠ RE-BASELINED BY 200-WIRE — FIVE BECOMES SIX, AND THE ADDITION IS DELIBERATE ────
+     *
+     * The original list is kept VERBATIM above (both its shipped order and the pre-200 one),
+     * because a re-baseline that overwrites what it replaced destroys the only evidence of
+     * what the surface used to be. What changed:
+     *
+     *     + starter-door-trigger        ← the SIXTH control
+     *
+     * ⚠ IT IS A MOUNT, NOT A NEW CONTROL. `doors.html:307-319` draws a starter shelf on this
+     * door and the port silently omitted it — not as one of its seven recorded refusals, but
+     * by mapping the sheet's `<!-- Template Row -->` section onto the shipped attach-a-document
+     * row and rendering neither of the two things it actually needed. `StarterTemplatePicker`
+     * has shipped since 187-14 and was already mounted on the GOVERN door; this door, which is
+     * the fast path most authors land on, had zero mounts of it.
+     *
+     * ⚠ THE PROPERTY THE COUNT GUARDED IS UNCHANGED AND STILL ASSERTED. The paragraph above
+     * says the count exists to prove the KB picker's empty arm adds no control — that claim is
+     * about `describe-kb-upload`, and its own assertion is directly below, byte-untouched and
+     * still passing. Six is not five-plus-drift: it is five plus one named, sourced control,
+     * and the KB assertion is what makes that distinction machine-checkable rather than
+     * rhetorical. ⚠ `describe-kb-upload` REMAINS ABSENT ON PURPOSE — 200-WIRE measured that
+     * the app has NO navigation seam reachable from this component (no router, and
+     * `WorkflowsPage` is handed no `onNavigate`), so supplying a destination would mean
+     * threading a new prop through four files. That is plumbing, not wiring, and it was
+     * declined rather than faked.
      */
     expect(controls).toEqual([
       "both-doors",
       "describe-box",
       "describe-draft",
       "describe-template-input",
+      "starter-door-trigger",
       "switch-to-govern",
     ])
-    expect(controls).toHaveLength(5)
+    expect(controls).toHaveLength(6)
     expect(screen.queryByTestId("describe-kb-upload")).toBeNull()
   })
 })
