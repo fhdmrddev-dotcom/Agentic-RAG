@@ -2296,6 +2296,139 @@ node-card half a source-only fence cannot see; restored md5-identical (`c5bc0e18
 
 ---
 
+## Phase 200 — the run surface's centre: the canvas came off, the run log went on (2026-08-20)
+
+**Triples re-derived at the commit that lands this change** (`git log --oneline -- <f> | wc -l`; the
+numeric `sed` bucket recipe; `wc -l <f>`), not carried forward:
+
+| File | at this commit | previously in `CLAUDE.md` |
+|---|---|---|
+| `frontend/src/pages/WorkflowRunPage.tsx` | **19 / 6 / 1474** | `16 / 6 / 1329` — stale by 3 commits / 145 L |
+| `frontend/src/components/workflows/phaseDuration.ts` | **4 / 1 / 493** | `3 / 1 / 412` |
+| `frontend/src/components/workflows/RunTranscript.tsx` | **1 / 1 / 428** | ABSENT (created here) |
+| `frontend/src/components/workflows/transcriptVocabulary.ts` | **1 / 1 / 105** | ABSENT (created here) |
+
+### What changed, and the four measured reasons
+
+`WorkflowRunPage.tsx`'s centre region rendered `WorkflowCanvas`; it now renders `RunTranscript`.
+`WIRE-run-surface.md` had held its rows 1-2 **BLOCKED** on an operator decision about what belongs
+in the centre, and the decision was taken on this evidence:
+
+1. **There is no graph to draw.** `WorkflowDefinition.phases` is `list[PhaseSpec]`
+   (`backend/app/models/harness.py:524`) and `grep -n "branch" backend/app/models/harness.py`
+   returns **zero**. Every run is a straight chain, so a graph of one is the spine drawn
+   expensively.
+2. **The page stated one fact three times** — canvas, right-hand live spine, receipt, all
+   renderings of {step → status}. This surface has shipped that defect once already: its run band
+   is `sr-only` today because an operator reported the status appearing twice.
+3. **Sketch 200 carries `acceptance_bar: true` and draws no canvas on this surface.** The
+   canvas-on-the-run-page came from sketch 152-B via Phase 188.
+4. ⚠ **The blocker that held rows 1-2 was scoped to the WRONG SOURCE.**
+   `AUDIT-run-arrival-connections.md` marked the sheet's per-line clock `BE-NEEDED` on
+   `ToolCall.startedAt` being a client `Date.now()`. That is true of TOOL CALLS; the log is built
+   from PHASE ROWS, and `200-02` + migration 121 put `started_at` / `completed_at` on
+   `workflow_phases`, already serialised beside `step_count` / `step_noun`.
+
+⚠ **The canvas port lost nothing.** `PORT-canvas.md`'s four commits edited `WorkflowCanvas.tsx` /
+`PhaseNodeCard.tsx` — the SHARED component the BUILDER renders, which is the surface
+`builder-canvas.html` draws. Removing this page's mount removed a mount.
+
+### ⚠ What became UNREACHABLE, named rather than left to be discovered
+
+`grep -rn "runState=" frontend/src --include=*.tsx | grep -v test` returns **nothing** after this
+change. The canvas's whole RUN MODE therefore has no mount anywhere in the product:
+
+- `BC-MR-01`'s per-connection declared-count payload label (`200-06` built it, `200-07` wired the
+  page's supply line — both in this same phase);
+- `PORT-canvas.md`'s page-resolved marching `live` connector;
+- the run-tense connection states in `connectionState.ts`.
+
+**The page still computes all three and none of the code is deleted.** The declared count itself
+reaches a person on the log and again on the receipt, so no INFORMATION was lost — what was lost is
+the canvas's presentation of it. **Re-open trigger: branching becoming representable** (backlog
+foundation 2), which is also the first moment a graph of a run would show something a list cannot.
+
+`useGroundingBundle` was removed from the page in the same change: F7's fix existed to feed
+`kbTools` to that canvas and had no other consumer here, so a live subscription with no reader was
+left behind. **The fix is not lost** — it reads verbatim from `WorkflowBuilderPage.tsx`, where the
+canvas that needs it still lives. Re-open trigger: the next thing on THIS page that renders per-step
+governance.
+
+### ⚠ THE DEFECT THE LOG EXPOSED, which no test could have found
+
+**The first run opened in a browser rendered two self-contradicting lines:**
+
+```
+Produce the deliverable   Not started   time not recorded     ← this step had FAILED
+Work out how to do it     Failed …      not reached           ← never started
+```
+
+Measured on the local database (`workflow_runs` / `workflow_phases`, run
+`0b1ad929-3d8b-41b0-b6f2-3d3563d23738`): the DEFINITION carries `retrieve @ phase_index 0`,
+`emit @ 1`; the RUN's own rows carry `emit @ 0 (failed)`, `retrieve @ 1 (pending)`. The page derives
+its reading by joining the definition's steps onto the run's rows **by `phase_index`** (D-188-01) —
+and that decision is sound, because the live reconcile skeleton emits placeholder SLUGS, so a slug
+join is the one that cannot be trusted. When the two sequences disagree the join reports each step's
+state as its neighbour's.
+
+⚠ **It is REAL and RARE: 2 of 228 local runs**, counted with a query that has to double-decode
+`workflow_definitions.definition` — `jsonb_typeof(definition)` is **`'string'`**, the
+`SEED`-recorded jsonb string-scalar trap, so `definition->'phases'` returns nothing and a naive
+count returns a **vacuous zero**. The first version of that query did exactly that.
+
+⚠ **Nothing about the canvas would have made this visible.** It painted the same crossed readings;
+what the log did was put the page's reading and the row's own outcome ON THE SAME LINE.
+
+**This surface does not fix the crossing and must not try** — re-keying the join on slug would
+overturn D-188-01 on the strength of two rows, at a surface that is not where the join lives. What
+it does is refuse to repeat it: the page's words are used ONLY while they agree with the row's own
+status, and a disagreement renders the row's own fields (which cannot be crossed — slug, status,
+timestamps and count all come from one record) and sets `data-source-conflict="true"` so the
+crossing stays diagnosable rather than silently corrected.
+
+### The invariants that now bind these files
+
+- ⚠ **THE TENSE RULE WAS WRONG TWICE BEFORE IT WAS RIGHT, and both wrong versions are recorded in
+  `RunTranscript.tsx` rather than deleted.** Draft 1 preferred the page's label unconditionally →
+  reachable contradiction. Draft 2 dropped the page's label on ANY disagreement → read D-v2.5-03 as
+  *"the fetch wins everything"*, which it does not say (it is about reconciling on RECONNECT), and
+  would have made this log visibly lag the spine beside it. The shipped rule is an AGREEMENT test on
+  liveness plus withholding the duration, and **both halves were driven RED independently** —
+  deleting either fails exactly one case.
+- ⚠ **`waiting-for-you` AGREES with a `running` row and an `===` would get that wrong.** The wire has
+  no such status; it is DERIVED on top of a running row when an ask is pending. An identity
+  comparison would drop the label on the one state this surface most needs to name.
+- ⚠ **The agreement table is read through `own()`, and it is load-bearing, MEASURED:** replacing it
+  with a bare index throws `allowed.includes is not a function` on a `constructor`-shaped reading —
+  the WR-04 sink, met at a ninth site.
+- ⚠ **A timing reading identical to the state word is not a second fact.** A `pending` row resolves
+  both to the same constant and the line read `not reached · not reached` in the browser. Compared
+  by VALUE, so it holds for any future pair that collides. ⚠ **`RunReceipt` still prints that pair**
+  — pre-existing, untouched here, and worth a look.
+- ⚠ **`transcriptEntries` lives in `phaseDuration.ts`, not beside its component**, and the reason is
+  the tooling's own: eslint's `react-refresh/only-export-components` was MEASURED as a real error on
+  `RunTranscript.tsx` before the move — the same instruction that produced `phaseStatusMeta.ts` and
+  `stepCardSectionContext.ts`.
+- ⚠ **The gutter reads `4m 12s`, not the sheet's `00:42`.** `lib/fmtElapsed.ts`'s own docblock names
+  a fourth elapsed formatter as *"the thing NOT to write"*. The sheet governs presentation; it does
+  not overrule a rule the product already keeps.
+
+### ⚠ OWED — the timed arm has never rendered against real data
+
+`select count(*) from workflow_phases where started_at is not null` returns **0 of 570**: no run has
+executed since migration 121 landed, so **every existing run falls into the untimed arm and the
+clock gutter has never been seen on live data.** The writer exists and is wired
+(`db/workflows.py:1466`, the ONE `started_at` write site, called from `harness_engine.py:1638`).
+**One UAT row closes it: run any published workflow once, open its run page, and the gutter appears.**
+
+### Three fixtures in `WorkflowRunPage.test.tsx` were REPAIRED, not relaxed
+
+Three cases set a live slice saying a step had FAILED (or was WAITING) while leaving the durable
+rows saying it was still `active` or not yet reached — a state the backend does not produce, and one
+that only showed once the log put both sources on one line. `phasesMatching(...)` makes the two agree.
+**Every assertion they carry is unchanged**, and the disagreement case now has cases of its own,
+driven against the real crossing above.
+
 ## Young files — tracked, G-5 does not fire yet
 
 These were created or grown in Phase 194.1 and were named in `CLAUDE.md` **in prose only**, which is

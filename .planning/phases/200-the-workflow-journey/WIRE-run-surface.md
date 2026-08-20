@@ -5,6 +5,56 @@
 real gap. No backend work. Reference is the two SHEETS; `200-CHECKLIST.md` and `index.html`'s
 `JOURNEY` array were **not** consulted.
 
+> ## ⚠ UPDATE 2026-08-20 — ROWS 1 AND 2 ARE CLOSED. THE OPERATOR DECIDED THE CENTRE.
+>
+> The decision this file held rows 1-2 for was taken: **the run surface's centre is the LOG,
+> and `WorkflowCanvas` is no longer mounted on this page.** Built as
+> `components/workflows/RunTranscript.tsx` + `transcriptVocabulary.ts`, with the entry
+> derivation in `phaseDuration.ts`.
+>
+> **Revised tally: DONE 15 · BLOCKED 1 · NOT TAKEN 0.** The one still blocked is the sheet's
+> per-line NARRATION, which is separated out below from the clock it was bundled with.
+>
+> ⚠ **THIS FILE'S OWN REASON 3 WAS WRONG, AND THE CORRECTION IS THE USEFUL PART.** It called
+> the sheet's `mm:ss` gutter `BE-NEEDED`, citing `ToolCall.startedAt` being a client
+> `Date.now()`. That is true **of tool calls**, and the log is not built from tool calls.
+> `200-02` + migration 121 put `started_at` / `completed_at` on `workflow_phases`;
+> `api/workflow_runs.py` already serialises them beside `step_count` / `step_noun` and
+> `api.ts` already declares them. **A step-grained log has real instants and real counts
+> today, with zero backend work** — the blocker was scoped to the wrong source. Original
+> wording preserved below rather than overwritten.
+>
+> **What the sheet drew and this does NOT build, stated so it is a refusal and not an
+> omission:** the per-line narration (*"Connecting to Northwind CRM instance…"*, *"Extracted
+> vendor list"*). That is authored copy the product does not have; inventing it is the same
+> class of lie as a fabricated figure, which `199-05` called the highest-consequence one this
+> work could ship. **A two-line-per-step draft was written and WITHDRAWN on that measurement**
+> — with only the step's NAME to put on both lines, the second line said the same thing as the
+> first. What shipped is ONE LINE PER STEP, stamped at the instant it last became true.
+>
+> **Reasons 1 and 2 were answered rather than overruled:**
+> · *reason 1 (replacing the canvas undoes the port)* — it does not. `PORT-canvas.md`'s four
+> commits edited `WorkflowCanvas.tsx` / `PhaseNodeCard.tsx`, the **shared** component the
+> BUILDER renders, which is the surface `builder-canvas.html` draws. Removing this page's
+> mount removed a mount.
+> · *reason 2 (four readings of one run)* — the count went **down, not up**. The canvas, the
+> panel spine and the receipt were three renderings of {step → status}; the canvas is gone and
+> the log carries a clock and a live word that none of the other three does. Two contradictions
+> were possible on one line and BOTH are fenced: the duration is withheld until the stream and
+> the fetch agree the step has stopped, driven RED in both directions.
+>
+> ⚠ **WHAT BECAME UNREACHABLE, named rather than left to be discovered.** Nothing passes
+> `runState` to `WorkflowCanvas` anywhere in the product now, so the canvas's RUN MODE has no
+> mount: `BC-MR-01`'s per-connection payload label, `PORT-canvas.md`'s marching `live`
+> connector, and the run-tense connection states render nowhere. **The page still computes all
+> three and the code is kept**, because it returns the moment a run canvas is mounted again —
+> the natural trigger being branching becoming representable (backlog foundation 2), which is
+> also the first time a graph of a run would show anything a list cannot.
+>
+> ---
+>
+> **ORIGINAL TALLY AND VERDICTS, PRESERVED VERBATIM BELOW.**
+
 **Tally: DONE 13 · BLOCKED 3 · NOT TAKEN 0** (15 audit rows + the canvas port's `live` seam,
 which is split — page half DONE, canvas half BLOCKED).
 

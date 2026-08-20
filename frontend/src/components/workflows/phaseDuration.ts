@@ -192,12 +192,17 @@ export interface SpineRunTense {
 /**
  * An ISO instant, or `null` for every shape that is not one.
  *
+ * ⚠ EXPORTED SINCE PHASE 200's TRANSCRIPT, and exported rather than copied for the reason
+ * the paragraph below states: the "unparseable ⇒ absence, never zero" rule is the whole
+ * value of this function, and a second private copy beside a second consumer is a second
+ * place for it to be got wrong quietly. It stays the ONLY string→instant door in this tree.
+ *
  * ⚠ AN UNPARSEABLE STRING IS AN ABSENCE, NOT A ZERO. `Date.parse("")` is `NaN` and
  * `new Date(NaN).getTime()` is `NaN`; letting either through would compute a duration
  * against the epoch and print a number nothing measured. `relativeChanged.ts` reaches the
  * same conclusion for the same reason.
  */
-function instant(raw: string | null | undefined): number | null {
+export function readInstant(raw: string | null | undefined): number | null {
   if (raw === undefined || raw === null) return null
   const ms = Date.parse(raw)
   return Number.isFinite(ms) ? ms : null
@@ -244,8 +249,8 @@ export function phaseTiming(
   now: number = Date.now(),
 ): PhaseTiming {
   const status = phaseStatusFromDb(row.status)
-  const startedAt = instant(row.started_at)
-  const completedAt = instant(row.completed_at)
+  const startedAt = readInstant(row.started_at)
+  const completedAt = readInstant(row.completed_at)
 
   // (1) It has not run, and it did not run. Two arms, two reasons, two different sentences
   // — kept apart because folding an absence together with a negative is THE defect.
@@ -350,6 +355,58 @@ export function runFactsBySlug(
   return (slug: string) => own(map, slug)
 }
 
+// ── The transcript's entry order (Phase 200 · the run log) ─────────────────────────────
+
+/** One step, placed (or not) on the run's clock. */
+export interface TranscriptEntry {
+  slug: string
+  /**
+   * Milliseconds since the run's zero, or `null` for a row carrying no readable instant.
+   * ⚠ `0` IS A REAL POSITION — the first step starts at the anchor — so the absence arm is
+   * `null` and is tested as `null`, never as a falsy value.
+   */
+  offsetMs: number | null
+  /** The row's index in the SERVER's order. Ties break on it and on nothing else. */
+  order: number
+}
+
+// ── The derivation ──────────────────────────────────────────────────────────────────────
+
+/**
+ * The run's rows, ordered as a log: timed rows by their instant, untimed rows appended in
+ * the server's own order.
+ *
+ * ⚠ A ROW'S INSTANT IS ITS `completed_at` WHEN IT HAS ONE. A log entry is stamped when the
+ * thing became known, so a finished step is placed at its ending and the step still running
+ * is placed at its beginning. Placing a finished step at its START would put it before rows
+ * that had already resolved while it was working, which reads as an out-of-order run.
+ *
+ * ⚠ NOTHING IS SYNTHESISED TO MAKE THE LIST REGULAR. A `done` row with no `completed_at` is
+ * a historic row (pre-migration-121) and keeps whatever instant it does have; a row with
+ * neither is untimed. Inventing either would be the backfill D-05 refuses.
+ */
+export function transcriptEntries(rows: readonly PhaseTimingRow[]): TranscriptEntry[] {
+  const anchor = runAnchorMs(rows)
+  const timed: TranscriptEntry[] = []
+  const untimed: TranscriptEntry[] = []
+
+  rows.forEach((row, order) => {
+    const at = readInstant(row.completed_at) ?? readInstant(row.started_at)
+    if (at === null || anchor === null) {
+      untimed.push({ slug: row.slug, offsetMs: null, order })
+      return
+    }
+    timed.push({ slug: row.slug, offsetMs: Math.max(0, at - anchor), order })
+  })
+
+  timed.sort((a, b) => {
+    // Both offsets are numbers in this branch; the guards above are what guarantee it.
+    const delta = (a.offsetMs ?? 0) - (b.offsetMs ?? 0)
+    return delta !== 0 ? delta : a.order - b.order
+  })
+  return [...timed, ...untimed]
+}
+
 // ── The run span (D-09's header) ────────────────────────────────────────────────────────
 
 /**
@@ -367,16 +424,40 @@ export function runFactsBySlug(
 export function runSpan(
   rows: readonly PhaseTimingRow[],
 ): { ms: number; startedAtMs: number; finishedAtMs: number } | null {
-  let first: number | null = null
+  const first = runAnchorMs(rows)
   let last: number | null = null
   for (const row of rows) {
-    const s = instant(row.started_at)
-    const c = instant(row.completed_at)
-    if (s !== null && (first === null || s < first)) first = s
+    const c = readInstant(row.completed_at)
     if (c !== null && (last === null || c > last)) last = c
   }
   if (first === null || last === null) return null
   return { ms: Math.max(0, last - first), startedAtMs: first, finishedAtMs: last }
+}
+
+/**
+ * The run's ZERO — `min(started_at)` across the phase rows, and nothing else.
+ *
+ * ⚠ IT IS EXTRACTED FROM `runSpan` RATHER THAN COPIED BESIDE IT, and the distinction is the
+ * reason this function exists at all. `runSpan` answers *"how long did the whole thing
+ * take"* and therefore returns `null` the moment no row has COMPLETED — which is true of
+ * every run that is still going. A transcript needs the opposite property: it is at its most
+ * useful mid-run, and its clock starts at the first step that STARTED whether or not
+ * anything has finished. Re-deriving `min(started_at)` at that call site would have been a
+ * second home for the run's own zero, and two homes for a zero disagree exactly when a row
+ * arrives out of order — which is the one case a reader would never suspect.
+ *
+ * `null` when NO row carries a readable `started_at`: a run whose steps were all routed
+ * around, one that has not been claimed, or any row written before migration 121. The caller
+ * then says so in words — it never substitutes a client clock, and it never prints `00:00`
+ * for an instant nothing measured (the D-05 no-backfill rule, one field over).
+ */
+export function runAnchorMs(rows: readonly PhaseTimingRow[]): number | null {
+  let first: number | null = null
+  for (const row of rows) {
+    const s = readInstant(row.started_at)
+    if (s !== null && (first === null || s < first)) first = s
+  }
+  return first
 }
 
 /**

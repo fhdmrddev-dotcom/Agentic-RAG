@@ -18,8 +18,11 @@ import {
   declaredCount,
   phaseRunFacts,
   phaseTiming,
+  readInstant,
+  runAnchorMs,
   runFactsBySlug,
   runSpan,
+  transcriptEntries,
   type PhaseTimingRow,
 } from "./phaseDuration"
 import {
@@ -387,5 +390,151 @@ describe("branchReading — BS-MR-03's two words", () => {
     expect(branchReading(true)).toBe(BRANCH_TAKEN)
     expect(branchReading(false)).toBe(BRANCH_NOT_TAKEN)
     expect(BRANCH_TAKEN).not.toBe(BRANCH_NOT_TAKEN)
+  })
+})
+
+// ── Phase 200 · the run log's zero and its entry order ──────────────────────────────────
+
+/**
+ * WHAT WOULD BE UNGUARDED WITHOUT THIS BLOCK:
+ *  • that `runAnchorMs` answers where `runSpan` deliberately does not — mid-run, when
+ *    nothing has completed. That difference is the entire reason it was extracted, and a
+ *    log built on `runSpan` would have had no clock during the only period it matters;
+ *  • that `readInstant` is exported as the ONE string→instant door and still refuses an
+ *    unparseable value as an ABSENCE rather than an epoch zero;
+ *  • that a row is placed at its COMPLETION when it has one, so a finished step sorts by
+ *    its ending;
+ *  • that untimed rows are APPENDED rather than dropped or floated to the top.
+ */
+describe("runAnchorMs — the run's zero, which is not the run's span", () => {
+  const started = (at: string, slug = "a"): PhaseTimingRow => ({
+    slug,
+    status: "active",
+    started_at: at,
+  })
+
+  it("answers mid-run, where runSpan cannot", () => {
+    // ⚠ THE WHOLE POINT OF THE EXTRACTION, driven as a contrast rather than asserted alone:
+    // one step has started and nothing has finished, which is every run that is still going.
+    const rows = [started("2026-08-19T14:00:00.000Z")]
+    expect(runSpan(rows)).toBeNull()
+    expect(runAnchorMs(rows)).toBe(Date.parse("2026-08-19T14:00:00.000Z"))
+  })
+
+  it("takes the EARLIEST start, not the first row's", () => {
+    const rows = [
+      started("2026-08-19T14:00:30.000Z", "late"),
+      started("2026-08-19T14:00:00.000Z", "early"),
+    ]
+    expect(runAnchorMs(rows)).toBe(Date.parse("2026-08-19T14:00:00.000Z"))
+  })
+
+  it("is null when no row carries a readable start — never a client clock, never zero", () => {
+    expect(runAnchorMs([])).toBeNull()
+    expect(runAnchorMs([{ slug: "a", status: "pending" }])).toBeNull()
+    // ⚠ AN UNPARSEABLE STRING IS AN ABSENCE. Letting it through would anchor the whole log
+    // on the epoch and print figures nothing measured.
+    expect(runAnchorMs([{ slug: "a", status: "active", started_at: "not a date" }])).toBeNull()
+  })
+
+  it("agrees with runSpan's own startedAtMs whenever runSpan has an answer", () => {
+    // One derivation, read two ways — which is what "one home" has to mean operationally.
+    const rows: PhaseTimingRow[] = [
+      {
+        slug: "a",
+        status: "completed",
+        started_at: "2026-08-19T14:00:00.000Z",
+        completed_at: "2026-08-19T14:00:12.000Z",
+      },
+    ]
+    expect(runAnchorMs(rows)).toBe(runSpan(rows)!.startedAtMs)
+  })
+})
+
+describe("readInstant — the one string→instant door", () => {
+  it("reads an ISO instant and refuses everything that is not one", () => {
+    expect(readInstant("2026-08-19T14:00:00.000Z")).toBe(Date.parse("2026-08-19T14:00:00.000Z"))
+    expect(readInstant(null)).toBeNull()
+    expect(readInstant(undefined)).toBeNull()
+    // ⚠ THE ARM THAT MATTERS: `Date.parse("")` is NaN, and a NaN reaching a subtraction
+    // produces a duration against nothing at all.
+    expect(readInstant("")).toBeNull()
+    expect(readInstant("tuesday")).toBeNull()
+  })
+})
+
+describe("transcriptEntries — where each step sits in the log", () => {
+  const T0 = Date.parse("2026-08-19T14:00:00.000Z")
+  const at = (seconds: number) => new Date(T0 + seconds * 1000).toISOString()
+
+  it("places a finished step at its COMPLETION, offset from the run's zero", () => {
+    const rows: PhaseTimingRow[] = [
+      { slug: "a", status: "completed", started_at: at(0), completed_at: at(12) },
+    ]
+    expect(transcriptEntries(rows)).toEqual([{ slug: "a", offsetMs: 12_000, order: 0 }])
+  })
+
+  it("places a still-running step at its START, because that is all that has happened", () => {
+    const rows: PhaseTimingRow[] = [
+      { slug: "a", status: "completed", started_at: at(0), completed_at: at(12) },
+      { slug: "b", status: "active", started_at: at(14) },
+    ]
+    expect(transcriptEntries(rows).map((e) => e.offsetMs)).toEqual([12_000, 14_000])
+  })
+
+  it("sorts by the clock and appends untimed rows in the SERVER's order", () => {
+    const rows: PhaseTimingRow[] = [
+      { slug: "never", status: "skipped" },
+      { slug: "second", status: "completed", started_at: at(14), completed_at: at(70) },
+      { slug: "first", status: "completed", started_at: at(0), completed_at: at(12) },
+      { slug: "unreached", status: "pending" },
+    ]
+    expect(transcriptEntries(rows).map((e) => e.slug)).toEqual([
+      "first",
+      "second",
+      "never",
+      "unreached",
+    ])
+  })
+
+  it("keeps EVERY row — a dropped one reads as a step that does not exist", () => {
+    const rows: PhaseTimingRow[] = [
+      { slug: "a", status: "completed", started_at: at(0), completed_at: at(12) },
+      { slug: "b", status: "pending" },
+      { slug: "c", status: "skipped" },
+    ]
+    expect(transcriptEntries(rows)).toHaveLength(3)
+    expect(transcriptEntries(rows).filter((e) => e.offsetMs === null).map((e) => e.slug)).toEqual([
+      "b",
+      "c",
+    ])
+  })
+
+  it("gives every row a null offset when the run has no zero at all", () => {
+    // ⚠ `offsetMs: 0` WOULD BE A READING. A run whose rows carry no readable start has no
+    // clock, and the caller says so in words rather than stamping everything at the start.
+    const rows: PhaseTimingRow[] = [
+      { slug: "a", status: "completed" },
+      { slug: "b", status: "failed" },
+    ]
+    expect(transcriptEntries(rows).every((e) => e.offsetMs === null)).toBe(true)
+  })
+
+  it("breaks a tie on the server's row order, never on the slug", () => {
+    const rows: PhaseTimingRow[] = [
+      { slug: "zebra", status: "completed", started_at: at(0), completed_at: at(5) },
+      { slug: "alpha", status: "completed", started_at: at(1), completed_at: at(5) },
+    ]
+    expect(transcriptEntries(rows).map((e) => e.slug)).toEqual(["zebra", "alpha"])
+  })
+
+  it("never returns a negative offset, even for a row stamped before the anchor", () => {
+    // Clock skew between writers is not this module's to fix, but a negative elapsed time is
+    // a figure that cannot be true, so it is floored rather than printed.
+    const rows: PhaseTimingRow[] = [
+      { slug: "a", status: "active", started_at: at(10) },
+      { slug: "b", status: "completed", started_at: at(20), completed_at: at(5) },
+    ]
+    expect(transcriptEntries(rows).every((e) => (e.offsetMs ?? 0) >= 0)).toBe(true)
   })
 })

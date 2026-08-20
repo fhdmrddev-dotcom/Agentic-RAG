@@ -2421,7 +2421,26 @@ const BASELINE = {
   //     governed id, and the inequality against every one of `runVocabulary.ts`'s LOCKED
   //     canvas words — asserted AFTER a non-vacuity check on that comparison set, because a
   //     negative against an empty set passes while proving nothing.
-  "phaseDuration.test.ts": 31,
+  // ⚠ RAISED 31 → 43 IN PHASE 200's RUN-LOG COMMIT, and the twelve are attributed rather than
+  // absorbed: `runAnchorMs` (4), `readInstant` (1) and `transcriptEntries` (7). Leaving the pin
+  // at 31 would have left every one of them deletable under a green gate — the exact slack
+  // §187-29 records ("a pinned TOTAL rising proves nothing about the NEW cases, because slack
+  // inside an already-listed file absorbs them").
+  //
+  // WHAT THE TWELVE CARRY:
+  //   · that `runAnchorMs` ANSWERS WHERE `runSpan` DOES NOT — mid-run, when a step has started
+  //     and nothing has completed, which is every run that is still going. Driven as a CONTRAST
+  //     (`runSpan(rows)` null, `runAnchorMs(rows)` not) rather than asserted alone, because the
+  //     whole reason the function was extracted is that difference. A log built on `runSpan`
+  //     would have had no clock during the only period a log matters.
+  //   · that the two agree on `startedAtMs` whenever `runSpan` has an answer — which is what
+  //     "one home for the run's zero" has to mean operationally, rather than as a comment.
+  //   · that an UNPARSEABLE start is an ABSENCE — `readInstant("")` is `NaN`, and letting it
+  //     through would anchor a whole log on the epoch and print figures nothing measured.
+  //   · that a row is placed at its `completed_at` when it has one, so a finished step sorts by
+  //     its ENDING; that untimed rows are APPENDED rather than dropped (a dropped row reads as
+  //     a step that does not exist); and that ties break on the SERVER's row order.
+  "phaseDuration.test.ts": 43,
   "receiptVocabulary.test.ts": 16,
   // ── Added in 200-05 Task 3, in the SAME COMMIT that creates the file. Same one-knob check
   //    as the two pins above: `src/components/workflows` is already a `TARGETS` directory
@@ -2448,6 +2467,45 @@ const BASELINE = {
   //     with its own positive control, plus the `aria-label` proved to come from the
   //     vocabulary — an `aria-label` IS user-visible text, just not to a sighted reviewer.
   "RunReceipt.test.tsx": 20,
+  // ── Added in Phase 200's run-log commit, in the SAME COMMIT that creates both files. Same
+  //    one-knob check as every pin above: `src/components/workflows` is already a `TARGETS`
+  //    directory entry, so the gate RAN both the moment they existed and printed them as
+  //    `— 19 new` and `— 7 new`. **No `TARGETS` entry is added for either.**
+  //
+  // ⚠ BOTH FIGURES ARE READ FROM THIS SCRIPT'S OWN `actual` COLUMN, never hand-counted from
+  // `it(` literals. That run's verdict lines, verbatim:
+  //     RunTranscript.test.tsx                        —      19     new
+  //     transcriptVocabulary.test.ts                  —       7     new
+  //     total                                      4824    5283    +459
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT THESE TWO PINS:
+  //   · `RunTranscript.test.tsx` (19) — **THE TENSE RULE**, which is the highest-consequence
+  //     logic on the run surface's new centre. The state word comes from the phase STREAM and
+  //     the duration from the durable FETCH, and this page already carries a test proving the
+  //     two really do disagree. Two contradictions are therefore reachable on one line — a
+  //     present-tense word beside a finished duration, and a settled word beside a still-
+  //     ticking one — and the mitigation is that the NUMBER waits for both sources. ⚠ BOTH
+  //     HALVES WERE DRIVEN RED INDEPENDENTLY before this pin was written: deleting either
+  //     guard fails exactly one case, so neither is decorative. It also pins that a finished
+  //     step is stamped at its COMPLETION (inverting the preference goes red), that EVERY row
+  //     renders including the untimed ones (with the gutter present and EMPTY — never a
+  //     fabricated zero, never a dash), that a declared `0` renders while an ABSENT count
+  //     renders NO ELEMENT (D-07 / `SEED-159`, with a same-render non-vacuity control), and
+  //     that the component spells NO user-visible string — a JSX literal sweep with its own
+  //     positive control, run over comment-STRIPPED source because that file's docblock quotes
+  //     the sheet's own narration on purpose (the 187-24 trap, met again).
+  //   · `transcriptVocabulary.test.ts` (7) — that the module's two absence headlines are
+  //     DIFFERENT SENTENCES. *"No steps recorded"* and *"step times not recorded"* are two
+  //     facts about two different runs, and folding them prints "nothing happened" about a run
+  //     that did plenty — the same shape this repo has now got wrong three times (`runFacts.ts`
+  //     CR-01, `DecisionsList` D-20, `phaseDuration.ts`'s own nine arms). It also pins the
+  //     export COUNT (so growing the module is deliberate), the zero-glyph rule as a
+  //     CHARACTER-CLASS sweep rather than a list of forbidden marks (a list only catches the
+  //     glyphs someone already thought of), and inequality against every `receiptVocabulary`
+  //     export and every `RUN_READING_WORD` value — compared against the REAL exports, never a
+  //     hand-listed copy, and asserted after a non-vacuity check on each comparison set.
+  "RunTranscript.test.tsx": 19,
+  "transcriptVocabulary.test.ts": 7,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

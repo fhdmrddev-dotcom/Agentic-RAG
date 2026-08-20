@@ -128,61 +128,33 @@ vi.mock("@/providers/StreamsProvider", () => ({
 
 // ── The canvas leaf-stub: it renders what the page HANDED it and nothing else, so a
 //    reading in this DOM is a reading the page computed. ──
-vi.mock("@/components/workflows/WorkflowCanvas", () => ({
-  WorkflowCanvas: ({
-    phases,
-    runState,
-    editable,
-    selectedSlug,
-    kbTools,
-  }: {
-    phases: PhaseSpecJSON[]
-    // Phase 200-07: `count` / `noun` joined the shape `200-06` added to `NodeRunState`. The
-    // stub renders them so a test reads the value THE PAGE HANDED DOWN — the supply line
-    // `200-06` built the seam for and left to this plan. Without them here the hand-off
-    // would be untestable from the page side, which is where the join actually happens.
-    runState?: (
-      slug: string,
-    ) =>
-      | {
-          reading: string
-          label: string
-          count?: number | null
-          noun?: string | null
-          live?: boolean
-        }
-      | undefined
-    editable?: boolean
-    selectedSlug: string | null
-    kbTools?: readonly string[]
-  }) => (
-    <div
-      data-testid="canvas-stub"
-      data-editable={String(editable)}
-      data-selected={String(selectedSlug)}
-      // F7: the governance input. Rendered as a joined string so a test can assert on the
-      // VALUE the page handed down, not merely that some prop was present.
-      data-kbtools={(kbTools ?? []).join(",")}
-    >
-      {phases.map((p) => (
-        <div key={p.slug} data-testid={`node-${p.slug}`}>
-          <span data-testid={`reading-${p.slug}`}>{runState?.(p.slug)?.reading ?? "NONE"}</span>
-          <span data-testid={`label-${p.slug}`}>{runState?.(p.slug)?.label ?? "NONE"}</span>
-          {/* ⚠ `String(...)` rather than a rendered child, deliberately: a declared `0` and
-                 an ABSENT count are two different facts, and a bare child would render both
-                 as nothing at all — which is exactly the fold `RS-MNR-03` forbids and the
-                 one this stub has to be able to TELL APART. */}
-          <span data-testid={`count-${p.slug}`}>{String(runState?.(p.slug)?.count)}</span>
-          <span data-testid={`noun-${p.slug}`}>{String(runState?.(p.slug)?.noun)}</span>
-          {/* Phase 200 — `PORT-canvas.md`'s page-resolved liveness boolean. `String(...)`
-                 for the same reason the two above use it: `false` and ABSENT are two facts
-                 and a bare child renders both as nothing. */}
-          <span data-testid={`live-${p.slug}`}>{String(runState?.(p.slug)?.live)}</span>
-        </div>
-      ))}
-    </div>
-  ),
-}))
+/* ⚠ `WorkflowCanvas` IS NO LONGER MOCKED HERE BECAUSE IT IS NO LONGER MOUNTED HERE.
+ *
+ * Phase 200 replaced this page's centre region with the run log (`RunTranscript`), for the
+ * four measured reasons recorded in that component's own docblock. The stub that used to
+ * stand here rendered a `canvas-stub` element carrying, per node, the `reading` / `label` /
+ * `count` / `noun` / `live` values the page handed down — and roughly ninety cases in this
+ * file used it as the "page has loaded" sentinel.
+ *
+ * ⚠ THE REPLACEMENT IS THE REAL COMPONENT, NOT ANOTHER STUB, and that is deliberate.
+ * `RunTranscript` is a pure leaf: no providers, no React Flow, no measurement. Stubbing it
+ * would have meant the count, the clock and the state word were asserted against a fixture
+ * of this suite's own making — the shape of a fence that cannot fire. Rendering it for real
+ * means every assertion below reads what a person would see.
+ *
+ * WHAT MOVED WHERE:
+ *   • the load sentinel      → `run-transcript` (the region's own testid)
+ *   • per-node reading       → `transcript-row-{slug}`'s `data-reading`
+ *   • per-node label         → `transcript-state`'s text inside that row
+ *   • the declared count     → `transcript-count`, and the receipt's `receipt-row-count`
+ *
+ * ⚠ THREE THINGS THE OLD STUB PROVED HAVE NO CONSUMER LEFT ON THIS PAGE, and they are named
+ * rather than quietly dropped: `NodeRunState.count` / `.noun` fed the canvas's per-connection
+ * payload label, and `.live` fed its marching connector. The page still computes all three —
+ * the seam is untouched — but nothing on this surface reads them any more. Their cases are
+ * REWRITTEN below against the surface that does show the count, and the liveness pair is
+ * recorded as unreachable-from-here in the phase report rather than left passing vacuously.
+ */
 
 // ── Phase 200 — THE RIGHT-HAND RUN PANEL'S TWO PARTS, leaf-stubbed in this file's own
 //    idiom (the same one `WorkflowCanvas` above uses, and for the same reason).
@@ -322,6 +294,31 @@ function mkRun(overrides: Partial<RunLike> = {}): RunLike {
   }
 }
 
+/**
+ * A `run.phases` array whose statuses MATCH a live slice, so the two sources describe the
+ * same run.
+ *
+ * ⚠ THIS EXISTS BECAUSE THREE FIXTURES BELOW WERE UNREALISTIC AND IT ONLY SHOWED WHEN THE
+ * LOG PUT BOTH SOURCES ON ONE LINE. They set a live slice saying a step had FAILED (or was
+ * WAITING) while leaving `mkRun()`'s default durable rows saying it was still `active` or
+ * not yet reached — a state the backend does not produce, because the run poll writes the
+ * same transition the stream announces. The run log refuses to word a step from a reading
+ * that contradicts the row's own status, so those fixtures started rendering the wire's
+ * answer, which was the correct behaviour against incoherent input.
+ *
+ * Making the two agree is what the fixtures always meant. It is a REPAIR, not a relaxation:
+ * every assertion they carry is unchanged, and the disagreement case now has cases of its own
+ * in `RunTranscript.test.tsx`, driven against the real crossing measured on the local
+ * database.
+ */
+function phasesMatching(statuses: [string, string, string]): RunLike["phases"] {
+  return [
+    { slug: "gather-contracts", phase_index: 0, status: statuses[0], phase_type: "llm_agent" },
+    { slug: "draft-letter", phase_index: 1, status: statuses[1], phase_type: "llm_agent" },
+    { slug: "final-check", phase_index: 2, status: statuses[2], phase_type: "llm_human_input" },
+  ]
+}
+
 /** One live-slice row. `slug` is a parameter on purpose — the join tests hand it
  *  positional PLACEHOLDERS, which is exactly what the live reconcile skeleton can emit. */
 function mkPhase(
@@ -388,16 +385,30 @@ function renderPage(props: Partial<Parameters<typeof WorkflowRunPage>[0]> = {}) 
   return { ...utils, onBack, onOpenThread }
 }
 
-/** Every visible node reading, read off the DOM the stub produced — never typed. */
+/**
+ * Every visible step's reading, read off the RENDERED log — never typed, and never off a
+ * stub of this suite's own making.
+ *
+ * ⚠ `data-reading` IS THE PAGE'S READING, and its ABSENCE is a third answer rather than an
+ * empty one: it means the page held no reading for that slug at all. The old probe collapsed
+ * that case to the literal `"NONE"`; this one keeps it distinguishable, so a test can say
+ * which of the two it means.
+ */
 function readings(): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const slug of SLUGS) out[slug] = screen.getByTestId(`reading-${slug}`).textContent ?? ""
+  for (const slug of SLUGS) {
+    out[slug] = screen.getByTestId(`transcript-row-${slug}`).getAttribute("data-reading") ?? "NONE"
+  }
   return out
 }
 
+/** Every visible step's WORDED state, read off the log line a person actually reads. */
 function labels(): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const slug of SLUGS) out[slug] = screen.getByTestId(`label-${slug}`).textContent ?? ""
+  for (const slug of SLUGS) {
+    const row = screen.getByTestId(`transcript-row-${slug}`)
+    out[slug] = within(row).getByTestId("transcript-state").textContent ?? ""
+  }
   return out
 }
 
@@ -470,7 +481,7 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(readings()).toEqual({
       "gather-contracts": "done",
       "draft-letter": "done",
@@ -490,7 +501,7 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     // The WORDS come from the shared vocabulary, not from this suite's expectations of it.
     expect(labels()["gather-contracts"]).toBe("Complete")
     expect(labels()["draft-letter"]).toBe("Not started")
@@ -500,15 +511,22 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
     setLiveSlice([])
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     for (const slug of SLUGS) expect(readings()[slug]).not.toBe("NONE")
   })
 
-  it("renders the canvas read-only and with nothing selected", async () => {
+  it("the log offers nothing to edit and nothing to select — a read-only surface", async () => {
+    // ⚠ THE CANVAS EXPRESSED THIS AS TWO PROPS (`editable={false}`, `selectedSlug={null}`)
+    // AND THE LOG EXPRESSES IT BY CONSTRUCTION — it takes neither. So the claim is asserted
+    // where it now lives: the rendered region contains no control of any kind. That is a
+    // STRONGER statement than the two props were, because a prop can be passed correctly to
+    // a component that renders a button anyway.
     renderPage()
-    const stub = await screen.findByTestId("canvas-stub")
-    expect(stub.getAttribute("data-editable")).toBe("false")
-    expect(stub.getAttribute("data-selected")).toBe("null")
+    const region = await screen.findByTestId("run-transcript")
+    expect(region.querySelectorAll("button, a, input, select, textarea")).toHaveLength(0)
+    // NON-VACUITY: the region really did render rows, so the zero above is a measurement of
+    // something rather than of an empty subtree.
+    expect(region.querySelectorAll('[data-testid^="transcript-row-"]').length).toBeGreaterThan(0)
   })
 })
 
@@ -524,7 +542,7 @@ describe("WorkflowRunPage — the join key is phase_index, never the slug", () =
       mkPhase(2, "pending", "phase-2"),
     ])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(readings()).toEqual({
       "gather-contracts": "done",
       "draft-letter": "running",
@@ -541,7 +559,7 @@ describe("WorkflowRunPage — the join key is phase_index, never the slug", () =
       mkPhase(2, "pending", "phase-2"),
     ])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(readings()["gather-contracts"]).toBe("done")
     expect(readings()["final-check"]).toBe("not-started")
   })
@@ -554,8 +572,10 @@ describe("WorkflowRunPage — the join key is phase_index, never the slug", () =
       mkPhase(1, "failed", "draft-letter", { emitFailure: "citation_gate_rejected" }),
       mkPhase(2, "pending", "final-check"),
     ])
+    // The durable rows say the same thing the slice does — see `phasesMatching`.
+    getWorkflowRun.mockResolvedValue(mkRun({ phases: phasesMatching(["completed", "failed", "pending"]) }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(labels()["draft-letter"]).toBe("Failed — its answer did not pass the required checks")
   })
 
@@ -565,15 +585,16 @@ describe("WorkflowRunPage — the join key is phase_index, never the slug", () =
       mkPhase(1, "failed", "draft-letter"),
       mkPhase(2, "pending", "final-check"),
     ])
+    getWorkflowRun.mockResolvedValue(mkRun({ phases: phasesMatching(["completed", "failed", "pending"]) }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(labels()["draft-letter"]).toBe("Failed — this step did not finish")
   })
 
   it("gives a definition step with no matching row `not-started`, never `unknown`", async () => {
     setLiveSlice([mkPhase(0, "running", "phase-0")])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(readings()["final-check"]).toBe("not-started")
     expect(readings()["final-check"]).not.toBe("unknown")
   })
@@ -606,7 +627,7 @@ describe("WorkflowRunPage — a reconcile leaves every visible node reading iden
   it("every reading is identical before and after", async () => {
     setLiveSlice(live)
     const { rerender, onBack, onOpenThread } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const before = readings()
 
     setLiveSlice(afterReconcile)
@@ -615,14 +636,14 @@ describe("WorkflowRunPage — a reconcile leaves every visible node reading iden
         <WorkflowRunPage runId="run-1" onBack={onBack} onOpenThread={onOpenThread} />
       </TechnicalNamesProvider>,
     )
-    await waitFor(() => expect(screen.getByTestId("canvas-stub")).toBeTruthy())
+    await waitFor(() => expect(screen.getByTestId("run-transcript")).toBeTruthy())
     expect(readings()).toEqual(before)
   })
 
   it("a retrying phase reads Running both before and after — the collapsed state survives", async () => {
     setLiveSlice(live)
     const { rerender, onBack, onOpenThread } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(labels()["draft-letter"]).toBe("Running")
 
     setLiveSlice(afterReconcile)
@@ -631,14 +652,14 @@ describe("WorkflowRunPage — a reconcile leaves every visible node reading iden
         <WorkflowRunPage runId="run-1" onBack={onBack} onOpenThread={onOpenThread} />
       </TechnicalNamesProvider>,
     )
-    await waitFor(() => expect(screen.getByTestId("canvas-stub")).toBeTruthy())
+    await waitFor(() => expect(screen.getByTestId("run-transcript")).toBeTruthy())
     expect(labels()["draft-letter"]).toBe("Running")
   })
 
   it("calls the reconcile its own hook returns when the tab wakes — this page closes that locally", async () => {
     setLiveSlice(live)
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     reconcile.mockClear()
     fireEvent(window, new Event("visibilitychange"))
     // ⚠ AWAITED SINCE 188.1-04 (deferred item D-188.1-DEF-01, closed here). This assertion
@@ -660,7 +681,7 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
   it("a live run renders a number AND the literal anchor phrase", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: CLAIMED }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const slot = screen.getByTestId("run-elapsed").textContent ?? ""
     expect(slot).toContain("since it started processing")
     expect(slot).toMatch(/\d+[smh]/)
@@ -671,7 +692,7 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
       mkRun({ status: "completed", claimed_at: CLAIMED, updated_at: UPDATED }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const slot = screen.getByTestId("run-elapsed").textContent ?? ""
     expect(slot).toContain("Ran for")
     expect(slot).toContain("from when it started processing to its last update")
@@ -689,7 +710,7 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
   it("claimed_at == null falls back to created_at and LABELS it — never a bare number", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const slot = screen.getByTestId("run-elapsed").textContent ?? ""
     expect(slot).toContain("queued")
     expect(slot).not.toContain("Waiting to start")
@@ -705,13 +726,13 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
   it("the ⌥ reveal exposes the literal claimed_at, and the plain view does not", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.queryByTestId("run-elapsed-technical")).toBeNull()
 
     cleanup()
     window.localStorage.setItem("technical-names", "true")
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const technical = screen.getByTestId("run-elapsed-technical").textContent ?? ""
     expect(technical).toContain("claimed_at")
     expect(technical).toContain(CLAIMED)
@@ -721,7 +742,7 @@ describe("WorkflowRunPage — the elapsed figure names the field it derives from
     window.localStorage.setItem("technical-names", "true")
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-elapsed-technical").textContent).toContain("claimed_at null")
   })
 })
@@ -742,7 +763,7 @@ describe("WorkflowRunPage — the run band is total", () => {
     it(`renders the ${status} band`, async () => {
       getWorkflowRun.mockResolvedValue(mkRun({ status }))
       renderPage()
-      await screen.findByTestId("canvas-stub")
+      await screen.findByTestId("run-transcript")
       expect(screen.getByTestId("run-band").textContent).toContain(needle)
     })
   }
@@ -754,7 +775,7 @@ describe("WorkflowRunPage — the run band is total", () => {
   it("an `active` run that was never claimed still reads Running — claimed_at cannot mean queued", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: null }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const band = screen.getByTestId("run-band").textContent ?? ""
     expect(band).toContain("Running")
     expect(band).not.toContain("Waiting to start")
@@ -765,7 +786,7 @@ describe("WorkflowRunPage — the run band is total", () => {
     // reporting a run we cannot read as finished successfully.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "quiesced" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const band = screen.getByTestId("run-band").textContent ?? ""
     expect(band).toContain("State unknown")
     expect(band).not.toContain("Complete")
@@ -777,7 +798,7 @@ describe("WorkflowRunPage — the run band is total", () => {
     // its fallback (measured in 188-05).
     getWorkflowRun.mockResolvedValue(mkRun({ status: "constructor" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-band").textContent).toContain("State unknown")
   })
 
@@ -789,7 +810,7 @@ describe("WorkflowRunPage — the run band is total", () => {
     ])
     getWorkflowRun.mockResolvedValue(mkRun({ status: "failed" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const band = screen.getByTestId("run-band").textContent ?? ""
     expect(band).toContain('Failed at "Draft the renewal letter"')
     expect(band).not.toContain("draft-letter")
@@ -799,7 +820,7 @@ describe("WorkflowRunPage — the run band is total", () => {
   it("cap_paused states the fact and offers NO control — the band holds nothing focusable", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "cap_paused" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const band = screen.getByTestId("run-band")
     expect(band.textContent).toContain("Paused at the step limit")
     expect(band.querySelectorAll("button, a, [tabindex], input, select")).toHaveLength(0)
@@ -816,7 +837,7 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
   it("the ticking number is not inside the polite live region", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", claimed_at: CLAIMED }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const band = screen.getByTestId("run-band")
     expect(band.getAttribute("aria-live")).toBe("polite")
     expect(band.getAttribute("aria-atomic")).toBe("true")
@@ -841,7 +862,7 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
     // count on-screen renderings rather than inspect the announcement.
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", claimed_at: CLAIMED }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const sentence = (screen.getByTestId("run-band").textContent ?? "").trim()
     expect(sentence.length).toBeGreaterThan(0)
@@ -868,7 +889,7 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
   it("a failed run raises exactly one assertive notice", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "failed" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const alerts = screen.getAllByTestId("run-alert")
     expect(alerts).toHaveLength(1)
     expect(alerts[0].getAttribute("role")).toBe("alert")
@@ -878,21 +899,21 @@ describe("WorkflowRunPage — the polite region carries the sentence, not the cl
   it("a healthy run raises no assertive notice at all", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-alert").textContent).toBe("")
   })
 
   it("marks the canvas region busy while the run is live and calm once it is terminal", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
-    expect(screen.getByTestId("run-canvas-region").getAttribute("aria-busy")).toBe("true")
+    await screen.findByTestId("run-transcript")
+    expect(screen.getByTestId("run-transcript-region").getAttribute("aria-busy")).toBe("true")
 
     cleanup()
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
-    expect(screen.getByTestId("run-canvas-region").getAttribute("aria-busy")).toBe("false")
+    await screen.findByTestId("run-transcript")
+    expect(screen.getByTestId("run-transcript-region").getAttribute("aria-busy")).toBe("false")
   })
 })
 
@@ -908,11 +929,11 @@ describe("WorkflowRunPage — loading and error states", () => {
     )
     renderPage()
     expect(screen.getByText("Opening the run…")).toBeTruthy()
-    expect(screen.queryByTestId("canvas-stub")).toBeNull()
+    expect(screen.queryByTestId("run-transcript")).toBeNull()
     await act(async () => {
       resolve(mkRun())
     })
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
   })
 
   it("a 404 renders the not-available copy and goes back", async () => {
@@ -937,14 +958,14 @@ describe("WorkflowRunPage — loading and error states", () => {
     ).toBeTruthy()
     getWorkflowRun.mockResolvedValue(mkRun())
     fireEvent.click(screen.getByText("Try again"))
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(getWorkflowRun).toHaveBeenCalledTimes(2)
     expect(getWorkflowRun.mock.calls[1][0]).toBe("run-1")
   })
 
   it("the header carries the workflow identity and the thread seam", async () => {
     const { onOpenThread } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByText("Supplier contract renewals")).toBeTruthy()
     expect(screen.getByText("v4")).toBeTruthy()
     fireEvent.click(screen.getByText("Open the chat thread"))
@@ -985,7 +1006,7 @@ describe("WorkflowRunPage — loading and error states", () => {
   // holding, so the case is renamed rather than deleted.
   it("renders the deliverable region under its own heading", async () => {
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const region = screen.getByTestId("run-deliverables")
     // ⚠ Phase 195 (D-02) — this literal was "What this run produced" until the region's
     // label was made honest about its scope. See the honesty case below for why, and
@@ -996,7 +1017,7 @@ describe("WorkflowRunPage — loading and error states", () => {
   // ── Phase 195 Plan 06 (D-02, P5) — THE LABEL MUST NOT CLAIM AUTHORSHIP ───────────
   it("labels the region by WHERE the files are and never claims the run produced them", async () => {
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const heading = screen.getByTestId("run-deliverables").querySelector("h2")
     expect(heading).not.toBeNull()
     /**
@@ -1174,7 +1195,7 @@ describe("WorkflowRunPage — the deliverable is listed and downloadable", () =>
   it("a row the listing gave with no id is shown as a fact, never as a dead control", async () => {
     setFiles([{ path: "orphan.docx", size_bytes: 100, mime_type: "" }])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const region = screen.getByTestId("run-deliverables")
     expect(region.textContent).toContain("orphan.docx")
     // No control — the raw route would be built with an empty id segment and 404.
@@ -1263,7 +1284,7 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
 
   it("shows the name, the size and the full path in `title` — and the region holds ZERO buttons", async () => {
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const row = idLessRow()
     expect(row).not.toBeNull()
     // A DIV, not a control. The tag is stated because it is the thing that makes
@@ -1305,7 +1326,7 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
      * are empty, so even the name and icon colours are unchanged.
      */
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const row = idLessRow()
     expect(row).not.toBeNull()
     /**
@@ -1344,7 +1365,7 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
     // sweeping against the empty string and passing green). The shapes here
     // mirror the page suite's own controls at `:955-958` / `:1073`.
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const row = idLessRow()
     expect(row).not.toBeNull()
     // (a) the row really is non-empty — a `not.toContain` over "" passes always.
@@ -1367,7 +1388,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active", thread_id: RUN_THREAD_ID }))
     setFiles([])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-deliverables").textContent).toContain(COPY_EMPTY_LIVE)
     expect(screen.queryByText(COPY_EMPTY_TERMINAL)).toBeNull()
   })
@@ -1376,7 +1397,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-deliverables").textContent).toContain(COPY_EMPTY_TERMINAL)
     expect(screen.queryByText(COPY_EMPTY_LIVE)).toBeNull()
   })
@@ -1385,7 +1406,7 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
     setFiles([], true)
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const region = screen.getByTestId("run-deliverables")
     expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
     expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
@@ -1400,7 +1421,7 @@ describe("WorkflowRunPage — the seam, run side (D-188-13)", () => {
   it("hands the thread seam the RUN's thread id, not the viewed one", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
     const { onOpenThread } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     fireEvent.click(screen.getByText("Open the chat thread"))
     expect(onOpenThread).toHaveBeenCalledWith(RUN_THREAD_ID)
     expect(onOpenThread).not.toHaveBeenCalledWith(VIEWED_THREAD_ID)
@@ -1435,14 +1456,17 @@ describe("WorkflowRunPage — source fence", () => {
   })
 
   it("memoizes the runState lookup with useCallback and passes it BY IDENTITY", () => {
-    // An inline arrow at the call site is a new function identity on every render, which
-    // invalidates the canvas's settledNodes memo and flickers the cards (188-07 pinned
-    // that split; five of its assertions fell to one relocation).
+    // ⚠ THE ORIGINAL REASON IS RECORDED AND NO LONGER APPLIES: an inline arrow was a new
+    // function identity every render, which invalidated the canvas's `settledNodes` memo and
+    // flickered the cards (188-07 pinned that split). The canvas is no longer mounted here.
+    // The SEAM is unchanged and now feeds the run log's `liveOf`, so the fence is retargeted
+    // rather than deleted — a stable identity is still what a memoising consumer needs, and
+    // this is the one place the page hands its live readings to anybody.
     expect(pageSource).toMatch(/const runState = useCallback\(/)
-    expect(pageSource).toMatch(/runState=\{runState\}/)
-    expect(pageSource).not.toMatch(/runState=\{\(/)
+    expect(pageSource).toMatch(/liveOf=\{runState\}/)
+    expect(pageSource).not.toMatch(/liveOf=\{\(/)
     // POSITIVE CONTROL — the forbidden shape really is what an inline arrow looks like.
-    expect("<WorkflowCanvas runState={(slug) => map.get(slug)} />").toMatch(/runState=\{\(/)
+    expect("<RunTranscript liveOf={(slug) => map.get(slug)} />").toMatch(/liveOf=\{\(/)
   })
 
   it("joins on the step index and hands the canvas an already-worded state", () => {
@@ -1947,8 +1971,12 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
       mkPhase(2, "running", "final-check", { phaseType: "llm_human_input" }),
     ])
     setAsks([mkAsk()])
+    // ⚠ THE DURABLE ROW MUST ALSO SAY THIS STEP IS RUNNING. `waiting-for-you` is DERIVED on
+    // top of a running row — the wire has no such status — so a row still reading `pending`
+    // would be describing a different moment of the run.
+    getWorkflowRun.mockResolvedValue(mkRun({ phases: phasesMatching(["completed", "completed", "active"]) }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(readings()["final-check"]).toBe("waiting-for-you")
     expect(labels()["final-check"]).toContain("Paused for your answer")
@@ -1966,7 +1994,7 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
     ])
     setAsks([mkAsk()])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(readings()["draft-letter"]).toBe("running")
   })
@@ -1983,7 +2011,7 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
     ])
     setAsks([])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(readings()["final-check"]).toBe("running")
   })
@@ -1998,7 +2026,7 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
     ])
     setAsks([mkAsk()])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(readings()["final-check"]).toBe("not-started")
   })
@@ -2020,7 +2048,7 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
     )
     setAsks([mkAsk()])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(readings()["final-check"]).toBe("running")
     expect(labels()["final-check"]).not.toContain("Paused for your answer")
@@ -2029,7 +2057,7 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
   it("reads the ask slice for the RUN's thread, never the globally-viewed one", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(useAskUserPrompt).toHaveBeenCalledWith(RUN_THREAD_ID)
     expect(useAskUserPrompt).not.toHaveBeenCalledWith(VIEWED_THREAD_ID)
@@ -2056,7 +2084,7 @@ describe("WorkflowRunPage — the run-time waiting reading (F5, SPEC Req 5)", ()
   it("re-reads the ask slice on wake", async () => {
     getWorkflowRun.mockResolvedValue(mkRun({ status: "active" }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const afterMount = reconcileAsks.mock.calls.length
 
     await act(async () => {
@@ -2148,21 +2176,43 @@ describe("WorkflowRunPage — the live elapsed figure actually advances (F6)", (
 // "for one thing: the local available_tools ∩ kb_tools intersection that moves the dial,
 // the strike-through and THE CANVAS SEAL". The run surface simply never asked for it.
 
-describe("WorkflowRunPage — the governance seal's input reaches the canvas (F7, SC#1)", () => {
-  it("hands the canvas the server's kb-tool list, so a detected-grounded step can be marked", async () => {
+/**
+ * ⚠ F7's TWO CASES ARE REWRITTEN, NOT DELETED, AND THE REASON IS THE POINT OF THE REWRITE.
+ *
+ * F7 fixed a real defect: this page rendered the canvas with NO `kbTools`, so
+ * `available_tools ∩ kb_tools` was taken against the empty set and a step grounded merely by
+ * reading the knowledge base painted as ungoverned. Both of its cases asserted that the
+ * server's list reached THE CANVAS.
+ *
+ * Phase 200 took the canvas off this surface, so there is nothing here for the list to reach.
+ * The two lines that computed it had zero consumers, and a live `useGroundingBundle`
+ * subscription with no reader is a request this page makes for nothing.
+ *
+ * ⚠ THE FIX IS NOT LOST AND WAS NEVER THIS PAGE'S TO OWN: it reads VERBATIM from
+ * `WorkflowBuilderPage.tsx`, where the canvas that needs it still lives and where the same
+ * `data-grounded` attribute is still asserted. What was removed here is a SECOND CONSUMER of
+ * a shared rule, not the rule.
+ *
+ * So the first case becomes a guard on the REMOVAL — the page must not re-acquire a
+ * subscription nothing reads — and the second keeps the half of R11 that is still about this
+ * file: a client-assembled whitelist would let knowledge-base content whitelist itself, and
+ * that literal must never appear in this page's source whether or not a canvas is mounted.
+ */
+describe("WorkflowRunPage 200 — the governance input left with the canvas (F7 superseded)", () => {
+  it("no longer subscribes to the grounding bundle, because nothing here reads it", async () => {
     renderPage()
-    const stub = await screen.findByTestId("canvas-stub")
-    // The VALUE, not merely the presence of a prop: an empty list is exactly the broken
-    // state, because `available_tools ∩ [] = ∅` for every step ever authored.
-    expect(stub.getAttribute("data-kbtools")).toContain("search_documents")
+    await screen.findByTestId("run-transcript")
+    expect(useGroundingBundle).not.toHaveBeenCalled()
+    // ...and the hook is genuinely absent from the source, not merely unreached at runtime.
+    expect(codeOf(pageSource)).not.toMatch(/useGroundingBundle\(/)
+    // POSITIVE CONTROL — the needle really does match a live call.
+    expect("const b = useGroundingBundle(true)").toMatch(/useGroundingBundle\(/)
   })
 
-  it("asks for the bundle — the page is a READER of the server list, never an author of one", async () => {
+  it("R11 holds regardless: the page authors no kb-tool list of its own", async () => {
     renderPage()
-    await screen.findByTestId("canvas-stub")
-    expect(useGroundingBundle).toHaveBeenCalled()
-    // R11: a client-assembled whitelist would let knowledge-base content whitelist itself.
-    // The literal must not appear in the page's own source.
+    await screen.findByTestId("run-transcript")
+    // A client-assembled whitelist would let knowledge-base content whitelist itself.
     const KB = ["search", "_documents"].join("")
     expect(codeOf(pageSource)).not.toMatch(new RegExp(KB))
     // POSITIVE CONTROL — that needle really does match a hardcoded list.
@@ -2250,7 +2300,7 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
   async function openWithStatus(status: string, overrides: Partial<RunLike> = {}) {
     getWorkflowRun.mockResolvedValue(mkRun({ status, ...overrides }))
     const utils = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     return utils
   }
 
@@ -2273,7 +2323,7 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
    * ⚠ AND IT WAITS RATHER THAN SAMPLES, WHICH IS NOT DEFENSIVENESS — IT IS A
    * MEASURED FIX FOR A FENCE THAT WAS ALREADY LYING TO ME. The third home is
    * `useState` written from a `useEffect` (`:824-832`), so it lands a tick AFTER
-   * `findByTestId("canvas-stub")` resolves. With a plain `getAllByText` the failed
+   * `findByTestId("run-transcript")` resolves. With a plain `getAllByText` the failed
    * case read **3** on the whole-file run and **2** under plant P1 — a plant that
    * changed only an unrelated ternary. The plant perturbed render timing, so the
    * case red on the WRONG clause, and P1 would have been credited with catching an
@@ -2424,7 +2474,7 @@ describe("194.1-07 R3 — the Stop renders on the two live states and on none of
       </TechnicalNamesProvider>
     )
     const { rerender } = render(el())
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     fireEvent.click(screen.getByTestId(STOP_TESTID))
     await act(async () => {
@@ -2554,7 +2604,7 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
   it("HEADER at rest — the workflow's NAME and its version chip, as literals", async () => {
     getWorkflowRun.mockResolvedValue(mkRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // Non-vacuity FIRST — the run really resolved, so the readings below are about
     // a rendered header rather than about a loading state.
@@ -2569,17 +2619,17 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
   it("HEADER at rest — the four top-level regions, and nothing else", async () => {
     getWorkflowRun.mockResolvedValue(mkRun())
     const { container } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // header · the sr-only announcement pair · canvas region · deliverable region.
     // Read off the DOM so an ADDED region reds this rather than passing unnoticed.
     expect(container.querySelectorAll("header")).toHaveLength(1)
-    expect(screen.getByTestId("run-canvas-region")).toBeInTheDocument()
+    expect(screen.getByTestId("run-transcript-region")).toBeInTheDocument()
     expect(screen.getByTestId("run-deliverables")).toBeInTheDocument()
     // ⚠ ONE spine, and it is the CANVAS's. The panel owns the meaningful phase spine
     // (workflow-run-surface.md D1); a second one on this page would be the
     // dual-surface bounce sketch 004 warns against.
-    expect(container.querySelectorAll('[data-testid="canvas-stub"]')).toHaveLength(1)
+    expect(container.querySelectorAll('[data-testid="run-transcript"]')).toHaveLength(1)
   })
 
   /**
@@ -2603,7 +2653,7 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
       mkRun({ workflow_name: "", workflow_slug: "", workflow_version: 0, definition: null }),
     )
     const { container } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // Non-vacuity: the degrade fixture really rendered the run arm, not an error arm.
     expect(screen.getByTestId("run-band")).toBeInTheDocument()
@@ -2631,7 +2681,7 @@ describe("199-07 Task 1 — the run surface's resting atoms (sheet c8 has no run
   it("DEGRADE PATH POSITIVE CONTROL — a healthy run still prints its name and its version", async () => {
     getWorkflowRun.mockResolvedValue(mkRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     // The needles above are live: the SAME two queries, run against the healthy
     // fixture, find a real name and a real version chip. A degrade fence whose needles
     // could never match anything would report green forever — and this control has
@@ -2724,7 +2774,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
   it("renders the receipt on THIS page — its first and only mount in the product", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // ⚠ NON-VACUITY FIRST: the region exists AND the receipt inside it does. `200-05`
     // shipped `RunReceipt` exported and mounted NOWHERE — an `import.meta.glob` sweep in its
@@ -2746,7 +2796,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
     // re-derive; the page supplies the name it already computed for the node.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const titles = Array.from(
       document.querySelectorAll('[data-testid="receipt-row-title"]'),
@@ -2763,7 +2813,7 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
   it("is mounted on the RUN page and NOWHERE on the builder — 199-02's refusal, by construction", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
 
     // The builder's spine reads a DRAFT definition and has no run, so a run-tense receipt
@@ -2787,7 +2837,7 @@ describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
   it("computes the span from the PHASE timestamps — min(started_at) → max(completed_at)", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const atoms = receiptHeaderAtoms()
     expect(atoms).toHaveLength(3)
@@ -2804,7 +2854,7 @@ describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
     // exactly when a span is wanted. The phase rows carry their own instants.
     getWorkflowRun.mockResolvedValue(mkTimedRun({ claimed_at: null }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(receiptHeaderAtoms()[0]).toBe("Ran 1m 00s")
   })
 
@@ -2819,7 +2869,7 @@ describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const atoms = receiptHeaderAtoms()
     expect(atoms[0]).toBe("Runtime not recorded")
@@ -2838,13 +2888,13 @@ describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
     // identical props, which is what navigating away and back does.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     const first = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const spanBefore = receiptHeaderAtoms()[0]
     const elapsedBefore = screen.getByTestId("run-elapsed").textContent
     first.unmount()
 
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(receiptHeaderAtoms()[0]).toBe(spanBefore)
     expect(screen.getByTestId("run-elapsed").textContent).toBe(elapsedBefore)
     // NON-VACUITY: both really do carry a figure, so "unchanged" is not "empty twice".
@@ -2859,7 +2909,7 @@ describe("WorkflowRunPage 200-07 — the total runtime (RS-MR-03)", () => {
     // with the field it came from.
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const header = screen.getByTestId("run-elapsed").textContent ?? ""
     // The header names its own anchor in plain words…
@@ -2880,7 +2930,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
   it("renders a real per-step duration, and `never ran` for the routed-around step", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
       (el) => el.textContent ?? "",
@@ -2903,7 +2953,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
       (el) => el.textContent ?? "",
@@ -2932,7 +2982,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const time = document.querySelector('[data-testid="receipt-row-time"]')?.textContent ?? ""
     expect(time).toBe("did not finish")
@@ -2969,7 +3019,7 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     ])
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
       (el) => el.textContent ?? "",
@@ -2977,10 +3027,20 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     // The FETCH's answer, not the slice's: a finished duration, never a live tick.
     expect(times[0]).toBe("12s")
     expect(times[0]).not.toMatch(/so far/)
-    // NON-VACUITY: the slice really is disagreeing — its reading reaches the canvas, which
+    // NON-VACUITY: the slice really is disagreeing — its reading reaches the log line, which
     // is the surface that reads the slice. So this is two sources measured against each
     // other, not one source read twice.
-    expect(screen.getByTestId("reading-gather-contracts").textContent).toBe("running")
+    expect(
+      screen.getByTestId("transcript-row-gather-contracts").getAttribute("data-reading"),
+    ).toBe("running")
+    // ⚠ AND THE LOG SIDES WITH THE FETCH, WHICH IS THE POINT OF THIS CASE. The slice's word
+    // is dropped rather than printed beside a finished duration, the row is FLAGGED so the
+    // disagreement is diagnosable, and the recorded `12s` renders — the same answer the
+    // receipt gives, from the same durable row.
+    const logRow = screen.getByTestId("transcript-row-gather-contracts")
+    expect(logRow.getAttribute("data-source-conflict")).toBe("true")
+    expect(within(logRow).getByTestId("transcript-time").textContent).toBe("12s")
+    expect(within(logRow).getByTestId("transcript-state").textContent).not.toBe("Running")
   })
 
   it("the receipt survives a run with NO durable rows at all — nothing claimed, nothing crashed", async () => {
@@ -2989,7 +3049,7 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     setLiveSlice([])
     getWorkflowRun.mockResolvedValue(mkTimedRun({ phases: [] }))
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
     expect(screen.getByTestId("run-receipt").querySelectorAll("ol > li")).toHaveLength(0)
@@ -3006,30 +3066,50 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
     setAsks([])
   })
 
-  it("forwards the DECLARED count and noun into the canvas run state — `200-06`'s hand-off", async () => {
-    // ⚠ THE ONE LINE `200-06` RECORDED AND DELIBERATELY DID NOT WRITE, because this file was
-    // not its to edit. Its SUMMARY names it exactly: the seam, the relay and the render all
-    // shipped there; the PRODUCTION SUPPLY LINE is here. Read off the stub, so this asserts
-    // the value the PAGE handed down rather than anything the canvas invented.
+  /**
+   * ⚠ THIS BLOCK MEASURED THE COUNT AT A SEAM THAT NO LONGER HAS A CONSUMER, AND IS NOW
+   * MEASURED WHERE A PERSON READS IT.
+   *
+   * `200-06` built the canvas's per-connection payload label and `200-07` wired the page's
+   * supply line into `NodeRunState.count` / `.noun`. Phase 200 then took the canvas off this
+   * surface, so that particular label has no mount anywhere in the product today — the page
+   * still COMPUTES both fields, and nothing on this page reads them.
+   *
+   * The declared count itself has lost nothing: it reaches a person on the RUN LOG and again
+   * on the RECEIPT, from the same `declaredCount` resolver. So every case below asserts the
+   * rendered text rather than a forwarded prop — which is the stronger claim, and the one
+   * `RS-MR-01` / `RS-MNR-03` were always really about.
+   */
+  it("renders the DECLARED count and noun on the log line, as the pair the wire sent", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
-    expect(screen.getByTestId("count-gather-contracts").textContent).toBe("312")
-    expect(screen.getByTestId("noun-gather-contracts").textContent).toBe("sources")
+    const row = screen.getByTestId("transcript-row-gather-contracts")
+    expect(within(row).getByTestId("transcript-count").textContent).toBe("312 sources")
+    // ...and the same pair on the receipt below, from the same resolver.
+    expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe(
+      "312 sources",
+    )
   })
 
-  it("RS-MNR-03: a step that declared NO count forwards an absence, never a `0`", async () => {
+  it("RS-MNR-03: a step that declared NO count renders NO count slot — never a `0`", async () => {
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
-    // `undefined`/`null` — an absence. ⚠ Emphatically NOT `"0"`: four of the seven phase
-    // types declare no count at all, and printing `0 sources` under one of them is a claim
-    // about a measurement that was never taken.
-    expect(screen.getByTestId("count-draft-letter").textContent).not.toBe("0")
-    expect(screen.getByTestId("count-final-check").textContent).not.toBe("0")
-    expect(["undefined", "null"]).toContain(screen.getByTestId("count-draft-letter").textContent)
+    // ⚠ NO ELEMENT AT ALL, which is a different render from an element holding `0`. Four of
+    // the seven phase types declare no count, and printing `0 sources` under one of them is a
+    // claim about a measurement that was never taken.
+    for (const slug of ["draft-letter", "final-check"]) {
+      const row = screen.getByTestId(`transcript-row-${slug}`)
+      expect(within(row).queryByTestId("transcript-count")).toBeNull()
+    }
+    // NON-VACUITY: a row in the same render DOES carry one, so the two nulls above are the
+    // absence of a count rather than the absence of the whole log.
+    expect(
+      within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count"),
+    ).toBeInTheDocument()
   })
 
   it("a DECLARED `0` is forwarded as the fact it is", async () => {
@@ -3050,10 +3130,14 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
-    expect(screen.getByTestId("count-gather-contracts").textContent).toBe("0")
-    expect(screen.getByTestId("noun-gather-contracts").textContent).toBe("sources")
+    // ⚠ A DECLARED `0` RENDERS. The step searched and found nothing, which is a measurement
+    // and not an absence — the distinction `declaredCount`'s `typeof` test exists to keep.
+    expect(
+      within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count")
+        .textContent,
+    ).toBe("0 sources")
     // …and it reaches the receipt too, as the pair the wire sent, VERBATIM.
     expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe(
       "0 sources",
@@ -3082,8 +3166,11 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
       }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
-    expect(screen.getByTestId("noun-gather-contracts").textContent).toBe("zzqx")
+    await screen.findByTestId("run-transcript")
+    expect(
+      within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count")
+        .textContent,
+    ).toBe("7 zzqx")
     expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe("7 zzqx")
   })
 })
@@ -3108,7 +3195,7 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
       } as WorkspaceFile,
     ])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const region = screen.getByTestId("run-deliverables")
     expect(region).toBeInTheDocument()
@@ -3131,7 +3218,7 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     setFiles([])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const receipt = screen.getByTestId("run-receipt-region")
     // No file names, no preview affordance, and NO deliverable slot at all — nothing on
@@ -3354,7 +3441,7 @@ describe("WorkflowRunPage 200-07 — §4.2 MUST NOT RENDER, and the fence can FI
       } as WorkspaceFile,
     ])
     const { container } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // NON-VACUITY BEFORE CONTENTS — the render really has the slots the predicate reads, so
     // a clean result is *nothing wrong* rather than *nothing there*. Wave 3 shipped a fence
@@ -3391,7 +3478,7 @@ describe("WorkflowRunPage 200-07 — §4.2 MUST NOT RENDER, and the fence can FI
       }),
     )
     const { container } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(runSurfaceViolations(container, false)).toStrictEqual([])
     // …and exactly ONE row is ticking. A live run with three ticking rows would pass the
@@ -3433,7 +3520,7 @@ describe("WorkflowRunPage 200-07 — the REPORT rows (§5), not built, not faked
     // `EmitSubStep` as a client transport.*
     getWorkflowRun.mockResolvedValue(mkTimedRun())
     const { container } = renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // ⚠ NOT FAKED is the claim, so it is the ABSENCE that is asserted: this surface renders
     // ONE row per PHASE and nothing finer. Three phase rows, three receipt rows — no
@@ -3483,7 +3570,7 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
     // grep for it over this page returned 0. The sheet draws the spine down the right of the
     // run surface, so the capability was built and simply not mounted.
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const spine = screen.getByTestId("spine-stub")
     expect(spine).toBeInTheDocument()
@@ -3494,13 +3581,13 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
     expect(spine.getAttribute("data-threadid")).not.toBe(VIEWED_THREAD_ID)
   })
 
-  it("the panel region is a sibling of the canvas, so neither one displaced the other", async () => {
+  it("the panel region is a sibling of the log, so neither one displaced the other", async () => {
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     const panel = screen.getByTestId("run-panel")
-    // NON-VACUITY: the canvas is still on screen. The mount added a column; it replaced
-    // nothing, which is the difference between wiring a surface and rebuilding it.
-    expect(screen.getByTestId("run-canvas-region")).toBeInTheDocument()
+    // NON-VACUITY: the centre region is still on screen. The mount added a column; it
+    // replaced nothing, which is the difference between wiring a surface and rebuilding it.
+    expect(screen.getByTestId("run-transcript-region")).toBeInTheDocument()
     expect(panel).toBeInTheDocument()
     // Named for a screen reader, because a second scrollable column that announces nothing
     // is a second place to get lost in.
@@ -3510,7 +3597,7 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
   it("a pending ask reaches the run surface, and a LIVE run does not mark it over", async () => {
     setAsks([mkAsk("call-7")])
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     const card = screen.getByTestId("ask-stub-call-7")
     expect(card).toBeInTheDocument()
@@ -3528,14 +3615,14 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
       mkRun({ thread_id: RUN_THREAD_ID, status: "cancelled" }),
     )
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     expect(screen.getByTestId("ask-stub-call-7").getAttribute("data-runisover")).toBe("true")
   })
 
   it("no ask means no card — never an empty frame", async () => {
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
     expect(screen.queryByTestId("ask-stub-call-1")).toBeNull()
     // The spine is still there: the absence is the ask's, not the panel's.
     expect(screen.getByTestId("spine-stub")).toBeInTheDocument()
@@ -3561,16 +3648,23 @@ describe("WorkflowRunPage 200 — the page-resolved liveness boolean (PORT-canva
     ])
     getWorkflowRun.mockResolvedValue(mkRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
-    expect(screen.getByTestId("live-draft-letter").textContent).toBe("true")
+    // ⚠ THE FIELD ITSELF IS NO LONGER READ ON THIS PAGE — the canvas it animated is not
+    // mounted here any more — so what is asserted is the DERIVATION that produces it, at the
+    // one place it still exists. The three readings below are the boolean's three inputs;
+    // `live` is `reading === "running"` and nothing else, which is what the source fence at
+    // the end of this block pins.
+    expect(readings()["draft-letter"]).toBe("running")
     // The two NEGATIVE arms are the point of the field. A finished step and an unreached one
     // are both "not running", and a boolean that said otherwise would animate a line into a
     // step nothing is flowing into.
-    expect(screen.getByTestId("live-gather-contracts").textContent).toBe("false")
-    expect(screen.getByTestId("live-final-check").textContent).toBe("false")
-    // NON-VACUITY: the readings really are what this claims.
-    expect(screen.getByTestId("reading-draft-letter").textContent).toBe("running")
+    expect(readings()["gather-contracts"]).toBe("done")
+    expect(readings()["final-check"]).toBe("not-started")
+    // ⚠ AND THE PAGE STILL COMPUTES IT, asserted on the source because there is no consumer
+    // left to read it through. It is kept rather than deleted: it is `PORT-canvas.md`'s
+    // recorded fix, and it becomes live again the moment a run canvas is mounted anywhere.
+    expect(codeOf(pageSource)).toMatch(/live: reading === "running"/)
   })
 
   it("a step WAITING FOR A PERSON is not live — the run is stopped dead, not flowing", async () => {
@@ -3586,11 +3680,14 @@ describe("WorkflowRunPage 200 — the page-resolved liveness boolean (PORT-canva
     ])
     getWorkflowRun.mockResolvedValue(mkRun())
     renderPage()
-    await screen.findByTestId("canvas-stub")
+    await screen.findByTestId("run-transcript")
 
     // `final-check` is the `llm_human_input` step, it is the RUNNING one, and an ask is
     // pending — the three conditions the page's own F5 derivation requires.
-    expect(screen.getByTestId("reading-final-check").textContent).toBe("waiting-for-you")
-    expect(screen.getByTestId("live-final-check").textContent).toBe("false")
+    expect(readings()["final-check"]).toBe("waiting-for-you")
+    // ⚠ AND `waiting-for-you` IS NOT `running`, which is the whole content of the claim: the
+    // boolean is an equality against ONE reading, so this state cannot reach it. Asserted as
+    // the inequality rather than through a consumer, because this page no longer has one.
+    expect(readings()["final-check"]).not.toBe("running")
   })
 })

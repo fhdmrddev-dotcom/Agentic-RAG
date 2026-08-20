@@ -89,7 +89,15 @@ import { RunReceipt } from "@/components/workflows/RunReceipt"
 // exactly one home (`phaseDuration.runSpan`) and exactly one call site (the receipt), so
 // there is no second place for the product's first honest total runtime to drift.
 import { type PhaseTimingRow } from "@/components/workflows/phaseDuration"
-import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
+// ── Phase 200 · THE CENTRE OF THIS PAGE IS THE RUN LOG, NOT THE CANVAS ───────────────
+//    `WorkflowCanvas` is no longer mounted here. The four measured reasons live in
+//    `RunTranscript.tsx`'s own docblock rather than being restated here, because that is
+//    the file a reader arrives at when they ask what replaced it. In one line: the
+//    definition is a flat `list[PhaseSpec]` with no branch construct, so a graph of a run
+//    was the spine drawn expensively — and this page was rendering {step → status} three
+//    times over. The canvas port itself lost nothing; it edited the SHARED component the
+//    builder renders, which is the surface its sheet actually draws.
+import { RunTranscript } from "@/components/workflows/RunTranscript"
 // Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
@@ -105,7 +113,6 @@ import {
   useWorkspaceFiles,
 } from "@/providers/StreamsProvider"
 import { useTechnicalNamesOptional } from "@/providers/TechnicalNamesProvider"
-import { useGroundingBundle } from "@/hooks/useGroundingBundle"
 import type { Phase, WorkspaceFile } from "@/types"
 
 interface Props {
@@ -589,11 +596,24 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
    * which marks nothing, the safe direction, because the run-time gate is server-side and
    * unconditional either way. R11: the list is the SERVER's; this page authors none of it.
    */
-  const bundle = useGroundingBundle(true)
-  const kbTools = useMemo<readonly string[]>(
-    () => (bundle.kind === "ready" || bundle.kind === "unavailable" ? bundle.kbTools : []),
-    [bundle],
-  )
+  /**
+   * ⚠ SUPERSEDED BY PHASE 200's CENTRE DECISION — THE DOCBLOCK ABOVE IS KEPT, THE CODE IS
+   * GONE, AND NEITHER HALF OF THAT IS AN ACCIDENT.
+   *
+   * F7's fix existed to feed `kbTools` to THE CANVAS, whose `toCanvas` resolves `grounded`
+   * through `isGrounded(phase, kbTools)`. This page no longer mounts a canvas, so the two
+   * lines that computed the list had exactly zero consumers — and a live `useGroundingBundle`
+   * subscription with no reader is a request this surface makes for nothing.
+   *
+   * ⚠ THE FIX IS NOT LOST AND WAS NEVER THIS PAGE'S TO OWN. It reads VERBATIM from
+   * `WorkflowBuilderPage.tsx`, where the canvas that needs it still lives and where the same
+   * `data-grounded` attribute is still asserted. What was deleted here is a SECOND consumer
+   * of a shared rule, not the rule.
+   *
+   * ⚠ RE-OPEN TRIGGER, stated so this is a decision rather than a disappearance: the next
+   * time anything on THIS page renders per-step governance, it takes the list back — from
+   * the same hook, by the same rule — and this comment is what tells it where the rule is.
+   */
 
   /**
    * ⚠ CR-02 — SOMETHING HAS TO OPEN THE RUN'S STREAM, and after the retarget nothing did.
@@ -833,11 +853,21 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   }, [specs, byIndex, asks, isTerminal, wireBySlug])
 
   /**
-   * ⚠ `useCallback`, NOT an inline arrow at the call site. An inline arrow is a NEW
-   * function identity on every render of this page, which invalidates the canvas's
-   * `settledNodes` memo every time and re-creates every node object — dropping React
-   * Flow's `measured` dimensions and flickering the cards. 188-07 pinned that memo split
-   * with a test; defeating it from here would go red there rather than silently.
+   * The page's live per-step reading, as a stable lookup.
+   *
+   * ⚠ THE ORIGINAL REASON FOR THE `useCallback` IS RECORDED BELOW RATHER THAN DELETED, AND
+   * IT NO LONGER APPLIES:
+   *
+   *     "⚠ `useCallback`, NOT an inline arrow at the call site. An inline arrow is a NEW
+   *      function identity on every render of this page, which invalidates the canvas's
+   *      `settledNodes` memo every time and re-creates every node object — dropping React
+   *      Flow's `measured` dimensions and flickering the cards. 188-07 pinned that memo
+   *      split with a test; defeating it from here would go red there rather than silently."
+   *
+   * That was true while the canvas was mounted here and stopped being true in Phase 200.
+   * The seam itself is UNCHANGED and is now the run log's `liveOf`: it is the one place this
+   * page holds an ALREADY-WORDED live reading per step, so the log prints the same sentence
+   * the spine does instead of minting a third phrasing for one state.
    */
   const runState = useCallback((slug: string) => runStateBySlug.get(slug), [runStateBySlug])
 
@@ -1261,17 +1291,15 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <section
           aria-busy={!isTerminal}
-          data-testid="run-canvas-region"
-          className="min-h-0 min-h-[320px] flex-1 px-6"
+          data-testid="run-transcript-region"
+          className="flex min-h-0 min-h-[320px] flex-1 flex-col px-6"
         >
-          <WorkflowCanvas
-            phases={specs}
-            selectedSlug={null}
-            onSelectNode={noop}
-            onClearSelection={noop}
-            editable={false}
-            runState={runState}
-            kbTools={kbTools}
+          <RunTranscript
+            phases={wireRows}
+            titleOf={titleOf}
+            liveOf={runState}
+            runStatus={runStatus}
+            now={nowMs}
           />
         </section>
 
@@ -1434,7 +1462,13 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   )
 }
 
-/** The canvas requires both selection callbacks; this surface has no selection at all
- *  (`selectedSlug` is permanently null), so they are inert by construction rather than
- *  by discipline. Module-scope, so the identity is stable across renders. */
-function noop() {}
+/* ⚠ `noop` LIVED HERE AND IS GONE WITH THE CANVAS IT EXISTED FOR. Its docblock read:
+ *
+ *     "The canvas requires both selection callbacks; this surface has no selection at all
+ *      (`selectedSlug` is permanently null), so they are inert by construction rather than
+ *      by discipline. Module-scope, so the identity is stable across renders."
+ *
+ * The run log has no selection either, and takes no callback for one — so the absence is
+ * now structural rather than supplied. Recorded rather than deleted: a removed helper is
+ * exactly as invisible as one that never existed, and the next reader looking for why this
+ * page has no node selection should find the answer here. */
