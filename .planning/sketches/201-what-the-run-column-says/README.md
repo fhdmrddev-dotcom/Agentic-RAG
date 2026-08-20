@@ -3,7 +3,7 @@ sketch: 201
 name: what-the-run-column-says
 kind: language-sketch
 question: "The run surface's centre column duplicates the right panel character-for-character. If it stops being a second list, what is it instead — and what fills its top slot when the run produced nothing?"
-winner: null
+winner: "hero+ledger (A/B/D are its three states) — C ruled out"
 tags: [run-surface, run-transcript, deliverable, seed-191, stitch-derived, hierarchy, empty-state]
 seeds: [SEED-191, SEED-155]
 built: 2026-08-21
@@ -68,6 +68,34 @@ So the real choice is two, not three:
 
 **D is the tie-breaker.** If the "neither" arm looks wrong under a hero slot, C is the safer shape —
 it has no slot to leave empty.
+
+## ✅ DECIDED 2026-08-21 — the adaptive hero, by the operator
+
+> *"I don't want to select either A or B — I want the render to be based on the workflow type and the
+> workflow scenario, which I assume is D."*
+
+**The instinct is right; only the label was off. D is not a fourth design — it is the EMPTY STATE of
+A and B.** All three are one family: **a hero slot the RUN fills according to what it produced.** The
+operator never picks A or B; the deliverable type does, per run.
+
+| the run produced | the hero renders |
+|---|---|
+| a file | file card + Download — looks like **B** |
+| only a written answer | the answer card — looks like **A** |
+| both | the file first, the answer beneath it |
+| neither | the dashed placeholder + the work it still did — **D** |
+
+**⛔ C IS RULED OUT.** It killed the duplication hardest, but it has **no hero slot**, so there is
+nothing for the deliverable type to change. It cannot do the thing that was actually asked for.
+
+⚠ **This is the shape the code is ALREADY built for.** `200.1-02` shipped exactly these four arms and
+three of them were driven live on 2026-08-21. This decision is about how they LOOK — it is not a
+rewrite, and any plan that treats it as one has misread the scope.
+
+⚠ **Still open, and it is the duplication half:** the hero fixes *what the column leads with*. It does
+NOT by itself stop the step rows repeating the right panel's names. The step **yields**
+(`Read 38 sources`, `Wrote 517 characters`) are the proposed answer — new content beside a repeated
+name — but whether that earns the repetition is exactly what the RENDERED sketch must settle.
 
 ## Binding refusals — carried from SEED-191, and honoured here
 

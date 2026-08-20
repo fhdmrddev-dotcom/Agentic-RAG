@@ -2320,7 +2320,7 @@ the five decisions aside.
 
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
-| 201 | what-the-run-column-says | The centre column duplicates the right panel character-for-character. If it stops being a second list, what is it instead — and what fills its top slot when the run produced nothing? | _pending_ | run-surface, seed-191, stitch-derived, empty-state |
+| 201 | what-the-run-column-says | The centre column duplicates the right panel character-for-character. If it stops being a second list, what is it instead — and what fills its top slot when the run produced nothing? | **hero+ledger — the adaptive hero (A/B/D are its states); C ruled out** ★ | run-surface, seed-191, stitch-derived, empty-state |
 
 ⚠ **A LANGUAGE sketch, not the acceptance bar** — it does not render `RunTranscript` /
 `WorkflowRunPage`. A rendered sketch is owed before planning (`SEED-155`).
@@ -2330,3 +2330,10 @@ what happens if the workflow does not produce the file?"* — **A and B are not 
 are ONE hero slot filled by whatever the run made, and the four arms already ship (`200.1-02`). The
 real choice is **hero + ledger** vs **C, one spine**, and tab **D** (the *neither* arm) is the
 tie-breaker: a hero slot that looks wrong when empty argues for C, which has no slot to leave empty.
+
+✅ **DECIDED 2026-08-21.** The operator declined to pick A or B: *"I want the render to be based on the
+workflow type and the workflow scenario."* That IS the hero+ledger family — one slot the RUN fills by
+deliverable type (file / answer / both / neither). **C is ruled out**: it has no hero slot, so nothing
+for the type to change. ⚠ The hero fixes what the column LEADS WITH; it does not by itself end the
+step-name duplication — the per-step **yields** are the proposal for that, and the rendered sketch
+must settle whether they earn it.
