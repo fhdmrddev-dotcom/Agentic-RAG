@@ -45,6 +45,7 @@ the right vocabulary, stop it, and see what it produced.
 | 199 | **(INSERT)** The Component Map | Every workflow surface re-presented in the adopted design language | DES-01 | 5 |
 | 200 | **(INSERT)** The Run Becomes Measurable | 7/7 | Complete   | 2026-08-19 |
 | 200.1 | **(INSERT)** The Run Says What It Produced | 3/3 | Complete    | 2026-08-20 |
+| 200.2 | **(INSERT)** The Run Column Stops Repeating Itself | The run surface's centre column leads with the deliverable and shows what each step yielded, instead of restating the panel's list | RUN-05 (new) | 4 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
 most independent first — 194 in particular is mostly UI over an endpoint that already exists. 196 and
@@ -83,7 +84,8 @@ is the incumbent any proposal must beat.
 - [x] **Phase 199: The Component Map** — **PLANNED 2026-08-19: 10 plans / 3 waves, one plan per sheet** (`/gsd:execute-phase 199`) — every workflow surface is re-presented in the adopted design language; ten of sketch 178's eleven component sheets, built against the components that actually ship (DES-01). ⚠ **INSERTED 2026-08-19 on an explicit operator instruction to implement the whole map in ONE body of work.** **PRESENTATION ONLY — no data, no endpoint, no migration, no new capability**; that fence is what makes it affordable and a plan that needs to cross it STOPS and reports. ⚠ **G-2 is satisfied by sketch 178 plus the operator's standing ratification, and the method's step-3 re-sketch is DELIBERATELY SKIPPED** — recorded as a decision, with `SEED-155` carried into execution as a hard rule instead (*if the shipped component cannot express the sheet, report it, never fake it*). ⚠ **CLOSED 2026-08-20 by the v3.7 close audit, AND SUPERSEDED IN PART BY PHASE 200 — recorded rather than smoothed over.** 5/5 SCs verified (`199-VERIFICATION.md`), and the operator's verdict on the same work was *"nothing changed from a UI perspective."* **Both were true**: the charter was PRESENTATION-ONLY, so `ALREADY-SHIPPED` counted as a pass (measured BUILT 17 · REFUSED/CANNOT-EXPRESS 31 · ALREADY-SHIPPED 57). Phase 200 lifted that fence and **re-ported six of these screens directly from `screens/*.html`**. The phase's own criteria stand as met; its *outcome* is carried by 200. ⚠ **6 human-UAT rows stay OWED** (`199-HUMAN-UAT.md`, 0 of 6 driven).
 - [x] **Phase 198: Node Vocabulary (research-first)** — prove the deterministic-primitive need before shipping one; cover structured mid-run input (NODE-01, NODE-02) ✅ **ANSWERED 2026-08-20 — SHIPS NOTHING, WHICH IS THE ENTRY'S OWN DECLARED OUTCOME.** Zero commits, zero plans, and none owed: this entry says *"Research-first — NODE-01 may legitimately ship nothing"*, and SC#1 is a COUNT rather than a build. **The count is `0`.** Measured against the live DB: **291 definitions · 119 carry phases · 264 phases · 38 sit strictly between two steps · 25 after excluding `external_action`+`llm_human_input` · ZERO exist only to reshape data.** ⚠ **Taken THROUGH the unwrap** (`definition` is a jsonb string scalar on **261 of 291** rows — a naive `definition->'phases'` answers a vacuous 0), and with a **non-vacuity control on the same scan**: reshape verbs **0/264**, control verbs `search|summar` **147/264**. **SC#2 is vacuously satisfied** (no primitive proposed — the three constraints are UNTESTED, not met, and a future proposal may not cite this phase as having cleared them). **SC#3 was already satisfied and is DRIVEN**: `llm_human_input` ships (8 live instances), `200-03` extracted its executor to `harness/human_input.py` (discharging this phase's own G-5 on `phase_types.py`), `BUG-260816-06`'s silent-approval timeout is fixed to PAUSE, and a published human-input workflow ran end to end 2026-08-20 with the card rendering in the spine and the answer resuming the run. Full derivation: `.planning/phases/198-node-vocabulary/198-RESEARCH-ANSWER.md`. ⚠ **Re-open trigger: any workflow whose MIDDLE step exists only to reshape data — re-derive with the unwrap and the control.** Branching stays OUT and is a different question (backlog foundation 2).
 - [x] **Phase 200: The Run Becomes Measurable** — **CONTEXT GATHERED 2026-08-19** (`/gsd:plan-phase 200`) — the wire gains per-step timings and per-step counts, and the four surfaces that consume them (step panel · spine · canvas · run surface) are built to sketch 200 (DES-02). ⚠ **INSERTED 2026-08-19; it had NO roadmap entry when its discussion began** — `init.phase-op 200` returned `phase_found: false`, genuine rather than the heading quirk, so **scope was settled in discussion and this entry is written FROM `200-CONTEXT.md`**. ⚠ **THE PRESENTATION-ONLY FENCE IS LIFTED** — backend changes are in scope, and **`ALREADY-SHIPPED` no longer counts as a pass** (it was **57 of 105 verdicts** in 199). Folds four open bug reports incl. `BUG-260816-06`, the silent approval. ✅ **CLOSED 2026-08-20 by the v3.7 close audit** — 5/5 SCs verified against the tree and the live DB, not against a SUMMARY. **SC#2**: `workflow_phases.started_at`/`completed_at` exist and carry data (**18 of 588 rows**, 3 real runs; the run page draws real per-step durations). ⚠ **SC#3 IS THE ONE THAT DOES NOT HOLD, AND IT WAS FOUND BY MEASURING RATHER THAN BY READING — the tick above is qualified, not withdrawn.** The wire fields exist (`api/workflow_runs.py:133-148`, `models/thread.py:120`) and `FlowEdge.tsx:336` renders the SAME declared count via `payloadLabel`, so the mechanism is single-sourced exactly as the criterion asks. **But the count reaches nobody.** `declared_phase_measure` (`models/thread.py:48`) opens with `if not isinstance(raw, dict): return None, None`, and `complete_phase` (`db/workflows.py:1606`) binds `json.dumps(output)` into a `$2::jsonb` parameter on a pool that already registers a jsonb codec with `encoder=json.dumps` (D-073-06) — **migration 122's root cause, one column over.** Encoded twice ⇒ `workflow_phases.output` is a jsonb STRING SCALAR, the read side receives a `str`, and the extractor degrades to `(None, None)` **silently**. **Measured 2026-08-20, and the split is total rather than partial: `_measure` is present on 13 rows THROUGH the unwrap and reachable on ZERO rows without it; every one of the 484 `completed` rows is `string` (the `object` rows are `pending`/`cancelled`/`skipped`, written by a path that binds the dict directly).** ⚠ **`completed` is exactly the status that can carry a measure, so the failure rate is 100%, not 90%.** The render is HONEST (nothing, never a `0` or a dash — D-07's absent arm doing its job), which is why no test and no eye caught it: **built, gated, green, and structurally unreachable — the Phase-118 lesson with a live mechanism.** Routed to `200.1` as line 1, ahead of the text arm, because the text arm lands on this same read. Everything else in SC#3 stands . ⚠ **STATE.md's claim that the canvas run mode has NO MOUNT is STALE**: the finishing pass added a log↔canvas centre switch (`WorkflowRunPage.tsx:933,1277,1444`), so `runState` IS passed to `WorkflowCanvas` at `:1455`, behind a toggle defaulting to `log`. **SC#4**: `harness/human_input.py` — the extracted executor pauses on timeout and never approves (`BUG-260816-06`, measured at the 300 s default). **SC#5**: migrations 121 · 122 · **123 ALL APPLIED** (`workflow_runs.definition_snapshot` is `object` on **4 of 4** rows — zero string scalars remain), `full-schema.sql` carries both new columns, count gate re-derived **`OK · total 5365 · failed 0 · pinned 5004 · 110/110`**, `tsc` at its 33-error/19-file pre-existing baseline. **SC#1**: every `WIRE-*.md` row is enumerated `DONE` / `BLOCKED` / `NOT TAKEN` with none in no bucket. ⚠ **RESIDUALS, routed not hidden:** 17 FE-WIRING rows still open of 45, plus 24 BE-NEEDED + 63 NEW, which collapse into **the six foundations** in `STATE.md`. Two of those foundations are `200.1`.
-- [ ] **Phase 200.1 (INSERT): The Run Says What It Produced** — the run surface names its deliverable BY TYPE, and the log's live line looks live (RUN-04). ⚠ **INSERTED 2026-08-20 by the v3.7 close audit, from two operator observations and one defect the audit measured.** ⚠ **NOT a Phase 195 gap and not a gap-closure round** — 195's goal is verbatim *"a workflow that produces a FILE shows it"* and all three of its criteria are about files; a TEXT deliverable is new capability, which G-7 forbids inside a closure round. **Three plans.** ⚠ **The backend half is ONE narrow field on an existing route — but it is BLOCKED behind a read-side defect this audit found**, which is why the defect is plan 1 rather than a footnote. Full derivation in the phase detail below.
+- [x] **Phase 200.1 (INSERT): The Run Says What It Produced** ✅ **CLOSED 2026-08-21** — 3/3 plans, verification **passed 5/5** (re-run independently, not read off SUMMARYs), code review **2 Criticals found and BOTH fixed the same session**: a `RecursionError` escaping `phase_output_object`'s "never raises" contract on a model-influenced parser, and `runAnswer` selecting a confirm step's own QUESTION as the run's answer — the shipped FIXTURE was itself the defect shape, which is why 163 tests were green over it. All four deliverable arms driven in a browser; the `file only` arm proved to have **zero instances** across the 120 most recent terminal runs by the UI's own thread-scoped predicate. ⚠ `/gsd:secure-phase 200.1` **NOT RUN** and is owed. ⚠ `phase.complete` wrote `status: milestone_complete` here and it was FALSE (it sorts by phase NUMBER); hand-corrected, see commit `d9c35fe1`. — the run surface names its deliverable BY TYPE, and the log's live line looks live (RUN-04). ⚠ **INSERTED 2026-08-20 by the v3.7 close audit, from two operator observations and one defect the audit measured.** ⚠ **NOT a Phase 195 gap and not a gap-closure round** — 195's goal is verbatim *"a workflow that produces a FILE shows it"* and all three of its criteria are about files; a TEXT deliverable is new capability, which G-7 forbids inside a closure round. **Three plans.** ⚠ **The backend half is ONE narrow field on an existing route — but it is BLOCKED behind a read-side defect this audit found**, which is why the defect is plan 1 rather than a footnote. Full derivation in the phase detail below.
+- [ ] **Phase 200.2 (INSERT): The Run Column Stops Repeating Itself** — the centre column leads with the deliverable, chosen by what the run produced, and shows what each step yielded instead of restating the panel's list (RUN-05). ⚠ **INSERTED 2026-08-21 by the operator, watching real runs during 200.1.** Measured: the two columns carry **character-identical** step names and the left clock is the **running sum** of the panel's durations; ~780px of the column is empty; the main area is white plus one grey at two opacities while the *smaller* panel carries the status colour. ⚠ **SEQUENCED AFTER 198** — 198 is the last CORE item and must not be delayed by a presentation phase. ⚠ **G-2 half-satisfied**: sketch **201** decided the winner (*the adaptive hero*), but it is `renders_real_components: false`, so **a rendered sketch is owed before planning** (SEED-155). ⚠ **RESTYLE, NOT REBUILD** — 200.1-02 already ships the four arms. Brief: `SEED-191`.
 
 ### Phase Details
 
@@ -1158,6 +1160,62 @@ hot-file ledger triples cannot be derived until every source edit has landed.**
       than an approximation. One deviation taken in writing: the sheet's `#464651` measures **2.16:1**
       against the ground both drawings share, so it is declined. Both shipped refusals asserted as
       still holding — one against a test that must pass UNEDITED.
+
+
+#### Phase 200.2: The Run Column Stops Repeating Itself (INSERT)
+
+**Goal**: The run surface's centre column leads with the deliverable — chosen by what the run
+actually produced — and shows what each step YIELDED, instead of restating the right panel's list of
+step names in a second, plainer typeface.
+**Depends on**: Phase 200.1 (it shipped `deliverable_text`, the four render arms and the count read —
+this phase re-presents them, it does not rebuild them).
+**Requirements**: RUN-05 (new — must be added to `REQUIREMENTS.md` at planning time).
+**Inserted**: 2026-08-21, by the operator watching real runs during 200.1 execution.
+**Sequenced AFTER Phase 198** deliberately — 198 is v3.7's last CORE item and must not be delayed by
+a presentation phase.
+
+⚠ **G-2 FIRES and is ALREADY HALF-SATISFIED.** Live UI, visual, "feels like". Sketch **201**
+(`.planning/sketches/201-what-the-run-column-says/`) is the LANGUAGE pass and carries a decided
+winner: **the adaptive hero** — one slot the run fills by deliverable type. ⚠ It is
+`renders_real_components: false`, so **a RENDERED sketch is still owed before planning** (`SEED-155`
+is the scar: a sketch that hand-draws its own CSS produced an atom the shipped card could not render,
+and only UAT caught it).
+
+⚠ **G-5 FIRES** on `frontend/src/pages/WorkflowRunPage.tsx` and
+`frontend/src/components/workflows/RunTranscript.tsx` — read their sections in
+`docs/HOT-FILE-LEDGER.md` before planning.
+
+⚠ **SCOPE FENCE — THIS IS A RESTYLE, NOT A REBUILD.** `200.1-02` already ships the four arms (file /
+answer / both / neither) and three were driven live in a browser on 2026-08-21. The selection logic
+is DONE. A plan that scopes this as new capability has misread it.
+
+⚠ **THE HERO DOES NOT BY ITSELF CLOSE THE DUPLICATION**, and the phase must not claim it does. It
+fixes what the column LEADS WITH. The step rows still repeat the panel's names; the proposed answer is
+the per-step **yield** (`Read 38 sources`, `Wrote 517 characters`) as new content beside a repeated
+name. Whether that earns the repetition is the question the rendered sketch must settle, and it is a
+success criterion, not an assumption.
+
+⚠ **THREE BINDING REFUSALS** — full derivation in `SEED-191`:
+1. **No stored thinking process.** No substep/event table exists; `reasoning_content` is `0` on every
+   workflow-run message; the live substep stream is an ephemeral Redis buffer. A reasoning view is a
+   **backend persistence phase**, not this one.
+2. **No fabricated relevance score.** `similarity_scores` held 7 entries against 38 `citations` on the
+   same row — they do not correspond. The Stitch reference drew one anyway.
+3. **No invented per-step narration.** `RunTranscript` ships this refusal with a driven positive
+   control; a restyle must not quietly overturn it.
+
+⚠ **Colour is spent on STATE, never decoration** — Deep Midnight uses accent sparingly and Phase 185
+already spent the budget (*"governance spends no colour and no third badge"*). Prominence comes from
+weight, size, spacing and the card.
+
+**Success criteria**
+1. The centre column's top region renders the deliverable by TYPE, and all four arms are driven in a
+   browser on real runs — including `neither`, which today reads as a loading failure.
+2. Each step shows what it yielded, sourced from a stored field; a step that yielded nothing shows
+   nothing (no `0`, no dash) — D-07's absent arm survives.
+3. The real citation passages are reachable from the step that read them.
+4. The column and the right panel no longer read as the same list — judged by a human, on screen, not
+   by a DOM assertion.
 
 
 #### Phase 198: Node Vocabulary (research-first)
