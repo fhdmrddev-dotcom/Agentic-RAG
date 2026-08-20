@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: executing
-last_updated: "2026-08-19T15:17:46.498Z"
-last_activity: 2026-08-19
+last_updated: "2026-08-20T18:40:00.000Z"
+last_activity: 2026-08-20
 progress:
   total_phases: 22
   completed_phases: 12
@@ -36,8 +36,9 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 ## Current Position
 
 Phase: 200 (the-workflow-journey) — **EXECUTED, THEN RE-PORTED FROM THE SKETCHES 2026-08-20.**
-Plan: 7 of 7 plans + 6 sketch ports + 3 wiring passes, all merged to `develop`, HEAD `e56b821a`
-Next action: **operator decision on the run page's centre** (see below), then the six foundations.
+Plan: 7 of 7 plans + 6 sketch ports + 4 wiring passes, all merged to `develop`, HEAD `13107cc5`
+Next action: **the six foundations** — the run page's centre is decided and shipped (see below). Nearest
+unblocked value: **branching in the definition** (~6 rows), which also re-earns the run canvas.
 
 ⚠ **THE PHASE PASSED ITS OWN CHECKLIST AND FAILED THE OPERATOR — AGAIN, AND THE CAUSE IS
 STRUCTURAL.** 47/49 atoms were reported built and every gate was green; the operator's verdict
@@ -83,12 +84,55 @@ matched by position, not by meaning, and reported COMPLETE. The fix that caught 
 must enumerate each row as `DONE` / `BLOCKED` / `NOT TAKEN`; **a row in none of the three is a
 failure, not an omission.**
 
-**⏸ ONE OPERATOR DECISION IS BLOCKING** — *what belongs in the CENTRE of the run page?* The
-sheet puts a **transcript** in the slot the canvas was ported into during this same phase.
-Shipping both gives the page **four readings of one run** (canvas + transcript + `RunReceipt` +
-deliverables), and this surface already had a status-shown-twice defect reported once. Its
-`mm:ss` gutter is backend-gated regardless. Options: canvas stays / transcript replaces it /
-they share a toggle.
+**✅ THE BLOCKING DECISION IS TAKEN (2026-08-20, `01e58298`) — THE CENTRE IS THE RUN LOG.**
+`WorkflowRunPage.tsx` renders `RunTranscript` where it rendered `WorkflowCanvas`; `WIRE-run-surface.md`
+rows 1 and 2 are CLOSED (revised tally **DONE 15 · BLOCKED 1 · NOT TAKEN 0**). Four measured reasons:
+(1) `WorkflowDefinition.phases` is `list[PhaseSpec]` and the harness models contain **no branch
+construct at all**, so a graph of a run is the spine drawn expensively; (2) the page stated
+{step → status} **three** times, and its run band is already `sr-only` because an operator reported
+the status twice; (3) sketch 200 is the newer `acceptance_bar: true` sheet and draws no canvas here
+— the canvas came from 152-B via Phase 188; (4) ⚠ **the `mm:ss` blocker was scoped to the WRONG
+SOURCE.** The audit cited `ToolCall.startedAt`; the log is built from PHASE rows, and `200-02` +
+migration 121 already put `started_at`/`completed_at` on the wire beside `step_count`/`step_noun`.
+**Zero backend work.** ⚠ **The canvas port lost nothing** — it edited the SHARED component the
+BUILDER renders. **Still refused, and it is a refusal not an omission:** the sheet's per-line
+NARRATION (*"Connecting to Northwind CRM instance…"*) is authored copy the product does not have; a
+two-line-per-step draft was built and WITHDRAWN because with only the step's name both lines say the
+same thing.
+
+⚠ **THE LOG EXPOSED A REAL PRE-EXISTING DEFECT ON ITS FIRST BROWSER OPEN, and 144 green tests could
+not have found it.** The screen read *"Produce the deliverable · Not started"* about a step that had
+FAILED, and *"Work out how to do it · Failed"* about one that never ran. **Measured:** the page joins
+the definition's steps onto the run's rows by `phase_index` (D-188-01 — sound, because the reconcile
+skeleton emits placeholder SLUGS), and on **2 of 228 local runs** `workflow_phases.phase_index`
+disagrees with the definition's ordering, so the join reports each step's state as its NEIGHBOUR's.
+⚠ **The counting query has to double-decode `workflow_definitions.definition`** —
+`jsonb_typeof(definition)` is **`'string'`** (the recorded jsonb string-scalar trap), so a naive
+`definition->'phases'` returns nothing and the first version of that query answered a **vacuous
+zero**. **The canvas painted the same crossed readings; what the log did was put both sources on one
+line.** The surface does NOT fix it (re-keying on slug would overturn D-188-01 on two rows, at a
+surface that is not where the join lives) — it refuses to repeat it, and flags
+`data-source-conflict`. **The join itself is still owed a fix.**
+
+⚠ **WHAT BECAME UNREACHABLE, named rather than left to be found:** `grep -rn "runState=" frontend/src`
+outside tests now returns **nothing**, so the canvas's whole RUN MODE has no mount — `BC-MR-01`'s
+per-connection payload label, `PORT-canvas.md`'s marching `live` connector, and the run-tense
+connection states. **All three are still computed and none of the code is deleted**; the declared
+count still reaches a person on the log and the receipt. **Re-open trigger: branching becoming
+representable (foundation 2).** `useGroundingBundle` was removed from the page with the canvas that
+was its only consumer; F7's fix still reads verbatim from `WorkflowBuilderPage.tsx`.
+
+⚠ **OWED — the log's clock has NEVER rendered against live data.**
+`select count(*) from workflow_phases where started_at is not null` → **0 of 570**: no run has
+executed since migration 121 landed. The writer exists and is wired (`db/workflows.py:1466` →
+`harness_engine.py:1638`). **One UAT row closes it: run any published workflow once and open its run
+page.** Every existing run falls into the untimed arm, which renders correctly (verified live).
+
+⚠ **`RunReceipt`'s row list is now the closest thing to a duplicate on the page** — the log has one
+line per step with a clock, the receipt one row per step with a duration. **Recommendation, not
+done:** collapse `RunReceipt` to its header strip (total runtime · N steps · finished at) and let the
+log carry the rows. Also seen in the browser and left alone: the receipt prints `recorded-not-sent`
+as **`finished`**, which D-07 says must be distinct at every surface.
 
 **THE REMAINING BACKLOG IS SIX FOUNDATIONS** (24 BE-NEEDED + 63 NEW collapse into these):
 1. **Connections** (~18 rows) — **a milestone, not a screen.** No MCP client
