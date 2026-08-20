@@ -467,19 +467,39 @@ describe("transcriptEntries — where each step sits in the log", () => {
   const T0 = Date.parse("2026-08-19T14:00:00.000Z")
   const at = (seconds: number) => new Date(T0 + seconds * 1000).toISOString()
 
-  it("places a finished step at its COMPLETION, offset from the run's zero", () => {
+  /**
+   * ⚠ THIS PAIR ASSERTED THE OPPOSITE UNTIL 2026-08-20, AND THE REVERSAL IS THE POINT.
+   * `transcriptEntries` stamped a finished step at its `completed_at`, on the reasoning that a
+   * log entry marks when a thing became KNOWN. That held for a line carrying no duration. The
+   * line now carries one, and on the very first step — which starts at the anchor — the stamp
+   * and the duration became THE SAME STRING: `11s · Pull usage and adoption data · 11s`, seen
+   * in a browser. Start-stamp plus duration state the whole interval instead of overlapping,
+   * and the column reads as a timeline whose gaps between steps are visible.
+   */
+  it("places a step at its START, so the stamp and the duration are complementary", () => {
     const rows: PhaseTimingRow[] = [
       { slug: "a", status: "completed", started_at: at(0), completed_at: at(12) },
     ]
-    expect(transcriptEntries(rows)).toEqual([{ slug: "a", offsetMs: 12_000, order: 0 }])
+    expect(transcriptEntries(rows)).toEqual([{ slug: "a", offsetMs: 0, order: 0 }])
   })
 
-  it("places a still-running step at its START, because that is all that has happened", () => {
+  it("reads as a timeline — each stamp is when that step began", () => {
     const rows: PhaseTimingRow[] = [
       { slug: "a", status: "completed", started_at: at(0), completed_at: at(12) },
       { slug: "b", status: "active", started_at: at(14) },
     ]
-    expect(transcriptEntries(rows).map((e) => e.offsetMs)).toEqual([12_000, 14_000])
+    expect(transcriptEntries(rows).map((e) => e.offsetMs)).toEqual([0, 14_000])
+  })
+
+  it("falls back to `completed_at` for a row that has no readable start", () => {
+    // ⚠ THE FALLBACK IS NOT DEAD CODE: a row can carry a completion and no start (a historic
+    // row half-written before migration 121). Placing it at its completion is the only instant
+    // it has, and dropping it would remove a step that really ran.
+    const rows: PhaseTimingRow[] = [
+      { slug: "a", status: "completed", started_at: at(0), completed_at: at(12) },
+      { slug: "b", status: "completed", completed_at: at(30) },
+    ]
+    expect(transcriptEntries(rows).map((e) => e.offsetMs)).toEqual([0, 30_000])
   })
 
   it("sorts by the clock and appends untimed rows in the SERVER's order", () => {
@@ -521,9 +541,12 @@ describe("transcriptEntries — where each step sits in the log", () => {
   })
 
   it("breaks a tie on the server's row order, never on the slug", () => {
+    // ⚠ TIED ON THE STAMPED INSTANT, which is the START — the fixture was tied on
+    // `completed_at` while the stamp was the completion, and had to move with the reversal or
+    // it would have stopped exercising a tie at all while still passing.
     const rows: PhaseTimingRow[] = [
       { slug: "zebra", status: "completed", started_at: at(0), completed_at: at(5) },
-      { slug: "alpha", status: "completed", started_at: at(1), completed_at: at(5) },
+      { slug: "alpha", status: "completed", started_at: at(0), completed_at: at(9) },
     ]
     expect(transcriptEntries(rows).map((e) => e.slug)).toEqual(["zebra", "alpha"])
   })
@@ -531,9 +554,10 @@ describe("transcriptEntries — where each step sits in the log", () => {
   it("never returns a negative offset, even for a row stamped before the anchor", () => {
     // Clock skew between writers is not this module's to fix, but a negative elapsed time is
     // a figure that cannot be true, so it is floored rather than printed.
+    // Row `b` carries only a completion, and it lands BEFORE the anchor row `a` started.
     const rows: PhaseTimingRow[] = [
       { slug: "a", status: "active", started_at: at(10) },
-      { slug: "b", status: "completed", started_at: at(20), completed_at: at(5) },
+      { slug: "b", status: "completed", completed_at: at(5) },
     ]
     expect(transcriptEntries(rows).every((e) => (e.offsetMs ?? 0) >= 0)).toBe(true)
   })

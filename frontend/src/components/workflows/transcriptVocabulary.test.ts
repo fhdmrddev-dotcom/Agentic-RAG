@@ -24,6 +24,7 @@ import {
   TRANSCRIPT_LANDMARK_LABEL,
   TRANSCRIPT_NO_STEPS,
   TRANSCRIPT_TIMES_NOT_RECORDED,
+  SPINE_HEADING,
 } from "./transcriptVocabulary"
 
 /** Every string this module exports, read off the module rather than hand-listed — so a
@@ -33,17 +34,18 @@ const EXPORTED: string[] = Object.values(TRANSCRIPT).filter(
   (v) => typeof v === "string",
 ) as string[]
 
-describe("transcriptVocabulary — the three governed strings", () => {
-  it("exports exactly the three, and the module holds nothing else", () => {
+describe("transcriptVocabulary — the four governed strings", () => {
+  it("exports exactly the four, and the module holds nothing else", () => {
     // ⚠ A COUNT, so an export added without a decision fails a test rather than arriving
     // silently. It is not a ceiling on the module — it is a requirement that growing it is
     // deliberate, which is what `doorVocabulary.ts`'s own governed-id count buys.
-    expect(EXPORTED).toHaveLength(3)
+    expect(EXPORTED).toHaveLength(4)
     expect(EXPORTED).toEqual(
       expect.arrayContaining([
         TRANSCRIPT_LANDMARK_LABEL,
         TRANSCRIPT_NO_STEPS,
         TRANSCRIPT_TIMES_NOT_RECORDED,
+        SPINE_HEADING,
       ]),
     )
   })

@@ -2,12 +2,12 @@
  * Phase 200 · the run transcript's WORDS (sketch `run-surface.html`, WIRE rows 1 + 2).
  *
  * EVERY GOVERNED USER-FACING STRING THE TRANSCRIPT SPELLS OF ITS OWN, IN ONE HOME: the
- * landmark and the two honest-absence headlines. That is the WHOLE
+ * landmark, the spine's heading and the two honest-absence headlines. That is the WHOLE
  * table and not a subset of it — the `doorVocabulary.ts` rule, kept for its mechanical
  * reason rather than a tidy one: a module holding a SUBSET means the next reader cannot
  * tell which strings are governed.
  *
- * ── ⚠ WHY IT IS THREE STRINGS AND NOT FORTY ────────────────────────────────────────────
+ * ── ⚠ WHY IT IS FOUR STRINGS AND NOT FORTY ────────────────────────────────────────────
  *
  * The transcript renders three kinds of text and AUTHORS only one of them:
  *
@@ -60,6 +60,16 @@
  * happens not to be legible to a sighted reviewer — the harder kind of drift to notice.
  */
 export const TRANSCRIPT_LANDMARK_LABEL = "Run log"
+
+/**
+ * `spine.heading` — the right-hand step spine's own heading, from the sheet.
+ *
+ * ⚠ IT LIVES HERE RATHER THAN IN A SECOND MODULE because the log and the spine are the two
+ * halves of ONE screen and share one register: the log says what happened and when, the spine
+ * says where the run is. Splitting three strings across two files would buy nothing and would
+ * make each file's "this is the WHOLE table" claim narrower than the screen it describes.
+ */
+export const SPINE_HEADING = "Workflow progress"
 
 // ── The two absences, which are two DIFFERENT statements ────────────────────────────────
 

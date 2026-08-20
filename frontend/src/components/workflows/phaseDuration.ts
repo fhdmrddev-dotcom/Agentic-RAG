@@ -376,10 +376,19 @@ export interface TranscriptEntry {
  * The run's rows, ordered as a log: timed rows by their instant, untimed rows appended in
  * the server's own order.
  *
- * ⚠ A ROW'S INSTANT IS ITS `completed_at` WHEN IT HAS ONE. A log entry is stamped when the
- * thing became known, so a finished step is placed at its ending and the step still running
- * is placed at its beginning. Placing a finished step at its START would put it before rows
- * that had already resolved while it was working, which reads as an out-of-order run.
+ * ⚠ A ROW'S INSTANT IS ITS `started_at`, AND THIS REVERSES AN EARLIER DECISION IN THIS SAME
+ * FILE. The first version stamped a finished step at its `completed_at`, reasoning that *"a
+ * log entry is stamped when the thing became known"*. That was sound **for a line carrying no
+ * duration**, and the line now carries one: with a duration on the right, a completion stamp
+ * on the left makes the two numbers describe overlapping facts, and on the very first step —
+ * which starts at the anchor — they are the SAME STRING. Seen in a browser as
+ * `11s · Pull usage and adoption data · Complete · 11s`.
+ *
+ * Start-stamp plus duration are COMPLEMENTARY: together they state the whole interval, the
+ * column reads as a timeline (`0s, 11s, 19s, 26s, 33s`), and the gaps BETWEEN steps become
+ * visible — which a completion stamp hides. The reversal is recorded rather than quietly
+ * applied, because the original reasoning is still correct about the thing it was reasoning
+ * about.
  *
  * ⚠ NOTHING IS SYNTHESISED TO MAKE THE LIST REGULAR. A `done` row with no `completed_at` is
  * a historic row (pre-migration-121) and keeps whatever instant it does have; a row with
@@ -391,7 +400,7 @@ export function transcriptEntries(rows: readonly PhaseTimingRow[]): TranscriptEn
   const untimed: TranscriptEntry[] = []
 
   rows.forEach((row, order) => {
-    const at = readInstant(row.completed_at) ?? readInstant(row.started_at)
+    const at = readInstant(row.started_at) ?? readInstant(row.completed_at)
     if (at === null || anchor === null) {
       untimed.push({ slug: row.slug, offsetMs: null, order })
       return

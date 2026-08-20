@@ -99,6 +99,25 @@ export interface RunReceiptProps {
   deliverableOf?: (slug: string) => string | null | undefined
   /** The instant to tick a still-running row against — hoist ONE per render (P-1). */
   now?: number
+  /**
+   * ⚠ `"summary"` RENDERS THE HEADER STRIP AND NO ROWS, AND IT EXISTS BECAUSE THE FULL RECEIPT
+   * BECAME A DUPLICATE THE DAY THE RUN LOG SHIPPED.
+   *
+   * Seen in a browser: the log listed five steps with their durations, and this region listed
+   * the same five steps with the same durations seven hundred pixels below it. That is the
+   * defect this surface has already shipped once — its run band is `sr-only` today because an
+   * operator reported the status appearing twice — arriving again in a new place.
+   *
+   * The HEADER is not a duplicate of anything: `Ran 57s · 5 steps · finished 19:55` is the only
+   * statement on the page about the run AS A WHOLE that is derived from the steps that really
+   * ran. So the strip survives and the rows go.
+   *
+   * ⚠ THE ROW RENDERER IS KEPT, NOT DELETED. `"full"` is still the default and still the tested
+   * shape: nothing about D-06's nine arms or D-07's count rule is weakened, and a surface that
+   * wants the whole receipt (a printable record, an audit view) can still ask for it. What
+   * changed is which variant the run page mounts.
+   */
+  variant?: "full" | "summary"
 }
 
 export function RunReceipt({
@@ -107,6 +126,7 @@ export function RunReceipt({
   runStatus,
   deliverableOf,
   now = Date.now(),
+  variant = "full",
 }: RunReceiptProps) {
   // ⚠ THE SPAN IS DERIVED FROM THE PHASE TIMESTAMPS, NOT FROM A CLIENT CLOCK and not from
   // `workflow_runs.claimed_at` — `200-02` measured that column null on 0 of 149 completed
@@ -137,6 +157,7 @@ export function RunReceipt({
         ))}
       </p>
 
+      {variant === "summary" ? null : (
       <ol className="flex flex-col gap-1">
         {phases.map((row) => {
           const facts = phaseRunFacts(row, runStatus, now)
@@ -180,6 +201,7 @@ export function RunReceipt({
           )
         })}
       </ol>
+      )}
     </section>
   )
 }

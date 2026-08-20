@@ -397,17 +397,63 @@ function renderPage(props: Partial<Parameters<typeof WorkflowRunPage>[0]> = {}) 
 function readings(): Record<string, string> {
   const out: Record<string, string> = {}
   for (const slug of SLUGS) {
-    out[slug] = screen.getByTestId(`transcript-row-${slug}`).getAttribute("data-reading") ?? "NONE"
+    // ⚠ `query`, NOT `get`. A step the RUN never recorded has no durable row and therefore no
+    // line — which is a real state (`run.phases` is the run's rows, not the definition's) and
+    // must read as an ABSENCE rather than throwing inside a helper.
+    const row = screen.queryByTestId(`transcript-row-${slug}`)
+    out[slug] = row?.getAttribute("data-reading") ?? "NONE"
   }
   return out
 }
 
-/** Every visible step's WORDED state, read off the log line a person actually reads. */
+/**
+ * Every visible step's WORDED state, read off the log line a person actually reads.
+ *
+ * ⚠ AN EMPTY STRING IS A REAL ANSWER HERE, NOT A LOOKUP FAILURE. Since the re-port the log is
+ * SILENT for an ordinary completion — the sheet prints no status word anywhere, and printing
+ * `Complete` on all five rows of a five-step run was `SEED-184`'s "dumped as text" complaint
+ * arriving in the surface built to answer it. The state is still stated in words once per step,
+ * on the SPINE; `spineWords()` below reads that. So a `""` from this helper means "the log
+ * deliberately said nothing", and the assertions that care say so explicitly.
+ */
 function labels(): Record<string, string> {
   const out: Record<string, string> = {}
   for (const slug of SLUGS) {
-    const row = screen.getByTestId(`transcript-row-${slug}`)
-    out[slug] = within(row).getByTestId("transcript-state").textContent ?? ""
+    const row = screen.queryByTestId(`transcript-row-${slug}`)
+    out[slug] = row ? (within(row).queryByTestId("transcript-state")?.textContent ?? "") : ""
+  }
+  return out
+}
+
+/**
+ * Each step's TIME READING as the run log renders it, in row order.
+ *
+ * ⚠ THESE ASSERTIONS USED TO READ `receipt-row-time`, AND THE RETARGET IS NOT A WEAKENING.
+ * The receipt on this page is now its `variant="summary"` strip — its rows repeated the log's
+ * five steps and five durations verbatim, which an operator caught on screen. D-06's arms and
+ * D-07's count rule are unchanged and are still asserted against the FULL receipt in
+ * `RunReceipt.test.tsx`; what these cases exist to prove is that the arms reach THIS PAGE, and
+ * the surface they reach it through is the log.
+ *
+ * ⚠ THE LOG SPLITS THE PAIR THE RECEIPT PRINTS SIDE BY SIDE. A duration lands in
+ * `transcript-time`; a reading that is a WORD rather than a number (`never ran (skipped)`,
+ * `time not recorded`, `did not finish`) lands in `transcript-state`, and the log suppresses
+ * `transcript-time` when it would be the identical string. So the honest reader takes whichever
+ * of the two the row carries — which is what a person sees.
+ */
+function logTimes(): string[] {
+  return Array.from(document.querySelectorAll('[data-testid^="transcript-row-"]')).map((row) => {
+    const time = row.querySelector('[data-testid="transcript-time"]')?.textContent
+    if (time) return time
+    return row.querySelector('[data-testid="transcript-state"]')?.textContent ?? ""
+  })
+}
+
+/** Each step's reading as the SPINE renders it — the surface that speaks for every step. */
+function spineReadings(): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const slug of SLUGS) {
+    out[slug] = screen.queryByTestId(`spine-step-${slug}`)?.getAttribute("data-reading") ?? "NONE"
   }
   return out
 }
@@ -503,7 +549,12 @@ describe("WorkflowRunPage — a terminal run re-opens by id with no live stream"
     renderPage()
     await screen.findByTestId("run-transcript")
     // The WORDS come from the shared vocabulary, not from this suite's expectations of it.
-    expect(labels()["gather-contracts"]).toBe("Complete")
+    // ⚠ THE COMPLETED STEP IS SILENT IN THE LOG BY DESIGN — see `labels()`. Its state is
+    // carried by the spine, so the derivation is asserted THERE and the log's silence is
+    // asserted as the deliberate thing it is.
+    expect(spineReadings()["gather-contracts"]).toBe("done")
+    expect(labels()["gather-contracts"]).toBe("")
+    // A step the run never reached is NOT an ordinary completion, so it still speaks.
     expect(labels()["draft-letter"]).toBe("Not started")
   })
 
@@ -2780,15 +2831,19 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
     // shipped `RunReceipt` exported and mounted NOWHERE — an `import.meta.glob` sweep in its
     // own suite asserted zero importers — so until this line it had never rendered outside a
     // test. This is the case that makes `BS-MR-03`/`RS-MR-05` a product fact.
-    expect(screen.getByTestId("run-receipt-region")).toBeInTheDocument()
     expect(screen.getByTestId("run-receipt")).toBeInTheDocument()
-    // One row per phase row, in the SERVER's order — never re-sorted client-side.
-    // ⚠ Scoped to the receipt's own list rather than a `data-testid` PREFIX match: the
-    // prefix `receipt-row-` also matches every atom INSIDE a row (`-title`, `-outcome`,
-    // `-time`), so a prefix count reads 12 for a three-step run and would have passed a
-    // wrong number for a plausible-looking reason.
-    const rows = screen.getByTestId("run-receipt").querySelectorAll("ol > li")
-    expect(rows).toHaveLength(3)
+    // ⚠ AND IT RENDERS AS A STRIP, NOT A LIST — `variant="summary"`, asserted as ZERO rows.
+    // Its rows repeated the run log's steps and durations verbatim, seven hundred pixels
+    // below them; an operator caught that on screen while every test here was green, because
+    // each one asserted the region's CONTENTS were right and none asked whether the page said
+    // the same thing twice. The strip survives because `Ran … · N steps · finished …` is the
+    // page's only statement about the run AS A WHOLE derived from steps that really ran.
+    expect(screen.getByTestId("run-receipt").querySelectorAll("ol > li")).toHaveLength(0)
+    const atoms = receiptHeaderAtoms()
+    expect(atoms[1]).toBe("3 steps")
+    // ⚠ NON-VACUITY: the per-step detail did not vanish from the page, it MOVED. The log
+    // below the strip carries one line per step.
+    expect(document.querySelectorAll('[data-testid^="transcript-row-"]')).toHaveLength(3)
   })
 
   it("names each step with the SAME `nodeTitle` the canvas paints — never the slug", async () => {
@@ -2798,8 +2853,9 @@ describe("WorkflowRunPage 200-07 — the receipt is MOUNTED (RS-MR-05 / D-09)", 
     renderPage()
     await screen.findByTestId("run-transcript")
 
+    // Retargeted at the LOG, which is the surface on this page that now names each step.
     const titles = Array.from(
-      document.querySelectorAll('[data-testid="receipt-row-title"]'),
+      document.querySelectorAll('[data-testid="transcript-title"]'),
     ).map((el) => el.textContent ?? "")
     expect(titles).toStrictEqual([
       "Find the supplier contracts",
@@ -2932,9 +2988,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
-      (el) => el.textContent ?? "",
-    )
+    const times = logTimes()
     expect(times[0]).toBe("12s")
     expect(times[1]).toBe("48s")
     // ⚠ The skipped row is an AFFIRMATIVE fact, not a blank — and it is a DIFFERENT string
@@ -2955,9 +3009,7 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
-      (el) => el.textContent ?? "",
-    )
+    const times = logTimes()
     expect(times[0]).toBe("time not recorded")
     expect(times[1]).toBe("never ran (skipped)")
     expect(times[0]).not.toBe(times[1])
@@ -2984,15 +3036,15 @@ describe("WorkflowRunPage 200-07 — D-06's arms on the receipt (RS-MR-02 / RS-M
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const time = document.querySelector('[data-testid="receipt-row-time"]')?.textContent ?? ""
+    const time = logTimes()[0]
     expect(time).toBe("did not finish")
     expect(time).not.toMatch(/\d/)
-    // …and the row's OUTCOME agrees with its reading rather than contradicting it. A row
-    // still marked active reading *still running* beside *did not finish* is how a receipt
-    // stops being a receipt.
-    const outcome =
-      document.querySelector('[data-testid="receipt-row-outcome"]')?.textContent ?? ""
-    expect(outcome).toBe("did not finish")
+    // …and the line states it ONCE. The reading and the outcome word are the same string for
+    // this arm, and the log suppresses the duplicate rather than printing it twice — the
+    // `not reached · not reached` defect, caught in a browser and fenced in the component.
+    const row = screen.getByTestId("transcript-row-gather-contracts")
+    expect(within(row).queryByTestId("transcript-time")).toBeNull()
+    expect(within(row).getByTestId("transcript-state").textContent).toBe("did not finish")
   })
 })
 
@@ -3021,9 +3073,7 @@ describe("WorkflowRunPage 200-07 — FETCH IS AUTHORITATIVE (D-v2.5-03)", () => 
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const times = Array.from(document.querySelectorAll('[data-testid="receipt-row-time"]')).map(
-      (el) => el.textContent ?? "",
-    )
+    const times = logTimes()
     // The FETCH's answer, not the slice's: a finished duration, never a live tick.
     expect(times[0]).toBe("12s")
     expect(times[0]).not.toMatch(/so far/)
@@ -3087,10 +3137,9 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
 
     const row = screen.getByTestId("transcript-row-gather-contracts")
     expect(within(row).getByTestId("transcript-count").textContent).toBe("312 sources")
-    // ...and the same pair on the receipt below, from the same resolver.
-    expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe(
-      "312 sources",
-    )
+    // ⚠ The receipt below is a SUMMARY STRIP now and carries no rows, so there is no second
+    // rendering of the pair to compare against on this page. `RunReceipt.test.tsx` still
+    // asserts the full variant's row directly.
   })
 
   it("RS-MNR-03: a step that declared NO count renders NO count slot — never a `0`", async () => {
@@ -3138,10 +3187,8 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
       within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count")
         .textContent,
     ).toBe("0 sources")
-    // …and it reaches the receipt too, as the pair the wire sent, VERBATIM.
-    expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe(
-      "0 sources",
-    )
+    // (the receipt below is a summary strip and carries no rows — see the count block's
+    // opening docblock)
   })
 
   it("the NOUN passes VERBATIM — this page substitutes no word of its own", async () => {
@@ -3171,7 +3218,7 @@ describe("WorkflowRunPage 200-07 — the count's supply line (RS-MR-01 / RS-MNR-
       within(screen.getByTestId("transcript-row-gather-contracts")).getByTestId("transcript-count")
         .textContent,
     ).toBe("7 zzqx")
-    expect(document.querySelector('[data-testid="receipt-row-count"]')?.textContent).toBe("7 zzqx")
+    // (the receipt below is a summary strip and carries no rows)
   })
 })
 
@@ -3220,7 +3267,7 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const receipt = screen.getByTestId("run-receipt-region")
+    const receipt = screen.getByTestId("run-transcript-region")
     // No file names, no preview affordance, and NO deliverable slot at all — nothing on
     // `workflow_phases` says which file a step produced, so the page passes no
     // `deliverableOf` and the receipt renders none.
@@ -3264,10 +3311,24 @@ describe("WorkflowRunPage 200-07 — D-17 verified, not rebuilt (RS-MR-06 / RS-M
 // synthetic control below — see `200-07-SUMMARY.md` for the checksums.
 // ═════════════════════════════════════════════════════════════════════════════════════════
 
-/** The count slots this surface renders, on BOTH halves of it. */
-const COUNT_SLOTS = '[data-testid="receipt-row-count"],[data-testid="phase-card-count"]'
-/** The one-reading-per-row time slots, on both halves. */
-const TIME_SLOTS = '[data-testid="receipt-row-time"],[data-testid="phase-card-timing"]'
+/**
+ * The count slots this surface renders.
+ *
+ * ⚠ WIDENED WHEN THE RUN LOG BECAME THE PAGE'S CENTRE, and widening it was NOT optional. This
+ * fence exists to prove that a fabricated figure or a stray ligature cannot reach the screen;
+ * a selector list that names only the OLD slots would have kept returning zero and reporting
+ * `clean` about a surface it could no longer see. A fence that stops matching is not a fence
+ * that passes — the failure this project records over and over — so the log's slots are named
+ * here in the same commit that made them the ones a person reads.
+ */
+const COUNT_SLOTS =
+  '[data-testid="receipt-row-count"],[data-testid="phase-card-count"],' +
+  '[data-testid="transcript-count"],[data-testid="spine-count"]'
+/** The one-reading-per-row time slots, on every half. */
+const TIME_SLOTS =
+  '[data-testid="receipt-row-time"],[data-testid="phase-card-timing"],' +
+  '[data-testid="transcript-time"],[data-testid="transcript-state"],' +
+  '[data-testid="spine-elapsed"]'
 
 /**
  * The Material Symbols ligature names measured in the rendered text of all four in-scope
@@ -3525,7 +3586,10 @@ describe("WorkflowRunPage 200-07 — the REPORT rows (§5), not built, not faked
     // ⚠ NOT FAKED is the claim, so it is the ABSENCE that is asserted: this surface renders
     // ONE row per PHASE and nothing finer. Three phase rows, three receipt rows — no
     // sub-step line has been invented to fill the sketch's eight.
-    expect(screen.getByTestId("run-receipt").querySelectorAll("ol > li")).toHaveLength(3)
+    // ⚠ COUNTED ON THE LOG, which is where the per-step lines live since the receipt became a
+    // summary strip. The claim is unchanged: THREE step-level lines and not one sub-step line,
+    // because the sub-step trace the sheet draws has no client transport.
+    expect(document.querySelectorAll('[data-testid^="transcript-row-"]')).toHaveLength(3)
     const text = container.textContent ?? ""
     expect(text).not.toContain("Connecting to")
     expect(text).not.toContain("Analyzing risk factors")
@@ -3572,13 +3636,33 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
     renderPage()
     await screen.findByTestId("run-transcript")
 
-    const spine = screen.getByTestId("spine-stub")
+    /**
+     * ⚠ THE SPINE IS NO LONGER THE DEVELOPER PANEL'S, AND THIS CASE CHANGED WITH IT.
+     *
+     * It used to assert that `PhaseTimeline` received the RUN's `threadId` rather than the
+     * globally-viewed one. Seen in a browser against the sheet, that component was the wrong
+     * one entirely: it rendered raw `workflow_phases.slug` values, a `Phase 5 / 5` counter and
+     * an agent count to a business author. `RunSpine` replaced it and takes NO thread id at
+     * all — it is handed the run's own durable rows — so the wrong-thread hazard the old
+     * assertion guarded is now structurally unreachable rather than merely tested.
+     *
+     * What replaces it is the stronger claim: the spine names the steps of THIS run, in the
+     * page's own vocabulary, and spells no slug.
+     */
+    const spine = screen.getByTestId("spine-step-gather-contracts")
     expect(spine).toBeInTheDocument()
-    // ⚠ AND IT IS THE RUN'S THREAD. `VIEWED_THREAD_ID` is a live decoy in this file — the
-    // globally-viewed thread is a real value here and it is the WRONG answer. A spine fed
-    // from it would render somebody else's steps while looking completely correct.
-    expect(spine.getAttribute("data-threadid")).toBe(RUN_THREAD_ID)
-    expect(spine.getAttribute("data-threadid")).not.toBe(VIEWED_THREAD_ID)
+    const spineTitles = Array.from(
+      document.querySelectorAll('[data-testid="spine-title"]'),
+    ).map((el) => el.textContent ?? "")
+    expect(spineTitles).toStrictEqual([
+      "Find the supplier contracts",
+      "Draft the renewal letter",
+      "Check it over",
+    ])
+    // ⚠ NON-VACUITY, AND THE WHOLE REASON THIS COMPONENT EXISTS: those are the author's names,
+    // and NOT ONE of the run's slugs appears anywhere in the spine.
+    const spineText = screen.getByTestId("run-panel").textContent ?? ""
+    for (const slug of SLUGS) expect(spineText).not.toContain(slug)
   })
 
   it("the panel region is a sibling of the log, so neither one displaced the other", async () => {
@@ -3625,7 +3709,7 @@ describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", ()
     await screen.findByTestId("run-transcript")
     expect(screen.queryByTestId("ask-stub-call-1")).toBeNull()
     // The spine is still there: the absence is the ask's, not the panel's.
-    expect(screen.getByTestId("spine-stub")).toBeInTheDocument()
+    expect(screen.getByTestId("spine-step-draft-letter")).toBeInTheDocument()
   })
 })
 

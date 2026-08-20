@@ -118,21 +118,24 @@ describe("RunTranscript — the region", () => {
 // ── 2. Placement and order ──────────────────────────────────────────────────────────
 
 describe("RunTranscript — where a step sits on the clock", () => {
-  it("stamps a finished step at its COMPLETION, measured from the run's first start", () => {
+  it("stamps every step at its START, so the gutter reads as a timeline", () => {
+    // ⚠ REVERSED FROM A COMPLETION STAMP on 2026-08-20 — see `transcriptEntries`' docblock. The
+    // first step starts AT the anchor, so a completion stamp printed the same string as its own
+    // duration (`11s · … · 11s`), which is what the browser showed.
     render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
-    // `gather` ran 0s → 12s. Its line is stamped 12s, not 0s: a log entry marks when the
-    // thing became known.
-    expect(clockOf("gather")).toBe("12s")
-    expect(clockOf("draft")).toBe("1m 10s")
+    expect(clockOf("gather")).toBe("0s")
+    expect(clockOf("draft")).toBe("14s")
   })
 
-  it("stamps a still-running step at its START, because that is all that has happened", () => {
-    const live: PhaseTimingRow[] = [
-      { slug: "gather", status: "completed", started_at: s(0), completed_at: s(12) },
-      { slug: "draft", status: "active", started_at: s(14) },
-    ]
-    render(<RunTranscript phases={live} titleOf={titleOf} runStatus="active" now={T0 + 60_000} />)
-    expect(clockOf("draft")).toBe("14s")
+  it("the stamp and the duration are DIFFERENT facts on the same line", () => {
+    // The non-vacuity of the reversal: on the first row they must not be the same string.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    const row = screen.getByTestId("transcript-row-gather")
+    const stamp = within(row).getByTestId("transcript-clock").textContent
+    const duration = within(row).getByTestId("transcript-time").textContent
+    expect(stamp).toBe("0s")
+    expect(duration).toBe("12s")
+    expect(stamp).not.toBe(duration)
   })
 
   it("orders by the clock, and appends the untimed rows after every timed one", () => {
@@ -296,7 +299,16 @@ describe("RunTranscript — the state word and the duration cannot contradict ea
       .toBe("true")
   })
 
-  it("with both sources settled the line carries the page's word AND the wire's duration", () => {
+  it("an ORDINARY COMPLETION says nothing — the bright line is the statement", () => {
+    /**
+     * ⚠ THE RULE THE BROWSER FORCED. The first port printed `Complete` on all five rows of a
+     * five-step run: `SEED-184`'s *"information is dumped as text, not presented"* complaint,
+     * arriving in the surface built to answer it. The sheet prints no status word anywhere.
+     *
+     * ⚠ IT IS NOT COLOUR-ALONE, and that is why the removal is safe: the state is still stated
+     * in words once per step, on the SPINE beside this column, which carries a glyph and a
+     * `data-reading` for every step including the finished ones.
+     */
     render(
       <RunTranscript
         phases={ROWS}
@@ -305,10 +317,38 @@ describe("RunTranscript — the state word and the duration cannot contradict ea
         now={T0}
       />,
     )
-    expect(stateOf("gather")).toBe("Complete")
-    expect(
-      within(screen.getByTestId("transcript-row-gather")).getByTestId("transcript-time").textContent,
-    ).toBe("12s")
+    const row = screen.getByTestId("transcript-row-gather")
+    expect(within(row).queryByTestId("transcript-state")).toBeNull()
+    // ...and the facts it DOES carry are all still there.
+    expect(within(row).getByTestId("transcript-time").textContent).toBe("12s")
+    expect(within(row).getByTestId("transcript-count").textContent).toBe("312 sources")
+    // NON-VACUITY: a step that is NOT an ordinary completion still speaks, in the same render.
+    expect(stateOf("check")).toBe(OUTCOME_NOT_REACHED)
+  })
+
+  it("every reading other than `done` still carries its word", () => {
+    // The exceptional cases are exactly the ones a person needs told rather than left to infer.
+    const mixed: PhaseTimingRow[] = [
+      { slug: "gather", status: "failed", started_at: s(0), completed_at: s(4) },
+      { slug: "draft", status: "active", started_at: s(6) },
+      { slug: "check", status: "skipped" },
+    ]
+    render(
+      <RunTranscript
+        phases={mixed}
+        titleOf={titleOf}
+        runStatus="active"
+        liveOf={liveMap({
+          gather: { reading: "failed", label: "Failed — its answer did not pass the checks" },
+          draft: { reading: "running", label: "Running" },
+          check: { reading: "skipped", label: "Skipped" },
+        })}
+        now={T0 + 10_000}
+      />,
+    )
+    expect(stateOf("gather")).toBe("Failed — its answer did not pass the checks")
+    expect(stateOf("draft")).toBe("Running")
+    expect(stateOf("check")).toBe("Skipped")
   })
 
   it("falls back to the RECEIPT's outcome for a slug the page holds no reading for", () => {

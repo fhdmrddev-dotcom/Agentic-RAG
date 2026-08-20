@@ -104,7 +104,12 @@ import { StopControl } from "@/components/chat/StopControl"
 // ── Phase 200 — the run surface's right-hand spine. Both are PANEL parts taken as
 //    props, not the panel SHELL: see the mount docblock at the canvas region below for
 //    why the shell itself cannot come here (a global chat singleton, and the previewer).
-import { PhaseTimeline } from "@/components/panel/PhaseTimeline"
+// ── Phase 200 re-port — THE SPINE IS THIS SURFACE'S OWN, NOT THE DEVELOPER PANEL'S ──────
+//    `PhaseTimeline` was mounted here by a wiring pass and rendered raw `workflow_phases.slug`
+//    values, a `Phase 5 / 5` counter and an agent count to a business author — see
+//    `RunSpine.tsx`'s docblock for the screenshot-level diff against the sheet. It remains the
+//    right component in CHAT and is untouched there; this page no longer imports it.
+import { RunSpine } from "@/components/workflows/RunSpine"
 import { PendingAskCard } from "@/components/panel/PendingAskCard"
 import {
   useAskUserPrompt,
@@ -194,18 +199,19 @@ const COPY_DELIVERABLE_HEADING = "Files in this run's workspace"
 const COPY_NO_FILES_LIVE = "No files yet — this run hasn't written anything."
 const COPY_NO_FILES_TERMINAL = "This run produced no files."
 const COPY_DOWNLOAD_FAILED = "Download failed — try again."
-/**
- * Phase 200-07 (D-09 · `RS-MR-05`) — the receipt region's heading.
+/* ⚠ `COPY_RECEIPT_HEADING` LIVED HERE AND IS GONE WITH THE REGION IT NAMED. It read:
  *
- * ⚠ PAST TENSE, and it is the receipt's whole premise rather than a stylistic choice: the
- * canvas above says what the run IS DOING, and this region says what it DID. `200-05`'s
- * `receiptVocabulary.ts` owns every string INSIDE the receipt; this one names the region on
- * the page and therefore belongs to the page, beside the three copy constants above it.
+ *     "What this run did, step by step"
  *
- * ⚠ It deliberately does not repeat the word `run` twice in one line with the deliverable
- * heading below, and it names no mechanism — no *phases*, no *timeline*, no *spine*.
- */
-const COPY_RECEIPT_HEADING = "What this run did, step by step"
+ * and its docblock argued, correctly at the time: *"the canvas above says what the run IS
+ * DOING, and this region says what it DID."* Both halves of that sentence stopped being true
+ * in the same afternoon — the canvas came off this page, and the region's step-by-step rows
+ * turned out to repeat the run log's five steps and five durations verbatim. The rows went;
+ * the heading described the rows, so it went with them.
+ *
+ * Recorded rather than deleted: a removed string is exactly as invisible as one never written,
+ * and the next reader wondering why this page announces no step-by-step list should find the
+ * answer here — the log below IS the list, and it does not need announcing. */
 
 // ── The deliverable list (SPEC Req 7) ──────────────────────────────────────────
 //
@@ -872,6 +878,27 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   const runState = useCallback((slug: string) => runStateBySlug.get(slug), [runStateBySlug])
 
   /**
+   * WHICH step the answer control is rendered beside.
+   *
+   * ⚠ IT FALLS BACK RATHER THAN MATCHING STRICTLY, AND A FAILING TEST IS WHY. The first version
+   * rendered the ask only on a step whose reading was `waiting-for-you` — which reads correctly
+   * and loses the control entirely whenever the page holds an ask that F5's three conditions do
+   * not resolve to a step (a slice that has not caught up, a run whose human step is not the one
+   * running). An unanswered prompt that renders NOWHERE is strictly worse than one rendered a
+   * row away from its step: the first is a run nobody can unblock.
+   *
+   * So: the waiting step if there is one, else the step that is running, else the last row. The
+   * control is always reachable, and it is beside the right step in the case that matters.
+   */
+  const askAnchorSlug = useMemo(() => {
+    const waiting = wireRows.find((r) => runStateBySlug.get(r.slug)?.reading === "waiting-for-you")
+    if (waiting) return waiting.slug
+    const running = wireRows.find((r) => runStateBySlug.get(r.slug)?.reading === "running")
+    if (running) return running.slug
+    return wireRows.length > 0 ? wireRows[wireRows.length - 1].slug : null
+  }, [wireRows, runStateBySlug])
+
+  /**
    * ── Phase 200-07 · the receipt's step names ────────────────────────────────────────────
    *
    * ⚠ THE TITLE IS THE PAGE'S, RE-DERIVED NOWHERE. `nodeTitle`'s ladder needs a page-owned
@@ -1294,6 +1321,22 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
           data-testid="run-transcript-region"
           className="flex min-h-0 min-h-[320px] flex-1 flex-col px-6"
         >
+          {/* ⚠ THE RUN'S TOTAL SITS ABOVE THE LOG IT SUMMARISES, AS A STRIP.
+              It used to be the header of a separate region below, whose ROWS repeated the log's
+              five steps and five durations verbatim — the duplication an operator caught on
+              screen. The rows are gone (`variant="summary"`); the strip stays, because
+              `Ran 57s · 5 steps · finished 19:55` is the page's ONLY statement about the run as
+              a whole derived from the steps that really ran. The page header's figure measures
+              something else (`created → updated`) and says so in words. */}
+          <div className="mx-auto mb-6 w-full max-w-3xl">
+            <RunReceipt
+              phases={wireRows}
+              titleOf={titleOf}
+              runStatus={runStatus}
+              now={nowMs}
+              variant="summary"
+            />
+          </div>
           <RunTranscript
             phases={wireRows}
             titleOf={titleOf}
@@ -1306,31 +1349,49 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
         <aside
           data-testid="run-panel"
           aria-label="Run steps"
-          className="hidden w-[320px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-border/10 px-3 py-4 lg:flex"
+          // ⚠ 380px AND NO PADDING OF ITS OWN — both are the sheet's. The spine owns its
+          // header strip and its own inset, so an outer padding here would double it and
+          // break the header's alignment with the page header beside it.
+          className="hidden w-[380px] shrink-0 flex-col overflow-hidden border-l border-border/10 lg:flex"
         >
           {/* The ask stack, newest first — the same ordering rule `PendingAskStack` keeps,
               re-derived here rather than imported because the stack resolves its own thread
               from the chat singleton. `created_at` is GET-only, so an SSE-delivered ask with
               no timestamp falls back to store insertion order rather than being invented a
               position (`PendingAskCard.tsx:610-613`). */}
-          {asks.length > 0
-            ? [...asks]
-                .sort((a, b) =>
-                  a.created_at && b.created_at ? b.created_at.localeCompare(a.created_at) : 0,
-                )
-                .map((ask) => (
-                  <PendingAskCard
-                    key={ask.tool_call_id}
-                    ask={ask}
-                    reconcile={reconcileAsks}
-                    runIsOver={isTerminal}
-                  />
-                ))
-            : null}
-          {/* ⚠ THE THREAD IS THE RUN'S, PASSED EXPLICITLY. `PhaseTimeline` has taken
-              `threadId` as a prop since Phase 094; nothing about it was chat-specific
-              except its caller. */}
-          <PhaseTimeline threadId={run?.thread_id ?? null} />
+          {/* ⚠ THE ASK RENDERS INSIDE THE SPINE, AT THE STEP IT BELONGS TO. It used to be a
+              stack floating ABOVE the list, which tells a reader that something is waiting and
+              not WHICH thing — the sheet draws the answer control in the row itself, and that
+              placement is the whole point of it.
+
+              The step is resolved through the page's own F5 derivation (`runStateBySlug`),
+              which is the ONE place this page decides a step is waiting; matching on the
+              reading rather than on the ask means the control cannot land on a step the page
+              does not consider blocked. ⚠ A terminal run's unanswered prompt still renders
+              (the row is real) but `runIsOver` disarms it, so nothing can post into a run that
+              has stopped. */}
+          <RunSpine
+            phases={wireRows}
+            titleOf={titleOf}
+            liveOf={runState}
+            now={nowMs}
+            renderAsk={(slug) =>
+              slug === askAnchorSlug && asks.length > 0
+                ? [...asks]
+                    .sort((a, b) =>
+                      a.created_at && b.created_at ? b.created_at.localeCompare(a.created_at) : 0,
+                    )
+                    .map((ask) => (
+                      <PendingAskCard
+                        key={ask.tool_call_id}
+                        ask={ask}
+                        reconcile={reconcileAsks}
+                        runIsOver={isTerminal}
+                      />
+                    ))
+                : null
+            }
+          />
         </aside>
       </div>
 
@@ -1361,13 +1422,16 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
 
              `now` is the page's ONE hoisted instant, so a still-running row on the receipt
              and the header's clock cannot straddle a second boundary and disagree. */}
-      <section
-        data-testid="run-receipt-region"
-        className="shrink-0 border-t border-border/10 px-6 py-4"
-      >
-        <h2 className="mb-2 text-xs font-semibold text-foreground">{COPY_RECEIPT_HEADING}</h2>
-        <RunReceipt phases={wireRows} titleOf={titleOf} runStatus={runStatus} now={nowMs} />
-      </section>
+      {/* ⚠ THE SEPARATE RECEIPT REGION IS GONE, AND ITS HEADING WITH IT. Its rows repeated the
+             run log's five steps and five durations verbatim, seven hundred pixels below them —
+             caught on screen, not by a test, because every test asserted the region's CONTENTS
+             were correct and none asked whether the page said the same thing twice. The strip
+             that carried the run's total moved to the TOP of the log column, where it reads as
+             that column's summary; see the mount above.
+
+             ⚠ `COPY_RECEIPT_HEADING` ("What this run did, step by step") went with the rows,
+             deliberately: it describes a step-by-step list, and the strip is not one. The log
+             beneath it IS the step-by-step, and it does not need to be announced. */}
 
       {/* 5. DELIVERABLE REGION — the thing the run made, listed and downloadable. The
              region caps its height on desktop and flows on mobile (<768px), where a

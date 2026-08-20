@@ -146,6 +146,23 @@
  * ⚠ `--panel-*` TOKENS ARE FORBIDDEN HERE. This region renders on `--background`, not inside
  * the panel shell; `phaseStatusMeta.ts` states that boundary in as many words.
  *
+ * ⚠ AN ORDINARY COMPLETION SAYS NOTHING, AND THAT IS THE SHEET'S RULE RATHER THAN A
+ * SUBTRACTION. Its log prints no status word anywhere: a finished line is simply BRIGHT, an
+ * in-flight one dim, and the exceptional line — the violet *"Awaiting review"* — is the only
+ * one that speaks. The first port printed `Complete` on all five rows, which is `SEED-184`'s
+ * *"information is dumped as text, not presented"* complaint arriving in the surface built to
+ * answer it.
+ *
+ * So: **the ordinary case is silent and the exceptional case speaks.** A step that simply
+ * finished shows its name, its declared count and its duration; anything else — failed,
+ * waiting, running, skipped, never reached — still carries its word, because those are the
+ * readings a person needs told rather than left to infer.
+ *
+ * ⚠ THIS IS NOT COLOUR-ALONE. The state is stated in words exactly once per step, on the
+ * SPINE beside this column (`RunSpine.tsx`), which carries a glyph, a ring and a
+ * `data-reading` for every step INCLUDING the finished ones. What is removed here is the
+ * SECOND telling, not the only one.
+ *
  * ⚠ ROW ORDER IS DERIVED FROM THE SERVER'S INSTANTS, AND TIES BREAK ON THE SERVER'S OWN ROW
  * ORDER. There is no client-side re-sort by anything else — the D-17/D-18 fence the library
  * feeds carry, met one surface along.
@@ -244,10 +261,35 @@ const WIRE_STATUS_FOR_READING: Record<string, readonly string[]> = {
   unknown: ["unknown"],
 }
 
-/** Whether the page's reading for this step is consistent with the row's own status. */
-function pageAgreesWithWire(row: PhaseTimingRow, live: TranscriptLiveReading): boolean {
+/**
+ * Whether the page's reading for this step is consistent with what the wire says about it.
+ *
+ * ⚠ THE SECOND CLAUSE WAS ADDED BY A FAILING TEST, AND IT IS A REAL DEFECT IT CAUGHT. A phase
+ * row left `active` under a run that has ENDED is the residual the engine leaves on a crash
+ * (`harness_engine.py` only terminalizes the interrupted phase on a cancellation). Comparing
+ * the reading to the raw STATUS alone, both sides say "running" and the page's label wins — so
+ * the line printed *Running* about a run that finished, which is `BUG-260610-01`'s symptom
+ * re-created on the surface built to remove it.
+ *
+ * `PhaseTiming.kind` is where the RUN-level question has already been answered: that row
+ * resolves to `unfinished`, not `running`. So a live reading is only honoured while the timing
+ * arm agrees the step is genuinely in flight.
+ */
+function pageAgreesWithWire(
+  row: PhaseTimingRow,
+  live: TranscriptLiveReading,
+  timingKind: string,
+): boolean {
   const allowed = own(WIRE_STATUS_FOR_READING, live.reading)
-  return allowed != null && allowed.includes(phaseStatusFromDb(row.status))
+  if (allowed == null || !allowed.includes(phaseStatusFromDb(row.status))) return false
+  // ⚠ `!== "unfinished"`, NOT `is in-flight`. The stricter form was written first and was
+  // WRONG in a way a test caught: a genuinely running step whose row carries no `started_at`
+  // (every row written before migration 121) resolves to `not-recorded`, which is not an
+  // in-flight KIND — so the page's live label was dropped on a step that really was running,
+  // and the line fell back to the receipt's past-tense word. What must be excluded is only the
+  // one arm where the RUN-level answer contradicts the status: `unfinished`.
+  if (LIVE_READINGS.has(live.reading)) return timingKind !== "unfinished"
+  return true
 }
 
 /**
@@ -294,7 +336,7 @@ export function RunTranscript({
     <section
       data-testid="run-transcript"
       aria-label={TRANSCRIPT_LANDMARK_LABEL}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto py-8"
     >
       {phases.length === 0 ? (
         <p data-testid="run-transcript-empty" className="text-sm text-muted-foreground">
@@ -306,11 +348,14 @@ export function RunTranscript({
               row happens to be untimed. It is a statement about the RUN, and printing it
               above a list that does carry a clock would be false. */}
           {anchor === null && (
-            <p data-testid="run-transcript-untimed" className="mb-3 text-xs text-muted-foreground">
+            <p
+            data-testid="run-transcript-untimed"
+            className="mx-auto mb-5 w-full max-w-3xl text-xs text-muted-foreground"
+          >
               {TRANSCRIPT_TIMES_NOT_RECORDED}
             </p>
           )}
-          <ol className="flex flex-col gap-1.5">
+          <ol className="mx-auto flex w-full max-w-3xl flex-col gap-5">
             {entries.map((entry) => {
               const row = phases[entry.order]
               const facts = phaseRunFacts(row, runStatus, now)
@@ -318,7 +363,8 @@ export function RunTranscript({
               // ⚠ THE PAGE'S WORDS ARE USED ONLY WHILE THEY AGREE WITH THE ROW'S OWN STATUS —
               // see the tense rule in the docblock, and the crossing it was measured against.
               // A disagreement drops them ENTIRELY rather than contributing half a line.
-              const live = held != null && pageAgreesWithWire(row, held) ? held : null
+              const live =
+                held != null && pageAgreesWithWire(row, held, facts.timing.kind) ? held : null
               const isLive = live != null && LIVE_READINGS.has(live.reading)
               const attention = live != null && live.reading === ATTENTION_READING
               // The duration belongs to a step that has stopped. When the page's label is in
@@ -332,6 +378,11 @@ export function RunTranscript({
               // The word this line ends up carrying, resolved ONCE so the duplicate check
               // below and the rendered span can never disagree about what it is.
               const word = live != null ? live.label : facts.outcome
+              // ⚠ THE ORDINARY CASE IS SILENT — see the docblock. `done` is the ONE reading
+              // that earns no word, because a bright line already says it. Tested against the
+              // READING rather than against the word, so re-wording the vocabulary cannot
+              // silently re-open the noise.
+              const speaks = live?.reading !== "done"
               // ⚠ A TIMING READING THAT IS THE SAME STRING AS THE STATE WORD IS NOT A SECOND
               // FACT. `pending` resolves both to the same constant, and printing it twice
               // ("not reached · not reached") reads as a surface that has lost track of what
@@ -355,14 +406,14 @@ export function RunTranscript({
                   // measured crossing from something a person has to notice into something a
                   // test — or a console — can ask about directly.
                   data-source-conflict={held != null && live == null ? "true" : undefined}
-                  className="flex min-w-0 items-baseline gap-3 text-[13px] leading-relaxed"
+                  className="flex min-w-0 items-baseline gap-4 text-sm leading-relaxed"
                 >
                   {/* ⚠ THE GUTTER IS ALWAYS PRESENT AND SOMETIMES EMPTY. An untimed row keeps
                       its column so the timed rows above it stay aligned, and it holds nothing
                       rather than a placeholder — a dash in a clock column is a reading. */}
                   <span
                     data-testid="transcript-clock"
-                    className="w-16 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground"
+                    className="w-16 shrink-0 font-mono text-[11px] tabular-nums text-muted-foreground/70"
                   >
                     {entry.offsetMs === null ? "" : fmtElapsed(entry.offsetMs)}
                   </span>
@@ -372,10 +423,16 @@ export function RunTranscript({
                       lines. With one line per step that mapping inverts: it would mute the
                       single most important row on a page somebody is watching. The tone that
                       distinguishes the states rides on the STATE WORD instead. */}
+                  {/* ⚠ THE TITLE DOES NOT TAKE `flex-1`, AND THAT IS THE FIX FOR THE THING
+                      THAT LOOKED WORST. When it did, it ate the whole 768px column and threw
+                      every trailing atom to the far right edge — the duration sat ~500px from
+                      the step it measured, and the eye could not pair them. The sheet's line
+                      FLOWS: gutter, then one continuous phrase. The spacer below takes the
+                      slack instead, so a long title still truncates rather than wrapping. */}
                   <span
                     data-testid="transcript-title"
                     className={cn(
-                      "min-w-0 flex-1 truncate text-foreground",
+                      "min-w-0 max-w-[60%] truncate text-foreground",
                       attention && "text-accent-violet-text",
                     )}
                   >
@@ -386,15 +443,17 @@ export function RunTranscript({
                       words a failure with WHICH of three things went wrong, where the receipt
                       has a single word for all three. The receipt's outcome is the FLOOR, for
                       a slug the page holds no reading for at all. */}
-                  <span
-                    data-testid="transcript-state"
-                    className={cn(
-                      "shrink-0",
-                      attention ? "text-accent-violet-text" : "text-muted-foreground",
-                    )}
-                  >
-                    {word}
-                  </span>
+                  {speaks && (
+                    <span
+                      data-testid="transcript-state"
+                      className={cn(
+                        "shrink-0",
+                        attention ? "text-accent-violet-text" : "text-muted-foreground",
+                      )}
+                    >
+                      {word}
+                    </span>
+                  )}
                   {showPast && (
                     <>
                       {timeAddsSomething && (
@@ -415,6 +474,9 @@ export function RunTranscript({
                       )}
                     </>
                   )}
+                  {/* The slack. It exists so the atoms above stay beside the title instead of
+                      being spread across the column, and it renders nothing. */}
+                  <span aria-hidden="true" className="min-w-0 flex-1" />
                 </li>
               )
             })}
