@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from typing import Literal
 from uuid import UUID
@@ -45,6 +46,83 @@ class ThreadSnapshotResponse(BaseModel):
     since_cursors: dict[str, str]
 
 
+def phase_output_object(raw: object) -> dict | None:
+    """One ``workflow_phases.output`` jsonb value as a dict — or ``None``. THE READ-SIDE UNWRAP.
+
+    Phase 200.1 / **D-200.1-01**. Sited immediately above ``declared_phase_measure`` on purpose:
+    the read side keeps exactly ONE home (see that function's docblock for why), and this is
+    that home gaining a helper — never a second copy of the read.
+
+    ⚠ **THE COLUMN HAS TWO SHAPES IN IT, AND THAT IS MEASURED RATHER THAN SUSPECTED.**
+    ``db/workflows.py``'s terminal phase writers bound ``json.dumps(output)`` into a
+    ``$2::jsonb`` parameter on a pool that ALREADY registers a jsonb codec with
+    ``encoder=json.dumps`` (``dependencies._init_pg_connection`` — D-073-06, whose own docblock
+    says the codec exists precisely so *"call sites pass plain Python dicts/lists"*). Encoded
+    twice, the value lands as a jsonb **string scalar** holding JSON text — migration 122's root
+    cause, one column over. Measured against the live local DB on 2026-08-20: **527 of 588**
+    non-null ``output`` values are ``jsonb_typeof = 'string'``, and that includes **484 of 484**
+    ``completed`` rows. ``completed`` is exactly the status that can carry a measure, so the
+    failure rate on the rows that matter was **100%**, not 90%: ``_measure`` is reachable on
+    **13** rows THROUGH this unwrap and on **ZERO** rows without it. ``declared_phase_measure``
+    opened with a bare dict-only type test on ``raw`` and degraded to ``(None, None)``
+    **silently** — built, gated, green and structurally unreachable for four months.
+
+    ⚠ **THE OLD GUARD IS DESCRIBED HERE AND DELIBERATELY NOT SPELLED.** This repo has recorded
+    that trap firing three times (``toolNames.ts`` read `3` where its guard required `0`, all
+    comments): a docblock that quotes the forbidden form makes the acceptance grep count its own
+    prose and report a fix that landed as a fix that did not. The verbatim pre-change predicate
+    lives in ONE place — ``tests/unit/test_200_1_phase_output_shape.py``, where it is re-stated
+    locally and driven as the counterfactual.
+
+    CONTRACT. A ``dict`` passes through unchanged. A ``str`` is ``json.loads``-ed and returned
+    ONLY if it parses to a dict. ``None``, a non-``str`` non-``dict``, an unparseable string, and
+    a string that parses to a list / number / bool / null all return ``None``.
+
+    ⚠ **IT MUST NEVER RAISE** (T-200.1-01). It reads model-influenced jsonb, and a parser that
+    raises here 500s the run page for the owner of a run whose model wrote something odd.
+    ``ValueError`` and ``TypeError`` are caught — the same two ``_coerce_definition``
+    (``api/workflow_runs.py``) catches, which is the shipped precedent for this shape, and whose
+    degrade-to-``None`` silence is mirrored deliberately rather than reinvented.
+
+    ─── D-200.1-01 — BOTH (a) AND (b) ARE TAKEN. NO MIGRATION. ──────────────────────────────
+    · **(a) repairs the READ and is the load-bearing half.** It is the only half that reaches the
+      588 historical rows — the 484 ``completed`` ones, and the 479 carrying ``output.text`` that
+      the deliverable-by-type arm reads through this same door. Nothing else reaches history.
+    · **(b) repairs the WRITER** (``db/workflows.py``'s three terminal phase writers), because
+      leaving it wrong mints roughly three new bad rows per run, and because (a) makes the reader
+      tolerate BOTH shapes, so the flip cannot break a consumer.
+    · **THE SIBLING DEFERRAL IS HONOURED, and the reason it does not transfer is stated rather
+      than assumed.** ``STATE.md`` and migration 123's header leave ``workflow_runs.inputs``
+      (**230 of 230** string) and ``workflow_definitions.definition`` (**261 of 291**) in the old
+      shape because *"flipping a writer alone gives a table with two shapes in it."* ``output``
+      ALREADY has two shapes — 527 string against 61 object, and the object rows are
+      ``pending``/``cancelled``/``skipped``, written by a path that binds the dict directly, which
+      is what makes the split diagnostic rather than coincidental. And migration 123's own stated
+      condition for repairing a column alone is *"one reader that already accepts BOTH shapes"* —
+      which is precisely what (a) creates here. **Neither ``inputs`` nor
+      ``workflow_definitions.definition`` is touched by this phase**, and their re-open trigger is
+      carried forward VERBATIM: the next phase that touches either on the WRITE path.
+    · **NO MIGRATION — and the reason, not the assurance.** The read repair reaches every row, so
+      a data migration buys nothing the read does not already buy, while running a blind
+      ``#>> '{}'``-then-``::jsonb`` cast over 527 rows of MODEL-INFLUENCED content is strictly
+      more risk than the two-row ``definition_snapshot`` case migration 123 was written for.
+      ⚠ **Re-open trigger, named so it is not a silence: the first phase that needs ``output``
+      queryable IN SQL** — a ``->> 'text'`` predicate, an index, or a feed's ``WHERE`` /
+      ``ORDER BY``. At that point read-side tolerance is not enough, because SQL sees the raw
+      column and never this helper.
+    ─────────────────────────────────────────────────────────────────────────────────────────
+    """
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str):
+        try:
+            decoded = json.loads(raw)
+        except (ValueError, TypeError):
+            return None
+        return decoded if isinstance(decoded, dict) else None
+    return None
+
+
 def declared_phase_measure(raw: object) -> tuple[int | None, str | None]:
     """Extract the executor-DECLARED ``(count, noun)`` from a phase's ``output`` jsonb.
 
@@ -76,10 +154,18 @@ def declared_phase_measure(raw: object) -> tuple[int | None, str | None]:
     Defensive by construction: this reads model-influenced jsonb, so every layer is
     ``isinstance``-guarded and anything unexpected degrades to ``(None, None)`` rather than
     raising. Never ``raw["_measure"]``.
+
+    ⚠ **Phase 200.1 / D-200.1-01 — THE FIRST LINE IS NOW AN UNWRAP, NOT AN ``isinstance``
+    TEST.** This function opened with a bare dict-only type test on ``raw`` (not spelled here —
+    see ``phase_output_object``'s note on why), and the column it reads is a jsonb STRING SCALAR
+    on **484 of 484** ``completed`` rows, so the
+    declared count reached nobody for four months. ``phase_output_object`` above carries the
+    measurement and the decision; everything below this line is unchanged, deliberately.
     """
-    if not isinstance(raw, dict):
+    output = phase_output_object(raw)
+    if output is None:
         return None, None
-    measure = raw.get("_measure")
+    measure = output.get("_measure")
     if not isinstance(measure, dict):
         return None, None
     count = measure.get("count")

@@ -462,7 +462,9 @@ async def test_engine_persists_large_phase_output_inline(
         if "SET status='completed'" in sql
     ]
     assert len(completed_args) == 1
-    persisted = _json.loads(completed_args[0][1])  # the output=$2::jsonb json string
+    # 200.1 / D-200.1-01(b): the output=$2::jsonb parameter is now a PLAIN DICT — see
+    # `_phase_output_arg` below for why this no longer `json.loads` anything.
+    persisted = _phase_output_arg(completed_args[0])
     assert persisted == {"text": big_text}, "full output stored inline, no placeholder"
     assert "_spilled_path" not in persisted
 
@@ -840,6 +842,32 @@ _RECORDED_SQL = "SET status='recorded_not_sent'"
 _COMPLETED_SQL = "SET status='completed'"
 
 
+def _phase_output_arg(args):
+    """The durable phase output out of a ``workflow_phases`` writer's BOUND ARGS.
+
+    ⚠ **200.1 / D-200.1-01(b) — THESE ASSERTIONS USED TO ``json.loads`` THE BOUND PARAMETER,
+    AND THAT ONLY WORKED BECAUSE THE WRITER PRE-ENCODED IT.** The pre-encode WAS the defect:
+    the pool already installs a jsonb codec with ``encoder=json.dumps``
+    (``dependencies._init_pg_connection``, D-073-06), so every value was encoded twice and
+    landed as a jsonb **STRING SCALAR** — 484 of 484 ``completed`` rows, measured. The three
+    terminal writers now hand the codec a plain dict, so the parameter IS the payload and
+    ``json.loads`` raises ``TypeError`` on it.
+
+    ⚠ **Read through the SHIPPED unwrap rather than re-typing a shape check at each site.**
+    ``phase_output_object`` accepts BOTH shapes, so every caller below stays an assertion
+    about the **CONTENT** and cannot be broken again by the transport. A test that re-states
+    the encoding is a test that PINS the encoding — which is how these sites came to defend
+    the very defect Phase 200.1 exists to repair.
+    """
+    from app.models.thread import phase_output_object
+
+    for a in args:
+        unwrapped = phase_output_object(a)
+        if unwrapped is not None:
+            return unwrapped
+    return None
+
+
 def _external_action_definition(
     build_workflow_definition, *, capability="send_email", connection_id=None
 ):
@@ -1017,7 +1045,7 @@ def test_an_approved_external_action_records_not_sent_and_the_run_continues(
         f"{[s for s, _ in mock_asyncpg_pool.calls if 'workflow_phases' in s]!r}"
     )
     assert recorded[0][1][0] == r.ids[0], "the write landed on the wrong phase row"
-    persisted = _json.loads(recorded[0][1][1])
+    persisted = _phase_output_arg(recorded[0][1])
     assert persisted["recorded_intent"]["capability"] == "send_email", (
         "the recorded intent must be durable on the row — the record IS the outcome"
     )
@@ -1395,7 +1423,7 @@ def test_a_failed_send_and_a_recorded_not_sent_step_differ_on_all_three_axes(
         f"the unbound half never reached recorded_not_sent ({recorded_writes!r}); every "
         f"comparison below would be against nothing"
     )
-    record_output = _json.loads(recorded_writes[0][1][1])
+    record_output = _phase_output_arg(recorded_writes[0][1])
 
     # ── run B · the BOUND step whose adapter refuses ─────────────────────────────────
     class _RefusingAdapter:
@@ -1422,11 +1450,11 @@ def test_a_failed_send_and_a_recorded_not_sent_step_differ_on_all_three_axes(
         f"the bound half's refused send did not land `failed`; the engine writes: "
         f"{[s for s, _ in mock_asyncpg_pool.calls if 'workflow_phases' in s]!r}"
     )
-    fail_output = _json.loads(failed_writes[0][1][-1]) if False else None
     fail_args = failed_writes[0][1]
-    fail_output = next(
-        (_json.loads(a) for a in fail_args if isinstance(a, str) and a.startswith("{")), None
-    )
+    # 200.1 / D-200.1-01(b): the scan here used to hunt for a `str` starting with `{` — which
+    # is exactly the pre-encoded shape that no longer exists. `_phase_output_arg` finds the
+    # payload under BOTH shapes, so this axis keeps testing the OUTPUT and not the transport.
+    fail_output = _phase_output_arg(fail_args)
     assert fail_output is not None, f"no durable output on the failed write: {fail_args!r}"
 
     # ── AXIS 1 · the status ───────────────────────────────────────────────────────────
