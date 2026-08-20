@@ -640,3 +640,206 @@ describe("RunTranscript — the settled gutter carries the sheet's width and typ
     }
   })
 })
+
+// ── 7. THE LIVE ROW — INDIGO, PULSING, AND SPINNING ────────────────────────────────────
+//
+// `run-surface.html`'s Active Log block is four lines of markup and it is the whole
+// specification:
+//
+//     <div class="flex space-x-4 items-center">
+//       <div class="w-16 font-data-sm text-data-sm flex-shrink-0 text-indigo animate-pulse">…
+//       <div class="flex-1 text-[#F4F6FE] flex items-center space-x-2">
+//         <span class="material-symbols-outlined text-[16px] text-indigo animate-spin">sync</span>
+//
+// `.text-indigo` is `#A3A5FF`; this tree's dark `--primary` (239 100% 82%) converts to
+// `#A3A5FF` exactly, so `text-primary` is a TOKEN MATCH rather than an approximation. The
+// glyph is NOT ported — a CSS ring is the shipped precedent and keeps this file's zero-glyph
+// property true.
+
+/** A three-step run whose LAST step is genuinely in flight: the row is `active`, the page
+ *  reads `running`, and the two therefore AGREE — which is what the tense rule requires
+ *  before any live treatment may fire at all. */
+const LIVE_ROWS: PhaseTimingRow[] = [
+  ROWS[0],
+  ROWS[1],
+  { slug: "check", status: "active", started_at: s(72), completed_at: null },
+]
+
+function renderLive() {
+  return render(
+    <RunTranscript
+      phases={LIVE_ROWS}
+      titleOf={titleOf}
+      now={T0 + 80_000}
+      runStatus="active"
+      liveOf={liveMap({ check: { reading: "running", label: "Running" } })}
+    />,
+  )
+}
+
+describe("RunTranscript — the live row is unmistakably live", () => {
+  it("the live clock is the sheet's indigo, and it pulses", () => {
+    renderLive()
+    const cls = clockClassOf("check")
+    expect(cls).toContain("text-primary")
+    expect(cls).toContain("animate-pulse")
+    // ⚠ THE SETTLED TONE MUST BE GONE, NOT MERELY OUTVOTED. Two colour utilities in one class
+    // list is a coin flip on emission order, so the treatment composes rather than appends.
+    expect(cls).not.toContain("text-muted-foreground/60")
+  })
+
+  it("the treatment is scoped to the ONE live row, in the same render", () => {
+    // ⚠ NON-VACUITY. Without this, a change that pulsed EVERY clock would pass the case above.
+    renderLive()
+    for (const slug of ["gather", "draft"]) {
+      expect(clockClassOf(slug)).toContain("text-muted-foreground/60")
+      expect(clockClassOf(slug)).not.toContain("text-primary")
+      expect(clockClassOf(slug)).not.toContain("animate-pulse")
+    }
+  })
+
+  it("a textless ring spins beside the live line", () => {
+    renderLive()
+    const spinner = within(screen.getByTestId("transcript-row-check")).getByTestId(
+      "transcript-spinner",
+    )
+    expect(spinner.getAttribute("aria-hidden")).toBe("true")
+    expect(spinner.className).toContain("animate-spin")
+    expect(spinner.className).toContain("border-primary")
+    // ⚠ IT SAYS NOTHING, AND THAT IS THE REFUSAL BEING KEPT. See the row-text case below.
+    expect(spinner.textContent).toBe("")
+  })
+
+  it("no glyph library was imported to draw it", () => {
+    // The sheet's mark is `material-symbols-outlined sync`. A CSS ring costs no dependency and
+    // keeps this component's zero-glyph property, which its own docblock states.
+    expect(RunTranscriptSource).not.toMatch(/from "lucide-react"/)
+    expect(RunTranscriptSource).not.toContain("material-symbols")
+  })
+
+  it("a run with NO live row has NO spinner — a terminal run, and an unreached step", () => {
+    // ⚠ T-200.1-05, ASSERTED RATHER THAN ASSUMED. A spinner on a finished run is a false claim
+    // that work is in progress, which is the one lie this treatment could tell.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} runStatus="completed" />)
+    expect(screen.queryAllByTestId("transcript-spinner")).toHaveLength(0)
+    cleanup()
+    // …and the `not-started` step of a still-active run does not get one either.
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} runStatus="active" />)
+    expect(screen.queryAllByTestId("transcript-spinner")).toHaveLength(0)
+  })
+
+  it("a STALE slice calling a finished step live earns no spinner — the tense rule holds the gate", () => {
+    // ⚠ THE TREATMENT DERIVES NOTHING OF ITS OWN. It hangs off `isLive`, which
+    // `pageAgreesWithWire` has already refused for this fixture, so the spinner is unreachable
+    // through a disagreement rather than merely absent from one.
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        liveOf={liveMap({ gather: { reading: "running", label: "Running" } })}
+        now={T0}
+      />,
+    )
+    expect(screen.queryAllByTestId("transcript-spinner")).toHaveLength(0)
+    expect(screen.getByTestId("transcript-row-gather").getAttribute("data-source-conflict")).toBe(
+      "true",
+    )
+  })
+
+  it("the live row is cross-axis CENTRED; a settled row is not", () => {
+    // A 16px ring on a baseline-aligned row sits visibly low. The sheet draws `items-center` on
+    // its Active Log row and on none of the others.
+    renderLive()
+    expect(rowClassOf("check")).toContain("items-center")
+    expect(rowClassOf("check")).not.toContain("items-baseline")
+    for (const slug of ["gather", "draft"]) {
+      expect(rowClassOf(slug)).toBe(SETTLED_ROW_CLASS)
+    }
+  })
+})
+
+// ── 8. BOTH SHIPPED REFUSALS, ASSERTED AS STILL HOLDING ────────────────────────────────
+//
+// ⚠ THE POINT OF THIS SECTION IS THAT THE PORT DID NOT QUIETLY OVERTURN EITHER OF THEM. The
+// three cases that carry refusal (i) already exist above and pass with their bodies UNEDITED —
+// a pin that still holds against a test nobody re-typed is evidence; a re-baselined pin is only
+// a record of what the code now does. What is ADDED here is the pairing each refusal was
+// missing.
+
+describe("RunTranscript — the live line is STILL full strength (refusal i)", () => {
+  it("the live title is bright AND the spinner is present, in one case", () => {
+    // ⚠ ASSERTED TOGETHER ON PURPOSE. Split across two cases, a later change could dim the row
+    // and point at the spinner as the compensation, and both cases would still pass. The
+    // sheet's own current line is bright WITH a spinner — it is not one or the other.
+    renderLive()
+    const cls = titleClassOf("check")
+    expect(cls).toContain("text-foreground")
+    expect(cls).not.toContain("text-muted-foreground")
+    // …and no opacity modifier snuck the dimming back in by another route.
+    expect(cls).not.toMatch(/text-foreground\/\d/)
+    expect(
+      within(screen.getByTestId("transcript-row-check")).getByTestId("transcript-spinner"),
+    ).toBeTruthy()
+  })
+})
+
+describe("RunTranscript — no per-line narration was invented (refusal ii)", () => {
+  /**
+   * ⚠ A SPINNER IS NOT NARRATION, AND THIS IS WHERE THAT CLAIM IS MADE CHECKABLE. It states
+   * *this is happening now* — a fact this product HAS, and already carries on `data-live` and
+   * on the spine's pulsing mark. What the sheet's dim lines add is a claim about WHAT is
+   * happening ("Connecting to Northwind CRM instance…"), which this product cannot source.
+   *
+   * So the live row's rendered text is pinned to an EXACT accounting: its gutter, its title,
+   * and the one state word the component already computes. Nothing else.
+   */
+  const NARRATION = "Connecting to Northwind CRM instance..."
+
+  it("the live LINE reads exactly the step's name and its one state word", () => {
+    renderLive()
+    const row = screen.getByTestId("transcript-row-check")
+    const clock = within(row).getByTestId("transcript-clock")
+    // The LINE is the row minus its gutter — the half of the sheet's structure that would
+    // carry a narration sentence if one had been invented.
+    const line = Array.from(row.childNodes)
+      .filter((n) => n !== clock)
+      .map((n) => n.textContent ?? "")
+      .join("")
+    expect(line).toBe(`${titleOf("check")}Running`)
+  })
+
+  it("the live ROW's TOTAL text is its clock plus that line, and nothing else", () => {
+    // The complete accounting, gutter included — strictly stronger than the line assertion
+    // above, and the reason no character on that row can be unaccounted for.
+    renderLive()
+    const row = screen.getByTestId("transcript-row-check")
+    const clock = within(row).getByTestId("transcript-clock").textContent ?? ""
+    expect(row.textContent).toBe(`${clock}${titleOf("check")}Running`)
+    // NON-VACUITY: the clock really is carrying text here, so the concatenation is doing work
+    // rather than agreeing with an empty string.
+    expect(clock).toMatch(/^\d{2}:\d{2}$/)
+  })
+
+  it("POSITIVE CONTROL — the same assertion FAILS when a narration sentence is present", () => {
+    /**
+     * ⚠ DRIVEN, NOT REASONED. A row-text assertion that has never been shown to fail is not
+     * evidence that narration would be caught. This builds the very row the sheet draws — the
+     * live line WITH its narration appended — and proves the check above goes red on it.
+     */
+    renderLive()
+    const row = screen.getByTestId("transcript-row-check")
+    const clock = within(row).getByTestId("transcript-clock").textContent ?? ""
+    const expected = `${clock}${titleOf("check")}Running`
+
+    // Sanity: the untouched row passes.
+    expect(row.textContent).toBe(expected)
+
+    const narrating = row.cloneNode(true) as HTMLElement
+    const invented = document.createElement("span")
+    invented.textContent = NARRATION
+    narrating.appendChild(invented)
+
+    expect(narrating.textContent).not.toBe(expected)
+    expect(narrating.textContent).toContain(NARRATION)
+  })
+})
