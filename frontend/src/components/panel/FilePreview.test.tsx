@@ -106,3 +106,101 @@ describe("FilePreview Download wiring (gap 3 — deliverable reachable from the 
     expect(btn).toBeTruthy()
   })
 })
+
+
+describe("FilePreview — the copy control (Phase 200, sketch `run-panel-parts.html`)", () => {
+  /** A plain-text file, which routes to the `text` inline arm. */
+  const TEXT_FILE = {
+    id: "file-txt",
+    path: "/notes.txt",
+    size_bytes: 12,
+    mime_type: "text/plain",
+    version: 1,
+    created_at: "",
+    updated_at: "",
+  } as WorkspaceFile
+
+  const TEXT_CONTENT = {
+    storage_type: "inline",
+    mime_type: "text/plain",
+    content: "the whole file",
+  } as unknown as WorkspaceFileContent
+
+  it("offers a copy control over an INLINE preview", async () => {
+    mockGetContent.mockResolvedValue(TEXT_CONTENT)
+    render(<FilePreview threadId={THREAD} file={TEXT_FILE} onBack={vi.fn()} />)
+    const btn = await screen.findByTestId("preview-copy")
+    expect(btn).toBeTruthy()
+    // Named for assistive tech — the glyph alone says nothing.
+    expect(btn.getAttribute("aria-label")).toBe("Copy file contents")
+  })
+
+  it("copies the WHOLE content and says so", async () => {
+    mockGetContent.mockResolvedValue(TEXT_CONTENT)
+    // ORDER IS LOAD-BEARING - `userEvent.setup()` INSTALLS ITS OWN `navigator.clipboard`
+    // stub, so a spy planted before it is silently replaced and the assertion below then
+    // measures user-event's stub instead of the component. Measured, not predicted: the
+    // first draft planted first and read `expected "vi.fn()" to be called with [...]`.
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    })
+    render(<FilePreview threadId={THREAD} file={TEXT_FILE} onBack={vi.fn()} />)
+    await user.click(await screen.findByTestId("preview-copy"))
+
+    expect(writeText).toHaveBeenCalledWith("the whole file")
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy").textContent).toContain("Copied")
+    })
+  })
+
+  it("⚠ SAYS SO WHEN IT FAILS — a silent no-op is worse than no control at all", async () => {
+    // `navigator.clipboard` is undefined outside a secure context and its write REJECTS
+    // when the document is not focused. A control that quietly does nothing in those cases
+    // leaves the person believing they hold the text.
+    mockGetContent.mockResolvedValue(TEXT_CONTENT)
+    // See the ordering note above - plant AFTER setup, or user-event's stub wins.
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) },
+      configurable: true,
+    })
+    render(<FilePreview threadId={THREAD} file={TEXT_FILE} onBack={vi.fn()} />)
+    await user.click(await screen.findByTestId("preview-copy"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy").textContent).toContain("Copy failed")
+    })
+    // ...and it does NOT flash the success word.
+    expect(screen.getByTestId("preview-copy").textContent).not.toContain("Copied")
+  })
+
+  it("survives a MISSING clipboard entirely, and reports rather than throwing", async () => {
+    mockGetContent.mockResolvedValue(TEXT_CONTENT)
+    // See the ordering note above - plant AFTER setup, or user-event's stub wins.
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true })
+    render(<FilePreview threadId={THREAD} file={TEXT_FILE} onBack={vi.fn()} />)
+    await user.click(await screen.findByTestId("preview-copy"))
+
+    await waitFor(() => {
+      expect(screen.getByTestId("preview-copy").textContent).toContain("Copy failed")
+    })
+  })
+
+  it("⚠ offers NO copy control on the no-preview fallback — there is nothing to copy", async () => {
+    // The binary arm renders the download fallback. An offer to copy "the content" there
+    // would copy nothing, or bytes a person cannot read.
+    mockGetContent.mockResolvedValue({
+      storage_type: "inline",
+      mime_type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      content: "",
+    } as unknown as WorkspaceFileContent)
+    render(<FilePreview threadId={THREAD} file={file()} onBack={vi.fn()} />)
+    // NON-VACUITY: the fallback really did render.
+    await screen.findByRole("button", { name: /download/i })
+    expect(screen.queryByTestId("preview-copy")).toBeNull()
+  })
+})

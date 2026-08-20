@@ -25,6 +25,7 @@ import { describe, it, expect } from "vitest"
 import { createRef } from "react"
 import { render } from "@testing-library/react"
 import { FileRow } from "../FileRow"
+import { TIME_UNKNOWN } from "../fileRowUtils"
 
 const DENSITIES = ["chat", "panel", "run"] as const
 
@@ -345,5 +346,64 @@ describe("FileRow — XSS (T-195-03-01): every string prop is a TEXT child", () 
     )
     expect(container.querySelector("img")).toBeNull()
     expect(container.textContent).toContain(hostile)
+  })
+})
+
+
+describe("FileRow — the age cell (Phase 200, sketch `run-panel-parts.html`)", () => {
+  it("renders NO time cell when the caller omits `age` — every pre-existing caller is unchanged", () => {
+    // ⚠ THE THIRD STATE, and the reason the prop is optional rather than defaulted. A
+    // surface that does not ask for a clock must not acquire one, and must certainly not
+    // acquire the word "time unknown" — which would be this component asserting an absence
+    // on behalf of a caller that never mentioned time at all.
+    const { container } = render(<FileRow density="run" name="a.txt" sizeBytes={10} />)
+    expect(container.querySelector('[data-testid="file-row-age"]')).toBeNull()
+    expect(container.textContent).not.toContain(TIME_UNKNOWN)
+  })
+
+  it("renders the caller's phrase VERBATIM — this component words nothing", () => {
+    const { container } = render(
+      <FileRow density="run" name="a.txt" sizeBytes={10} age="2 min ago" />,
+    )
+    const cell = container.querySelector('[data-testid="file-row-age"]')
+    expect(cell?.textContent).toBe("2 min ago")
+    // NON-VACUITY: the size is still there, so the age was ADDED to the row rather than
+    // having replaced the cell beside it.
+    expect(container.textContent).toContain("10 B")
+  })
+
+  it("dims the named-absence arm, and dims ONLY that arm", () => {
+    const unknown = render(
+      <FileRow density="run" name="a.txt" sizeBytes={10} age={TIME_UNKNOWN} />,
+    )
+    const known = render(<FileRow density="run" name="b.txt" sizeBytes={10} age="2 min ago" />)
+    const unknownCell = unknown.container.querySelector('[data-testid="file-row-age"]')
+    const knownCell = known.container.querySelector('[data-testid="file-row-age"]')
+    expect(unknownCell?.className).toContain("opacity-60")
+    // ⚠ THE NEGATIVE ARM IS THE ASSERTION THAT MATTERS. A dim applied to every age cell
+    // would make the two states indistinguishable while still passing the positive arm.
+    expect(knownCell?.className).not.toContain("opacity-60")
+  })
+
+  it("selects the dim by the SHARED constant, so the row and the sort cannot disagree", () => {
+    // A phrase that merely LOOKS like an absence is not one — the row is handed a finished
+    // string and must not re-derive the fact behind it.
+    const { container } = render(
+      <FileRow density="run" name="a.txt" sizeBytes={10} age="time  unknown" />,
+    )
+    expect(container.querySelector('[data-testid="file-row-age"]')?.className).not.toContain(
+      "opacity-60",
+    )
+  })
+
+  it("carries the age on all three densities — one row, three surfaces", () => {
+    for (const density of ["chat", "panel", "run"] as const) {
+      const { container } = render(
+        <FileRow density={density} name="a.txt" sizeBytes={10} age="yesterday" />,
+      )
+      expect(container.querySelector('[data-testid="file-row-age"]')?.textContent).toBe(
+        "yesterday",
+      )
+    }
   })
 })

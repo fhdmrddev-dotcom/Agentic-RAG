@@ -71,6 +71,7 @@
 import { useEffect, useRef, useState } from "react"
 import { cn } from "@/lib/utils"
 import { FileRow } from "@/components/files/FileRow"
+import { fileAgeLabel } from "@/components/files/fileRowUtils"
 import {
   useWorkspaceFiles,
   useViewingThread,
@@ -246,6 +247,9 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
   }
 
   const rows = files
+  // ONE instant for the whole list — see the `age` prop below and `fileAgeLabel`'s @param.
+  // Deliberately not memoised: it must be re-read on every render.
+  const rowsNow = Date.now()
 
   // ── Upload affordance (D-01): extracted to <TemplateUpload/> so the panel's
   //    no-activity empty state (WorkspacePanel) can render it too. Rendered in
@@ -286,6 +290,13 @@ export function FilesSection({ onSelectFile }: FilesSectionProps = {}) {
               mimeType={file.mime_type}
               sizeBytes={file.size_bytes}
               metaSuffix={file.version != null ? ` · v${file.version}` : undefined}
+              // ⚠ Phase 200 — the row's age, from the list's ONE hoisted instant. An absent
+              // `created_at` renders `time unknown` DIMMED rather than nothing, which is the
+              // same honesty shape this file already keeps one field along for expiry: the
+              // word is `expiry unknown`, never `no expiry`. And it is exactly the row that
+              // needs it — a live SSE deliverable arrives with no instant at all, and
+              // `byNewestFirst` sorts precisely that row to the TOP.
+              age={fileAgeLabel(file.created_at, rowsNow)}
               trailing="none"
               trailingSlot={
                 /* Ephemeral-template cue (D-02): "Template" badge + a live expiry

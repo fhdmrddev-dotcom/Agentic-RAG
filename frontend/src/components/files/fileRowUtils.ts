@@ -35,6 +35,10 @@
  * one PRESENTATION, and that is what Phase 195 ships.
  */
 
+// Phase 200 — the row's clock. See `fileAgeLabel` at the foot of this file for why
+// this REUSES the library's band engine rather than becoming a fourth spelling.
+import { relativeBand } from "@/components/workflows/library/relativeChanged"
+
 /**
  * Bytes → a short human label.
  *
@@ -130,4 +134,65 @@ export function byNewestFirst(
   if (!a.created_at && b.created_at) return -1
   if (a.created_at && !b.created_at) return 1
   return 0
+}
+
+
+// ── Phase 200 — THE ROW'S CLOCK (sketch `run-panel-parts.html`) ─────────────
+//
+// The sheet draws `name · 1.2 MB · 2m ago` on every file row, with a dimmed
+// `time unknown` beside a row whose instant the wire did not carry. The data
+// was already there — `WorkspaceFile.created_at?` — and NO row rendered a time:
+// this module exported `formatBytes`, `baseName` and `byNewestFirst` and nothing
+// that could say when.
+//
+// ⚠ **NO FOURTH FORMATTER.** `relativeChanged.ts` opens by counting the relative-
+// time spellings in this repository (`UsersAndAccess.tsx:87`,
+// `connectionsCopy.ts:265`, and itself) and stating that a new one which does not
+// say why the existing ones cannot serve reads as drift. So this does not author
+// bands; it CALLS `relativeBand`, and the reasons are the ones that module's own
+// docblock uses to distinguish the three audiences:
+//
+//   · a file row is read ONCE, in passing, beside a name and a size — the same
+//     long-form register as the library's identity line, not the compact
+//     instrument-table register (`4mo ago`) the other two serve; and
+//   · `relativeBand` RETURNS `null` for an absent instant rather than inventing a
+//     phrase, which is exactly the contract this row needs and is the half the
+//     two compact spellings do not have.
+//
+// It also means the file list and the library card can never disagree about what
+// "last week" means, which two engines kept in step by hand eventually do.
+
+/**
+ * The word for "the wire did not carry an instant for this row".
+ *
+ * ⚠ **A NAMED ABSENCE, NOT A FABRICATED TIME AND NOT A DASH.** The panel already
+ * ships this exact shape one field along — `FilesSection.tsx` renders
+ * `expiry unknown`, and its comment records the rule as *"THE WORD IS `expiry
+ * unknown`, NEVER `no expiry`"*. The same distinction binds here: an absent
+ * `created_at` does not mean the file has no age, it means nobody said. Printing
+ * `just now` (or `new Date()`) would be a fabricated figure; printing nothing at
+ * all would silently drop a column that is present on every neighbouring row.
+ *
+ * ⚠ AND IT IS LOAD-BEARING RATHER THAN COSMETIC, because `byNewestFirst` above
+ * SORTS a missing `created_at` FIRST — the just-produced deliverable arrives on
+ * the SSE path with no instant at all, so the top row of a live run's file list
+ * is precisely the row that renders this word.
+ */
+export const TIME_UNKNOWN = "time unknown"
+
+/**
+ * `created_at` → the phrase a row prints, or the named absence.
+ *
+ * @param createdAt an ISO-8601 instant, or `null`/`undefined` for "the wire did
+ *                  not say" — the LIVE (SSE) regime, which carries no
+ *                  `created_at` at all (see `byNewestFirst`'s two-regimes note).
+ * @param now       the instant to measure against. ⚠ HOIST ONE VALUE PER RENDER
+ *                  in the caller and pass it: a list of rows each taking the
+ *                  `Date.now()` default can straddle a band boundary mid-render,
+ *                  so two rows stamped a millisecond apart read a band apart.
+ *                  Same rule `relativeBand` states for itself, and the same one
+ *                  `WorkflowsPage.tsx` follows for `cardFace(row, now)`.
+ */
+export function fileAgeLabel(createdAt?: string | null, now: number = Date.now()): string {
+  return relativeBand(createdAt, now) ?? TIME_UNKNOWN
 }

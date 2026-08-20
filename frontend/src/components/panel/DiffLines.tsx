@@ -77,6 +77,30 @@ export function DiffLines({ lines, truncated, className }: DiffLinesProps) {
                 !isAdd && !isDel && "text-panel-muted-foreground",
               )}
             >
+              {/* ── Phase 200 (sketch `run-panel-parts.html`) — THE LINE-NUMBER GUTTER ────
+                     The sheet draws 12 / 13 / 14 / 15 down the left of the diff. The numbers
+                     were always on the wire, inside the `@@` hunk headers this component
+                     already renders verbatim; the parser simply never extracted them. No
+                     backend change was owed and none was made.
+
+                     ⚠ THE NEW-SIDE NUMBER, FALLING BACK TO THE OLD-SIDE ONE. A deletion has
+                     no position in the after-file, and a single gutter must still say WHERE
+                     the reader would have found it — so a `del` row shows its before-file
+                     line. This is why the parser carries both rather than one.
+
+                     ⚠ AN ABSENT NUMBER RENDERS AN EMPTY CELL, NEVER A ZERO AND NEVER A DASH.
+                     A diff with a malformed or missing hunk header leaves every line
+                     unnumbered, and a plausible-looking wrong line number is worse than a
+                     blank one: a reader would use it to find the line in the real file.
+                     `aria-hidden`, like the sign gutter beside it — a screen reader reading
+                     "twelve" before every line is noise, and the line's TEXT is the content. */}
+              <span
+                aria-hidden="true"
+                data-testid="diff-line-number"
+                className="w-8 flex-none select-none pr-2 text-right text-panel-muted-foreground-dim"
+              >
+                {line.newLine ?? line.oldLine ?? ""}
+              </span>
               <span
                 aria-hidden="true"
                 className={cn(

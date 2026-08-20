@@ -164,3 +164,85 @@ describe("VersionDiff (PANEL-07) — version pills + in-column diff + truncation
     expect(await axe(container)).toHaveNoViolations()
   })
 })
+
+
+describe("parseUnifiedDiff — the line-number gutter (Phase 200, sketch `run-panel-parts.html`)", () => {
+  /** A hunk starting at line 12 on BOTH sides — the sheet's own 12 / 13 / 14 / 15. */
+  const DIFF = ["@@ -12,4 +12,5 @@", " context-a", "-removed", "+added-one", "+added-two", " context-b", ""].join("\n")
+
+  it("numbers a context line on BOTH sides — it exists in both files", () => {
+    const lines = parseUnifiedDiff(DIFF)
+    expect(lines[1]).toMatchObject({ kind: "context", oldLine: 12, newLine: 12 })
+  })
+
+  it("a DELETION carries only its before-file position — it has none in the after file", () => {
+    // ⚠ NOT A DETAIL. Giving a deleted line an after-file number would point a reader at
+    // whatever now occupies that position, which is a different line entirely.
+    const lines = parseUnifiedDiff(DIFF)
+    expect(lines[2]).toMatchObject({ kind: "del", oldLine: 13 })
+    expect(lines[2].newLine).toBeUndefined()
+  })
+
+  it("an ADDITION carries only its after-file position — it had none in the before file", () => {
+    const lines = parseUnifiedDiff(DIFF)
+    expect(lines[3]).toMatchObject({ kind: "add", newLine: 13 })
+    expect(lines[3].oldLine).toBeUndefined()
+    expect(lines[4]).toMatchObject({ kind: "add", newLine: 14 })
+  })
+
+  it("the two counters advance INDEPENDENTLY, which is the whole reason both are carried", () => {
+    // After one deletion and two additions the sides have diverged: the trailing context
+    // line is 14 in the before file and 15 in the after file. A single counter cannot say
+    // this, and a gutter built from one would be wrong for every line past the first change.
+    const lines = parseUnifiedDiff(DIFF)
+    expect(lines[5]).toMatchObject({ kind: "context", oldLine: 14, newLine: 15 })
+  })
+
+  it("hunk and file-header rows are numbered NEITHER — they are not lines of the file", () => {
+    const lines = parseUnifiedDiff("--- v2\n+++ v3\n@@ -12,4 +12,5 @@\n context\n")
+    for (const i of [0, 1, 2]) {
+      expect(lines[i].oldLine).toBeUndefined()
+      expect(lines[i].newLine).toBeUndefined()
+    }
+    // NON-VACUITY: the header really did seed the counters for the body below it.
+    expect(lines[3]).toMatchObject({ oldLine: 12, newLine: 12 })
+  })
+
+  it("reads the COUNT-LESS single-line hunk form difflib emits", () => {
+    const lines = parseUnifiedDiff("@@ -7 +9 @@\n context\n")
+    expect(lines[1]).toMatchObject({ oldLine: 7, newLine: 9 })
+  })
+
+  it("⚠ NO HUNK HEADER MEANS NO NUMBERS — never a count that starts at 1 and is wrong", () => {
+    // A plausible-looking wrong line number is worse than a blank gutter: a reader would
+    // use it to find the line in the real file. So a malformed diff renders unnumbered.
+    const lines = parseUnifiedDiff(" context\n+added\n")
+    expect(lines[0].oldLine).toBeUndefined()
+    expect(lines[0].newLine).toBeUndefined()
+    expect(lines[1].newLine).toBeUndefined()
+    // ...and a CORRUPT header does not silently re-base the lines after it either.
+    const corrupt = parseUnifiedDiff("@@ garbage @@\n context\n")
+    expect(corrupt[1].oldLine).toBeUndefined()
+  })
+
+  it("a SECOND hunk re-seeds both counters rather than continuing the first", () => {
+    const two = parseUnifiedDiff("@@ -1,1 +1,1 @@\n a\n@@ -40,1 +42,1 @@\n b\n")
+    expect(two[1]).toMatchObject({ oldLine: 1, newLine: 1 })
+    expect(two[3]).toMatchObject({ oldLine: 40, newLine: 42 })
+  })
+
+  it("leaves `kind`, `text` and `sign` exactly as they shipped", () => {
+    // The numbers were ADDED to the shape; nothing about what a reader sees was rewritten.
+    const lines = parseUnifiedDiff(DIFF)
+    expect(lines.map((l) => l.kind)).toEqual([
+      "hunk",
+      "context",
+      "del",
+      "add",
+      "add",
+      "context",
+    ])
+    expect(lines[2]).toMatchObject({ text: "removed", sign: "−" })
+    expect(lines[3]).toMatchObject({ text: "added-one", sign: "+" })
+  })
+})

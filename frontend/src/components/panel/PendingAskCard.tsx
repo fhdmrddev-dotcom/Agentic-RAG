@@ -533,8 +533,28 @@ export function PendingAskCard({ ask, reconcile, runIsOver = false }: PendingAsk
 
       {/* Always-present free-text (D3 — no-options trap). */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor={`ask-${tool_call_id}-free`} className="sr-only">
-          Type an answer
+        {/* ── Phase 200 (sketch `run-panel-parts.html`) — THE LABEL IS VISIBLE NOW ──────
+              The sheet draws a "Reason" field label above this box. It shipped `sr-only`,
+              so a screen-reader user was told what the box was for and a SIGHTED user was
+              told nothing — the same asymmetry `PORT-canvas.md` found on the plane's end
+              cap and fixed the same way.
+
+              ⚠ THE WORD DEPENDS ON WHAT THE BOX IS FOR, and both arms are honest rather
+              than one being the sheet's. With options present the choice is the answer and
+              this box is the SUPPORTING SENTENCE beside it — the sheet's "Reason", which is
+              what it draws it next to. With NO options (the D3 no-options case) this box IS
+              the answer, and calling it a reason would mislabel the only control on the
+              card. So the sr-only wording is kept verbatim for that arm rather than
+              replaced, and nothing is renamed for a case the sheet does not draw.
+
+              Still tied by `htmlFor`/`id`, so the accessible name is the visible text and
+              the two cannot drift — which is exactly what an `sr-only` label risks. */}
+        <label
+          htmlFor={`ask-${tool_call_id}-free`}
+          data-testid="ask-free-label"
+          className="text-[11px] font-medium uppercase tracking-wide text-[hsl(var(--muted-foreground-dim))]"
+        >
+          {options.length > 0 ? "Reason" : "Type an answer"}
         </label>
         <textarea
           id={`ask-${tool_call_id}-free`}

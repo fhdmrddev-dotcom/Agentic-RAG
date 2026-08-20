@@ -143,7 +143,15 @@ vi.mock("@/components/workflows/WorkflowCanvas", () => ({
     // would be untestable from the page side, which is where the join actually happens.
     runState?: (
       slug: string,
-    ) => { reading: string; label: string; count?: number | null; noun?: string | null } | undefined
+    ) =>
+      | {
+          reading: string
+          label: string
+          count?: number | null
+          noun?: string | null
+          live?: boolean
+        }
+      | undefined
     editable?: boolean
     selectedSlug: string | null
     kbTools?: readonly string[]
@@ -166,8 +174,53 @@ vi.mock("@/components/workflows/WorkflowCanvas", () => ({
                  one this stub has to be able to TELL APART. */}
           <span data-testid={`count-${p.slug}`}>{String(runState?.(p.slug)?.count)}</span>
           <span data-testid={`noun-${p.slug}`}>{String(runState?.(p.slug)?.noun)}</span>
+          {/* Phase 200 — `PORT-canvas.md`'s page-resolved liveness boolean. `String(...)`
+                 for the same reason the two above use it: `false` and ABSENT are two facts
+                 and a bare child renders both as nothing. */}
+          <span data-testid={`live-${p.slug}`}>{String(runState?.(p.slug)?.live)}</span>
         </div>
       ))}
+    </div>
+  ),
+}))
+
+// ── Phase 200 — THE RIGHT-HAND RUN PANEL'S TWO PARTS, leaf-stubbed in this file's own
+//    idiom (the same one `WorkflowCanvas` above uses, and for the same reason).
+//
+// ⚠ THE STUBS ARE NOT A CONVENIENCE — MOUNTING THE REAL ONES TOOK THE WHOLE SUITE DOWN,
+// and it is recorded because it is the `196-08` failure mode arriving here rather than a
+// prediction. `PhaseTimeline` calls `useTasks` off `@/providers/StreamsProvider`, and this
+// file's module mock did not declare it: the import resolved to `undefined`, the render
+// died inside React, and the run was `117 failed / 20 passed` with 102 errors — none of
+// them about this plan's change. A module mock that omits an export a newly-mounted child
+// imports does not fail informatively.
+//
+// Stubbing rather than widening the mock is also the RIGHT division of proof for this file.
+// Its stated contract is that "a reading in this DOM is a reading the page computed": the
+// spine's own faces (the violet active bar, the raised needs-review card) belong to
+// `PhaseCard`'s suite, and the ask card's radiogroup of options belongs to
+// `PendingAskCard.test.tsx`. What is THIS page's property — and what these stubs make
+// assertable — is the HAND-OFF: that the panel is mounted at all, that it is handed the
+// RUN's thread rather than the globally-viewed one (`useViewingThread` above is a decoy
+// for exactly this mistake), and that a terminal run marks its prompts as over.
+vi.mock("@/components/panel/PhaseTimeline", () => ({
+  PhaseTimeline: ({ threadId }: { threadId: string | null }) => (
+    <div data-testid="spine-stub" data-threadid={String(threadId)} />
+  ),
+}))
+vi.mock("@/components/panel/PendingAskCard", () => ({
+  PendingAskCard: ({
+    ask,
+    runIsOver,
+  }: {
+    ask: { tool_call_id: string; prompt: string }
+    runIsOver?: boolean
+  }) => (
+    <div
+      data-testid={`ask-stub-${ask.tool_call_id}`}
+      data-runisover={String(runIsOver)}
+    >
+      {ask.prompt}
     </div>
   ),
 }))
@@ -3407,5 +3460,137 @@ describe("WorkflowRunPage 200-07 — the REPORT rows (§5), not built, not faked
     // re-read on every gate run rather than once. There is nothing to assert about a capture
     // that does not exist, which is exactly the point being recorded.
     expect(true).toBe(true)
+  })
+})
+
+
+describe("WorkflowRunPage 200 — the right-hand run panel, mounted at last", () => {
+  beforeEach(() => {
+    setFiles([])
+    setAsks([])
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "running", "draft-letter"),
+      mkPhase(2, "pending", "final-check"),
+    ])
+    getWorkflowRun.mockResolvedValue(mkRun({ thread_id: RUN_THREAD_ID }))
+    useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
+  })
+
+  it("mounts a step spine on the run surface and hands it the RUN's thread, not the viewed one", async () => {
+    // ⚠ THE WHOLE ROW, IN ONE ASSERTION PAIR. Before this plan the spine existed and no run
+    // surface could reach it: the panel shell's ONLY mount is inside chat's branch, and a
+    // grep for it over this page returned 0. The sheet draws the spine down the right of the
+    // run surface, so the capability was built and simply not mounted.
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const spine = screen.getByTestId("spine-stub")
+    expect(spine).toBeInTheDocument()
+    // ⚠ AND IT IS THE RUN'S THREAD. `VIEWED_THREAD_ID` is a live decoy in this file — the
+    // globally-viewed thread is a real value here and it is the WRONG answer. A spine fed
+    // from it would render somebody else's steps while looking completely correct.
+    expect(spine.getAttribute("data-threadid")).toBe(RUN_THREAD_ID)
+    expect(spine.getAttribute("data-threadid")).not.toBe(VIEWED_THREAD_ID)
+  })
+
+  it("the panel region is a sibling of the canvas, so neither one displaced the other", async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    const panel = screen.getByTestId("run-panel")
+    // NON-VACUITY: the canvas is still on screen. The mount added a column; it replaced
+    // nothing, which is the difference between wiring a surface and rebuilding it.
+    expect(screen.getByTestId("run-canvas-region")).toBeInTheDocument()
+    expect(panel).toBeInTheDocument()
+    // Named for a screen reader, because a second scrollable column that announces nothing
+    // is a second place to get lost in.
+    expect(panel.getAttribute("aria-label")).toBe("Run steps")
+  })
+
+  it("a pending ask reaches the run surface, and a LIVE run does not mark it over", async () => {
+    setAsks([mkAsk("call-7")])
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    const card = screen.getByTestId("ask-stub-call-7")
+    expect(card).toBeInTheDocument()
+    // `mkRun`'s default status is `active`, so the prompt is answerable.
+    expect(card.getAttribute("data-runisover")).toBe("false")
+  })
+
+  it("a TERMINAL run marks its unanswered prompt over — the control must not post into a stopped run", async () => {
+    // ⚠ NOT A COSMETIC ARM. The panel's own stack derives `runIsOver` from two hooks; this
+    // surface holds the run ROW itself, which is the stronger source. A cancelled run with an
+    // unanswered ask left on its thread does NOT need your reply, and offering a live-looking
+    // control there would be this page's own honesty rule broken in a new place.
+    setAsks([mkAsk("call-7")])
+    getWorkflowRun.mockResolvedValue(
+      mkRun({ thread_id: RUN_THREAD_ID, status: "cancelled" }),
+    )
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(screen.getByTestId("ask-stub-call-7").getAttribute("data-runisover")).toBe("true")
+  })
+
+  it("no ask means no card — never an empty frame", async () => {
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+    expect(screen.queryByTestId("ask-stub-call-1")).toBeNull()
+    // The spine is still there: the absence is the ask's, not the panel's.
+    expect(screen.getByTestId("spine-stub")).toBeInTheDocument()
+  })
+})
+
+describe("WorkflowRunPage 200 — the page-resolved liveness boolean (PORT-canvas.md)", () => {
+  beforeEach(() => {
+    setFiles([])
+    setAsks([])
+    useViewingThread.mockReturnValue(VIEWED_THREAD_ID)
+  })
+
+  it("marks ONLY the executing step live — never the waiting one and never the unreached one", async () => {
+    // ⚠ THIS IS THE ROW THE CANVAS AUTHOR BUILT AND BACKED OUT. Its suite forbids that file
+    // from spelling any reading word or importing the vocabulary as a value, so it could not
+    // derive "running" for itself; the recorded clean fix was a page-resolved boolean, and
+    // the page was not that dispatch's to edit. This asserts the page half.
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "running", "draft-letter"),
+      mkPhase(2, "pending", "final-check"),
+    ])
+    getWorkflowRun.mockResolvedValue(mkRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    expect(screen.getByTestId("live-draft-letter").textContent).toBe("true")
+    // The two NEGATIVE arms are the point of the field. A finished step and an unreached one
+    // are both "not running", and a boolean that said otherwise would animate a line into a
+    // step nothing is flowing into.
+    expect(screen.getByTestId("live-gather-contracts").textContent).toBe("false")
+    expect(screen.getByTestId("live-final-check").textContent).toBe("false")
+    // NON-VACUITY: the readings really are what this claims.
+    expect(screen.getByTestId("reading-draft-letter").textContent).toBe("running")
+  })
+
+  it("a step WAITING FOR A PERSON is not live — the run is stopped dead, not flowing", async () => {
+    // ⚠ THE ARM THAT MAKES THE FIELD HONEST RATHER THAN CONVENIENT. `waiting-for-you` is
+    // "not finished", and a boolean built from `!isTerminal` or from `status !== "done"`
+    // would call it live. Nothing is executing: motion there would assert progress that is
+    // not happening — the fabricated-figure defect told in movement instead of in type.
+    setAsks([mkAsk("call-1")])
+    setLiveSlice([
+      mkPhase(0, "done", "gather-contracts"),
+      mkPhase(1, "done", "draft-letter"),
+      mkPhase(2, "running", "final-check"),
+    ])
+    getWorkflowRun.mockResolvedValue(mkRun())
+    renderPage()
+    await screen.findByTestId("canvas-stub")
+
+    // `final-check` is the `llm_human_input` step, it is the RUNNING one, and an ask is
+    // pending — the three conditions the page's own F5 derivation requires.
+    expect(screen.getByTestId("reading-final-check").textContent).toBe("waiting-for-you")
+    expect(screen.getByTestId("live-final-check").textContent).toBe("false")
   })
 })
