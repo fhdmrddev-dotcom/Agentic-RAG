@@ -2,15 +2,26 @@
 gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
-status: executing
-last_updated: "2026-08-20T19:59:08.824Z"
+status: phase_complete
+last_updated: 2026-08-20T22:27:23.575Z
 last_activity: 2026-08-20
 progress:
   total_phases: 23
   completed_phases: 13
   total_plans: 136
-  completed_plans: 135
+  completed_plans: 138
   percent: 57
+stopped_at: >
+  Phase 200.1 COMPLETE (3/3 plans, verified 5/5, code review 2 Criticals closed).
+  ⚠ THE MILESTONE IS **NOT** COMPLETE. `gsd-sdk query phase.complete 200.1` returned
+  `is_last_phase: true` / `next_phase: null` and wrote `status: milestone_complete` plus
+  "Milestone complete (Phase 200.1 was final phase)" — all FALSE, and hand-corrected here
+  on 2026-08-21. It reads the highest phase NUMBER, and 200.1 sorts above 197/198.
+  v3.7 has real work left: **Phase 197 (guided-authoring) EXECUTED 11/11 but NOT COMPLETE**,
+  and **Phase 198 (Node Vocabulary, research-first) NOT STARTED**. Next action is 197, not
+  a milestone close. This is the SEVEN-false-completion-verbs failure mode, sixth recorded
+  firing — see the 193.1-05 note further down this file where a `state.*` verb deleted ~9 KB
+  of `stopped_at` outright.
 ---
 
 # Project State
@@ -31,11 +42,11 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 200.1 — the-run-says-what-it-produced-insert
+**Current focus:** Phase 200.1 complete — next: Phase 197 (guided-authoring, executed 11/11, not closed)
 
 ## Current Position
 
-Phase: 200.1 (the-run-says-what-it-produced-insert) — EXECUTING
+Phase: 200.1
 pass; Phase 200.1 inserted.** The prior Position block (Phase 200's finishing pass) is preserved
 verbatim below the audit, because its findings are still the record of that work.
 Plan: 1 of 3
@@ -2454,7 +2465,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Executing Phase 200.1
+**Status:** Phase 200.1 complete · milestone v3.7 STILL OPEN (197 not closed, 198 not started)
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 

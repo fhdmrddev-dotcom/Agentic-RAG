@@ -44,7 +44,7 @@ the right vocabulary, stop it, and see what it produced.
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 | 199 | **(INSERT)** The Component Map | Every workflow surface re-presented in the adopted design language | DES-01 | 5 |
 | 200 | **(INSERT)** The Run Becomes Measurable | 7/7 | Complete   | 2026-08-19 |
-| 200.1 | **(INSERT)** The Run Says What It Produced | 3/3 | Complete   | 2026-08-20 |
+| 200.1 | **(INSERT)** The Run Says What It Produced | 3/3 | Complete    | 2026-08-20 |
 
 **Build order rationale:** 192-195 are the four things that block *using* the product, cheapest and
 most independent first — 194 in particular is mostly UI over an endpoint that already exists. 196 and
