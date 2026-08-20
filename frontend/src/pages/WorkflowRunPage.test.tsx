@@ -314,6 +314,9 @@ interface RunLike {
     completed_at?: string | null
     step_count?: number | null
     step_noun?: string | null
+    // Phase 200.1 (RUN-04) — the fifth field, optional for the same reason: every case in
+    // this file that predates the plan omits it, which IS the no-answer shape.
+    deliverable_text?: string | null
   }[]
 }
 
@@ -537,7 +540,33 @@ const DELIVERABLE_SIZE = "18.4 KB"
 const DOWNLOAD_LABEL = `Download ${DELIVERABLE_NAME} (${DELIVERABLE_SIZE})`
 
 const COPY_EMPTY_LIVE = "No files yet — this run hasn't written anything."
-const COPY_EMPTY_TERMINAL = "This run produced no files."
+/**
+ * ⚠ **SUPERSEDED — Phase 200.1 (RUN-04). The old string is quoted here rather than erased.**
+ *
+ * It read, verbatim:
+ *
+ *     "This run produced no files."
+ *
+ * It was replaced because files stopped being the only thing this region can report. Measured
+ * on the live local DB: **479 phase rows carry `output.text` against 60 carrying a file — eight
+ * to one** — so on the common case that sentence was TRUE and USELESS. It named the absence of
+ * the rarer deliverable and said nothing about the one the run actually made.
+ *
+ * The new sentence is the SAME claim widened to cover both kinds, and it renders only when both
+ * are genuinely absent. The quotation is deliberate: `git log -S "This run produced no files."`
+ * still finds the whole thread through this block and through `WorkflowRunPage.tsx`'s own copy
+ * docblock — a removed string is exactly as invisible as one never written.
+ *
+ * ⚠ THE `:2047` SOURCE FENCE MOVED WITH IT, and the check the plan asked for was run BEFORE any
+ * prose was written: that fence reads `codeOf(pageSource)`, i.e. **comment-stripped** source, so
+ * the docblock quotations added on both sides do NOT change its count. Had it read raw `?raw`
+ * source, the quotation would have turned the fence red — the trap that fired twice in this tree
+ * in one phase.
+ */
+const COPY_EMPTY_TERMINAL = "This run produced no file and no written answer."
+/** 200.1 — the ANSWER region's heading and the fixture text the four arms are driven with. */
+const COPY_ANSWER_HEADING = "The answer this run wrote"
+const RUN_ANSWER = "Renewals are on track.\n\nThree of four suppliers confirmed."
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -1137,11 +1166,13 @@ describe("WorkflowRunPage — loading and error states", () => {
      *
      * ⚠ AND IT IS SCOPED TO THE `<h2>` ON PURPOSE — a sweep
      * of the region's whole `textContent` REDS ON CORRECT CODE. The terminal empty
-     * state legitimately reads *"This run produced no files."*, and that sentence is
-     * NOT an overclaim (an empty thread-scoped list does entail the run produced
-     * nothing — D-15 keeps it byte-identical). A region-wide needle would therefore
-     * fire on the one true sentence in the region. The proof of that is the last
-     * assertion in this case, not a promise.
+     * state legitimately reads *"This run produced no file and no written answer."*
+     * (⚠ 200.1 superseded *"This run produced no files."* here — see `COPY_EMPTY_TERMINAL`),
+     * and that sentence is NOT an overclaim (an empty thread-scoped list does entail the
+     * run produced nothing, and the answer arm is read from the run's OWN phase rows). A
+     * region-wide needle would therefore fire on the one true sentence in the region. The
+     * proof of that is the last assertion in this case, not a promise — and it still holds
+     * on the NEW string, which is why that assertion is unedited.
      */
     expect(heading?.textContent ?? "").not.toMatch(/this run (produced|made|created)/i)
     // (b) the equality. On its own this is weak — it passes on ANY wrong copy that
@@ -1438,8 +1469,10 @@ describe("195-02/195-06 — the id-less deliverable row: still no control, now N
     /**
      * ⚠ STILL SCOPED TO THE ROW, NOT TO THE REGION — the scoping reason is unchanged
      * by the inversion and is measured, not stylistic. The region's terminal empty
-     * copy is *"This run produced no files."* and its error line carries whatever the
-     * API said; a region-wide `textContent` sweep is precisely the mis-scoped query
+     * copy is *"This run produced no file and no written answer."* (⚠ 200.1 superseded
+     * *"This run produced no files."* — see `COPY_EMPTY_TERMINAL`), and its error line
+     * carries whatever the API said; a region-wide `textContent` sweep is precisely the
+     * mis-scoped query
      * P5 names. `idLessRow()` returns the `<li>`'s only child, so these assertions can
      * only be satisfied by the row itself.
      */
@@ -1520,6 +1553,321 @@ describe("WorkflowRunPage — the two empty states say different true things", (
     // ⚠ Phase 195 (D-02): this literal was "What this run produced". D-15's third arm
     // and D-02's relabel land in ONE plan precisely because this assertion joins them.
     expect(region.textContent).toContain("Files in this run's workspace")
+  })
+})
+
+// ── Phase 200.1 (RUN-04) — FOUR DELIVERABLE RENDERS, AND NONE FOLDED INTO ANOTHER ────────
+//
+// The region was file-only: it headed "Files in this run's workspace" and, on a terminal
+// empty run, said "This run produced no files." Both sentences are TRUE and USELESS about a
+// run whose deliverable was a text answer — and that is the COMMON case: **479 phase rows
+// carry `output.text` against 60 carrying a file, eight to one**.
+//
+// ⚠ EACH ARM IS ITS OWN CASE, and the fifth case asserts the four are DISTINCT by set size.
+// That last one is what catches a fold DIRECTLY rather than by inference: three arms can each
+// pass their own assertions while two of them render the same words.
+//
+// ⚠ THE FILE-ONLY ARM IS PROVED BYTE-IDENTICAL TO THE BASE COMMIT, not eyeballed. The literal
+// below was CAPTURED by rendering `3a14fc08`'s own `WorkflowRunPage.tsx` against this file's
+// existing `DELIVERABLE` fixture, before any of this plan's page edits were applied — the
+// `CARD_HTML_BASELINE` pattern. A capture re-taken from the NEW code would only record what
+// the code now does; this one can still fail.
+
+/** The `run-deliverables` region's `innerHTML` at base commit `3a14fc08`, file-only arm. */
+const FILE_ONLY_HTML_BASELINE =
+  '<h2 class="text-xs font-semibold text-foreground">Files in this run\'s workspace</h2>' +
+  '<ul role="list" class="mt-2 flex flex-col gap-0.5"><li><button type="button" ' +
+  'title="output/renewal-letter.docx" aria-label="Download renewal-letter.docx (18.4 KB)" ' +
+  'class="flex items-center gap-2 w-full rounded-md px-2 py-2 text-left transition-colors ' +
+  'hover:bg-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">' +
+  '<span class="inline-flex items-center shrink-0 text-muted-foreground">' +
+  '<span class="inline-flex flex-col items-center gap-0.5" aria-hidden="true">' +
+  '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" ' +
+  'fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" ' +
+  'stroke-linejoin="round" class="lucide lucide-file-text" aria-hidden="true">' +
+  '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 ' +
+  '2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path>' +
+  '<path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>' +
+  '</span></span><span class="flex-1 min-w-0 flex flex-col">' +
+  '<span class="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground/90">' +
+  "renewal-letter.docx</span></span>" +
+  '<span class="shrink-0 font-mono text-[11px] text-muted-foreground">18.4 KB</span>' +
+  '<span data-testid="file-row-age" class="shrink-0 font-mono text-[11px] ' +
+  'text-muted-foreground opacity-60">time unknown</span>' +
+  '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" ' +
+  'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" ' +
+  'stroke-linejoin="round" class="lucide lucide-download h-3.5 w-3.5 shrink-0 ' +
+  'text-muted-foreground" aria-hidden="true"><path d="M12 15V3"></path>' +
+  '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><path d="m7 10 5 5 5-5">' +
+  "</path></svg></button></li></ul>"
+
+/** A terminal run whose LAST row carries the answer. */
+function runWithAnswer(overrides: Partial<RunLike> = {}): RunLike {
+  return mkRun({
+    status: "completed",
+    thread_id: RUN_THREAD_ID,
+    phases: [
+      { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+      { slug: "draft-letter", phase_index: 1, status: "completed", phase_type: "llm_agent" },
+      {
+        slug: "final-check",
+        phase_index: 2,
+        status: "completed",
+        phase_type: "llm_human_input",
+        deliverable_text: RUN_ANSWER,
+      },
+    ],
+    ...overrides,
+  })
+}
+
+describe("WorkflowRunPage — the four deliverable renders", () => {
+  async function regionFor(run: RunLike, files: typeof DELIVERABLE[]): Promise<HTMLElement> {
+    getWorkflowRun.mockResolvedValue(run)
+    setFiles(files)
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    return screen.getByTestId("run-deliverables")
+  }
+
+  it("FILE ONLY — the render is byte-identical to the base commit's", async () => {
+    const region = await regionFor(
+      mkRun({ status: "completed", thread_id: RUN_THREAD_ID }),
+      [DELIVERABLE],
+    )
+    // ⚠ THE WHOLE REGION'S innerHTML, not a subset. Today's arm is UNCHANGED and is PROVED
+    // so — the plan's premise is that only the OTHER three arms are new.
+    expect(region.innerHTML).toBe(FILE_ONLY_HTML_BASELINE)
+    // ...and the baseline is not vacuously short, which a truncated capture would be.
+    expect(FILE_ONLY_HTML_BASELINE.length).toBeGreaterThan(1500)
+  })
+
+  it("TEXT ONLY — the answer renders, and the file sentence does NOT", async () => {
+    const region = await regionFor(runWithAnswer(), [])
+    expect(region.textContent).toContain(COPY_ANSWER_HEADING)
+    expect(region.textContent).toContain("Renewals are on track.")
+    // ⚠ THE FOLD THIS ARM FORBIDS: "produced no files" beside an answer is true and useless.
+    expect(screen.queryByText("This run produced no files.")).toBeNull() // the SUPERSEDED string
+    expect(screen.queryByText(COPY_EMPTY_TERMINAL)).toBeNull() // and the NEW one
+    expect(screen.queryByText(COPY_EMPTY_LIVE)).toBeNull()
+    // The file heading is absent too — there are no files and nothing to head.
+    expect(region.textContent).not.toContain("Files in this run's workspace")
+  })
+
+  it("BOTH — the file list comes FIRST in the DOM, the answer beneath it", async () => {
+    const region = await regionFor(runWithAnswer(), [DELIVERABLE])
+    const list = region.querySelector('[role="list"]')
+    const answer = region.querySelector('[data-testid="run-deliverable-answer"]')
+    expect(list).not.toBeNull()
+    expect(answer).not.toBeNull()
+    // ⚠ ASSERTED ON DOM POSITION, never by reading the source order — `DOCUMENT_POSITION_
+    // FOLLOWING` (4) means `answer` comes after `list` in document order.
+    const rel = list!.compareDocumentPosition(answer!)
+    expect(rel & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(rel & Node.DOCUMENT_POSITION_PRECEDING).toBeFalsy()
+    // Both really are present, so the position assertion is about two live things.
+    expect(region.textContent).toContain(DELIVERABLE_NAME)
+    expect(region.textContent).toContain("Renewals are on track.")
+    expect(region.textContent).toContain("Files in this run's workspace")
+  })
+
+  it("GENUINELY NOTHING — one sentence about BOTH kinds, and only that", async () => {
+    const region = await regionFor(
+      mkRun({ status: "completed", thread_id: RUN_THREAD_ID }),
+      [],
+    )
+    expect(region.textContent).toContain(COPY_EMPTY_TERMINAL)
+    // It is about neither only-files nor only-text: both nouns appear in the one sentence.
+    expect(COPY_EMPTY_TERMINAL).toMatch(/file/i)
+    expect(COPY_EMPTY_TERMINAL).toMatch(/written answer/i)
+    // The other three arms' distinguishing text is absent.
+    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+    expect(region.textContent).not.toContain(DELIVERABLE_NAME)
+    expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
+  })
+
+  it("the FOUR arms render FOUR DISTINCT texts — a fold is caught directly", async () => {
+    const texts: string[] = []
+    for (const [run, files] of [
+      [mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), [DELIVERABLE]],
+      [runWithAnswer(), []],
+      [runWithAnswer(), [DELIVERABLE]],
+      [mkRun({ status: "completed", thread_id: RUN_THREAD_ID }), []],
+    ] as [RunLike, typeof DELIVERABLE[]][]) {
+      const region = await regionFor(run, files)
+      texts.push(region.textContent ?? "")
+      cleanup()
+      vi.clearAllMocks()
+    }
+    expect(texts).toHaveLength(4)
+    // ⚠ THE CRITERION THAT CATCHES A FOLD DIRECTLY. Four arms, four readings — if any two
+    // arms ever printed the same words, this set collapses and no amount of per-arm green
+    // would say so.
+    expect(new Set(texts).size).toBe(4)
+    // POSITIVE CONTROL — the set really does collapse when two readings coincide.
+    expect(new Set([texts[0], texts[1], texts[2], texts[0]]).size).toBe(3)
+  })
+
+  it("LIVE and empty is UNCHANGED — still the 'yet' sentence, never the terminal one", async () => {
+    const region = await regionFor(
+      mkRun({ status: "active", thread_id: RUN_THREAD_ID }),
+      [],
+    )
+    expect(region.textContent).toContain(COPY_EMPTY_LIVE)
+    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
+    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+  })
+
+  it("claims NEITHER absence while the first file read is in flight", async () => {
+    getWorkflowRun.mockResolvedValue(mkRun({ status: "completed", thread_id: RUN_THREAD_ID }))
+    setFiles([], true)
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    const region = screen.getByTestId("run-deliverables")
+    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
+    expect(region.textContent).not.toContain(COPY_EMPTY_LIVE)
+    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+  })
+
+  it("an ANSWER renders even while the file read is in flight — the two are independent", async () => {
+    getWorkflowRun.mockResolvedValue(runWithAnswer())
+    setFiles([], true)
+    renderPage()
+    await screen.findByTestId("run-transcript")
+    const region = screen.getByTestId("run-deliverables")
+    // The answer comes from the RUN read, which has already landed; nothing about it waits
+    // on the thread-scoped file listing.
+    expect(region.textContent).toContain(COPY_ANSWER_HEADING)
+    expect(region.textContent).not.toContain(COPY_EMPTY_TERMINAL)
+  })
+
+  it("the answer is the LAST row with text — not strictly the final row", async () => {
+    // ⚠ THE CASE THE RULE EXISTS FOR: the closing step emitted a FILE and wrote no prose,
+    // while the step before it wrote the answer. A final-row rule reports this run as having
+    // produced no answer — on a surface whose whole job is to say what it produced.
+    const region = await regionFor(
+      mkRun({
+        status: "completed",
+        thread_id: RUN_THREAD_ID,
+        phases: [
+          {
+            slug: "gather-contracts",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+          },
+          {
+            slug: "draft-letter",
+            phase_index: 1,
+            status: "completed",
+            phase_type: "llm_agent",
+            deliverable_text: RUN_ANSWER,
+          },
+          {
+            slug: "final-check",
+            phase_index: 2,
+            status: "completed",
+            phase_type: "programmatic",
+            deliverable_text: null,
+          },
+        ],
+      }),
+      [],
+    )
+    expect(region.textContent).toContain("Renewals are on track.")
+  })
+
+  it("takes the LAST answer when several rows carry one — a confirm's QUESTION never wins", async () => {
+    // Measured on real local data, verbatim: a `confirm` step's `output.text` is
+    // *"Does this draft answer your question? Add any corrections."* — a QUESTION, not a
+    // deliverable. A first-row-wins rule prints the machine's question back at the person.
+    const QUESTION = "Does this draft answer your question? Add any corrections."
+    const region = await regionFor(
+      mkRun({
+        status: "completed",
+        thread_id: RUN_THREAD_ID,
+        phases: [
+          {
+            slug: "gather-contracts",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_human_input",
+            deliverable_text: QUESTION,
+          },
+          {
+            slug: "draft-letter",
+            phase_index: 1,
+            status: "completed",
+            phase_type: "llm_agent",
+            deliverable_text: RUN_ANSWER,
+          },
+          { slug: "final-check", phase_index: 2, status: "completed", phase_type: "programmatic" },
+        ],
+      }),
+      [],
+    )
+    expect(region.textContent).toContain("Renewals are on track.")
+    expect(region.textContent).not.toContain(QUESTION)
+  })
+
+  it("an EMPTY-STRING answer is no answer at all", async () => {
+    // The server already collapses `""` to `null`; the client refuses it independently, so a
+    // future writer of this field cannot make the region render a heading over nothing.
+    const region = await regionFor(runWithAnswer({ phases: [
+      { slug: "gather-contracts", phase_index: 0, status: "completed", phase_type: "llm_agent" },
+      {
+        slug: "draft-letter",
+        phase_index: 1,
+        status: "completed",
+        phase_type: "llm_agent",
+        deliverable_text: "",
+      },
+    ] }), [])
+    expect(region.textContent).not.toContain(COPY_ANSWER_HEADING)
+    expect(region.textContent).toContain(COPY_EMPTY_TERMINAL)
+  })
+
+  it("renders the answer as TEXT and keeps its line breaks", async () => {
+    const region = await regionFor(runWithAnswer(), [])
+    const block = region.querySelector('[data-testid="run-deliverable-answer"] p')
+    expect(block).not.toBeNull()
+    // The run's own newlines survive into the DOM, and the class that makes them visible
+    // is on the element that holds them.
+    expect(block!.textContent).toBe(RUN_ANSWER)
+    expect(block!.className).toContain("whitespace-pre-wrap")
+    expect(block!.className).toContain("break-words")
+    // ⚠ MODEL-AUTHORED CONTENT CANNOT BECOME MARKUP. A `<b>` in the answer arrives as text.
+    expect(block!.querySelectorAll("*")).toHaveLength(0)
+  })
+
+  it("model-authored markup in the answer is rendered as text, never as DOM", async () => {
+    const HOSTILE = '<img src=x onerror="alert(1)"> and <b>bold</b>'
+    const region = await regionFor(
+      runWithAnswer({
+        phases: [
+          {
+            slug: "draft-letter",
+            phase_index: 0,
+            status: "completed",
+            phase_type: "llm_agent",
+            deliverable_text: HOSTILE,
+          },
+        ],
+      }),
+      [],
+    )
+    const block = region.querySelector('[data-testid="run-deliverable-answer"] p')
+    expect(block!.textContent).toBe(HOSTILE)
+    expect(block!.querySelector("img")).toBeNull()
+    expect(block!.querySelector("b")).toBeNull()
+  })
+
+  it("adds NO focus stop — the answer is prose, not a control", async () => {
+    // The region's shipped contract is one focus stop per downloadable row and nothing else.
+    const region = await regionFor(runWithAnswer(), [])
+    expect(region.querySelectorAll("button")).toHaveLength(0)
+    expect(region.querySelectorAll("a")).toHaveLength(0)
+    expect(region.querySelectorAll("[tabindex]")).toHaveLength(0)
   })
 })
 
@@ -2044,7 +2392,25 @@ describe("WorkflowRunPage — the run row is re-read while it is live (CR-01)", 
   it("carries both empty-state strings, each written exactly once", () => {
     const code = codeOf(pageSource)
     expect(code.match(/No files yet — this run hasn't written anything\./g) ?? []).toHaveLength(1)
-    expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(1)
+    /**
+     * ⚠ **SUPERSEDED — Phase 200.1.** This line read, verbatim:
+     *
+     *     expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(1)
+     *
+     * It is rewritten IN PLACE onto the new sentence rather than added beside the old one,
+     * because the old string no longer exists in the page's CODE — only in its prose, which
+     * `codeOf` strips. See `COPY_EMPTY_TERMINAL` above for why the sentence changed.
+     */
+    expect(
+      code.match(/This run produced no file and no written answer\./g) ?? [],
+    ).toHaveLength(1)
+    // ⚠ AND THE SUPERSEDED SENTENCE IS GONE FROM THE CODE ENTIRELY — asserted, so a
+    // half-finished rename that left both strings live cannot pass.
+    expect(code.match(/This run produced no files\./g) ?? []).toHaveLength(0)
+    // ...while the page's PROSE still quotes it, which is what keeps `git log -S` useful.
+    expect(pageSource).toContain("This run produced no files.")
+    // The answer heading, likewise pinned at exactly one occurrence in code.
+    expect(code.match(/The answer this run wrote/g) ?? []).toHaveLength(1)
   })
 })
 
