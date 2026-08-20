@@ -162,8 +162,29 @@ describe("194.1-01 — the three shipped retirement sentences, READ from source"
      * stale loudly, in the same commit as the change, which is the behaviour asked
      * for. Re-derive with `wc -l frontend/src/components/panel/PendingAskCard.tsx`
      * and add one.
+     *
+     * SUPERSEDED IN PLACE AGAIN BY PHASE 200 - `630` -> `650`. Both earlier figures
+     * are kept above and here rather than overwritten (193.2 WR-05), so the file's
+     * growth curve stays readable:
+     *
+     *   SUPERSEDED (194.1-05):  the same expression, pinned at 630.
+     *
+     * `629 -> 649` (`wc -l`), i.e. `630 -> 650` segments. +20, and NINETEEN of them
+     * are the reasoning comment - the code change is a SINGLE JSX line: the free-text
+     * label lost `sr-only` and gained a visible class plus a two-arm word (`Reason`
+     * when the ask carries options, the shipped `Type an answer` when it does not).
+     * Sketch `run-panel-parts.html` draws that label visibly; it shipped
+     * screen-reader-only, so a sighted user was told nothing about what the box was
+     * for while an assistive-tech user was told.
+     *
+     * RE-BASELINED, NOT LOOSENED, AND NOT HIDING A REGRESSION. This clause's only job
+     * is to prove the `?raw` sweep reads the file it thinks it does; the three
+     * retirement-sentence fences below it are UNTOUCHED and all three passed on the
+     * same run, which is what says the edit did not disturb what this file actually
+     * guards. The pin stays EXACT for the reason stated above - a range here would
+     * stop catching a `?raw` import that silently resolved elsewhere.
      */
-    expect(src.split("\n").length).toBe(630)
+    expect(src.split("\n").length).toBe(650)
   })
 
   /** (a) The 404-expiry constant — `setExpiredMessage("…")` in the catch. */
