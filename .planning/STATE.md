@@ -100,7 +100,36 @@ NARRATION (*"Connecting to Northwind CRM instance…"*) is authored copy the pro
 two-line-per-step draft was built and WITHDRAWN because with only the step's name both lines say the
 same thing.
 
-⚠ **THE LOG EXPOSED A REAL PRE-EXISTING DEFECT ON ITS FIRST BROWSER OPEN, and 144 green tests could
+✅ **THE CROSSING'S CAUSE WAS FOUND AND FIXED FORWARD — migration 122 (`65dd4946`), APPLIED.**
+Both crossed runs point at a **`draft`** definition that was **edited after the run started** (one
+**7 seconds** later, mid-run; one 5 days). `workflow_definitions.definition` is MUTABLE while
+`status = 'draft'`, and `workflow_runs` stored only a `definition_id` — so D-188-14's *"the
+definition version that RAN"* was protected against the SLUG moving and not against the ROW moving.
+**Exposure is wider than the 2 crossings: 21 of 228 runs point at a draft, 14 of those drafts have
+been edited since**; any reorder, insert or delete re-crosses it. **Published definitions are
+immutable and show ZERO crossings — the control.**
+`workflow_runs.definition_snapshot` (jsonb, nullable, **no default, no backfill**) is written in
+`create_workflow_run`'s existing INSERT from **the same object the very next statement iterates to
+write the phase rows, in the same transaction** — so the snapshot and the phase rows cannot drift.
+⚠ **FORWARD-ONLY, STATED PLAINLY:** the 228 existing runs keep NULL and still fall back to the live
+row, crossing and all. Verified in the browser after the apply — the pre-122 run still renders
+`data-source-conflict`, which is the correct behaviour, not a failure.
+⚠ **NOT TAKEN, with triggers:** draft definitions stay mutable (trigger: the next phase touching run
+creation or the draft-run door), and `workflow_name`/`slug`/`version` still come from the live row
+(trigger: the next phase touching the run header's identity — that is Phase 197's D-19 and
+re-sourcing it inside a correctness fix would be a quiet widening).
+⚠ **CLOUD PARITY IS OWED AND IS HARDER THAN 121's:** migration 122 must be pasted into the cloud SQL
+editor in the **SAME operation** that deploys this backend — it is on the WRITE path of the one
+function that starts a run, so a half-deploy fails **every run creation**.
+✅ **RED→GREEN OBSERVED, not assumed:** `test_migration_122.py` read **5 skipped** before the apply
+and **4 passed / 1 skipped** after. The writer was proven against the real schema inside a
+transaction that ROLLED BACK (228 rows / 0 snapshots before and after): `jsonb_typeof = 'object'`,
+`snapshot->'phases'` resolves directly, ordering matches the source object — and **the counterfactual
+fired in the same run**, the string-scalar shape returning `None` **without raising**. ⚠ `mode="json"`
+is load-bearing: the plain `model_dump()` refuses on a UUID. **The last skip closes on the first real
+run.**
+
+⚠ **THE LOG EXPOSED THIS PRE-EXISTING DEFECT ON ITS FIRST BROWSER OPEN, and 144 green tests could
 not have found it.** The screen read *"Produce the deliverable · Not started"* about a step that had
 FAILED, and *"Work out how to do it · Failed"* about one that never ran. **Measured:** the page joins
 the definition's steps onto the run's rows by `phase_index` (D-188-01 — sound, because the reconcile
@@ -127,6 +156,10 @@ was its only consumer; F7's fix still reads verbatim from `WorkflowBuilderPage.t
 executed since migration 121 landed. The writer exists and is wired (`db/workflows.py:1466` →
 `harness_engine.py:1638`). **One UAT row closes it: run any published workflow once and open its run
 page.** Every existing run falls into the untimed arm, which renders correctly (verified live).
+⚠ **THAT SAME SINGLE RUN NOW CLOSES THREE THINGS AT ONCE** — migration 121's clock gutter, migration
+122's snapshot (`test_migration_122.py`'s one remaining skip), and the end-to-end proof that the
+widened INSERT works outside a rolled-back probe. ⚠ **Restart the backend first if it is not running
+with `--reload`**, or the run will use the pre-122 INSERT and prove only the clock.
 
 ⚠ **`RunReceipt`'s row list is now the closest thing to a duplicate on the page** — the log has one
 line per step with a clock, the receipt one row per step with a duration. **Recommendation, not
