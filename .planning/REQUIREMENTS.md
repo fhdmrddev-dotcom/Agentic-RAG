@@ -44,7 +44,7 @@ Where a requirement's seed carries analysis, the seed is the spec input — read
 ### Authoring — the doors and the journey (AUTH)
 
 - [ ] **AUTH-01**: A user can tell the two authoring doors apart and predict what each will do, before choosing. *(SEED-147)*
-- [ ] **AUTH-02**: A user drafting from a description is guided through the decisions that matter, rather than getting one shot at a prompt and a finished draft. *(SEED-051)*
+- [x] **AUTH-02**: A user drafting from a description is guided through the decisions that matter, rather than getting one shot at a prompt and a finished draft. *(SEED-051)*
 - [x] **AUTH-03**: A user attaches a template to a workflow **when authoring it**, and every run fills that same template with current information. *(SEED-110 / **REWRITTEN 2026-08-14, operator** — see the correction note below)*
 
   > ⚠ **THIS REQUIREMENT WAS WRITTEN WRONG, AND PHASE 193 BUILT THE WRONG THING TO IT.**

@@ -40,7 +40,7 @@ the right vocabulary, stop it, and see what it produced.
 | 194 | Stop a Running Workflow | A run can be stopped at any point and says so honestly | RUN-01 | 3 |
 | 195 | Show the Deliverable | A workflow that produces a file shows it, reusing the shipped file presentation | RUN-02, RUN-03 | 3 |
 | 196 | Registry-Backed Model Picker (canvas) | A step's model is chosen from the live registry, never typed | AUTH-04 | 3 |
-| 197 | Guided Authoring | 11/11 | In Progress|  |
+| 197 | Guided Authoring | 11/11 | Complete    | 2026-08-20 |
 | 198 | Node Vocabulary (research-first) | Establish whether deterministic primitives earn their place, and cover structured mid-run input | NODE-01, NODE-02 | 3 |
 | 199 | **(INSERT)** The Component Map | Every workflow surface re-presented in the adopted design language | DES-01 | 5 |
 | 200 | **(INSERT)** The Run Becomes Measurable | 7/7 | Complete   | 2026-08-19 |

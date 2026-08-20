@@ -6,6 +6,37 @@ started: 2026-08-18T15:15:00Z
 updated: 2026-08-18T16:40:00Z
 ---
 
+## ⚠ CLOSED AS A DECISION 2026-08-21 — the rows below are OWED, not passed
+
+**Phase 197 was closed with these rows outstanding. That is a decision, not a claim that they ran.**
+CLAUDE.md § G-7 permits it explicitly and requires it be stated this way.
+
+**What justified the close, stated so it can be argued with:**
+- Verification: **3/3 ROADMAP success criteria verified IN CODE**, 11/11 plan must-haves, **0 code
+  gaps** — and the verifier re-ran the suites and gates independently rather than trusting a SUMMARY.
+- The review's one **Critical (CR-01) is FIXED**, RED-first (`96a43ebd` → `f017f08b`).
+- Standing, quoted from this file's own header rather than recounted: **4 PASS · 2 PARTIAL ·
+  5 NOT DRIVEN.** ⚠ A recount on close made it 5 PASS, and the difference is **U-WR01**, whose
+  result reads *"PASS on the population; the empty case is UNREACHABLE through the UI"* — half a
+  row. The lower number is kept; a row with an unreachable arm is not a clean pass.
+
+**Why the remainder was NOT driven by the agent rather than left silent:** every outstanding row is
+an *eye* judgement — *"the appearance judgement"* (U1), *"the feel"* (U2), *"the 11px controls are
+actually legible"* (U9) — or needs a second live provider (U4) or a workflow that emits a file (U8).
+⚠ Driving those from the DOM would repeat **Phase 192's recorded mistake**: its post-fix re-drive
+located rows by `getElementById`, so it proved the code and could not prove the row was findable.
+A machine check that bypasses the human's task does not verify it.
+
+**RUN U4 FIRST** when you pick this up — the requirement row on **anthropic + openai**. That is what
+`ROADMAP.md`'s own 197 checklist entry already names, and cross-provider coverage is a standing
+project rule, so it outranks a judgement call. ⚠ An earlier draft of this note said "U1 first"; it is
+corrected here rather than left to contradict the ROADMAP, because two planning documents disagreeing
+about what to do next is the drift this project keeps paying for. Then **U1** (the arrival moment —
+its mechanical half already passes, so only the judgement is left), then **U2**, then **U9**.
+
+⚠ `status:` stays `partial` on purpose. A row that reads `[pending]` below is still pending, and this
+file remains the register for it — it will keep surfacing in `/gsd:progress` and `/gsd:audit-uat`.
+
 ## Current Test
 
 **Driven 2026-08-18 against the live local stack** (backend :8000, frontend :5173, Supabase :54322),

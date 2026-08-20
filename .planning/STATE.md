@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
-status: phase_complete
-last_updated: 2026-08-20T22:27:23.575Z
+status: ready_to_plan
+last_updated: 2026-08-20T22:31:30.088Z
 last_activity: 2026-08-20
 progress:
   total_phases: 23
@@ -12,6 +12,21 @@ progress:
   completed_plans: 138
   percent: 57
 stopped_at: >
+  Phase 197 complete (11/11) — ready to discuss Phase 198. Phase 200.1 also complete
+  (3/3, verified 5/5, code review 2 Criticals found and fixed).
+  ⚠ **DO NOT TRUST `phase.complete` ON THE HIGHEST-NUMBERED PHASE.** Run against 200.1 on
+  2026-08-21 it returned `is_last_phase: true` / `next_phase: null` and wrote
+  `status: milestone_complete` — all FALSE, because it sorts by phase NUMBER and 200.1 ranks
+  above 197/198. Hand-corrected; full account in commit `d9c35fe1`. Run against 197 minutes
+  later it was CORRECT (`next_phase: 198`) and surfaced both owed-work warnings — so the verb
+  is right in the ordinary case and wrong at the boundary. Check its output, every time.
+  ⚠ This same `state.*` write then DELETED the hand-written `stopped_at` that recorded the
+  above — the 193.1-05 failure mode, second recorded firing. Re-added by hand.
+  ⚠ **v3.7 IS STILL OPEN: Phase 198 (Node Vocabulary, research-first) has not started.**
+  ⚠ OWED, carried not closed: 197's UAT rows (see `197-HUMAN-UAT.md`, drive U4 first) ·
+  `/gsd:secure-phase 200.1` never run, and that phase put a `json.loads` parser on a
+  model-influenced boundary · `graphify update .` owed since the 200.1 worktrees were torn
+  down · SEED-191 (the run surface's centre column) awaiting `/gsd:sketch`.
   Phase 200.1 COMPLETE (3/3 plans, verified 5/5, code review 2 Criticals closed).
   ⚠ THE MILESTONE IS **NOT** COMPLETE. `gsd-sdk query phase.complete 200.1` returned
   `is_last_phase: true` / `next_phase: null` and wrote `status: milestone_complete` plus
@@ -42,11 +57,11 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and can be taught new behaviors (skills) that persist and can be shared.
 
-**Current focus:** Phase 200.1 complete — next: Phase 197 (guided-authoring, executed 11/11, not closed)
+**Current focus:** Phase 198 — node vocabulary
 
 ## Current Position
 
-Phase: 200.1
+Phase: 198
 pass; Phase 200.1 inserted.** The prior Position block (Phase 200's finishing pass) is preserved
 verbatim below the audit, because its findings are still the record of that work.
 Plan: 1 of 3
@@ -2465,7 +2480,7 @@ by any plan.** Seven of them write false records; one deleted ~9 KB of locked de
 
 ### Phase 193.2 — PLANNED 2026-08-15 · 10 plans / 6 waves · Ready to execute
 
-**Status:** Phase 200.1 complete · milestone v3.7 STILL OPEN (197 not closed, 198 not started)
+**Status:** Ready to plan
 
 ⚠ **NO GUARDRAIL OVERRIDE IS RECORDED FOR PHASE 193.2, AND THAT ABSENCE IS A MEASUREMENT (D-01).** It is the third consecutive phase (193, 193.1, 193.2) to be offered one and decline it. G-5 is honoured **by construction** on all seven hot files, each carrying the D-02 no-second-concern argument in its plan.
 
