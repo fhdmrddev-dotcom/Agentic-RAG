@@ -411,3 +411,147 @@ describe("RunTranscript — it spells nothing", () => {
     expect(code).toMatch(/from "@\/components\/workflows\/phaseDuration"/)
   })
 })
+
+// ── THE BRIGHT / DIM CONTRAST, AND EXACTLY WHERE IT IS HONEST ───────────────────────────
+//
+// The operator asked for "the sheet's bright-completed / dim-in-flight contrast". The sheet
+// alternates because its bright lines are RESULTS and its dim lines are in-flight NARRATION
+// between them ("Connecting to Northwind CRM instance…"). This product holds no narration and
+// renders ONE LINE PER STEP, so there is no alternation to copy. What is real — and what the
+// eye actually reads as rhythm on that drawing — is that work which has not happened yet is
+// quieter than work that has.
+//
+// ⚠ THE RUNNING LINE STAYS BRIGHT, and that refusal is asserted here rather than left in a
+// comment: it is the single most important row on a page somebody is watching, and the sheet's
+// own current line is bright with a spinner, not dim.
+function titleClassOf(slug: string): string {
+  const row = screen.getByTestId(`transcript-row-${slug}`)
+  return within(row).getByTestId("transcript-title").className
+}
+
+describe("RunTranscript — a step that has not run is QUIETER than one that has", () => {
+  it("a step the run never reached is dimmed", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    expect(titleClassOf("check")).toContain("text-muted-foreground")
+    expect(titleClassOf("check")).not.toContain("text-foreground")
+  })
+
+  it("a COMPLETED step is full strength — the other half of the contrast", () => {
+    render(<RunTranscript phases={ROWS} titleOf={titleOf} now={T0} />)
+    for (const slug of ["gather", "draft"]) {
+      expect(titleClassOf(slug)).toContain("text-foreground")
+      expect(titleClassOf(slug)).not.toContain("text-muted-foreground")
+    }
+  })
+
+  it("the RUNNING step is full strength — the muting refusal, asserted", () => {
+    // ⚠ THE ONE THING A NAIVE READING OF "dim-in-flight" WOULD HAVE DONE. `check` is `active`
+    // here and the page says it is running, so it is the row being watched.
+    const live: PhaseTimingRow[] = [
+      ROWS[0],
+      ROWS[1],
+      { slug: "check", status: "active", started_at: s(72), completed_at: null },
+    ]
+    render(
+      <RunTranscript
+        phases={live}
+        titleOf={titleOf}
+        now={T0 + 80_000}
+        runStatus="active"
+        liveOf={liveMap({ check: { reading: "running", label: "Running" } })}
+      />,
+    )
+    expect(titleClassOf("check")).toContain("text-foreground")
+    expect(titleClassOf("check")).not.toContain("text-muted-foreground")
+  })
+
+  it("a SKIPPED step is full strength — it is a settled outcome, not a not-yet", () => {
+    // ⚠ THE ARM MOST LIKELY TO BE GOT WRONG. A skipped step never ran, so it is tempting to
+    // file it with "has not happened". The run REACHED it and routed around it, which is a
+    // decision; dimming it would file a decision under "not yet".
+    render(
+      <RunTranscript
+        phases={[ROWS[0], { slug: "escalate", status: "skipped" }]}
+        titleOf={titleOf}
+        now={T0}
+        runStatus="completed"
+      />,
+    )
+    expect(titleClassOf("escalate")).toContain("text-foreground")
+  })
+
+  it("a HISTORIC row is full strength — its step ran, only its clock is missing", () => {
+    render(
+      <RunTranscript
+        phases={[{ slug: "write", status: "completed", started_at: null, completed_at: null }]}
+        titleOf={titleOf}
+        now={T0}
+        runStatus="completed"
+      />,
+    )
+    expect(titleClassOf("write")).toContain("text-foreground")
+  })
+
+  it("ATTENTION outranks the dim arm, and the precedence is not incidental", () => {
+    // ⚠ THE WIRE ROW IS `active`, AND THE FIRST DRAFT OF THIS CASE GOT THAT WRONG. It seeded
+    // the row as `pending` while telling the page it was `waiting-for-you`, and the title came
+    // out DIM — correctly. That is this file's own tense rule doing its job: the two sources
+    // disagreed, so the page's words were dropped entirely and the row rendered from the wire,
+    // which said the step had not started.
+    //
+    // The corrected fixture is what the product really produces, measured on a live run of a
+    // human-input workflow on 2026-08-20: the engine flips the phase row to `active` when it
+    // asks, so the row and the slice AGREE and the violet arm fires. Kept as a note because a
+    // fixture that cannot occur proves nothing about a precedence that never runs.
+    const asking: PhaseTimingRow[] = [
+      ROWS[0],
+      ROWS[1],
+      { slug: "check", status: "active", started_at: s(72), completed_at: null },
+    ]
+    render(
+      <RunTranscript
+        phases={asking}
+        titleOf={titleOf}
+        now={T0 + 80_000}
+        runStatus="active"
+        liveOf={liveMap({ check: { reading: "waiting-for-you", label: "Paused for your answer" } })}
+      />,
+    )
+    expect(titleClassOf("check")).toContain("text-accent-violet-text")
+    expect(titleClassOf("check")).not.toContain("text-muted-foreground")
+  })
+
+  it("a step the two sources DISAGREE about renders from the WIRE — dim, and silent", () => {
+    // The case the draft above stumbled into, kept as coverage in its own right. The page
+    // claims a step is waiting; the row says it never started. The tense rule drops the page's
+    // words, and the tone follows the row rather than the claim.
+    render(
+      <RunTranscript
+        phases={ROWS}
+        titleOf={titleOf}
+        now={T0}
+        runStatus="active"
+        liveOf={liveMap({ check: { reading: "waiting-for-you", label: "Paused for your answer" } })}
+      />,
+    )
+    expect(titleClassOf("check")).toContain("text-muted-foreground")
+    expect(titleClassOf("check")).not.toContain("text-accent-violet-text")
+    // …and the disagreement is machine-readable, which is what a person diagnosing a crossed
+    // run needs.
+    expect(
+      screen.getByTestId("transcript-row-check").getAttribute("data-source-conflict"),
+    ).toBe("true")
+  })
+
+  it("a run where EVERY step finished has no alternation, and that is correct", () => {
+    // ⚠ ASSERTED SO THE ABSENCE IS NOT LATER READ AS THE CHANGE HAVING FAILED. Five completed
+    // steps are five equal facts. The sheet's alternation is a property of copy this product
+    // does not have — the same reason its two-line-per-step rhythm was built and withdrawn.
+    render(
+      <RunTranscript phases={[ROWS[0], ROWS[1]]} titleOf={titleOf} now={T0} runStatus="completed" />,
+    )
+    const tones = ["gather", "draft"].map(titleClassOf)
+    expect(new Set(tones).size).toBe(1)
+    expect(tones[0]).toContain("text-foreground")
+  })
+})

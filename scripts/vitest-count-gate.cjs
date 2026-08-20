@@ -1234,7 +1234,17 @@ const BASELINE = {
   // ⚠ THIS SUITE IS ONE OF `SEED-171`'s FIVE FLAKY SUITES. It read `failed 0` on every
   // invocation across this plan and the gate never redded — recorded as an OBSERVATION, not
   // as proof of innocence. One green sample of a flaky suite is not proof of anything.
-  "WorkflowRunPage.test.tsx": 137,
+  // ⚠ RE-PINNED 137 → 148 (2026-08-20). THE DRIFT IS NOT THIS PASS'S DOING AND SAYING SO IS
+  //    THE POINT: Phase 200 deliberately WITHHELD the count-gate pins from every agent so its
+  //    waves could run in parallel instead of serialising on this file, and `.planning/STATE.md`
+  //    records that as owed debt. This is that debt being paid, for the three suites Phase 200
+  //    left unpinned or under-pinned. The figure is read from this script's own `actual` column
+  //    (`WorkflowRunPage.test.tsx  137  148  +11`), never hand-counted from `it(` literals.
+  //
+  // ⚠ AND THE SUITE ITSELF IS BYTE-UNCHANGED BY THE PASS THAT RAISES THE PIN — checked with
+  //    `git diff --numstat` before the number was touched, because a pin raised in the same
+  //    breath as an edit to its subject proves nothing about either.
+  "WorkflowRunPage.test.tsx": 148,
   // ── Added in 195-02 task 3, in the SAME COMMIT as their TARGETS entries. Every ───────
   // ── number below is this script's own printed `actual` column across TWO agreeing ────
   // ── runs (`total 4044 · failed 0 · count gate OK` both times) — never hand-counted ───
@@ -2466,7 +2476,10 @@ const BASELINE = {
   //   · that the component spells NO user-visible string: a JSX text-position literal sweep
   //     with its own positive control, plus the `aria-label` proved to come from the
   //     vocabulary — an `aria-label` IS user-visible text, just not to a sighted reviewer.
-  "RunReceipt.test.tsx": 20,
+  // ⚠ THIS PIN IS SUPERSEDED — see `"RunReceipt.test.tsx": 26` at the foot of this block, where
+  //    the six in-flight cases are described. The original entry is REMOVED rather than left
+  //    beside it: two entries for one key in one object literal is a silent last-wins, which is
+  //    the one shape a pin table may never take.
   // ── Added in Phase 200's run-log commit, in the SAME COMMIT that creates both files. Same
   //    one-knob check as every pin above: `src/components/workflows` is already a `TARGETS`
   //    directory entry, so the gate RAN both the moment they existed and printed them as
@@ -2504,8 +2517,107 @@ const BASELINE = {
   //     glyphs someone already thought of), and inequality against every `receiptVocabulary`
   //     export and every `RUN_READING_WORD` value — compared against the REAL exports, never a
   //     hand-listed copy, and asserted after a non-vacuity check on each comparison set.
-  "RunTranscript.test.tsx": 19,
+  // ── RE-PINNED 19 → 28 (2026-08-20, the run-surface finish pass) ────────────────────────
+  //
+  // ⚠ RAISING A PIN NECESSARILY DELETES A LINE, so this is an EDIT and not an addition — the
+  // distinction `196` records about this very file. The nine new cases are the BRIGHT/DIM
+  // CONTRAST block, and what they guard is a judgement rather than a treatment:
+  //
+  //   · a step the run NEVER REACHED is dimmed, and a COMPLETED one is not — the honest half
+  //     of the operator's "bright-completed / dim-in-flight" ask;
+  //   · the RUNNING step stays FULL STRENGTH. That is the refusal this file already carried in
+  //     prose and now carries in a test: the sheet's dim lines are in-flight NARRATION between
+  //     bright RESULT lines, and with one line per step that mapping inverts and would mute
+  //     the single most important row on a page somebody is watching;
+  //   · a SKIPPED step is full strength — the arm most likely to be got wrong, because it
+  //     never ran and yet is a settled DECISION, not a not-yet;
+  //   · a run where every step finished has NO alternation, asserted so the absence cannot
+  //     later be read as the change having failed;
+  //   · and ATTENTION outranks the dim arm — pinned with a fixture whose WIRE ROW is `active`,
+  //     because the first draft seeded `pending` and the tense rule correctly dropped the
+  //     page's word. That miss is itself now a case: two sources that disagree render from the
+  //     WIRE and flag `data-source-conflict`.
+  "RunTranscript.test.tsx": 28,
   "transcriptVocabulary.test.ts": 7,
+  // ── ADDED 2026-08-20 (the run-surface finish pass). `src/components/workflows` is already a
+  //    `TARGETS` directory entry, so the gate RAN this suite from the moment it existed and
+  //    printed it `— 11 new`. **No `TARGETS` entry is added.** The figure is read from this
+  //    script's own `actual` column, never hand-counted from `it(` literals.
+  //
+  // WHAT WOULD BE UNGUARDED WITHOUT IT: `RunSpine.test.tsx` (11) is the only pin on the run
+  // panel's own column — the surface that carries the ANSWER CONTROL. It holds that the spine
+  // speaks the author's titles and spells NO slug anywhere (the whole reason the component
+  // replaced `PhaseTimeline` on this page); that D-07's declared count renders VERBATIM, that
+  // an absent count renders NO element and a declared `0` renders; that the time column
+  // carries TIME facts only, so a HISTORIC row says its time was not recorded (the arm a local
+  // subtraction silently loses) and a STATE fact never appears there; that a running step
+  // ticks and the tick DISCLOSES it is unfinished; that a STALE slice cannot pulse a finished
+  // step, because liveness needs BOTH sources; and that the caller's ask renders inside the
+  // row it was given for and nowhere else — which is the placement the whole re-port turns on.
+  "RunSpine.test.tsx": 11,
+  // ── SEED-190's run log, pinned in the commit that creates all three files ───────────────
+  //
+  // ⚠ THREE SUITES, THREE DIFFERENT THINGS, and none of them is coverage for its own sake:
+  //
+  //   · `runLogRow.test.ts` (21) — that an UNMEASURED run reports NO duration and above all
+  //     never `0s`. Migration 121 is not backfilled, so most rows in the real database take
+  //     that arm today (measured: 10 of 580 phase rows carry the pair), and a resolver that
+  //     coalesced a missing instant to zero would look perfect on a fixture and print `0s` at
+  //     a person about ~220 of their 230 runs. It also pins that the outcome word is the
+  //     LIBRARY CARD's — asserted by calling `runFacts` independently and comparing, never by
+  //     a copied literal, so the log and the card cannot drift into two vocabularies for one
+  //     fact — and that the span is measured from the INSTANTS and never from `created_at`
+  //     (falsified with a row whose insert time is 90 minutes from its 57-second span).
+  //   · `RunLogPanel.test.tsx` (20) — that a FAILURE is never rendered as an EMPTY LOG, in
+  //     BOTH directions, and that the three empty states are three SENTENCES. "We could not
+  //     look" and "we looked and there is nothing" are different facts, and showing the second
+  //     when the first is true is how a surface tells a person their work is gone. Also: the
+  //     filter goes over the wire as a SLUG and never a definition id (the version trap), and
+  //     with no way to open a run the rows are NOT CONTROLS rather than dead ones.
+  //   · `runLogTone.mirror.test.ts` (10) — the guard that makes a deliberate duplication safe.
+  //     The log's colour tables mirror `WorkflowCard.tsx`'s, which could not be extracted
+  //     because `gutterTokens.fences.test.ts` pins the shape of those object bodies IN THE
+  //     CARD'S OWN SOURCE. This asserts the two agree entry for entry, with a positive control
+  //     proving the parser really sees six entries per map and a driven falsification proving
+  //     a single changed utility is caught.
+  "runLogRow.test.ts": 21,
+  "RunLogPanel.test.tsx": 20,
+  "runLogTone.mirror.test.ts": 10,
+  // ── THE LAST TWO OF PHASE 200'S UNPINNED SUITES, pinned at their measured actuals ───────
+  //
+  //   · `StepPanelPort.test.tsx` (25) — the step panel's port, guarded against the failure
+  //     that made the port necessary. Its own header says it plainly: `PhaseFormPanel.test.tsx`
+  //     reported 13/14 atoms GREEN on a screen the operator then said was not what was
+  //     designed, because those atoms were derived from a CHANGE-LOG rather than from the
+  //     drawing. This suite's atoms come from the sheet's markup, and it asserts the ABSENCES
+  //     as strictly as the presences — an invented per-folder lock badge, an `Add a source`
+  //     that writes nothing — each with a positive control, because "nothing is there" must
+  //     not be reachable by a selector typo.
+  //   · `WorkflowCard.baseline.test.tsx` (29) — the CHARACTERIZATION PIN that discharged
+  //     `WorkflowCard.tsx`'s G-5: it was committed ONE COMMIT BEFORE `cardFace.ts` existed and
+  //     passed unedited across the extraction. It pins the card's whole resting atom inventory
+  //     BY VISIBLE TEXT, so a refactor that keeps a `data-testid` alive while emptying the node
+  //     it names still reds. ⚠ A pin on a characterization suite is the one place where the
+  //     count matters most and the count is the least of it — the file's value is that its
+  //     lines predate the change they judge.
+  "StepPanelPort.test.tsx": 25,
+  "WorkflowCard.baseline.test.tsx": 29,
+  // ── ADDED 2026-08-20 in the SAME COMMIT as `RunReceipt.test.tsx`'s own growth ───────────
+  //
+  // ⚠ RE-PINNED 20 → 26. The six new cases exist because of a defect NO TEST IN THIS FILE
+  // COULD HAVE CAUGHT, and that is the reason they are pinned rather than left to run: every
+  // case in that suite rendered a TERMINAL run, so the receipt's header was never exercised in
+  // flight. Driven on a real run with a human-input step on 2026-08-20, the strip read
+  // *"Ran 42s · 3 steps · finished 22:15"* beside a spine visibly waiting for an answer.
+  // Both FIGURES were honest; the SENTENCES asserted a stop that had not happened.
+  //
+  // The block pins that all three in-flight statuses (`active`, `paused`, `cap_paused`) report
+  // the runtime SO FAR and name no finish; that a terminal run is UNCHANGED (the control,
+  // without which the block passes on a strip that never says `Ran`); that "still running"
+  // OUTRANKS "no finish time recorded", because the two are different facts and only one tells
+  // a person to keep waiting; and that an ABSENT status asserts NO finish — never success by
+  // default, which is the arm whose first draft was written backwards and corrected in place.
+  "RunReceipt.test.tsx": 26,
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

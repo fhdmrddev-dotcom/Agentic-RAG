@@ -291,6 +291,27 @@ function pageAgreesWithWire(
 }
 
 /**
+ * The two timing kinds a step reaches when it HAS NOT RUN — the lines the sheet draws quiet.
+ *
+ * ⚠ THIS IS THE HONEST HALF OF "bright-completed / dim-in-flight", AND THE OTHER HALF IS
+ * DECLINED IN THE SAME BREATH — see the title's own note at the render site. The sheet
+ * alternates bright and dim because its bright lines are RESULTS and its dim lines are
+ * in-flight NARRATION ("Connecting to Northwind CRM instance…") between them. This product
+ * holds no narration and renders one line per STEP, so there is no alternation to copy. What
+ * IS real, and is what the eye actually reads as rhythm on that drawing, is that work which
+ * has not happened yet is quieter than work that has: `not-started` (the run never got this
+ * far) and `not-recorded`'s sibling `never-ran` are facts about ABSENCE.
+ *
+ * ⚠ `never-ran` (a SKIPPED step) IS DELIBERATELY NOT IN THIS SET. It is a settled outcome —
+ * the run reached that step and routed around it, which is something that HAPPENED — and its
+ * own word says so. Dimming it would file a decision under "not yet".
+ *
+ * ⚠ NOR IS `not-recorded`. A historic row's step really ran; only its clock is missing. Its
+ * line is a result and reads as one.
+ */
+const UNRUN_KINDS: ReadonlySet<string> = new Set(["not-started"])
+
+/**
  * The reading that earns the attention tone. Kept apart from `LIVE_READINGS` because
  * "is happening" and "is stuck on a person" are two facts, and only one of them is an ask.
  */
@@ -365,6 +386,11 @@ export function RunTranscript({
                 held != null && pageAgreesWithWire(row, held, facts.timing.kind) ? held : null
               const isLive = live != null && LIVE_READINGS.has(live.reading)
               const attention = live != null && live.reading === ATTENTION_READING
+              // ⚠ READ FROM THE WIRE'S OWN TIMING KIND, NOT FROM THE PAGE'S SLICE. A step that
+              // has not run is a fact the ROW carries; the slice is a hint that can be stale,
+              // and a stale slice dimming a step that has since completed would be the same
+              // class of defect as the crossing this file's tense rule exists to refuse.
+              const unrun = UNRUN_KINDS.has(facts.timing.kind)
               // The duration belongs to a step that has stopped. When the page's label is in
               // use and says the step is live, there is no duration to show yet; otherwise the
               // wire's own reading is internally consistent and renders as it is.
@@ -404,12 +430,28 @@ export function RunTranscript({
                   >
                     {entry.offsetMs === null ? "" : runClock(entry.offsetMs)}
                   </span>
-                  {/* ⚠ THE TITLE IS FULL-STRENGTH ON EVERY LINE, INCLUDING THE LIVE ONE.
-                      An earlier draft dimmed the running step, borrowed from the sheet, where
-                      the dim lines are IN-FLIGHT NARRATION beside separate bright RESULT
-                      lines. With one line per step that mapping inverts: it would mute the
-                      single most important row on a page somebody is watching. The tone that
-                      distinguishes the states rides on the STATE WORD instead. */}
+                  {/* ⚠ THE LIVE LINE STAYS FULL-STRENGTH, AND THAT REFUSAL IS UNCHANGED. It
+                      read, and still reads: "An earlier draft dimmed the running step,
+                      borrowed from the sheet, where the dim lines are IN-FLIGHT NARRATION
+                      beside separate bright RESULT lines. With one line per step that mapping
+                      inverts: it would mute the single most important row on a page somebody
+                      is watching."
+
+                      ⚠ WHAT IS AMENDED IS THE CLAUSE "ON EVERY LINE". The operator asked for
+                      the sheet's bright/dim contrast and they are right that the column has
+                      none — but the axis that makes it honest is NOT running-vs-finished. It
+                      is HAPPENED-vs-NOT-YET: a step the run never reached is an absence, and
+                      an absence printed at the same weight as a result is the flattest thing
+                      on the page. So `not-started` dims and everything that has actually
+                      occurred — completed, failed, skipped, historic, and the one in flight —
+                      stays bright.
+
+                      ⚠ ON A RUN WHERE EVERY STEP FINISHED THERE IS STILL NO ALTERNATION, and
+                      that is correct rather than a shortfall: five completed steps are five
+                      equal facts. The sheet's alternation is a property of copy this product
+                      does not have, which is the same reason its two-line-per-step rhythm was
+                      built and withdrawn. Said plainly here so the absence is not read as the
+                      change having failed. */}
                   {/* ⚠ THE TITLE DOES NOT TAKE `flex-1`, AND THAT IS THE FIX FOR THE THING
                       THAT LOOKED WORST. When it did, it ate the whole 768px column and threw
                       every trailing atom to the far right edge — the duration sat ~500px from
@@ -419,8 +461,18 @@ export function RunTranscript({
                   <span
                     data-testid="transcript-title"
                     className={cn(
-                      "min-w-0 max-w-[60%] truncate text-foreground",
-                      attention && "text-accent-violet-text",
+                      "min-w-0 max-w-[60%] truncate",
+                      // ⚠ THE ORDER OF THESE THREE IS THE PRECEDENCE, and it is not
+                      // interchangeable: attention outranks everything, then "not yet", then
+                      // the ordinary bright line. A step that is WAITING has certainly been
+                      // reached, so the two can never actually contend — but writing them in
+                      // this order means a future reading that could be both still resolves
+                      // to the louder one rather than to whichever `cn` emitted last.
+                      attention
+                        ? "text-accent-violet-text"
+                        : unrun
+                          ? "text-muted-foreground"
+                          : "text-foreground",
                     )}
                   >
                     {titleOf(row.slug)}

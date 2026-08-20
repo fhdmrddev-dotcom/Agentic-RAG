@@ -23,7 +23,6 @@ import { describe, it, expect, afterEach } from "vitest"
 import { render, screen, within, cleanup } from "@testing-library/react"
 import { RunSpine } from "./RunSpine"
 import { type PhaseTimingRow } from "./phaseDuration"
-import { SPINE_HEADING } from "./transcriptVocabulary"
 
 afterEach(cleanup)
 
@@ -53,7 +52,13 @@ function row(slug: string) {
 describe("RunSpine — it speaks the author's language, never the schema's", () => {
   it("names every step with the caller's title and spells no slug anywhere", () => {
     render(<RunSpine phases={ROWS} titleOf={titleOf} now={T0} />)
-    const text = screen.getByText(SPINE_HEADING).closest("div")?.parentElement?.textContent ?? ""
+    // ⚠ RE-ANCHORED ON THE COMPONENT'S OWN ROOT, NOT ON THE HEADING. It read
+    // `screen.getByText(SPINE_HEADING).closest("div")?.parentElement` — which reached this
+    // component's root only because the heading happened to live inside it. The heading has
+    // moved to the PAGE's header band (so the panel's heading and the page's share one row;
+    // see `RunSpine.tsx`'s own note), and an anchor that depended on where a heading lived was
+    // never asserting anything about the spine. `run-spine` names the subject directly.
+    const text = screen.getByTestId("run-spine").textContent ?? ""
     expect(text).toContain("Pull the contracts")
     // ⚠ THE WHOLE REASON THIS COMPONENT EXISTS. The component it replaced rendered these.
     for (const slug of ["gather", "draft", "check"]) expect(text).not.toContain(slug)

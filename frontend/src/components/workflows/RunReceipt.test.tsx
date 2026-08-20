@@ -35,6 +35,7 @@ import {
   OUTCOME_NEVER_RAN,
   RECEIPT_LANDMARK_LABEL,
   TIME_NOT_RECORDED,
+  HEADER_STILL_RUNNING,
 } from "./receiptVocabulary"
 
 const NOW = Date.parse("2026-08-19T14:22:00.000Z")
@@ -309,5 +310,84 @@ describe("RunReceipt — the one-string-home rule, and the deliberate non-mount"
       titleOf: vi.fn(() => "A hostile slug"),
     })
     expect(cell("constructor", "receipt-row-time")?.textContent).toBe("5s")
+  })
+})
+
+// ── THE HEADER MUST NOT CLAIM A RUN HAS STOPPED WHILE IT IS RUNNING ──────────────────────
+//
+// ⚠ FOUND BY DRIVING A REAL RUN, NOT BY A TEST — and that is why the block exists. On
+// 2026-08-20 a live run of a workflow with a human-input step sat PAUSED on its approval
+// gate, and this strip read *"Ran 42s · 3 steps · finished 22:15"* beside a spine whose
+// second row was visibly waiting for an answer and a page header that said `Running`.
+//
+// Both FIGURES were honest — `runSpan` is `min(started_at) → max(completed_at)` across the
+// phase rows, and the first step really did complete at 22:15. What was wrong is what the
+// SENTENCES asserted about them. Every case in this file passed throughout, because every one
+// of them rendered a terminal run: the defect lived entirely in a state the suite never built.
+describe("RunReceipt — a run in flight is never described in the past tense", () => {
+  /** The same rows, cut off mid-run: two steps done, the third started and not finished. */
+  const liveRows: PhaseTimingRow[] = [
+    rows[0],
+    rows[1],
+    { slug: "check", status: "active", started_at: "2026-08-19T14:02:06.000Z", completed_at: null },
+  ]
+
+  for (const status of ["active", "paused", "cap_paused"] as const) {
+    it(`\`${status}\` reports the runtime SO FAR and refuses to name a finish`, () => {
+      renderReceipt({ phases: liveRows, runStatus: status })
+      const header = screen.getByTestId("receipt-header").textContent ?? ""
+
+      // ⚠ THE EXACT SHAPE OF THE OLD LIE, RULED OUT BY NAME: `Ran …` is a claim that it
+      // stopped, and `finished HH:MM` names an instant it has not reached.
+      expect(header).not.toMatch(/\bRan\b/)
+      expect(header).not.toMatch(/\bfinished \d/)
+      // …and it still reports the measurement, because the figure was never the problem.
+      expect(header).toContain(HEADER_STILL_RUNNING)
+      expect(header).toMatch(/\d+[smh]/)
+      expect(header).toContain("3 steps")
+    })
+  }
+
+  it("a TERMINAL run is unchanged — the past tense is correct there and still used", () => {
+    // The control. Without it the block above is satisfied by a strip that never says `Ran`.
+    renderReceipt({ phases: liveRows, runStatus: "completed" })
+    const header = screen.getByTestId("receipt-header").textContent ?? ""
+    expect(header).toMatch(/\bRan\b/)
+    expect(header).not.toContain(HEADER_STILL_RUNNING)
+  })
+
+  it("`still running` OUTRANKS `no finish time recorded`, and the two are different words", () => {
+    // ⚠ THE PRECEDENCE IS THE CONTRACT. A live run whose rows carry NO instants has no finish
+    // time for TWO reasons at once, and the useful one is that it has not finished — that
+    // tells a person to keep waiting, where "we do not hold the instant" does not.
+    renderReceipt({
+      phases: [{ slug: "write", status: "active", started_at: null, completed_at: null }],
+      runStatus: "active",
+    })
+    const header = screen.getByTestId("receipt-header").textContent ?? ""
+    expect(header).toContain(HEADER_STILL_RUNNING)
+    expect(header).not.toContain(HEADER_NOT_FINISHED)
+    // …and the untimed arm still speaks, because the runtime really is not recorded.
+    expect(header).toContain(HEADER_SPAN_NOT_RECORDED)
+    // The two sentences are not the same sentence — the fold this asserts against.
+    expect(HEADER_STILL_RUNNING).not.toBe(HEADER_NOT_FINISHED)
+  })
+
+  it("an ABSENT run status asserts NO finish — never success by default", () => {
+    // ⚠ THIS CASE WAS WRITTEN THE OTHER WAY ROUND FIRST, AND THE IMPLEMENTATION WAS RIGHT.
+    // The first draft asserted the PAST tense here, arguing that `runStatus` is optional, that
+    // the receipt's only production mount always passes one, and that a missing status is
+    // therefore a caller bug rather than a run state. It went red, and the argument does not
+    // survive being checked: when the status is absent we do not know whether the run
+    // finished, and the two arms are NOT symmetric. The past-tense arm ASSERTS a completion
+    // and names an instant; the live arm asserts only that no finish is known. This
+    // repository's standing rule — never success by default (T-15) — picks the second.
+    //
+    // Recorded rather than quietly re-pointed: a test rewritten to match the code is worthless
+    // unless the reason it changed is written down.
+    renderReceipt({ phases: liveRows, runStatus: undefined })
+    const header = screen.getByTestId("receipt-header").textContent ?? ""
+    expect(header).not.toMatch(/finished \d/)
+    expect(header).toContain(HEADER_STILL_RUNNING)
   })
 })

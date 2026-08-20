@@ -98,10 +98,36 @@ export function headerSteps(n: number): string {
   return n === 1 ? "1 step" : `${n} steps`
 }
 
+/**
+ * `header.span.live` — the run's runtime SO FAR.
+ *
+ * ⚠ A SEPARATE SENTENCE FROM `headerSpan`, AND THE PAST TENSE IS THE WHOLE REASON. *"Ran 42s"*
+ * on a run that is at that moment waiting for a person is a claim that it has stopped. The
+ * figure is the same measurement; what changes is what the sentence asserts about it.
+ */
+export function headerSpanSoFar(formattedDuration: string): string {
+  return `Running for ${formattedDuration}`
+}
+
 /** `header.finished` — the clock time the last step reached a terminal status. */
 export function headerFinished(clockTime: string): string {
   return `finished ${clockTime}`
 }
+
+/**
+ * `header.finished.live` — the run has not finished, and this says so instead of naming an
+ * instant.
+ *
+ * ⚠ IT IS A THIRD SENTENCE, NOT A REUSE OF `HEADER_NOT_FINISHED`, and the three are pairwise
+ * distinct on purpose:
+ *   · `HEADER_NOT_FINISHED`  — it may well have finished; we hold no instant for it.
+ *   · this                   — it has NOT finished; there is no instant to hold yet.
+ *   · `headerFinished(t)`    — it finished, at t.
+ * Folding the first two is the same defect this file already refuses twice over: an absence
+ * of knowledge and an absence of the event are different facts, and only one of them tells a
+ * person to keep waiting.
+ */
+export const HEADER_STILL_RUNNING = "not finished yet"
 
 /**
  * `header.finished.absent` — the run has not reached a last completion yet, or none was

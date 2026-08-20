@@ -1051,10 +1051,24 @@ describe("Builder header — useEffectiveFeatures() has ZERO non-test call sites
   })
 
   it("POSITIVE CONTROL — a planted second call site is actually found", () => {
-    const planted = workflowsPageSource.replace(
-      "export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {",
-      'export function WorkflowsPage({ folders, onLaunch }: WorkflowsPageProps) {\n  const leak = useEffectiveFeatures("planted")',
-    )
+    // ⚠ THE ANCHOR IS THE DECLARATION, NOT ITS PARAMETER LIST, AND THAT WAS LEARNED THE
+    // useful way. It used to be the whole signature spelled out verbatim
+    // (`({ folders, onLaunch }: WorkflowsPageProps)`), and SEED-190 added a third prop to that
+    // page — so the plant stopped landing, the control could no longer prove anything, and
+    // this case went RED. That is the `not.toBe` line below doing exactly its job: a positive
+    // control whose plant silently misses is a fence that has quietly stopped being one.
+    //
+    // Re-anchored on `export function WorkflowsPage(`, which is what this control is really
+    // about — a call site planted INSIDE that component — and which cannot move without the
+    // component being renamed.
+    const anchor = "export function WorkflowsPage("
+    expect(workflowsPageSource).toContain(anchor)
+    const bodyStart =
+      workflowsPageSource.indexOf(") {", workflowsPageSource.indexOf(anchor)) + ") {".length
+    const planted =
+      workflowsPageSource.slice(0, bodyStart) +
+      '\n  const leak = useEffectiveFeatures("planted")' +
+      workflowsPageSource.slice(bodyStart)
     expect(planted).not.toBe(workflowsPageSource) // the plant actually landed
     expect(callSites(planted)).toBe(1)
   })

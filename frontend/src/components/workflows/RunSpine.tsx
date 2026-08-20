@@ -70,7 +70,6 @@ import {
   type PhaseTimingRow,
 } from "@/components/workflows/phaseDuration"
 import { countDeclared, timeRunning } from "@/components/workflows/receiptVocabulary"
-import { SPINE_HEADING } from "@/components/workflows/transcriptVocabulary"
 
 /**
  * The page's live reading for one step, structurally declared.
@@ -206,23 +205,55 @@ export function RunSpine({
   now = Date.now(),
 }: RunSpineProps) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* ⚠ THE HEADER MATCHES THE PAGE HEADER'S HEIGHT AND CARRIES THE SAME BORDER, which is
-          what makes the two columns read as ONE screen split in two rather than as a list that
-          happens to sit beside a page. The operator's screenshot shows the divider running from
-          the very top; a panel whose header floats below the page header breaks that line. */}
-      <div className="flex h-[72px] shrink-0 items-center border-b border-border px-6">
-        <h2 className="text-base font-semibold text-foreground">{SPINE_HEADING}</h2>
-      </div>
+    <div data-testid="run-spine" className="flex min-h-0 flex-1 flex-col">
+      {/* ⚠⚠ THE HEADING IS NOT HERE ANY MORE, AND THE ATTEMPT THAT PUT IT HERE IS QUOTED
+          RATHER THAN DELETED — because its GOAL was right and its MECHANISM could not reach it:
+
+            "⚠ THE HEADER MATCHES THE PAGE HEADER'S HEIGHT AND CARRIES THE SAME BORDER, which
+             is what makes the two columns read as ONE screen split in two rather than as a
+             list that happens to sit beside a page. The operator's screenshot shows the
+             divider running from the very top; a panel whose header floats below the page
+             header breaks that line."
+              — with `h-[72px]`.
+
+          **It could not match a height it did not know.** MEASURED in the browser 2026-08-20:
+          the page header renders **112px** (a back-button row over a title row that also
+          carries the centre switch and the Stop control) and this strip rendered 72 — so the
+          panel began 112px down and its heading sat **90px below** the page's. The number was
+          not merely wrong; it was UNKNOWABLE from here, because this component cannot see the
+          header it was trying to match.
+
+          THE FIX IS STRUCTURAL, NOT ARITHMETIC. The page's header is now a flex ROW of two
+          cells — the title cell and a 380px panel cell carrying this heading — so the two
+          headings share a band BY CONSTRUCTION and the divider runs from the very top. A flex
+          row makes the cells equal height whatever the left one grows to, which no constant
+          here could have done.
+
+          ⚠ THIS FILE'S DOCBLOCK USED TO SAY THE PANEL "owns its header strip". It no longer
+          does, and the sentence is corrected at its source rather than left to rot. */}
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         {/* ⚠ THE CONNECTING LINE IS WHAT MAKES THIS READ AS A SPINE rather than a list, and it
             is the sheet's own device (`absolute left-3.5 top-4 bottom-4 w-px`). It sits BEHIND
-            the rings — hence the z-ordering — so each ring punches through it. */}
+            the rings — hence the z-ordering — so each ring punches through it.
+
+            ⚠ IT WAS TOO FAINT TO SEE, AND THE FIGURE IS THE ARGUMENT. `bg-border` computes to
+            `rgb(33, 38, 49)` — measured in the browser, on this very element — against a panel
+            painted `bg-card/40` over the app's `--background`. That is a one-pixel line at a
+            few percent of contrast: present in the DOM, invisible on the screen, and the
+            operator said so. `bg-muted-foreground/40` is the same token family the panel's own
+            quiet text already uses, at a weight that reads as a drawn line rather than a smudge.
+
+            ⚠ IT IS STILL ONE UNIFORM LINE, and the sheet's brighter ACCENT SEGMENT beside the
+            step a run is waiting on is NOT taken. That segment encodes *how far the run has
+            got* — a second statement of progress on a column where every row already states its
+            own — and it is a change of SHAPE (a second, partial rail) rather than of tone.
+            Declined with a trigger: the first time this panel needs to say something about the
+            run AS A WHOLE that no individual row says. */}
         <div className="relative">
           <div
             aria-hidden="true"
             data-testid="spine-rail"
-            className="absolute bottom-4 left-[13px] top-4 z-0 w-px bg-border"
+            className="absolute bottom-4 left-[13px] top-4 z-0 w-px bg-muted-foreground/40"
           />
           <ol className="relative z-10 flex flex-col gap-5">
             {phases.map((row) => {

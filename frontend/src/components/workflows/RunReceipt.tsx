@@ -60,6 +60,10 @@
  * ordering authority, and two authorities disagree eventually.
  */
 import { fmtElapsed } from "@/lib/fmtElapsed"
+// The ONE run-terminal predicate in the tree (`lib/phaseState.ts`), imported rather than
+// re-derived — `phaseDuration.ts` reads the same Set for the same reason, and a second
+// definition of "the run is over" is how a header comes to contradict the page it heads.
+import { TERMINAL_RUN_STATUSES } from "@/lib/phaseState"
 import {
   clockTime,
   declaredCount,
@@ -72,8 +76,10 @@ import {
   HEADER_NOT_FINISHED,
   HEADER_SEPARATOR,
   HEADER_SPAN_NOT_RECORDED,
+  HEADER_STILL_RUNNING,
   headerFinished,
   headerSpan,
+  headerSpanSoFar,
   headerSteps,
   RECEIPT_LANDMARK_LABEL,
 } from "@/components/workflows/receiptVocabulary"
@@ -133,10 +139,36 @@ export function RunReceipt({
   // runs, so it anchors a live run and nothing else. `min(started_at) → max(completed_at)` is
   // what makes the header a measurement.
   const span = runSpan(phases)
+  // ⚠ THE STRIP MUST NOT CLAIM A RUN HAS STOPPED WHILE IT IS RUNNING, AND IT DID.
+  //
+  // Found by driving a real run with a human-input step on 2026-08-20: with the run PAUSED on
+  // its approval gate, this strip read *"Ran 42s · 3 steps · finished 22:15"* — beside a spine
+  // whose second row was visibly waiting for an answer, and a page header that said `Running`.
+  // Both figures were honest measurements of the STEPS (`runSpan` is min(started) →
+  // max(completed) across the phase rows, and the first step really did complete at 22:15);
+  // what was wrong is what the SENTENCES asserted about them. The header contradicted the
+  // surface it heads.
+  //
+  // ⚠ IT READS THE RUN'S OWN STATUS, NOT THE PHASE ROWS. A "have all the steps finished?" test
+  // over `phases` would be a second, weaker definition of terminal — it answers `true` for a
+  // run that is between steps, which is exactly the state this defect appeared in. The run
+  // says whether it is over; the phases say how long its steps took.
+  const runIsOver = runStatus != null && TERMINAL_RUN_STATUSES.has(runStatus)
   const header = [
-    span === null ? HEADER_SPAN_NOT_RECORDED : headerSpan(fmtElapsed(span.ms)),
+    span === null
+      ? HEADER_SPAN_NOT_RECORDED
+      : runIsOver
+        ? headerSpan(fmtElapsed(span.ms))
+        : headerSpanSoFar(fmtElapsed(span.ms)),
     headerSteps(phases.length),
-    span === null ? HEADER_NOT_FINISHED : headerFinished(clockTime(span.finishedAtMs)),
+    // ⚠ THE ORDER OF THESE TESTS IS THE CONTRACT. "Still running" outranks "no instant
+    // recorded": a live run has no finish time because it has not finished, which is a
+    // stronger and more useful statement than saying we do not hold one.
+    !runIsOver
+      ? HEADER_STILL_RUNNING
+      : span === null
+        ? HEADER_NOT_FINISHED
+        : headerFinished(clockTime(span.finishedAtMs)),
   ]
 
   return (

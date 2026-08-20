@@ -110,6 +110,9 @@ import { StopControl } from "@/components/chat/StopControl"
 //    `RunSpine.tsx`'s docblock for the screenshot-level diff against the sheet. It remains the
 //    right component in CHAT and is untouched there; this page no longer imports it.
 import { RunSpine } from "@/components/workflows/RunSpine"
+// SEED-190 / the run-surface re-port: the panel's heading is rendered by the HEADER BAND now,
+// not by `RunSpine`, so the two columns' headings share one row. See the header's own note.
+import { SPINE_HEADING } from "@/components/workflows/transcriptVocabulary"
 // ── THE CANVAS IS BACK ON THIS PAGE, BEHIND A SWITCH — an operator decision, 2026-08-20 ──
 //    It was removed outright for four measured reasons (still recorded in `RunTranscript.tsx`),
 //    and the strongest of them — that a linear chain drawn as a graph shows nothing a list does
@@ -1175,8 +1178,25 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       {/* 1. HEADER — orientation, never a focal point. The only accent it spends is the
-             seam link. */}
-      <header className="flex shrink-0 flex-col gap-2 border-b border-border/10 px-6 py-4">
+             seam link.
+
+             ⚠ IT IS A BAND OF TWO CELLS NOW, AND THAT IS THE FIX FOR THE THING THE OPERATOR
+             SAW. It used to span the full width, with the run panel starting BELOW it and
+             carrying a 72px header strip of its own — so the panel's heading sat 90px lower
+             than the page's (measured: page header 112px, strip 72px) and the divider between
+             the two columns began a third of the way down the screen. The reference draws ONE
+             band with the divider running from the very top and the two headings level.
+
+             ⚠ TWO FLEX CELLS RATHER THAN A SHARED HEIGHT CONSTANT, deliberately. The left cell
+             grows with its own content — the back row, the title, the centre switch, the Stop
+             control — and a constant copied into the panel would be wrong the first time any
+             of those changed. A flex row makes the cells equal height BY CONSTRUCTION, which
+             is a property rather than a number somebody has to maintain.
+
+             ⚠ THE RIGHT CELL IS `lg:flex` AND HIDDEN BELOW IT, matching the panel it heads. A
+             heading for a column that is not rendered is a label pointing at nothing. */}
+      <header className="flex shrink-0 border-b border-border/10">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 px-6 py-4">
         <button
           type="button"
           onClick={onBack}
@@ -1302,6 +1322,29 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
                   : `claimed_at null → created_at ${run?.created_at}`}
             </span>
           ) : null}
+        </div>
+      </div>
+        {/* THE PANEL CELL. It carries the divider, the panel's surface and the panel's
+            heading, so all three run from the very top of the band.
+
+            ⚠ `items-center`, AND THE FIRST ATTEMPT AT THIS WAS `items-end` — recorded because
+            the correction is the interesting part. The left cell has THREE rows, not two
+            (measured: the back button 16–36, the title row 44–71, a state/meta row 79–95), so
+            bottom-aligning put this heading against the THIRD row and left it 25px below the
+            title it was supposed to sit beside. Centring it in the band lands it within **2px**
+            of the h1's own centre — measured, not estimated — and it does so with NO constant
+            at all: no row height, no spacer, no copy of the left cell's padding. That is why
+            this is the version that ships. A hand-derived offset would be `h-[72px]`'s mistake
+            wearing a different number.
+
+            ⚠ THE WIDTH, THE BORDER AND THE SURFACE ARE THE `<aside>`'s, REPEATED EXACTLY. Any
+            drift between the two and the divider steps sideways at the band's lower edge —
+            the one defect this restructure exists to remove, reintroduced one element down. */}
+        <div
+          data-testid="run-panel-header"
+          className="hidden w-[380px] shrink-0 items-center border-l border-border bg-card/40 px-6 py-4 lg:flex"
+        >
+          <h2 className="text-base font-semibold text-foreground">{SPINE_HEADING}</h2>
         </div>
       </header>
 
