@@ -322,6 +322,26 @@ export interface NodeRunState {
    * spells no noun of its own — it renders the one the server declared, or nothing.
    */
   noun?: string | null
+  /**
+   * Phase 200 (`PORT-canvas.md` — *"the marching running connector, NOT LANDED, and this is
+   * the one real gap"*) — IS THIS STEP EXECUTING RIGHT NOW, resolved by the PAGE.
+   *
+   * ⚠ **A BOOLEAN, AND THAT IS THE WHOLE POINT.** `WorkflowCanvas.tsx` is forbidden by its
+   * own suite from spelling ANY of the seven reading words or importing this module as a
+   * value (D-188-01/D-188-02 — the page decides the reading, the canvas paints it), so a
+   * canvas that wanted to animate its one live connector had to write `reading === "running"`
+   * and tripped the fence. The canvas author built the marching line, measured the trip, and
+   * backed the whole thing out rather than loosen the fence. This field is the seam that was
+   * missing: the page — which already owns the vocabulary — resolves the fact, and the canvas
+   * merges a stroke delta and a CSS class with **no derivation and no lookup**.
+   *
+   * ⚠ **`true` MEANS EXECUTING, NOT "NOT FINISHED".** A step `waiting-for-you` is stopped
+   * dead awaiting a human and nothing is flowing into it; a step `not-started` has not been
+   * reached. Animating either would be motion asserting progress that is not happening — the
+   * same class of claim as a fabricated count. Absent ⇒ paint the resting connector, which
+   * is why the field is optional and why no consumer may read it as `!live ⇒ finished`.
+   */
+  live?: boolean
 }
 
 /**

@@ -93,6 +93,11 @@ import { WorkflowCanvas } from "@/components/workflows/WorkflowCanvas"
 // Phase 194.1 Plan 07 (R3) — the FOURTH and last mount of the ONE shared Stop. It owns its
 // own dispatch and its own pressed state; this page hands it a thread id and nothing else.
 import { StopControl } from "@/components/chat/StopControl"
+// ── Phase 200 — the run surface's right-hand spine. Both are PANEL parts taken as
+//    props, not the panel SHELL: see the mount docblock at the canvas region below for
+//    why the shell itself cannot come here (a global chat singleton, and the previewer).
+import { PhaseTimeline } from "@/components/panel/PhaseTimeline"
+import { PendingAskCard } from "@/components/panel/PendingAskCard"
 import {
   useAskUserPrompt,
   usePhases,
@@ -785,12 +790,28 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       // mentioned, and `payloadLabel` renders NOTHING for a non-number — never `0`, never a
       // dash, never an empty pill. A declared `0` is a real measurement and DOES render.
       const wire = wireBySlug.get(spec.slug)
+      // ── Phase 200 · `PORT-canvas.md`'s ONE REAL GAP — the page half of it ─────────────
+      //
+      // The canvas author built the marching "running" connector and BACKED IT OUT, because
+      // `WorkflowCanvas.test.tsx` forbids that file from spelling any of the seven reading
+      // words or importing `runVocabulary` as a value (D-188-01/02): `reading === "running"`
+      // trips it, and a second fence forbids the run lookup below the anti-blink memo split.
+      // The recorded clean fix was "a page-resolved boolean on `NodeRunState`" — and the page
+      // is this file, which that dispatch was not allowed to edit. This is that boolean.
+      //
+      // ⚠ IT IS `reading === "running"`, NOT `!isTerminal` AND NOT `status !== "done"`. A
+      // step `waiting-for-you` is stopped dead awaiting a human and a step `not-started` has
+      // not been reached — animating either would be motion asserting progress that is not
+      // happening, which is the fabricated-figure defect told in movement instead of in type.
+      // Reading it off the SAME `reading` the label is worded from is what keeps the moving
+      // line and the printed sentence from ever disagreeing.
       m.set(spec.slug, {
         reading,
         label: runReadingLabel(reading, emitFailure),
         emitFailure,
         count: wire?.step_count,
         noun: wire?.step_noun,
+        live: reading === "running",
       })
     }
     return m
@@ -1180,21 +1201,95 @@ export function WorkflowRunPage({ runId, onBack, onOpenThread }: Props) {
       {/* 3. CANVAS REGION — the focal point. The canvas ships its own header row and its
              own ⌥ toggle; this surface adds neither, and does not reword its shipped
              view-only copy (which is correct on a run surface). */}
-      <section
-        aria-busy={!isTerminal}
-        data-testid="run-canvas-region"
-        className="min-h-0 min-h-[320px] flex-1 px-6"
-      >
-        <WorkflowCanvas
-          phases={specs}
-          selectedSlug={null}
-          onSelectNode={noop}
-          onClearSelection={noop}
-          editable={false}
-          runState={runState}
-          kbTools={kbTools}
-        />
-      </section>
+      {/* ── Phase 200 · THE RIGHT-HAND RUN PANEL (sketch `run-surface.html`) ──────────────
+             The sheet draws a step spine down the right of the run surface, and every part
+             of it was already built — `PhaseTimeline` (the spine), `PhaseCard` (the violet
+             active bar and the raised needs-review face) and `PendingAskCard` (the answer
+             control). None of it reached this surface: `WorkspacePanel`'s ONLY mount is
+             `ChatLayout.tsx:673`, inside `activeView === "chat"`, and this page rendered in
+             the `else` branch with no panel at all.
+
+             ⚠ THE SHELL IS NOT MOUNTED, ITS PARTS ARE — and that is a resolution of two
+             hard constraints, not a shortcut.
+
+               1. The shell resolves its thread through the globally-viewed-thread
+                  SELECTOR — a zustand singleton written only by `ChatArea`. Mounting the
+                  shell here would have meant this page writing chat state as a side effect
+                  of opening a run, which the CR-02 docblock above deliberately refuses
+                  ("opening a run writes no chat state") and which is why the stream is armed
+                  through `reconcile` directly. `PhaseTimeline` and `PendingAskCard` both
+                  take what they need as PROPS, so they need no such write.
+
+               2. The shell also reaches the workspace previewer through the panel's file
+                  list, and `WorkflowRunPage.test.tsx` records why this surface has neither:
+                  DOCX/PPTX/XLSX/PDF are download-only and the template engine emits `.docx`,
+                  so the flagship deliverable is exactly the artefact that cannot be shown in
+                  place. Mounting the shell would have smuggled the previewer back in behind
+                  a section header. Mounting the two parts leaves that list unmounted, so the
+                  fence holds BY CONSTRUCTION rather than by a new suppression flag — and no
+                  cross-surface prop was added, so chat is byte-unchanged.
+
+               ⚠ AND NEITHER MECHANISM IS SPELLED ABOVE, WHICH IS ITSELF THE RULE. This
+                  file's own suite sweeps its `?raw` source for the previewer's identifier,
+                  the panel list's identifier and the viewed-thread selector's — comments
+                  included, because a source fence cannot tell prose from code. The first
+                  draft of this docblock NAMED all three while explaining why it mounts none
+                  of them, and both fences went red. They were right to: the fences forbid
+                  the MECHANISM APPEARING IN THIS FILE, and they were not re-baselined.
+
+             The asks come from THIS page's own `asks` / `reconcileAsks` (`:545`), already
+             fetched for the `waiting-for-you` reading, so the panel opens no new request.
+             `runIsOver` is the page's own `isTerminal` rather than `PendingAskStack`'s
+             two-hook derivation — this surface holds the run row itself, which is the
+             stronger source, and a terminal run's unanswered prompt must not offer a
+             control that would post into a run that has stopped. ── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        <section
+          aria-busy={!isTerminal}
+          data-testid="run-canvas-region"
+          className="min-h-0 min-h-[320px] flex-1 px-6"
+        >
+          <WorkflowCanvas
+            phases={specs}
+            selectedSlug={null}
+            onSelectNode={noop}
+            onClearSelection={noop}
+            editable={false}
+            runState={runState}
+            kbTools={kbTools}
+          />
+        </section>
+
+        <aside
+          data-testid="run-panel"
+          aria-label="Run steps"
+          className="hidden w-[320px] shrink-0 flex-col gap-3 overflow-y-auto border-l border-border/10 px-3 py-4 lg:flex"
+        >
+          {/* The ask stack, newest first — the same ordering rule `PendingAskStack` keeps,
+              re-derived here rather than imported because the stack resolves its own thread
+              from the chat singleton. `created_at` is GET-only, so an SSE-delivered ask with
+              no timestamp falls back to store insertion order rather than being invented a
+              position (`PendingAskCard.tsx:610-613`). */}
+          {asks.length > 0
+            ? [...asks]
+                .sort((a, b) =>
+                  a.created_at && b.created_at ? b.created_at.localeCompare(a.created_at) : 0,
+                )
+                .map((ask) => (
+                  <PendingAskCard
+                    key={ask.tool_call_id}
+                    ask={ask}
+                    reconcile={reconcileAsks}
+                    runIsOver={isTerminal}
+                  />
+                ))
+            : null}
+          {/* ⚠ THE THREAD IS THE RUN'S, PASSED EXPLICITLY. `PhaseTimeline` has taken
+              `threadId` as a prop since Phase 094; nothing about it was chat-specific
+              except its caller. */}
+          <PhaseTimeline threadId={run?.thread_id ?? null} />
+        </aside>
+      </div>
 
       {/* 4. RUN RECEIPT — the same spine above, re-read in the PAST TENSE (D-09 ·
              `RS-MR-02` / `RS-MR-03` / `RS-MR-04` / `RS-MR-05`).
