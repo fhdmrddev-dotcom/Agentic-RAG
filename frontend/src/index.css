@@ -501,6 +501,12 @@
   .animate-fileFlash {
     animation: none;
   }
+  /* BUG-260823-02: the tool-row entrance was the only motion in the chat panel
+     with no reduced-motion escape. It starts at opacity 0, so without this the
+     rows fade in for a user who asked the OS for no animation. */
+  .animate-toolSlideIn {
+    animation: none;
+  }
 }
 
 /* Tool panel progress shimmer bar */

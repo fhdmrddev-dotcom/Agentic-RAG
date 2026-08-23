@@ -681,14 +681,20 @@ export function ToolCallPanel({ toolCalls, activatedSkills }: Props) {
 
             return (
               <div
-                key={i}
+                // BUG-260823-02: a STABLE key, not the list index. With `key={i}`
+                // React re-identified rows whenever the list changed shape, and a
+                // remounted element restarts its CSS animation from `opacity: 0` —
+                // so the whole history re-played its entrance on every reconcile.
+                // `stepKey` is the same identity `dedupToolCalls` and `expandedSteps`
+                // already use (clientKey > id > name-startedAt-idx), so a row keeps
+                // its DOM element and its finished animation stays finished.
+                key={stepKey}
                 className={cn(
                   "pt-2.5 animate-toolSlideIn",
                   isToolActive && "tc-active-wrap rounded-md px-2",
                 )}
                 data-testid={isToolActive ? "tc-active" : undefined}
                 data-tool-status={tc.status}
-                style={{ animationDelay: `${i * 80}ms` }}
               >
                 {/* D-067-03: Step N divider on iteration boundary; plain inter-tool separator otherwise.
                     Renders ONLY when (a) not the first item, (b) both current and previous tool items

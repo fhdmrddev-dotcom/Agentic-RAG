@@ -80,6 +80,42 @@ ever runs on genuinely-new rows, where a small cascade is defensible. Removing i
 `${name}-${startedAt}-${idx}` when neither `clientKey` nor `id` is present (DB-loaded historical
 rows), so uniqueness holds — but assert it rather than assume it.
 
+## Fix applied 2026-08-23 (/gsd:fast) — ⚠ STATUS STAYS `open` PENDING OPERATOR CONFIRMATION
+
+Shipped, three changes, two files:
+
+1. `key={stepKey}` replaces `key={i}` on the row div. This is the whole fix for the *replay*:
+   with a stable identity React keeps the same DOM element, and a CSS animation that has already
+   finished on a retained element does not restart.
+2. The `animationDelay: i * 80ms` stagger is **removed**. It was the wave, and it could not have
+   been kept even in a reduced form — the delay is computed from the row's ABSOLUTE index, so a
+   single new tool arriving at position 12 would have waited 960ms before appearing.
+3. `.animate-toolSlideIn { animation: none }` added to the `prefers-reduced-motion: reduce` block
+   in `index.css`, which previously covered `.animate-fileFlash` only.
+
+⚠ **A first draft also carried a `useRef` "first sight" set, and it was REMOVED before commit —
+the reason is worth keeping.** It looked like the principled half of the fix and it was neither
+sufficient nor safe: a ref dies with its component, so it does nothing for the case the operator
+actually described (collapsing and re-opening the panel unmounts the rows and the ref with them),
+and it wrote during render, which `StrictMode` double-invokes — so in dev every genuinely-new row
+would have been marked already-seen by the second pass and never animated at all. `key={stepKey}`
+alone covers every case the ref would have.
+
+**Residual, stated rather than left to be discovered:** a *fresh mount* of the panel still runs the
+entrance once — all rows now fade in together over 0.25s instead of cascading at 80ms intervals.
+That is a single fade, not a wave, and it is the honest remaining behaviour. If the operator still
+reads it as a blink, the next step is a module-scoped seen-set (surviving unmount), not a ref.
+
+**Verification:** `tsc --noEmit -p tsconfig.app.json` → 33 errors, identical to the pre-change
+baseline, **zero** in `ToolCallPanel.tsx`. Seven suites that mount the panel or its parents run
+green: `ToolCallPanel`, `ToolArgsLivePanel`, `RunCard`, `RunCard.timer`, `MessageList`,
+`MessageItem.sticky`, `panel/Seam` — 101 tests, 0 failing. ⚠ No test asserts the animation
+behaviour itself; none existed before and none was added, so the fix is verified by typecheck,
+by no-regression, and by reading — **not** by a test that would catch its return.
+
+⚠ **The operator's screenshots have not been re-taken.** Status stays `open` until the blink is
+confirmed gone in the live UI; flip to `closed` then.
+
 ## Surface classification
 
 `Agentic-RAG`. Frontend-only, one component plus three lines of CSS.
