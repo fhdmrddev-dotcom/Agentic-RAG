@@ -698,3 +698,221 @@ def test_extract_and_store_tables_fallback_when_extracted_doc_none():
     # Legacy pdfplumber pass ran exactly once (proves fallback path).
     mock_extract.assert_called_once()
     mock_supabase.table.assert_called_with("document_tables")
+
+
+# ---------------------------------------------------------------------------
+# Phase 201 TAB-01: CSV and Excel table extraction
+# ---------------------------------------------------------------------------
+
+def test_extract_csv_tables_basic():
+    """CSV bytes with headers + data rows → single table dict with correct headers/rows."""
+    from app.services.multimodal_service import extract_csv_tables
+    result = extract_csv_tables(b"Name,Age,Role\nAlice,30,Engineer\nBob,25,Designer")
+    assert len(result) == 1
+    tbl = result[0]
+    assert tbl["headers"] == ["Name", "Age", "Role"]
+    assert tbl["rows"] == [["Alice", "30", "Engineer"], ["Bob", "25", "Designer"]]
+    assert tbl["page"] == 1
+    assert tbl["table_index"] == 0
+
+
+def test_extract_csv_tables_semicolon_delimiter():
+    """CSV with semicolon delimiter is auto-detected via Sniffer."""
+    from app.services.multimodal_service import extract_csv_tables
+    result = extract_csv_tables(b"Name;Age\nAlice;30")
+    assert len(result) == 1
+    assert result[0]["headers"] == ["Name", "Age"]
+    assert result[0]["rows"] == [["Alice", "30"]]
+
+
+def test_extract_csv_tables_tab_delimiter():
+    """TSV (tab-delimited) is auto-detected via Sniffer."""
+    from app.services.multimodal_service import extract_csv_tables
+    result = extract_csv_tables(b"Name\tAge\nAlice\t30")
+    assert len(result) == 1
+    assert result[0]["headers"] == ["Name", "Age"]
+
+
+def test_extract_csv_tables_header_normalization():
+    """Empty or purely-numeric header cells are replaced with 'Column N'."""
+    from app.services.multimodal_service import extract_csv_tables
+    # First header is empty, second is numeric
+    result = extract_csv_tables(b",42,Role\nAlice,30,Engineer")
+    assert len(result) == 1
+    assert result[0]["headers"] == ["Column 1", "Column 2", "Role"]
+
+
+def test_extract_csv_tables_blank_rows_filtered():
+    """Blank trailing rows in a CSV are excluded from the result rows."""
+    from app.services.multimodal_service import extract_csv_tables
+    result = extract_csv_tables(b"Name,Age\nAlice,30\n\n\nBob,25\n")
+    assert len(result) == 1
+    assert result[0]["rows"] == [["Alice", "30"], ["Bob", "25"]]
+
+
+def test_extract_csv_tables_empty_file_returns_empty():
+    """An empty or all-blank CSV returns []."""
+    from app.services.multimodal_service import extract_csv_tables
+    assert extract_csv_tables(b"") == []
+    assert extract_csv_tables(b"\n\n\n") == []
+
+
+def test_extract_csv_tables_header_only_returns_empty():
+    """A CSV with only a header row (no data) returns []."""
+    from app.services.multimodal_service import extract_csv_tables
+    assert extract_csv_tables(b"Name,Age,Role") == []
+
+
+def test_extract_excel_tables_single_sheet():
+    """Excel workbook with one sheet → 1 table dict, page=1."""
+    import io
+    import openpyxl
+    from app.services.multimodal_service import extract_excel_tables
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    ws.append(["Product", "Price"])
+    ws.append(["Widget", "9.99"])
+    ws.append(["Gadget", "24.99"])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    result = extract_excel_tables(buf.getvalue())
+    assert len(result) == 1
+    assert result[0]["headers"] == ["Product", "Price"]
+    assert result[0]["page"] == 1
+    assert len(result[0]["rows"]) == 2
+
+
+def test_extract_excel_tables_multi_sheet():
+    """Excel workbook with 2 sheets → 2 table dicts, page=1 and page=2."""
+    import io
+    import openpyxl
+    from app.services.multimodal_service import extract_excel_tables
+
+    wb = openpyxl.Workbook()
+    ws1 = wb.active
+    ws1.title = "Sheet1"
+    ws1.append(["A", "B"])
+    ws1.append(["1", "2"])
+    ws2 = wb.create_sheet("Sheet2")
+    ws2.append(["X", "Y"])
+    ws2.append(["3", "4"])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    result = extract_excel_tables(buf.getvalue())
+    assert len(result) == 2
+    assert result[0]["page"] == 1
+    assert result[1]["page"] == 2
+
+
+def test_extract_excel_tables_header_normalization():
+    """None or empty Excel header cells are replaced with 'Column N'."""
+    import io
+    import openpyxl
+    from app.services.multimodal_service import extract_excel_tables
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append([None, "Price", ""])
+    ws.append(["Widget", "9.99", "blue"])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    result = extract_excel_tables(buf.getvalue())
+    assert result[0]["headers"] == ["Column 1", "Price", "Column 3"]
+
+
+def test_extract_excel_tables_empty_sheet_skipped():
+    """A workbook with one empty sheet and one populated sheet → only 1 table."""
+    import io
+    import openpyxl
+    from app.services.multimodal_service import extract_excel_tables
+
+    wb = openpyxl.Workbook()
+    ws_empty = wb.active
+    ws_empty.title = "Empty"
+    ws_data = wb.create_sheet("Data")
+    ws_data.append(["Col"])
+    ws_data.append(["val"])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    result = extract_excel_tables(buf.getvalue())
+    assert len(result) == 1
+    assert result[0]["headers"] == ["Col"]
+
+
+def test_extract_and_store_tables_csv():
+    """extract_and_store_tables routes 'text/csv' → csv-reader extractor tag in insert."""
+    from unittest.mock import MagicMock, patch
+    from app.services.multimodal_service import extract_and_store_tables
+
+    mock_supabase = MagicMock()
+    mock_builder = MagicMock()
+    mock_supabase.table.return_value = mock_builder
+    mock_builder.insert.return_value = mock_builder
+    mock_builder.execute.return_value = MagicMock(data=[])
+
+    with patch("app.services.multimodal_service.extract_csv_tables") as mock_extract:
+        mock_extract.return_value = [
+            {"page": 1, "table_index": 0, "headers": ["A", "B"], "rows": [["1", "2"]]}
+        ]
+        extract_and_store_tables(
+            raw=b"A,B\n1,2",
+            mime_type="text/csv",
+            document_id="doc-csv-01",
+            user_id="user-01",
+            supabase=mock_supabase,
+        )
+
+    mock_extract.assert_called_once()
+    insert_call = mock_supabase.table.return_value.insert.call_args[0][0]
+    assert insert_call[0]["extractor"] == "csv-reader"
+
+
+def test_extract_and_store_tables_excel():
+    """extract_and_store_tables routes xlsx MIME → openpyxl extractor tag in insert."""
+    from unittest.mock import MagicMock, patch
+    from app.services.multimodal_service import extract_and_store_tables
+
+    mock_supabase = MagicMock()
+    mock_builder = MagicMock()
+    mock_supabase.table.return_value = mock_builder
+    mock_builder.insert.return_value = mock_builder
+    mock_builder.execute.return_value = MagicMock(data=[])
+
+    xlsx_mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    with patch("app.services.multimodal_service.extract_excel_tables") as mock_extract:
+        mock_extract.return_value = [
+            {"page": 1, "table_index": 0, "headers": ["X"], "rows": [["y"]]}
+        ]
+        extract_and_store_tables(
+            raw=b"fake_xlsx",
+            mime_type=xlsx_mime,
+            document_id="doc-xlsx-01",
+            user_id="user-01",
+            supabase=mock_supabase,
+        )
+
+    mock_extract.assert_called_once()
+    insert_call = mock_supabase.table.return_value.insert.call_args[0][0]
+    assert insert_call[0]["extractor"] == "openpyxl"
+
+
+def test_extract_and_store_tables_unsupported_mime_noop():
+    """extract_and_store_tables with text/plain is a no-op — no insert."""
+    from unittest.mock import MagicMock
+    from app.services.multimodal_service import extract_and_store_tables
+
+    mock_supabase = MagicMock()
+    extract_and_store_tables(
+        raw=b"hello world",
+        mime_type="text/plain",
+        document_id="doc-txt-01",
+        user_id="user-01",
+        supabase=mock_supabase,
+    )
+    mock_supabase.table.assert_not_called()

@@ -1,6 +1,0 @@
-{
-  "//": "⚠ THROWAWAY — SKETCH 202. Delete with `frontend/sketch/` at teardown; `src/__tests__/no-sketch-surface.test.ts` asserts the pairing.",
-  "//why": "`tsconfig.app.json` includes only `src`, so a sketch outside it would not be typechecked at all — and SEED-155's whole guarantee is that a proposal needing a field the wire does not carry fails `tsc`, not review. This extends the app config rather than editing it, so no shipped file moves and the app's own baseline is untouched.",
-  "extends": "./tsconfig.app.json",
-  "include": ["src", "sketch"]
-}

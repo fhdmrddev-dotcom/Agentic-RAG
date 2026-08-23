@@ -268,6 +268,45 @@ def _upload_pipeline(
     )
 
 
+# Number of data rows per header-anchored chunk block (Phase 201 SEED-060).
+# Blocks are \n\n-separated → chunk_text treats each block as a paragraph unit,
+# keeping the [Columns: ...] prefix with its data rows on every split.
+_TABLE_ROWS_PER_CHUNK = 50
+
+
+def _tabular_text_blocks(
+    headers: list[str],
+    rows: list[list[str]],
+    prefix: str = "",
+) -> str:
+    """Produce header-anchored text blocks for CSV/Excel data (Phase 201 SEED-060).
+
+    Each block of _TABLE_ROWS_PER_CHUNK data rows is prefixed with:
+      [Columns: Header1 | Header2 | ...]
+    Blocks are separated by \\n\\n so chunk_text treats them as paragraph-level
+    units and will not split a data row away from its column context.
+
+    Args:
+        headers: Column names for this table.
+        rows:    Data rows (list of string lists).
+        prefix:  Optional text prepended inside the [Columns: ...] bracket
+                 (e.g. "Sheet: Revenue | ").
+    """
+    if not headers:
+        return ""
+    col_label = " | ".join(headers)
+    if prefix:
+        col_line = f"[{prefix}Columns: {col_label}]"
+    else:
+        col_line = f"[Columns: {col_label}]"
+    blocks: list[str] = []
+    for i in range(0, max(len(rows), 1), _TABLE_ROWS_PER_CHUNK):
+        batch = rows[i : i + _TABLE_ROWS_PER_CHUNK]
+        row_text = "\n".join("\t".join(str(c) for c in row) for row in batch)
+        blocks.append(f"{col_line}\n{row_text}" if row_text else col_line)
+    return "\n\n".join(blocks)
+
+
 def extract_text(raw: bytes, mime_type: str) -> str:
     """Extract text from non-PDF/non-DOCX MIME types.
 
@@ -298,21 +337,49 @@ def extract_text(raw: bytes, mime_type: str) -> str:
     ):
         from openpyxl import load_workbook  # noqa: PLC0415
         wb = load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
-        sheets: list[str] = []
-        for sheet in wb.worksheets:
-            rows: list[str] = [f"## Sheet: {sheet.title}"]
-            for row in sheet.iter_rows(values_only=True):
-                cells = [str(c) if c is not None else "" for c in row]
-                if any(cells):
-                    rows.append("\t".join(cells))
-            if len(rows) > 1:
-                sheets.append("\n".join(rows))
-        return "\n\n".join(sheets)
+        sheet_blocks: list[str] = []
+        for ws in wb.worksheets:
+            all_ws_rows = [
+                [str(c.value) if c.value is not None else "" for c in row]
+                for row in ws.iter_rows()
+            ]
+            non_empty = [r for r in all_ws_rows if any(cell.strip() for cell in r)]
+            if len(non_empty) < 2:
+                continue
+            ws_headers = [
+                cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+                else f"Column {i + 1}"
+                for i, cell in enumerate(non_empty[0])
+            ]
+            ws_data_rows = non_empty[1:]
+            prefix = f"Sheet: {ws.title} | "
+            body = _tabular_text_blocks(ws_headers, ws_data_rows, prefix=prefix)
+            sheet_blocks.append(f"## Sheet: {ws.title}\n{body}")
+        return "\n\n".join(sheet_blocks)
 
     if mime_type in ("text/csv", "application/csv"):
-        text = raw.decode("utf-8-sig")  # strip BOM if present
-        reader = csv.reader(io.StringIO(text))
-        return "\n".join("\t".join(row) for row in reader)
+        try:
+            decoded_csv = raw.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            decoded_csv = raw.decode("latin-1")
+        try:
+            csv_dialect = csv.Sniffer().sniff(decoded_csv[:2048], delimiters=",;\t|")
+        except csv.Error:
+            csv_dialect = None
+        csv_kwargs: dict = {"dialect": csv_dialect} if csv_dialect else {}
+        csv_all_rows = [
+            r for r in csv.reader(io.StringIO(decoded_csv), **csv_kwargs)
+            if any(cell.strip() for cell in r)
+        ]
+        if not csv_all_rows:
+            return ""
+        csv_headers = [
+            cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+            else f"Column {i + 1}"
+            for i, cell in enumerate(csv_all_rows[0])
+        ]
+        csv_data_rows = csv_all_rows[1:]
+        return _tabular_text_blocks(csv_headers, csv_data_rows)
 
     if mime_type == "application/epub+zip":
         import ebooklib  # noqa: PLC0415

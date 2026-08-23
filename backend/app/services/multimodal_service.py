@@ -25,6 +25,11 @@ log = logging.getLogger(__name__)
 
 PDF_MIME = "application/pdf"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+CSV_MIMES: frozenset[str] = frozenset({"text/csv", "application/csv"})
+EXCEL_MIMES: frozenset[str] = frozenset({
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+})
 
 # Max edge length (px) for PIL.thumbnail() before vision-LLM call (D-072-02).
 # OpenAI detail=low downsamples to 512px internally → no quality gain above 1024px.
@@ -178,6 +183,92 @@ def extract_docx_tables(raw: bytes) -> list[dict]:
     return results
 
 
+def _mime_to_extractor(mime: str) -> str:
+    """Return a short extractor tag for the given MIME type (document_tables.extractor)."""
+    if mime == PDF_MIME:
+        return "pdfplumber"
+    if mime == DOCX_MIME:
+        return "python-docx"
+    if mime in CSV_MIMES:
+        return "csv-reader"
+    if mime in EXCEL_MIMES:
+        return "openpyxl"
+    return "unknown"
+
+
+def extract_csv_tables(raw: bytes) -> list[dict]:
+    """Return a list of table dicts extracted from CSV bytes.
+
+    Performs delimiter auto-detection via csv.Sniffer (comma/semicolon/tab/pipe).
+    Normalises blank or purely-numeric header cells to 'Column N'.
+    Filters trailing blank rows.
+    Returns [] when the file has fewer than 2 non-empty rows (no usable header+data).
+    """
+    import csv as _csv  # noqa: PLC0415
+
+    try:
+        decoded = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        decoded = raw.decode("latin-1")
+
+    try:
+        dialect = _csv.Sniffer().sniff(decoded[:2048], delimiters=",;\t|")
+    except _csv.Error:
+        dialect = None
+
+    reader_kwargs: dict = {"dialect": dialect} if dialect else {}
+    all_rows = [
+        r for r in _csv.reader(io.StringIO(decoded), **reader_kwargs)
+        if any(cell.strip() for cell in r)
+    ]
+    if len(all_rows) < 2:
+        return []
+
+    raw_headers = all_rows[0]
+    headers = [
+        cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+        else f"Column {i + 1}"
+        for i, cell in enumerate(raw_headers)
+    ]
+    data_rows = [[str(cell) for cell in row] for row in all_rows[1:]]
+    return [{"page": 1, "table_index": 0, "headers": headers, "rows": data_rows}]
+
+
+def extract_excel_tables(raw: bytes) -> list[dict]:
+    """Return a list of table dicts extracted from Excel (.xlsx/.xls) bytes.
+
+    Each sheet becomes one table dict with page = sheet number (1-based).
+    Sheets with fewer than 2 non-empty rows are skipped.
+    Header cells that are None/empty or purely numeric are normalised to 'Column N'.
+    """
+    import openpyxl  # noqa: PLC0415
+
+    wb = openpyxl.load_workbook(io.BytesIO(raw), read_only=True, data_only=True)
+    results: list[dict] = []
+    for sheet_num, ws in enumerate(wb.worksheets, start=1):
+        all_rows = [
+            [str(c.value) if c.value is not None else "" for c in row]
+            for row in ws.iter_rows()
+        ]
+        non_empty = [r for r in all_rows if any(cell.strip() for cell in r)]
+        if len(non_empty) < 2:
+            continue
+        raw_headers = non_empty[0]
+        headers = [
+            cell.strip() if cell.strip() and not cell.strip().lstrip("-").isnumeric()
+            else f"Column {i + 1}"
+            for i, cell in enumerate(raw_headers)
+        ]
+        data_rows = non_empty[1:]
+        results.append({
+            "page": sheet_num,
+            "table_index": 0,
+            "headers": headers,
+            "rows": data_rows,
+        })
+    return results
+
+
 def extract_and_store_tables(
     raw: bytes,
     mime_type: str,
@@ -210,13 +301,27 @@ def extract_and_store_tables(
             ]
         elif mime_type == PDF_MIME:
             table_dicts = extract_pdf_tables(raw)
+            extractor_tag = "pdfplumber"
         elif mime_type == DOCX_MIME:
             table_dicts = extract_docx_tables(raw)
+            extractor_tag = "python-docx"
+        elif mime_type in CSV_MIMES:
+            table_dicts = extract_csv_tables(raw)
+            extractor_tag = "csv-reader"
+        elif mime_type in EXCEL_MIMES:
+            table_dicts = extract_excel_tables(raw)
+            extractor_tag = "openpyxl"
         else:
             return  # Unsupported mime type — nothing to extract
 
         if not table_dicts:
             return
+
+        # When extracted_doc provides the tag, prefer it (Docling has its own name).
+        if extracted_doc is not None and extracted_doc.tables:
+            extractor_tag = getattr(extracted_doc, "extractor_name", None) or "docling"
+        elif "extractor_tag" not in dir():  # fallback safety — should never trigger
+            extractor_tag = _mime_to_extractor(mime_type)
 
         rows = [
             {
@@ -226,6 +331,7 @@ def extract_and_store_tables(
                 "table_index": t["table_index"],
                 "headers": t["headers"],
                 "rows": t["rows"],
+                "extractor": extractor_tag,
                 # Phase 071.2 D-071.2-08: conditional bbox spread — populate the
                 # migration 042 column only when the upstream extractor produced one.
                 # Skipping the key (rather than writing None) keeps the DB write clean
