@@ -2321,7 +2321,7 @@ the five decisions aside.
 | # | Name | Design Question | Winner | Tags |
 |---|------|----------------|--------|------|
 | 201 | what-the-run-column-says | The centre column duplicates the right panel character-for-character. If it stops being a second list, what is it instead — and what fills its top slot when the run produced nothing? | **hero+ledger — the adaptive hero (A/B/D are its states); C ruled out** ★ | run-surface, seed-191, stitch-derived, empty-state |
-| 202 | the-run-column-rendered | The Stitch reference draws a hero + a card-stack "process trace". How much of it survives contact with the data we actually hold — and does the centre column stop reading as a second copy of the right panel? | _pending operator verdict_ — ⚠ **4 findings, incl. the shipped answer rule picking a 61-char status line over a 6,133-char narrative** | run-surface, renders-real-components, stitch-derived, seed-155, seed-191, acceptance-bar, phase-200.2 |
+| 202 | the-run-column-rendered | The Stitch reference draws a hero + a card-stack "process trace". How much of it survives contact with the data we actually hold — and does the centre column stop reading as a second copy of the right panel? | **C — strict single line** ★ — ⚠ **C makes D-05 load-bearing: with the count still on the spine the centre is a strict subset of it.** Plus 4 findings, incl. the shipped answer rule picking a 61-char status line over a 6,133-char narrative | run-surface, renders-real-components, stitch-derived, seed-155, seed-191, acceptance-bar, phase-200.2 |
 
 ⚠ **A LANGUAGE sketch, not the acceptance bar** — it does not render `RunTranscript` /
 `WorkflowRunPage`. A rendered sketch is owed before planning (`SEED-155`).

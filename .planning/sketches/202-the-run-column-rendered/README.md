@@ -4,7 +4,7 @@ name: the-run-column-rendered
 kind: rendered-sketch
 acceptance_bar: true
 question: "The Stitch reference draws a hero + a card-stack 'process trace'. How much of it survives contact with the data we actually hold — and does the centre column stop reading as a second copy of the right panel?"
-winner: null
+winner: "C — reference shape, strict single line"
 tags: [run-surface, run-transcript, run-spine, deliverable, hero, seed-191, seed-155, renders-real-components, stitch-derived, g5-hot-files]
 seeds: [SEED-191, SEED-155, SEED-185]
 phase: 200.2
@@ -73,8 +73,8 @@ stays **byte-identical** to its shipped shape.
 - **B — Reference shape, duration on line two.** The Stitch card stack. Where the reference put
   invented narration, this puts the step's own **duration** — backable, and it preserves the
   two-line rhythm the cards are built around.
-- **C — Reference shape, strict single line.** The same cards with **nothing** where the
-  narration was. What strict R-3 compliance actually costs.
+- **C — Reference shape, strict single line.** ★ **WINNER (operator, 2026-08-23).** The same
+  cards with **nothing** where the narration was. What strict R-3 compliance actually costs.
 
 ---
 
@@ -186,3 +186,64 @@ An operator verdict on A / B / C, then the CONTEXT amendments findings 1–4 for
 has an executed plan), the directory ↔ tsconfig pairing, and `src/main.tsx` staying clean — all
 three **driven RED and restored** on 2026-08-23. ⚠ It is **not** in the count gate's `TARGETS`,
 so a green gate is not evidence it passed; a plain `vitest run` is.
+
+---
+
+# ✅ VERDICT — C, the strict single line (operator, 2026-08-23)
+
+The card stack, one line per step: status ring · name · the step's own yield · a chevron where
+there is something behind it. **B's second line is rejected** — the duration was a backable
+stand-in for the reference's narration, but standing something in for a slot only because the
+drawing had a slot is the drawing leading the data.
+
+```
+Process trace
+ ✓  Pull usage and adoption data                    15 sources  ›
+ ✓  Pull support history                            20 sources  ›
+ ✓  Pull commercial position and meeting notes      20 sources  ›
+ ✓  Synthesize the QBR narrative                      finished
+ ✓  Fill the QBR template                             2 fields
+```
+
+## ⚠ C MAKES D-05 LOAD-BEARING, AND THE RENDER IS WHY
+
+This is the consequence the verdict carries, and it was NOT visible before the sketch existed.
+
+The shipped `RunSpine` renders in every variant — deliberately, so the disagreement between
+the reference and `D-05` would be on screen. Read the two columns as they stand:
+
+| centre (C) | spine (shipped) |
+|---|---|
+| `Pull usage and adoption data · 15 sources` | `Pull usage and adoption data · 15 sources · 26s` |
+| `Pull support history · 20 sources` | `Pull support history · 20 sources · 23s` |
+
+**The centre is now a strict subset of the spine plus a chevron.** C strips the centre down so
+far that, with the spine's count sub-line still in place, the columns say the same thing twice
+more plainly than before — SEED-191's original finding, in a new shape.
+
+So **C only works if the count comes off the spine**, which is exactly what `D-05` decided and
+what the Stitch reference does *not* do. The reference keeps the count in both columns; on our
+data, with our narration absent, that is the arrangement that fails. **D-05 stands, and it is
+now the load-bearing half of this design rather than a preference.**
+
+The division of labour C settles on: **the centre says WHAT each step yielded; the spine says
+WHEN and HOW LONG.** Neither column repeats the other's payload.
+
+## Two smaller things the winning render surfaced
+
+- ⚠ **The right-hand slot mixes two kinds of thing.** Four rows carry a yield (`15 sources`,
+  `2 fields`); `Synthesize the QBR narrative` carries the state word `finished`, because it
+  declares no count. That is D-07 working as written — but at one line per card the two read as
+  the same slot, and `finished` next to `20 sources` looks like an odd one out rather than a
+  different kind of fact. Worth deciding at plan time; not a blocker.
+- ⚠ **`Fill the QBR template · 2 fields` is the step that produced the FILE, and its card does
+  not say so.** Nothing on `workflow_phases` attributes a file to a step (the run's file list is
+  thread-scoped), so the card *cannot* say it without fabricating the join — the same refusal
+  `RunReceipt` keeps by passing no `deliverableOf`. Recorded so it is not read as an oversight.
+
+## Owed, in order
+
+1. **Amend `200.2-CONTEXT.md`** for findings 1–4 above: D-06 (the signal exists), D-10 / R-2
+   (re-justify), D-11 (correct the premise), and **D-05 promoted from a decision to the thing C
+   depends on**. Add the `llm_emit` answer-rule defect as a new decision or a bug report.
+2. `/gsd:plan-phase 200.2`.
