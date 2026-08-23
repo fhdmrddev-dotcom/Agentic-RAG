@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v3.7
 milestone_name: Workflow Product Completion
 status: ready_to_plan
-last_updated: 2026-08-20T22:31:30.088Z
-last_activity: 2026-08-20
+last_updated: 2026-08-23
+last_activity: 2026-08-23
 progress:
   total_phases: 23
   completed_phases: 13
@@ -12,6 +12,14 @@ progress:
   completed_plans: 138
   percent: 57
 stopped_at: >
+  ⚠ 2026-08-23 — Phase 200.2 CONTEXT GATHERED (`/gsd:discuss-phase 200.2`, commit `4adf13ae`).
+  **NEXT ACTION IS `/gsd:sketch`, NOT `/gsd:plan-phase`** — G-2 fires and sketch 201 is
+  `renders_real_components: false`, so a RENDERED sketch is owed first (SEED-155).
+  ⚠ `RUN-05` DOES NOT EXIST in REQUIREMENTS.md and must be added at plan time.
+  ⚠ The ROADMAP's "RESTYLE, NOT A REBUILD" fence must be AMENDED — D-09 gives the phase a
+  backend half (a narrow lazy per-step citations read).
+  ⚠ Phase 198 still NOT STARTED and the ROADMAP sequences 200.2 after it.
+  Everything below is the prior record, preserved verbatim.
   Phase 197 complete (11/11) — ready to discuss Phase 198. Phase 200.1 also complete
   (3/3, verified 5/5, code review 2 Criticals found and fixed).
   ⚠ **DO NOT TRUST `phase.complete` ON THE HIGHEST-NUMBERED PHASE.** Run against 200.1 on
@@ -60,6 +68,55 @@ See: `.planning/PROJECT.md` (updated 2026-08-09)
 **Current focus:** Phase 198 — node vocabulary
 
 ## Current Position
+
+### ⚠ 2026-08-23 — Phase 200.2 CONTEXT GATHERED (`/gsd:discuss-phase 200.2`). The block below is preserved verbatim; it is the record of the 200.1 pass and is still accurate about that work.
+
+Phase: **200.2** — The Run Column Stops Repeating Itself (INSERT)
+Plan: 0 of ? — **NOT PLANNED, and must not be planned yet.**
+Artifacts: `.planning/phases/200.2-the-run-column-stops-repeating-itself-insert/200.2-CONTEXT.md`
+(D-01..D-16 + R-1..R-4) and `200.2-DISCUSSION-LOG.md`. Commit `4adf13ae`.
+
+**Next action: `/gsd:sketch` — a RENDERED sketch that mounts the shipped components.**
+⚠ **G-2 fires and is only HALF satisfied.** Sketch 201 is the LANGUAGE pass and carries the
+operator's decided winner (*the adaptive hero*), but it is `renders_real_components: false`.
+SEED-155 is the scar: a sketch that hand-writes its own CSS produced an atom the shipped card
+could not render, and only UAT caught it. **Do not route to `/gsd:plan-phase 200.2` until the
+rendered sketch exists.**
+
+⚠ **TWO THINGS THE PLAN PASS MUST DO THAT NOTHING ELSE WILL PROMPT:**
+  1. **`RUN-05` DOES NOT EXIST IN `REQUIREMENTS.md`** — the ROADMAP names it as the phase's
+     requirement and it was never written. Add it at planning time.
+  2. **The ROADMAP's *"RESTYLE, NOT A REBUILD"* fence must be AMENDED, not quietly exceeded.**
+     D-09 gives the phase a backend half (a narrow lazy per-step citations read), because
+     citations are measurably NOT on the wire and the run read is POLLED.
+
+⚠ **FOUR SCOUTING CORRECTIONS, recorded because each was believed true going in:**
+  - **SEED-191 §2 is CLOSED** — `8da83fe9` shipped `MarkdownRenderer` + `max-w-[72ch]` the same
+    day the seed was planted, later. The 208-chars/line finding is stale.
+  - **The seed's "third copy" is half closed** — `5a487762` removed the receipt region's step
+    rows. The remaining duplication is exactly TWO lists, not three.
+  - **`200.1-03` moved count + duration OFF the log line in writing.** D-05 reconciles rather
+    than reverses: that block removed a TRAILING ATOM while asking for "one continuous phrase".
+  - **The canvas came BACK as a switch** (`c5e3a352`, `centreView`). `RunTranscript.tsx`'s
+    docblock and `docs/HOT-FILE-LEDGER.md` both still say it came off this page — correct both
+    BESIDE the original when 200.2 lands.
+
+⚠ **ONE TRAP CAUGHT BEFORE IT SHIPPED:** `CitationCard` / `CitationList` / `CitationPeek` all
+render `citation.similarity.toFixed(2)` when non-null — literally the `Relevance: 0.94` that
+SEED-191's refusal #2 forbids. D-10 strips `similarity` at the new endpoint so the score branch
+provably cannot fire, and the components are reused UNCHANGED.
+
+Registers updated in the same commit: **SEED-191 `planted` → `folded` / `folded_into: 200.2`**
+with a `routing_note` recording both stale measurements beside the originals;
+**`BUG-260610-01` reviewed and LEFT OPEN** (neither half lives in this column — the
+duplicate-avatar half is a chat message-list double-mount, the timer half is folded into 200 and
+still unverified). ⚠ Do NOT flip that bug's status on the strength of 200.2 shipping.
+
+⚠ **STILL OPEN AND UNCHANGED BY THIS SESSION: Phase 198 (Node Vocabulary, research-first) has
+not started, and the ROADMAP sequences 200.2 AFTER it.** 198 is v3.7's last CORE item and must
+not be delayed by a presentation phase.
+
+---
 
 Phase: 198
 pass; Phase 200.1 inserted.** The prior Position block (Phase 200's finishing pass) is preserved
