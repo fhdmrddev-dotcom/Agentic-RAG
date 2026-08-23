@@ -1185,9 +1185,15 @@ and only UAT caught it).
 `frontend/src/components/workflows/RunTranscript.tsx` — read their sections in
 `docs/HOT-FILE-LEDGER.md` before planning.
 
-⚠ **SCOPE FENCE — THIS IS A RESTYLE, NOT A REBUILD.** `200.1-02` already ships the four arms (file /
+⚠ **SCOPE FENCE — THIS IS A RESTYLE, NOT A REBUILD — ⚠ AMENDED 2026-08-23 (planning, per D-09 /
+A-05): the phase HAS a narrow backend half.** `200.1-02` already ships the four arms (file /
 answer / both / neither) and three were driven live in a browser on 2026-08-21. The selection logic
-is DONE. A plan that scopes this as new capability has misread it.
+is DONE. A plan that scopes this as new capability has misread it. **The amendment:** reaching the
+real citation passages from the step that read them (SC#3) is ONE new lazy, run+step-scoped read —
+`GET /workflow-runs/{id}/phases/{slug}/citations` — which leaves the existing run serializer and
+its written *only `text` may reach the wire* comment byte-unchanged (D-09) and strips the
+per-citation score at that boundary (D-10 / A-05: a DESIGN call, not an honesty one — the
+per-entry number IS backable; the `similarity_scores` mismatch does not justify refusing it).
 
 ⚠ **THE HERO DOES NOT BY ITSELF CLOSE THE DUPLICATION**, and the phase must not claim it does. It
 fixes what the column LEADS WITH. The step rows still repeat the panel's names; the proposed answer is
@@ -1216,6 +1222,37 @@ weight, size, spacing and the card.
 3. The real citation passages are reachable from the step that read them.
 4. The column and the right panel no longer read as the same list — judged by a human, on screen, not
    by a DOM assertion.
+
+**Plans**: 6 plans in 4 waves (planned 2026-08-23 from rendered sketch 202, verdict C):
+
+- [ ] `200.2-01-PLAN.md` — **the lazy citation route** (wave 1). Owner-scoped (`require_canvas` +
+      `user_id` on the same select), run+step-scoped, reads `output.citations` through
+      `phase_output_object`, strips the per-entry score by not copying it (D-10), fenced by set
+      equality over the real response body + planted never-before-seen key + non-vacuity + driven
+      counterfactual + an AST no-widening walk. The EXISTING serializer stays byte-unchanged. No
+      migration. Registers the path in `CANVAS_GATED_PATHS` in the same commit.
+- [ ] `200.2-02-PLAN.md` — **the step-card list** (wave 2). The variant-C process trace consuming
+      the FULL `WorkflowRunPhase` wire model (never `PhaseTimingRow`); yield = declared count, or
+      `wrote an answer` from `deliverable_text` keyed on `phase_type` from the wire (A-03), else
+      nothing; the yield replaces ONLY `finished` (D-07); fetch-on-expand with empty-degrade
+      (operator decision 1); the new `runColumnVocabulary.ts` leaf (operator decision 3).
+- [ ] `200.2-03-PLAN.md` — **the hero region** (wave 2). The four 200.1-02 arms re-presented at
+      the top of the centre column (D-01/D-02/D-04); the D-13/D-16 split terminal sentences with
+      type-level totality; the A-07 typed heading; D-15 newest-file hero; D-03 live renders
+      nothing; reuses the shipped `runAnswer` memo UNCHANGED and FILES D-17 as
+      `BUG-260823-04` (operator decision 2 — the rule stays).
+- [ ] `200.2-04-PLAN.md` — **the page integration** (wave 3). Hero above the `[Log|Shape]` switch
+      in both views; `RunStepList` replaces the `RunTranscript` mount; `RunSpine`'s count sub-line
+      REMOVED (D-05/A-02 — load-bearing, shipped in the SAME plan as the centre yield); the foot
+      deliverable region retired with every superseded string quoted, not deleted.
+- [ ] `200.2-05-PLAN.md` — **the A-10 teardown + the phase's ledger sync** (wave 3).
+      `frontend/sketch/` + `tsconfig.sketch.json` deleted in one commit; `RunTranscript.tsx`'s
+      OWED ledger section; every touched hot file re-derived in BOTH documents in one commit; the
+      CLAUDE.md size gate measured (the margin was 3,613 below the warn band at 200.1's close).
+- [ ] `200.2-06-PLAN.md` — **the G-4 lived-experience UAT** (wave 4, `autonomous: false`). SC#4's
+      human judgement, the four hero arms on real runs, the disclosure affordance, the spine's
+      ring faces, the narrow viewport, the long-answer row. Cross-provider / multi-tool /
+      parallel-thread axes DO NOT APPLY (UI-state-only) — stated in the UAT doc, not omitted.
 
 
 #### Phase 198: Node Vocabulary (research-first)
