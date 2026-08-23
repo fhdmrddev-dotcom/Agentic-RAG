@@ -3,7 +3,11 @@ seed_id: SEED-191
 title: The run surface's centre column repeats the right panel and carries no visual hierarchy — the answer is unreadable at 208 chars/line, the produced file is buried, and the whole main area is one grey
 created: 2026-08-21
 planted_during: Phase 200.1 execution (operator, watching real runs in the browser between wave 1 and wave 2)
-status: planted
+status: folded            # ROUTED at /gsd:discuss-phase 200.2 (2026-08-23) -- see folded_into.
+folded_into: 200.2        # The centre-column redesign. CONTEXT.md carries D-01..D-16 and R-1..R-4.
+                          # NOT the whole seed: R-1 (a stored thinking trace) is explicitly DEFERRED
+                          # as a backend persistence phase and is recorded in 200.2-CONTEXT.md
+                          # <deferred> with its own re-open trigger.
 surface: Agentic-RAG
 relates_to:
   - Phase 200 — moved the canvas off `WorkflowRunPage` and made `RunTranscript` the centre.
@@ -16,6 +20,23 @@ relates_to:
   - `docs/HOT-FILE-LEDGER.md` → `frontend/src/pages/WorkflowRunPage.tsx`,
     `frontend/src/components/workflows/RunTranscript.tsx`,
     `frontend/src/components/workflows/RunSpine.tsx`
+routing_note: >
+  ⚠ TWO OF THIS SEED'S MEASUREMENTS WENT STALE BETWEEN PLANTING AND ROUTING, AND THE
+  CORRECTIONS ARE RECORDED HERE RATHER THAN OVER THEM.
+  (a) §2 "the answer is unreadable" IS CLOSED. Commit `8da83fe9` (2026-08-21, the same day
+      this seed was planted, LATER) replaced the raw `<p>{runAnswer}</p>` with
+      `MarkdownRenderer` + `max-w-[72ch] break-words`. The ~208 chars/line measure and the
+      literal `**bold**` / `>` markers are fixed; the two shipped XSS guards were REWRITTEN
+      to assert the sanitised property rather than deleted.
+  (b) §1's "THERE IS A THIRD COPY" is half closed ON THE PAGE. Commit `5a487762` removed the
+      receipt region's step rows, which repeated the log's five names and durations 700px
+      below them. Only the totals strip survived, and it moved to the top of the log column.
+      The CHAT thread's copy of the run is untouched and that half still stands.
+  Everything else measured here HELD and was re-confirmed at discuss-phase: the
+  character-identical names, the integrated clock, the colour census, and all three refusals.
+  ⚠ ALSO SUPERSEDED ELSEWHERE: `RunTranscript.tsx`'s docblock and `docs/HOT-FILE-LEDGER.md`
+  both still say the canvas came OFF the run page. `c5e3a352` brought it back as a SWITCH
+  (`centreView`, log by default). Correct both beside the original when 200.2 lands.
 trigger_when: >
   The next phase that touches `WorkflowRunPage.tsx`'s centre column, OR any phase scoped to the
   run surface's readability / hierarchy. Run `/gsd:sketch` FIRST — G-2 fires (live UI, visual,
