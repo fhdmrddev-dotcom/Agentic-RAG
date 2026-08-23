@@ -1,50 +1,20 @@
 ---
 gsd_state_version: 1.0
-milestone: v3.7
-milestone_name: Workflow Product Completion
-status: ready_to_plan
-last_updated: 2026-08-23
-last_activity: 2026-08-23
+milestone: v3.8
+milestone_name: Document Intelligence, Automations & Connectors
+status: ready_to_execute
+last_updated: 2026-08-24
+last_activity: 2026-08-24
 progress:
-  total_phases: 23
-  completed_phases: 13
-  total_plans: 136
-  completed_plans: 138
-  percent: 57
+  total_phases: 6
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 17
 stopped_at: >
-  ⚠ 2026-08-23 — Phase 200.2 CONTEXT GATHERED (`/gsd:discuss-phase 200.2`, commit `4adf13ae`).
-  **NEXT ACTION IS `/gsd:sketch`, NOT `/gsd:plan-phase`** — G-2 fires and sketch 201 is
-  `renders_real_components: false`, so a RENDERED sketch is owed first (SEED-155).
-  ⚠ `RUN-05` DOES NOT EXIST in REQUIREMENTS.md and must be added at plan time.
-  ⚠ The ROADMAP's "RESTYLE, NOT A REBUILD" fence must be AMENDED — D-09 gives the phase a
-  backend half (a narrow lazy per-step citations read).
-  ⚠ Phase 198 still NOT STARTED and the ROADMAP sequences 200.2 after it.
-  Everything below is the prior record, preserved verbatim.
-  Phase 197 complete (11/11) — ready to discuss Phase 198. Phase 200.1 also complete
-  (3/3, verified 5/5, code review 2 Criticals found and fixed).
-  ⚠ **DO NOT TRUST `phase.complete` ON THE HIGHEST-NUMBERED PHASE.** Run against 200.1 on
-  2026-08-21 it returned `is_last_phase: true` / `next_phase: null` and wrote
-  `status: milestone_complete` — all FALSE, because it sorts by phase NUMBER and 200.1 ranks
-  above 197/198. Hand-corrected; full account in commit `d9c35fe1`. Run against 197 minutes
-  later it was CORRECT (`next_phase: 198`) and surfaced both owed-work warnings — so the verb
-  is right in the ordinary case and wrong at the boundary. Check its output, every time.
-  ⚠ This same `state.*` write then DELETED the hand-written `stopped_at` that recorded the
-  above — the 193.1-05 failure mode, second recorded firing. Re-added by hand.
-  ⚠ **v3.7 IS STILL OPEN: Phase 198 (Node Vocabulary, research-first) has not started.**
-  ⚠ OWED, carried not closed: 197's UAT rows (see `197-HUMAN-UAT.md`, drive U4 first) ·
-  `/gsd:secure-phase 200.1` never run, and that phase put a `json.loads` parser on a
-  model-influenced boundary · `graphify update .` owed since the 200.1 worktrees were torn
-  down · SEED-191 (the run surface's centre column) awaiting `/gsd:sketch`.
-  Phase 200.1 COMPLETE (3/3 plans, verified 5/5, code review 2 Criticals closed).
-  ⚠ THE MILESTONE IS **NOT** COMPLETE. `gsd-sdk query phase.complete 200.1` returned
-  `is_last_phase: true` / `next_phase: null` and wrote `status: milestone_complete` plus
-  "Milestone complete (Phase 200.1 was final phase)" — all FALSE, and hand-corrected here
-  on 2026-08-21. It reads the highest phase NUMBER, and 200.1 sorts above 197/198.
-  v3.7 has real work left: **Phase 197 (guided-authoring) EXECUTED 11/11 but NOT COMPLETE**,
-  and **Phase 198 (Node Vocabulary, research-first) NOT STARTED**. Next action is 197, not
-  a milestone close. This is the SEVEN-false-completion-verbs failure mode, sixth recorded
-  firing — see the 193.1-05 note further down this file where a `state.*` verb deleted ~9 KB
-  of `stopped_at` outright.
+  Phase 201 COMPLETE (commit 555432c4). 39/39 tests passing.
+  TAB-01 satisfied: CSV/Excel → document_tables, header-anchored chunk text.
+  Next: Phase 202 or next milestone phase.
 ---
 
 # Project State
