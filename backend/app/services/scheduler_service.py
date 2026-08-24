@@ -200,9 +200,9 @@ async def _drive_run(
     ``last_status``. A scheduled run whose outcome nobody recorded is a run whose author has no
     way to learn it failed, which is the specific way unattended automation goes bad quietly.
     """
-    from app.db.runs import finalize_run
     from app.db.schedules import record_schedule_outcome
     from app.services.harness_engine import _build_resume_context, run_workflow
+    from app.services.run_lifecycle import finalize_run_terminal, mirror_run_active
 
     ctx = None
     failed = False
@@ -218,6 +218,28 @@ async def _drive_run(
             redis,
             pool,
         )
+        # ── MAKE THE RUN VISIBLE TO THE OPERATOR, BEFORE IT DOES ANY WORK ────────────
+        # ⚠ WITHOUT THIS THE CONTROL ROOM CANNOT SEE A SCHEDULED RUN AT ALL, AND THAT IS
+        # THE WORST CASE TO MISS. `/admin/runs` lists `runs:active` (ZRANGE) and enriches
+        # from the `runs` table; `register_run_start` — the only writer of that mirror —
+        # is called from exactly ONE place, `threads.py`, the CHAT path. `run_lifecycle`'s
+        # own header admits the invariant is "CHAT-SCOPED this phase" (D-145-12).
+        #
+        # A chat run has a person watching who can stop it. An unattended scheduled run is
+        # precisely the one an operator needs to SEE and KILL — and it was the invisible
+        # one. Measured 2026-08-24: run 27e00e7e sat `active` in Postgres while
+        # `runs:active` held ZERO entries.
+        #
+        # The `runs` row already exists — `_build_resume_context` mints the producer shell
+        # — so only the MIRROR half is owed here, which is why this is `mirror_run_active`
+        # and not `register_run_start` (calling that would insert a SECOND runs row).
+        #
+        # ⚠ BEST-EFFORT, NEVER FATAL. The mirror is a DERIVED index; `runs.status` is
+        # authoritative (D-145-01). A Redis blip must not turn into a failed scheduled run.
+        pid = getattr(ctx, "producer_run_id", None)
+        if pid is not None:
+            await mirror_run_active(redis, run_id=pid, thread_id=thread_id)
+
         await run_workflow(run_id, definition, ctx, pool=pool, redis=redis)
     except Exception:  # noqa: BLE001 — one run must never take down the loop
         failed = True
@@ -226,9 +248,16 @@ async def _drive_run(
         pid = getattr(ctx, "producer_run_id", None) if ctx is not None else None
         if pid is not None:
             try:
-                await finalize_run(
-                    pool,
+                # ⚠ `finalize_run_terminal`, NOT `finalize_run`. The DB-only writer leaves
+                # the run in `runs:active` forever, so the Control Room would show a
+                # finished scheduled run as permanently active with a live Kill button —
+                # a GHOST. Registering without finalizing through the co-writer would have
+                # made the visibility fix worse than the gap it closed.
+                await finalize_run_terminal(
+                    pool=pool,
+                    redis=redis,
                     run_id=pid,
+                    thread_id=thread_id,
                     status="failed" if failed else "completed",
                     error="scheduled run failed" if failed else None,
                     completed_at=datetime.now(timezone.utc),

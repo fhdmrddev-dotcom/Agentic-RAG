@@ -279,3 +279,109 @@ async def test_one_cap_set_and_one_absent_arms_exactly_one_axis():
     )
     assert captured["max_tokens_per_run"] == 5000
     assert captured["max_duration_seconds"] is None
+
+
+# ══════════════════════════════════════════════════════════════════════════════════════
+# 7. OPERATOR VISIBILITY — a scheduled run must reach the Control Room, and must leave it.
+# ══════════════════════════════════════════════════════════════════════════════════════
+# ⚠ Found the same way as the budget defect: by driving a real scheduled run, not by a
+# test. Run 27e00e7e sat `active` in Postgres while Redis `runs:active` held ZERO entries,
+# so `/admin/runs` — the operator's active-runs list, and the only surface carrying Kill —
+# could not see it. `register_run_start` (the mirror's only writer) is called from exactly
+# one place: `threads.py`, the CHAT path. run_lifecycle's header records the invariant as
+# "CHAT-SCOPED this phase" (D-145-12).
+#
+# A chat run has a person watching. An unattended scheduled run is the one that most needs
+# an operator to see and kill it, and it was the invisible one.
+
+
+def test_a_scheduled_run_is_mirrored_into_the_operators_active_list():
+    """The ZADD half. Asserted as an AST CALL — an import is not a use (the 187-24 trap,
+    which already bit this very file once and was caught by driving the counterfactual)."""
+    calls = {
+        n.func.id
+        for n in ast.walk(ast.parse(_src(SCHEDULER)))
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+    }
+    assert "mirror_run_active" in calls, (
+        "scheduler_service.py does not mirror its run into runs:active — the Control Room "
+        "cannot see scheduled runs"
+    )
+
+
+def test_the_scheduler_finalizes_through_the_co_writer_so_no_ghost_is_left_behind():
+    """The ZREM half, and it is NOT optional.
+
+    ``db.runs.finalize_run`` writes the terminal status but leaves the id in
+    ``runs:active`` forever — the Control Room would then show a FINISHED scheduled run as
+    permanently active, with a live Kill button. Mirroring without this makes the operator
+    surface worse than the gap it closed, so the two are tested as a pair.
+    """
+    calls = {
+        n.func.id
+        for n in ast.walk(ast.parse(_src(SCHEDULER)))
+        if isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+    }
+    assert "finalize_run_terminal" in calls, "must finalize through the mirror co-writer"
+    assert "finalize_run" not in calls, (
+        "bare finalize_run leaves the run in runs:active — a permanent ghost in the "
+        "Control Room's active list"
+    )
+
+
+def test_the_mirror_helper_adds_both_keys_and_the_terminal_removes_both():
+    """Both mirrors move together, or `runs_by_thread` and `runs:active` disagree."""
+    import inspect
+
+    from app.services.run_lifecycle import finalize_run_terminal, mirror_run_active
+
+    add = inspect.getsource(mirror_run_active)
+    rem = inspect.getsource(finalize_run_terminal)
+    for src, verb in ((add, "zadd"), (rem, "zrem")):
+        assert f"{verb}(_ACTIVE_SET_KEY" in src or f"{verb}(\n            _ACTIVE_SET_KEY" in src or "_ACTIVE_SET_KEY" in src
+        assert "runs_by_thread:" in src, f"{verb} half does not touch runs_by_thread"
+
+
+@pytest.mark.asyncio
+async def test_a_redis_blip_does_not_fail_the_scheduled_run():
+    """The mirror is DERIVED; ``runs.status`` is authoritative (D-145-01).
+
+    Failing closed here would mean a Redis hiccup killed scheduled automation outright —
+    strictly worse than a run missing from a list.
+    """
+    from app.services.run_lifecycle import mirror_run_active
+
+    class _RaisingRedis:
+        async def zadd(self, *_a, **_k):
+            raise RuntimeError("redis down")
+
+    # Must NOT raise.
+    await mirror_run_active(
+        _RaisingRedis(),
+        run_id="00000000-0000-0000-0000-000000000001",
+        thread_id="00000000-0000-0000-0000-000000000002",
+    )
+
+
+@pytest.mark.asyncio
+async def test_the_mirror_is_written_with_the_producer_shell_id_not_the_workflow_run_id():
+    """The two ids are different, and `/admin/runs` enriches from the ``runs`` table.
+
+    Mirroring the workflow_run_id would put an id in ``runs:active`` that has no ``runs``
+    row, so the enrichment finds nothing and the Control Room classifies it as a tuner
+    job — visible, but labelled wrong. The producer shell is the id with the row.
+    """
+    captured = {}
+
+    class _CapturingRedis:
+        async def zadd(self, key, mapping):
+            captured[key] = mapping
+
+    from app.services.run_lifecycle import mirror_run_active
+
+    await mirror_run_active(
+        _CapturingRedis(), run_id="pid-1", thread_id="tid-1"
+    )
+    assert "runs:active" in captured
+    assert "pid-1" in captured["runs:active"]
+    assert captured["runs_by_thread:tid-1"]

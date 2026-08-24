@@ -312,6 +312,50 @@ async def register_run_start(
         )
 
 
+async def mirror_run_active(redis, *, run_id, thread_id) -> None:
+    """ZADD an ALREADY-INSERTED run into the two liveness mirrors. Best-effort.
+
+    ⚠ WHY THIS EXISTS SEPARATELY FROM ``register_run_start``. That function does two
+    things — INSERT the ``runs`` row, then mirror it. A scheduled run already has its row
+    by the time anyone can mirror it: ``harness_engine._build_resume_context`` mints the
+    producer shell. Calling ``register_run_start`` there would insert a SECOND ``runs``
+    row for the same producer, so the mirror half is factored out here rather than
+    duplicated at the call site.
+
+    ⚠ THE GAP THIS CLOSES. ``/admin/runs`` (the Control Room's active-runs list, with the
+    Kill control) reads ``runs:active`` and enriches from ``runs``. Until now
+    ``register_run_start`` was called from exactly ONE place — ``threads.py``, the CHAT
+    path — and this module's own header records the invariant as "CHAT-SCOPED this phase"
+    (D-145-12). So a workflow run launched by the SCHEDULER appeared nowhere in the
+    operator surface. Measured 2026-08-24: run ``27e00e7e`` sat ``active`` in Postgres
+    while ``runs:active`` held ZERO entries.
+
+    That is the worst case to miss rather than a cosmetic one: a chat run has a person
+    watching who can stop it, while an unattended scheduled run is exactly the one an
+    operator needs to see and kill.
+
+    ⚠ BEST-EFFORT, AND THE DIRECTION MATTERS. ``runs.status`` is AUTHORITATIVE and
+    ``runs:active`` is a DERIVED mirror (D-145-01), so a transient Redis blip is logged
+    and swallowed — it must never escalate into a failed scheduled run. This is the same
+    posture ``register_run_start``'s own ZADDs take (CR-01).
+
+    ⚠ ITS TERMINAL PARTNER IS ``finalize_run_terminal``, NEVER ``db.runs.finalize_run``.
+    The DB-only writer leaves the id in ``runs:active`` forever, which would show a
+    finished run as permanently active with a live Kill button — a ghost. Mirroring
+    without that partner makes the surface worse than the gap it closes.
+    """
+    _score = time.time()
+    try:
+        await redis.zadd(f"runs_by_thread:{thread_id}", {str(run_id): _score})
+        await redis.zadd(_ACTIVE_SET_KEY, {str(run_id): _score})
+    except Exception:
+        logger.exception(
+            "mirror_run_active: ZADD failed for run %s — the run proceeds but will not "
+            "appear in the operator's active-runs list",
+            run_id,
+        )
+
+
 async def finalize_run_terminal(
     *,
     pool,
@@ -689,6 +733,7 @@ async def _cancel_run_internals(
 
 __all__ = [
     "register_run_start",
+    "mirror_run_active",
     "finalize_run_terminal",
     # Exported ON PURPOSE (194-09): plan 194-10's no-producer arm calls the SAME
     # composition rather than re-composing finish_run + cancel_active_phases itself.
