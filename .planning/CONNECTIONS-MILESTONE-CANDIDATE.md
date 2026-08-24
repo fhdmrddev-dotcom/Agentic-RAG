@@ -61,13 +61,32 @@ by JQL, read the last N messages of a Slack channel, or list channels / projects
 even to help an author pick one from a dropdown.
 
 ### 3. Breadth — the "famous applications" set
-Sequenced by auth family, because the auth work is what actually costs:
-- **Google** — Gmail, Drive, Calendar, Sheets (one OAuth app)
-- **Microsoft** — Outlook, OneDrive, SharePoint, Teams (one OAuth app)
-- **Atlassian** — Jira, Confluence
-- **Slack**
-- **ClickUp** (operator-named)
-- Generic **SMTP / IMAP** for anything else
+
+**The initial list, deliberately expandable.** Sequenced by **auth family**, because the OAuth app is
+what actually costs — once Google is connected, Gmail / Drive / Calendar / Sheets are four
+capabilities on one connection, not four integrations.
+
+| Tier | Provider | Capabilities wanted | Why this tier |
+|---|---|---|---|
+| **1** | **Google** | Gmail, Drive, Calendar, Sheets | One OAuth app, four surfaces. Also the SEED-142 drive-ingest consumer |
+| **1** | **Microsoft** | Outlook, OneDrive, SharePoint, Teams | One OAuth app (Graph). ⚠ Operator-named and **absent from the competitor's own catalog** — a differentiator, not a catch-up |
+| **1** | **Atlassian** | Jira, Confluence — create/update/get issue, JQL + CQL search | **Ships an official MCP server** (`https://mcp.atlassian.com/v1/mcp`) — we write no adapter |
+| **1** | **Slack** | post, read channel, search, list channels | Already half-built (the one capability that works today) |
+| **2** | **ClickUp** | tasks, lists, docs | Operator-named |
+| **2** | **GitHub** | issues, PRs, code search | **Ships an official MCP server** |
+| **2** | **Notion / Linear** | pages, issues | Common in the same buyer's stack |
+| **3** | **HubSpot / Salesforce** | CRM records | B2B org-scale (SEED target scale) |
+| **3** | **Figma** | file/comment read | Design-adjacent; low cost via MCP |
+| **any** | **Generic SMTP / IMAP** | send / read mail | The escape hatch for everything unlisted |
+| **any** | **Custom MCP URL** | whatever that server exposes | ⭐ **This is what makes the list expandable without us shipping code** |
+
+⭐ **THE EXPANDABILITY ANSWER IS "CUSTOM MCP URL", AND IT IS NOT A COMPROMISE.** The competitor's own
+catalog (screenshots, 2026-08-24) shows a `Type: Web` column with a **`Custom`** badge on exactly the
+entries that are pasted MCP endpoints — Atlassian Rovo and GitHub_MCP among them. So the pattern is:
+a curated Popular set for the common cases, **plus a paste-a-URL door** for the long tail. The user
+adds a provider we have never heard of and it works. That is how the list stays expandable and
+flexible without a per-vendor adapter treadmill, and it is the concrete cash-out of the MCP-first
+verdict this repo recorded a month ago and never implemented.
 
 ### 4. MCP — both directions
 - **MCP client** — this app consumes MCP servers, which is how breadth arrives without hand-writing
@@ -87,6 +106,32 @@ does not come for free: Phase 189/190's outbound governance lives on the workflo
 outbound capability to `_TOOL_REGISTRY` before the approval model exists.* Otherwise the chat agent
 can send an email or create a ticket with nobody confirming it. Phase 085's `ask_user` is the
 existing pause/approve primitive to build on.
+
+⭐ **THE SHAPE IS SETTLED BY EVIDENCE — the competitor's connector detail screen (screenshot,
+2026-08-24) is exactly this control and we should copy its grain:**
+
+- A **per-tool** list, not a per-connector switch — Atlassian Rovo shows its 7 tools individually:
+  *Create issue · Update issue · Get issue · Retrieve Confluence page · Search Confluence with CQL ·
+  Search with JQL*.
+- A connector-level default dropdown reading **"Needs approval"**, with the caption *"Choose when
+  Claude is allowed to use these tools."*
+- Reads and writes sit in the **same** list, which is what lets a user grant search freely and hold
+  `Create issue` behind a confirm. **A connector-level toggle cannot express that**, and a
+  connector-level toggle is what we would have built by default.
+
+**Consequence for the connection model (§1):** the capability record must be per-tool from the start,
+because retrofitting per-tool permissions onto a per-connector grant is a migration.
+
+### 6b. Per-connector prompt suggestions — small, cheap, and the onboarding answer
+The same screen carries starter chips (*"Show what's on my plate"*, *"Find my stuck issues"*, *"Write
+my status update"*). A freshly connected system is otherwise a capability with no visible way in.
+This is a few strings per connector and it is how "very simple" gets delivered concretely rather than
+aspired to. It is also the same affordance SEED-198's Experts need, so build it once.
+
+### 6c. Catalog IA, taken from the same screenshots
+A **Popular** row of 3 one-click connects · an **All / Connected / Not connected** filter · a table of
+*Connector · Type · Status* · an **Add** menu carrying the custom-MCP-URL door. Recorded so the
+milestone does not re-derive an information architecture that has already been shown to work.
 
 Also carried forward from the architecture verdict: **no arbitrary-code / community-node connector,
 ever.** That is a supply-chain surface, excluded by construction rather than by omission.
@@ -116,6 +161,12 @@ of itself*.
 entirely chat-shaped and has **no modality dimension**, so any image model id resolves
 `capability_source=inferred` and silently loses its capabilities. That is model-registry work,
 unrelated to connectors.
+
+**SEED-198 (Experts) — adjacent, and it DEPENDS on this milestone rather than belonging to it.**
+An Expert (Financial Analyzer, Strategy Writer) is a bundle of skills + connections + knowledge
+scope + prompt suggestions. It needs the connection model to exist first, or it is a prompt pack.
+Two things it shares with this milestone, so they are built once and not twice: the **per-tool
+permission grain** (§6) and the **prompt-suggestion chips** (§6b).
 
 ## Sequencing
 
