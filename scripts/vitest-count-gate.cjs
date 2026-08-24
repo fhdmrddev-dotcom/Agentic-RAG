@@ -1651,6 +1651,24 @@ const BASELINE = {
   // to `userEvent.setup({ delay: null })` cleared all eight. A slow new suite inside this
   // gate is not merely slow — it reds files it never touches.
   "ConnectionsTab.test.tsx": 36,
+  // ── 206.1-01 (item 3, CONN-02 / SC#3) — the per-service mark map's own suite. ──
+  // The number is THIS SCRIPT'S OWN `actual` column across TWO AGREEING RUNS on 2026-08-25
+  // (both printed `connectionMark.test.tsx — 39 new`, total 5511, failed 0) — never a hand
+  // count of `it(` literals, which is unsound under the six `it.each` blocks this suite uses.
+  //
+  // ⚠ IT NEEDED BOTH KNOBS, like `ConnectionsTab.test.tsx` above and for the same reason:
+  // the two existing `src/components/settings/` entries are FILE-LEVEL, so a third file in
+  // that directory is reached by neither. See the TARGETS note for the measurement that
+  // established it (the grand total moved by the FIVE cases added to `ConnectionsTab` and by
+  // NONE of this suite's 39) and for the honest record that the entry landed ONE COMMIT
+  // LATE against the same-commit rule the blocks above state.
+  //
+  // ⚠ THE PIN DIRECTLY ABOVE IS DELIBERATELY LEFT AT 36 THOUGH THAT SUITE NOW REPORTS 41.
+  // The gate's contract is *no per-file DECREASE*, so 41 satisfies a pin of 36, and RAISING
+  // a pin necessarily deletes a line — which this file's own ledger row names as the thing
+  // that makes a `-0` deletion check wrong. ADDING a pin is not RAISING one; this edit is
+  // additions only.
+  "connectionMark.test.tsx": 39,
   // ── 190-17: the add/edit panel's own suite, pinned in the commit that creates it. ──
   // Number read from THIS SCRIPT'S OWN `actual` column across two agreeing runs — never a
   // hand count of `it(` literals, which is unsound under the `it.each` this suite uses for
@@ -3216,6 +3234,36 @@ const TARGETS = [
   // the gate ERROR (exit 2) rather than fail, so it can only land in the commit that creates
   // the file — never before, never after.
   "src/components/settings/__tests__/ConnectionFormPanel.test.tsx",
+  // ── Added in 206.1-01 (item 3, the per-service mark map) — the THIRD entry on
+  //    `src/components/settings/`, for the identical reason the two above give: those two
+  //    are FILE-LEVEL, so a THIRD file in that directory is still invisible to the gate.
+  //
+  // MEASURED BEFORE THIS LINE WAS WRITTEN rather than assumed. The gate was run with the
+  // suite already on disk and green (39 passing), and its printed `running: npx vitest run …`
+  // line did NOT contain `connectionMark.test.tsx`: the grand total moved 5467 → 5472, i.e.
+  // by the FIVE cases added to `ConnectionsTab.test.tsx` and by NONE of this suite's 39. A
+  // falsification that does not run has falsified nothing (verification truth 14).
+  //
+  // ⚠ AND THE TIMING RULE ABOVE WAS MISSED BY ONE COMMIT — recorded rather than tidied
+  // away. The blocks above say an entry *"can only land in the commit that creates the file
+  // — never before, never after"*; this one lands one commit after `ae8a2359`, because the
+  // gap was found by reading the gate's own arithmetic at the plan's verification step
+  // rather than at the file's creation. The `never before` half is mechanical (an entry for
+  // a non-existent path makes the gate exit 2); the `never after` half is discipline, and
+  // this is what breaking it looks like. Landing it late is strictly better than leaving
+  // the file unguarded — *"an unpinned file is not a lightly-guarded one, it is an
+  // UNGUARDED one"* (196-05 / 196-07).
+  //
+  // What would be unguarded without it: the whole of SC#3. TWENTY-ONE of the 39 cases are
+  // ABSENCE or NEGATIVE assertions — the two wordmark slugs never imported and the absent
+  // `jira` variant never tried, the coalesced bracket read absent from the source, the
+  // compiles-to-nothing utility absent, an inherited key never resolving to a mark, the
+  // brand marks carrying NO colour utility, the lucide glyphs carrying NO fill utility (a
+  // CSS fill on a lucide root beats its presentation attribute and turns the outline into a
+  // blob), and `capability: null` alone never resolving MCP. Each is the kind that deletes
+  // unnoticed, and three of them guard properties that exist NOWHERE else in the tree: the
+  // ink contract, the wordmark refusal, and the MCP arm's own-condition rule.
+  "src/components/settings/__tests__/connectionMark.test.tsx",
   // ── Added in 192-01 (Phase 192 Wave 0, the FIRST commit of the phase) ──────────────
   // The EIGHTH occurrence of the two-knob trap, and the first one that lands on the very
   // file the phase exists to rewrite. Stated as the rule rather than as an incident, for a
