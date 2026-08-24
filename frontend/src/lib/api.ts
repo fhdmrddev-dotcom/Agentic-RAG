@@ -1534,6 +1534,31 @@ export interface PublishedWorkflow {
    */
   last_run_status?: string | null
   /**
+   * Phase 204.1 (SCHED-01 follow-up) — the soonest ACTIVE schedule on this published row.
+   *
+   * ⚠ A TYPE, NOT A RUNTIME EXPORT, and that distinction is what this file's ledger row turns
+   * on. `api.ts` is the hottest file in the repository and its G-5 seam was RE-DECLINED at
+   * `204-03` with a trigger reading: the NEXT phase that adds a runtime export TAKES the
+   * split, or escalates it as a phase of its own, and may NOT re-decline. This change adds
+   * five optional fields to an existing interface and ZERO runtime exports, so the trigger
+   * does not fire — the same measured basis 197 and 192.2 each declined on. Re-derive with a
+   * diff of added lines filtered for exported function/const/let/var/class; it must read 0.
+   *
+   * ⚠ ON `PublishedWorkflow` ONLY. This file's own WR-02-LOOKALIKE warning above records that
+   * three identically-typed field sets live here — on `ThreadWorkflowState`, on this type and
+   * on `WorkflowDraftRow` — and that a swap between any two TYPECHECKS. These belong to the
+   * published library feed alone: the schedules API refuses a draft, and a thread's workflow
+   * state is a different question entirely.
+   *
+   * ⚠ ABSENT MEANS NO ACTIVE SCHEDULE, NOT "NEVER SCHEDULED" — a PAUSED schedule reads absent
+   * on purpose. `automationFacts.ts` is the one module that reads that difference.
+   */
+  next_schedule_at?: string | null
+  next_schedule_cron?: string | null
+  next_schedule_interval_seconds?: number | null
+  next_schedule_timezone?: string | null
+  next_schedule_count?: number | null
+  /**
    * Phase 192.2 (LIB-06 / CR-01) — WHETHER ANY RUN OF THIS DEFINITION EXISTS, BY ANYBODY.
    * A ROW-LEVEL fact, and the only deliberately UNSCOPED field on this model. Landed by
    * `192.2-08` as one projection-only SQL `EXISTS` at four sites.

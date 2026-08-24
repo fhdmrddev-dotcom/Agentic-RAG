@@ -169,6 +169,49 @@ _LAST_RUN_LATERAL_SQL = (
     ") lr ON TRUE "
 )
 
+# ── Phase 204.1 (SCHED-01 follow-up) — the ACTIVE SCHEDULE the card shows ────────────
+#
+# ⚠ WHY THIS EXISTS. 204 shipped scheduling and the library card said NOTHING about it: a
+# workflow that fires every Monday at 08:00 looked identical to one that had never been
+# automated, and the only way to find out was to open the ⋯ menu on every card in turn. For
+# a feature whose entire point is running when nobody is watching, invisible is the wrong
+# default. `204-03` recorded it as deviation 4 rather than building it, because the
+# projection lives in THIS file — its parallel sibling's file during that wave — and
+# reaching across was the seam that produced 204's two defects.
+#
+# ⚠ IT ANSWERS "WHAT IS THE NEXT ONE", NOT "HOW MANY". A workflow may carry MANY schedules
+# (nothing constrains `workflow_id`; the modal says "Existing schedules" and keeps its add
+# form) — a weekday digest plus a monthly roll-up is the intended shape. The soonest ACTIVE
+# one is what a card can say in a line; the full list is one click away and is that modal's
+# job. `next_schedule_count` carries the rest so the card can say "+2 more" without a
+# second query, and so a UI that wants the plural is not blocked on another migration.
+#
+# ⚠ OWNER-SCOPED ON `s.user_id = $1`, and that is SECURITY-BEARING, not tidiness: this feed
+# runs on a service-role pool that BYPASSES RLS, so the predicate is the only boundary. It
+# mirrors `_LAST_RUN_LATERAL_SQL` exactly — the unscoped shape is `_HAS_ANY_RUN_SQL`, and
+# the difference between them is the CR-01 defect this file already records.
+#
+# ⚠ PROJECTION-ONLY: it binds NO placeholder, touches no WHERE and no ORDER BY, and cannot
+# move a row into or out of the result set — which is why the `$2` project-folder filter
+# appended after it is NOT renumbered. Same argument the constant above makes for itself.
+#
+# ⚠ `is_active` IS THE PREDICATE. A paused schedule must not make a card claim it is
+# automated; the modal's Pause control exists precisely so an author can stop it without
+# deleting it, and a badge that ignored that would contradict the button.
+_NEXT_SCHEDULE_LATERAL_SQL = (
+    "LEFT JOIN LATERAL ("
+    "SELECT s.next_run_at AS next_schedule_at, "
+    "s.cron_expression AS next_schedule_cron, "
+    "s.interval_seconds AS next_schedule_interval_seconds, "
+    "s.timezone AS next_schedule_timezone, "
+    "count(*) OVER () AS next_schedule_count "
+    "FROM workflow_schedules s "
+    "WHERE s.workflow_id = wd.id AND s.user_id = $1 AND s.is_active "
+    "ORDER BY s.next_run_at ASC NULLS LAST, s.id ASC "
+    "LIMIT 1"
+    ") sch ON TRUE "
+)
+
 # ── Phase 192.2 gap round 1 (CR-01 / DEC-08-A) — the ROW-LEVEL run bit ───────────────
 #
 # ⚠ THIS CONSTANT IS DELIBERATELY UNSCOPED, AND THAT IS THE WHOLE POINT OF IT EXISTING.
@@ -512,9 +555,13 @@ async def list_published_workflows(
         sql = (
             "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
             "lr.last_run_at, lr.last_run_status, "
+            "sch.next_schedule_at, sch.next_schedule_cron, "
+            "sch.next_schedule_interval_seconds, sch.next_schedule_timezone, "
+            "sch.next_schedule_count, "
             + _HAS_ANY_RUN_SQL
             + "FROM workflow_definitions wd "
             + _LAST_RUN_LATERAL_SQL
+            + _NEXT_SCHEDULE_LATERAL_SQL
             + "WHERE status = 'published' AND created_by = $1"
         )
     else:
@@ -552,9 +599,13 @@ async def list_published_workflows(
             # filter appended below is not renumbered.
             "SELECT id, slug, name, definition, created_by, is_system_global, updated_at, "
             "lr.last_run_at, lr.last_run_status, "
+            "sch.next_schedule_at, sch.next_schedule_cron, "
+            "sch.next_schedule_interval_seconds, sch.next_schedule_timezone, "
+            "sch.next_schedule_count, "
             + _HAS_ANY_RUN_SQL
             + "FROM workflow_definitions wd "
             + _LAST_RUN_LATERAL_SQL
+            + _NEXT_SCHEDULE_LATERAL_SQL
             + "WHERE status = 'published' AND (is_system_global = true OR created_by = $1)"
         )
     params: list = [user_id]

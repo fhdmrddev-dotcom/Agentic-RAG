@@ -295,6 +295,7 @@ import {
 import { templateAdmission } from "@/components/workflows/soulData"
 import { deleteWorkflowDraft } from "@/lib/api"
 
+import { automationFacts } from "./automationFacts"
 import { cardFace, type CardFace, type CardMark } from "./cardFace"
 import { CHIP_PREDICATES, type MatchReason } from "./libraryFilter"
 import type { LibraryRow, Provenance } from "./libraryRow"
@@ -1057,6 +1058,9 @@ export function WorkflowCard({
    * does not move. `templateMark` spreads an empty array on the two silent arms, so a row that
    * does not admit composes byte-identically to the way it did before this phase.
    */
+  // Phase 204.1 — resolved by the leaf, never decided here. See `automationFacts.ts`.
+  const automation = automationFacts(row)
+
   const identityParts: string[] = [
     ...templateMark,
     // ⚠ BUG-260819-01 — THE STATE WORD RENDERED TWICE ON A NAME-COLLIDING ROW, and this is the
@@ -1091,6 +1095,32 @@ export function WorkflowCard({
     ...identity.segs.filter((seg) => seg !== face.state),
     ...(identity.ofN === null ? [] : [identity.ofN]),
     ...(identity.when === null ? [] : [identity.when]),
+    // ⚠ Phase 204.1 (SCHED-01 follow-up) — THE AUTOMATION FACT, and it goes LAST on purpose.
+    // 204 shipped scheduling and this card said nothing about it: a workflow firing every
+    // Monday at 08:00 read identically to one never automated, and the only way to find out
+    // was to open the ⋯ menu on every card in turn. For a feature whose whole point is
+    // running while nobody watches, invisible is the wrong default.
+    //
+    // ⚠ IT JOINS THIS ARRAY RATHER THAN BECOMING A BADGE, and that is FORCED, not chosen:
+    // the badge budget is a max-2 tuple enforced as a TYPECHECK ERROR (189 spent the second
+    // slot), so a third badge does not compile. The identity line is the card's one home for
+    // a muted fact about the row, which is exactly what this is.
+    //
+    // ⚠ IT SPREADS EMPTY WHEN SILENT, so a row with no active schedule composes
+    // BYTE-IDENTICALLY to before — the property `templateMark` documents above, and the
+    // reason 192.1's by-child-order DOM assertions keep passing untouched:
+    // `1 + 2 × identityParts.length` is unchanged on those rows.
+    //
+    // ⚠ LAST, AFTER `when`. The earlier segments DISCRIMINATE between namesakes
+    // (`rowIdentity.ts` ranks them); automation discriminates nothing — it is a fact about
+    // one row, like `changed 2 days ago`. Ahead of the ranked segments it would push the
+    // thing that tells two cards apart further from the eye.
+    //
+    // ⚠ THE DECISION IS NOT HERE. `automationFacts.ts` owns it, for the reason `cardFace.ts`
+    // exists: this file's G-5 was DISCHARGED by extracting exactly this shape once, and a
+    // second wire-reading ternary inline would undo that discharge one commit later.
+    ...(automation.phrase === null ? [] : [automation.phrase]),
+    ...(automation.more === null ? [] : [automation.more]),
   ]
 
   /** Every row state has something behind `⋯` — the fork and the two delete grades. */
