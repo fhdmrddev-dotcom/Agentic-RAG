@@ -100,6 +100,9 @@ ALLOWED_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-excel",
+    "message/rfc822",
+    "application/vnd.ms-outlook",
+    "application/x-msg",
 }
 
 # Extension → canonical MIME type for formats browsers misreport
@@ -109,6 +112,8 @@ _EXT_MIME_OVERRIDES: dict[str, str] = {
     ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     ".epub": "application/epub+zip",
+    ".eml":  "message/rfc822",
+    ".msg":  "application/vnd.ms-outlook",
 }
 
 
@@ -413,6 +418,18 @@ def extract_text(raw: bytes, mime_type: str) -> str:
             if text:
                 chapters.append(text)
         return "\n\n".join(chapters)
+
+    if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
+        from app.services.email_extraction_service import (  # noqa: PLC0415
+            parse_eml_bytes,
+            parse_msg_bytes,
+            format_email_text_for_retrieval,
+        )
+        if mime_type == "message/rfc822":
+            parsed_email = parse_eml_bytes(raw)
+        else:
+            parsed_email = parse_msg_bytes(raw)
+        return format_email_text_for_retrieval(parsed_email)
 
     # plain text, markdown, html — decode as UTF-8
     return raw.decode("utf-8")
@@ -1806,6 +1823,36 @@ def ingest_document(
         else:
             metadata = extract_metadata(text)  # UNTOUCHED legacy path (byte-identical)
             metadata_dict = metadata.model_dump(exclude_none=True) if metadata else None
+
+        # Phase 203 (EML-01): Merge deterministic email header metadata
+        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
+            try:
+                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
+                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
+                metadata_dict = metadata_dict or {}
+                if parsed_email.subject and not metadata_dict.get("title"):
+                    metadata_dict["title"] = parsed_email.subject
+                if parsed_email.sender and not metadata_dict.get("author"):
+                    metadata_dict["author"] = parsed_email.sender
+                if parsed_email.date and not metadata_dict.get("date"):
+                    metadata_dict["date"] = parsed_email.date
+                if not metadata_dict.get("document_type"):
+                    metadata_dict["document_type"] = "email"
+                if parsed_email.sender:
+                    metadata_dict["email_from"] = parsed_email.sender
+                if parsed_email.to:
+                    metadata_dict["email_to"] = parsed_email.to
+                if parsed_email.cc:
+                    metadata_dict["email_cc"] = parsed_email.cc
+                if parsed_email.message_id:
+                    metadata_dict["email_message_id"] = parsed_email.message_id
+                if parsed_email.in_reply_to:
+                    metadata_dict["email_in_reply_to"] = parsed_email.in_reply_to
+                if parsed_email.references:
+                    metadata_dict["email_references"] = parsed_email.references
+            except Exception as em_exc:
+                log.warning("Email metadata extraction warning for %s: %s", document_id, em_exc)
+
         # Normalize case-sensitive filter fields for consistent retrieval.
         # D-111-9: lowercase ONLY document_type + language; _confidence is nested and
         # is NEVER touched here, and is NEVER promoted to a flat filter field.
@@ -1941,6 +1988,73 @@ def ingest_document(
                 raw, mime_type, document_id, user_id, supabase, app_settings,
                 extracted_doc=extracted_doc,
             )
+
+        # Phase 203 (EML-02): Email attachment extraction & document relationships linking
+        if mime_type in ("message/rfc822", "application/vnd.ms-outlook", "application/x-msg"):
+            try:
+                import hashlib  # noqa: PLC0415
+                from app.services.email_extraction_service import parse_eml_bytes, parse_msg_bytes  # noqa: PLC0415
+                parsed_email = parse_eml_bytes(raw) if mime_type == "message/rfc822" else parse_msg_bytes(raw)
+                for att in parsed_email.attachments:
+                    if not att.raw or not att.filename:
+                        continue
+                    att_doc_id = str(uuid4())
+                    att_ext = "." + att.filename.rsplit(".", 1)[-1].lower() if "." in att.filename else ""
+                    att_mime = att.content_type
+                    if att_mime in ("application/octet-stream", "text/plain") and att_ext in _EXT_MIME_OVERRIDES:
+                        att_mime = _EXT_MIME_OVERRIDES[att_ext]
+
+                    if att_mime in ALLOWED_MIME_TYPES:
+                        att_storage_path = f"{user_id}/{att_doc_id}/{att.filename}"
+                        try:
+                            supabase.storage.from_("documents").upload(
+                                path=att_storage_path,
+                                file=att.raw,
+                                file_options={"content-type": att_mime},
+                            )
+                        except Exception:
+                            pass
+
+                        att_doc_data = {
+                            "id": att_doc_id,
+                            "user_id": user_id,
+                            "filename": att.filename,
+                            "file_path": att_storage_path,
+                            "file_size": len(att.raw),
+                            "mime_type": att_mime,
+                            "status": "pending",
+                            "content_hash": hashlib.sha256(att.raw).hexdigest(),
+                            "version_number": 1,
+                            "is_latest": True,
+                        }
+                        supabase.table("documents").insert(att_doc_data).execute()
+
+                        try:
+                            supabase.table("document_relationships").insert({
+                                "user_id": user_id,
+                                "source_doc_id": att_doc_id,
+                                "target_doc_id": document_id,
+                                "rel_type": "attached_to",
+                            }).execute()
+                        except Exception as rel_err:
+                            log.warning("Failed to link attachment %s -> %s: %s", att_doc_id, document_id, rel_err)
+
+                        try:
+                            att_text = extract_text(att.raw, att_mime)
+                            ingest_document(
+                                document_id=att_doc_id,
+                                text=att_text,
+                                user_id=user_id,
+                                supabase=supabase,
+                                raw=att.raw,
+                                mime_type=att_mime,
+                                filename=att.filename,
+                                engine_override="legacy",
+                            )
+                        except Exception as att_ing_err:
+                            log.warning("Failed to ingest attachment document %s: %s", att_doc_id, att_ing_err)
+            except Exception as att_exc:
+                log.warning("Email attachment extraction loop warning for %s: %s", document_id, att_exc)
 
         # Phase 071 D-071-08 — telemetry write (happy path).
         # Telemetry INSERT failure must NOT block document ingest completion (T-071-02-07).
