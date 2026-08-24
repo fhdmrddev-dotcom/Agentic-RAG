@@ -4,7 +4,7 @@ type: preflight
 stage: plan → execute boundary
 reviewed: 2026-08-25
 reviewer: Claude (validation pass over Gemini's 206-01-PLAN.md)
-verdict: EXECUTE after ONE blocker is resolved. It is a governance blocker, not a technical one, and it needs the operator rather than a code change.
+verdict: CLEARED TO EXECUTE 2026-08-25. The one blocker was a governance blocker, it went to the operator, and the operator chose ESCALATION — the api.ts split is now ROADMAP Phase 207.
 ---
 
 # Phase 206 pre-flight
@@ -27,7 +27,20 @@ Migration **126** is the correct next number (125 is the highest, applied 2026-0
 
 ---
 
-## ⛔ BLOCKER — `frontend/src/lib/api.ts` adds RUNTIME EXPORTS, and its trigger forbids another decline
+## ✅ BLOCKER RESOLVED 2026-08-25 — escalated, and Phase 207 now exists
+
+> **OPERATOR DECISION (2026-08-25): ESCALATE.** Phase 206 adds its two runtime exports and spends the
+> 7-suite mock budget in the same commit. The split is registered as **ROADMAP Phase 207: `api.ts`
+> split**, with a goal, a dependency on 206 landing first, and five success criteria.
+>
+> ⚠ **The plan's own wording was corrected as part of this.** `206-01-PLAN.md:98` proposed recording
+> the escalation as a ledger entry — which is the outcome the strengthened trigger forbids by name
+> (*"neither of them is another entry in this file"*). Escalation means a roadmap row. Both the row
+> and the ledger pointer are written; **206 writes neither.**
+
+The original finding is preserved below.
+
+### ⛔ (original) `frontend/src/lib/api.ts` adds RUNTIME EXPORTS, and its trigger forbids another decline
 
 Task 5 adds **two runtime exports**: `discoverConnectorTools` and `updateConnectorGrants`.
 

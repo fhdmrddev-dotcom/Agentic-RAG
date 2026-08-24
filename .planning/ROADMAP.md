@@ -21,7 +21,8 @@
 - ✅ **v3.5 UX Consolidation & Chat Polish** — Phases 174-177 CORE (shipped 2026-07-23); STRETCH 178-180 deferred → carry-forward guide `.planning/v3.5-STRETCH-CARRYFORWARD.md`. Cleared the load-bearing chat-surface bug backlog + consolidated the accumulated UI/UX (incl. the new v3.4 org surfaces) into one coherent, honest experience: run-state & lifecycle honesty (174) · cross-provider streaming fidelity (175) · chat render correctness + exec reliability (176) · v3.4 org-surface family-cohesion polish (177). 14/14 CORE requirements delivered; no migration. Full detail archived: `.planning/milestones/v3.5-ROADMAP.md`.
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
-- 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** + insert 204.1 (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and reaches external systems through their official MCP servers. ⚠ **Phase 206 was REWRITTEN 2026-08-24** from first-party outbound adapters to an MCP client; the rest of the connector story is a milestone of its own (`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`).
+- 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** + insert 204.1 (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and reaches external systems through their official MCP servers. ⚠ **Phase 206 was REWRITTEN 2026-08-24** from first-party outbound adapters to an MCP client; the rest of the connector story is a milestone of its own (`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
+- [ ] **Phase 207: `api.ts` split — the hottest file in the repository** — ⚠ **CREATED 2026-08-25 BY THE ONLY MECHANISM ITS OWN TRIGGER PERMITS.** `docs/HOT-FILE-LEDGER.md`'s trigger for `frontend/src/lib/api.ts` reads verbatim: *"The NEXT phase that adds a runtime export to `frontend/src/lib/api.ts` TAKES the split, or escalates it to the operator as a phase of its own. It may NOT re-decline."* Phase 206 is that phase — `discoverConnectorTools` and `updateConnectorGrants` are functions, so the type-only defence that carried 197 and 192.2 is gone. **The operator chose escalation on 2026-08-25, and escalation means THIS ROW.** ⚠ The trigger was strengthened precisely because *"another entry in this file"* is the outcome it forbids: a paragraph in the ledger would have been a third decline wearing an escalation's clothes.).
 
 ---
 
@@ -38,6 +39,7 @@
 | 204.1 | **(INSERT)** The Library Says What Runs Itself | A scheduled workflow says so on its card, on the line a reader already scans — instead of hiding the fact behind the ⋯ menu | SCHED-01 (follow-up) | ✅ Complete + seen in the browser (2026-08-25) |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | ✅ Complete (2026-08-25) — planned by Gemini, pre-flighted here; 2 blockers caught before execution |
 | 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | Planned — ⚠ **REWRITTEN 2026-08-24**, see detail |
+| 207 | **`api.ts` split — the hottest file in the repository** | `frontend/src/lib/api.ts` (179 commits / 102 phases / 6,580 lines) is split by domain into modules with a same-commit re-export, so the barrel stays wirable and no caller moves | (guardrail debt — G-5 / ledger trigger) | Planned — **ESCALATED from 206 by operator decision 2026-08-25** |
 
 ### Phase Checklist
 
@@ -393,6 +395,44 @@ would be the migration that seed warns about.
 - **CONN-03** — the credential-as-platform-asset half is satisfied here (org-level, encrypted,
   cross-tenant isolated). **OAuth is NOT** — MCP server auth is not OAuth, and Google/Microsoft OAuth
   is milestone work.
+
+---
+
+#### Phase 207: `api.ts` split — the hottest file in the repository
+
+**Goal**: `frontend/src/lib/api.ts` is split by domain into modules, with a **same-commit re-export
+barrel** at the original path, so that no call site in the repository moves and no import breaks.
+
+**Requirements**: none — this is guardrail debt (G-5 / the `api.ts` ledger trigger), not a feature.
+**Depends on**: Phase 206 landing first (it adds the last two exports before the split).
+
+##### Why this is its own phase and not a task inside 206
+
+The extraction is **6,580 lines across 102 phases of history**. Taking it inside a phase whose real
+work is an MCP client is the shape G-7 exists to stop — a feature phase quietly absorbing a refactor
+it was never scoped, reviewed, or verified for. **Phase 206 therefore adds its two exports and pays
+the mock budget; Phase 207 takes the split.**
+
+##### The binding constraint — measured, not assumed
+
+⚠ **THE RE-EXPORT BARREL IS NOT A CONVENIENCE, IT IS THE WHOLE SAFETY STORY.** `196-08` measured
+**249 red tests** from a single added export, because suites `vi.mock("@/lib/api")` by path. A split
+that MOVES the path turns every one of those factories inert — and inert mocks fail loudly at mount,
+which is the good case; the bad case is a factory that still resolves and silently stops matching.
+So: modules underneath, `api.ts` re-exporting everything it exports today, byte-identical public
+surface, and the count gate + a full `vi.mock` census as the acceptance evidence.
+
+##### Success criteria
+
+1. `frontend/src/lib/api.ts` is under 500 lines and contains only re-exports.
+2. Every symbol exported by `api.ts` at Phase 206's tip is still exported from `api.ts` — asserted by
+   diffing the export list before and after, not by reading.
+3. **No call site outside `frontend/src/lib/` changes.** A `git diff --numstat` over the phase shows
+   zero lines changed in any file that imports from `@/lib/api`.
+4. Count gate green with **no per-file decrease**, and the `vi.mock("@/lib/api")` census unchanged in
+   both count and path.
+5. The ledger row for `api.ts` records the split as **TAKEN**, retiring the trigger rather than
+   re-declining it.
 
 ---
 

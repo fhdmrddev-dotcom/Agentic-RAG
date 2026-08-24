@@ -3702,6 +3702,42 @@ working. Its contract is no per-file DECREASE and zero failing, never a fixed to
 
 ---
 
+### `frontend/src/lib/api.ts` — ⚠ 2026-08-25 (Phase 206 pre-flight): the trigger FIRED, and it was **ANSWERED BY ESCALATION — Phase 207 now exists**
+
+**The trigger above fired on its FIRST test.** Phase 206's plan (`206-01-PLAN.md` task 5) adds two
+runtime exports — `discoverConnectorTools` and `updateConnectorGrants`. Both are functions, so the
+type-only defence that legitimately carried 197 and 192.2 is **not available**: those declines were
+measured with `git diff … | grep -E 'export (function|const|let|var|class)'` reading **0**, and this
+one does not.
+
+**THE VERDICT: ESCALATED. The operator was asked on 2026-08-25 and chose escalation over taking the
+split inside 206.** The trigger permits exactly two answers and this is one of them.
+
+⚠ **AND ESCALATION MEANS A ROADMAP ROW, NOT THIS PARAGRAPH.** `206-01-PLAN.md:98` proposed recording
+*"an escalated operator decision documented in `docs/HOT-FILE-LEDGER.md`"* — which is precisely the
+outcome the strengthened trigger forbids in writing (*"neither of them is another entry in this
+file"*). A decline wearing an escalation's clothes is still the third decline. So the answer is
+**`.planning/ROADMAP.md` → Phase 207: `api.ts` split**, with a goal, a dependency on 206 landing
+first, and five success criteria. This section exists only to point at it.
+
+**What Phase 206 still owes, in its own commit:**
+
+- The **mock budget, spent in advance** — 204-03's precedent, and the first thing this file's history
+  says goes wrong. Measured at pre-flight: **7 suites** both `vi.mock("@/lib/api")` and touch 206's
+  surfaces — `chat/__tests__/StopControl.test.tsx`, `workflows/ConnectionPicker.test.tsx`,
+  `workflows/TemplateAttachSection.test.tsx`, `workflows/WorkflowDoorSwitch.test.tsx`,
+  `hooks/useDraftPersistence.test.tsx`, `pages/WorkflowBuilderPage.canvas.test.tsx`,
+  `pages/WorkflowBuilderPage.header.test.tsx`. ⚠ **Census the factory SHAPES, do not assume one
+  idiom** — 204-03 measured three forms across eleven factories and one suite needed nothing at all.
+- **No re-decline text.** The trigger is not re-issued here; it is **discharged into Phase 207**, and
+  the only thing that closes it is that phase shipping.
+
+⚠ **THE TRIGGER'S DESIGN IS VINDICATED AND THAT IS WORTH RECORDING.** The two prior versions each
+fired and were paid off with prose. This one fired once and produced a numbered phase on the roadmap
+within a day — because its permitted outcomes were both *actions*, and neither was writing.
+
+---
+
 ### `frontend/src/pages/WorkflowsPage.tsx` — 204-03, honoured by construction
 
 **Measured 2026-08-24: `41 commits / 16 phases / 1383 L`.** ⚠ The row read `39 / 14 / 1340` —
