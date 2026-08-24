@@ -80,7 +80,7 @@ async def launch_scheduled_run(
     """
     from fastapi.concurrency import run_in_threadpool  # D-v2.5-01
 
-    from app.db.workflows import create_workflow_run, get_definition
+    from app.db.workflows import arm_run_budget, create_workflow_run, get_definition
     from app.models.harness import WorkflowDefinition
 
     owner_id = _as_uuid(schedule["user_id"])
@@ -132,6 +132,38 @@ async def launch_scheduled_run(
         model=None,
         user_id=owner_id,
     )
+
+    # ── ARM THE SPEND CAP, BEFORE A SINGLE PHASE RUNS ─────────────────────────────────
+    # ⚠ THIS CALL IS THE WHOLE OF SCHED-02 ON THE SCHEDULED PATH, AND ITS ABSENCE WAS
+    # INVISIBLE TO 106 PASSING TESTS. The caps above land in `workflow_runs.inputs`;
+    # `db/workflows.load_run_budget` — the breaker's ONLY source — reads the TOP LEVEL of
+    # `workflow_runs.metadata`. Until this line existed the two never met, and because that
+    # read FAILS OPEN the breaker disarmed silently: a live scheduled run was measured at
+    # 3m20s against a 120-second cap (2026-08-24, run 27e00e7e).
+    #
+    # ⚠ IT MUST PRECEDE `_drive_run`. The breaker resolves its budget once, when the engine
+    # starts the run; arming afterwards is a race that the engine usually wins, which is the
+    # worst kind — it would pass a test and cap nothing in production.
+    #
+    # ⚠ IT IS BEST-EFFORT, DELIBERATELY, AND THE ASYMMETRY IS THE POINT. A failure here must
+    # not stop the run from launching (that would make an unapplied migration 125 an outage
+    # rather than a disarmed cap — the same fail-open argument `load_run_budget` makes). But
+    # it is logged at exception level, because a silently uncapped unattended run is exactly
+    # what this phase exists to prevent.
+    try:
+        await arm_run_budget(
+            pool,
+            run_id,
+            max_tokens_per_run=schedule.get("max_tokens_per_run"),
+            max_duration_seconds=schedule.get("max_duration_seconds"),
+        )
+    except Exception:
+        logger.exception(
+            "could not arm the circuit breaker for scheduled run %s (schedule %s) — the "
+            "run proceeds UNCAPPED. If migration 125 is unapplied, that is the cause.",
+            run_id,
+            schedule.get("id"),
+        )
 
     # ── drive it, in the background, with the mandatory shell finalizer ────────────────
     asyncio.create_task(

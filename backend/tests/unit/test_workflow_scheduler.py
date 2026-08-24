@@ -732,10 +732,24 @@ async def test_d_stop_is_idempotent_and_start_does_not_double_task(monkeypatch):
 
 def test_d_the_scheduler_is_off_by_default():
     """⚠ It starts REAL runs with nobody watching. An install that never asked for it must
-    behave exactly as it did before this phase."""
+    behave exactly as it did before this phase.
+
+    ⚠ THIS ASSERTS THE CODE'S DEFAULT, NOT THE DEVELOPER'S ``.env``. It used to read
+    ``Settings().scheduler_process_enabled``, which instantiates the model and therefore
+    LOADS ``backend/.env`` — so the moment a developer legitimately enabled the scheduler
+    on their own box (2026-08-24, exactly as the feature intends), this test went red on a
+    tree with no defect in it. A test that fails because a machine is configured is
+    measuring the machine.
+
+    The property that actually matters is that a fresh install, told nothing, does not
+    start launching runs. That lives in the FIELD DEFAULT, which is read here directly.
+    """
     from app.config import Settings
 
-    assert Settings().scheduler_process_enabled is False
+    field = Settings.model_fields["scheduler_process_enabled"]
+    assert field.default is False, (
+        "the scheduler must be OFF unless an install deliberately turns it on"
+    )
 
 
 def test_d_main_wires_the_scheduler_behind_that_flag():

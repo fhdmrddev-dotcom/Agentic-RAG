@@ -2264,6 +2264,67 @@ async def record_circuit_breaker_trip(
     )
 
 
+async def arm_run_budget(
+    pool: asyncpg.Pool,
+    run_id: UUID,
+    *,
+    max_tokens_per_run: int | None,
+    max_duration_seconds: int | None,
+) -> None:
+    """Write a scheduled run's circuit-breaker limits where ``load_run_budget`` reads them.
+
+    ⚠ THIS FUNCTION EXISTS BECAUSE THE TWO HALVES OF PHASE 204 DISAGREED, AND THE
+    DISAGREEMENT WAS INVISIBLE TO 106 PASSING TESTS. 204-03's scheduler wrote the caps
+    into ``workflow_runs.inputs`` (as ``_schedule_max_tokens_per_run`` /
+    ``_schedule_max_duration_seconds``); 204-02's ``load_run_budget`` reads them from the
+    TOP LEVEL of ``workflow_runs.metadata``. ``scheduler_service.py`` contained zero
+    occurrences of the word ``metadata``. The two plans ran in parallel waves and each
+    mocked the other's side, so both suites were green and neither crossed the seam.
+
+    Measured on a live scheduled run (2026-08-24, run 27e00e7e): ``metadata`` was NULL and
+    the run passed **3m20s against a 120-second cap** without tripping. Because
+    ``load_run_budget`` FAILS OPEN by design, the breaker silently disarmed and the run
+    behaved exactly as if Phase 204 had never shipped — the "built, gated, green,
+    structurally unreachable" shape (Phase 200 SC#3, Phase 118).
+
+    ⚠ THE CAPS BELONG IN ``metadata``, NOT ``inputs``, AND THE DIRECTION OF THE FIX IS THE
+    DECISION. ``inputs`` is the AUTHOR's kickoff payload — it is echoed to the run surface
+    and handed to the definition; system-imposed ceilings are not the author's data and a
+    caller could legitimately overwrite them. ``metadata`` is what migration 125 created
+    for precisely this, and ``load_run_budget`` already carries the string-scalar defence.
+
+    ⚠ MERGE, NEVER REPLACE, AND COALESCE FIRST. ``metadata`` is nullable with no default,
+    and ``NULL || anything`` is ``NULL`` in Postgres — without the coalesce this would
+    write nothing and report success. The merge is what lets
+    ``record_circuit_breaker_trip`` later add its ``circuit_breaker`` key without
+    clobbering the budget that armed it.
+
+    ⚠ A PLAIN DICT IS BOUND, NEVER ``json.dumps``. The pool registers a jsonb codec
+    (``dependencies.py::_init_pg_connection``), so pre-encoding stores a STRING SCALAR and
+    every later arrow read returns NULL — the defect that shipped on 484 of 484
+    ``workflow_phases.output`` rows and was repaired by migration 123.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY. This module writes through a
+    service-role pool that BYPASSES RLS; the predicate takes a key and no user-supplied
+    filter, so ownership is the CALLER's (T-147-06).
+
+    A ``None`` on either limit is written as SQL NULL, which ``load_run_budget``'s
+    ``_positive_int`` already reads back as "no ceiling on this axis" — so a schedule with
+    one cap set and one absent arms exactly one half of the breaker.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs "
+        "SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb, updated_at = now() "
+        "WHERE id = $1",
+        run_id,
+        # THE PLAIN DICT — see the codec paragraph above.
+        {
+            "max_tokens_per_run": max_tokens_per_run,
+            "max_duration_seconds": max_duration_seconds,
+        },
+    )
+
+
 async def load_run_budget(pool: asyncpg.Pool, run_id: UUID) -> dict:
     """Read a run's circuit-breaker limits + its wall-clock anchor (SCHED-02).
 
