@@ -26,18 +26,49 @@
  * `src/components/ui/` and 190 must not add one (UI-SPEC §15): this is a RE-USE whose
  * density behaviour is already known at real scale, and 190 installs nothing.
  *
- * ── CAPABILITY MARKS, NEVER VENDOR LOGOS (§10 / U-12) ──
- * The mark says *"this sends an email"*, not *"this is Fastmail"*. `@lobehub/icons` is the
- * single source for PROVIDER marks and it is an LLM-provider set — Slack/Jira/SMTP are not
- * in its domain, and sourcing them from a second package is exactly the per-surface
- * vocabulary the icon convention forbids. The vendor is already told, in text, where it is
- * actionable: the `Sends to` column carries the real host.
+ * ── ⚠ SUPERSEDED 2026-08-25 (Phase 206.1-01, item 3 · SC#3 · D-206.1-08) ──
+ * The paragraph immediately below is the sentence this file shipped from Phase 190-16 until
+ * this commit. It is kept VERBATIM and marked superseded rather than deleted, because a
+ * reader who finds it with no correction beside it will re-apply it. The correction follows
+ * it. (House precedent for this shape: `lib/phaseGlyph.tsx:107-119` and
+ * `components/workflows/ownProperty.ts:67-80`.)
  *
- * ⚠ ALL THREE SLUGS WERE VERIFIED AGAINST THE INSTALLED PACKAGE, not against any document
- * (icon-convention §3's empty-icon trap: `fluent-emoji:direct-hit` shipped BLANK in Phase
- * 127). Measured 2026-08-09 against `@iconify-json/fluent-emoji@1.2.7` (3174 icons):
- * `envelope` PRESENT · `ticket` PRESENT · `speech-balloon` PRESENT. For the record, the
- * near-misses that are ABSENT and must never be tried: `email`, `outbox`, `direct-hit`.
+ *   ┌─ SUPERSEDED — do not re-apply ────────────────────────────────────────────────────┐
+ *   │ ── CAPABILITY MARKS, NEVER VENDOR LOGOS (§10 / U-12) ──                           │
+ *   │ The mark says *"this sends an email"*, not *"this is Fastmail"*. `@lobehub/icons`  │
+ *   │ is the single source for PROVIDER marks and it is an LLM-provider set —            │
+ *   │ Slack/Jira/SMTP are not in its domain, and sourcing them from a second package is  │
+ *   │ exactly the per-surface vocabulary the icon convention forbids. The vendor is      │
+ *   │ already told, in text, where it is actionable: the `Sends to` column carries the   │
+ *   │ real host.                                                                        │
+ *   │                                                                                   │
+ *   │ ⚠ ALL THREE SLUGS WERE VERIFIED AGAINST THE INSTALLED PACKAGE, not against any     │
+ *   │ document (icon-convention §3's empty-icon trap: `fluent-emoji:direct-hit` shipped  │
+ *   │ BLANK in Phase 127). Measured 2026-08-09 against `@iconify-json/fluent-emoji@1.2.7`│
+ *   │ (3174 icons): `envelope` PRESENT · `ticket` PRESENT · `speech-balloon` PRESENT.    │
+ *   │ For the record, the near-misses that are ABSENT and must never be tried: `email`,  │
+ *   │ `outbox`, `direct-hit`.                                                           │
+ *   └───────────────────────────────────────────────────────────────────────────────────┘
+ *
+ * ── THE RULE THAT REPLACES IT: A VENDOR SHOWS ITS OWN MARK ──
+ * The operator's icon convention (`references/icon-convention.md` §1, Running Design
+ * Decision 43, 2026-06-27) says a service shows its OWN mark, from one source,
+ * byte-identical everywhere — and the ROADMAP's SC#3 makes that binding for THIS surface.
+ *
+ * ⚠ AND THE ORIGINAL'S REASONING IS OBSOLETE, NOT MERELY OUTVOTED. It rested on a set
+ * membership that does not hold: measured at HEAD, `@lobehub/icons@^5.10.0` ships `Github`
+ * and `Google` and **no Slack and no Jira/Atlassian at all**. So *"sourcing them from a
+ * second package is exactly the per-surface vocabulary the icon convention forbids"* was
+ * arguing against a package that could never have supplied these marks in the first place.
+ * The per-surface vocabulary the convention actually forbids is a SECOND HOME for the same
+ * mark — which is why the replacement is ONE module (`connectionMark.tsx`) and not three
+ * imports here. Its second arm is equally load-bearing: a vendorLESS shape (SMTP; anything
+ * unmapped) is drawn in the interface's own ink, never in a borrowed vendor's.
+ *
+ * ⚠ EVERY SLUG'S VERIFICATION, THE INK CONTRACT AND THE NEAR-MISSES NOW LIVE IN
+ * `connectionMark.tsx`'s HEADER — one home for the marks means one home for their evidence.
+ * The slug-verification paragraph above is preserved for the three fluent-emoji slugs it
+ * describes, which this file no longer imports.
  *
  * ── THE STATE WORDS, THE COPY AND THE DERIVATIONS LIVE IN `connectionsCopy.ts` ──
  * That module's header states why (the measured `react-refresh/only-export-components`
@@ -59,12 +90,8 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react"
 import { Check, Loader2, MoreHorizontal, Search } from "lucide-react"
 
-import Envelope from "~icons/fluent-emoji/envelope"
-import Ticket from "~icons/fluent-emoji/ticket"
-import SpeechBalloon from "~icons/fluent-emoji/speech-balloon"
-
 import { cn } from "@/lib/utils"
-import type { PhaseMark } from "@/lib/phaseGlyph"
+import { ConnectionMarkGlyph } from "@/components/settings/connectionMark"
 import {
   getEffectiveFeatures,
   listConnectorConnections,
@@ -144,22 +171,13 @@ import {
   type ConnectionStateKind,
 } from "@/components/settings/connectionsCopy"
 
-// ── Capability marks (§10). Module-private on purpose: handing the map out would let a
-//    caller bypass the own-property guard below, and an inherited key read that way is the
-//    `[Function Object]` React child that hard-crashed a node face before 188.1-04. ──
-const CAPABILITY_MARKS: Record<string, PhaseMark> = {
-  send_email: Envelope,
-  create_ticket: Ticket,
-  post_message: SpeechBalloon,
-}
-
-/** Total over any key — `capability` is server data, and totality is a property of the
- *  lookup rather than of its current callers (the house argument, `phaseGlyph.tsx:106`). */
-function capabilityMark(capability: string | undefined): PhaseMark | null {
-  if (!capability) return null
-  if (!Object.prototype.hasOwnProperty.call(CAPABILITY_MARKS, capability)) return null
-  return CAPABILITY_MARKS[capability]
-}
+// ── The marks moved OUT of this file in 206.1-01 (item 3 · D-206.1-08) ───────────────
+//    They now live in `connectionMark.tsx`, which is the ONE home for the map, the
+//    own-property guard, the named neutral, the slug verification and the ink contract.
+//    That module's map is still MODULE-PRIVATE for the reason this file's deleted comment
+//    gave: handing a mark map out lets a caller bypass the own-property guard, and an
+//    inherited key read that way is the `[Function Object]` React child that hard-crashed a
+//    node face before 188.1-04. Only the keys and the resolver cross the boundary.
 
 const MOBILE_BREAKPOINT = 768
 
@@ -325,7 +343,6 @@ export function ConnectionsTabView({
         </label>
 
         {CONNECTIONS_FILTER_CHIPS.map((chip) => {
-          const Mark = capabilityMark(chip.capability ?? undefined)
           const on = capability === chip.capability
           return (
             <button
@@ -341,7 +358,16 @@ export function ConnectionsTabView({
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
-              {Mark && <Mark aria-hidden="true" className="h-3 w-3" />}
+              {/* ⚠ THE `!== null` GUARD IS LOAD-BEARING, AND IT IS A CALLER FACT.
+                  The `All` chip is the ABSENCE OF A FILTER, not a connection whose service
+                  is unknown, so it wears no service mark at all. Handing it to the resolver
+                  would give it the named neutral `Plug` — correct behaviour for a
+                  connection, wrong MEANING for this chip. `connectionMark`'s totality
+                  contract is over CONNECTIONS; this distinction belongs here, at the call
+                  site that knows it, and not in the module. */}
+              {chip.capability !== null && (
+                <ConnectionMarkGlyph shape={{ capability: chip.capability }} size="chip" />
+              )}
               {chip.label}
             </button>
           )
@@ -523,7 +549,6 @@ function ConnectionRow({
   const [receipt, setReceipt] = useState<string | null>(null)
 
   const state = connectionStateOf(connection)
-  const Mark = capabilityMark(connection.capability ?? undefined)
   const facts = destinationFactsOf(connection)
   const isSlack = connection.capability === "post_message"
 
@@ -555,15 +580,21 @@ function ConnectionRow({
         !connection.is_enabled && "bg-muted/20",
       )}
     >
-      {/* 1 · Connection — the capability mark + the AUTHOR'S word. Never the row id. */}
+      {/* 1 · Connection — the service's OWN mark + the AUTHOR'S word. Never the row id.
+          ⚠ THE WHOLE CONNECTION IS PASSED, not just its capability. That is what lets an
+          MCP row — which has no capability at all — reach MCP's own mark by its own
+          `mcp_server_url` condition. Passing `capability` alone here would send every MCP
+          row to the neutral, which is a quieter version of the ROADMAP's named failure.
+          ⚠ AND THE OLD `Mark ? mark : bullet-span` BRANCH IS GONE. The resolver is TOTAL,
+          so the else-arm became unreachable — and it is DELETED rather than left in place,
+          because a bullet character IS the blank mark D-206.1-10 forbids, wearing a
+          disguise, and an unreachable branch that renders one is a defect waiting for a
+          refactor to make it reachable again. ⚠ Its exact glyph is deliberately not spelled
+          in this file: acceptance greps this source for it and expects ZERO, so naming it
+          here would turn the guard red on the comment that forbids it (the 187-24 trap —
+          which fired THREE times inside this one plan). */}
       <div className="flex min-w-0 flex-[2] items-center gap-2">
-        {Mark ? (
-          <Mark aria-hidden="true" className="h-4 w-4 flex-none" />
-        ) : (
-          <span aria-hidden="true" className="w-4 flex-none text-center text-[11px] text-muted-foreground">
-            •
-          </span>
-        )}
+        <ConnectionMarkGlyph shape={connection} size="row" />
         {onOpen ? (
           <button
             type="button"

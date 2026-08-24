@@ -686,3 +686,95 @@ describe("the container wires the credential check", () => {
     expect(handler).not.toMatch(/set[A-Z]\w*\(/)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════════════════
+// 13 · Phase 206.1-01 (item 3 · SC#3) — every row wears its OWN service's mark
+//
+// ⚠ ADDED, NEVER RE-BASELINED. Every case above this banner is untouched by 206.1: an
+// `<svg>` contributes ZERO textContent, and `renderTab` passes no `panel`, so swapping the
+// three fluent-emoji glyphs for the shared map moved no shipped assertion. If one of the
+// 36 had gone red, that would have been a real finding rather than a licence to edit it.
+//
+// WHY THESE CASES EXIST AT ALL, given `connectionMark.test.tsx` already pins the module:
+// that suite proves the RESOLVER is right. These prove the CALL SITE hands it the whole
+// connection. An MCP row has no capability at all, so a call site passing `capability`
+// alone would send every MCP row to the neutral — a quieter version of the ROADMAP's named
+// *"the MCP row borrows another service's mark"* failure, and invisible to the unit suite.
+// ═══════════════════════════════════════════════════════════════════════════════════════
+
+describe("SC#3 — the marks reach the row, and they are each their own", () => {
+  /** Four rows: the three capabilities plus the shape that has none. */
+  const FOUR_SHAPES: ConnectorConnection[] = [
+    ...THREE_ROWS,
+    makeConnection({
+      id: "conn-4",
+      name: "DeepWiki MCP",
+      capability: null,
+      mcp_server_url: "https://mcp.deepwiki.com/mcp",
+      config: { headers: {} },
+      last_checked_at: null,
+      last_check_verdict: "not_checked",
+    }),
+  ]
+
+  /** The row's FIRST `<svg>` is cell 1's mark — the name cell leads every row. */
+  function rowMarkBodies() {
+    return screen.getAllByTestId("connections-row").map((row) => {
+      const svg = row.querySelector("svg")
+      expect(svg).not.toBeNull()
+      return svg!.innerHTML
+    })
+  }
+
+  it("all four rows render a NON-EMPTY mark, and the four are PAIRWISE DISTINCT", () => {
+    renderTab({ connections: FOUR_SHAPES })
+
+    // Non-vacuity control FIRST: without it, zero rows would satisfy every claim below.
+    const rows = screen.getAllByTestId("connections-row")
+    expect(rows).toHaveLength(4)
+
+    const bodies = rowMarkBodies()
+    bodies.forEach((body) => expect(body.length).toBeGreaterThan(0))
+    expect(new Set(bodies).size).toBe(4)
+  })
+
+  it("⚠ the MCP row's mark is neither Slack's nor Jira's nor the SMTP one", () => {
+    // The ROADMAP's named failure, asserted where it would actually be seen. This is the
+    // case that fails if the call site ever narrows to `connection.capability`.
+    renderTab({ connections: FOUR_SHAPES })
+    const [smtp, jira, slack, mcp] = rowMarkBodies()
+    expect(mcp).not.toBe(slack)
+    expect(mcp).not.toBe(jira)
+    expect(mcp).not.toBe(smtp)
+  })
+
+  it("the `All` chip wears NO mark; the three capability chips each wear exactly one", () => {
+    // `All` is the ABSENCE OF A FILTER, not a connection whose service is unknown. Handing
+    // it to the resolver would give it the named neutral — right for a row, wrong here.
+    renderTab({ connections: FOUR_SHAPES })
+    const chips = screen.getAllByTestId("connections-filter-chip")
+    expect(chips).toHaveLength(4)
+    expect(chips[0].querySelectorAll("svg")).toHaveLength(0)
+    expect(chips[0].textContent).toContain("All")
+    chips.slice(1).forEach((chip) => expect(chip.querySelectorAll("svg")).toHaveLength(1))
+  })
+
+  it("no secret-shaped needle rides in on the newly inlined SVG bodies (T-190-16-T7)", () => {
+    // Case 12 above scans the THREE-row render. This re-runs the same scan over a render
+    // containing all four marks, so the `logos` path data, gradient ids and titles this
+    // phase inlines are inside the swept markup rather than beside it.
+    const { container } = renderTab({ connections: FOUR_SHAPES })
+    expect(screen.getAllByTestId("connections-row")).toHaveLength(4)
+    const markup = container.innerHTML.toLowerCase()
+    for (const needle of ["secret", "ciphertext", "password", "xoxb-", "api_token", "enc:v1:"]) {
+      expect(markup).not.toContain(needle)
+    }
+  })
+
+  it("the marks come from ONE module — this file imports no icon set directly", () => {
+    // The icon convention's actual prohibition is a SECOND HOME for a mark, not a second
+    // package. A future edit that re-adds a `~icons/...` import here fails this case.
+    expect(connectionsTabSource).not.toContain("~icons/")
+    expect(connectionsTabSource).toContain("ConnectionMarkGlyph")
+  })
+})
