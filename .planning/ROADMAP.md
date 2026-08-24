@@ -21,7 +21,7 @@
 - ✅ **v3.5 UX Consolidation & Chat Polish** — Phases 174-177 CORE (shipped 2026-07-23); STRETCH 178-180 deferred → carry-forward guide `.planning/v3.5-STRETCH-CARRYFORWARD.md`. Cleared the load-bearing chat-surface bug backlog + consolidated the accumulated UI/UX (incl. the new v3.4 org surfaces) into one coherent, honest experience: run-state & lifecycle honesty (174) · cross-provider streaming fidelity (175) · chat render correctness + exec reliability (176) · v3.4 org-surface family-cohesion polish (177). 14/14 CORE requirements delivered; no migration. Full detail archived: `.planning/milestones/v3.5-ROADMAP.md`.
 - ✅ **v3.6 Visual / No-Code Workflow Studio** ([[SEED-123]]) — Phases **181-189 CORE + 190 STRETCH** (shipped 2026-08-09, git tag `v3.6`); STRETCH **191 deferred** → carry-forward guide `.planning/v3.6-STRETCH-CARRYFORWARD.md`. Inserts 184.1 / 188.1 / 188.2. A drag-and-drop node-canvas authoring + non-technical live-run-observability layer ON TOP of the existing governed harness engine (build-on-not-rewrite; `@xyflow/react` v12, the milestone's one net-new dep). **The differentiator shipped: graded governance** — strict-when-KB-grounded / flexible-when-open per node, structurally enforced at RUN time rather than authoring time, which is the category white-space the Beam/Glean/n8n deep crawl found none of them covering. **The D-14 red line held across all 13 phases — 7 harness executors at close, exactly as at open; the canvas never became a second runtime.** HARD gates: #1 revert-at-any-time ✅ (`test_revert_byte_identical`) · #2 study-and-beat ✅ · #3 connector story **⚠ CORE half ✅ (CONN-01), live half ⅓** — a real Slack message sends through the full governed path, but Jira and email are not drivable from a workflow (`D-190-DEF-17` → connections milestone, SEED-146). **20/24 requirements satisfied · 2 partial · 1 unsatisfied (CONN-02) · 1 deferred (SCALE-01);** CORE closed 19/21 satisfied with **zero unsatisfied**. Migrations 114-118. Full detail archived: `.planning/milestones/v3.6-ROADMAP.md`.
 - ✅ **v3.7 Workflow Product Completion** — Phases **192-200.3** (shipped 2026-08-24). 17 phases (CORE 192-198 + inserts 192.1, 192.2, 193.1, 193.2, 194.1, 199, 200, 200.1, 200.2, 200.3), 147 plans, 20/20 requirements satisfied. Full archive in `.planning/v3.7-MILESTONE-AUDIT.md`.
-- 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and wires governed outbound action connectors.
+- 🚧 **v3.8 Document Intelligence, Automations & Connectors** — Phases **201-206** (opened 2026-08-24). Elevates document ingestion to first-class structured table and email parsing, delivers unattended recurring workflow execution with strict spend caps, provides stateful multi-run memory, and reaches external systems through their official MCP servers. ⚠ **Phase 206 was REWRITTEN 2026-08-24** from first-party outbound adapters to an MCP client; the rest of the connector story is a milestone of its own (`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`).
 
 ---
 
@@ -36,7 +36,7 @@
 | 203 | Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline | Parse `.msg` and `.eml` files with header metadata extracted, thread deduplication, and attachment relationship links | EML-01, EML-02 | ✅ Complete (2026-08-24) |
 | 204 | Scheduled & Recurring Unattended Runs | Cron/interval scheduler for published workflows with hard spend-cap and token circuit breakers — **and a brake that actually stops the work (L-01)** | SCHED-01, SCHED-02, **L-01** | Planned |
 | 205 | Stateful & Incremental Workflows | A workflow reads its own prior run state to perform living-register and incremental delta processing | STATE-01, STATE-02 | Planned |
-| 206 | Outbound Action Connectors | Governed first-party outbound connectors for Jira, Email/SMTP, and Slack with platform-level credential management | CONN-02, CONN-03 | Planned |
+| 206 | **MCP Connector Client — workflow-scoped** | A workflow reaches Atlassian and GitHub through their **official MCP servers** — reads included — with per-tool permissions and zero per-vendor adapter code | CONN-02, CONN-03 | Planned — ⚠ **REWRITTEN 2026-08-24**, see detail |
 
 ### Phase Checklist
 
@@ -45,7 +45,7 @@
 - [x] **Phase 203: Outlook (`.msg`) & Email (`.eml`) Ingestion Pipeline** — `725a2b5c` — 56 tests passing
 - [ ] **Phase 204: Scheduled & Recurring Unattended Runs** — ⚠ carries **L-01**, folded in from Phase 194 (see the detail section below)
 - [ ] **Phase 205: Stateful & Incremental Workflows**
-- [ ] **Phase 206: Outbound Action Connectors**
+- [ ] **Phase 206: MCP Connector Client — workflow-scoped** — ⚠ **REWRITTEN 2026-08-24** (was *Outbound Action Connectors*). The rest of the connector story moved to the **Connections & Open Platform** milestone: `.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`
 
 ---
 
@@ -55,7 +55,7 @@
 STYLE CHOICE.** *"Phase NNN not found"* has two causes, and the second is that phase details must be
 `#### Phase NNN:` **headings** — a bold label is silently skipped. That failure mode broke the whole of
 v3.7's roadmap once. Phases 201-203 shipped without one and were fine, so this is a latent trap rather
-than a live break; **205 and 206 owe themselves a heading before anyone runs a phase-op against them.**
+than a live break. ⚠ **206 was GIVEN its heading on 2026-08-24 when it was rewritten — see below. 205 still owes one.**
 
 #### Phase 204: Scheduled & Recurring Unattended Runs
 
@@ -104,6 +104,81 @@ a stop the reader did not make — is a **vocabulary** defect on a surface a sch
 It stays open against the next workflow-surface phase. **Re-open trigger: a scheduled run's cancel path
 becoming a fourth non-owner caller**, which would make the wrong sentence reachable from this phase's own
 feature and turn a cosmetic bug into a misleading one.
+
+---
+
+#### Phase 206: MCP Connector Client — workflow-scoped
+
+**Goal**: A workflow reaches Atlassian (Jira + Confluence) and GitHub through their **official MCP
+servers** — reads as well as writes — with per-tool permissions and **no per-vendor adapter code**.
+
+**Requirements**: CONN-02, CONN-03 (both re-scoped — see below)
+**Depends on**: Phase 189/190 (the governed external-action node this drives), `connector_service.py`.
+
+⚠ **THIS PHASE WAS REWRITTEN ON 2026-08-24 AND THE ORIGINAL IS RECORDED HERE RATHER THAN DELETED.**
+It read: *"Governed first-party outbound connectors for Jira, Email/SMTP, and Slack with
+platform-level credential management."* Operator direction, same day: *"open a connections milestone
+from SEED-146 instead of 206"*, then *"assess what we can fold into this milestone rather than
+waiting."* This is that fold — the one item that folds cleanly. Full scope, the seven-seed
+derivation and everything deliberately left out: **`.planning/CONNECTIONS-MILESTONE-CANDIDATE.md`**.
+
+**Why the rewrite beats the phase it replaces**, measured against the direction rather than asserted:
+
+| | 206 as planned | 206 rewritten |
+|---|---|---|
+| Capabilities | 2 write verbs (Jira, SMTP) | **every tool the connected MCP server exposes** |
+| Reads | **zero** | JQL search, CQL search, get issue, PR + code search |
+| Per-vendor adapter code | 2 | **none** |
+| Validates the MCP-first verdict | no | yes — the first implementation of a decision recorded 2026-07-24 |
+
+**Why it does NOT need the Connections milestone first:**
+
+1. **Workflow-scoped, so the approval model is not a blocker.** Phase 189/190's outbound governance
+   already lives on the canvas. **Chat** is what needs an approval model, and chat stays in the milestone.
+2. **No OAuth needed.** MCP servers carry their own auth. The OAuth work is for Google/Microsoft
+   first-party APIs — also in the milestone.
+3. **Atlassian and GitHub already ship official MCP servers** (`https://mcp.atlassian.com/v1/mcp`),
+   so the proof costs no adapter.
+
+**Scope:**
+
+1. Provider-shaped connection row holding an **MCP server URL** + **per-tool grants**.
+2. **MCP client** in the backend.
+3. **Tool discovery** from the server, feeding the per-tool permission list.
+4. Drivable from the existing external-action workflow node.
+5. **Atlassian + GitHub** as the proof. No further breadth.
+
+**Explicitly NOT in this phase** — all of it stays in the Connections milestone: chat surface +
+approval model · OAuth · Google / Microsoft first-party · drive auto-ingest · inbound public API and
+MCP **server** · the Popular-catalog IA.
+
+##### Two constraints that must not be discovered late
+
+⚠ **1. `backend/tests/test_189_no_egress.py` FAILS ON ANY MCP IDENTIFIER IN `backend/app`.** That
+fence is doing its job — it was written when no MCP client was meant to exist. It must be
+**consciously retired in the same commit that adds the client**, with the reason recorded, and never
+worked around or narrowed until it passes.
+
+⚠ **2. THE PER-TOOL GRAIN IS A SCHEMA DECISION, AND THIS PHASE COMMITS IT.** Evidence, from the
+competitor's own connector screen (screenshots, 2026-08-24): Atlassian Rovo lists its **7 tools
+individually** — *Create issue · Update issue · Get issue · Retrieve Confluence page · Search
+Confluence with CQL · Search with JQL* — under a connector-level default reading **"Needs approval"**.
+Reads and writes sit in the **same** list, which is exactly what lets a user grant search freely while
+holding `Create issue` behind a confirm. **A per-connector toggle cannot express that, and a
+per-connector toggle is what this phase would build by default.**
+
+SEED-146 names *"before committing to the `connector_connections` table shape a second time"* as a
+trigger to stop. This phase does commit it a second time — **acceptable ONLY because it commits the
+per-tool, provider-shaped design the milestone wants anyway.** Committing the old action-shaped design
+would be the migration that seed warns about.
+
+##### Requirement re-scoping
+
+- **CONN-02** — satisfied for Atlassian + GitHub **via MCP**, not by hand-written Jira/SMTP adapters.
+  The Email/SMTP half moves to the Connections milestone (generic SMTP/IMAP).
+- **CONN-03** — the credential-as-platform-asset half is satisfied here (org-level, encrypted,
+  cross-tenant isolated). **OAuth is NOT** — MCP server auth is not OAuth, and Google/Microsoft OAuth
+  is milestone work.
 
 ---
 
