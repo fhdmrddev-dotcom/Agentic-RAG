@@ -101,10 +101,13 @@ verdict this repo recorded a month ago and never implemented.
 Operator, 2026-08-24, on the xyOps editor: *"the visual representation of this workflow is exactly
 how I imagined it… this is exactly what I am concerned about especially with the connectors."*
 
-xyOps puts ,  and  on the canvas as **glyph nodes**
+xyOps puts `Send Email`, `Web Hook Discord` and `Create Ticket` on the canvas as **glyph nodes**
 hanging off edge outcomes — a second, smaller node class beside the big work-step cards. That is the
 shape Phase 206 should target, and it is captured in full with its two binding constraints (the D-14
-no-new-executors red line, and our card's full badge budget) in ****.
+no-new-executors red line, and our card's full badge budget) in **`SEED-199`**.
+
+⚠ Their canvas is hand-built **jQuery + SVG with no flow library at all**, so the look is not tied to
+their stack and is reachable in `@xyflow/react`, which we already ship.
 
 ### 5. Surfaces — connections are platform assets
 The same connection usable from **chat**, **workflows**, and **ingestion**. Chat is the one that
