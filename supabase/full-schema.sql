@@ -743,7 +743,7 @@ CREATE TABLE public.connector_connections (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     org_id uuid NOT NULL,
     created_by uuid NOT NULL,
-    capability text NOT NULL,
+    capability text,
     name text NOT NULL,
     config jsonb DEFAULT '{}'::jsonb NOT NULL,
     secret_ciphertext text,
@@ -752,8 +752,13 @@ CREATE TABLE public.connector_connections (
     last_check_verdict text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    mcp_server_url text,
+    tool_grants jsonb DEFAULT '{}'::jsonb NOT NULL,
+    discovered_tools jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT connector_connections_capability_check CHECK ((capability = ANY (ARRAY['send_email'::text, 'create_ticket'::text, 'post_message'::text]))),
-    CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text])))
+    CONSTRAINT connector_connections_last_check_verdict_check CHECK ((last_check_verdict = ANY (ARRAY['not_checked'::text, 'ok'::text, 'failed'::text]))),
+    CONSTRAINT connector_connections_mcp_url_is_https CHECK (((mcp_server_url IS NULL) OR (mcp_server_url ~~ 'https://%'::text))),
+    CONSTRAINT connector_connections_shape_is_one_of_two CHECK (((capability IS NOT NULL) OR (mcp_server_url IS NOT NULL)))
 );
 
 
@@ -776,6 +781,27 @@ COMMENT ON COLUMN public.connector_connections.secret_ciphertext IS 'D-11: the c
 --
 
 COMMENT ON COLUMN public.connector_connections.last_check_verdict IS '190-UI-SPEC §5a: a QUALITY HINT, never an authorization boundary. It feeds the Credential column (§2c) and the client-side picker filter (Gate 1); the SERVER bind gate (Gate 2) validates org + is_enabled ONLY and deliberately does NOT read this column (U-07a, door (b)) — because check is admin-only while bind is org-wide, so a stale `failed` would hard-block a member who cannot clear it. NULL means never checked.';
+
+
+--
+-- Name: COLUMN connector_connections.mcp_server_url; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.mcp_server_url IS 'Phase 206 (D-206-01): The HTTPS endpoint of the remote MCP server. Required for MCP provider connections.';
+
+
+--
+-- Name: COLUMN connector_connections.tool_grants; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.tool_grants IS 'Phase 206 (F-1 / D-206-06): JSONB mapping of tool names to boolean permission grants. Key presence and true means granted; absent or false means denied.';
+
+
+--
+-- Name: COLUMN connector_connections.discovered_tools; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.connector_connections.discovered_tools IS 'Phase 206 (D-206-05): JSONB array of tool schemas discovered from the remote MCP server via tools/list.';
 
 
 --
